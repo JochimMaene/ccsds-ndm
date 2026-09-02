@@ -136,6 +136,26 @@ impl Ndm {
         Self::from_core(py, inner)
     }
 
+    /// Parse a combined NDM from a KVN or XML file.
+    #[staticmethod]
+    #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
+    fn from_file(
+        py: Python<'_>,
+        path: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+        max_records: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, max_records);
+        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        Self::from_core(py, inner)
+    }
+
+    /// Atomically write this combined NDM as KVN or XML.
+    fn to_file(&self, py: Python<'_>, path: &str, format: &str) -> PyResult<()> {
+        crate::api::generate_file(&MessageType::Ndm(self.to_core(py)?), path, format)
+    }
+
     /// Serialize to a string.
     fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
         let message = MessageType::Ndm(self.to_core(py)?);

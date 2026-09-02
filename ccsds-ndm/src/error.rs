@@ -1065,8 +1065,7 @@ impl CcsdsNdmError {
     }
 
     /// Returns the inner I/O error if this is an IoError.
-    #[cfg(test)]
-    pub(crate) fn as_io_error(&self) -> Option<&std::io::Error> {
+    pub fn as_io_error(&self) -> Option<&std::io::Error> {
         match self {
             CcsdsNdmError::Generation { source, .. } | CcsdsNdmError::Parsing { source, .. } => {
                 source.as_io_error()

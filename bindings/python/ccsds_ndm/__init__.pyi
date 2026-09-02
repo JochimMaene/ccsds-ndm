@@ -104,6 +104,19 @@ class Acm:
     """
     def __init__(self, header, segment) -> None: ...
     @staticmethod
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Acm:
+        """
+        Parse an ACM from a KVN or XML file.
+        """
+        ...
+
+    @staticmethod
     def from_str(
         data: str,
         format: Optional[str] = None,
@@ -150,6 +163,12 @@ class Acm:
 
     @segment.setter
     def segment(self, value: AcmSegment) -> None: ...
+    def to_file(self, path: str, format: str) -> None:
+        """
+        Atomically write this ACM as KVN or XML.
+        """
+        ...
+
     def to_str(self, format: str) -> str:
         """
         Serialize to validated KVN or XML.
@@ -1437,6 +1456,19 @@ class Aem:
     """
     def __init__(self, header, segments) -> None: ...
     @staticmethod
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Aem:
+        """
+        Parse an AEM from a KVN or XML file.
+        """
+        ...
+
+    @staticmethod
     def from_str(
         data: str,
         format: Optional[str] = None,
@@ -1483,6 +1515,12 @@ class Aem:
 
     @segments.setter
     def segments(self, value: list[AemSegment]) -> None: ...
+    def to_file(self, path: str, format: str) -> None:
+        """
+        Atomically write this AEM as KVN or XML.
+        """
+        ...
+
     def to_str(self, format: str) -> str:
         """
         Serialize to validated KVN or XML.
@@ -1935,6 +1973,18 @@ class Apm:
     """
     def __init__(self, header, segment) -> None: ...
     @staticmethod
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+    ) -> Apm:
+        """
+        Parse an APM from a KVN or XML file.
+        """
+        ...
+
+    @staticmethod
     def from_str(
         data: str,
         format: Optional[str] = None,
@@ -1978,6 +2028,12 @@ class Apm:
 
     @segment.setter
     def segment(self, value: ApmSegment) -> None: ...
+    def to_file(self, path: str, format: str) -> None:
+        """
+        Atomically write this APM as KVN or XML.
+        """
+        ...
+
     def to_str(self, format: str) -> str:
         """
         Serialize to validated KVN or XML.
@@ -2466,6 +2522,18 @@ class Cdm:
     @body.setter
     def body(self, value: CdmBody) -> None: ...
     @staticmethod
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+    ) -> Cdm:
+        """
+        Parse a CDM from a KVN or XML file.
+        """
+        ...
+
+    @staticmethod
     def from_str(
         data: str,
         format: Optional[str] = None,
@@ -2512,6 +2580,12 @@ class Cdm:
     def id(self) -> Optional[str]:
         """
         Unique ID for this message.
+        """
+        ...
+
+    def to_file(self, path: str, format: str) -> None:
+        """
+        Atomically write this CDM as KVN or XML.
         """
         ...
 
@@ -5016,6 +5090,19 @@ class Ndm:
     @comments.setter
     def comments(self, value: list[str]) -> None: ...
     @staticmethod
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Ndm:
+        """
+        Parse a combined NDM from a KVN or XML file.
+        """
+        ...
+
+    @staticmethod
     def from_str(
         data: str,
         format: Optional[str] = None,
@@ -5046,6 +5133,12 @@ class Ndm:
     def messages(
         self, value: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]
     ) -> None: ...
+    def to_file(self, path: str, format: str) -> None:
+        """
+        Atomically write this combined NDM as KVN or XML.
+        """
+        ...
+
     def to_str(self, format: str) -> str:
         """
         Serialize to a string.
@@ -5083,6 +5176,19 @@ class Ocm:
         The OCM data segment.
     """
     def __init__(self, header: OdmHeader, segment: OcmSegment) -> None: ...
+    @staticmethod
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Ocm:
+        """
+        Parse an OCM from a KVN or XML file.
+        """
+        ...
+
     @staticmethod
     def from_str(
         data: str,
@@ -5144,6 +5250,12 @@ class Ocm:
 
     @segment.setter
     def segment(self, value: OcmSegment) -> None: ...
+    def to_file(self, path: str, format: str) -> None:
+        """
+        Atomically write this OCM as KVN or XML.
+        """
+        ...
+
     def to_str(self, format: str) -> str:
         """
         Serialize to KVN or XML after mandatory CCSDS validation.
@@ -8865,6 +8977,19 @@ class Oem:
     """
     def __init__(self, header: OdmHeader, segments: list[OemSegment]) -> None: ...
     @staticmethod
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Oem:
+        """
+        Parse an OEM from a KVN or XML file.
+        """
+        ...
+
+    @staticmethod
     def from_str(
         data: str,
         format: Optional[str] = None,
@@ -8915,6 +9040,12 @@ class Oem:
 
     @segments.setter
     def segments(self, value: list[OemSegment]) -> None: ...
+    def to_file(self, path: str, format: str) -> None:
+        """
+        Atomically write this OEM as KVN or XML.
+        """
+        ...
+
     def to_str(self, format: str) -> str:
         """
         Serialize to validated KVN or XML.
@@ -9703,6 +9834,18 @@ class Omm:
     """
     def __init__(self, header: OdmHeader, segment: OmmSegment) -> None: ...
     @staticmethod
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+    ) -> Omm:
+        """
+        Parse an OMM from a KVN or XML file.
+        """
+        ...
+
+    @staticmethod
     def from_str(
         data: str,
         format: Optional[str] = None,
@@ -9778,6 +9921,12 @@ class Omm:
 
     @segment.setter
     def segment(self, value: OmmSegment) -> None: ...
+    def to_file(self, path: str, format: str) -> None:
+        """
+        Atomically write this OMM as KVN or XML.
+        """
+        ...
+
     def to_str(self, format: str) -> str:
         """
         Serialize to validated KVN or XML.
@@ -10070,6 +10219,18 @@ class Opm:
     """
     def __init__(self, header: OdmHeader, segment: OpmSegment) -> None: ...
     @staticmethod
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+    ) -> Opm:
+        """
+        Parse an OPM from a KVN or XML file.
+        """
+        ...
+
+    @staticmethod
     def from_str(
         data: str,
         format: Optional[str] = None,
@@ -10112,6 +10273,12 @@ class Opm:
 
     @segment.setter
     def segment(self, value: OpmSegment) -> None: ...
+    def to_file(self, path: str, format: str) -> None:
+        """
+        Atomically write this OPM as KVN or XML.
+        """
+        ...
+
     def to_str(self, format: str) -> str:
         """
         Serialize to KVN or XML after mandatory CCSDS validation.
@@ -10961,6 +11128,18 @@ class Rdm:
     """
     def __init__(self, *, header: RdmHeader, segment: RdmSegment) -> None: ...
     @staticmethod
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+    ) -> Rdm:
+        """
+        Parse an RDM from a KVN or XML file.
+        """
+        ...
+
+    @staticmethod
     def from_str(
         data: str,
         format: Optional[str] = None,
@@ -11020,6 +11199,12 @@ class Rdm:
 
     @segment.setter
     def segment(self, value: RdmSegment) -> None: ...
+    def to_file(self, path: str, format: str) -> None:
+        """
+        Atomically write this RDM as KVN or XML.
+        """
+        ...
+
     def to_str(self, format: str) -> str:
         """
         Serialize to string (generic).
@@ -12732,6 +12917,19 @@ class Tdm:
     @body.setter
     def body(self, value: TdmBody) -> None: ...
     @staticmethod
+    def from_file(
+        path: str,
+        format: Optional[str] = None,
+        *,
+        max_input_bytes: Optional[int] = None,
+        max_records: Optional[int] = None,
+    ) -> Tdm:
+        """
+        Parse a TDM from a KVN or XML file.
+        """
+        ...
+
+    @staticmethod
     def from_str(
         data: str,
         format: Optional[str] = None,
@@ -12790,6 +12988,12 @@ class Tdm:
     def segments(self) -> list[TdmSegment]:
         """
         Shortcut to access segments directly from the body.
+        """
+        ...
+
+    def to_file(self, path: str, format: str) -> None:
+        """
+        Atomically write this TDM as KVN or XML.
         """
         ...
 
@@ -14114,12 +14318,12 @@ class NdmIoError(OSError):
     I/O error during file operations.
     """
 
-class NdmUnsupportedMessageError(ValueError):
+class NdmUnsupportedMessageError(NdmError):
     """
     Unsupported CCSDS message type.
     """
 
-class NdmValidationError(ValueError):
+class NdmValidationError(NdmError):
     """
     Validation error against CCSDS rules.
     """

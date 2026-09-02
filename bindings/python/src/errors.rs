@@ -42,7 +42,7 @@ create_exception!(
 create_exception!(
     ccsds_ndm,
     NdmValidationError,
-    PyValueError,
+    NdmError,
     "Validation error against CCSDS rules."
 );
 
@@ -66,7 +66,7 @@ create_exception!(
 create_exception!(
     ccsds_ndm,
     NdmUnsupportedMessageError,
-    PyValueError,
+    NdmError,
     "Unsupported CCSDS message type."
 );
 

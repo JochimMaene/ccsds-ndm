@@ -79,6 +79,16 @@ pub fn parse_typed_with_options<T: FromMessageType>(
     expect_typed(message)
 }
 
+pub fn parse_typed_file_with_options<T: FromMessageType>(
+    path: &str,
+    format: Option<&str>,
+    options: &ParseOptions,
+) -> PyResult<T> {
+    let message = ccsds_ndm::from_file_with_options(path, selected_notation(format)?, options)
+        .map_err(ccsds_error_to_pyerr)?;
+    expect_typed(message)
+}
+
 pub fn validate_message<T: Validate>(message: &T) -> PyResult<()> {
     message.validate().map_err(ccsds_error_to_pyerr)
 }
@@ -89,6 +99,15 @@ pub fn generate_string<T: Ndm>(message: &T, format: &str) -> PyResult<String> {
         "xml" => message.to_xml().map_err(ccsds_error_to_pyerr),
         other => Err(unsupported_format(other)),
     }
+}
+
+pub fn generate_file(message: &MessageType, path: &str, format: &str) -> PyResult<()> {
+    match format {
+        "kvn" => message.to_kvn_file(path),
+        "xml" => message.to_xml_file(path),
+        other => return Err(unsupported_format(other)),
+    }
+    .map_err(ccsds_error_to_pyerr)
 }
 
 pub fn unsupported_format(format: &str) -> PyErr {

@@ -289,6 +289,29 @@ impl Cdm {
         Self::from_core(py, inner)
     }
 
+    /// Parse a CDM from a KVN or XML file.
+    #[staticmethod]
+    #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
+    fn from_file(
+        py: Python<'_>,
+        path: &str,
+        format: Option<&str>,
+        max_input_bytes: Option<usize>,
+    ) -> PyResult<Self> {
+        let options = crate::api::parse_options(max_input_bytes, None);
+        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        Self::from_core(py, inner)
+    }
+
+    /// Atomically write this CDM as KVN or XML.
+    fn to_file(&self, py: Python<'_>, path: &str, format: &str) -> PyResult<()> {
+        crate::api::generate_file(
+            &ccsds_ndm::MessageType::Cdm(self.to_core(py)?),
+            path,
+            format,
+        )
+    }
+
     /// Serialize to validated KVN or XML.
     fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)

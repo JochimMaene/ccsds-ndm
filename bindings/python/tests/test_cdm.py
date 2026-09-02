@@ -215,7 +215,7 @@ class TestCdm:
         covariance = cdm.body.segments[0].data.covariance_matrix
         covariance.cdrg_r = 1.0
 
-        with pytest.raises(ValueError, match="CDRG_T"):
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="CDRG_T"):
             covariance.to_numpy()
 
     def test_relative_metadata_screen_volume_setters(self):

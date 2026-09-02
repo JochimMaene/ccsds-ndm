@@ -77,8 +77,15 @@ LIVE_LIST_CASES = [
 
 @pytest.mark.parametrize(("cls", "path"), CLASS_FIXTURES)
 def test_type_specific_from_file_allows_default_format(cls, path):
-    parsed = ccsds_ndm.from_file(str(path))
+    parsed = cls.from_file(str(path))
     assert isinstance(parsed, cls)
+
+
+@pytest.mark.parametrize(("cls", "path"), CLASS_FIXTURES)
+def test_type_specific_file_round_trip(cls, path, tmp_path):
+    output = tmp_path / f"{cls.__name__.lower()}.xml"
+    cls.from_file(str(path)).to_file(str(output), "xml")
+    assert isinstance(cls.from_file(str(output)), cls)
 
 
 @pytest.mark.parametrize(("cls", "path"), CLASS_FIXTURES)
@@ -92,11 +99,11 @@ def test_public_exceptions_follow_python_error_categories():
         ccsds_ndm.NdmFormatError,
         ccsds_ndm.NdmKvnParseError,
         ccsds_ndm.NdmXmlError,
-        ccsds_ndm.NdmValidationError,
         ccsds_ndm.NdmEpochError,
-        ccsds_ndm.NdmUnsupportedMessageError,
     ]
     assert all(issubclass(exception, ValueError) for exception in value_errors)
+    assert issubclass(ccsds_ndm.NdmValidationError, ccsds_ndm.NdmError)
+    assert issubclass(ccsds_ndm.NdmUnsupportedMessageError, ccsds_ndm.NdmError)
     assert issubclass(ccsds_ndm.NdmIoError, OSError)
     assert not issubclass(ccsds_ndm.NdmIoError, ValueError)
 
