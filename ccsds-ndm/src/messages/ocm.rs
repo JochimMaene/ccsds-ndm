@@ -2903,20 +2903,25 @@ impl<'de> Deserialize<'de> for TrajLine {
     where
         D: serde::Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        let mut parts = s.split_whitespace();
-        let epoch = parts
-            .next()
-            .ok_or_else(|| serde::de::Error::custom("Missing epoch"))?
-            .parse()
-            .map_err(serde::de::Error::custom)?;
-        let values: std::result::Result<Vec<f64>, _> = parts
-            .map(|v| fast_float::parse(v).map_err(serde::de::Error::custom))
-            .collect();
-        Ok(TrajLine {
-            epoch,
-            values: values?,
-        })
+        crate::utils::deserialize_parsed(
+            deserializer,
+            "an OCM trajectory line",
+            |s| -> std::result::Result<TrajLine, String> {
+                let mut parts = s.split_whitespace();
+                let epoch = parts
+                    .next()
+                    .ok_or_else(|| "Missing epoch".to_string())?
+                    .parse::<Epoch>()
+                    .map_err(|error| error.to_string())?;
+                let values: std::result::Result<Vec<f64>, _> = parts
+                    .map(|v| fast_float::parse(v).map_err(|error| error.to_string()))
+                    .collect();
+                Ok(TrajLine {
+                    epoch,
+                    values: values?,
+                })
+            },
+        )
     }
 }
 
@@ -4031,20 +4036,25 @@ impl<'de> Deserialize<'de> for CovLine {
     where
         D: serde::Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        let mut parts = s.split_whitespace();
-        let epoch = parts
-            .next()
-            .ok_or_else(|| serde::de::Error::custom("Missing epoch"))?
-            .parse()
-            .map_err(serde::de::Error::custom)?;
-        let values: std::result::Result<Vec<f64>, _> = parts
-            .map(|v| fast_float::parse(v).map_err(serde::de::Error::custom))
-            .collect();
-        Ok(CovLine {
-            epoch,
-            values: values?,
-        })
+        crate::utils::deserialize_parsed(
+            deserializer,
+            "an OCM covariance line",
+            |s| -> std::result::Result<CovLine, String> {
+                let mut parts = s.split_whitespace();
+                let epoch = parts
+                    .next()
+                    .ok_or_else(|| "Missing epoch".to_string())?
+                    .parse::<Epoch>()
+                    .map_err(|error| error.to_string())?;
+                let values: std::result::Result<Vec<f64>, _> = parts
+                    .map(|v| fast_float::parse(v).map_err(|error| error.to_string()))
+                    .collect();
+                Ok(CovLine {
+                    epoch,
+                    values: values?,
+                })
+            },
+        )
     }
 }
 
@@ -4498,15 +4508,20 @@ impl<'de> Deserialize<'de> for ManLine {
     where
         D: serde::Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        let mut parts = s.split_whitespace();
-        let epoch = parts
-            .next()
-            .ok_or_else(|| serde::de::Error::custom("Missing epoch"))?
-            .parse()
-            .map_err(serde::de::Error::custom)?;
-        let values: Vec<String> = parts.map(|s| s.to_string()).collect();
-        Ok(ManLine { epoch, values })
+        crate::utils::deserialize_parsed(
+            deserializer,
+            "an OCM maneuver line",
+            |s| -> std::result::Result<ManLine, String> {
+                let mut parts = s.split_whitespace();
+                let epoch = parts
+                    .next()
+                    .ok_or_else(|| "Missing epoch".to_string())?
+                    .parse::<Epoch>()
+                    .map_err(|error| error.to_string())?;
+                let values: Vec<String> = parts.map(|s| s.to_string()).collect();
+                Ok(ManLine { epoch, values })
+            },
+        )
     }
 }
 

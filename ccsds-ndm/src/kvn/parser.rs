@@ -26,7 +26,7 @@ use crate::traits::{CcsdsNullable, FromKvnFloat, FromKvnValue};
 use crate::types::{UserDefined, UserDefinedParameter, *};
 use std::str::FromStr;
 use winnow::ascii::{line_ending, space0, till_line_ending};
-use winnow::combinator::{alt, delimited, opt, peek, preceded, repeat, terminated};
+use winnow::combinator::{alt, delimited, peek, preceded, repeat, terminated};
 use winnow::error::{
     AddContext, ErrMode, FromExternalError, ParserError, StrContext, StrContextValue,
 };
@@ -507,12 +507,27 @@ pub fn skip_empty_lines(input: &mut &str) -> KvnResult<()> {
 
 /// Parses an optional line ending, consuming any trailing horizontal whitespace.
 pub fn opt_line_ending(input: &mut &str) -> KvnResult<()> {
-    (space0, opt(line_ending)).void().parse_next(input)
+    *input = input.trim_start_matches([' ', '\t']);
+    if let Some(rest) = input.strip_prefix("\r\n") {
+        *input = rest;
+    } else if let Some(rest) = input.strip_prefix('\n') {
+        *input = rest;
+    }
+    Ok(())
 }
 
 /// Skips any run of blank lines.
 pub fn blank_lines(input: &mut &str) -> KvnResult<()> {
-    repeat(0.., (ws, line_ending)).parse_next(input)
+    loop {
+        let line = input.trim_start_matches([' ', '\t']);
+        if let Some(rest) = line.strip_prefix("\r\n") {
+            *input = rest;
+        } else if let Some(rest) = line.strip_prefix('\n') {
+            *input = rest;
+        } else {
+            return Ok(());
+        }
+    }
 }
 
 //----------------------------------------------------------------------

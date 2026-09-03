@@ -508,10 +508,10 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             message_name: "RDM",
             rank,
             comment_starts_block: comments_start_block,
-            allows_non_increasing: |previous, current, key| {
-                current == KEYS.len() as u16
-                    && previous == current
-                    && key.starts_with("USER_DEFINED_")
+            allows_non_increasing: |previous, current| {
+                current.rank == KEYS.len() as u16
+                    && previous.rank == current.rank
+                    && current.key.starts_with("USER_DEFINED_")
             },
         },
     )

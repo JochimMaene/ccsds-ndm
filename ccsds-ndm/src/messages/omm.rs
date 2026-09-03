@@ -438,11 +438,14 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             message_name: "OMM",
             rank,
             comment_starts_block: comments_start_block,
-            allows_non_increasing: |previous, current, _| {
-                (current == 13 && previous == 13)
-                    || (current == 45 && previous == 45)
-                    || (current == 47 && previous == 47)
-                    || (current == 90 && previous == 90)
+            allows_non_increasing: |previous, current| {
+                // SEMI_MAJOR_AXIS/MEAN_MOTION, BSTAR/BTERM, and MEAN_MOTION_DDOT/AGOM each share
+                // a rank so either spelling may fill the slot; only the *other* alternative may
+                // follow, never a repeat of the same keyword. USER_DEFINED_* genuinely repeats.
+                (matches!(previous.rank, 13 | 45 | 47)
+                    && current.rank == previous.rank
+                    && current.key != previous.key)
+                    || (current.rank == 90 && previous.rank == 90)
             },
         },
     )
@@ -764,7 +767,29 @@ impl ToKvn for OmmData {
 
 impl crate::traits::Validate for OmmData {
     fn validate(&self) -> Result<()> {
-        self.mean_elements.validate()
+        crate::validation::validate_at_field_path(
+            self.mean_elements.validate(),
+            "body.segment.data.mean_elements",
+        )?;
+        if let Some(parameters) = &self.spacecraft_parameters {
+            crate::validation::validate_at_field_path(
+                parameters.validate(),
+                "body.segment.data.spacecraft_parameters",
+            )?;
+        }
+        if let Some(tle) = &self.tle_parameters {
+            crate::validation::validate_at_field_path(
+                tle.validate_values(),
+                "body.segment.data.tle_parameters",
+            )?;
+        }
+        if let Some(covariance) = &self.covariance_matrix {
+            crate::validation::validate_at_field_path(
+                covariance.validate(),
+                "body.segment.data.covariance_matrix",
+            )?;
+        }
+        Ok(())
     }
 }
 
@@ -904,18 +929,121 @@ pub struct MeanElements {
     pub gm: Option<Gm>,
 }
 
+/// Reject a value the OMM schema types as a double but that is not a real number.
+///
+/// Range facets such as `nonNegativeDouble` are expressed as comparisons, and every comparison
+/// against NaN is false, so a NaN passes them. Finiteness therefore has to be checked in its own
+/// right rather than inferred from a range check.
+fn finite(field: &'static str, value: f64) -> Result<()> {
+    if value.is_finite() {
+        return Ok(());
+    }
+    Err(ValidationError::InvalidValue {
+        field: field.into(),
+        value: value.to_string(),
+        expected: "a finite number".into(),
+        line: None,
+    }
+    .into())
+}
+
 impl crate::traits::Validate for MeanElements {
     fn validate(&self) -> Result<()> {
         match (self.semi_major_axis.is_some(), self.mean_motion.is_some()) {
-            (true, false) | (false, true) => Ok(()),
-            _ => Err(ValidationError::Generic {
-                message: Cow::Borrowed(
-                    "Mean Elements must have exactly one of SEMI_MAJOR_AXIS or MEAN_MOTION",
-                ),
+            (true, false) | (false, true) => {}
+            _ => {
+                return Err(ValidationError::Generic {
+                    message: Cow::Borrowed(
+                        "Mean Elements must have exactly one of SEMI_MAJOR_AXIS or MEAN_MOTION",
+                    ),
+                    line: None,
+                }
+                .into())
+            }
+        }
+
+        if let Some(value) = &self.semi_major_axis {
+            finite("SEMI_MAJOR_AXIS", value.value)?;
+        }
+        if let Some(value) = &self.mean_motion {
+            finite("MEAN_MOTION", value.value)?;
+        }
+        finite("ECCENTRICITY", self.eccentricity.value)?;
+        if self.eccentricity.value < 0.0 {
+            return Err(ValidationError::OutOfRange {
+                name: "ECCENTRICITY".into(),
+                value: self.eccentricity.value.to_string(),
+                expected: ">= 0".into(),
                 line: None,
             }
-            .into()),
+            .into());
         }
+
+        let inclination = self.inclination.angle.value;
+        finite("INCLINATION", inclination)?;
+        if !(0.0..=180.0).contains(&inclination) {
+            return Err(ValidationError::OutOfRange {
+                name: "INCLINATION".into(),
+                value: inclination.to_string(),
+                expected: "[0, 180]".into(),
+                line: None,
+            }
+            .into());
+        }
+
+        for (field, angle) in [
+            ("RA_OF_ASC_NODE", &self.ra_of_asc_node),
+            ("ARG_OF_PERICENTER", &self.arg_of_pericenter),
+            ("MEAN_ANOMALY", &self.mean_anomaly),
+        ] {
+            finite(field, angle.value)?;
+            if !(-360.0..360.0).contains(&angle.value) {
+                return Err(ValidationError::OutOfRange {
+                    name: field.into(),
+                    value: angle.value.to_string(),
+                    expected: "[-360, 360)".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+
+        if let Some(gm) = &self.gm {
+            finite("GM", gm.value)?;
+            if gm.value <= 0.0 {
+                return Err(ValidationError::OutOfRange {
+                    name: "GM".into(),
+                    value: gm.value.to_string(),
+                    expected: "> 0".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+}
+
+impl TleParameters {
+    /// Check the values the schema types as doubles, independently of the mean-element theory.
+    ///
+    /// The theory-dependent presence rules live in [`TleParameters::validate`], which needs
+    /// metadata this pass deliberately does not.
+    pub(crate) fn validate_values(&self) -> Result<()> {
+        for (field, value) in [
+            ("BSTAR", self.bstar.as_ref().map(|value| value.value)),
+            ("BTERM", self.bterm.as_ref().map(|value| value.value)),
+            ("MEAN_MOTION_DOT", Some(self.mean_motion_dot.value)),
+            (
+                "MEAN_MOTION_DDOT",
+                self.mean_motion_ddot.as_ref().map(|value| value.value),
+            ),
+            ("AGOM", self.agom.as_ref().map(|value| value.value)),
+        ] {
+            let Some(value) = value else { continue };
+            finite(field, value)?;
+        }
+        Ok(())
     }
 }
 

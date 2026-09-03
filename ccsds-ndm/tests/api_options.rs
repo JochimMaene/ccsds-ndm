@@ -138,7 +138,7 @@ fn oem_generation_rejects_non_finite_state_vectors() {
     oem.body.segment[0].data.covariance_matrix[0].cx_x.value = f64::INFINITY;
 
     let error = oem.to_kvn().unwrap_err();
-    assert!(error.to_string().contains("representable CCSDS number"));
+    assert!(error.to_string().contains("finite number"));
 }
 
 #[test]

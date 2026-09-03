@@ -1,5 +1,5 @@
 use ccsds_ndm::messages::oem::Oem;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::{MessageType, VersionedNdm};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -92,6 +92,39 @@ fn public_generation_surfaces_are_identical_and_preflight_invalid_models() {
             ccsds_ndm::validation::MessageKind::Oem
         );
         assert_eq!(diagnostic.source_edition, Some("3.0"));
+    }
+}
+
+#[test]
+fn kvn_generation_rejects_semantically_invalid_mutations() {
+    let mut negative_variance = Oem::from_kvn(KVN_FIXTURES[2].1).unwrap();
+    negative_variance.body.segment[0].data.covariance_matrix[0]
+        .cx_x
+        .value = -1.0;
+
+    let mut overlapping_useable_spans = Oem::from_kvn(KVN_FIXTURES[0].1).unwrap();
+    overlapping_useable_spans.body.segment[1]
+        .metadata
+        .start_time = "2019-12-28T21:00:00.000".parse().unwrap();
+    overlapping_useable_spans.body.segment[1]
+        .metadata
+        .useable_start_time = Some("2019-12-28T21:22:00.331".parse().unwrap());
+
+    for (label, message) in [
+        ("negative covariance variance", negative_variance),
+        ("overlapping useable spans", overlapping_useable_spans),
+    ] {
+        message
+            .validate()
+            .expect_err(&format!("{label} must be semantically invalid"));
+        message
+            .to_kvn()
+            .expect_err(&format!("materialized KVN accepted {label}"));
+        let mut output = Vec::new();
+        message
+            .write_kvn_to(&mut output)
+            .expect_err(&format!("streaming KVN accepted {label}"));
+        assert!(output.is_empty(), "streaming KVN wrote bytes for {label}");
     }
 }
 

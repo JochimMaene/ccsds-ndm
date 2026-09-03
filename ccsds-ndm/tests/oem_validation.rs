@@ -25,6 +25,30 @@ fn all_segments_must_describe_one_object_and_one_time_system() {
 }
 
 #[test]
+fn consecutive_useable_spans_may_touch_but_not_overlap() {
+    let mut message = Oem::from_kvn(MULTI_SEGMENT).unwrap();
+    let second = &mut message.body.segment[1].metadata;
+    second.start_time = epoch("2019-12-28T21:00:00.000");
+    message
+        .validate()
+        .expect("total spans may overlap when useable spans do not");
+
+    message.body.segment[1].metadata.useable_start_time = Some(epoch("2019-12-28T21:23:00.331"));
+    message
+        .validate()
+        .expect("a shared useable-span endpoint is allowed");
+
+    message.body.segment[1].metadata.useable_start_time = Some(epoch("2019-12-28T21:22:00.331"));
+    let error = message
+        .validate()
+        .expect_err("consecutive useable spans must not overlap");
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[1].metadata.useable_start_time")
+    );
+}
+
+#[test]
 fn oem_time_tags_are_absolute_and_metadata_ranges_are_consistent() {
     let mut message = Oem::from_xml(XML).unwrap();
     message.body.segment[0].data.state_vector[0].epoch = epoch("123.5");

@@ -107,15 +107,16 @@ impl Opm {
         kvn: &str,
         options: &crate::options::ParseOptions,
     ) -> Result<Self> {
-        let source_edition = kvn.lines().find_map(|line| {
+        let source_edition = kvn.split(['\r', '\n']).find_map(|line| {
             line.split_once('=')
                 .filter(|(key, _)| key.trim() == "CCSDS_OPM_VERS")
                 .map(|(_, value)| value.trim())
         });
         (|| {
             validate_input_size(kvn, options)?;
-            validate_kvn_syntax(kvn)?;
-            let opm = Self::from_kvn_str(kvn)?;
+            let normalized = crate::kvn::normalize_line_endings(kvn);
+            validate_kvn_syntax(&normalized)?;
+            let opm = Self::from_kvn_str(&normalized)?;
             crate::traits::Validate::validate(&opm)?;
             Ok(opm)
         })()
@@ -134,13 +135,10 @@ impl Opm {
         xml: &str,
         options: &crate::options::ParseOptions,
     ) -> Result<Self> {
-        let source_edition = xml
-            .find("<opm")
-            .and_then(|root| xml[root..].split_once("version=\"").map(|(_, value)| value))
-            .and_then(|value| value.split_once('"').map(|(version, _)| version));
+        let mut source_edition = None;
         (|| {
             validate_input_size(xml, options)?;
-            validate_xml_envelope(xml, options)?;
+            validate_xml_envelope(xml, options, &mut source_edition)?;
             let opm: Self = crate::xml::from_str_with_context(xml, "OPM")?;
             crate::traits::Validate::validate(&opm)?;
             Ok(opm)
@@ -150,7 +148,7 @@ impl Opm {
                 crate::validation::MessageKind::Opm,
                 crate::error::DiagnosticNotation::Xml,
                 xml,
-                source_edition,
+                source_edition.as_deref(),
             )
         })
     }
@@ -261,396 +259,215 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             message_name: "OPM",
             rank,
             comment_starts_block,
-            allows_non_increasing: |previous, current, _| {
-                (current == 70 && previous == 76)
-                    || (current == 80 && previous == 80)
-                    || (current == 25 && previous == 25)
+            allows_non_increasing: |previous, current| {
+                // A new maneuver block restarts after MAN_DV_3, and USER_DEFINED_* repeats.
+                (current.rank == 70 && previous.rank == 76)
+                    || (current.rank == 80 && previous.rank == 80)
+                    // TRUE_ANOMALY and MEAN_ANOMALY share a rank so either may fill the slot;
+                    // only the *other* alternative may follow, never a repeat of the same
+                    // keyword. Both present is left to `KeplerianElements::validate`, which
+                    // reports the choice violation.
+                    || (current.rank == 25
+                        && previous.rank == 25
+                        && current.key != previous.key)
             },
         },
     )
 }
 
-fn validate_xml_envelope(xml: &str, options: &crate::options::ParseOptions) -> Result<()> {
-    use crate::error::{CcsdsNdmError, FormatError};
-    use quick_xml::events::Event;
+fn validate_xml_envelope(
+    xml: &str,
+    options: &crate::options::ParseOptions,
+    source_edition: &mut Option<String>,
+) -> Result<()> {
+    use crate::xml::XmlSequenceRule;
 
-    fn invalid(message: impl Into<String>) -> CcsdsNdmError {
-        CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(message.into())))
-    }
+    const OPM: &[&[u8]] = &[b"header", b"body"];
+    const HEADER: &[&[u8]] = &[
+        b"COMMENT",
+        b"CLASSIFICATION",
+        b"CREATION_DATE",
+        b"ORIGINATOR",
+        b"MESSAGE_ID",
+    ];
+    const BODY: &[&[u8]] = &[b"segment"];
+    const SEGMENT: &[&[u8]] = &[b"metadata", b"data"];
+    const METADATA: &[&[u8]] = &[
+        b"COMMENT",
+        b"OBJECT_NAME",
+        b"OBJECT_ID",
+        b"CENTER_NAME",
+        b"REF_FRAME",
+        b"REF_FRAME_EPOCH",
+        b"TIME_SYSTEM",
+    ];
+    const DATA: &[&[u8]] = &[
+        b"COMMENT",
+        b"stateVector",
+        b"keplerianElements",
+        b"spacecraftParameters",
+        b"covarianceMatrix",
+        b"maneuverParameters",
+        b"userDefinedParameters",
+    ];
+    const STATE_VECTOR: &[&[u8]] = &[
+        b"COMMENT", b"EPOCH", b"X", b"Y", b"Z", b"X_DOT", b"Y_DOT", b"Z_DOT",
+    ];
+    const KEPLERIAN: &[&[u8]] = &[
+        b"COMMENT",
+        b"SEMI_MAJOR_AXIS",
+        b"ECCENTRICITY",
+        b"INCLINATION",
+        b"RA_OF_ASC_NODE",
+        b"ARG_OF_PERICENTER",
+        b"TRUE_ANOMALY",
+        b"MEAN_ANOMALY",
+        b"GM",
+    ];
+    const SPACECRAFT: &[&[u8]] = &[
+        b"COMMENT",
+        b"MASS",
+        b"SOLAR_RAD_AREA",
+        b"SOLAR_RAD_COEFF",
+        b"DRAG_AREA",
+        b"DRAG_COEFF",
+    ];
+    const COVARIANCE: &[&[u8]] = &[
+        b"COMMENT",
+        b"COV_REF_FRAME",
+        b"CX_X",
+        b"CY_X",
+        b"CY_Y",
+        b"CZ_X",
+        b"CZ_Y",
+        b"CZ_Z",
+        b"CX_DOT_X",
+        b"CX_DOT_Y",
+        b"CX_DOT_Z",
+        b"CX_DOT_X_DOT",
+        b"CY_DOT_X",
+        b"CY_DOT_Y",
+        b"CY_DOT_Z",
+        b"CY_DOT_X_DOT",
+        b"CY_DOT_Y_DOT",
+        b"CZ_DOT_X",
+        b"CZ_DOT_Y",
+        b"CZ_DOT_Z",
+        b"CZ_DOT_X_DOT",
+        b"CZ_DOT_Y_DOT",
+        b"CZ_DOT_Z_DOT",
+    ];
+    const MANEUVER: &[&[u8]] = &[
+        b"COMMENT",
+        b"MAN_EPOCH_IGNITION",
+        b"MAN_DURATION",
+        b"MAN_DELTA_MASS",
+        b"MAN_REF_FRAME",
+        b"MAN_DV_1",
+        b"MAN_DV_2",
+        b"MAN_DV_3",
+    ];
+    const USER_DEFINED: &[&[u8]] = &[b"COMMENT", b"USER_DEFINED"];
 
-    fn validate_root(start: &quick_xml::events::BytesStart<'_>) -> Result<()> {
-        if start.name().as_ref() != b"opm" {
-            return Err(invalid("expected standalone OPM root element 'opm'"));
-        }
-        for attribute in start.attributes() {
-            let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
-            if !matches!(
-                attribute.key.as_ref(),
-                b"id" | b"version" | b"xmlns:xsi" | b"xsi:noNamespaceSchemaLocation"
-            ) {
-                return Err(invalid(format!(
-                    "unknown OPM root attribute '{}'",
-                    String::from_utf8_lossy(attribute.key.as_ref())
-                )));
-            }
-        }
-        Ok(())
-    }
-
-    /// Reject attributes the OPM schema does not declare on the element carrying them.
-    fn validate_attributes(start: &quick_xml::events::BytesStart<'_>) -> Result<()> {
-        let name = start.name();
-        let name = name.as_ref();
-        // Elements whose schema type extends a base with an optional `units` attribute.
-        let allows_units = matches!(
-            name,
-            b"X" | b"Y"
-                | b"Z"
-                | b"X_DOT"
-                | b"Y_DOT"
-                | b"Z_DOT"
-                | b"SEMI_MAJOR_AXIS"
-                | b"INCLINATION"
-                | b"RA_OF_ASC_NODE"
-                | b"ARG_OF_PERICENTER"
-                | b"TRUE_ANOMALY"
-                | b"MEAN_ANOMALY"
-                | b"GM"
-                | b"MASS"
-                | b"SOLAR_RAD_AREA"
-                | b"DRAG_AREA"
-                | b"CX_X"
-                | b"CY_X"
-                | b"CY_Y"
-                | b"CZ_X"
-                | b"CZ_Y"
-                | b"CZ_Z"
-                | b"CX_DOT_X"
-                | b"CX_DOT_Y"
-                | b"CX_DOT_Z"
-                | b"CX_DOT_X_DOT"
-                | b"CY_DOT_X"
-                | b"CY_DOT_Y"
-                | b"CY_DOT_Z"
-                | b"CY_DOT_X_DOT"
-                | b"CY_DOT_Y_DOT"
-                | b"CZ_DOT_X"
-                | b"CZ_DOT_Y"
-                | b"CZ_DOT_Z"
-                | b"CZ_DOT_X_DOT"
-                | b"CZ_DOT_Y_DOT"
-                | b"CZ_DOT_Z_DOT"
-                | b"MAN_DURATION"
-                | b"MAN_DELTA_MASS"
-                | b"MAN_DV_1"
-                | b"MAN_DV_2"
-                | b"MAN_DV_3"
-        );
-        // Optional values may be marked absent instead of omitted (see `crate::utils::nullable`).
-        let allows_nil = matches!(
-            name,
-            b"REF_FRAME_EPOCH"
-                | b"TRUE_ANOMALY"
-                | b"MEAN_ANOMALY"
-                | b"MASS"
-                | b"SOLAR_RAD_AREA"
-                | b"SOLAR_RAD_COEFF"
-                | b"DRAG_AREA"
-                | b"DRAG_COEFF"
-                | b"COV_REF_FRAME"
-        );
-        for attribute in start.attributes() {
-            let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
-            let key = attribute.key.as_ref();
-            let allowed = match key {
-                b"units" => allows_units,
-                b"nil" | b"xsi:nil" => allows_nil,
-                b"parameter" => name == b"USER_DEFINED",
-                _ => false,
-            };
-            if !allowed {
-                return Err(invalid(format!(
-                    "attribute '{}' is not allowed on OPM element '{}'",
-                    String::from_utf8_lossy(key),
-                    String::from_utf8_lossy(name)
-                )));
-            }
-        }
-        Ok(())
-    }
-
-    let document = xml.strip_prefix('\u{feff}').unwrap_or(xml);
-    if document
-        .find("<?xml")
-        .is_some_and(|declaration| declaration != 0)
-    {
-        return Err(invalid(
-            "an XML declaration, when present, must begin the document",
-        ));
-    }
-
-    #[derive(Clone, Copy)]
-    enum Container {
-        Opm,
-        Header,
-        Body,
-        Segment,
-        Metadata,
-        Data,
-        StateVector,
-        Keplerian,
-        Spacecraft,
-        Covariance,
-        Maneuver,
-        UserDefined,
-        Leaf,
-    }
-
-    struct Frame {
-        container: Container,
-        last_child: u8,
-    }
-
-    fn container(name: &[u8]) -> Container {
-        match name {
-            b"opm" => Container::Opm,
-            b"header" => Container::Header,
-            b"body" => Container::Body,
-            b"segment" => Container::Segment,
-            b"metadata" => Container::Metadata,
-            b"data" => Container::Data,
-            b"stateVector" => Container::StateVector,
-            b"keplerianElements" => Container::Keplerian,
-            b"spacecraftParameters" => Container::Spacecraft,
-            b"covarianceMatrix" => Container::Covariance,
-            b"maneuverParameters" => Container::Maneuver,
-            b"userDefinedParameters" => Container::UserDefined,
-            _ => Container::Leaf,
-        }
-    }
-
-    fn child_rank(parent: Container, name: &[u8]) -> Option<u8> {
-        let rank = match parent {
-            Container::Opm => match name {
-                b"header" => 0,
-                b"body" => 1,
-                _ => return None,
-            },
-            Container::Header => match name {
-                b"COMMENT" => 0,
-                b"CLASSIFICATION" => 1,
-                b"CREATION_DATE" => 2,
-                b"ORIGINATOR" => 3,
-                b"MESSAGE_ID" => 4,
-                _ => return None,
-            },
-            Container::Body => match name {
-                b"segment" => 0,
-                _ => return None,
-            },
-            Container::Segment => match name {
-                b"metadata" => 0,
-                b"data" => 1,
-                _ => return None,
-            },
-            Container::Metadata => match name {
-                b"COMMENT" => 0,
-                b"OBJECT_NAME" => 1,
-                b"OBJECT_ID" => 2,
-                b"CENTER_NAME" => 3,
-                b"REF_FRAME" => 4,
-                b"REF_FRAME_EPOCH" => 5,
-                b"TIME_SYSTEM" => 6,
-                _ => return None,
-            },
-            Container::Data => match name {
-                b"COMMENT" => 0,
-                b"stateVector" => 1,
-                b"keplerianElements" => 2,
-                b"spacecraftParameters" => 3,
-                b"covarianceMatrix" => 4,
-                b"maneuverParameters" => 5,
-                b"userDefinedParameters" => 6,
-                _ => return None,
-            },
-            Container::StateVector => match name {
-                b"COMMENT" => 0,
-                b"EPOCH" => 1,
-                b"X" => 2,
-                b"Y" => 3,
-                b"Z" => 4,
-                b"X_DOT" => 5,
-                b"Y_DOT" => 6,
-                b"Z_DOT" => 7,
-                _ => return None,
-            },
-            Container::Keplerian => match name {
-                b"COMMENT" => 0,
-                b"SEMI_MAJOR_AXIS" => 1,
-                b"ECCENTRICITY" => 2,
-                b"INCLINATION" => 3,
-                b"RA_OF_ASC_NODE" => 4,
-                b"ARG_OF_PERICENTER" => 5,
-                b"TRUE_ANOMALY" | b"MEAN_ANOMALY" => 6,
-                b"GM" => 7,
-                _ => return None,
-            },
-            Container::Spacecraft => match name {
-                b"COMMENT" => 0,
-                b"MASS" => 1,
-                b"SOLAR_RAD_AREA" => 2,
-                b"SOLAR_RAD_COEFF" => 3,
-                b"DRAG_AREA" => 4,
-                b"DRAG_COEFF" => 5,
-                _ => return None,
-            },
-            Container::Covariance => match name {
-                b"COMMENT" => 0,
-                b"COV_REF_FRAME" => 1,
-                b"CX_X" => 2,
-                b"CY_X" => 3,
-                b"CY_Y" => 4,
-                b"CZ_X" => 5,
-                b"CZ_Y" => 6,
-                b"CZ_Z" => 7,
-                b"CX_DOT_X" => 8,
-                b"CX_DOT_Y" => 9,
-                b"CX_DOT_Z" => 10,
-                b"CX_DOT_X_DOT" => 11,
-                b"CY_DOT_X" => 12,
-                b"CY_DOT_Y" => 13,
-                b"CY_DOT_Z" => 14,
-                b"CY_DOT_X_DOT" => 15,
-                b"CY_DOT_Y_DOT" => 16,
-                b"CZ_DOT_X" => 17,
-                b"CZ_DOT_Y" => 18,
-                b"CZ_DOT_Z" => 19,
-                b"CZ_DOT_X_DOT" => 20,
-                b"CZ_DOT_Y_DOT" => 21,
-                b"CZ_DOT_Z_DOT" => 22,
-                _ => return None,
-            },
-            Container::Maneuver => match name {
-                b"COMMENT" => 0,
-                b"MAN_EPOCH_IGNITION" => 1,
-                b"MAN_DURATION" => 2,
-                b"MAN_DELTA_MASS" => 3,
-                b"MAN_REF_FRAME" => 4,
-                b"MAN_DV_1" => 5,
-                b"MAN_DV_2" => 6,
-                b"MAN_DV_3" => 7,
-                _ => return None,
-            },
-            Container::UserDefined => match name {
-                b"COMMENT" => 0,
-                b"USER_DEFINED" => 1,
-                _ => return None,
-            },
-            Container::Leaf => return Some(0),
+    fn rule(parent: &[u8], child: &[u8]) -> Option<XmlSequenceRule> {
+        let sequence = match parent {
+            b"opm" => OPM,
+            b"header" => HEADER,
+            b"body" => BODY,
+            b"segment" => SEGMENT,
+            b"metadata" => METADATA,
+            b"data" => DATA,
+            b"stateVector" => STATE_VECTOR,
+            b"keplerianElements" => KEPLERIAN,
+            b"spacecraftParameters" => SPACECRAFT,
+            b"covarianceMatrix" => COVARIANCE,
+            b"maneuverParameters" => MANEUVER,
+            b"userDefinedParameters" => USER_DEFINED,
+            _ => return None,
         };
-        Some(rank)
+        sequence
+            .iter()
+            .position(|candidate| *candidate == child)
+            .map(|rank| XmlSequenceRule {
+                rank: rank as u16,
+                repeatable: child == b"COMMENT"
+                    || child == b"maneuverParameters"
+                    || child == b"USER_DEFINED",
+            })
     }
 
-    fn enter_child(stack: &mut [Frame], name: &[u8]) -> Result<()> {
-        if let Some(parent) = stack.last_mut() {
-            let rank = child_rank(parent.container, name).ok_or_else(|| {
-                invalid(format!(
-                    "element '{}' is not allowed in this OPM block",
-                    String::from_utf8_lossy(name)
-                ))
-            })?;
-            if rank < parent.last_child {
-                return Err(invalid(format!(
-                    "element '{}' is out of order in its OPM block",
-                    String::from_utf8_lossy(name)
-                )));
-            }
-            parent.last_child = rank;
-        }
-        Ok(())
-    }
-
-    let mut reader = quick_xml::Reader::from_str(xml);
-    let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut stack = Vec::with_capacity(8);
-
-    loop {
-        match reader.read_event() {
-            Ok(Event::Start(start)) => {
-                if root_closed {
-                    return Err(invalid("trailing content after OPM document"));
-                }
-                if !root_seen {
-                    validate_root(&start)?;
-                    root_seen = true;
-                } else {
-                    validate_attributes(&start)?;
-                    enter_child(&mut stack, start.name().as_ref())?;
-                }
-                stack.push(Frame {
-                    container: container(start.name().as_ref()),
-                    last_child: 0,
-                });
-                depth += 1;
-                if depth > options.max_xml_depth {
-                    return Err(CcsdsNdmError::ResourceLimitExceeded {
-                        resource: "xml_depth",
-                        limit: options.max_xml_depth,
-                        actual: depth,
-                    });
-                }
-            }
-            Ok(Event::Empty(start)) => {
-                if root_closed {
-                    return Err(invalid("trailing content after OPM document"));
-                }
-                if !root_seen {
-                    validate_root(&start)?;
-                    root_seen = true;
-                    root_closed = true;
-                } else {
-                    validate_attributes(&start)?;
-                    enter_child(&mut stack, start.name().as_ref())?;
-                }
-            }
-            Ok(Event::End(_)) => {
-                depth = depth
-                    .checked_sub(1)
-                    .ok_or_else(|| invalid("unexpected XML closing element"))?;
-                stack.pop();
-                if depth == 0 {
-                    root_closed = true;
-                }
-            }
-            Ok(Event::Text(text)) => {
-                if (root_closed || !root_seen)
-                    && !text
-                        .xml_content()
-                        .map_err(|error| invalid(error.to_string()))?
-                        .trim()
-                        .is_empty()
-                {
-                    return Err(invalid("text outside OPM root element"));
-                }
-            }
-            Ok(Event::CData(_)) if root_closed || !root_seen => {
-                return Err(invalid("CDATA outside OPM root element"));
-            }
-            Ok(Event::DocType(_)) => {
-                return Err(invalid("XML document type declarations are not supported"));
-            }
-            Ok(Event::Eof) => break,
-            Ok(_) => {}
-            Err(error) => return Err(CcsdsNdmError::from(error)),
-        }
-    }
-
-    if !root_seen || !root_closed {
-        return Err(invalid("incomplete OPM XML document"));
-    }
-    Ok(())
+    crate::xml::validate_standalone_document(
+        xml,
+        b"opm",
+        "OPM",
+        options,
+        source_edition,
+        crate::xml::MessageSchema {
+            child_rule: rule,
+            attribute_allowed: |element: &[u8], attribute: &[u8]| match attribute {
+                b"units" => matches!(
+                    element,
+                    b"X" | b"Y"
+                        | b"Z"
+                        | b"X_DOT"
+                        | b"Y_DOT"
+                        | b"Z_DOT"
+                        | b"SEMI_MAJOR_AXIS"
+                        | b"INCLINATION"
+                        | b"RA_OF_ASC_NODE"
+                        | b"ARG_OF_PERICENTER"
+                        | b"TRUE_ANOMALY"
+                        | b"MEAN_ANOMALY"
+                        | b"GM"
+                        | b"MASS"
+                        | b"SOLAR_RAD_AREA"
+                        | b"DRAG_AREA"
+                        | b"CX_X"
+                        | b"CY_X"
+                        | b"CY_Y"
+                        | b"CZ_X"
+                        | b"CZ_Y"
+                        | b"CZ_Z"
+                        | b"CX_DOT_X"
+                        | b"CX_DOT_Y"
+                        | b"CX_DOT_Z"
+                        | b"CX_DOT_X_DOT"
+                        | b"CY_DOT_X"
+                        | b"CY_DOT_Y"
+                        | b"CY_DOT_Z"
+                        | b"CY_DOT_X_DOT"
+                        | b"CY_DOT_Y_DOT"
+                        | b"CZ_DOT_X"
+                        | b"CZ_DOT_Y"
+                        | b"CZ_DOT_Z"
+                        | b"CZ_DOT_X_DOT"
+                        | b"CZ_DOT_Y_DOT"
+                        | b"CZ_DOT_Z_DOT"
+                        | b"MAN_DURATION"
+                        | b"MAN_DELTA_MASS"
+                        | b"MAN_DV_1"
+                        | b"MAN_DV_2"
+                        | b"MAN_DV_3"
+                ),
+                b"nil" | b"xsi:nil" => matches!(
+                    element,
+                    b"REF_FRAME_EPOCH"
+                        | b"TRUE_ANOMALY"
+                        | b"MEAN_ANOMALY"
+                        | b"MASS"
+                        | b"SOLAR_RAD_AREA"
+                        | b"SOLAR_RAD_COEFF"
+                        | b"DRAG_AREA"
+                        | b"DRAG_COEFF"
+                        | b"COV_REF_FRAME"
+                ),
+                b"parameter" => element == b"USER_DEFINED",
+                _ => false,
+            },
+            // An OPM holds one state, so it has no repeatable history record to bound here.
+            is_record: |_: &[u8]| false,
+        },
+    )
 }
 
 /// A diagnostic field path that is only materialized when an error is reported.
@@ -1618,17 +1435,7 @@ impl Validate for OpmData {
 impl ToKvn for OpmData {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
-        // State Vector
-        // Keep these OPM-only numeric fields paired with `validate_kvn_numbers`.
-        let state = &self.state_vector;
-        writer.write_comments(&state.comment);
-        writer.write_pair("EPOCH", state.epoch);
-        writer.write_odm_float_measure("X", &state.x);
-        writer.write_odm_float_measure("Y", &state.y);
-        writer.write_odm_float_measure("Z", &state.z);
-        writer.write_odm_float_measure("X_DOT", &state.x_dot);
-        writer.write_odm_float_measure("Y_DOT", &state.y_dot);
-        writer.write_odm_float_measure("Z_DOT", &state.z_dot);
+        self.state_vector.write_kvn(writer);
 
         // Keplerian Elements
         if let Some(ke) = &self.keplerian_elements {
@@ -1657,32 +1464,7 @@ impl ToKvn for OpmData {
 
         // Covariance
         if let Some(cov) = &self.covariance_matrix {
-            // Keep these OPM-only numeric fields paired with `validate_kvn_numbers`.
-            writer.write_comments(&cov.comment);
-            if let Some(frame) = &cov.cov_ref_frame {
-                writer.write_pair("COV_REF_FRAME", frame);
-            }
-            writer.write_odm_float_measure("CX_X", &cov.cx_x);
-            writer.write_odm_float_measure("CY_X", &cov.cy_x);
-            writer.write_odm_float_measure("CY_Y", &cov.cy_y);
-            writer.write_odm_float_measure("CZ_X", &cov.cz_x);
-            writer.write_odm_float_measure("CZ_Y", &cov.cz_y);
-            writer.write_odm_float_measure("CZ_Z", &cov.cz_z);
-            writer.write_odm_float_measure("CX_DOT_X", &cov.cx_dot_x);
-            writer.write_odm_float_measure("CX_DOT_Y", &cov.cx_dot_y);
-            writer.write_odm_float_measure("CX_DOT_Z", &cov.cx_dot_z);
-            writer.write_odm_float_measure("CX_DOT_X_DOT", &cov.cx_dot_x_dot);
-            writer.write_odm_float_measure("CY_DOT_X", &cov.cy_dot_x);
-            writer.write_odm_float_measure("CY_DOT_Y", &cov.cy_dot_y);
-            writer.write_odm_float_measure("CY_DOT_Z", &cov.cy_dot_z);
-            writer.write_odm_float_measure("CY_DOT_X_DOT", &cov.cy_dot_x_dot);
-            writer.write_odm_float_measure("CY_DOT_Y_DOT", &cov.cy_dot_y_dot);
-            writer.write_odm_float_measure("CZ_DOT_X", &cov.cz_dot_x);
-            writer.write_odm_float_measure("CZ_DOT_Y", &cov.cz_dot_y);
-            writer.write_odm_float_measure("CZ_DOT_Z", &cov.cz_dot_z);
-            writer.write_odm_float_measure("CZ_DOT_X_DOT", &cov.cz_dot_x_dot);
-            writer.write_odm_float_measure("CZ_DOT_Y_DOT", &cov.cz_dot_y_dot);
-            writer.write_odm_float_measure("CZ_DOT_Z_DOT", &cov.cz_dot_z_dot);
+            cov.write_kvn(writer);
         }
 
         // Maneuvers
@@ -2009,10 +1791,18 @@ impl Validate for ManeuverParameters {
             }
             .into());
         }
-        if matches!(self.man_duration.units, Some(TimeUnits::Day)) {
+        // `durationType` declares `timeUnits`, which permits only `s`. `TimeUnits` is shared with
+        // messages that also allow days, so accept the permitted spelling rather than excluding
+        // today's other variants: a new variant must not silently become valid here.
+        if !matches!(self.man_duration.units, None | Some(TimeUnits::Seconds)) {
             return Err(ValidationError::InvalidValue {
                 field: "MAN_DURATION units".into(),
-                value: "d".into(),
+                value: self
+                    .man_duration
+                    .units
+                    .as_ref()
+                    .map(ToString::to_string)
+                    .unwrap_or_default(),
                 expected: "s or omitted".into(),
                 line: None,
             }

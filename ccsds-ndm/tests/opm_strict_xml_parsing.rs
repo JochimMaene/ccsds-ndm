@@ -131,3 +131,24 @@ fn strict_xml_keeps_schema_attributes_and_the_documented_nil_extension() {
         "nil DRAG_COEFF should deserialize as absent"
     );
 }
+
+#[test]
+fn strict_xml_accepts_namespace_metadata_and_does_not_confuse_processing_instructions() {
+    let source = xml();
+    let source = source.replacen(
+        "?>",
+        "?><?xml-stylesheet type=\"text/xsl\" href=\"opm.xsl\"?>",
+        1,
+    );
+    let source = source.replacen(
+        "<opm ",
+        "<opm xmlns:ndm=\"urn:ccsds:ndm\" xsi:schemaLocation=\"urn:ccsds:ndm opm.xsd\" ",
+        1,
+    );
+    Opm::from_xml(&source).expect("namespace metadata and xml-stylesheet PI should parse");
+
+    assert_rejected(
+        "default namespace that qualifies the OPM root",
+        xml().replacen("<opm ", "<opm xmlns=\"urn:ccsds:ndm\" ", 1),
+    );
+}

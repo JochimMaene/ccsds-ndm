@@ -105,3 +105,47 @@ fn file_conversion_enforces_input_limit_before_materializing_the_document() {
         b"sentinel"
     );
 }
+
+/// KVN has one comment slot ahead of `EPOCH`, so `data.COMMENT` and `stateVector.COMMENT` are
+/// indistinguishable once written. Parsing assigns every pre-`EPOCH` comment to the data section,
+/// which makes the merge canonical and idempotent rather than arbitrary.
+///
+/// XML keeps the two positions apart, so the model keeps both fields; only a round trip *through*
+/// KVN collapses them. This test fixes that contract.
+#[test]
+fn kvn_merges_data_and_state_vector_comments_into_the_data_section() {
+    let xml = XML_FIXTURE
+        .replace("<data>", "<data>\n<COMMENT>DATA BLOCK</COMMENT>")
+        .replace(
+            "<stateVector>",
+            "<stateVector>\n<COMMENT>STATE BLOCK</COMMENT>",
+        );
+    let source = Opm::from_xml(&xml).expect("XML distinguishes the two comment positions");
+    assert_eq!(source.body.segment.data.comment, ["DATA BLOCK"]);
+    assert_eq!(
+        source.body.segment.data.state_vector.comment,
+        ["STATE BLOCK"]
+    );
+
+    let kvn = convert(&xml, Notation::Kvn).expect("XML to KVN conversion should work");
+    let merged = Opm::from_kvn(&kvn).expect("output KVN should parse");
+    assert_eq!(
+        merged.body.segment.data.comment,
+        ["DATA BLOCK", "STATE BLOCK"],
+        "KVN keeps both comments, in order, in the data section"
+    );
+    assert!(
+        merged.body.segment.data.state_vector.comment.is_empty(),
+        "KVN cannot address the state-vector comment position"
+    );
+
+    // The merge is idempotent: a further round trip neither loses nor duplicates a comment.
+    let again = Opm::from_kvn(&merged.to_kvn().expect("merged model should generate KVN"))
+        .expect("regenerated KVN should parse");
+    assert_eq!(again, merged);
+
+    // Every comment survives the trip; only its logical position is normalized.
+    let round_tripped_xml = merged.to_xml().expect("merged model should generate XML");
+    assert!(round_tripped_xml.contains("<COMMENT>DATA BLOCK</COMMENT>"));
+    assert!(round_tripped_xml.contains("<COMMENT>STATE BLOCK</COMMENT>"));
+}

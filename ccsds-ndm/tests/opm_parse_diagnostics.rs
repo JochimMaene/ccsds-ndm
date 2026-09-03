@@ -70,3 +70,26 @@ fn xml_parse_diagnostic_identifies_input_notation_without_inventing_a_location()
     assert_eq!(diagnostic.source_location, None);
     assert_eq!(diagnostic.original_token, None);
 }
+
+#[test]
+fn xml_source_edition_comes_from_the_parsed_root() {
+    let xml = Opm::from_kvn(KVN)
+        .expect("fixture should parse")
+        .to_xml()
+        .expect("fixture should generate XML")
+        .replacen("?>", "?><!-- <opm version=\"bogus\"> -->", 1)
+        .replacen("version=\"3.0\"", "version='3.0'", 1)
+        .replace(
+            "<OBJECT_NAME>OSPREY 5</OBJECT_NAME>",
+            "<OBJECT_NAME></OBJECT_NAME>",
+        );
+
+    let error = Opm::from_xml(&xml).expect_err("empty object name should fail validation");
+    assert_eq!(
+        error
+            .diagnostic()
+            .expect("parse context should be present")
+            .source_edition,
+        Some("3.0")
+    );
+}

@@ -780,15 +780,18 @@ pub struct StateVector {
 }
 
 impl ToKvn for StateVector {
+    // ODM 7.7.1 fixes the KVN spelling of a number (at most 16 significant digits, explicit
+    // mantissa fraction). `write_odm_float_measure` applies it; plain `Display` would emit
+    // spellings such as `0.30000000000000004` that this library's own parser rejects.
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         writer.write_pair("EPOCH", self.epoch);
-        writer.write_measure("X", &self.x);
-        writer.write_measure("Y", &self.y);
-        writer.write_measure("Z", &self.z);
-        writer.write_measure("X_DOT", &self.x_dot);
-        writer.write_measure("Y_DOT", &self.y_dot);
-        writer.write_measure("Z_DOT", &self.z_dot);
+        writer.write_odm_float_measure("X", &self.x);
+        writer.write_odm_float_measure("Y", &self.y);
+        writer.write_odm_float_measure("Z", &self.z);
+        writer.write_odm_float_measure("X_DOT", &self.x_dot);
+        writer.write_odm_float_measure("Y_DOT", &self.y_dot);
+        writer.write_odm_float_measure("Z_DOT", &self.z_dot);
     }
 }
 
@@ -2021,6 +2024,36 @@ pub struct OpmCovarianceMatrix {
     pub cz_dot_z_dot: VelocityCovariance,
 }
 
+/// Report whether a lower-triangular covariance keyword names a diagonal entry.
+///
+/// The six diagonal entries are variances, so a negative value is not a producer rounding
+/// artifact but an impossible matrix. Off-diagonal covariances may legitimately be negative.
+/// Full positive-semidefinite checking is deliberately not attempted: it needs a numerical
+/// tolerance policy that rounded producer data would otherwise trip.
+pub(crate) fn is_covariance_variance(field: &str) -> bool {
+    matches!(
+        field,
+        "CX_X" | "CY_Y" | "CZ_Z" | "CX_DOT_X_DOT" | "CY_DOT_Y_DOT" | "CZ_DOT_Z_DOT"
+    )
+}
+
+/// Reject a covariance entry that cannot represent a real matrix element.
+pub(crate) fn covariance_value_error(field: &'static str, value: f64) -> Option<ValidationError> {
+    let expected = if !value.is_finite() {
+        "a finite number"
+    } else if is_covariance_variance(field) && value < 0.0 {
+        "a non-negative variance on the covariance diagonal"
+    } else {
+        return None;
+    };
+    Some(ValidationError::InvalidValue {
+        field: field.into(),
+        value: value.to_string(),
+        expected: expected.into(),
+        line: None,
+    })
+}
+
 impl crate::traits::Validate for OpmCovarianceMatrix {
     fn validate(&self) -> Result<()> {
         for (field, value) in [
@@ -2046,14 +2079,8 @@ impl crate::traits::Validate for OpmCovarianceMatrix {
             ("CZ_DOT_Y_DOT", self.cz_dot_y_dot.value),
             ("CZ_DOT_Z_DOT", self.cz_dot_z_dot.value),
         ] {
-            if !value.is_finite() {
-                return Err(ValidationError::InvalidValue {
-                    field: field.into(),
-                    value: value.to_string(),
-                    expected: "a finite number".into(),
-                    line: None,
-                }
-                .into());
+            if let Some(error) = covariance_value_error(field, value) {
+                return Err(error.into());
             }
         }
         Ok(())
@@ -2061,36 +2088,37 @@ impl crate::traits::Validate for OpmCovarianceMatrix {
 }
 
 impl ToKvn for OpmCovarianceMatrix {
+    // ODM 7.7.1 number spelling; see `ToKvn for StateVector`.
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         if let Some(ref frame) = self.cov_ref_frame {
             writer.write_pair("COV_REF_FRAME", frame);
         }
 
-        writer.write_measure("CX_X", &self.cx_x);
-        writer.write_measure("CY_X", &self.cy_x);
-        writer.write_measure("CY_Y", &self.cy_y);
-        writer.write_measure("CZ_X", &self.cz_x);
-        writer.write_measure("CZ_Y", &self.cz_y);
-        writer.write_measure("CZ_Z", &self.cz_z);
+        writer.write_odm_float_measure("CX_X", &self.cx_x);
+        writer.write_odm_float_measure("CY_X", &self.cy_x);
+        writer.write_odm_float_measure("CY_Y", &self.cy_y);
+        writer.write_odm_float_measure("CZ_X", &self.cz_x);
+        writer.write_odm_float_measure("CZ_Y", &self.cz_y);
+        writer.write_odm_float_measure("CZ_Z", &self.cz_z);
 
-        writer.write_measure("CX_DOT_X", &self.cx_dot_x);
-        writer.write_measure("CX_DOT_Y", &self.cx_dot_y);
-        writer.write_measure("CX_DOT_Z", &self.cx_dot_z);
-        writer.write_measure("CX_DOT_X_DOT", &self.cx_dot_x_dot);
+        writer.write_odm_float_measure("CX_DOT_X", &self.cx_dot_x);
+        writer.write_odm_float_measure("CX_DOT_Y", &self.cx_dot_y);
+        writer.write_odm_float_measure("CX_DOT_Z", &self.cx_dot_z);
+        writer.write_odm_float_measure("CX_DOT_X_DOT", &self.cx_dot_x_dot);
 
-        writer.write_measure("CY_DOT_X", &self.cy_dot_x);
-        writer.write_measure("CY_DOT_Y", &self.cy_dot_y);
-        writer.write_measure("CY_DOT_Z", &self.cy_dot_z);
-        writer.write_measure("CY_DOT_X_DOT", &self.cy_dot_x_dot);
-        writer.write_measure("CY_DOT_Y_DOT", &self.cy_dot_y_dot);
+        writer.write_odm_float_measure("CY_DOT_X", &self.cy_dot_x);
+        writer.write_odm_float_measure("CY_DOT_Y", &self.cy_dot_y);
+        writer.write_odm_float_measure("CY_DOT_Z", &self.cy_dot_z);
+        writer.write_odm_float_measure("CY_DOT_X_DOT", &self.cy_dot_x_dot);
+        writer.write_odm_float_measure("CY_DOT_Y_DOT", &self.cy_dot_y_dot);
 
-        writer.write_measure("CZ_DOT_X", &self.cz_dot_x);
-        writer.write_measure("CZ_DOT_Y", &self.cz_dot_y);
-        writer.write_measure("CZ_DOT_Z", &self.cz_dot_z);
-        writer.write_measure("CZ_DOT_X_DOT", &self.cz_dot_x_dot);
-        writer.write_measure("CZ_DOT_Y_DOT", &self.cz_dot_y_dot);
-        writer.write_measure("CZ_DOT_Z_DOT", &self.cz_dot_z_dot);
+        writer.write_odm_float_measure("CZ_DOT_X", &self.cz_dot_x);
+        writer.write_odm_float_measure("CZ_DOT_Y", &self.cz_dot_y);
+        writer.write_odm_float_measure("CZ_DOT_Z", &self.cz_dot_z);
+        writer.write_odm_float_measure("CZ_DOT_X_DOT", &self.cz_dot_x_dot);
+        writer.write_odm_float_measure("CZ_DOT_Y_DOT", &self.cz_dot_y_dot);
+        writer.write_odm_float_measure("CZ_DOT_Z_DOT", &self.cz_dot_z_dot);
     }
 }
 
@@ -3067,9 +3095,8 @@ mod tests {
             .contains("2000-01-01T00:00:00 1.0 0.0 0.0 0.0 0.1 0.2 0.3 0.4"));
     }
 
-    #[test]
-    fn test_opm_covariance_kvn() {
-        let cov = OpmCovarianceMatrix::builder()
+    fn opm_covariance_fixture() -> OpmCovarianceMatrix {
+        OpmCovarianceMatrix::builder()
             .cx_x(PositionCovariance::new(1.0, None))
             .cy_x(PositionCovariance::new(2.0, None))
             .cy_y(PositionCovariance::new(3.0, None))
@@ -3091,7 +3118,55 @@ mod tests {
             .cz_dot_x_dot(VelocityCovariance::new(19.0, None))
             .cz_dot_y_dot(VelocityCovariance::new(20.0, None))
             .cz_dot_z_dot(VelocityCovariance::new(21.0, None))
-            .build();
+            .build()
+    }
+
+    #[test]
+    fn opm_covariance_rejects_a_negative_variance() {
+        use crate::traits::Validate;
+
+        for (name, mutate) in [
+            (
+                "CX_X",
+                (|cov: &mut OpmCovarianceMatrix| cov.cx_x.value = -1.0)
+                    as fn(&mut OpmCovarianceMatrix),
+            ),
+            ("CY_Y", |cov| cov.cy_y.value = -1.0),
+            ("CZ_Z", |cov| cov.cz_z.value = -1.0),
+            ("CX_DOT_X_DOT", |cov| cov.cx_dot_x_dot.value = -1.0),
+            ("CY_DOT_Y_DOT", |cov| cov.cy_dot_y_dot.value = -1.0),
+            ("CZ_DOT_Z_DOT", |cov| cov.cz_dot_z_dot.value = -1.0),
+        ] {
+            let mut cov = opm_covariance_fixture();
+            mutate(&mut cov);
+            let error = cov
+                .validate()
+                .expect_err("a negative variance is not a representable covariance");
+            assert!(
+                error.to_string().contains(name)
+                    && error
+                        .to_string()
+                        .contains("a non-negative variance on the covariance diagonal"),
+                "unexpected error for {name}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn opm_covariance_accepts_a_negative_off_diagonal_term() {
+        use crate::traits::Validate;
+
+        // Off-diagonal entries are covariances, not variances, so a negative value is physical.
+        let mut cov = opm_covariance_fixture();
+        cov.cy_x.value = -2.0;
+        cov.cz_dot_y.value = -17.0;
+        cov.validate()
+            .expect("negative off-diagonal covariances are valid");
+    }
+
+    #[test]
+    fn test_opm_covariance_kvn() {
+        let cov = opm_covariance_fixture();
         let mut w = KvnWriter::new();
         cov.write_kvn(&mut w);
         let s = w.finish();

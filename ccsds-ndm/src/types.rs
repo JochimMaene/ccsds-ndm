@@ -68,8 +68,9 @@ impl<'de> Deserialize<'de> for Epoch {
     where
         D: serde::Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        Epoch::try_from(s).map_err(serde::de::Error::custom)
+        // An `Epoch` owns a fixed-size buffer, so the token is read straight out of the
+        // deserializer's view of the document rather than through an owned `String`.
+        crate::utils::deserialize_parsed(deserializer, "a CCSDS epoch value", Epoch::new)
     }
 }
 
@@ -885,8 +886,7 @@ impl<'de> Deserialize<'de> for CalendarEpoch {
     where
         D: serde::Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        Self::new(&s).map_err(serde::de::Error::custom)
+        crate::utils::deserialize_parsed(deserializer, "a CCSDS calendar epoch value", Self::new)
     }
 }
 
@@ -1035,8 +1035,7 @@ impl<'de> Deserialize<'de> for RelativeTime {
     where
         D: serde::Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        Self::new(&s).map_err(serde::de::Error::custom)
+        crate::utils::deserialize_parsed(deserializer, "a CCSDS relative time value", Self::new)
     }
 }
 
@@ -1098,6 +1097,34 @@ where
     where
         D: serde::Deserializer<'de>,
     {
+        /// The three keys a `UnitValue` map can carry. Deserializing into this instead of a
+        /// `String` keeps the value elements of a large ephemeris allocation-free: every record
+        /// carries several of them, and the key text is only ever compared, never retained.
+        enum UnitValueKey {
+            Value,
+            Units,
+            Other,
+        }
+
+        impl<'de> serde::Deserialize<'de> for UnitValueKey {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                crate::utils::deserialize_parsed(
+                    deserializer,
+                    "a UnitValue field name",
+                    |key| -> std::result::Result<UnitValueKey, std::convert::Infallible> {
+                        Ok(match key {
+                            "$value" | "$text" => UnitValueKey::Value,
+                            "@units" => UnitValueKey::Units,
+                            _ => UnitValueKey::Other,
+                        })
+                    },
+                )
+            }
+        }
+
         struct UnitValueVisitor<V, U>(std::marker::PhantomData<(V, U)>);
 
         impl<'de, V, U> serde::de::Visitor<'de> for UnitValueVisitor<V, U>
@@ -1127,19 +1154,23 @@ where
                 let mut value = None;
                 let mut units = None;
 
-                while let Some(key) = map.next_key::<String>()? {
-                    if key == "$value" || key == "$text" {
-                        if value.is_some() {
-                            return Err(serde::de::Error::duplicate_field("$value"));
+                while let Some(key) = map.next_key::<UnitValueKey>()? {
+                    match key {
+                        UnitValueKey::Value => {
+                            if value.is_some() {
+                                return Err(serde::de::Error::duplicate_field("$value"));
+                            }
+                            value = Some(map.next_value()?);
                         }
-                        value = Some(map.next_value()?);
-                    } else if key == "@units" {
-                        if units.is_some() {
-                            return Err(serde::de::Error::duplicate_field("@units"));
+                        UnitValueKey::Units => {
+                            if units.is_some() {
+                                return Err(serde::de::Error::duplicate_field("@units"));
+                            }
+                            units = Some(map.next_value()?);
                         }
-                        units = Some(map.next_value()?);
-                    } else {
-                        let _: serde::de::IgnoredAny = map.next_value()?;
+                        UnitValueKey::Other => {
+                            let _: serde::de::IgnoredAny = map.next_value()?;
+                        }
                     }
                 }
 
@@ -4430,8 +4461,11 @@ impl<'de> Deserialize<'de> for Vec3Double {
     where
         D: serde::Deserializer<'de>,
     {
-        let value = String::deserialize(deserializer)?;
-        Self::from_kvn_value(&value).map_err(serde::de::Error::custom)
+        crate::utils::deserialize_parsed(
+            deserializer,
+            "three space-separated numbers",
+            Self::from_kvn_value,
+        )
     }
 }
 
