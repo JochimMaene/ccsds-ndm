@@ -6,7 +6,7 @@ use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{from_str, MessageType};
+use ccsds_ndm::{from_str, from_str_with_options, MessageType, ParseOptions};
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 
@@ -101,6 +101,14 @@ INTERPOLATION_DEGREE = 1
 META_STOP
 2021-01-01T12:00:00.000 6500.0 0.0 0.0 0.0 7.5 0.0
 "#;
+
+    let error = from_str_with_options(
+        input,
+        None,
+        &ParseOptions::default().with_max_input_bytes(input.len() - 1),
+    )
+    .unwrap_err();
+    assert_eq!(error.code(), Some("resource.input_limit_exceeded"));
 
     let error = from_str(input).unwrap_err();
     let diagnostic = error.diagnostic().unwrap();

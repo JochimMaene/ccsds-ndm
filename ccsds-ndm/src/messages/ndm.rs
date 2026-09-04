@@ -226,6 +226,7 @@ pub(crate) fn combined_kvn_unsupported() -> CcsdsNdmError {
 }
 
 impl Ndm for CombinedNdm {
+    /// Always returns `UnsupportedNotation`; combined NDM has no KVN representation.
     fn to_kvn(&self) -> Result<String> {
         Err(combined_kvn_unsupported().with_generation_context(
             crate::validation::MessageKind::Ndm,
@@ -234,6 +235,7 @@ impl Ndm for CombinedNdm {
         ))
     }
 
+    /// Always returns `UnsupportedNotation`; combined NDM has no KVN representation.
     fn from_kvn(kvn: &str) -> Result<Self> {
         Err(combined_kvn_unsupported().with_parse_context(
             crate::validation::MessageKind::Ndm,

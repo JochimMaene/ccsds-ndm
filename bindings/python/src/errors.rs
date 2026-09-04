@@ -222,19 +222,15 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
         CcsdsNdmError::UnexpectedEof { context } => {
             NdmFormatError::new_err(format!("Unexpected end of input: {}", context))
         }
-        CcsdsNdmError::UnsupportedNotation {
-            message_type,
-            requested,
-        } => {
+        error @ CcsdsNdmError::UnsupportedNotation { requested, .. } => {
+            let code = error.code();
             enrich_exception(
-                NdmUnsupportedNotationError::new_err(format!(
-                    "{message_type} has no CCSDS-defined {requested} representation"
-                )),
+                NdmUnsupportedNotationError::new_err(error.to_string()),
                 "generate",
                 Some(requested),
                 None,
                 None,
-                Some("unsupported.notation"),
+                code,
                 None,
                 None,
                 None,
