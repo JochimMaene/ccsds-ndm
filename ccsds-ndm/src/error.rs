@@ -600,6 +600,13 @@ pub enum CcsdsNdmError {
     /// Error when an unexpected end of input is reached.
     #[error("Unexpected end of input: {context}")]
     UnexpectedEof { context: String },
+
+    /// Error for a notation in which CCSDS defines no representation of a message family.
+    #[error("{message_type} has no CCSDS-defined {requested} representation")]
+    UnsupportedNotation {
+        message_type: &'static str,
+        requested: DiagnosticNotation,
+    },
 }
 
 /// A stack-allocated collection of error contexts.
@@ -999,6 +1006,7 @@ impl CcsdsNdmError {
             Self::Io(_) => Some("io.error"),
             Self::UnsupportedInputVersion { .. } => Some("parse.unsupported_input_version"),
             Self::UnexpectedEof { .. } => Some("parse.unexpected_eof"),
+            Self::UnsupportedNotation { .. } => Some("unsupported.notation"),
             Self::UnsupportedOutputVersion { .. } => Some("generation.unsupported_output_version"),
             Self::ResourceLimitExceeded { resource, .. } => match *resource {
                 "input_document" => Some("resource.input_limit_exceeded"),

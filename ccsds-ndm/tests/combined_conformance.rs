@@ -104,14 +104,6 @@ fn aggregate_parse_limits_apply_to_direct_combined_entry_points() {
         Some("resource.record_limit_exceeded"),
         "{error:?}"
     );
-
-    let kvn = format!("{OPM_KVN}{OPM_KVN}");
-    let error = CombinedNdm::from_kvn_with_options(
-        &kvn,
-        &ParseOptions::default().with_max_input_bytes(kvn.len() - 1),
-    )
-    .unwrap_err();
-    assert_eq!(error.code(), Some("resource.input_limit_exceeded"));
 }
 
 #[test]
@@ -128,10 +120,6 @@ fn opm_maneuvers_are_not_history_records_in_standalone_or_combined_messages() {
     let xml = combined.to_xml().unwrap();
     CombinedNdm::from_xml_with_options(&xml, &options).unwrap();
     from_str_with_options(&xml, Some(Notation::Xml), &options).unwrap();
-
-    let kvn = combined.to_kvn().unwrap();
-    CombinedNdm::from_kvn_with_options(&kvn, &options).unwrap();
-    from_str_with_options(&kvn, Some(Notation::Kvn), &options).unwrap();
 }
 
 #[test]
@@ -147,22 +135,10 @@ fn streaming_generation_matches_string_generation() {
     let mut xml_output = Vec::new();
     message.write_xml_to(&mut xml_output).unwrap();
     assert_eq!(xml_output, xml.as_bytes());
-    let kvn = message.to_kvn().unwrap();
-    let mut kvn_output = Vec::new();
-    message.write_kvn_to(&mut kvn_output).unwrap();
-    assert_eq!(kvn_output, kvn.as_bytes());
 }
 
 #[test]
 fn loss_or_non_schema_model_states_are_rejected() {
-    let opm = Opm::from_kvn(OPM_KVN).unwrap();
-    let with_id = CombinedNdm {
-        id: Some("XML-only identifier".into()),
-        comments: Vec::new(),
-        messages: vec![MessageType::Opm(opm)],
-    };
-    assert!(with_id.to_kvn().is_err());
-
     let nested = CombinedNdm {
         id: None,
         comments: Vec::new(),
@@ -174,7 +150,6 @@ fn loss_or_non_schema_model_states_are_rejected() {
     };
     assert!(nested.validate().is_err());
     assert!(nested.to_xml().is_err());
-    assert!(nested.to_kvn().is_err());
 }
 
 fn validate_xml(label: &str, xml: &str) {

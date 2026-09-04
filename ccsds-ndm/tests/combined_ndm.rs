@@ -22,19 +22,6 @@ fn combined_generation_preserves_child_checks() {
 
     message.to_xml().unwrap();
 
-    let mut invalid_kvn = opm.clone();
-    invalid_kvn.header.originator = "non-ASCII é".into();
-    let invalid_kvn = CombinedNdm {
-        id: None,
-        comments: Vec::new(),
-        messages: vec![MessageType::Opm(invalid_kvn)],
-    };
-    let error = invalid_kvn.to_kvn().unwrap_err();
-    assert_eq!(
-        error.diagnostic().unwrap().message_kind,
-        ccsds_ndm::validation::MessageKind::Opm
-    );
-
     let mut invalid_xml = opm;
     invalid_xml.header.originator = "control \u{1}".into();
     let invalid_xml = CombinedNdm {
@@ -42,7 +29,11 @@ fn combined_generation_preserves_child_checks() {
         comments: Vec::new(),
         messages: vec![MessageType::Opm(invalid_xml)],
     };
-    assert!(invalid_xml.to_xml().is_err());
+    let error = invalid_xml.to_xml().unwrap_err();
+    assert_eq!(
+        error.diagnostic().unwrap().message_kind,
+        ccsds_ndm::validation::MessageKind::Opm
+    );
 }
 
 #[test]
@@ -74,7 +65,7 @@ fn combined_xml_parser_enforces_the_normative_envelope() {
 }
 
 #[test]
-fn test_combined_ndm_kvn() {
+fn sequential_kvn_messages_are_rejected_by_generic_detection() {
     let input = r#"
 CCSDS_OPM_VERS = 3.0
 CREATION_DATE = 2021-01-01T12:00:00.000
@@ -111,15 +102,21 @@ META_STOP
 2021-01-01T12:00:00.000 6500.0 0.0 0.0 0.0 7.5 0.0
 "#;
 
-    let msg = from_str(input).unwrap();
-    match msg {
-        MessageType::Ndm(ndm) => {
-            assert_eq!(ndm.messages.len(), 2);
-            assert!(matches!(ndm.messages[0], MessageType::Opm(_)));
-            assert!(matches!(ndm.messages[1], MessageType::Oem(_)));
-        }
-        _ => panic!("Expected MessageType::Ndm, got {:?}", msg),
-    }
+    let error = from_str(input).unwrap_err();
+    let diagnostic = error.diagnostic().unwrap();
+    assert_eq!(diagnostic.code, Some("unsupported.notation"));
+    assert_eq!(
+        diagnostic.operation,
+        ccsds_ndm::error::DiagnosticOperation::Parse
+    );
+    assert_eq!(
+        diagnostic.notation,
+        ccsds_ndm::error::DiagnosticNotation::Kvn
+    );
+    assert_eq!(
+        diagnostic.message_kind,
+        ccsds_ndm::validation::MessageKind::Ndm
+    );
 }
 
 #[test]

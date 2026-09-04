@@ -53,6 +53,7 @@ from .ccsds_ndm import (
     NdmIoError,
     NdmKvnParseError,
     NdmUnsupportedMessageError,
+    NdmUnsupportedNotationError,
     NdmValidationError,
     NdmXmlError,
     ObjectDescription,
@@ -137,6 +138,7 @@ __all__ = [
     "NdmEpochError",
     "NdmIoError",
     "NdmUnsupportedMessageError",
+    "NdmUnsupportedNotationError",
     # Common Types
     "OdmHeader",
     "StateVector",

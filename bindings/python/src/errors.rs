@@ -70,6 +70,14 @@ create_exception!(
     "Unsupported CCSDS message type."
 );
 
+// Unsupported notation for an otherwise supported message family.
+create_exception!(
+    ccsds_ndm,
+    NdmUnsupportedNotationError,
+    NdmError,
+    "The requested notation has no CCSDS-defined representation for this message family."
+);
+
 /// Converts a `CcsdsNdmError` into a `PyErr`.
 ///
 /// This function maps each variant of the Rust error enum to the corresponding
@@ -214,6 +222,27 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
         CcsdsNdmError::UnexpectedEof { context } => {
             NdmFormatError::new_err(format!("Unexpected end of input: {}", context))
         }
+        CcsdsNdmError::UnsupportedNotation {
+            message_type,
+            requested,
+        } => {
+            enrich_exception(
+                NdmUnsupportedNotationError::new_err(format!(
+                    "{message_type} has no CCSDS-defined {requested} representation"
+                )),
+                "generate",
+                Some(requested),
+                None,
+                None,
+                Some("unsupported.notation"),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+        }
         error @ CcsdsNdmError::ResourceLimitExceeded { .. } => {
             let code = error.code();
             let operation = match &error {
@@ -327,6 +356,10 @@ pub fn register_exceptions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "NdmUnsupportedMessageError",
         m.py().get_type::<NdmUnsupportedMessageError>(),
+    )?;
+    m.add(
+        "NdmUnsupportedNotationError",
+        m.py().get_type::<NdmUnsupportedNotationError>(),
     )?;
     Ok(())
 }

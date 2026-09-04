@@ -121,7 +121,7 @@ impl Ndm {
         crate::api::validate_message(&self.to_core(py)?)
     }
 
-    /// Parse an NDM combined instantiation from a string.
+    /// Parse an XML combined NDM. KVN has no combined representation.
     #[staticmethod]
     #[pyo3(signature = (data, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_str(
@@ -136,7 +136,7 @@ impl Ndm {
         Self::from_core(py, inner)
     }
 
-    /// Parse a combined NDM from a KVN or XML file.
+    /// Parse an XML combined NDM file. KVN has no combined representation.
     #[staticmethod]
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_file(
@@ -151,12 +151,17 @@ impl Ndm {
         Self::from_core(py, inner)
     }
 
-    /// Atomically write this combined NDM as KVN or XML.
+    /// Atomically write this combined NDM as XML.
+    ///
+    /// Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError` and leaves the
+    /// destination untouched.
     fn to_file(&self, py: Python<'_>, path: &str, format: &str) -> PyResult<()> {
         crate::api::generate_file(&MessageType::Ndm(self.to_core(py)?), path, format)
     }
 
-    /// Serialize to a string.
+    /// Serialize to an XML string.
+    ///
+    /// Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError`.
     fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
         let message = MessageType::Ndm(self.to_core(py)?);
         match crate::api::notation(format)? {

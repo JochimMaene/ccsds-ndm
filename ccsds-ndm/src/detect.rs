@@ -26,25 +26,20 @@ const KVN_HEADERS: [&str; 10] = [
     "CCSDS_APM_VERS",
 ];
 
-pub(crate) fn kvn_message_offsets(input: &str) -> Vec<usize> {
-    let mut offsets = Vec::new();
-    let mut offset = 0usize;
-    for line in input.split_inclusive('\n') {
-        let line_without_eol = line.strip_suffix('\n').unwrap_or(line);
-        let line_without_eol = line_without_eol
-            .strip_suffix('\r')
-            .unwrap_or(line_without_eol);
-        if KVN_HEADERS.iter().any(|header| {
-            line_without_eol.strip_prefix(header).is_some_and(|rest| {
-                rest.starts_with('=')
-                    || rest.as_bytes().first().is_some_and(u8::is_ascii_whitespace)
-            })
-        }) {
-            offsets.push(offset);
-        }
-        offset += line.len();
-    }
-    offsets
+fn is_kvn_message_header(line: &str) -> bool {
+    KVN_HEADERS.iter().any(|header| {
+        line.strip_prefix(header).is_some_and(|rest| {
+            rest.starts_with('=') || rest.as_bytes().first().is_some_and(u8::is_ascii_whitespace)
+        })
+    })
+}
+
+fn has_multiple_kvn_messages(input: &str) -> bool {
+    input
+        .lines()
+        .filter(|line| is_kvn_message_header(line))
+        .nth(1)
+        .is_some()
 }
 
 /// Wire notation used by complete NDM documents.
@@ -355,31 +350,16 @@ fn detect_kvn_type(s: &str, options: &ParseOptions) -> Result<MessageType> {
         .parse_next(&mut input)
         .map_err(|_| CcsdsNdmError::UnsupportedMessage("Could not identify KVN header".into()))?;
 
-    if kvn_message_offsets(s).len() > 1 {
-        validate_input_size(
-            s,
-            options,
-            crate::validation::MessageKind::Ndm,
-            crate::error::DiagnosticNotation::Kvn,
-        )?;
-        return crate::messages::ndm::CombinedNdm::from_kvn_with_options(s, options)
-            .map(MessageType::Ndm)
-            .map_err(|error| {
-                ensure_parse_context(
-                    error,
-                    crate::validation::MessageKind::Ndm,
-                    crate::error::DiagnosticNotation::Kvn,
-                    s,
-                )
-            });
-    }
-
     validate_input_size(
         s,
         options,
         kind.message_kind(),
         crate::error::DiagnosticNotation::Kvn,
     )?;
+
+    if has_multiple_kvn_messages(s) {
+        return Err(crate::messages::ndm::combined_kvn_unsupported());
+    }
     validate_kvn_record_limit(s, kind.message_kind(), options)?;
 
     let result = kind.parse_kvn(s, options);

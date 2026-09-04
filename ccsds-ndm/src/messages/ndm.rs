@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::error::{CcsdsNdmError, FormatError, Result};
-use crate::kvn::ser::KvnWriter;
-use crate::traits::{Ndm, ToKvn};
+use crate::traits::Ndm;
 use crate::MessageType;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -219,19 +218,29 @@ impl crate::traits::Validate for CombinedNdm {
     }
 }
 
+pub(crate) fn combined_kvn_unsupported() -> CcsdsNdmError {
+    CcsdsNdmError::UnsupportedNotation {
+        message_type: "Combined NDM",
+        requested: crate::error::DiagnosticNotation::Kvn,
+    }
+}
+
 impl Ndm for CombinedNdm {
     fn to_kvn(&self) -> Result<String> {
-        self.validate_kvn_envelope()?;
-        for message in &self.messages {
-            message.validate_for_generation(crate::generation::OutputFormat::Kvn)?;
-        }
-        let mut writer = KvnWriter::new();
-        self.write_kvn(&mut writer);
-        writer.finish_checked()
+        Err(combined_kvn_unsupported().with_generation_context(
+            crate::validation::MessageKind::Ndm,
+            crate::error::DiagnosticNotation::Kvn,
+            "combined",
+        ))
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        Self::from_kvn_with_options(kvn, &crate::options::ParseOptions::default())
+        Err(combined_kvn_unsupported().with_parse_context(
+            crate::validation::MessageKind::Ndm,
+            crate::error::DiagnosticNotation::Kvn,
+            kvn,
+            None,
+        ))
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -255,27 +264,6 @@ impl Ndm for CombinedNdm {
 }
 
 impl CombinedNdm {
-    fn validate_kvn_envelope(&self) -> Result<()> {
-        crate::traits::Validate::validate(self)?;
-        if self.id.is_some() {
-            return Err(crate::error::ValidationError::InvalidValue {
-                field: "MESSAGE_ID".into(),
-                value: "present".into(),
-                expected:
-                    "omitted when generating the non-standard sequential KVN convenience form"
-                        .into(),
-                line: None,
-            }
-            .into());
-        }
-        for comment in &self.comments {
-            if let Some(error) = crate::validation::kvn_comment_error(comment) {
-                return Err(error.into());
-            }
-        }
-        Ok(())
-    }
-
     fn validate_xml_envelope(&self) -> Result<()> {
         if let Some(value) = &self.id {
             if let Some(error) = crate::validation::xml_text_error("MESSAGE_ID", value) {
@@ -301,16 +289,6 @@ impl CombinedNdm {
         Ok(())
     }
 
-    /// Stream the sequential KVN convenience representation.
-    pub fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
-        self.validate_kvn_envelope()?;
-        self.validate_children_for_generation(crate::generation::OutputFormat::Kvn)?;
-
-        let mut writer = KvnWriter::from_io(output);
-        self.write_kvn(&mut writer);
-        writer.finish_io()
-    }
-
     /// Stream the normative XML combined instantiation.
     pub fn write_xml_to<W: Write>(&self, output: &mut W) -> Result<()> {
         self.validate_xml_envelope()?;
@@ -321,89 +299,6 @@ impl CombinedNdm {
                 crate::error::DiagnosticNotation::Xml,
                 "combined",
             )
-        })
-    }
-
-    /// Parse the sequential KVN convenience representation with bounded child parsing.
-    pub fn from_kvn_with_options(
-        kvn: &str,
-        options: &crate::options::ParseOptions,
-    ) -> Result<Self> {
-        if options
-            .max_input_bytes
-            .is_some_and(|limit| kvn.len() > limit)
-        {
-            return Err(CcsdsNdmError::ResourceLimitExceeded {
-                resource: "input_document",
-                limit: options.max_input_bytes.unwrap(),
-                actual: kvn.len(),
-            });
-        }
-        let indices = crate::detect::kvn_message_offsets(kvn);
-
-        if indices.is_empty() {
-            return Err(crate::error::CcsdsNdmError::UnsupportedMessage(
-                "No CCSDS KVN headers found in input".into(),
-            ));
-        }
-
-        let mut comments = Vec::new();
-        for line in kvn[..indices[0]].lines() {
-            let line = line.trim();
-            if line.is_empty() {
-                continue;
-            }
-            let Some(comment) = line.strip_prefix("COMMENT") else {
-                return Err(CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(
-                    "unexpected content before the first combined KVN message".into(),
-                ))));
-            };
-            comments.push(comment.trim_start().to_owned());
-        }
-
-        let mut messages = Vec::new();
-        let mut records = 0usize;
-        for i in 0..indices.len() {
-            let start = indices[i];
-            let end = if i + 1 < indices.len() {
-                indices[i + 1]
-            } else {
-                kvn.len()
-            };
-
-            let chunk = &kvn[start..end];
-            // We use from_str to auto-detect the type of this specific chunk.
-            // Since the chunk contains exactly one header, it should return Opm/Omm/etc.
-            // However, we must ensure `from_str` doesn't think it's XML (it won't, no <)
-            // or empty.
-            if chunk.trim().is_empty() {
-                continue;
-            }
-
-            let mut child_options = options.clone();
-            if let Some(limit) = options.max_records {
-                child_options.max_records = Some(limit.saturating_sub(records));
-            }
-            let msg = crate::from_str_with_options(
-                chunk,
-                Some(crate::detect::Notation::Kvn),
-                &child_options,
-            )?;
-            records = records.saturating_add(history_record_count(&msg));
-            if options.max_records.is_some_and(|limit| records > limit) {
-                return Err(CcsdsNdmError::ResourceLimitExceeded {
-                    resource: "history_records",
-                    limit: options.max_records.unwrap(),
-                    actual: records,
-                });
-            }
-            messages.push(msg);
-        }
-
-        Ok(CombinedNdm {
-            id: None, // Not applicable for KVN
-            comments,
-            messages,
         })
     }
 
@@ -592,42 +487,10 @@ impl CombinedNdm {
     }
 }
 
-impl ToKvn for CombinedNdm {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        // For KVN, there is no top-level "NDM" header or structure.
-        // We just write out the messages sequentially.
-        writer.write_comments(&self.comments);
-
-        for msg in &self.messages {
-            match msg {
-                MessageType::Opm(m) => m.write_kvn(writer),
-                MessageType::Omm(m) => m.write_kvn(writer),
-                MessageType::Oem(m) => m.write_kvn(writer),
-                MessageType::Ocm(m) => m.write_kvn(writer),
-                MessageType::Acm(m) => m.write_kvn(writer),
-                MessageType::Cdm(m) => m.write_kvn(writer),
-                MessageType::Tdm(m) => m.write_kvn(writer),
-                MessageType::Rdm(m) => m.write_kvn(writer),
-                MessageType::Aem(m) => m.write_kvn(writer),
-                MessageType::Apm(m) => m.write_kvn(writer),
-                MessageType::Ndm(m) => m.write_kvn(writer), // Nested NDM? Unlikely but possible in structure.
-            }
-            // KVN messages are typically separated by whitespace/newlines, which the writer handles or we add explicit breaks.
-            // The writer adds newlines after each pair/block.
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_combined_ndm_kvn() {
-        let kvn = "CCSDS_OPM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = NASA\nOBJECT_NAME = SAT\nOBJECT_ID = 1\nCENTER_NAME = EARTH\nREF_FRAME = GCRF\nTIME_SYSTEM = UTC\nEPOCH = 2023-01-01T00:00:00\nX = 1000.0\nY = 2000.0\nZ = 3000.0\nX_DOT = 1.0\nY_DOT = 2.0\nZ_DOT = 3.0\nCCSDS_OMM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = NASA\nOBJECT_NAME = SAT2\nOBJECT_ID = 2\nCENTER_NAME = EARTH\nREF_FRAME = GCRF\nTIME_SYSTEM = UTC\nMEAN_ELEMENT_THEORY = SGP4\nEPOCH = 2023-01-01T00:00:00\nMEAN_MOTION = 15.0\nECCENTRICITY = 0.001\nINCLINATION = 51.6\nRA_OF_ASC_NODE = 0.0\nARG_OF_PERICENTER = 0.0\nMEAN_ANOMALY = 0.0\nEPHEMERIS_TYPE = 0\nCLASSIFICATION_TYPE = U\nNORAD_CAT_ID = 12345\nELEMENT_SET_NO = 999\nREV_AT_EPOCH = 100\nBSTAR = 0.0001\nMEAN_MOTION_DOT = 0.000001\nMEAN_MOTION_DDOT = 0.0";
-        let combined = CombinedNdm::from_kvn(kvn).unwrap();
-        assert_eq!(combined.messages.len(), 2);
-    }
+    use crate::error::{DiagnosticNotation, DiagnosticOperation};
 
     #[test]
     fn test_combined_ndm_xml() {
@@ -666,7 +529,32 @@ mod tests {
     }
 
     #[test]
-    fn test_combined_ndm_empty_kvn() {
-        assert!(CombinedNdm::from_kvn("").is_err());
+    fn combined_kvn_is_reported_as_an_unsupported_notation() {
+        let error = CombinedNdm::from_kvn("CCSDS_OPM_VERS = 3.0\n").unwrap_err();
+        let diagnostic = error.diagnostic().unwrap();
+        assert_eq!(diagnostic.code, Some("unsupported.notation"));
+        assert_eq!(diagnostic.operation, DiagnosticOperation::Parse);
+        assert_eq!(diagnostic.notation, DiagnosticNotation::Kvn);
+        assert_eq!(diagnostic.message_kind, crate::validation::MessageKind::Ndm);
+
+        let message = CombinedNdm {
+            id: None,
+            comments: Vec::new(),
+            messages: Vec::new(),
+        };
+        let mut output = Vec::new();
+        for error in [
+            message.to_kvn().unwrap_err(),
+            crate::MessageType::Ndm(message)
+                .write_kvn_to(&mut output)
+                .unwrap_err(),
+        ] {
+            let diagnostic = error.diagnostic().unwrap();
+            assert_eq!(diagnostic.code, Some("unsupported.notation"));
+            assert_eq!(diagnostic.operation, DiagnosticOperation::Generate);
+            assert_eq!(diagnostic.notation, DiagnosticNotation::Kvn);
+            assert_eq!(diagnostic.source_edition, Some("combined"));
+        }
+        assert!(output.is_empty(), "a refused notation must emit zero bytes");
     }
 }

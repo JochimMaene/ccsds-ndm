@@ -5088,7 +5088,7 @@ class Ndm:
         max_records: Optional[int] = None,
     ) -> Ndm:
         """
-        Parse a combined NDM from a KVN or XML file.
+        Parse an XML combined NDM file. KVN has no combined representation.
         """
         ...
 
@@ -5101,7 +5101,7 @@ class Ndm:
         max_records: Optional[int] = None,
     ) -> Ndm:
         """
-        Parse an NDM combined instantiation from a string.
+        Parse an XML combined NDM. KVN has no combined representation.
         """
         ...
 
@@ -5125,13 +5125,18 @@ class Ndm:
     ) -> None: ...
     def to_file(self, path: str, format: str) -> None:
         """
-        Atomically write this combined NDM as KVN or XML.
+        Atomically write this combined NDM as XML.
+
+        Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError` and leaves the
+        destination untouched.
         """
         ...
 
     def to_str(self, format: str) -> str:
         """
-        Serialize to a string.
+        Serialize to an XML string.
+
+        Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError`.
         """
         ...
 
@@ -14312,6 +14317,11 @@ class NdmIoError(OSError):
 class NdmUnsupportedMessageError(NdmError):
     """
     Unsupported CCSDS message type.
+    """
+
+class NdmUnsupportedNotationError(NdmError):
+    """
+    The requested notation has no CCSDS-defined representation for this message family.
     """
 
 class NdmValidationError(NdmError):
