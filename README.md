@@ -26,7 +26,7 @@ The repository contains typed models, parsers, and serializers for the message f
 | **APM** | Attitude Parameter Message – Single attitude state and attitude parameters |
 | **AEM** | Attitude Ephemeris Message – Attitude state time series |
 | **ACM** | Attitude Comprehensive Message – Detailed attitude data with maneuvers and covariance |
-| **NDM** | Combined NDM Instantiation – Container for multiple CCSDS messages |
+| **NDM** | Combined NDM Instantiation – XML container for multiple CCSDS messages |
 
 ## Installation
 

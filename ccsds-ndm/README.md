@@ -29,7 +29,7 @@ The crate contains typed models, parsers, and serializers for the message famili
 | **APM** | Attitude Parameter Message - single attitude state and parameters |
 | **AEM** | Attitude Ephemeris Message - attitude state time series |
 | **ACM** | Attitude Comprehensive Message - detailed attitude data |
-| **NDM** | Combined NDM Instantiation - container for multiple messages |
+| **NDM** | Combined NDM Instantiation - XML container for multiple messages |
 
 ## Quick Start
 

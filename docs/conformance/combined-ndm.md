@@ -2,9 +2,18 @@
 
 Status: `implemented-unverified`.
 
-The normative combined instantiation is the XML `ndm` envelope defined by CCSDS 505.0-B-3,
-section 4.11, and `ccsds-ndm/data/xsd/ndmxml-4.0.0-master-4.0.xsd`. Sequential KVN is a library
-convenience representation, not an advertised CCSDS envelope.
+The combined instantiation is the XML `ndm` envelope defined by CCSDS 505.0-B-3, section 4.11,
+and `ccsds-ndm/data/xsd/ndmxml-4.0.0-master-4.0.xsd`. It is the only representation this library
+parses or writes.
+
+CCSDS defines no KVN combined instantiation. Section 4.11 lives in the XML specification and
+requires the `<ndm></ndm>` root element tags, while each KVN family section requires the message
+header line to be the first non-blank line in the file (CDM 508.0-B-1 section 6.3.1.2, ODM
+502.0-B-3 section 7.3.6, ADM 504.0-B-2 sections 3.2.2.3/4.2.2.3/5.3.2.3, RDM 508.1-B-1 section
+5.3.2.2). The ODM and ADM books also prescribe separate *files* for multiple messages (ODM
+section 2.5, ADM section 2.5.1). A previously shipped sequential-KVN convenience form was
+therefore removed; combined KVN parsing and generation now fail with the `unsupported.notation`
+diagnostic, and generic detection rejects any KVN document carrying more than one message header.
 
 `just conformance-combined` establishes:
 
@@ -15,10 +24,10 @@ convenience representation, not an advertised CCSDS envelope.
 - aggregate input-byte, XML-depth, history-record, and output-byte limits through direct Rust and
   Python entry points;
 - complete-envelope generation preflight: invalid children or aggregate output limits write zero
-  bytes before the normative XML or sequential KVN representation is streamed;
-- measured linear KVN streaming allocation budgets from 10 to 1,000 constituents (at most ten
-  temporary allocations and 128 temporary bytes per additional OPM constituent); and
-- explicit loss rejection when XML-only `MESSAGE_ID` data would be sent to sequential KVN.
+  bytes before the normative XML representation is streamed;
+- measured linear XML streaming allocation budgets from 10 to 1,000 constituents (at most twenty
+  temporary allocations and 8 KiB of temporaries per additional OPM constituent); and
+- refusal of combined KVN parsing and generation with an unsupported-notation diagnostic.
 
 The shipped `ndm_g22.xml` is valid against the official master XSD, but its OPM constituent has a
 maneuver without `spacecraftParameters/MASS`. The already-verified standalone OPM semantic gate

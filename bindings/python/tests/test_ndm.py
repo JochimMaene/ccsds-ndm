@@ -160,6 +160,26 @@ class TestNdm:
 
         assert isinstance(combined.messages[0], Tdm)
 
+    def test_combined_kvn_is_an_unsupported_notation(self):
+        root = Path(__file__).parents[3]
+        cdm_kvn = (root / "ccsds-ndm/data/kvn/cdm_362.kvn").read_text()
+
+        with pytest.raises(ccsds_ndm.NdmUnsupportedNotationError) as parsed:
+            ccsds_ndm.from_str(cdm_kvn + "\n" + cdm_kvn)
+        assert parsed.value.code == "unsupported.notation"
+        assert parsed.value.operation == "parse"
+        assert parsed.value.notation == "kvn"
+        assert parsed.value.message_kind == "ndm"
+
+        ndm = Ndm(messages=[self._create_valid_cdm()])
+
+        with pytest.raises(ccsds_ndm.NdmUnsupportedNotationError) as generated:
+            ndm.to_str(format="kvn")
+        assert generated.value.code == "unsupported.notation"
+        assert generated.value.operation == "generate"
+        assert generated.value.notation == "kvn"
+        assert generated.value.source_edition == "combined"
+
     def test_typed_ndm_rejects_single_message_kvn(self):
         root = Path(__file__).parents[3]
         opm = (root / "ccsds-ndm/data/kvn/opm_g1.kvn").read_text()

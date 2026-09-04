@@ -61,3 +61,5 @@ Exceptions
    :members:
 .. autoexception:: NdmUnsupportedMessageError
    :members:
+.. autoexception:: NdmUnsupportedNotationError
+   :members:

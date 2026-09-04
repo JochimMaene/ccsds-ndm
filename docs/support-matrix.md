@@ -34,7 +34,12 @@ rather than silently discarded.
 | AEM 1.0 | Parse only | Parse only | Yes | Yes | Available |
 | ACM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
 | ACM 1.0 | Parse only | Parse only | Yes | Yes | Available |
-| Combined NDM | Sequential convenience form | Parse and write | Yes | Yes | Available |
+| Combined NDM | Not defined | Parse and write | Yes | Yes | Available |
+
+Combined NDM is defined only as the XML `ndm` envelope, so KVN parsing and generation fail with
+the `unsupported.notation` diagnostic and exchanging several KVN messages together needs
+application-level framing such as one message per file; see
+[`docs/conformance/combined-ndm.md`](conformance/combined-ndm.md).
 
 OPM, OEM, AEM, APM, ACM, and TDM edition 1.0 remain parse-only. They cannot be written back or
 converted to a newer edition; callers must supply a supported current-edition message instead. The

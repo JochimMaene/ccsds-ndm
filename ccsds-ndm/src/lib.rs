@@ -359,7 +359,12 @@ impl MessageType {
             MessageType::Acm(msg) => VersionedNdm::write_kvn_to(msg, output),
             MessageType::Aem(msg) => VersionedNdm::write_kvn_to(msg, output),
             MessageType::Apm(msg) => VersionedNdm::write_kvn_to(msg, output),
-            MessageType::Ndm(msg) => msg.write_kvn_to(output),
+            MessageType::Ndm(_) => Err(messages::ndm::combined_kvn_unsupported()
+                .with_generation_context(
+                    self.kind(),
+                    error::DiagnosticNotation::Kvn,
+                    self.source_edition(),
+                )),
         }
     }
 
