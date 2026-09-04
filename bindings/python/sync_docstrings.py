@@ -8,8 +8,6 @@ synchronizes them with matching Python binding getter/setter methods.
 Usage:
     uv run python sync_docstrings.py                    # Sync all docstrings
     uv run python sync_docstrings.py --check            # Check if in sync
-    uv run python sync_docstrings.py --dry-run          # Preview changes
-    uv run python sync_docstrings.py --report           # Generate mismatch report
 """
 
 from __future__ import annotations
@@ -17,60 +15,26 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from binding_mappings import (
     PYTHON_ONLY_FIELDS,
     get_rust_path,
     get_rust_struct_name,
+    is_python_helper_class,
+)
+from binding_source import (
+    PythonClass,
+    RustField,
+    RustStruct,
+    collect_rust_structs,
+    parse_python_binding_file,
 )
 
 # ---------------------------------------------------------------------------
 # Data Classes
 # ---------------------------------------------------------------------------
-
-
-@dataclass
-class RustField:
-    """A field in a Rust struct with its docstring."""
-
-    name: str
-    docstring: str
-    rust_type: str = ""
-
-
-@dataclass
-class RustStruct:
-    """A Rust struct with its fields and docstrings."""
-
-    name: str
-    fields: dict[str, RustField] = field(default_factory=dict)
-    docstring: str = ""
-
-
-@dataclass
-class PythonGetter:
-    """A Python getter method in a PyO3 binding."""
-
-    name: str  # e.g., "get_object_name"
-    field_name: str  # e.g., "object_name"
-    docstring: str
-    line_start: int  # Line number where docstring starts (or where to insert)
-    line_end: int  # Line number where docstring ends
-    has_docstring: bool
-
-
-@dataclass
-class PythonClass:
-    """A Python class in a PyO3 binding."""
-
-    name: str
-    getters: dict[str, PythonGetter] = field(default_factory=dict)
-    docstring: str = ""
-    line_start: int = 0
-    line_end: int = 0
-    has_docstring: bool = False
 
 
 @dataclass
@@ -87,253 +51,6 @@ class SyncResult:
 # ---------------------------------------------------------------------------
 # Rust Parser
 # ---------------------------------------------------------------------------
-
-
-def parse_rust_docstring(lines: list[str], end_idx: int) -> str:
-    """
-    Extract docstring lines (///) above a field or struct definition.
-
-    Args:
-        lines: All lines in the file
-        end_idx: Index of the line containing the field/struct definition
-
-    Returns:
-        Combined docstring text
-    """
-    doc_lines: list[str] = []
-    idx = end_idx - 1
-
-    while idx >= 0:
-        line = lines[idx].strip()
-        if line.startswith("///"):
-            # Extract content after ///
-            content = line[3:].strip() if len(line) > 3 else ""
-            doc_lines.insert(0, content)
-            idx -= 1
-        elif line.startswith("#[") or line == "":
-            # Skip attributes and empty lines
-            idx -= 1
-        else:
-            break
-
-    return "\n".join(doc_lines)
-
-
-def parse_rust_struct(content: str, struct_match: re.Match) -> RustStruct | None:
-    """Parse a single Rust struct and extract its fields with docstrings."""
-    lines = content.split("\n")
-    struct_name = struct_match.group(1)
-    struct_start = content[: struct_match.start()].count("\n")
-
-    # Get struct docstring
-    struct_doc = parse_rust_docstring(lines, struct_start)
-
-    rust_struct = RustStruct(name=struct_name, docstring=struct_doc)
-
-    # The struct_match already includes the opening brace
-    brace_start = struct_match.end() - 1
-    if content[brace_start] != "{":
-        # Find it if not included
-        brace_start = content.find("{", struct_match.end())
-    if brace_start == -1:
-        return rust_struct
-
-    # Find matching closing brace
-    depth = 1
-    pos = brace_start + 1
-    while pos < len(content) and depth > 0:
-        if content[pos] == "{":
-            depth += 1
-        elif content[pos] == "}":
-            depth -= 1
-        pos += 1
-
-    struct_body = content[brace_start + 1 : pos - 1]
-    struct_body_start_char = brace_start + 1
-
-    # Parse fields with pub keyword
-    # Pattern matches: pub field_name: Type, with optional attributes
-    field_pattern = re.compile(r"^\s*pub\s+(\w+)\s*:\s*([^,\n]+)", re.MULTILINE)
-
-    for match in field_pattern.finditer(struct_body):
-        field_name = match.group(1)
-        field_type = match.group(2).strip().rstrip(",")
-
-        # Calculate absolute line number using character offset
-        field_char_in_content = struct_body_start_char + match.start()
-        field_line = content[:field_char_in_content].count("\n")
-
-        # Get docstring for this field
-        docstring = parse_rust_docstring(lines, field_line)
-
-        rust_struct.fields[field_name] = RustField(
-            name=field_name, docstring=docstring, rust_type=field_type
-        )
-
-    return rust_struct
-
-
-def parse_rust_file(filepath: Path) -> dict[str, RustStruct]:
-    """Parse a Rust file and extract all structs with their field docstrings."""
-    content = filepath.read_text()
-    structs: dict[str, RustStruct] = {}
-
-    # Pattern to find struct definitions
-    struct_pattern = re.compile(
-        r"pub\s+struct\s+(\w+)\s*(?:<[^>]*>)?\s*\{", re.MULTILINE
-    )
-
-    for match in struct_pattern.finditer(content):
-        rust_struct = parse_rust_struct(content, match)
-        if rust_struct:
-            structs[rust_struct.name] = rust_struct
-
-    return structs
-
-
-def collect_rust_structs(core_dir: Path) -> dict[str, RustStruct]:
-    """Collect all Rust structs from the core library."""
-    all_structs: dict[str, RustStruct] = {}
-
-    # Parse common.rs
-    common_path = core_dir / "common.rs"
-    if common_path.exists():
-        all_structs.update(parse_rust_file(common_path))
-
-    # Parse types.rs
-    types_path = core_dir / "types.rs"
-    if types_path.exists():
-        all_structs.update(parse_rust_file(types_path))
-
-    # Parse messages/*.rs
-    messages_dir = core_dir / "messages"
-    if messages_dir.exists():
-        for rs_file in messages_dir.glob("*.rs"):
-            if rs_file.name != "mod.rs":
-                all_structs.update(parse_rust_file(rs_file))
-
-    return all_structs
-
-
-# ---------------------------------------------------------------------------
-# Python Binding Parser
-# ---------------------------------------------------------------------------
-
-
-def parse_python_binding_file(filepath: Path) -> dict[str, PythonClass]:
-    """Parse a Python binding Rust file and extract pyclass structs with getters."""
-    content = filepath.read_text()
-    classes: dict[str, PythonClass] = {}
-
-    # Find #[pyclass] structs and their docstrings
-    pyclass_pattern = re.compile(
-        r"((?:\s*///[^\n]*\n)*)\s*(#\[pyclass[^\]]*\]\s*(?:#\[[^\]]*\]\s*)*)pub\s+struct\s+(\w+)",
-        re.MULTILINE,
-    )
-
-    for match in pyclass_pattern.finditer(content):
-        docstring_block = match.group(1)
-        class_name = match.group(3)
-
-        # Parse existing docstring
-        doc_lines = []
-        for line in docstring_block.split("\n"):
-            stripped = line.strip()
-            if stripped.startswith("///"):
-                slash_idx = line.find("///")
-                if slash_idx != -1:
-                    line_content = line[slash_idx + 3 :]
-                    if line_content.startswith(" "):
-                        line_content = line_content[1:]
-                    doc_lines.append(line_content.rstrip())
-
-        existing_docstring = "\n".join(doc_lines)
-        class_line_abs = content[: match.start(2)].count("\n")
-
-        # Find where docstring starts/ends
-        docstring_start = class_line_abs
-        if docstring_block.strip():
-            docstring_start = class_line_abs - docstring_block.count("\n")
-
-        classes[class_name] = PythonClass(
-            name=class_name,
-            docstring=existing_docstring,
-            line_start=docstring_start,
-            line_end=class_line_abs,
-            has_docstring=bool(doc_lines),
-        )
-
-    # Find #[pymethods] impl blocks
-    impl_pattern = re.compile(r"#\[pymethods\]\s*impl\s+(\w+)\s*\{", re.MULTILINE)
-
-    for impl_match in impl_pattern.finditer(content):
-        class_name = impl_match.group(1)
-        if class_name not in classes:
-            continue
-
-        # Find the end of this impl block correctly by tracking brace depth
-        impl_start = impl_match.end()
-        depth = 1
-        pos = impl_start
-        while pos < len(content) and depth > 0:
-            if content[pos] == "{":
-                depth += 1
-            elif content[pos] == "}":
-                depth -= 1
-            pos += 1
-
-        impl_body = content[impl_start : pos - 1]
-        impl_body_start_line = content[:impl_start].count("\n")
-
-        # Find getters in this impl block
-        # Pattern matches docstring + #[getter] + optional attributes + fn
-        getter_pattern = re.compile(
-            r"((?:\s*///[^\n]*\n)*)\s*#\[getter\]\s*\n(?:\s*#\[[^\]]*\]\s*\n)*\s*fn\s+(get_)?(\w+)\s*\(",
-            re.MULTILINE,
-        )
-
-        for getter_match in getter_pattern.finditer(impl_body):
-            docstring_block = getter_match.group(1)
-            prefix = getter_match.group(2) or ""
-            func_name_part = getter_match.group(3)
-
-            # Full function name and field name
-            full_func_name = f"{prefix}{func_name_part}"
-            field_name = func_name_part  # Field name is without get_ prefix
-
-            # Parse existing docstring
-            doc_lines = []
-            for line in docstring_block.split("\n"):
-                stripped = line.strip()
-                if stripped.startswith("///"):
-                    slash_idx = line.find("///")
-                    if slash_idx != -1:
-                        line_content = line[slash_idx + 3 :]
-                        if line_content.startswith(" "):
-                            line_content = line_content[1:]
-                        doc_lines.append(line_content.rstrip())
-
-            existing_docstring = "\n".join(doc_lines)
-
-            # Calculate line numbers
-            getter_line_in_impl = impl_body[: getter_match.start()].count("\n")
-            getter_line_abs = impl_body_start_line + getter_line_in_impl
-
-            # Find where docstring starts/ends
-            docstring_start = getter_line_abs
-            if docstring_block.strip():
-                docstring_start = getter_line_abs - docstring_block.count("\n")
-
-            classes[class_name].getters[field_name] = PythonGetter(
-                name=full_func_name,
-                field_name=field_name,
-                docstring=existing_docstring,
-                line_start=docstring_start,
-                line_end=getter_line_abs,
-                has_docstring=bool(doc_lines),
-            )
-
-    return classes
 
 
 def collect_python_classes(binding_dir: Path) -> dict[str, dict[str, PythonClass]]:
@@ -543,6 +260,9 @@ def sync_docstrings(
         changes: list[tuple[int, int, str, str, bool]] = []
 
         for class_name, py_class in classes.items():
+            if is_python_helper_class(class_name):
+                continue
+
             # Find matching Rust struct
             rust_struct_name = get_rust_struct_name(class_name)
             rust_struct = rust_structs.get(rust_struct_name)
@@ -772,7 +492,6 @@ def apply_docstring_changes(
 def print_report(
     results: list[SyncResult],
     rust_structs: dict[str, RustStruct],
-    verbose: bool = False,
 ) -> None:
     """Print a summary report of synchronization results."""
     by_status: dict[str, list[SyncResult]] = {}
@@ -794,7 +513,7 @@ def print_report(
         items = by_status.get(status, [])
         if items:
             print(f"{label}: {len(items)}")
-            if verbose or status in ("field_not_found", "struct_not_found"):
+            if status in ("field_not_found", "struct_not_found"):
                 for r in items:
                     print(f"    - {r.struct_name}.{r.field_name}")
 
@@ -831,26 +550,6 @@ def print_report(
     total = len(results)
     synced = len(by_status.get("updated", [])) + len(by_status.get("added", []))
     print(f"\nTotal: {total}, Synced: {synced}")
-    print(f"\nTotal: {total}, Synced: {synced}")
-
-
-def print_dry_run(results: list[SyncResult]) -> None:
-    """Print detailed changes for dry-run mode."""
-    print("\n=== Dry Run - Changes to be made ===\n")
-
-    changes = [r for r in results if r.status in ("updated", "added")]
-    if not changes:
-        print("No changes needed.")
-        return
-
-    for r in changes:
-        print(f"{'─' * 60}")
-        print(f"{r.struct_name}.{r.field_name} [{r.status}]")
-        if r.old_doc:
-            print(f"\n  OLD:\n    {r.old_doc.replace(chr(10), chr(10) + '    ')}")
-        print(f"\n  NEW:\n    {r.new_doc.replace(chr(10), chr(10) + '    ')}")
-    print(f"{'─' * 60}")
-    print(f"\nTotal changes: {len(changes)}")
 
 
 # ---------------------------------------------------------------------------
@@ -863,45 +562,15 @@ def main() -> int:
         description="Synchronize Rust docstrings to Python bindings"
     )
     parser.add_argument(
-        "--core-dir",
-        type=Path,
-        default=Path("../../ccsds-ndm/src"),
-        help="Path to ccsds-ndm/src directory",
-    )
-    parser.add_argument(
-        "--binding-dir",
-        type=Path,
-        default=Path("src"),
-        help="Path to bindings/python/src directory",
-    )
-    parser.add_argument(
         "--check",
         action="store_true",
         help="Check if docstrings are in sync (exit 1 if not)",
     )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show what would be changed without modifying files",
-    )
-    parser.add_argument(
-        "--report",
-        action="store_true",
-        help="Generate detailed mismatch report",
-    )
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Verbose output",
-    )
-
     args = parser.parse_args()
 
-    # Resolve paths
     script_dir = Path(__file__).parent
-    core_dir = (script_dir / args.core_dir).resolve()
-    binding_dir = (script_dir / args.binding_dir).resolve()
+    core_dir = (script_dir / "../../ccsds-ndm/src").resolve()
+    binding_dir = script_dir / "src"
 
     if not core_dir.exists():
         print(f"Error: Core directory not found: {core_dir}", file=sys.stderr)
@@ -931,16 +600,10 @@ def main() -> int:
         rust_structs,
         python_classes,
         binding_dir,
-        dry_run=args.dry_run or args.check,
+        dry_run=args.check,
     )
 
-    # Output
-    if args.dry_run:
-        print_dry_run(results)
-    elif args.report or args.verbose:
-        print_report(results, rust_structs, verbose=args.verbose)
-    else:
-        print_report(results, rust_structs, verbose=False)
+    print_report(results, rust_structs)
 
     # Check mode exit code
     if args.check:

@@ -40,7 +40,7 @@
 //!             └── CovarianceMatrix* (optional, within COVARIANCE_START/STOP)
 //! ```
 
-use crate::common::{OdmHeader, StateVectorAcc};
+use crate::common::StateVectorAcc;
 use crate::error::InternalParserError;
 use crate::kvn::parser::*;
 use crate::messages::oem::{Oem, OemBody, OemCovarianceMatrix, OemData, OemMetadata, OemSegment};
@@ -48,7 +48,7 @@ use crate::parse_block;
 use crate::types::*;
 use std::num::NonZeroU32;
 use winnow::ascii::space1;
-use winnow::combinator::{preceded, repeat};
+use winnow::combinator::preceded;
 use winnow::error::{AddContext, ErrMode};
 use winnow::prelude::*;
 use winnow::stream::Offset;
@@ -66,65 +66,6 @@ pub fn oem_version(input: &mut &str) -> KvnResult<String> {
 
     let (value, _) = expect_key("CCSDS_OEM_VERS").parse_next(input)?;
     Ok(value.to_string())
-}
-
-pub fn oem_header(input: &mut &str) -> KvnResult<OdmHeader> {
-    let mut comment = Vec::new();
-    let mut classification = None;
-    let mut creation_date = None;
-    let mut originator = None;
-    let mut message_id = None;
-
-    loop {
-        let checkpoint_loop = input.checkpoint();
-        comment.extend(collect_comments.parse_next(input)?);
-
-        let key = match preceded(ws, keyword).parse_next(input) {
-            Ok(k) => k,
-            Err(_) => {
-                input.reset(&checkpoint_loop);
-                break;
-            }
-        };
-
-        if key == "META_START" {
-            input.reset(&checkpoint_loop);
-            break;
-        }
-
-        kv_sep.parse_next(input)?;
-        match key {
-            "CLASSIFICATION" => {
-                classification = Some(kv_string.parse_next(input)?);
-            }
-            "CREATION_DATE" => {
-                creation_date = Some(kv_calendar_epoch.parse_next(input)?);
-            }
-            "ORIGINATOR" => {
-                originator = Some(kv_string.parse_next(input)?);
-            }
-            "MESSAGE_ID" => {
-                message_id = Some(kv_string.parse_next(input)?);
-            }
-            _ => {
-                input.reset(&checkpoint_loop);
-                break;
-            }
-        }
-
-        if input.offset_from(&checkpoint_loop) == 0 {
-            break;
-        }
-    }
-
-    Ok(OdmHeader {
-        comment,
-        classification,
-        creation_date: creation_date
-            .ok_or_else(|| missing_field_err(input, "Header", "CREATION_DATE"))?,
-        originator: originator.ok_or_else(|| missing_field_err(input, "Header", "ORIGINATOR"))?,
-        message_id,
-    })
 }
 
 //----------------------------------------------------------------------
@@ -197,6 +138,11 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
 // State Vector (Raw Line) Parser
 //----------------------------------------------------------------------
 
+/// True when only a line ending, or the end of input, remains of the current record.
+fn at_record_end(input: &str) -> bool {
+    input.is_empty() || input.starts_with('\n') || input.starts_with('\r')
+}
+
 fn parse_odm_f64(input: &mut &str) -> KvnResult<f64> {
     let token = take_while::<_, _, ()>(1.., ('0'..='9', '.', '-', '+', 'e', 'E'))
         .parse_next(input)
@@ -217,16 +163,16 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
 
     for f in &mut floats {
         let checkpoint = input.checkpoint();
-        match preceded(space1, parse_odm_f64).parse_next(input) {
-            Ok(val) => {
-                *f = val;
-                count += 1;
-            }
-            Err(_) => {
-                input.reset(&checkpoint);
-                break;
-            }
+        // Consume the separator on its own so that a missing separator (the record ended) stays
+        // distinguishable from a separator followed by a malformed token (a committed error).
+        let separator: KvnResult<&str> = space1.parse_next(input);
+        // Horizontal whitespace before the line ending is padding, not a missing component.
+        if separator.is_err() || at_record_end(input) {
+            input.reset(&checkpoint);
+            break;
         }
+        *f = parse_odm_f64.parse_next(input)?;
+        count += 1;
     }
 
     if count < 6 {
@@ -259,7 +205,16 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
         None
     };
 
-    // Consume trailing line ending if not already at EOF
+    // An ephemeris record occupies exactly one line, so only padding may follow its components.
+    // Without this anchor, leftover tokens are re-read as another record, which both accepts
+    // several records packed onto one line and undercounts them against `max_records`.
+    ws.parse_next(input)?;
+    if !at_record_end(input) {
+        return Err(cut_err(
+            input,
+            "State vector must have either 6 or 9 components",
+        ));
+    }
     opt_line_ending.parse_next(input)?;
 
     Ok(StateVectorAcc {
@@ -300,36 +255,26 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
     // Check for optional COV_REF_FRAME
     let mut cov_ref_frame = None;
     comment.extend(collect_comments.parse_next(input)?);
-    let checkpoint_inner = input.checkpoint();
-    if let Ok("COV_REF_FRAME") = key_token.parse_next(input) {
+    let next = input.trim_start_matches([' ', '\t']);
+    if next
+        .strip_prefix("COV_REF_FRAME")
+        .is_some_and(|rest| rest.starts_with([' ', '\t', '=']))
+    {
+        key_token.parse_next(input)?;
         cov_ref_frame = Some(kv_string.parse_next(input)?);
-    } else {
-        input.reset(&checkpoint_inner);
     }
 
     // Parse 6 lines of raw covariance data (1, 2, 3, 4, 5, 6 elements per line)
-    let expected_counts = [1, 2, 3, 4, 5, 6];
-    let mut floats = Vec::with_capacity(21);
+    let mut floats = [0.0; 21];
+    let mut offset = 0;
 
-    for expected_count in expected_counts {
-        comment.extend(collect_comments.parse_next(input)?);
-
-        let line_vals = (
-            preceded(ws, parse_odm_f64),
-            repeat(expected_count - 1, preceded(space1, parse_odm_f64)),
-        )
-            .map(|(first, rest): (f64, Vec<f64>)| {
-                let mut all = vec![first];
-                all.extend(rest);
-                all
-            })
-            .parse_next(input)?;
-
-        if line_vals.len() != expected_count {
-            return Err(cut_err(input, "Unexpected key or invalid format"));
+    for expected_count in 1..=6 {
+        blank_lines.parse_next(input)?;
+        floats[offset] = preceded(ws, parse_odm_f64).parse_next(input)?;
+        for value in &mut floats[offset + 1..offset + expected_count] {
+            *value = preceded(space1, parse_odm_f64).parse_next(input)?;
         }
-
-        floats.extend(line_vals);
+        offset += expected_count;
         opt_line_ending.parse_next(input)?;
     }
 
@@ -468,13 +413,9 @@ fn oem_data_item(input: &mut &str) -> KvnResult<OemDataItem> {
 
 /// Parses the OEM data section (state vectors and optional covariance matrices).
 pub fn oem_data(input: &mut &str) -> KvnResult<OemData> {
-    // Optimization: Pre-allocate vectors based on input size.
-    // Typical OEM state vector line is ~80-100 characters.
-    let estimated_records = (input.len() / 80).max(10);
-
     let mut data = OemData {
         comment: Vec::new(),
-        state_vector: Vec::with_capacity(estimated_records),
+        state_vector: Vec::new(),
         covariance_matrix: Vec::new(),
     };
 
@@ -611,7 +552,7 @@ pub fn parse_oem(input: &mut &str) -> KvnResult<Oem> {
     let version = oem_version.parse_next(input)?;
 
     // 2. Header
-    let header = oem_header.parse_next(input)?;
+    let header = odm_header.parse_next(input)?;
 
     // 3. Body (segments)
     let body = oem_body.parse_next(input)?;
@@ -2165,10 +2106,10 @@ META_STOP
     }
 
     #[test]
-    fn test_oem_header_loops() {
+    fn oem_reuses_the_shared_odm_header_parser() {
         let mut input =
             "COMMENT C1\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = ME\nMETA_START";
-        let header = oem_header.parse_next(&mut input).unwrap();
+        let header = odm_header.parse_next(&mut input).unwrap();
         assert_eq!(header.comment, vec!["C1"]);
         assert_eq!(header.originator, "ME");
         assert_eq!(input, "META_START");

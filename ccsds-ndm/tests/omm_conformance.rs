@@ -8,6 +8,8 @@ use tempfile::NamedTempFile;
 
 const KVN: &str = include_str!("../data/kvn/omm_g9.kvn");
 const XML: &str = include_str!("../data/xml/omm_g10.xml");
+/// The only shipped OMM fixture that carries a covariance matrix.
+const KVN_WITH_COVARIANCE: &str = include_str!("../data/kvn/omm_g8.kvn");
 
 fn repository_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
@@ -124,4 +126,157 @@ fn validate_xml(label: &str, xml: &str) {
         "{label} generated invalid XML: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+/// Each OMM keyword choice shares one ordering rank so either spelling may fill the slot. That
+/// allowance must not extend to repeating one alternative: the KVN block parser keeps the last
+/// assignment, so a repeat that reached it would silently discard a value.
+#[test]
+fn omm_kvn_separates_keyword_choices_from_repeated_alternatives() {
+    for (label, key, line) in [
+        (
+            "MEAN_MOTION",
+            "MEAN_MOTION = 1.00273272 [rev/day]",
+            "MEAN_MOTION = 2.0",
+        ),
+        ("BSTAR", "BSTAR = 0.0001 [1/ER]", "BSTAR = 0.0002"),
+        (
+            "MEAN_MOTION_DDOT",
+            "MEAN_MOTION_DDOT = 0.0 [rev/day**3]",
+            "MEAN_MOTION_DDOT = 1.0",
+        ),
+    ] {
+        assert!(KVN.contains(key), "fixture should contain {label}");
+        assert_kvn_rejected(
+            &format!("repeated {label}"),
+            KVN.replace(key, &format!("{key}\n{line}")),
+        );
+    }
+
+    // The other alternative may still follow; it is rejected as a semantic conflict rather than
+    // as an ordering error, so the diagnostic names both fields.
+    let error = Omm::from_kvn(&KVN.replace(
+        "BSTAR = 0.0001 [1/ER]",
+        "BSTAR = 0.0001 [1/ER]\nBTERM = 0.02",
+    ))
+    .expect_err("BSTAR and BTERM are mutually exclusive");
+    // `ValidationError::Conflict` has no stabilized code yet, so match the diagnostic itself.
+    assert!(
+        error.to_string().contains("Conflicting fields"),
+        "expected a conflict diagnostic, got {error}"
+    );
+}
+
+/// Every OMM value the schema types as a double must be a real number before generation runs.
+///
+/// The schema range facets are comparisons, and comparisons against NaN are false, so a range
+/// check alone lets NaN through to the output document.
+#[test]
+fn omm_generation_rejects_non_finite_values_in_every_numeric_block() {
+    /// A named mutation that puts a non-finite value into one numeric block.
+    type NonFiniteCase = (&'static str, fn(&mut Omm));
+
+    let cases: [NonFiniteCase; 6] = [
+        ("mean elements eccentricity", |omm| {
+            omm.body.segment.data.mean_elements.eccentricity.value = f64::NAN
+        }),
+        ("mean elements mean motion", |omm| {
+            omm.body
+                .segment
+                .data
+                .mean_elements
+                .mean_motion
+                .as_mut()
+                .expect("fixture uses MEAN_MOTION")
+                .value = f64::NAN
+        }),
+        ("mean elements GM", |omm| {
+            omm.body
+                .segment
+                .data
+                .mean_elements
+                .gm
+                .as_mut()
+                .expect("fixture has GM")
+                .value = f64::NAN
+        }),
+        ("TLE BSTAR", |omm| {
+            omm.body
+                .segment
+                .data
+                .tle_parameters
+                .as_mut()
+                .expect("fixture has TLE parameters")
+                .bstar
+                .as_mut()
+                .expect("fixture has BSTAR")
+                .value = f64::NAN
+        }),
+        ("TLE MEAN_MOTION_DOT", |omm| {
+            omm.body
+                .segment
+                .data
+                .tle_parameters
+                .as_mut()
+                .expect("fixture has TLE parameters")
+                .mean_motion_dot
+                .value = f64::NAN
+        }),
+        ("covariance CX_X", |omm| {
+            omm.body
+                .segment
+                .data
+                .covariance_matrix
+                .as_mut()
+                .expect("fixture has a covariance matrix")
+                .cx_x
+                .value = f64::NAN
+        }),
+    ];
+
+    for (label, mutate) in cases {
+        let mut omm = Omm::from_kvn(KVN_WITH_COVARIANCE).expect("fixture should parse");
+        mutate(&mut omm);
+        assert!(omm.to_kvn().is_err(), "{label} generated KVN");
+        assert!(omm.to_xml().is_err(), "{label} generated XML");
+    }
+}
+
+/// `inclinationType` narrows `angleRange` to `[0, 180]`, which the typed wrapper only enforces
+/// through its constructor. Validation has to restate it for models that reach the field directly.
+#[test]
+fn omm_validation_enforces_the_inclination_range() {
+    let mut omm = Omm::from_kvn(KVN).expect("fixture should parse");
+    omm.body.segment.data.mean_elements.inclination.angle.value = 190.0;
+
+    let error = omm.to_xml().expect_err("190 degrees is outside [0, 180]");
+    assert_eq!(error.code(), Some("validation.out_of_range"));
+}
+
+/// The shared ODM covariance and state-vector writers must spell numbers the way ODM 7.7.1
+/// requires, so that generated KVN reparses.
+#[test]
+fn omm_kvn_generation_spells_numbers_as_ccsds_numbers() {
+    let mut omm = Omm::from_kvn(KVN_WITH_COVARIANCE).expect("fixture should parse");
+    {
+        let covariance = omm
+            .body
+            .segment
+            .data
+            .covariance_matrix
+            .as_mut()
+            .expect("fixture has a covariance matrix");
+        covariance.cx_x.value = 1e-9;
+        covariance.cy_x.value = 0.1 + 0.2;
+        covariance.cy_y.value = 1.234_567_890_123_456_7;
+    }
+
+    let kvn = omm.to_kvn().expect("finite values should generate");
+    assert!(kvn.contains("CX_X                 = 1.0e-9\n"), "{kvn}");
+    assert!(kvn.contains("CY_X                 = 3.0e-1\n"), "{kvn}");
+    assert!(
+        kvn.contains("CY_Y                 = 1.234567890123457e0\n"),
+        "{kvn}"
+    );
+    Omm::from_kvn(&kvn).expect("generated KVN should reparse");
 }

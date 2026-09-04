@@ -1,6 +1,6 @@
 use crate::error::{CcsdsNdmError, Result};
 use std::fs;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::path::Path;
 use tempfile::Builder;
 
@@ -24,7 +24,10 @@ pub(crate) fn read_to_string(path: &Path, max_bytes: Option<usize>) -> Result<St
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error).into())
 }
 
-pub(crate) fn atomic_write(path: &Path, contents: &[u8]) -> Result<()> {
+pub(crate) fn atomic_write(
+    path: &Path,
+    write: impl FnOnce(&mut fs::File) -> Result<()>,
+) -> Result<()> {
     let parent = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
@@ -43,7 +46,7 @@ pub(crate) fn atomic_write(path: &Path, contents: &[u8]) -> Result<()> {
         builder.permissions(fs::Permissions::from_mode(0o666));
     }
     let mut temporary = builder.tempfile_in(parent)?;
-    temporary.write_all(contents)?;
+    write(temporary.as_file_mut())?;
     temporary.as_file().sync_all()?;
     if let Ok(metadata) = path.metadata() {
         temporary

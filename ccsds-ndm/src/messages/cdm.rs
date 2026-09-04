@@ -51,30 +51,11 @@ impl crate::traits::Validate for Cdm {
         self.header.validate()?;
         self.body.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        crate::validation::collect_message_validation_errors(
-            crate::validation::MessageKind::Cdm,
-            &self.id,
-            &self.version,
-            &self.header,
-            &self.body,
-        )
-    }
 }
 
 impl Ndm for Cdm {
     fn to_kvn(&self) -> Result<String> {
-        crate::generation::validate_for_generation(
-            crate::validation::MessageKind::Cdm,
-            &self.version,
-            crate::generation::OutputFormat::Kvn,
-            self,
-        )?;
-        self.validate_kvn_representability()?;
-        let mut writer = KvnWriter::new();
-        self.write_kvn(&mut writer);
-        writer.finish_checked()
+        crate::generation::to_kvn_string(self)
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
@@ -85,13 +66,7 @@ impl Ndm for Cdm {
     }
 
     fn to_xml(&self) -> Result<String> {
-        crate::generation::validate_for_generation(
-            crate::validation::MessageKind::Cdm,
-            &self.version,
-            crate::generation::OutputFormat::Xml,
-            self,
-        )?;
-        crate::xml::to_string(self)
+        crate::generation::to_xml_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
@@ -113,7 +88,7 @@ fn validate_xml_sequences(xml: &str) -> Result<()> {
             let children = cdm_xml_children(parent)?;
             let rank = children.iter().position(|candidate| *candidate == child)? as u16;
             let repeatable = child == b"COMMENT" || (parent == b"body" && child == b"segment");
-            Some(XmlSequenceRule { rank, repeatable })
+            Some(XmlSequenceRule::new(rank, repeatable))
         },
         |element, attribute| {
             attribute == b"units"
@@ -736,17 +711,6 @@ impl crate::traits::Validate for CdmHeader {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        Ok(crate::validation::missing_required_fields(
-            "CDM Header",
-            [
-                ("CREATION_DATE", self.creation_date.is_empty()),
-                ("ORIGINATOR", self.originator.trim().is_empty()),
-                ("MESSAGE_ID", self.message_id.trim().is_empty()),
-            ],
-        ))
-    }
 }
 
 impl ToKvn for CdmHeader {
@@ -808,39 +772,6 @@ impl crate::traits::Validate for CdmBody {
             segment.validate()?;
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = Vec::new();
-        if self.segments.len() != 2 {
-            errors.push(ValidationError::Generic {
-                message: Cow::Borrowed("CDM Body must have exactly 2 segments"),
-                line: None,
-            });
-        }
-        let object1_count = self
-            .segments
-            .iter()
-            .filter(|segment| segment.metadata.object == CdmObjectType::Object1)
-            .count();
-        let object2_count = self
-            .segments
-            .iter()
-            .filter(|segment| segment.metadata.object == CdmObjectType::Object2)
-            .count();
-        if object1_count != 1 || object2_count != 1 {
-            errors.push(ValidationError::Generic {
-                message: Cow::Borrowed(
-                    "CDM Body segments must contain exactly one OBJECT1 and one OBJECT2",
-                ),
-                line: None,
-            });
-        }
-        errors.extend(self.relative_metadata_data.validation_errors()?);
-        for segment in &self.segments {
-            errors.extend(segment.validation_errors()?);
-        }
-        Ok(errors)
     }
 }
 
@@ -1031,10 +962,6 @@ impl crate::traits::Validate for RelativeMetadataData {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        crate::validation::validation_errors_from(self.validate())
-    }
 }
 
 impl ToKvn for RelativeMetadataData {
@@ -1132,12 +1059,6 @@ impl crate::traits::Validate for CdmSegment {
         self.metadata.validate()?;
         self.data.validate()?;
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = self.metadata.validation_errors()?;
-        errors.extend(self.data.validation_errors()?);
-        Ok(errors)
     }
 }
 
@@ -1477,25 +1398,6 @@ impl crate::traits::Validate for CdmMetadata {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        Ok(crate::validation::missing_required_fields(
-            "CDM Metadata",
-            [
-                (
-                    "OBJECT_DESIGNATOR",
-                    self.object_designator.trim().is_empty(),
-                ),
-                ("CATALOG_NAME", self.catalog_name.trim().is_empty()),
-                ("OBJECT_NAME", self.object_name.trim().is_empty()),
-                (
-                    "INTERNATIONAL_DESIGNATOR",
-                    self.international_designator.trim().is_empty(),
-                ),
-                ("EPHEMERIS_NAME", self.ephemeris_name.trim().is_empty()),
-            ],
-        ))
-    }
 }
 
 impl CdmMetadata {
@@ -1556,18 +1458,6 @@ impl crate::traits::Validate for CdmData {
             covariance_matrix.validate()?;
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = crate::validation::missing_required_fields(
-            "CDM Data",
-            [("covarianceMatrix", self.covariance_matrix.is_none())],
-        );
-        errors.extend(self.state_vector.validation_errors()?);
-        if let Some(covariance_matrix) = &self.covariance_matrix {
-            errors.extend(covariance_matrix.validation_errors()?);
-        }
-        Ok(errors)
     }
 }
 
@@ -1809,13 +1699,6 @@ impl Validate for CdmStateVector {
             }
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        Ok(self
-            .values()
-            .filter_map(|(field, value)| non_finite_error(field, value))
-            .collect())
     }
 }
 
@@ -2167,15 +2050,6 @@ impl Validate for CdmCovarianceMatrix {
             }
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = self.optional_row_errors();
-        errors.extend(
-            self.values()
-                .filter_map(|(field, value)| non_finite_error(field, value)),
-        );
-        Ok(errors)
     }
 }
 

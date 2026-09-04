@@ -6,6 +6,7 @@
 Unit tests for Attitude Ephemeris Message (AEM) Python bindings.
 """
 
+import ccsds_ndm
 import numpy as np
 import pytest
 
@@ -201,11 +202,11 @@ class TestAem:
         kvn_path = tmp_path / "test.aem"
 
         # Write to file directly
-        aem.to_file(str(kvn_path), format="kvn")
+        aem.to_file(str(kvn_path), "kvn")
         assert kvn_path.exists()
 
         # Read back
-        aem2 = Aem.from_file(str(kvn_path), format="kvn")
+        aem2 = ccsds_ndm.from_file(str(kvn_path), format="kvn")
         assert aem2.header.originator == "TEST"
 
     def test_construction(self):

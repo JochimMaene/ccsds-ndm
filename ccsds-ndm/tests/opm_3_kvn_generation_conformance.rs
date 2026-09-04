@@ -1,6 +1,5 @@
 use ccsds_ndm::generation::VersionedNdm;
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::options::GenerateOptions;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{CalendarEpoch, GmUnits};
 use ccsds_ndm::MessageType;
@@ -128,7 +127,7 @@ fn opm_kvn_rounds_values_that_need_seventeen_digits() {
 
     let mut output = Vec::new();
     message
-        .write_kvn_to(&mut output, &GenerateOptions::source())
+        .write_kvn_to(&mut output)
         .expect("streaming should use the same CCSDS rounding");
     assert_eq!(output, generated.as_bytes());
 
@@ -215,7 +214,7 @@ fn opm_kvn_rounds_numbers_in_every_optional_numeric_block() {
 }
 
 #[test]
-fn opm_kvn_requires_the_odm_spelling_for_gm_units() {
+fn opm_kvn_canonicalizes_gm_units_to_the_odm_spelling() {
     let mut message =
         Opm::from_kvn(include_str!("../data/kvn/opm_g2.kvn")).expect("fixture should parse");
     message
@@ -228,14 +227,30 @@ fn opm_kvn_requires_the_odm_spelling_for_gm_units() {
         .gm
         .units = Some(GmUnits::KM3PerS2);
 
-    let error = message
+    // ODM 7.7.1 admits only the keyword table spelling in KVN, so the uppercase spelling the
+    // XML schema also permits is rewritten rather than rejected.
+    let kvn = message
         .to_kvn()
-        .expect_err("XML-only uppercase GM units must not reach KVN");
-    assert_eq!(error.code(), Some("validation.invalid_value"));
-    assert_eq!(
-        error.field_path().as_deref(),
-        Some("body.segment.data.keplerian_elements.gm.units")
+        .expect("uppercase GM units should be canonicalized, not rejected");
+    assert!(kvn.contains("[km**3/s**2]"), "{kvn}");
+    assert!(!kvn.contains("KM**3/S**2"), "{kvn}");
+
+    // The uppercase spelling stays valid on the XML side.
+    assert!(message
+        .to_xml()
+        .expect("XML generation")
+        .contains("KM**3/S**2"));
+}
+
+#[test]
+fn opm_kvn_gm_units_survive_a_kvn_round_trip() {
+    let source = include_str!("../data/kvn/opm_g2.kvn").replace(
+        "GM = 398600.4415 [km**3/s**2]",
+        "GM = 398600.4415 [KM**3/S**2]",
     );
+    let message = Opm::from_kvn(&source).expect("uppercase GM units should parse");
+    let regenerated = message.to_kvn().expect("regeneration should succeed");
+    Opm::from_kvn(&regenerated).expect("regenerated KVN should parse");
 }
 
 #[test]
@@ -246,14 +261,14 @@ fn opm_kvn_is_identical_across_public_generation_entry_points() {
 
     assert_eq!(
         message
-            .to_kvn_with(&GenerateOptions::source())
+            .to_kvn()
             .expect("versioned generation should succeed"),
         expected
     );
 
     let mut streamed = Vec::new();
     message
-        .write_kvn_to(&mut streamed, &GenerateOptions::source())
+        .write_kvn_to(&mut streamed)
         .expect("streaming generation should succeed");
     assert_eq!(streamed, expected.as_bytes());
 
@@ -266,7 +281,7 @@ fn opm_kvn_is_identical_across_public_generation_entry_points() {
     );
     assert_eq!(
         erased
-            .to_kvn_with(&GenerateOptions::source())
+            .to_kvn()
             .expect("type-erased versioned generation should succeed"),
         expected
     );
@@ -465,11 +480,11 @@ fn invalid_opm_kvn_is_rejected_across_public_generation_entry_points() {
     message.header.originator = "ESOC 🚀".to_owned();
 
     assert!(message.to_kvn().is_err());
-    assert!(message.to_kvn_with(&GenerateOptions::source()).is_err());
+    assert!(message.to_kvn().is_err());
 
     let mut output = Vec::new();
     let error = message
-        .write_kvn_to(&mut output, &GenerateOptions::source())
+        .write_kvn_to(&mut output)
         .expect_err("invalid KVN text must be rejected");
     assert_eq!(error.code(), Some("validation.invalid_value"));
     assert_eq!(error.field_path().as_deref(), Some("header.originator"));
@@ -477,7 +492,7 @@ fn invalid_opm_kvn_is_rejected_across_public_generation_entry_points() {
 
     let erased = MessageType::Opm(message);
     assert!(erased.to_kvn().is_err());
-    assert!(erased.to_kvn_with(&GenerateOptions::source()).is_err());
+    assert!(erased.to_kvn().is_err());
 
     let directory = tempfile::tempdir().expect("temporary directory should be created");
     let path = directory.path().join("opm.kvn");

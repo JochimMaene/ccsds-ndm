@@ -13,7 +13,6 @@ use crate::types::{
     PositionVelocityCovarianceUnits, VelocityCovariance, VelocityCovarianceUnits, VelocityUnits,
 };
 use serde::{Deserialize, Serialize};
-use std::fmt::Write;
 
 #[cfg(test)]
 use std::num::NonZeroU32;
@@ -27,6 +26,51 @@ fn absolute_epoch_error(epoch: &Epoch, field: &'static str) -> Option<Validation
             line: None,
         },
     )
+}
+
+/// Report a value with no CCSDS spelling that reads back as a finite number.
+fn unrepresentable_number(field: &str, value: f64, path: String) -> CcsdsNdmError {
+    ValidationError::InvalidValue {
+        field: field.to_owned().into(),
+        // Spell the offender in scientific form; `f64::to_string` expands large magnitudes to
+        // hundreds of digits, which buries the diagnostic.
+        value: format!("{value:e}"),
+        expected: "a representable CCSDS number".into(),
+        line: None,
+    }
+    .at_path(path)
+    .into()
+}
+
+/// Reject a record wider than the normative KVN line limit.
+fn line_length_error(
+    name: &'static str,
+    line_len: usize,
+    path: impl FnOnce() -> String,
+) -> Result<()> {
+    if line_len <= 254 {
+        return Ok(());
+    }
+    Err(ValidationError::OutOfRange {
+        name: name.into(),
+        value: line_len.to_string(),
+        expected: "a KVN line no longer than 254 characters".into(),
+        line: None,
+    }
+    .at_path(path())
+    .into())
+}
+
+/// Split the 21 lower-triangular values into the normative 1/2/3/4/5/6-element rows.
+fn covariance_rows<T>(values: &[T; 21]) -> [&[T]; 6] {
+    [
+        &values[0..1],
+        &values[1..3],
+        &values[3..6],
+        &values[6..10],
+        &values[10..15],
+        &values[15..21],
+    ]
 }
 
 fn validate_within_path(
@@ -79,21 +123,6 @@ impl crate::traits::Validate for Oem {
         self.header.validate()?;
         validate_within_path(self.body.validate(), || "body".into())
     }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = crate::validation::collect_message_validation_errors(
-            crate::validation::MessageKind::Oem,
-            &self.id,
-            &self.version,
-            &self.header,
-            &self.body,
-        )?;
-        crate::validation::collect_validation_result(
-            &mut errors,
-            crate::versioning::validate_oem_edition(self),
-        )?;
-        Ok(errors)
-    }
 }
 
 impl crate::traits::Validate for OemBody {
@@ -102,70 +131,7 @@ impl crate::traits::Validate for OemBody {
         for (index, segment) in self.segment.iter().enumerate() {
             validate_within_path(segment.validate(), || format!("segment[{index}]").into())?;
         }
-        Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = Vec::new();
-        if self.segment.is_empty() {
-            errors.push(
-                crate::error::ValidationError::MissingRequiredField {
-                    block: "OEM Body".into(),
-                    field: "segment (at least one required)".into(),
-                    line: None,
-                }
-                .at_path("body.segment"),
-            );
-        }
-        if let Some(first) = self.segment.first() {
-            let time_system = &first.metadata.time_system;
-            let object_name = &first.metadata.object_name;
-            let object_id = &first.metadata.object_id;
-            for (index, segment) in self.segment.iter().enumerate().skip(1) {
-                if segment.metadata.time_system != *time_system {
-                    errors.push(
-                        crate::error::ValidationError::InvalidValue {
-                            field: "TIME_SYSTEM".into(),
-                            value: segment.metadata.time_system.clone(),
-                            expected: format!(
-                                "consistent TIME_SYSTEM across OEM segments (expected {time_system})"
-                            )
-                            .into(),
-                            line: None,
-                        }
-                        .at_path(format!("body.segment[{index}].metadata.time_system")),
-                    );
-                }
-                if segment.metadata.object_name != *object_name
-                    || segment.metadata.object_id != *object_id
-                {
-                    errors.push(
-                        crate::error::ValidationError::InvalidValue {
-                            field: "OBJECT_NAME/OBJECT_ID".into(),
-                            value: format!(
-                                "{}/{}",
-                                segment.metadata.object_name, segment.metadata.object_id
-                            ),
-                            expected: format!(
-                                "one object throughout the OEM (expected {object_name}/{object_id})"
-                            )
-                            .into(),
-                            line: None,
-                        }
-                        .at_path(format!("body.segment[{index}].metadata.object_id")),
-                    );
-                }
-            }
-        }
-        for (index, segment) in self.segment.iter().enumerate() {
-            errors.extend(
-                segment
-                    .validation_errors()?
-                    .into_iter()
-                    .map(|error| error.within_path(format!("body.segment[{index}]"))),
-            );
-        }
-        Ok(errors)
+        self.validate_useable_spans()
     }
 }
 
@@ -221,48 +187,64 @@ impl OemBody {
         }
         Ok(())
     }
+
+    fn validate_useable_spans(&self) -> Result<()> {
+        use std::cmp::Ordering;
+
+        for (index, segments) in self.segment.windows(2).enumerate() {
+            let (Some(previous_stop), Some(next_start)) = (
+                &segments[0].metadata.useable_stop_time,
+                &segments[1].metadata.useable_start_time,
+            ) else {
+                continue;
+            };
+            if previous_stop.cmp_same_branch(next_start) == Some(Ordering::Greater) {
+                return Err(ValidationError::InvalidValue {
+                    field: "USEABLE_START_TIME".into(),
+                    value: next_start.to_string(),
+                    expected: format!(
+                        "not earlier than the preceding segment USEABLE_STOP_TIME {previous_stop}"
+                    )
+                    .into(),
+                    line: None,
+                }
+                .at_path(format!(
+                    "segment[{}].metadata.useable_start_time",
+                    index + 1
+                ))
+                .into());
+            }
+        }
+        Ok(())
+    }
 }
 
 impl crate::traits::Validate for OemSegment {
     fn validate(&self) -> Result<()> {
         validate_within_path(self.metadata.validate(), || "metadata".into())?;
         validate_within_path(self.data.validate(), || "data".into())?;
-        match self.epoch_range_errors().into_iter().next() {
+        match self.first_epoch_range_error() {
             Some(error) => Err(error.into()),
             None => Ok(()),
         }
     }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = self
-            .metadata
-            .validation_errors()?
-            .into_iter()
-            .map(|error| error.within_path("metadata"))
-            .collect::<Vec<_>>();
-        errors.extend(
-            self.data
-                .validation_errors()?
-                .into_iter()
-                .map(|error| error.within_path("data")),
-        );
-        errors.extend(self.epoch_range_errors());
-        Ok(errors)
-    }
 }
 
 impl OemSegment {
-    fn epoch_range_errors(&self) -> Vec<ValidationError> {
-        let mut errors = Vec::new();
+    /// Return the first epoch ordering or range violation in this segment, if any.
+    fn first_epoch_range_error(&self) -> Option<ValidationError> {
+        let mut first = None;
+        let mut report = |error| {
+            first.get_or_insert(error);
+        };
         let mut range = OemEpochRangeCheck::new(&self.metadata);
         for (index, state) in self.data.state_vector.iter().enumerate() {
-            range.state(index, state, &mut |error| errors.push(error));
+            range.state(index, state, &mut report);
         }
-
         for (index, covariance) in self.data.covariance_matrix.iter().enumerate() {
-            range.covariance(index, covariance, &mut |error| errors.push(error));
+            range.covariance(index, covariance, &mut report);
         }
-        errors
+        first
     }
 }
 
@@ -434,90 +416,49 @@ impl crate::traits::Validate for OemMetadata {
             }
             .into());
         }
-        match self.time_span_errors().into_iter().next() {
+        match self.first_time_span_error() {
             Some(error) => Err(error.into()),
             None => Ok(()),
         }
     }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = crate::validation::missing_required_fields(
-            "OEM Metadata",
-            [
-                ("OBJECT_NAME", self.object_name.trim().is_empty()),
-                ("OBJECT_ID", self.object_id.trim().is_empty()),
-                ("CENTER_NAME", self.center_name.trim().is_empty()),
-                ("REF_FRAME", self.ref_frame.trim().is_empty()),
-                ("TIME_SYSTEM", self.time_system.trim().is_empty()),
-                (
-                    "INTERPOLATION_DEGREE (required when INTERPOLATION is present)",
-                    self.interpolation.is_some() && self.interpolation_degree.is_none(),
-                ),
-            ],
-        );
-        for (field, epoch) in [
-            ("START_TIME", &self.start_time),
-            ("STOP_TIME", &self.stop_time),
-        ] {
-            if let Some(error) = absolute_epoch_error(epoch, field) {
-                errors.push(error);
-            }
-        }
-        for (field, epoch) in [
-            ("USEABLE_START_TIME", self.useable_start_time.as_ref()),
-            ("USEABLE_STOP_TIME", self.useable_stop_time.as_ref()),
-        ] {
-            if let Some(epoch) = epoch {
-                if let Some(error) = absolute_epoch_error(epoch, field) {
-                    errors.push(error);
-                }
-            }
-        }
-        errors.extend(self.time_span_errors());
-        Ok(errors)
-    }
 }
 
 impl OemMetadata {
-    fn time_span_errors(&self) -> Vec<ValidationError> {
+    /// Return the first metadata time-span violation, if any.
+    fn first_time_span_error(&self) -> Option<ValidationError> {
         use std::cmp::Ordering;
 
-        let mut errors = Vec::new();
-        if self.start_time.cmp_same_branch(&self.stop_time) == Some(Ordering::Greater) {
-            errors.push(ValidationError::InvalidValue {
+        let out_of_order = |earlier: &Epoch, later: &Epoch| {
+            earlier.cmp_same_branch(later) == Some(Ordering::Greater)
+        };
+        let within_total_span = |epoch: &Epoch| {
+            !out_of_order(&self.start_time, epoch) && !out_of_order(epoch, &self.stop_time)
+        };
+
+        if out_of_order(&self.start_time, &self.stop_time) {
+            return Some(ValidationError::InvalidValue {
                 field: "START_TIME/STOP_TIME".into(),
                 value: format!("{} > {}", self.start_time, self.stop_time),
                 expected: "START_TIME no later than STOP_TIME".into(),
                 line: None,
             });
         }
-        if let Some(start) = &self.useable_start_time {
-            if self.start_time.cmp_same_branch(start) == Some(Ordering::Greater)
-                || start.cmp_same_branch(&self.stop_time) == Some(Ordering::Greater)
-            {
-                errors.push(ValidationError::OutOfRange {
-                    name: "USEABLE_START_TIME".into(),
-                    value: start.to_string(),
-                    expected: "within the total START_TIME/STOP_TIME span".into(),
-                    line: None,
-                });
-            }
-        }
-        if let Some(stop) = &self.useable_stop_time {
-            if self.start_time.cmp_same_branch(stop) == Some(Ordering::Greater)
-                || stop.cmp_same_branch(&self.stop_time) == Some(Ordering::Greater)
-            {
-                errors.push(ValidationError::OutOfRange {
-                    name: "USEABLE_STOP_TIME".into(),
-                    value: stop.to_string(),
+        for (name, epoch) in [
+            ("USEABLE_START_TIME", self.useable_start_time.as_ref()),
+            ("USEABLE_STOP_TIME", self.useable_stop_time.as_ref()),
+        ] {
+            if let Some(epoch) = epoch.filter(|epoch| !within_total_span(epoch)) {
+                return Some(ValidationError::OutOfRange {
+                    name: name.into(),
+                    value: epoch.to_string(),
                     expected: "within the total START_TIME/STOP_TIME span".into(),
                     line: None,
                 });
             }
         }
         if let (Some(start), Some(stop)) = (&self.useable_start_time, &self.useable_stop_time) {
-            if start.cmp_same_branch(stop) == Some(Ordering::Greater) {
-                errors.push(ValidationError::InvalidValue {
+            if out_of_order(start, stop) {
+                return Some(ValidationError::InvalidValue {
                     field: "USEABLE_START_TIME/USEABLE_STOP_TIME".into(),
                     value: format!("{start} > {stop}"),
                     expected: "USEABLE_START_TIME no later than USEABLE_STOP_TIME".into(),
@@ -525,7 +466,7 @@ impl OemMetadata {
                 });
             }
         }
-        errors
+        None
     }
 }
 
@@ -543,33 +484,6 @@ impl crate::traits::Validate for OemData {
             })?;
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = crate::validation::missing_required_fields(
-            "OEM Data",
-            [(
-                "stateVector (at least one required)",
-                self.state_vector.is_empty(),
-            )],
-        );
-        for (index, state_vector) in self.state_vector.iter().enumerate() {
-            errors.extend(
-                state_vector
-                    .validation_errors()?
-                    .into_iter()
-                    .map(|error| error.within_path(format!("state_vector[{index}]"))),
-            );
-        }
-        for (index, covariance) in self.covariance_matrix.iter().enumerate() {
-            errors.extend(
-                covariance
-                    .validation_errors()?
-                    .into_iter()
-                    .map(|error| error.within_path(format!("covariance_matrix[{index}]"))),
-            );
-        }
-        Ok(errors)
     }
 }
 
@@ -612,7 +526,6 @@ impl Ndm for Oem {
                 crate::validation::MessageKind::Oem,
                 crate::error::DiagnosticNotation::Kvn,
                 &self.version,
-                &self.version,
             )
         })
     }
@@ -622,24 +535,7 @@ impl Ndm for Oem {
     }
 
     fn to_xml(&self) -> Result<String> {
-        (|| {
-            crate::generation::validate_for_generation(
-                crate::validation::MessageKind::Oem,
-                &self.version,
-                crate::generation::OutputFormat::Xml,
-                self,
-            )?;
-            self.validate_xml_text()?;
-            crate::xml::to_string(self)
-        })()
-        .map_err(|error: crate::error::CcsdsNdmError| {
-            error.with_generation_context(
-                crate::validation::MessageKind::Oem,
-                crate::error::DiagnosticNotation::Xml,
-                &self.version,
-                &self.version,
-            )
-        })
+        crate::generation::to_xml_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
@@ -648,16 +544,21 @@ impl Ndm for Oem {
 }
 
 impl Oem {
+    /// Run the generation pass against a discarding sink.
+    ///
+    /// `write_validated_kvn` is the single description of the OEM KVN layout, so validating
+    /// through it keeps the checks and the emitted bytes from drifting apart. Streaming callers
+    /// preflight here first so a rejected message never reaches the caller's sink half-written.
     pub(crate) fn validate_kvn_generation(&self) -> Result<()> {
-        self.run_kvn_generation(None)
+        let mut sink = std::io::sink();
+        let mut writer = KvnWriter::from_io(&mut sink);
+        self.write_validated_kvn(&mut writer)?;
+        writer.finish_io()
     }
 
+    /// Write the complete OEM KVN document, validating each record as it is emitted.
     fn write_validated_kvn(&self, writer: &mut KvnWriter<'_>) -> Result<()> {
-        self.run_kvn_generation(Some(writer))
-    }
-
-    fn run_kvn_generation(&self, mut writer: Option<&mut KvnWriter<'_>>) -> Result<()> {
-        fn text(field: &'static str, value: &str, path: String, key_len: usize) -> Result<()> {
+        fn text(field: &'static str, value: &str, path: String) -> Result<()> {
             if !value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
                 return Err(ValidationError::InvalidValue {
                     field: field.into(),
@@ -668,7 +569,8 @@ impl Oem {
                 .at_path(path)
                 .into());
             }
-            let line_len = key_len.max(20) + 3 + value.len();
+            // `KvnWriter::write_pair` left-pads the key to 20 columns and adds " = ".
+            let line_len = field.len().max(20) + 3 + value.len();
             if line_len > 254 {
                 return Err(ValidationError::OutOfRange {
                     name: field.into(),
@@ -689,19 +591,6 @@ impl Oem {
             }
             Ok(())
         }
-        fn number(field: &'static str, value: f64, path: impl FnOnce() -> String) -> Result<usize> {
-            if let Some(length) = OdmFloat::formatted_len(value) {
-                return Ok(length);
-            }
-            Err(ValidationError::InvalidValue {
-                field: field.into(),
-                value: value.to_string(),
-                expected: "a finite number".into(),
-                line: None,
-            }
-            .at_path(path())
-            .into())
-        }
         crate::versioning::validate_root(
             crate::validation::MessageKind::Oem,
             &self.id,
@@ -710,24 +599,22 @@ impl Oem {
         crate::versioning::validate_oem_edition(self)?;
         self.header.validate()?;
         validate_within_path(self.body.validate_identity(), || "body".into())?;
+        validate_within_path(self.body.validate_useable_spans(), || "body".into())?;
 
         comments(&self.header.comment, "header.comment".into())?;
         if let Some(value) = &self.header.classification {
-            text("CLASSIFICATION", value, "header.classification".into(), 14)?;
+            text("CLASSIFICATION", value, "header.classification".into())?;
         }
         text(
             "ORIGINATOR",
             &self.header.originator,
             "header.originator".into(),
-            10,
         )?;
         if let Some(value) = &self.header.message_id {
-            text("MESSAGE_ID", value, "header.message_id".into(), 10)?;
+            text("MESSAGE_ID", value, "header.message_id".into())?;
         }
-        if let Some(writer) = writer.as_deref_mut() {
-            writer.write_pair("CCSDS_OEM_VERS", &self.version);
-            self.header.write_kvn(writer);
-        }
+        writer.write_pair("CCSDS_OEM_VERS", &self.version);
+        self.header.write_kvn(writer);
         for (segment_index, segment) in self.body.segment.iter().enumerate() {
             let base = format!("body.segment[{segment_index}]");
             let metadata = &segment.metadata;
@@ -744,29 +631,21 @@ impl Oem {
                 ("REF_FRAME", metadata.ref_frame.as_str(), "ref_frame"),
                 ("TIME_SYSTEM", metadata.time_system.as_str(), "time_system"),
             ] {
-                text(
-                    field,
-                    value,
-                    format!("{base}.metadata.{member}"),
-                    field.len(),
-                )?;
+                text(field, value, format!("{base}.metadata.{member}"))?;
             }
             if let Some(value) = &metadata.interpolation {
                 text(
                     "INTERPOLATION",
                     value,
                     format!("{base}.metadata.interpolation"),
-                    13,
                 )?;
             }
             comments(&segment.data.comment, format!("{base}.data.comment"))?;
-            if let Some(writer) = writer.as_deref_mut() {
-                writer.write_section("META_START");
-                metadata.write_kvn(writer);
-                writer.write_section("META_STOP");
-                writer.write_comments(&segment.data.comment);
-                writer.write_empty();
-            }
+            writer.write_section("META_START");
+            metadata.write_kvn(writer);
+            writer.write_section("META_STOP");
+            writer.write_comments(&segment.data.comment);
+            writer.write_empty();
             for (state_index, state) in segment.data.state_vector.iter().enumerate() {
                 // The fused generation pass below applies the stronger OEM absolute/range/order
                 // epoch checks and checks every numeric component through `OdmFloat`. Calling the
@@ -806,87 +685,42 @@ impl Oem {
                     ("Y_DDOT", &state.y_ddot, "y_ddot"),
                     ("Z_DDOT", &state.z_ddot, "z_ddot"),
                 ];
-                if let Some(writer) = writer.as_deref_mut() {
-                    writer.try_write_validated_line(|line, line_start| -> Result<()> {
-                        line.push_str(state.epoch.as_str());
-                        for (field, value, member) in required_values {
-                            line.push(' ');
-                            if !OdmFloat::write_if_valid(value, line) {
-                                return Err(ValidationError::InvalidValue {
-                                    field: field.into(),
-                                    value: value.to_string(),
-                                    expected: "a finite number".into(),
-                                    line: None,
-                                }
-                                .at_path(format!(
-                                    "{base}.data.state_vector[{state_index}].{member}"
-                                ))
-                                .into());
-                            }
-                        }
-                        for (field, value, member) in acceleration_values {
-                            if let Some(value) = value {
-                                line.push(' ');
-                                if !OdmFloat::write_if_valid(value.value, line) {
-                                    return Err(ValidationError::InvalidValue {
-                                        field: field.into(),
-                                        value: value.value.to_string(),
-                                        expected: "a finite number".into(),
-                                        line: None,
-                                    }
-                                    .at_path(format!(
-                                        "{base}.data.state_vector[{state_index}].{member}"
-                                    ))
-                                    .into());
-                                }
-                            }
-                        }
-                        let line_len = line.len() - line_start;
-                        if line_len > 254 {
-                            return Err(ValidationError::OutOfRange {
-                                name: "stateVector".into(),
-                                value: line_len.to_string(),
-                                expected: "a KVN line no longer than 254 characters".into(),
-                                line: None,
-                            }
-                            .at_path(format!("{base}.data.state_vector[{state_index}]"))
-                            .into());
-                        }
-                        Ok(())
-                    })?;
-                } else {
-                    let mut formatted_values_len = 0usize;
+                writer.try_write_validated_line(|line, line_start| -> Result<()> {
+                    line.push_str(state.epoch.as_str());
                     for (field, value, member) in required_values {
-                        formatted_values_len += number(field, value, || {
-                            format!("{base}.data.state_vector[{state_index}].{member}")
-                        })?;
-                    }
-                    for (field, value, member) in acceleration_values {
-                        if let Some(value) = value {
-                            formatted_values_len += number(field, value.value, || {
-                                format!("{base}.data.state_vector[{state_index}].{member}")
-                            })?;
+                        line.push(' ');
+                        if !OdmFloat::write_if_valid(value, line) {
+                            return Err(unrepresentable_number(
+                                field,
+                                value,
+                                format!("{base}.data.state_vector[{state_index}].{member}"),
+                            ));
                         }
                     }
-                    let value_count = 6 + acceleration_count;
-                    let line_len = state.epoch.as_str().len() + value_count + formatted_values_len;
-                    if line_len > 254 {
-                        return Err(ValidationError::OutOfRange {
-                            name: "stateVector".into(),
-                            value: line_len.to_string(),
-                            expected: "a KVN line no longer than 254 characters".into(),
-                            line: None,
+                    for (field, value, member) in
+                        acceleration_values
+                            .into_iter()
+                            .flat_map(|(field, value, member)| {
+                                value.as_ref().map(|value| (field, value, member))
+                            })
+                    {
+                        line.push(' ');
+                        if !OdmFloat::write_if_valid(value.value, line) {
+                            return Err(unrepresentable_number(
+                                field,
+                                value.value,
+                                format!("{base}.data.state_vector[{state_index}].{member}"),
+                            ));
                         }
-                        .at_path(format!("{base}.data.state_vector[{state_index}]"))
-                        .into());
                     }
-                }
+                    line_length_error("stateVector", line.len() - line_start, || {
+                        format!("{base}.data.state_vector[{state_index}]")
+                    })
+                })?;
             }
             if !segment.data.covariance_matrix.is_empty() {
-                if let Some(writer) = writer.as_deref_mut() {
-                    writer.write_empty();
-                    writer.write_section("COVARIANCE_START");
-                }
+                writer.write_empty();
+                writer.write_section("COVARIANCE_START");
                 for (covariance_index, covariance) in
                     segment.data.covariance_matrix.iter().enumerate()
                 {
@@ -908,9 +742,7 @@ impl Oem {
                         &covariance.comment,
                         format!("{base}.data.covariance_matrix[{covariance_index}].comment"),
                     )?;
-                    if let Some(writer) = writer.as_deref_mut() {
-                        writer.write_comments(&covariance.comment);
-                    }
+                    writer.write_comments(&covariance.comment);
                 }
             }
             for (covariance_index, covariance) in segment.data.covariance_matrix.iter().enumerate()
@@ -936,106 +768,45 @@ impl Oem {
                         "COV_REF_FRAME",
                         value,
                         format!("{base}.data.covariance_matrix[{covariance_index}].cov_ref_frame"),
-                        13,
                     )?;
                 }
-                if let Some(writer) = writer.as_deref_mut() {
-                    writer.write_pair("EPOCH", covariance.epoch);
-                    if let Some(value) = &covariance.cov_ref_frame {
-                        writer.write_pair("COV_REF_FRAME", value);
-                    }
+                writer.write_pair("EPOCH", covariance.epoch);
+                if let Some(value) = &covariance.cov_ref_frame {
+                    writer.write_pair("COV_REF_FRAME", value);
                 }
                 let values = covariance.values();
-                if let Some(writer) = writer.as_deref_mut() {
-                    for (row_index, row) in [
-                        &values[0..1],
-                        &values[1..3],
-                        &values[3..6],
-                        &values[6..10],
-                        &values[10..15],
-                        &values[15..21],
-                    ]
-                    .into_iter()
-                    .enumerate()
-                    {
-                        writer.try_write_validated_line(|line, line_start| -> Result<()> {
-                            for (value_index, (field, value)) in row.iter().enumerate() {
-                                if value_index > 0 {
-                                    line.push(' ');
-                                }
-                                if !OdmFloat::write_if_valid(*value, line) {
-                                    return Err(ValidationError::InvalidValue {
-                                        field: (*field).into(),
-                                        value: value.to_string(),
-                                        expected: "a finite number".into(),
-                                        line: None,
-                                    }
-                                    .at_path(format!(
-                                        "{base}.data.covariance_matrix[{covariance_index}].{}",
-                                        field.to_ascii_lowercase()
-                                    ))
-                                    .into());
-                                }
+                for (row_index, row) in covariance_rows(&values).into_iter().enumerate() {
+                    writer.try_write_validated_line(|line, line_start| -> Result<()> {
+                        for (value_index, (field, value)) in row.iter().enumerate() {
+                            if value_index > 0 {
+                                line.push(' ');
                             }
-                            let line_len = line.len() - line_start;
-                            if line_len > 254 {
-                                return Err(ValidationError::OutOfRange {
-                                    name: "covariance row".into(),
-                                    value: line_len.to_string(),
-                                    expected: "a KVN line no longer than 254 characters".into(),
-                                    line: None,
-                                }
-                                .at_path(format!(
-                                    "{base}.data.covariance_matrix[{covariance_index}].row[{}]",
-                                    row_index + 1
-                                ))
-                                .into());
+                            let path = || {
+                                format!(
+                                    "{base}.data.covariance_matrix[{covariance_index}].{}",
+                                    field.to_ascii_lowercase()
+                                )
+                            };
+                            if let Some(error) =
+                                crate::common::covariance_value_error(field, *value)
+                            {
+                                return Err(error.at_path(path()).into());
                             }
-                            Ok(())
-                        })?;
-                    }
-                } else {
-                    let mut formatted_lengths = [0usize; 21];
-                    for ((field, value), length) in values.iter().zip(&mut formatted_lengths) {
-                        *length = number(field, *value, || {
+                            if !OdmFloat::write_if_valid(*value, line) {
+                                return Err(unrepresentable_number(field, *value, path()));
+                            }
+                        }
+                        line_length_error("covariance row", line.len() - line_start, || {
                             format!(
-                                "{base}.data.covariance_matrix[{covariance_index}].{}",
-                                field.to_ascii_lowercase()
-                            )
-                        })?;
-                    }
-                    for (row_index, row) in [
-                        &formatted_lengths[0..1],
-                        &formatted_lengths[1..3],
-                        &formatted_lengths[3..6],
-                        &formatted_lengths[6..10],
-                        &formatted_lengths[10..15],
-                        &formatted_lengths[15..21],
-                    ]
-                    .into_iter()
-                    .enumerate()
-                    {
-                        let line_len = row.len().saturating_sub(1) + row.iter().sum::<usize>();
-                        if line_len > 254 {
-                            return Err(ValidationError::OutOfRange {
-                                name: "covariance row".into(),
-                                value: line_len.to_string(),
-                                expected: "a KVN line no longer than 254 characters".into(),
-                                line: None,
-                            }
-                            .at_path(format!(
                                 "{base}.data.covariance_matrix[{covariance_index}].row[{}]",
                                 row_index + 1
-                            ))
-                            .into());
-                        }
-                    }
+                            )
+                        })
+                    })?;
                 }
             }
             if !segment.data.covariance_matrix.is_empty() {
-                if let Some(writer) = writer.as_deref_mut() {
-                    writer.write_section("COVARIANCE_STOP");
-                }
+                writer.write_section("COVARIANCE_STOP");
             }
         }
         Ok(())
@@ -1105,15 +876,16 @@ impl Oem {
         kvn: &str,
         options: &crate::options::ParseOptions,
     ) -> Result<Self> {
-        let source_edition = kvn.lines().find_map(|line| {
+        let source_edition = kvn.split(['\r', '\n']).find_map(|line| {
             line.split_once('=')
                 .filter(|(key, _)| key.trim() == "CCSDS_OEM_VERS")
                 .map(|(_, value)| value.trim())
         });
         (|| {
             validate_input_size(kvn, options)?;
-            validate_oem_kvn_syntax(kvn, options)?;
-            let oem = Self::from_kvn_str(kvn)?;
+            let normalized = crate::kvn::normalize_line_endings(kvn);
+            validate_oem_kvn_syntax(&normalized, options)?;
+            let oem = Self::from_kvn_str(&normalized)?;
             crate::traits::Validate::validate(&oem)?;
             Ok(oem)
         })()
@@ -1132,13 +904,10 @@ impl Oem {
         xml: &str,
         options: &crate::options::ParseOptions,
     ) -> Result<Self> {
-        let source_edition = xml
-            .find("<oem")
-            .and_then(|root| xml[root..].split_once("version=\"").map(|(_, value)| value))
-            .and_then(|value| value.split_once('"').map(|(version, _)| version));
+        let mut source_edition = None;
         (|| {
             validate_input_size(xml, options)?;
-            validate_oem_xml_envelope(xml, options)?;
+            validate_oem_xml_envelope(xml, options, &mut source_edition)?;
             let mut oem: Self = crate::xml::from_str_with_context(xml, "OEM")?;
             oem.normalize_implicit_units();
             crate::traits::Validate::validate(&oem)?;
@@ -1149,7 +918,7 @@ impl Oem {
                 crate::validation::MessageKind::Oem,
                 crate::error::DiagnosticNotation::Xml,
                 xml,
-                source_edition,
+                source_edition.as_deref(),
             )
         })
     }
@@ -1276,6 +1045,10 @@ pub(crate) fn valid_odm_number(token: &str) -> bool {
     index == bytes.len() && index > exponent_start
 }
 
+/// Validate the OEM KVN record structure.
+///
+/// Expects `kvn` to have gone through [`crate::kvn::normalize_line_endings`], so every remaining
+/// carriage return is part of a CRLF pair.
 fn validate_oem_kvn_syntax(kvn: &str, options: &crate::options::ParseOptions) -> Result<()> {
     use crate::error::{CcsdsNdmError, FormatError};
 
@@ -1357,9 +1130,6 @@ fn validate_oem_kvn_syntax(kvn: &str, options: &crate::options::ParseOptions) ->
     for (index, raw_line) in kvn.split('\n').enumerate() {
         let line_number = index + 1;
         let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
-        if line.as_bytes().contains(&b'\r') {
-            return Err(invalid(line_number, offset, "lone carriage return"));
-        }
         if line.len() > 254 {
             return Err(invalid(
                 line_number,
@@ -1374,8 +1144,8 @@ fn validate_oem_kvn_syntax(kvn: &str, options: &crate::options::ParseOptions) ->
                 "non-printable or non-ASCII character",
             ));
         }
-        let line = line.trim();
-        if line.is_empty() {
+        let line = line.trim_start();
+        if line.trim_end().is_empty() {
             offset += raw_line.len() + 1;
             continue;
         }
@@ -1383,10 +1153,10 @@ fn validate_oem_kvn_syntax(kvn: &str, options: &crate::options::ParseOptions) ->
             let allowed = match phase {
                 Phase::Header => header_rank_seen == Some(0),
                 Phase::Metadata => metadata_rank_seen == 0,
-                Phase::Ephemeris => state_records == 0 && !covariance_closed,
+                Phase::Ephemeris => state_records == 0,
                 Phase::Covariance => !covariance_epoch_seen && covariance_row == 0,
             };
-            if line == "COMMENT" || !allowed {
+            if !allowed {
                 return Err(invalid(
                     line_number,
                     offset,
@@ -1396,6 +1166,7 @@ fn validate_oem_kvn_syntax(kvn: &str, options: &crate::options::ParseOptions) ->
             offset += raw_line.len() + 1;
             continue;
         }
+        let line = line.trim_end();
 
         match line {
             "META_START" => {
@@ -1445,10 +1216,9 @@ fn validate_oem_kvn_syntax(kvn: &str, options: &crate::options::ParseOptions) ->
                 covariance_closed = true;
             }
             _ if line.contains('=') => {
-                if !line.contains('=') {
-                    return Err(invalid(line_number, offset, "expected an assignment"));
-                }
-                let (key, _) = line.split_once('=').expect("one equals was checked");
+                let (key, _) = line
+                    .split_once('=')
+                    .expect("the match guard found an equals");
                 let key = key.trim();
                 match phase {
                     Phase::Header => {
@@ -1542,332 +1312,143 @@ fn validate_oem_kvn_syntax(kvn: &str, options: &crate::options::ParseOptions) ->
     Ok(())
 }
 
-fn validate_oem_xml_envelope(xml: &str, options: &crate::options::ParseOptions) -> Result<()> {
-    use crate::error::{CcsdsNdmError, FormatError};
-    use quick_xml::events::Event;
+fn validate_oem_xml_envelope(
+    xml: &str,
+    options: &crate::options::ParseOptions,
+    source_edition: &mut Option<String>,
+) -> Result<()> {
+    use crate::xml::XmlSequenceRule;
 
-    fn invalid(message: impl Into<String>) -> CcsdsNdmError {
-        CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(message.into())))
+    const OEM: &[&[u8]] = &[b"header", b"body"];
+    const HEADER: &[&[u8]] = &[
+        b"COMMENT",
+        b"CLASSIFICATION",
+        b"CREATION_DATE",
+        b"ORIGINATOR",
+        b"MESSAGE_ID",
+    ];
+    const BODY: &[&[u8]] = &[b"segment"];
+    const SEGMENT: &[&[u8]] = &[b"metadata", b"data"];
+    const METADATA: &[&[u8]] = &[
+        b"COMMENT",
+        b"OBJECT_NAME",
+        b"OBJECT_ID",
+        b"CENTER_NAME",
+        b"REF_FRAME",
+        b"REF_FRAME_EPOCH",
+        b"TIME_SYSTEM",
+        b"START_TIME",
+        b"USEABLE_START_TIME",
+        b"USEABLE_STOP_TIME",
+        b"STOP_TIME",
+        b"INTERPOLATION",
+        b"INTERPOLATION_DEGREE",
+    ];
+    const DATA: &[&[u8]] = &[b"COMMENT", b"stateVector", b"covarianceMatrix"];
+    const STATE_VECTOR: &[&[u8]] = &[
+        b"EPOCH", b"X", b"Y", b"Z", b"X_DOT", b"Y_DOT", b"Z_DOT", b"X_DDOT", b"Y_DDOT", b"Z_DDOT",
+    ];
+    const COVARIANCE: &[&[u8]] = &[
+        b"COMMENT",
+        b"EPOCH",
+        b"COV_REF_FRAME",
+        b"CX_X",
+        b"CY_X",
+        b"CY_Y",
+        b"CZ_X",
+        b"CZ_Y",
+        b"CZ_Z",
+        b"CX_DOT_X",
+        b"CX_DOT_Y",
+        b"CX_DOT_Z",
+        b"CX_DOT_X_DOT",
+        b"CY_DOT_X",
+        b"CY_DOT_Y",
+        b"CY_DOT_Z",
+        b"CY_DOT_X_DOT",
+        b"CY_DOT_Y_DOT",
+        b"CZ_DOT_X",
+        b"CZ_DOT_Y",
+        b"CZ_DOT_Z",
+        b"CZ_DOT_X_DOT",
+        b"CZ_DOT_Y_DOT",
+        b"CZ_DOT_Z_DOT",
+    ];
+
+    fn rule(parent: &[u8], child: &[u8]) -> Option<XmlSequenceRule> {
+        let sequence = match parent {
+            b"oem" => OEM,
+            b"header" => HEADER,
+            b"body" => BODY,
+            b"segment" => SEGMENT,
+            b"metadata" => METADATA,
+            b"data" => DATA,
+            b"stateVector" => STATE_VECTOR,
+            b"covarianceMatrix" => COVARIANCE,
+            _ => return None,
+        };
+        sequence
+            .iter()
+            .position(|candidate| *candidate == child)
+            .map(|rank| {
+                XmlSequenceRule::new(
+                    rank as u16,
+                    matches!(
+                        child,
+                        b"COMMENT" | b"segment" | b"stateVector" | b"covarianceMatrix"
+                    ),
+                )
+            })
     }
 
-    fn validate_root(start: &quick_xml::events::BytesStart<'_>) -> Result<()> {
-        if start.name().as_ref() != b"oem" {
-            return Err(invalid("expected standalone OEM root element 'oem'"));
-        }
-        for attribute in start.attributes() {
-            let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
-            if !matches!(
-                attribute.key.as_ref(),
-                b"id" | b"version" | b"xmlns:xsi" | b"xsi:noNamespaceSchemaLocation"
-            ) {
-                return Err(invalid(format!(
-                    "unknown OEM root attribute '{}'",
-                    String::from_utf8_lossy(attribute.key.as_ref())
-                )));
-            }
-        }
-        Ok(())
-    }
-
-    fn validate_attributes(start: &quick_xml::events::BytesStart<'_>) -> Result<()> {
-        let name = start.name();
-        let name = name.as_ref();
-        let allows_units = matches!(
-            name,
-            b"X" | b"Y"
-                | b"Z"
-                | b"X_DOT"
-                | b"Y_DOT"
-                | b"Z_DOT"
-                | b"X_DDOT"
-                | b"Y_DDOT"
-                | b"Z_DDOT"
-                | b"CX_X"
-                | b"CY_X"
-                | b"CY_Y"
-                | b"CZ_X"
-                | b"CZ_Y"
-                | b"CZ_Z"
-                | b"CX_DOT_X"
-                | b"CX_DOT_Y"
-                | b"CX_DOT_Z"
-                | b"CX_DOT_X_DOT"
-                | b"CY_DOT_X"
-                | b"CY_DOT_Y"
-                | b"CY_DOT_Z"
-                | b"CY_DOT_X_DOT"
-                | b"CY_DOT_Y_DOT"
-                | b"CZ_DOT_X"
-                | b"CZ_DOT_Y"
-                | b"CZ_DOT_Z"
-                | b"CZ_DOT_X_DOT"
-                | b"CZ_DOT_Y_DOT"
-                | b"CZ_DOT_Z_DOT"
-        );
-        for attribute in start.attributes() {
-            let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
-            if !(allows_units && attribute.key.as_ref() == b"units") {
-                return Err(invalid(format!(
-                    "attribute '{}' is not allowed on OEM element '{}'",
-                    String::from_utf8_lossy(attribute.key.as_ref()),
-                    String::from_utf8_lossy(name)
-                )));
-            }
-        }
-        Ok(())
-    }
-
-    #[derive(Clone, Copy)]
-    enum Container {
-        Oem,
-        Header,
-        Body,
-        Segment,
-        Metadata,
-        Data,
-        StateVector,
-        Covariance,
-        Leaf,
-    }
-
-    struct Frame {
-        container: Container,
-        last_child: u8,
-    }
-
-    fn container(name: &[u8]) -> Container {
-        match name {
-            b"oem" => Container::Oem,
-            b"header" => Container::Header,
-            b"body" => Container::Body,
-            b"segment" => Container::Segment,
-            b"metadata" => Container::Metadata,
-            b"data" => Container::Data,
-            b"stateVector" => Container::StateVector,
-            b"covarianceMatrix" => Container::Covariance,
-            _ => Container::Leaf,
-        }
-    }
-
-    fn child_rank(parent: Container, name: &[u8]) -> Option<u8> {
-        Some(match parent {
-            Container::Oem => match name {
-                b"header" => 0,
-                b"body" => 1,
-                _ => return None,
+    crate::xml::validate_standalone_document(
+        xml,
+        b"oem",
+        "OEM",
+        options,
+        source_edition,
+        crate::xml::MessageSchema {
+            child_rule: rule,
+            attribute_allowed: |element: &[u8], attribute: &[u8]| match attribute {
+                b"units" => matches!(
+                    element,
+                    b"X" | b"Y"
+                        | b"Z"
+                        | b"X_DOT"
+                        | b"Y_DOT"
+                        | b"Z_DOT"
+                        | b"X_DDOT"
+                        | b"Y_DDOT"
+                        | b"Z_DDOT"
+                        | b"CX_X"
+                        | b"CY_X"
+                        | b"CY_Y"
+                        | b"CZ_X"
+                        | b"CZ_Y"
+                        | b"CZ_Z"
+                        | b"CX_DOT_X"
+                        | b"CX_DOT_Y"
+                        | b"CX_DOT_Z"
+                        | b"CX_DOT_X_DOT"
+                        | b"CY_DOT_X"
+                        | b"CY_DOT_Y"
+                        | b"CY_DOT_Z"
+                        | b"CY_DOT_X_DOT"
+                        | b"CY_DOT_Y_DOT"
+                        | b"CZ_DOT_X"
+                        | b"CZ_DOT_Y"
+                        | b"CZ_DOT_Z"
+                        | b"CZ_DOT_X_DOT"
+                        | b"CZ_DOT_Y_DOT"
+                        | b"CZ_DOT_Z_DOT"
+                ),
+                _ => false,
             },
-            Container::Header => match name {
-                b"COMMENT" => 0,
-                b"CLASSIFICATION" => 1,
-                b"CREATION_DATE" => 2,
-                b"ORIGINATOR" => 3,
-                b"MESSAGE_ID" => 4,
-                _ => return None,
-            },
-            Container::Body => match name {
-                b"segment" => 0,
-                _ => return None,
-            },
-            Container::Segment => match name {
-                b"metadata" => 0,
-                b"data" => 1,
-                _ => return None,
-            },
-            Container::Metadata => match name {
-                b"COMMENT" => 0,
-                b"OBJECT_NAME" => 1,
-                b"OBJECT_ID" => 2,
-                b"CENTER_NAME" => 3,
-                b"REF_FRAME" => 4,
-                b"REF_FRAME_EPOCH" => 5,
-                b"TIME_SYSTEM" => 6,
-                b"START_TIME" => 7,
-                b"USEABLE_START_TIME" => 8,
-                b"USEABLE_STOP_TIME" => 9,
-                b"STOP_TIME" => 10,
-                b"INTERPOLATION" => 11,
-                b"INTERPOLATION_DEGREE" => 12,
-                _ => return None,
-            },
-            Container::Data => match name {
-                b"COMMENT" => 0,
-                b"stateVector" => 1,
-                b"covarianceMatrix" => 2,
-                _ => return None,
-            },
-            Container::StateVector => match name {
-                b"EPOCH" => 0,
-                b"X" => 1,
-                b"Y" => 2,
-                b"Z" => 3,
-                b"X_DOT" => 4,
-                b"Y_DOT" => 5,
-                b"Z_DOT" => 6,
-                b"X_DDOT" => 7,
-                b"Y_DDOT" => 8,
-                b"Z_DDOT" => 9,
-                _ => return None,
-            },
-            Container::Covariance => match name {
-                b"COMMENT" => 0,
-                b"EPOCH" => 1,
-                b"COV_REF_FRAME" => 2,
-                b"CX_X" => 3,
-                b"CY_X" => 4,
-                b"CY_Y" => 5,
-                b"CZ_X" => 6,
-                b"CZ_Y" => 7,
-                b"CZ_Z" => 8,
-                b"CX_DOT_X" => 9,
-                b"CX_DOT_Y" => 10,
-                b"CX_DOT_Z" => 11,
-                b"CX_DOT_X_DOT" => 12,
-                b"CY_DOT_X" => 13,
-                b"CY_DOT_Y" => 14,
-                b"CY_DOT_Z" => 15,
-                b"CY_DOT_X_DOT" => 16,
-                b"CY_DOT_Y_DOT" => 17,
-                b"CZ_DOT_X" => 18,
-                b"CZ_DOT_Y" => 19,
-                b"CZ_DOT_Z" => 20,
-                b"CZ_DOT_X_DOT" => 21,
-                b"CZ_DOT_Y_DOT" => 22,
-                b"CZ_DOT_Z_DOT" => 23,
-                _ => return None,
-            },
-            Container::Leaf => return Some(0),
-        })
-    }
-
-    fn enter_child(stack: &mut [Frame], name: &[u8]) -> Result<()> {
-        if let Some(parent) = stack.last_mut() {
-            let rank = child_rank(parent.container, name).ok_or_else(|| {
-                invalid(format!(
-                    "element '{}' is not allowed in this OEM block",
-                    String::from_utf8_lossy(name)
-                ))
-            })?;
-            if rank < parent.last_child {
-                return Err(invalid(format!(
-                    "element '{}' is out of order in its OEM block",
-                    String::from_utf8_lossy(name)
-                )));
-            }
-            parent.last_child = rank;
-        }
-        Ok(())
-    }
-
-    let document = xml.strip_prefix('\u{feff}').unwrap_or(xml);
-    if document
-        .find("<?xml")
-        .is_some_and(|declaration| declaration != 0)
-    {
-        return Err(invalid(
-            "an XML declaration, when present, must begin the document",
-        ));
-    }
-
-    let mut reader = quick_xml::Reader::from_str(xml);
-    let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut root_closed = false;
-    let mut stack = Vec::with_capacity(8);
-    let mut records = 0usize;
-
-    let count_record = |records: &mut usize, name: &[u8]| -> Result<()> {
-        if matches!(name, b"stateVector" | b"covarianceMatrix") {
-            *records += 1;
-            if let Some(limit) = options.max_records {
-                if *records > limit {
-                    return Err(CcsdsNdmError::ResourceLimitExceeded {
-                        resource: "history_records",
-                        limit,
-                        actual: *records,
-                    });
-                }
-            }
-        }
-        Ok(())
-    };
-
-    loop {
-        match reader.read_event() {
-            Ok(Event::Start(start)) => {
-                if root_closed {
-                    return Err(invalid("trailing content after OEM document"));
-                }
-                if !root_seen {
-                    validate_root(&start)?;
-                    root_seen = true;
-                } else {
-                    validate_attributes(&start)?;
-                    enter_child(&mut stack, start.name().as_ref())?;
-                    count_record(&mut records, start.name().as_ref())?;
-                }
-                stack.push(Frame {
-                    container: container(start.name().as_ref()),
-                    last_child: 0,
-                });
-                depth += 1;
-                if depth > options.max_xml_depth {
-                    return Err(CcsdsNdmError::ResourceLimitExceeded {
-                        resource: "xml_depth",
-                        limit: options.max_xml_depth,
-                        actual: depth,
-                    });
-                }
-            }
-            Ok(Event::Empty(start)) => {
-                if root_closed {
-                    return Err(invalid("trailing content after OEM document"));
-                }
-                if !root_seen {
-                    validate_root(&start)?;
-                    root_seen = true;
-                    root_closed = true;
-                } else {
-                    validate_attributes(&start)?;
-                    enter_child(&mut stack, start.name().as_ref())?;
-                    count_record(&mut records, start.name().as_ref())?;
-                }
-            }
-            Ok(Event::End(_)) => {
-                depth = depth
-                    .checked_sub(1)
-                    .ok_or_else(|| invalid("unexpected XML closing element"))?;
-                stack.pop();
-                if depth == 0 {
-                    root_closed = true;
-                }
-            }
-            Ok(Event::Text(text)) => {
-                if (root_closed || !root_seen)
-                    && !text
-                        .xml_content()
-                        .map_err(|error| invalid(error.to_string()))?
-                        .trim()
-                        .is_empty()
-                {
-                    return Err(invalid("text outside OEM root element"));
-                }
-            }
-            Ok(Event::CData(_)) if root_closed || !root_seen => {
-                return Err(invalid("CDATA outside OEM root element"));
-            }
-            Ok(Event::DocType(_)) => {
-                return Err(invalid("XML document type declarations are not supported"));
-            }
-            Ok(Event::Eof) => break,
-            Ok(_) => {}
-            Err(error) => return Err(CcsdsNdmError::from(error)),
-        }
-    }
-
-    if !root_seen || !root_closed {
-        return Err(invalid("incomplete OEM XML document"));
-    }
-    Ok(())
+            // Both repeatable OEM data records are bounded before serde materializes any of
+            // them.
+            is_record: |element: &[u8]| matches!(element, b"stateVector" | b"covarianceMatrix"),
+        },
+    )
 }
 
 impl ToKvn for Oem {
@@ -1876,9 +1457,9 @@ impl ToKvn for Oem {
     }
 
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_pair("CCSDS_OEM_VERS", &self.version);
-        self.header.write_kvn(writer);
-        self.body.write_kvn(writer);
+        // Callers reach this only after `validate_kvn` has run the same pass against a sink, so
+        // the layout cannot fail here; the writer records any late I/O or lexical fault itself.
+        let _ = self.write_validated_kvn(writer);
     }
 }
 
@@ -1895,14 +1476,6 @@ pub struct OemBody {
     pub segment: Vec<OemSegment>,
 }
 
-impl ToKvn for OemBody {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        for seg in &self.segment {
-            seg.write_kvn(writer);
-        }
-    }
-}
-
 /// A single segment of the OEM.
 ///
 /// Each segment contains metadata (context) and a list of ephemeris data points.
@@ -1911,15 +1484,6 @@ impl ToKvn for OemBody {
 pub struct OemSegment {
     pub metadata: OemMetadata,
     pub data: OemData,
-}
-
-impl ToKvn for OemSegment {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_section("META_START");
-        self.metadata.write_kvn(writer);
-        writer.write_section("META_STOP");
-        self.data.write_kvn(writer);
-    }
 }
 
 //----------------------------------------------------------------------
@@ -2151,33 +1715,6 @@ pub struct OemData {
     pub covariance_matrix: Vec<OemCovarianceMatrix>,
 }
 
-impl ToKvn for OemData {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_comments(&self.comment);
-        if !self.state_vector.is_empty() {
-            writer.write_empty();
-        }
-        for sv in &self.state_vector {
-            sv.write_kvn(writer);
-        }
-        if !self.covariance_matrix.is_empty() {
-            writer.write_empty();
-            writer.write_section("COVARIANCE_START");
-
-            // OEM comments are only permitted at the beginning of the covariance section.
-            for cov in &self.covariance_matrix {
-                writer.write_comments(&cov.comment);
-            }
-
-            for cov in &self.covariance_matrix {
-                cov.write_kvn_matrix_lines(writer, false);
-            }
-
-            writer.write_section("COVARIANCE_STOP");
-        }
-    }
-}
-
 //----------------------------------------------------------------------
 // Covariance Matrix
 //----------------------------------------------------------------------
@@ -2346,45 +1883,17 @@ pub struct OemCovarianceMatrix {
     pub cz_dot_z_dot: VelocityCovariance,
 }
 
-impl ToKvn for OemCovarianceMatrix {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        self.write_kvn_matrix_lines(writer, true);
-    }
-}
-
 impl crate::traits::Validate for OemCovarianceMatrix {
     fn validate(&self) -> Result<()> {
         if let Some(error) = absolute_epoch_error(&self.epoch, "EPOCH") {
             return Err(error.into());
         }
         for (field, value) in self.values() {
-            if !value.is_finite() {
-                return Err(crate::error::ValidationError::InvalidValue {
-                    field: field.into(),
-                    value: value.to_string(),
-                    expected: "a finite number".into(),
-                    line: None,
-                }
-                .into());
+            if let Some(error) = crate::common::covariance_value_error(field, value) {
+                return Err(error.into());
             }
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = Vec::new();
-        if let Some(error) = absolute_epoch_error(&self.epoch, "EPOCH") {
-            errors.push(error);
-        }
-        errors.extend(self.values().into_iter().filter_map(|(field, value)| {
-            (!value.is_finite()).then_some(crate::error::ValidationError::InvalidValue {
-                field: field.into(),
-                value: value.to_string(),
-                expected: "a finite number".into(),
-                line: None,
-            })
-        }));
-        Ok(errors)
     }
 }
 
@@ -2414,36 +1923,6 @@ impl OemCovarianceMatrix {
             ("CZ_DOT_Z_DOT", self.cz_dot_z_dot.value),
         ]
     }
-
-    fn write_kvn_matrix_lines(&self, writer: &mut KvnWriter, write_comments: bool) {
-        if write_comments {
-            writer.write_comments(&self.comment);
-        }
-        writer.write_pair("EPOCH", self.epoch);
-        if let Some(rf) = &self.cov_ref_frame {
-            writer.write_pair("COV_REF_FRAME", rf);
-        }
-
-        // Lower triangular formatting strict compliance (1, 2, 3, 4, 5, 6 items per line)
-        let values = self.values();
-        for row in [
-            &values[0..1],
-            &values[1..3],
-            &values[3..6],
-            &values[6..10],
-            &values[10..15],
-            &values[15..21],
-        ] {
-            writer.write_built_line(|line| {
-                for (index, (_, value)) in row.iter().enumerate() {
-                    if index > 0 {
-                        line.push(' ');
-                    }
-                    let _ = write!(line, "{}", OdmFloat::new(*value));
-                }
-            });
-        }
-    }
 }
 
 //----------------------------------------------------------------------
@@ -2454,6 +1933,28 @@ impl OemCovarianceMatrix {
 mod tests {
     use super::*;
     use crate::traits::Ndm;
+
+    #[test]
+    fn oem_covariance_rejects_a_negative_variance() {
+        // The first covariance row of the shipped fixture is CX_X, a variance.
+        let kvn =
+            include_str!("../../data/kvn/oem_g13.kvn").replace("3.3313494e-04", "-3.3313494e-04");
+        let error = Oem::from_kvn(&kvn).expect_err("a negative variance is not representable");
+        let message = error.to_string();
+        assert!(
+            message.contains("CX_X")
+                && message.contains("a non-negative variance on the covariance diagonal"),
+            "unexpected error: {message}"
+        );
+    }
+
+    #[test]
+    fn oem_covariance_accepts_a_negative_off_diagonal_term() {
+        // CZ_X is an off-diagonal covariance, and the fixture already carries it negative.
+        let kvn = include_str!("../../data/kvn/oem_g13.kvn");
+        assert!(kvn.contains("-3.0700078e-04"));
+        Oem::from_kvn(kvn).expect("shipped OEM fixture should parse");
+    }
 
     #[test]
     fn odm_number_lexical_validation_matches_book_forms() {

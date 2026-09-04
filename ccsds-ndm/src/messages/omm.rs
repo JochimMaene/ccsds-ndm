@@ -5,7 +5,7 @@
 use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters};
 use crate::error::{EnumParseError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
-use crate::kvn::ser::KvnWriter;
+use crate::kvn::ser::{KvnWriter, OdmFloat};
 use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
@@ -47,26 +47,20 @@ pub type BStar = UnitValue<f64, InvErUnits>;
 // rev/day for MEAN_MOTION
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum RevPerDayUnits {
-    #[serde(rename = "rev/day")]
+    #[serde(rename = "rev/day", alias = "REV/DAY")]
     #[default]
     RevPerDay,
-    #[serde(rename = "REV/DAY")]
-    RevPerDayUpper,
 }
 impl std::fmt::Display for RevPerDayUnits {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RevPerDayUnits::RevPerDay => write!(f, "rev/day"),
-            RevPerDayUnits::RevPerDayUpper => write!(f, "REV/DAY"),
-        }
+        write!(f, "rev/day")
     }
 }
 impl FromStr for RevPerDayUnits {
     type Err = EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "rev/day" => Ok(RevPerDayUnits::RevPerDay),
-            "REV/DAY" => Ok(RevPerDayUnits::RevPerDayUpper),
+            "rev/day" | "REV/DAY" => Ok(RevPerDayUnits::RevPerDay),
             _ => Err(EnumParseError {
                 field: "unit",
                 value: s.to_string(),
@@ -80,26 +74,20 @@ pub type MeanMotion = UnitValue<f64, RevPerDayUnits>;
 // rev/day**2 for MEAN_MOTION_DOT
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum RevPerDay2Units {
-    #[serde(rename = "rev/day**2")]
+    #[serde(rename = "rev/day**2", alias = "REV/DAY**2")]
     #[default]
     RevPerDay2,
-    #[serde(rename = "REV/DAY**2")]
-    RevPerDay2Upper,
 }
 impl std::fmt::Display for RevPerDay2Units {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RevPerDay2Units::RevPerDay2 => write!(f, "rev/day**2"),
-            RevPerDay2Units::RevPerDay2Upper => write!(f, "REV/DAY**2"),
-        }
+        write!(f, "rev/day**2")
     }
 }
 impl FromStr for RevPerDay2Units {
     type Err = EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "rev/day**2" => Ok(RevPerDay2Units::RevPerDay2),
-            "REV/DAY**2" => Ok(RevPerDay2Units::RevPerDay2Upper),
+            "rev/day**2" | "REV/DAY**2" => Ok(RevPerDay2Units::RevPerDay2),
             _ => Err(EnumParseError {
                 field: "unit",
                 value: s.to_string(),
@@ -113,26 +101,20 @@ pub type MeanMotionDot = UnitValue<f64, RevPerDay2Units>;
 // rev/day**3 for MEAN_MOTION_DDOT
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum RevPerDay3Units {
-    #[serde(rename = "rev/day**3")]
+    #[serde(rename = "rev/day**3", alias = "REV/DAY**3")]
     #[default]
     RevPerDay3,
-    #[serde(rename = "REV/DAY**3")]
-    RevPerDay3Upper,
 }
 impl std::fmt::Display for RevPerDay3Units {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RevPerDay3Units::RevPerDay3 => write!(f, "rev/day**3"),
-            RevPerDay3Units::RevPerDay3Upper => write!(f, "REV/DAY**3"),
-        }
+        write!(f, "rev/day**3")
     }
 }
 impl FromStr for RevPerDay3Units {
     type Err = EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "rev/day**3" => Ok(RevPerDay3Units::RevPerDay3),
-            "REV/DAY**3" => Ok(RevPerDay3Units::RevPerDay3Upper),
+            "rev/day**3" | "REV/DAY**3" => Ok(RevPerDay3Units::RevPerDay3),
             _ => Err(EnumParseError {
                 field: "unit",
                 value: s.to_string(),
@@ -189,6 +171,151 @@ pub struct TleToOmmOptions {
     pub creation_date: Option<CalendarEpoch>,
 }
 
+impl Omm {
+    /// Reject values that KVN generation could not spell back to the same number.
+    ///
+    /// The schema types these fields as plain doubles, so range and finiteness checks let through
+    /// magnitudes whose shortest round-tripping spelling exceeds the 16 significant digits and
+    /// 255-character line that ODM 7.7.1 allows. Catching them here keeps generation from
+    /// emitting a document this library would refuse to read back.
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        fn check(field: &'static str, value: f64, path: &'static str) -> Result<()> {
+            if OdmFloat::is_valid(value) {
+                return Ok(());
+            }
+            Err(ValidationError::InvalidValue {
+                field: field.into(),
+                value: value.to_string(),
+                expected: "a representable CCSDS number".into(),
+                line: None,
+            }
+            .at_path(path)
+            .into())
+        }
+
+        let data = &self.body.segment.data;
+        let elements = &data.mean_elements;
+        check(
+            "ECCENTRICITY",
+            elements.eccentricity.value,
+            "body.segment.data.mean_elements.eccentricity",
+        )?;
+        check(
+            "INCLINATION",
+            elements.inclination.angle.value,
+            "body.segment.data.mean_elements.inclination",
+        )?;
+        check(
+            "RA_OF_ASC_NODE",
+            elements.ra_of_asc_node.value,
+            "body.segment.data.mean_elements.ra_of_asc_node",
+        )?;
+        check(
+            "ARG_OF_PERICENTER",
+            elements.arg_of_pericenter.value,
+            "body.segment.data.mean_elements.arg_of_pericenter",
+        )?;
+        check(
+            "MEAN_ANOMALY",
+            elements.mean_anomaly.value,
+            "body.segment.data.mean_elements.mean_anomaly",
+        )?;
+        for (field, value, path) in [
+            (
+                "SEMI_MAJOR_AXIS",
+                elements.semi_major_axis.as_ref().map(|v| v.value),
+                "body.segment.data.mean_elements.semi_major_axis",
+            ),
+            (
+                "MEAN_MOTION",
+                elements.mean_motion.as_ref().map(|v| v.value),
+                "body.segment.data.mean_elements.mean_motion",
+            ),
+            (
+                "GM",
+                elements.gm.as_ref().map(|v| v.value),
+                "body.segment.data.mean_elements.gm",
+            ),
+        ] {
+            let Some(value) = value else { continue };
+            check(field, value, path)?;
+        }
+        if let Some(parameters) = &data.spacecraft_parameters {
+            for (field, value, path) in [
+                (
+                    "MASS",
+                    parameters.mass.as_ref().map(|v| v.value),
+                    "body.segment.data.spacecraft_parameters.mass",
+                ),
+                (
+                    "SOLAR_RAD_AREA",
+                    parameters.solar_rad_area.as_ref().map(|v| v.value),
+                    "body.segment.data.spacecraft_parameters.solar_rad_area",
+                ),
+                (
+                    "SOLAR_RAD_COEFF",
+                    parameters.solar_rad_coeff.as_ref().map(|v| v.value),
+                    "body.segment.data.spacecraft_parameters.solar_rad_coeff",
+                ),
+                (
+                    "DRAG_AREA",
+                    parameters.drag_area.as_ref().map(|v| v.value),
+                    "body.segment.data.spacecraft_parameters.drag_area",
+                ),
+                (
+                    "DRAG_COEFF",
+                    parameters.drag_coeff.as_ref().map(|v| v.value),
+                    "body.segment.data.spacecraft_parameters.drag_coeff",
+                ),
+            ] {
+                let Some(value) = value else { continue };
+                check(field, value, path)?;
+            }
+        }
+
+        if let Some(tle) = &data.tle_parameters {
+            for (field, value, path) in [
+                (
+                    "BSTAR",
+                    tle.bstar.as_ref().map(|v| v.value),
+                    "body.segment.data.tle_parameters.bstar",
+                ),
+                (
+                    "BTERM",
+                    tle.bterm.as_ref().map(|v| v.value),
+                    "body.segment.data.tle_parameters.bterm",
+                ),
+                (
+                    "MEAN_MOTION_DOT",
+                    Some(tle.mean_motion_dot.value),
+                    "body.segment.data.tle_parameters.mean_motion_dot",
+                ),
+                (
+                    "MEAN_MOTION_DDOT",
+                    tle.mean_motion_ddot.as_ref().map(|v| v.value),
+                    "body.segment.data.tle_parameters.mean_motion_ddot",
+                ),
+                (
+                    "AGOM",
+                    tle.agom.as_ref().map(|v| v.value),
+                    "body.segment.data.tle_parameters.agom",
+                ),
+            ] {
+                let Some(value) = value else { continue };
+                check(field, value, path)?;
+            }
+        }
+
+        if let Some(covariance) = &data.covariance_matrix {
+            for (field, value, path) in covariance.kvn_numbers() {
+                check(field, value, path)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
 impl crate::traits::Validate for Omm {
     fn validate(&self) -> Result<()> {
         crate::versioning::validate_root(
@@ -200,38 +327,11 @@ impl crate::traits::Validate for Omm {
         self.header.validate()?;
         self.body.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = Vec::new();
-        crate::validation::collect_validation_result(
-            &mut errors,
-            crate::versioning::validate_root(
-                crate::validation::MessageKind::Omm,
-                &self.id,
-                &self.version,
-            ),
-        )?;
-        crate::validation::collect_validation_result(
-            &mut errors,
-            crate::versioning::validate_omm_edition(self),
-        )?;
-        errors.extend(self.header.validation_errors()?);
-        errors.extend(self.body.validation_errors()?);
-        Ok(errors)
-    }
 }
 
 impl Ndm for Omm {
     fn to_kvn(&self) -> Result<String> {
-        crate::generation::validate_for_generation(
-            crate::validation::MessageKind::Omm,
-            &self.version,
-            crate::generation::OutputFormat::Kvn,
-            self,
-        )?;
-        let mut writer = KvnWriter::new();
-        self.write_kvn(&mut writer);
-        writer.finish_checked()
+        crate::generation::to_kvn_string(self)
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
@@ -242,13 +342,7 @@ impl Ndm for Omm {
     }
 
     fn to_xml(&self) -> Result<String> {
-        crate::generation::validate_for_generation(
-            crate::validation::MessageKind::Omm,
-            &self.version,
-            crate::generation::OutputFormat::Xml,
-            self,
-        )?;
-        crate::xml::to_string(self)
+        crate::generation::to_xml_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
@@ -263,7 +357,10 @@ impl Ndm for Omm {
 fn validate_xml_sequences(xml: &str) -> Result<()> {
     use crate::xml::XmlSequenceRule;
 
-    let rule = |rank, repeatable| XmlSequenceRule { rank, repeatable };
+    let rule = |rank, repeatable| XmlSequenceRule::new(rank, repeatable);
+    // `userDefinedType` wraps its children in a repeating sequence, so a COMMENT may open a new
+    // iteration after a USER_DEFINED.
+    let repeating = |rank, repeatable| XmlSequenceRule::restarting(rank, repeatable);
     crate::xml::validate_element_sequences(
         xml,
         "OMM",
@@ -340,8 +437,8 @@ fn validate_xml_sequences(xml: &str) -> Result<()> {
                 (b"covarianceMatrix", b"CZ_DOT_X_DOT") => rule(20, false),
                 (b"covarianceMatrix", b"CZ_DOT_Y_DOT") => rule(21, false),
                 (b"covarianceMatrix", b"CZ_DOT_Z_DOT") => rule(22, false),
-                (b"userDefinedParameters", b"COMMENT") => rule(0, true),
-                (b"userDefinedParameters", b"USER_DEFINED") => rule(1, true),
+                (b"userDefinedParameters", b"COMMENT") => repeating(0, true),
+                (b"userDefinedParameters", b"USER_DEFINED") => repeating(1, true),
                 _ => return None,
             })
         },
@@ -489,11 +586,14 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             message_name: "OMM",
             rank,
             comment_starts_block: comments_start_block,
-            allows_non_increasing: |previous, current, _| {
-                (current == 13 && previous == 13)
-                    || (current == 45 && previous == 45)
-                    || (current == 47 && previous == 47)
-                    || (current == 90 && previous == 90)
+            allows_non_increasing: |previous, current| {
+                // SEMI_MAJOR_AXIS/MEAN_MOTION, BSTAR/BTERM, and MEAN_MOTION_DDOT/AGOM each share
+                // a rank so either spelling may fill the slot; only the *other* alternative may
+                // follow, never a repeat of the same keyword. USER_DEFINED_* genuinely repeats.
+                (matches!(previous.rank, 13 | 45 | 47)
+                    && current.rank == previous.rank
+                    && current.key != previous.key)
+                    || (current.rank == 90 && previous.rank == 90)
             },
         },
     )
@@ -525,10 +625,6 @@ impl crate::traits::Validate for OmmBody {
     fn validate(&self) -> Result<()> {
         self.segment.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        self.segment.validation_errors()
-    }
 }
 
 impl ToKvn for OmmBody {
@@ -555,12 +651,6 @@ impl crate::traits::Validate for OmmSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
         self.data.validate_with_metadata(&self.metadata)
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = self.metadata.validation_errors()?;
-        errors.extend(self.data.validation_errors_with_metadata(&self.metadata)?);
-        Ok(errors)
     }
 }
 
@@ -713,27 +803,6 @@ impl crate::traits::Validate for OmmMetadata {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = Vec::new();
-        for (field, value) in [
-            ("OBJECT_NAME", self.object_name.as_str()),
-            ("OBJECT_ID", self.object_id.as_str()),
-            ("CENTER_NAME", self.center_name.as_str()),
-            ("REF_FRAME", self.ref_frame.as_str()),
-            ("TIME_SYSTEM", self.time_system.as_str()),
-            ("MEAN_ELEMENT_THEORY", self.mean_element_theory.as_str()),
-        ] {
-            if value.trim().is_empty() {
-                errors.push(ValidationError::MissingRequiredField {
-                    block: "OMM Metadata".into(),
-                    field: field.into(),
-                    line: None,
-                });
-            }
-        }
-        Ok(errors)
-    }
 }
 
 impl ToKvn for OmmMetadata {
@@ -808,19 +877,19 @@ impl ToKvn for OmmData {
         if let Some(sp) = &self.spacecraft_parameters {
             writer.write_comments(&sp.comment);
             if let Some(v) = &sp.mass {
-                writer.write_measure("MASS", &v.to_unit_value());
+                writer.write_odm_float_measure("MASS", &v.to_unit_value());
             }
             if let Some(v) = &sp.solar_rad_area {
-                writer.write_measure("SOLAR_RAD_AREA", &v.to_unit_value());
+                writer.write_odm_float_measure("SOLAR_RAD_AREA", &v.to_unit_value());
             }
             if let Some(v) = &sp.solar_rad_coeff {
-                writer.write_pair("SOLAR_RAD_COEFF", v);
+                writer.write_odm_float_pair("SOLAR_RAD_COEFF", v.value);
             }
             if let Some(v) = &sp.drag_area {
-                writer.write_measure("DRAG_AREA", &v.to_unit_value());
+                writer.write_odm_float_measure("DRAG_AREA", &v.to_unit_value());
             }
             if let Some(v) = &sp.drag_coeff {
-                writer.write_pair("DRAG_COEFF", v);
+                writer.write_odm_float_pair("DRAG_COEFF", v.value);
             }
         }
 
@@ -846,11 +915,29 @@ impl ToKvn for OmmData {
 
 impl crate::traits::Validate for OmmData {
     fn validate(&self) -> Result<()> {
-        self.mean_elements.validate()
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        self.mean_elements.validation_errors()
+        crate::validation::validate_at_field_path(
+            self.mean_elements.validate(),
+            "body.segment.data.mean_elements",
+        )?;
+        if let Some(parameters) = &self.spacecraft_parameters {
+            crate::validation::validate_at_field_path(
+                parameters.validate(),
+                "body.segment.data.spacecraft_parameters",
+            )?;
+        }
+        if let Some(tle) = &self.tle_parameters {
+            crate::validation::validate_at_field_path(
+                tle.validate_values(),
+                "body.segment.data.tle_parameters",
+            )?;
+        }
+        if let Some(covariance) = &self.covariance_matrix {
+            crate::validation::validate_at_field_path(
+                covariance.validate(),
+                "body.segment.data.covariance_matrix",
+            )?;
+        }
+        Ok(())
     }
 }
 
@@ -892,33 +979,6 @@ impl OmmData {
         }
 
         Ok(())
-    }
-
-    fn validation_errors_with_metadata(
-        &self,
-        metadata: &OmmMetadata,
-    ) -> Result<Vec<ValidationError>> {
-        let theory = metadata.mean_element_theory.as_str();
-        let mut errors = self.validation_errors()?;
-        match self.tle_parameters.as_ref() {
-            Some(tle) => errors.extend(tle.validation_errors(theory)),
-            None if matches!(theory, "SGP" | "SGP4" | "PPT3" | "SGP4-XP") => {
-                errors.push(ValidationError::MissingRequiredField {
-                    block: Cow::Borrowed("OMM Data"),
-                    field: Cow::Borrowed("TLE_PARAMETERS"),
-                    line: None,
-                });
-            }
-            None => {}
-        }
-        if matches!(theory, "SGP" | "SGP4") && self.mean_elements.mean_motion.is_none() {
-            errors.push(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("Mean Elements"),
-                field: Cow::Borrowed("MEAN_MOTION"),
-                line: None,
-            });
-        }
-        Ok(errors)
     }
 }
 
@@ -1017,22 +1077,121 @@ pub struct MeanElements {
     pub gm: Option<Gm>,
 }
 
+/// Reject a value the OMM schema types as a double but that is not a real number.
+///
+/// Range facets such as `nonNegativeDouble` are expressed as comparisons, and every comparison
+/// against NaN is false, so a NaN passes them. Finiteness therefore has to be checked in its own
+/// right rather than inferred from a range check.
+fn finite(field: &'static str, value: f64) -> Result<()> {
+    if value.is_finite() {
+        return Ok(());
+    }
+    Err(ValidationError::InvalidValue {
+        field: field.into(),
+        value: value.to_string(),
+        expected: "a finite number".into(),
+        line: None,
+    }
+    .into())
+}
+
 impl crate::traits::Validate for MeanElements {
     fn validate(&self) -> Result<()> {
         match (self.semi_major_axis.is_some(), self.mean_motion.is_some()) {
-            (true, false) | (false, true) => Ok(()),
-            _ => Err(ValidationError::Generic {
-                message: Cow::Borrowed(
-                    "Mean Elements must have exactly one of SEMI_MAJOR_AXIS or MEAN_MOTION",
-                ),
+            (true, false) | (false, true) => {}
+            _ => {
+                return Err(ValidationError::Generic {
+                    message: Cow::Borrowed(
+                        "Mean Elements must have exactly one of SEMI_MAJOR_AXIS or MEAN_MOTION",
+                    ),
+                    line: None,
+                }
+                .into())
+            }
+        }
+
+        if let Some(value) = &self.semi_major_axis {
+            finite("SEMI_MAJOR_AXIS", value.value)?;
+        }
+        if let Some(value) = &self.mean_motion {
+            finite("MEAN_MOTION", value.value)?;
+        }
+        finite("ECCENTRICITY", self.eccentricity.value)?;
+        if self.eccentricity.value < 0.0 {
+            return Err(ValidationError::OutOfRange {
+                name: "ECCENTRICITY".into(),
+                value: self.eccentricity.value.to_string(),
+                expected: ">= 0".into(),
                 line: None,
             }
-            .into()),
+            .into());
         }
-    }
 
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        crate::validation::validation_errors_from(self.validate())
+        let inclination = self.inclination.angle.value;
+        finite("INCLINATION", inclination)?;
+        if !(0.0..=180.0).contains(&inclination) {
+            return Err(ValidationError::OutOfRange {
+                name: "INCLINATION".into(),
+                value: inclination.to_string(),
+                expected: "[0, 180]".into(),
+                line: None,
+            }
+            .into());
+        }
+
+        for (field, angle) in [
+            ("RA_OF_ASC_NODE", &self.ra_of_asc_node),
+            ("ARG_OF_PERICENTER", &self.arg_of_pericenter),
+            ("MEAN_ANOMALY", &self.mean_anomaly),
+        ] {
+            finite(field, angle.value)?;
+            if !(-360.0..360.0).contains(&angle.value) {
+                return Err(ValidationError::OutOfRange {
+                    name: field.into(),
+                    value: angle.value.to_string(),
+                    expected: "[-360, 360)".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+
+        if let Some(gm) = &self.gm {
+            finite("GM", gm.value)?;
+            if gm.value <= 0.0 {
+                return Err(ValidationError::OutOfRange {
+                    name: "GM".into(),
+                    value: gm.value.to_string(),
+                    expected: "> 0".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+}
+
+impl TleParameters {
+    /// Check the values the schema types as doubles, independently of the mean-element theory.
+    ///
+    /// The theory-dependent presence rules live in [`TleParameters::validate`], which needs
+    /// metadata this pass deliberately does not.
+    pub(crate) fn validate_values(&self) -> Result<()> {
+        for (field, value) in [
+            ("BSTAR", self.bstar.as_ref().map(|value| value.value)),
+            ("BTERM", self.bterm.as_ref().map(|value| value.value)),
+            ("MEAN_MOTION_DOT", Some(self.mean_motion_dot.value)),
+            (
+                "MEAN_MOTION_DDOT",
+                self.mean_motion_ddot.as_ref().map(|value| value.value),
+            ),
+            ("AGOM", self.agom.as_ref().map(|value| value.value)),
+        ] {
+            let Some(value) = value else { continue };
+            finite(field, value)?;
+        }
+        Ok(())
     }
 }
 
@@ -1041,18 +1200,19 @@ impl ToKvn for MeanElements {
         writer.write_comments(&self.comment);
         writer.write_pair("EPOCH", self.epoch);
         if let Some(v) = &self.semi_major_axis {
-            writer.write_measure("SEMI_MAJOR_AXIS", v);
+            writer.write_odm_float_measure("SEMI_MAJOR_AXIS", v);
         }
         if let Some(v) = &self.mean_motion {
-            writer.write_measure("MEAN_MOTION", v);
+            writer.write_odm_float_measure("MEAN_MOTION", v);
         }
-        writer.write_pair("ECCENTRICITY", self.eccentricity);
-        writer.write_measure("INCLINATION", &self.inclination.to_unit_value());
-        writer.write_measure("RA_OF_ASC_NODE", &self.ra_of_asc_node.to_unit_value());
-        writer.write_measure("ARG_OF_PERICENTER", &self.arg_of_pericenter.to_unit_value());
-        writer.write_measure("MEAN_ANOMALY", &self.mean_anomaly.to_unit_value());
+        writer.write_odm_float_pair("ECCENTRICITY", self.eccentricity.value);
+        writer.write_odm_float_measure("INCLINATION", &self.inclination.to_unit_value());
+        writer.write_odm_float_measure("RA_OF_ASC_NODE", &self.ra_of_asc_node.to_unit_value());
+        writer
+            .write_odm_float_measure("ARG_OF_PERICENTER", &self.arg_of_pericenter.to_unit_value());
+        writer.write_odm_float_measure("MEAN_ANOMALY", &self.mean_anomaly.to_unit_value());
         if let Some(v) = &self.gm {
-            writer.write_measure("GM", &UnitValue::new(v.value, v.units.clone()));
+            writer.write_odm_float_measure("GM", &UnitValue::new(v.value, v.units.clone()));
         }
     }
 }
@@ -1206,17 +1366,17 @@ impl ToKvn for TleParameters {
             writer.write_pair("REV_AT_EPOCH", v);
         }
         if let Some(v) = &self.bstar {
-            writer.write_measure("BSTAR", v);
+            writer.write_odm_float_measure("BSTAR", v);
         }
         if let Some(v) = &self.bterm {
-            writer.write_measure("BTERM", v);
+            writer.write_odm_float_measure("BTERM", v);
         }
-        writer.write_measure("MEAN_MOTION_DOT", &self.mean_motion_dot);
+        writer.write_odm_float_measure("MEAN_MOTION_DOT", &self.mean_motion_dot);
         if let Some(v) = &self.mean_motion_ddot {
-            writer.write_measure("MEAN_MOTION_DDOT", v);
+            writer.write_odm_float_measure("MEAN_MOTION_DDOT", v);
         }
         if let Some(v) = &self.agom {
-            writer.write_measure("AGOM", v);
+            writer.write_odm_float_measure("AGOM", v);
         }
     }
 }
@@ -1280,42 +1440,6 @@ impl TleParameters {
             _ => {}
         }
         Ok(())
-    }
-
-    fn validation_errors(&self, theory: &str) -> Vec<ValidationError> {
-        let mut errors = Vec::new();
-        if self.bstar.is_some() && self.bterm.is_some() {
-            errors.push(ValidationError::Conflict {
-                fields: vec![Cow::Borrowed("BSTAR"), Cow::Borrowed("BTERM")],
-                line: None,
-            });
-        }
-        if self.mean_motion_ddot.is_some() && self.agom.is_some() {
-            errors.push(ValidationError::Conflict {
-                fields: vec![Cow::Borrowed("MEAN_MOTION_DDOT"), Cow::Borrowed("AGOM")],
-                line: None,
-            });
-        }
-        let required = match theory {
-            "SGP" | "PPT3" => vec![("MEAN_MOTION_DDOT", self.mean_motion_ddot.is_none())],
-            "SGP4" => vec![("BSTAR", self.bstar.is_none())],
-            "SGP4-XP" => vec![
-                ("BTERM", self.bterm.is_none()),
-                ("AGOM", self.agom.is_none()),
-            ],
-            _ => Vec::new(),
-        };
-        errors.extend(
-            required
-                .into_iter()
-                .filter(|(_, missing)| *missing)
-                .map(|(field, _)| ValidationError::MissingRequiredField {
-                    block: Cow::Borrowed("TLE Parameters"),
-                    field: Cow::Borrowed(field),
-                    line: None,
-                }),
-        );
-        errors
     }
 }
 
@@ -2261,14 +2385,8 @@ MEAN_MOTION_DDOT = 0.0
 
     #[test]
     fn test_rev_per_day_units_display_all() {
-        assert_eq!(format!("{}", RevPerDayUnits::RevPerDayUpper), "REV/DAY");
-        assert_eq!(
-            format!("{}", RevPerDay2Units::RevPerDay2Upper),
-            "REV/DAY**2"
-        );
-        assert_eq!(
-            format!("{}", RevPerDay3Units::RevPerDay3Upper),
-            "REV/DAY**3"
-        );
+        assert_eq!(format!("{}", RevPerDayUnits::RevPerDay), "rev/day");
+        assert_eq!(format!("{}", RevPerDay2Units::RevPerDay2), "rev/day**2");
+        assert_eq!(format!("{}", RevPerDay3Units::RevPerDay3), "rev/day**3");
     }
 }

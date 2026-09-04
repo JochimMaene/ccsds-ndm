@@ -61,9 +61,62 @@ fn strict_kvn_rejects_unknown_duplicate_reordered_malformed_and_lossy_content() 
 }
 
 #[test]
-fn strict_kvn_accepts_lf_and_crlf_without_changing_meaning() {
+fn strict_kvn_accepts_every_normative_line_ending_without_changing_meaning() {
     let lf = Opm::from_kvn(KVN).expect("LF fixture should parse");
-    let crlf_source = KVN.replace('\n', "\r\n");
-    let crlf = Opm::from_kvn(&crlf_source).expect("CRLF fixture should parse");
-    assert_eq!(crlf, lf);
+    for (name, ending) in [("CR", "\r"), ("CRLF", "\r\n"), ("LFCR", "\n\r")] {
+        let source = KVN.replace('\n', ending);
+        let parsed = Opm::from_kvn(&source)
+            .unwrap_or_else(|error| panic!("{name} fixture should parse: {error}"));
+        assert_eq!(parsed, lf, "{name} changed the parsed model");
+    }
+}
+
+/// `TRUE_ANOMALY` and `MEAN_ANOMALY` share an ordering rank so either may fill the single
+/// anomaly slot. That allowance must not extend to repeating one of them: `parse_block!` keeps
+/// the last assignment, so a repeat that reached the parser would silently discard a value.
+#[test]
+fn strict_kvn_separates_the_anomaly_choice_from_a_repeated_anomaly() {
+    let keplerian = "SEMI_MAJOR_AXIS = 6800.0
+ECCENTRICITY = 0.0005
+INCLINATION = 51.6
+RA_OF_ASC_NODE = 10.0
+ARG_OF_PERICENTER = 20.0
+";
+    let with_anomalies = |anomalies: &str| {
+        let mut kvn = KVN
+            .lines()
+            .take_while(|line| !line.starts_with("MASS"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        kvn.push('\n');
+        kvn.push_str(keplerian);
+        kvn.push_str(anomalies);
+        kvn.push_str("GM = 398600.4418\n");
+        kvn
+    };
+
+    Opm::from_kvn(&with_anomalies("TRUE_ANOMALY = 30.0\n"))
+        .expect("a single TRUE_ANOMALY fills the choice");
+    Opm::from_kvn(&with_anomalies("MEAN_ANOMALY = 30.0\n"))
+        .expect("a single MEAN_ANOMALY fills the choice");
+
+    assert_rejected(
+        "repeated TRUE_ANOMALY",
+        with_anomalies("TRUE_ANOMALY = 30.0\nTRUE_ANOMALY = 40.0\n"),
+    );
+    assert_rejected(
+        "repeated MEAN_ANOMALY",
+        with_anomalies("MEAN_ANOMALY = 30.0\nMEAN_ANOMALY = 40.0\n"),
+    );
+
+    // Both alternatives present remains a semantic choice violation, not an ordering error, so
+    // the diagnostic still names the pair.
+    for order in [
+        "TRUE_ANOMALY = 30.0\nMEAN_ANOMALY = 40.0\n",
+        "MEAN_ANOMALY = 30.0\nTRUE_ANOMALY = 40.0\n",
+    ] {
+        let error =
+            Opm::from_kvn(&with_anomalies(order)).expect_err("only one anomaly may be present");
+        assert_eq!(error.code(), Some("validation.invalid_choice"));
+    }
 }

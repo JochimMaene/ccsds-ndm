@@ -11,9 +11,7 @@ use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::messages::tdm::{Tdm, TdmObservationData};
 use ccsds_ndm::traits::{Ndm, Validate};
-use ccsds_ndm::{
-    from_str, from_str_with_options, GenerateOptions, MessageType, Notation, ParseOptions,
-};
+use ccsds_ndm::{from_str, from_str_with_options, MessageType, Notation, ParseOptions};
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 const OPM_XML: &str = include_str!("../data/xml/opm_g5.xml");
@@ -93,8 +91,7 @@ fn history_record_limits_cover_each_concrete_history_message() {
     let MessageType::Acm(acm) = acm else {
         panic!("expected ACM fixture");
     };
-    let xml =
-        ccsds_ndm::VersionedNdm::to_xml_with(&acm, &ccsds_ndm::GenerateOptions::source()).unwrap();
+    let xml = acm.to_xml().unwrap();
     let error = from_str_with_options(&xml, Some(Notation::Xml), &options).unwrap_err();
     assert_eq!(error.code(), Some("resource.record_limit_exceeded"));
 }
@@ -135,13 +132,13 @@ fn oem_generation_rejects_non_finite_state_vectors() {
     oem.body.segment[0].data.state_vector[0].x.value = f64::NAN;
 
     let error = oem.to_kvn().unwrap_err();
-    assert!(error.to_string().contains("finite"));
+    assert!(error.to_string().contains("representable CCSDS number"));
 
     let mut oem = Oem::from_xml(OEM_XML).unwrap();
     oem.body.segment[0].data.covariance_matrix[0].cx_x.value = f64::INFINITY;
 
     let error = oem.to_kvn().unwrap_err();
-    assert!(error.to_string().contains("finite"));
+    assert!(error.to_string().contains("finite number"));
 }
 
 #[test]
@@ -153,9 +150,7 @@ fn opm_generation_rejects_non_finite_state_vectors() {
     assert!(error.to_string().contains("finite"));
 
     let mut output = Vec::new();
-    let error = opm
-        .write_kvn_to(&mut output, &GenerateOptions::source())
-        .unwrap_err();
+    let error = opm.write_kvn_to(&mut output).unwrap_err();
     assert!(error.to_string().contains("finite"));
     assert!(
         output.is_empty(),
@@ -183,11 +178,11 @@ fn rdm_generation_rejects_invalid_state_vectors() {
 }
 
 #[test]
-fn acm_and_ocm_collect_later_nested_validation_errors() {
+fn acm_and_ocm_fail_fast_on_nested_validation_errors() {
     let mut acm = Acm::from_kvn(ACM_KVN).unwrap();
     acm.body.segment.data.att[0].ref_frame_a.clear();
     acm.body.segment.data.man[0].man_purpose = Some(String::new());
-    assert_eq!(acm.validation_errors().unwrap().len(), 2);
+    assert!(acm.validate().is_err());
 
     let mut ocm = Ocm::from_kvn(OCM_KVN).unwrap();
     ocm.body.segment.data.traj[0].center_name.clear();
@@ -195,37 +190,62 @@ fn acm_and_ocm_collect_later_nested_validation_errors() {
         drag_coeff_nom: Some(-1.0),
         ..OcmPhysicalDescription::default()
     });
-    assert_eq!(ocm.validation_errors().unwrap().len(), 2);
+    assert!(ocm.validate().is_err());
 }
 
 #[test]
 fn oem_generation_handles_maximum_width_records_without_panicking() {
-    let mut input = OEM_XML.to_owned();
-    for value in [
-        "2789.6", "-280.0", "-1746.8", "4.73", "-2.50", "-1.04", "0.008", "0.001", "-0.159",
-    ] {
-        input = input.replacen(&format!(">{value}<"), ">1.7976931348623157e308<", 1);
-    }
+    // Widen every component of one state vector to the longest spelling the CCSDS digit limit
+    // allows, so the record sits just under the 254-character line limit.
+    let widest = f64::from_bits(f64::MAX.to_bits() - 2);
+    let oem = oem_with_state_vector_components(&format!("{widest:e}"));
 
-    let oem = Oem::from_xml(&input).unwrap();
     let result = std::panic::catch_unwind(|| oem.to_kvn());
     assert!(result.is_ok(), "KVN generation panicked");
     let output = result
         .unwrap()
-        .expect("finite values should round to the CCSDS digit limit");
-    assert!(output.contains("1.797693134862316e308"));
+        .expect("the widest representable values should generate");
+    assert!(output.contains("1.797693134862315e308"));
+    // The emitted document must read back, which is what makes the width limit meaningful.
+    Oem::from_kvn(&output).expect("widest records round-trip");
+}
+
+#[test]
+fn oem_generation_rejects_values_the_ccsds_digit_limit_cannot_represent() {
+    // Rounding `f64::MAX` to 16 digits overflows to infinity, so it has no CCSDS spelling.
+    let oem = oem_with_state_vector_components("1.7976931348623157e308");
+
+    let result = std::panic::catch_unwind(|| oem.to_kvn());
+    assert!(result.is_ok(), "KVN generation panicked");
+    let error = result
+        .unwrap()
+        .expect_err("f64::MAX has no representable CCSDS spelling");
+    assert!(
+        error.to_string().contains("representable CCSDS number"),
+        "unexpected diagnostic: {error}"
+    );
+}
+
+fn oem_with_state_vector_components(replacement: &str) -> Oem {
+    let mut input = OEM_XML.to_owned();
+    for value in [
+        "2789.6", "-280.0", "-1746.8", "4.73", "-2.50", "-1.04", "0.008", "0.001", "-0.159",
+    ] {
+        input = input.replacen(&format!(">{value}<"), &format!(">{replacement}<"), 1);
+    }
+    Oem::from_xml(&input).unwrap()
 }
 
 #[test]
 fn generation_preserves_source_version_by_default() {
     let opm = Opm::from_kvn(OPM_KVN).unwrap();
-    let output = opm.to_kvn_with(&GenerateOptions::source()).unwrap();
+    let output = opm.to_kvn().unwrap();
     assert!(output.starts_with("CCSDS_OPM_VERS"));
     assert!(output.lines().next().unwrap().ends_with("3.0"));
 }
 
 #[test]
-fn unaudited_source_version_cannot_be_generated_or_relabelled() {
+fn unaudited_source_version_cannot_be_generated() {
     let legacy = OPM_KVN.replacen("3.0", "1.0", 1);
     let opm = Opm::from_kvn(&legacy).unwrap();
 
@@ -234,28 +254,18 @@ fn unaudited_source_version_cannot_be_generated_or_relabelled() {
         source_error.code(),
         Some("generation.unsupported_output_version")
     );
-
-    let relabel_error = opm
-        .to_kvn_with(&GenerateOptions::latest())
-        .expect_err("ODM 1.0 has no audited edition converter");
-    assert_eq!(
-        relabel_error.code(),
-        Some("generation.unsupported_version_conversion")
-    );
 }
 
 #[test]
 fn sink_writers_match_string_generation() {
     let opm = Opm::from_kvn(OPM_KVN).unwrap();
-    let options = GenerateOptions::source();
-
-    let expected_kvn = opm.to_kvn_with(&options).unwrap();
+    let expected_kvn = opm.to_kvn().unwrap();
     let mut kvn = Vec::new();
-    opm.write_kvn_to(&mut kvn, &options).unwrap();
+    opm.write_kvn_to(&mut kvn).unwrap();
     assert_eq!(kvn, expected_kvn.as_bytes());
 
-    let expected_xml = opm.to_xml_with(&options).unwrap();
+    let expected_xml = opm.to_xml().unwrap();
     let mut xml = Vec::new();
-    opm.write_xml_to(&mut xml, &options).unwrap();
+    opm.write_xml_to(&mut xml).unwrap();
     assert_eq!(xml, expected_xml.as_bytes());
 }

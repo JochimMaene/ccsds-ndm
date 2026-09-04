@@ -217,31 +217,6 @@ impl crate::traits::Validate for CombinedNdm {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = Vec::new();
-        for message in &self.messages {
-            errors.extend(match message {
-                MessageType::Opm(message) => message.validation_errors()?,
-                MessageType::Omm(message) => message.validation_errors()?,
-                MessageType::Oem(message) => message.validation_errors()?,
-                MessageType::Ocm(message) => message.validation_errors()?,
-                MessageType::Acm(message) => message.validation_errors()?,
-                MessageType::Cdm(message) => message.validation_errors()?,
-                MessageType::Tdm(message) => message.validation_errors()?,
-                MessageType::Rdm(message) => message.validation_errors()?,
-                MessageType::Aem(message) => message.validation_errors()?,
-                MessageType::Apm(message) => message.validation_errors()?,
-                MessageType::Ndm(_) => vec![crate::error::ValidationError::InvalidValue {
-                    field: "ndm".into(),
-                    value: "nested combined NDM".into(),
-                    expected: "a constituent standalone message".into(),
-                    line: None,
-                }],
-            });
-        }
-        Ok(errors)
-    }
 }
 
 impl Ndm for CombinedNdm {
@@ -269,7 +244,6 @@ impl Ndm for CombinedNdm {
             error.with_generation_context(
                 crate::validation::MessageKind::Ndm,
                 crate::error::DiagnosticNotation::Xml,
-                "combined",
                 "combined",
             )
         })
@@ -316,19 +290,6 @@ impl CombinedNdm {
         Ok(())
     }
 
-    fn validate_source_options(options: &crate::options::GenerateOptions) -> Result<()> {
-        if matches!(
-            options.target_version,
-            crate::options::TargetVersion::Source
-        ) {
-            Ok(())
-        } else {
-            Err(CcsdsNdmError::UnsupportedMessage(
-                "A combined NDM has no single target version".into(),
-            ))
-        }
-    }
-
     fn validate_children_for_generation(
         &self,
         format: crate::generation::OutputFormat,
@@ -340,39 +301,24 @@ impl CombinedNdm {
         Ok(())
     }
 
-    /// Stream the sequential KVN convenience representation after aggregate preflight.
-    pub fn write_kvn_to<W: Write>(
-        &self,
-        output: &mut W,
-        options: &crate::options::GenerateOptions,
-    ) -> Result<()> {
-        Self::validate_source_options(options)?;
+    /// Stream the sequential KVN convenience representation.
+    pub fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
         self.validate_kvn_envelope()?;
         self.validate_children_for_generation(crate::generation::OutputFormat::Kvn)?;
-
-        crate::generation::preflight_kvn_limit(self, options)?;
 
         let mut writer = KvnWriter::from_io(output);
         self.write_kvn(&mut writer);
         writer.finish_io()
     }
 
-    /// Stream the normative XML combined instantiation after aggregate preflight.
-    pub fn write_xml_to<W: Write>(
-        &self,
-        output: &mut W,
-        options: &crate::options::GenerateOptions,
-    ) -> Result<()> {
-        Self::validate_source_options(options)?;
+    /// Stream the normative XML combined instantiation.
+    pub fn write_xml_to<W: Write>(&self, output: &mut W) -> Result<()> {
         self.validate_xml_envelope()?;
         self.validate_children_for_generation(crate::generation::OutputFormat::Xml)?;
-
-        crate::generation::preflight_xml_limit(self, options)?;
         crate::xml::to_writer(output, self).map_err(|error| {
             error.with_generation_context(
                 crate::validation::MessageKind::Ndm,
                 crate::error::DiagnosticNotation::Xml,
-                "combined",
                 "combined",
             )
         })

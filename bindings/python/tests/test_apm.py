@@ -6,6 +6,7 @@
 Unit tests for Attitude Parameter Message (APM) Python bindings.
 """
 
+import ccsds_ndm
 import pytest
 
 from ccsds_ndm import (
@@ -165,11 +166,11 @@ class TestApm:
         kvn_path = tmp_path / "test.apm"
 
         # Test to_file
-        apm.to_file(str(kvn_path), format="kvn")
+        apm.to_file(str(kvn_path), "kvn")
         assert kvn_path.exists()
 
         # Test from_file
-        apm2 = Apm.from_file(str(kvn_path), format="kvn")
+        apm2 = ccsds_ndm.from_file(str(kvn_path), format="kvn")
         assert apm2.header.originator == "TEST"
 
     def test_apm_setters(self):

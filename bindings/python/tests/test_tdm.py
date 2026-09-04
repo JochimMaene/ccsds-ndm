@@ -6,6 +6,7 @@
 Unit tests for Tracking Data Message (TDM) Python bindings.
 """
 
+import ccsds_ndm
 import pytest
 
 from ccsds_ndm import (
@@ -79,10 +80,10 @@ class TestTdm:
         tdm = self._create_valid_tdm()
         path = tmp_path / "test.tdm"
 
-        tdm.to_file(str(path), format="kvn")
+        tdm.to_file(str(path), "kvn")
         assert path.exists()
 
-        tdm2 = Tdm.from_file(str(path), format="kvn")
+        tdm2 = ccsds_ndm.from_file(str(path), format="kvn")
         assert tdm2.header.originator == "TEST"
 
     def test_epoch_fields_reject_numeric_xsd_branch(self):

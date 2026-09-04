@@ -56,6 +56,3 @@ def test_verified_odm_python_surfaces_preserve_models_and_strictness(
     with pytest.raises(ccsds_ndm.NdmError) as input_limited:
         wrapper.from_str(kvn, format="kvn", max_input_bytes=1)
     assert input_limited.value.code == "resource.input_limit_exceeded"
-    with pytest.raises(ccsds_ndm.NdmError) as output_limited:
-        wrapper.from_str(kvn, format="kvn").to_str("xml", max_output_bytes=1)
-    assert output_limited.value.code == "resource.output_limit_exceeded"

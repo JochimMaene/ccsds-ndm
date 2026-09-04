@@ -29,59 +29,351 @@ use std::io::Write as IoWrite;
 const XML_HEADER: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
 
 pub(crate) fn validate_document_root(s: &str, root: &[u8], type_name: &str) -> Result<()> {
-    let invalid =
-        |message: String| CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(message)));
-    let document = s.strip_prefix('\u{feff}').unwrap_or(s);
-    if document
-        .find("<?xml")
-        .is_some_and(|declaration| declaration != 0)
-    {
-        return Err(invalid(
-            "an XML declaration, when present, must begin the document".into(),
-        ));
+    let mut source_edition = None;
+    validate_document(
+        s,
+        type_name,
+        &mut source_edition,
+        DocumentRules {
+            root: Some(root),
+            max_depth: None,
+            allow_default_namespace: true,
+            child_rule: None,
+            attribute_allowed: None,
+            is_record: None,
+            max_records: None,
+        },
+    )
+}
+
+fn validate_root_start(
+    start: &quick_xml::events::BytesStart<'_>,
+    root: &[u8],
+    type_name: &str,
+    allow_default_namespace: bool,
+    source_edition: &mut Option<String>,
+    invalid: &impl Fn(String) -> CcsdsNdmError,
+) -> Result<()> {
+    if start.name().as_ref() != root {
+        return Err(invalid(format!(
+            "expected standalone {type_name} root element '{}'",
+            String::from_utf8_lossy(root)
+        )));
+    }
+    let mut unknown_attribute = None;
+    for attribute in start.attributes() {
+        let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+        if attribute.key.as_ref() == b"version" {
+            *source_edition = Some(
+                attribute
+                    .unescape_value()
+                    .map_err(|error| invalid(error.to_string()))?
+                    .into_owned(),
+            );
+        }
+        if !(matches!(
+            attribute.key.as_ref(),
+            b"id"
+                | b"version"
+                | b"xmlns:xsi"
+                | b"xmlns:ndm"
+                | b"xsi:noNamespaceSchemaLocation"
+                | b"xsi:schemaLocation"
+        ) || allow_default_namespace && attribute.key.as_ref() == b"xmlns")
+        {
+            unknown_attribute.get_or_insert_with(|| attribute.key.as_ref().to_vec());
+        }
+    }
+    if let Some(attribute) = unknown_attribute {
+        return Err(invalid(format!(
+            "unknown {type_name} root attribute '{}'",
+            String::from_utf8_lossy(&attribute)
+        )));
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct XmlSequenceRule {
+    pub rank: u16,
+    pub repeatable: bool,
+    /// The enclosing `xsd:sequence` carries `maxOccurs="unbounded"`, so this child opens a fresh
+    /// iteration of the group instead of regressing within the current one. `userDefinedType` is
+    /// the only such content model in the shipped schemas: it lets `COMMENT` follow
+    /// `USER_DEFINED`.
+    pub restarts_sequence: bool,
+}
+
+impl XmlSequenceRule {
+    /// A child of a plain `xsd:sequence`, which every sibling must respect in order.
+    pub(crate) fn new(rank: u16, repeatable: bool) -> Self {
+        Self {
+            rank,
+            repeatable,
+            restarts_sequence: false,
+        }
     }
 
+    /// A child that may reopen its enclosing repeating `xsd:sequence`.
+    pub(crate) fn restarting(rank: u16, repeatable: bool) -> Self {
+        Self {
+            rank,
+            repeatable,
+            restarts_sequence: true,
+        }
+    }
+}
+
+type ChildRule<'a> = dyn Fn(&[u8], &[u8]) -> Option<XmlSequenceRule> + 'a;
+type AttributeRule<'a> = dyn Fn(&[u8], &[u8]) -> bool + 'a;
+
+type RecordRule<'a> = dyn Fn(&[u8]) -> bool + 'a;
+
+struct DocumentRules<'a> {
+    root: Option<&'a [u8]>,
+    max_depth: Option<usize>,
+    allow_default_namespace: bool,
+    child_rule: Option<&'a ChildRule<'a>>,
+    attribute_allowed: Option<&'a AttributeRule<'a>>,
+    /// Families with repeatable history records bound them during this pass, before serde
+    /// materializes any of them.
+    is_record: Option<&'a RecordRule<'a>>,
+    max_records: Option<usize>,
+}
+
+/// The message-specific half of XML structural validation: which children a parent admits and in
+/// what order, which attributes an element admits, and which elements are countable history
+/// records. Everything else about the walk is family-independent.
+pub(crate) struct MessageSchema<Child, Attribute, Record> {
+    pub child_rule: Child,
+    pub attribute_allowed: Attribute,
+    pub is_record: Record,
+}
+
+/// Validate a standalone XML message in one event pass and retain its source edition for
+/// diagnostics.
+pub(crate) fn validate_standalone_document<Child, Attribute, Record>(
+    s: &str,
+    root: &[u8],
+    type_name: &str,
+    options: &crate::options::ParseOptions,
+    source_edition: &mut Option<String>,
+    schema: MessageSchema<Child, Attribute, Record>,
+) -> Result<()>
+where
+    Child: Fn(&[u8], &[u8]) -> Option<XmlSequenceRule>,
+    Attribute: Fn(&[u8], &[u8]) -> bool,
+    Record: Fn(&[u8]) -> bool,
+{
+    let MessageSchema {
+        child_rule,
+        attribute_allowed,
+        is_record,
+    } = schema;
+    validate_document(
+        s,
+        type_name,
+        source_edition,
+        DocumentRules {
+            root: Some(root),
+            max_depth: Some(options.max_xml_depth),
+            allow_default_namespace: false,
+            child_rule: Some(&child_rule),
+            attribute_allowed: Some(&attribute_allowed),
+            is_record: Some(&is_record),
+            max_records: options.max_records,
+        },
+    )
+}
+
+/// Longest element name in the shipped NDM schemas (`ORBIT_LIFETIME_CONFIDENCE_LEVEL`) rounded
+/// up. Keeping open element names in a stack buffer avoids one heap allocation per start tag,
+/// which dominates the walker on large ephemeris documents.
+const MAX_ELEMENT_NAME: usize = 32;
+
+/// The name of an element that is currently open, retained only so that a later child can be
+/// matched against its parent.
+#[derive(Clone, Copy)]
+struct ElementName {
+    bytes: [u8; MAX_ELEMENT_NAME],
+    len: u8,
+}
+
+impl ElementName {
+    /// An overlong name is retained as empty. It cannot match any schema rule either way, and an
+    /// element only reaches the stack after its own name has already been accepted.
+    fn new(name: &[u8]) -> Self {
+        let mut bytes = [0u8; MAX_ELEMENT_NAME];
+        let len = if name.len() <= MAX_ELEMENT_NAME {
+            bytes[..name.len()].copy_from_slice(name);
+            name.len()
+        } else {
+            0
+        };
+        Self {
+            bytes,
+            len: len as u8,
+        }
+    }
+
+    fn as_bytes(&self) -> &[u8] {
+        &self.bytes[..usize::from(self.len)]
+    }
+}
+
+fn validate_document(
+    s: &str,
+    type_name: &str,
+    source_edition: &mut Option<String>,
+    rules: DocumentRules<'_>,
+) -> Result<()> {
+    struct Frame {
+        name: ElementName,
+        last_rank: Option<u16>,
+    }
+
+    let invalid =
+        |message: String| CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(message)));
+    let invalid_sequence =
+        |message: String| invalid(format!("invalid {type_name} XML sequence: {message}"));
+    let document = s.strip_prefix('\u{feff}').unwrap_or(s);
     let mut reader = quick_xml::Reader::from_str(document);
+    let mut stack: Vec<Frame> = Vec::new();
     let mut depth = 0usize;
     let mut root_seen = false;
     let mut root_closed = false;
+    let mut event_seen = false;
+    let mut records = 0usize;
+
+    fn count_record(records: &mut usize, child: &[u8], rules: &DocumentRules<'_>) -> Result<()> {
+        let Some(is_record) = rules.is_record else {
+            return Ok(());
+        };
+        if !is_record(child) {
+            return Ok(());
+        }
+        *records += 1;
+        if let Some(limit) = rules.max_records {
+            if *records > limit {
+                return Err(CcsdsNdmError::ResourceLimitExceeded {
+                    resource: "history_records",
+                    limit,
+                    actual: *records,
+                });
+            }
+        }
+        Ok(())
+    }
+
     loop {
         match reader.read_event() {
+            Ok(Event::Decl(_)) => {
+                if event_seen {
+                    return Err(invalid(
+                        "an XML declaration, when present, must begin the document".into(),
+                    ));
+                }
+                event_seen = true;
+            }
             Ok(Event::Start(start)) => {
+                event_seen = true;
                 if root_closed {
                     return Err(invalid(format!(
                         "trailing content after {type_name} document"
                     )));
                 }
+                let child = start.name();
+                let child = child.as_ref();
                 if !root_seen {
-                    validate_root_start(&start, root, type_name, &invalid)?;
+                    if let Some(root) = rules.root {
+                        validate_root_start(
+                            &start,
+                            root,
+                            type_name,
+                            rules.allow_default_namespace,
+                            source_edition,
+                            &invalid,
+                        )?;
+                    }
                     root_seen = true;
+                } else if let (Some(parent), Some(child_rule), Some(attribute_allowed)) =
+                    (stack.last_mut(), rules.child_rule, rules.attribute_allowed)
+                {
+                    validate_attributes(&start, child, attribute_allowed, &invalid_sequence)?;
+                    apply_sequence_rule(parent, child, child_rule, &invalid_sequence)?;
+                    count_record(&mut records, child, &rules)?;
                 }
+                stack.push(Frame {
+                    name: ElementName::new(child),
+                    last_rank: None,
+                });
                 depth += 1;
+                if let Some(limit) = rules.max_depth {
+                    if depth > limit {
+                        return Err(CcsdsNdmError::ResourceLimitExceeded {
+                            resource: "xml_depth",
+                            limit,
+                            actual: depth,
+                        });
+                    }
+                }
             }
             Ok(Event::Empty(start)) => {
+                event_seen = true;
                 if root_closed {
                     return Err(invalid(format!(
                         "trailing content after {type_name} document"
                     )));
                 }
+                let child = start.name();
+                let child = child.as_ref();
                 if !root_seen {
-                    validate_root_start(&start, root, type_name, &invalid)?;
+                    if let Some(root) = rules.root {
+                        validate_root_start(
+                            &start,
+                            root,
+                            type_name,
+                            rules.allow_default_namespace,
+                            source_edition,
+                            &invalid,
+                        )?;
+                    }
                     root_seen = true;
                     root_closed = true;
+                } else if let (Some(parent), Some(child_rule), Some(attribute_allowed)) =
+                    (stack.last_mut(), rules.child_rule, rules.attribute_allowed)
+                {
+                    validate_attributes(&start, child, attribute_allowed, &invalid_sequence)?;
+                    apply_sequence_rule(parent, child, child_rule, &invalid_sequence)?;
+                    count_record(&mut records, child, &rules)?;
+                }
+                // A self-closing element occupies a level even though it never opens a frame,
+                // so it has to be measured against the limit the same way a start tag is.
+                if let Some(limit) = rules.max_depth {
+                    let actual = depth + 1;
+                    if actual > limit {
+                        return Err(CcsdsNdmError::ResourceLimitExceeded {
+                            resource: "xml_depth",
+                            limit,
+                            actual,
+                        });
+                    }
                 }
             }
             Ok(Event::End(_)) => {
+                event_seen = true;
                 depth = depth.checked_sub(1).ok_or_else(|| {
                     invalid(format!(
                         "unexpected closing element in {type_name} document"
                     ))
                 })?;
+                stack.pop();
                 if depth == 0 {
                     root_closed = true;
                 }
             }
             Ok(Event::Text(text)) => {
+                event_seen = true;
                 if (root_closed || !root_seen)
                     && !text
                         .xml_content()
@@ -101,125 +393,32 @@ pub(crate) fn validate_document_root(s: &str, root: &[u8], type_name: &str) -> R
                 ));
             }
             Ok(Event::Eof) => break,
-            Ok(_) => {}
-            Err(error) => return Err(error.into()),
-        }
-    }
-    if !root_seen || !root_closed {
-        return Err(invalid(format!("incomplete {type_name} XML document")));
-    }
-    Ok(())
-}
-
-fn validate_root_start(
-    start: &quick_xml::events::BytesStart<'_>,
-    root: &[u8],
-    type_name: &str,
-    invalid: &impl Fn(String) -> CcsdsNdmError,
-) -> Result<()> {
-    if start.name().as_ref() != root {
-        return Err(invalid(format!(
-            "expected standalone {type_name} root element '{}'",
-            String::from_utf8_lossy(root)
-        )));
-    }
-    for attribute in start.attributes() {
-        let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
-        if !matches!(
-            attribute.key.as_ref(),
-            b"id"
-                | b"version"
-                | b"xmlns"
-                | b"xmlns:xsi"
-                | b"xmlns:ndm"
-                | b"xsi:noNamespaceSchemaLocation"
-                | b"xsi:schemaLocation"
-        ) {
-            return Err(invalid(format!(
-                "unknown {type_name} root attribute '{}'",
-                String::from_utf8_lossy(attribute.key.as_ref())
-            )));
-        }
-    }
-    Ok(())
-}
-
-#[derive(Clone, Copy)]
-pub(crate) struct XmlSequenceRule {
-    pub rank: u16,
-    pub repeatable: bool,
-}
-
-/// Enforce schema sequence order without loading an XSD at runtime. Callers provide only the
-/// message-specific parent/child registration; serde remains responsible for typed values.
-pub(crate) fn validate_element_sequences(
-    s: &str,
-    type_name: &str,
-    child_rule: impl Fn(&[u8], &[u8]) -> Option<XmlSequenceRule>,
-    attribute_allowed: impl Fn(&[u8], &[u8]) -> bool,
-) -> Result<()> {
-    struct Frame {
-        name: Vec<u8>,
-        last_rank: Option<u16>,
-    }
-
-    let invalid = |message: String| {
-        CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(format!(
-            "invalid {type_name} XML sequence: {message}"
-        ))))
-    };
-    let mut reader = quick_xml::Reader::from_str(s.strip_prefix('\u{feff}').unwrap_or(s));
-    let mut stack: Vec<Frame> = Vec::new();
-
-    loop {
-        match reader.read_event() {
-            Ok(Event::Start(start)) => {
-                let child = start.name().as_ref().to_vec();
-                if let Some(parent) = stack.last_mut() {
-                    validate_attributes(&start, &child, &attribute_allowed, &invalid)?;
-                    apply_sequence_rule(parent, &child, &child_rule, &invalid)?;
-                }
-                stack.push(Frame {
-                    name: child,
-                    last_rank: None,
-                });
-            }
-            Ok(Event::Empty(start)) => {
-                let child = start.name().as_ref().to_vec();
-                if let Some(parent) = stack.last_mut() {
-                    validate_attributes(&start, &child, &attribute_allowed, &invalid)?;
-                    apply_sequence_rule(parent, &child, &child_rule, &invalid)?;
-                }
-            }
-            Ok(Event::End(_)) => {
-                stack.pop();
-            }
-            Ok(Event::Eof) => break,
-            Ok(_) => {}
+            Ok(_) => event_seen = true,
             Err(error) => return Err(error.into()),
         }
     }
     fn apply_sequence_rule(
         parent: &mut Frame,
         child: &[u8],
-        child_rule: &impl Fn(&[u8], &[u8]) -> Option<XmlSequenceRule>,
+        child_rule: &ChildRule<'_>,
         invalid: &impl Fn(String) -> CcsdsNdmError,
     ) -> Result<()> {
-        let rule = child_rule(&parent.name, child).ok_or_else(|| {
+        let rule = child_rule(parent.name.as_bytes(), child).ok_or_else(|| {
             invalid(format!(
                 "unknown child '{}' in '{}'",
                 String::from_utf8_lossy(child),
-                String::from_utf8_lossy(&parent.name)
+                String::from_utf8_lossy(parent.name.as_bytes())
             ))
         })?;
-        if parent
-            .last_rank
-            .is_some_and(|last| rule.rank < last || (rule.rank == last && !rule.repeatable))
-        {
+        // A child of a repeating group that steps backwards is starting the next iteration of
+        // that group, not breaking the order, so only a plain sequence rejects a lower rank.
+        if parent.last_rank.is_some_and(|last| {
+            (rule.rank < last && !rule.restarts_sequence) || (rule.rank == last && !rule.repeatable)
+        }) {
             return Err(invalid(format!(
                 "duplicate or out-of-order child '{}' in '{}'",
                 String::from_utf8_lossy(child),
-                String::from_utf8_lossy(&parent.name)
+                String::from_utf8_lossy(parent.name.as_bytes())
             )));
         }
         parent.last_rank = Some(rule.rank);
@@ -229,7 +428,7 @@ pub(crate) fn validate_element_sequences(
     fn validate_attributes(
         start: &quick_xml::events::BytesStart<'_>,
         element: &[u8],
-        attribute_allowed: &impl Fn(&[u8], &[u8]) -> bool,
+        attribute_allowed: &AttributeRule<'_>,
         invalid: &impl Fn(String) -> CcsdsNdmError,
     ) -> Result<()> {
         for attribute in start.attributes() {
@@ -245,7 +444,35 @@ pub(crate) fn validate_element_sequences(
         Ok(())
     }
 
+    if !root_seen || !root_closed {
+        return Err(invalid(format!("incomplete {type_name} XML document")));
+    }
     Ok(())
+}
+
+/// Enforce schema sequence order without loading an XSD at runtime. Callers provide only the
+/// message-specific parent/child registration; serde remains responsible for typed values.
+pub(crate) fn validate_element_sequences(
+    s: &str,
+    type_name: &str,
+    child_rule: impl Fn(&[u8], &[u8]) -> Option<XmlSequenceRule>,
+    attribute_allowed: impl Fn(&[u8], &[u8]) -> bool,
+) -> Result<()> {
+    let mut source_edition = None;
+    validate_document(
+        s,
+        type_name,
+        &mut source_edition,
+        DocumentRules {
+            root: None,
+            max_depth: None,
+            allow_default_namespace: true,
+            child_rule: Some(&child_rule),
+            attribute_allowed: Some(&attribute_allowed),
+            is_record: None,
+            max_records: None,
+        },
+    )
 }
 
 /// Deserialize an internal XML representation from a string.

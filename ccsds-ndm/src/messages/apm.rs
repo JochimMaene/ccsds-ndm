@@ -49,29 +49,11 @@ impl crate::traits::Validate for Apm {
         self.header.validate()?;
         self.body.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        crate::validation::collect_message_validation_errors(
-            crate::validation::MessageKind::Apm,
-            &self.id,
-            &self.version,
-            &self.header,
-            &self.body,
-        )
-    }
 }
 
 impl Ndm for Apm {
     fn to_kvn(&self) -> Result<String> {
-        crate::generation::validate_for_generation(
-            crate::validation::MessageKind::Apm,
-            &self.version,
-            crate::generation::OutputFormat::Kvn,
-            self,
-        )?;
-        let mut writer = KvnWriter::new();
-        self.write_kvn(&mut writer);
-        writer.finish_checked()
+        crate::generation::to_kvn_string(self)
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
@@ -82,13 +64,7 @@ impl Ndm for Apm {
     }
 
     fn to_xml(&self) -> Result<String> {
-        crate::generation::validate_for_generation(
-            crate::validation::MessageKind::Apm,
-            &self.version,
-            crate::generation::OutputFormat::Xml,
-            self,
-        )?;
-        crate::xml::to_string(self)
+        crate::generation::to_xml_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
@@ -103,7 +79,7 @@ impl Ndm for Apm {
 fn validate_xml_sequences(xml: &str) -> Result<()> {
     use crate::xml::XmlSequenceRule;
 
-    let rule = |rank, repeatable| XmlSequenceRule { rank, repeatable };
+    let rule = |rank, repeatable| XmlSequenceRule::new(rank, repeatable);
     crate::xml::validate_element_sequences(
         xml,
         "APM",
@@ -491,10 +467,6 @@ impl crate::traits::Validate for ApmBody {
     fn validate(&self) -> Result<()> {
         self.segment.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        self.segment.validation_errors()
-    }
 }
 
 impl ToKvn for ApmBody {
@@ -514,12 +486,6 @@ impl crate::traits::Validate for ApmSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
         self.data.validate()
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = self.metadata.validation_errors()?;
-        errors.extend(self.data.validation_errors()?);
-        Ok(errors)
     }
 }
 
@@ -629,17 +595,6 @@ impl crate::traits::Validate for ApmMetadata {
             .into());
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        Ok(crate::validation::missing_required_fields(
-            "APM Metadata",
-            [
-                ("OBJECT_NAME", self.object_name.trim().is_empty()),
-                ("OBJECT_ID", self.object_id.trim().is_empty()),
-                ("TIME_SYSTEM", self.time_system.trim().is_empty()),
-            ],
-        ))
     }
 }
 
@@ -752,28 +707,6 @@ impl crate::traits::Validate for ApmData {
             block.validate()?;
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-        let mut errors = crate::validation::missing_required_fields(
-            "APM Data",
-            [(
-                "At least one logical block",
-                self.quaternion_state.is_empty()
-                    && self.euler_angle_state.is_empty()
-                    && self.angular_velocity.is_empty()
-                    && self.spin.is_empty()
-                    && self.inertia.is_empty()
-                    && self.maneuver_parameters.is_empty(),
-            )],
-        );
-        for block in &self.quaternion_state {
-            errors.extend(block.quaternion.validation_errors()?);
-        }
-        for block in &self.spin {
-            errors.extend(block.validation_errors()?);
-        }
-        Ok(errors)
     }
 }
 

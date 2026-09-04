@@ -9,12 +9,6 @@ use thiserror::Error;
 use winnow::error::{AddContext, ParserError, StrContext};
 use winnow::stream::Stream;
 
-/// Severity of a structured diagnostic.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DiagnosticSeverity {
-    Error,
-}
-
 /// Public operation that produced a diagnostic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiagnosticOperation {
@@ -34,8 +28,7 @@ pub enum DiagnosticNotation {
 pub struct GenerationErrorContext {
     pub notation: DiagnosticNotation,
     pub message_kind: crate::validation::MessageKind,
-    pub source_edition: String,
-    pub target_edition: String,
+    pub edition: String,
 }
 
 /// Context stored only when strict parsing fails.
@@ -64,11 +57,10 @@ impl fmt::Display for GenerationErrorContext {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             formatter,
-            "failed to generate {} {} {} -> {}",
+            "failed to generate {} {} {}",
             self.message_kind.as_str(),
             self.notation,
-            self.source_edition,
-            self.target_edition
+            self.edition
         )
     }
 }
@@ -91,12 +83,10 @@ impl fmt::Display for ParseErrorContext {
 /// Borrowed, machine-readable diagnostic information.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic<'a> {
-    pub severity: DiagnosticSeverity,
     pub operation: DiagnosticOperation,
     pub notation: DiagnosticNotation,
     pub message_kind: crate::validation::MessageKind,
     pub source_edition: Option<&'a str>,
-    pub target_edition: Option<&'a str>,
     pub code: Option<&'static str>,
     pub field_path: Option<String>,
     pub requirement: Option<&'static str>,
@@ -104,7 +94,6 @@ pub struct Diagnostic<'a> {
     pub byte_offset: Option<usize>,
     pub original_token: Option<&'a str>,
     pub expected: Option<&'static str>,
-    pub recovery: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -154,12 +143,6 @@ impl ParseDiagnostic {
             message: message.into(),
             contexts: Vec::new(),
         }
-    }
-
-    /// Adds contexts to the diagnostic.
-    pub fn with_contexts(mut self, contexts: Vec<&'static str>) -> Self {
-        self.contexts = contexts;
-        self
     }
 }
 
@@ -362,11 +345,17 @@ impl ValidationError {
         }
     }
 
-    pub(crate) fn at_field_in(self, parent_path: &'static str) -> Self {
+    pub(crate) fn at_field_in(self, parent_path: impl Into<Cow<'static, str>>) -> Self {
+        let parent_path = parent_path.into();
         if matches!(self, Self::AtPath { .. }) {
             return self;
         }
-        if matches!(self, Self::MissingRequiredField { .. }) && self.field_path().is_some() {
+        // A block name derives its own path (see `field_path`), which is kept unless the caller
+        // supplies an indexed parent path: only the caller knows which repeat failed.
+        if matches!(self, Self::MissingRequiredField { .. })
+            && self.field_path().is_some()
+            && !parent_path.ends_with(']')
+        {
             return self;
         }
         let field = match &self {
@@ -382,7 +371,7 @@ impl ValidationError {
             Some(field) => format!("{field}.units"),
             None => field.replace(' ', "_"),
         };
-        let path = match parent_path {
+        let path = match parent_path.as_ref() {
             "" => field,
             _ => format!("{parent_path}.{field}"),
         };
@@ -525,20 +514,11 @@ impl WithLocation for ValidationError {
 /// # Example: Handling Parse Errors
 /// ```no_run
 /// use ccsds_ndm::messages::opm::Opm;
-/// use ccsds_ndm::error::CcsdsNdmError;
 /// use ccsds_ndm::traits::Ndm;
 ///
 /// match Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...") {
 ///     Ok(opm) => println!("Parsed: {:?}", opm),
-///     Err(e) => {
-///         if let Some(enum_err) = e.as_enum_error() {
-///             eprintln!("Invalid enum value '{}' for field '{}'", enum_err.value, enum_err.field);
-///         } else if let Some(validation_err) = e.as_validation_error() {
-///             eprintln!("Validation error: {}", validation_err);
-///         } else {
-///             eprintln!("Error: {}", e);
-///         }
-///     }
+///     Err(e) => eprintln!("{}: {}", e.code().unwrap_or("unknown"), e),
 /// }
 /// ```
 #[derive(Error, Debug)]
@@ -607,16 +587,6 @@ pub enum CcsdsNdmError {
         format: &'static str,
         version: String,
         supported: String,
-    },
-
-    /// Error for a requested edition change without a proven lossless mapping.
-    #[error(
-        "Unsupported version conversion for {message_type}: {source_version} to {target_version}"
-    )]
-    UnsupportedVersionConversion {
-        message_type: &'static str,
-        source_version: String,
-        target_version: String,
     },
 
     /// A caller-selected resource policy was exceeded.
@@ -897,8 +867,7 @@ impl CcsdsNdmError {
         self,
         message_kind: crate::validation::MessageKind,
         notation: DiagnosticNotation,
-        source_edition: &str,
-        target_edition: &str,
+        edition: &str,
     ) -> Self {
         let source = match self {
             Self::Generation { source, .. } | Self::Parsing { source, .. } => source,
@@ -908,8 +877,7 @@ impl CcsdsNdmError {
             context: Box::new(GenerationErrorContext {
                 notation,
                 message_kind,
-                source_edition: source_edition.to_owned(),
-                target_edition: target_edition.to_owned(),
+                edition: edition.to_owned(),
             }),
             source,
         }
@@ -931,7 +899,7 @@ impl CcsdsNdmError {
             Some(error) => {
                 let excerpt = input
                     .get(error.offset..)
-                    .and_then(|tail| tail.lines().next())
+                    .and_then(|tail| tail.split(['\r', '\n']).next())
                     .map(|token| token.chars().take(128).collect());
                 (
                     Some(error.offset),
@@ -962,12 +930,10 @@ impl CcsdsNdmError {
     pub fn diagnostic(&self) -> Option<Diagnostic<'_>> {
         match self {
             Self::Generation { context, source } => Some(Diagnostic {
-                severity: DiagnosticSeverity::Error,
                 operation: DiagnosticOperation::Generate,
                 notation: context.notation,
                 message_kind: context.message_kind,
-                source_edition: Some(&context.source_edition),
-                target_edition: Some(&context.target_edition),
+                source_edition: Some(&context.edition),
                 code: source.code(),
                 field_path: source.field_path(),
                 requirement: None,
@@ -975,15 +941,12 @@ impl CcsdsNdmError {
                 byte_offset: None,
                 original_token: None,
                 expected: None,
-                recovery: None,
             }),
             Self::Parsing { context, source } => Some(Diagnostic {
-                severity: DiagnosticSeverity::Error,
                 operation: DiagnosticOperation::Parse,
                 notation: context.notation,
                 message_kind: context.message_kind,
                 source_edition: context.source_edition.as_deref(),
-                target_edition: None,
                 code: if matches!(
                     source.as_format_error(),
                     Some(FormatError::InvalidFormat(_))
@@ -1001,7 +964,6 @@ impl CcsdsNdmError {
                 byte_offset: context.byte_offset,
                 original_token: context.original_token.as_deref(),
                 expected: context.expected,
-                recovery: None,
             }),
             _ => None,
         }
@@ -1038,11 +1000,7 @@ impl CcsdsNdmError {
             Self::UnsupportedInputVersion { .. } => Some("parse.unsupported_input_version"),
             Self::UnexpectedEof { .. } => Some("parse.unexpected_eof"),
             Self::UnsupportedOutputVersion { .. } => Some("generation.unsupported_output_version"),
-            Self::UnsupportedVersionConversion { .. } => {
-                Some("generation.unsupported_version_conversion")
-            }
             Self::ResourceLimitExceeded { resource, .. } => match *resource {
-                "generated_document" => Some("resource.output_limit_exceeded"),
                 "input_document" => Some("resource.input_limit_exceeded"),
                 "xml_depth" => Some("resource.xml_depth_limit_exceeded"),
                 "history_records" => Some("resource.record_limit_exceeded"),
@@ -1065,7 +1023,7 @@ impl CcsdsNdmError {
     }
 
     /// Returns the inner KVN parse error if this is a FormatError::Kvn.
-    pub fn as_kvn_parse_error(&self) -> Option<&KvnParseError> {
+    pub(crate) fn as_kvn_parse_error(&self) -> Option<&KvnParseError> {
         match self {
             CcsdsNdmError::Generation { source, .. } | CcsdsNdmError::Parsing { source, .. } => {
                 source.as_kvn_parse_error()
@@ -1101,7 +1059,8 @@ impl CcsdsNdmError {
     }
 
     /// Returns the inner epoch error if this is an EpochError.
-    pub fn as_epoch_error(&self) -> Option<&EpochError> {
+    #[cfg(test)]
+    pub(crate) fn as_epoch_error(&self) -> Option<&EpochError> {
         match self {
             CcsdsNdmError::Generation { source, .. } | CcsdsNdmError::Parsing { source, .. } => {
                 source.as_epoch_error()
@@ -1123,7 +1082,8 @@ impl CcsdsNdmError {
     }
 
     /// Returns the inner XML error if this is an XmlError.
-    pub fn as_xml_error(&self) -> Option<&quick_xml::Error> {
+    #[cfg(test)]
+    pub(crate) fn as_xml_error(&self) -> Option<&quick_xml::Error> {
         match self {
             CcsdsNdmError::Generation { source, .. } | CcsdsNdmError::Parsing { source, .. } => {
                 source.as_xml_error()
@@ -1137,32 +1097,38 @@ impl CcsdsNdmError {
     }
 
     /// Returns true if this is any FormatError.
-    pub fn is_format_error(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_format_error(&self) -> bool {
         matches!(self, CcsdsNdmError::Format(_))
     }
 
     /// Returns true if this is a KVN FormatError.
-    pub fn is_kvn_error(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_kvn_error(&self) -> bool {
         self.as_kvn_parse_error().is_some()
     }
 
     /// Returns true if this is a ValidationError.
-    pub fn is_validation_error(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_validation_error(&self) -> bool {
         self.as_validation_error().is_some()
     }
 
     /// Returns true if this is an I/O error.
-    pub fn is_io_error(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_io_error(&self) -> bool {
         matches!(self, CcsdsNdmError::Io(_))
     }
 
     /// Returns true if this is an epoch error.
-    pub fn is_epoch_error(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_epoch_error(&self) -> bool {
         matches!(self, CcsdsNdmError::Epoch(_))
     }
 
     /// Returns the inner EnumParseError if this is a FormatError::Enum.
-    pub fn as_enum_error(&self) -> Option<&EnumParseError> {
+    #[cfg(test)]
+    pub(crate) fn as_enum_error(&self) -> Option<&EnumParseError> {
         match self {
             CcsdsNdmError::Format(e) => match **e {
                 FormatError::Enum(ref ee) => Some(ee),
@@ -1173,7 +1139,8 @@ impl CcsdsNdmError {
     }
 
     /// Returns the inner ParseIntError if this is a FormatError::ParseInt.
-    pub fn as_parse_int_error(&self) -> Option<&std::num::ParseIntError> {
+    #[cfg(test)]
+    pub(crate) fn as_parse_int_error(&self) -> Option<&std::num::ParseIntError> {
         match self {
             CcsdsNdmError::Format(e) => match **e {
                 FormatError::ParseInt(ref pie) => Some(pie),
@@ -1184,7 +1151,8 @@ impl CcsdsNdmError {
     }
 
     /// Returns the inner ParseFloatError if this is a FormatError::ParseFloat.
-    pub fn as_parse_float_error(&self) -> Option<&std::num::ParseFloatError> {
+    #[cfg(test)]
+    pub(crate) fn as_parse_float_error(&self) -> Option<&std::num::ParseFloatError> {
         match self {
             CcsdsNdmError::Format(e) => match **e {
                 FormatError::ParseFloat(ref pfe) => Some(pfe),

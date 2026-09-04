@@ -12,7 +12,7 @@ behavior documented in `oem-3.0.md` and `omm-3.0.md`.
 | Validated KVN/XML generation | Covered | The focused surface test mutates required header data and confirms that generation fails through the shared validation gate for both message types. |
 | Both conversion directions | Covered | KVN→XML→KVN conversion is compared through each type's canonical KVN model representation. |
 | Resource behavior | Covered | Focused tests exercise exact input and output limits; OEM history-record limits remain covered by `test_parse_and_generation_options.py`. |
-| Model/API parity | Covered | `just audit-strict`, `just stubs-check`, and `just sync-docs-check` enforce Rust-field exposure, runtime/type-stub agreement, and Rust-derived documentation. |
+| Model/API parity | Covered | `just audit`, `just stubs-check`, and `just sync-docs-check` enforce Rust-field exposure, runtime/type-stub agreement, and Rust-derived documentation. |
 | Packaged surface | Covered | `just package-python` installs the wheel in isolation and exercises OPM, OEM, and OMM parsing and conversion in both notations. |
 
 The adapter contains no independent CCSDS rules. Its conformance claim is therefore the verified

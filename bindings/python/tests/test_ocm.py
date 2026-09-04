@@ -6,6 +6,7 @@
 Unit tests for Orbit Comprehensive Message (OCM) Python bindings.
 """
 
+import ccsds_ndm
 import pytest
 
 from ccsds_ndm import (
@@ -174,10 +175,10 @@ class TestOcm:
         ocm = self._create_valid_ocm()
         path = tmp_path / "test.ocm"
 
-        ocm.to_file(str(path), format="kvn")
+        ocm.to_file(str(path), "kvn")
         assert path.exists()
 
-        ocm2 = Ocm.from_file(str(path), format="kvn")
+        ocm2 = ccsds_ndm.from_file(str(path), format="kvn")
         assert ocm2.header.originator == "TEST"
 
     def test_ocm_covariance_and_maneuver_setters(self):

@@ -145,39 +145,8 @@ impl Apm {
     }
 
     /// Serialize to validated KVN or XML.
-    #[pyo3(signature = (format, version=None, max_output_bytes=None))]
-    fn to_str(
-        &self,
-        py: Python<'_>,
-        format: &str,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(
-            &self.to_core(py)?,
-            format,
-            version,
-            max_output_bytes,
-        )
-    }
-
-    /// Write validated KVN or XML directly to a file.
-    #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
-    fn to_file(
-        &self,
-        py: Python<'_>,
-        path: &str,
-        format: &str,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<()> {
-        crate::api::generate_file_with_limit(
-            &self.to_core(py)?,
-            path,
-            format,
-            version,
-            max_output_bytes,
-        )
+    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+        crate::api::generate_string(&self.to_core(py)?, format)
     }
 
     #[staticmethod]
@@ -193,6 +162,7 @@ impl Apm {
         Self::from_core(py, inner)
     }
 
+    /// Parse an APM from a KVN or XML file.
     #[staticmethod]
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
     fn from_file(
@@ -204,6 +174,15 @@ impl Apm {
         let options = crate::api::parse_options(max_input_bytes, None);
         let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
         Self::from_core(py, inner)
+    }
+
+    /// Atomically write this APM as KVN or XML.
+    fn to_file(&self, py: Python<'_>, path: &str, format: &str) -> PyResult<()> {
+        crate::api::generate_file(
+            &ccsds_ndm::MessageType::Apm(self.to_core(py)?),
+            path,
+            format,
+        )
     }
 }
 

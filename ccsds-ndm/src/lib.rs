@@ -63,8 +63,7 @@
 //! let opm = Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...").unwrap();
 //! ```
 //!
-//! Parsing is strict. A future permissive surface will be added only alongside explicit,
-//! deterministic recovery rules and structured diagnostics.
+//! Parsing is strict.
 //!
 //! ### 3. Generate a message using the Builder Pattern
 //!
@@ -110,17 +109,7 @@
 //! println!("{}", opm.to_kvn().unwrap());
 //! ```
 //!
-//! Generation validates output and preserves the source edition by default. An explicit target
-//! can be selected without mutating the parsed message:
-//!
-//! ```no_run
-//! use ccsds_ndm::{GenerateOptions, VersionedNdm};
-//! # use ccsds_ndm::messages::opm::Opm;
-//! # use ccsds_ndm::traits::Ndm;
-//! # let opm = Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...")?;
-//! let xml = opm.to_xml_with(&GenerateOptions::latest())?;
-//! # Ok::<(), ccsds_ndm::error::CcsdsNdmError>(())
-//! ```
+//! Generation validates output and preserves the edition stored on the message.
 //!
 //! ### 4. Serialize to KVN or XML
 //!
@@ -157,21 +146,19 @@ pub mod messages;
 pub mod options;
 pub mod traits;
 pub mod types;
-pub mod utils;
+mod utils;
 pub mod validation;
 pub mod versioning;
 pub(crate) mod xml;
 
-pub use conversion::{
-    convert, convert_file, convert_file_with_options, convert_to_file,
-    convert_to_file_with_options, convert_with_options,
-};
+pub use conversion::{convert, convert_file, convert_file_with_options, convert_with_options};
 pub use detect::Notation;
 use error::{CcsdsNdmError, Result};
 pub use generation::VersionedNdm;
 pub(crate) use kvn::parser::parse_block;
-pub use options::{GenerateOptions, ParseOptions, TargetVersion};
+pub use options::ParseOptions;
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 
 /// A generic container for any parsed NDM message.
@@ -264,10 +251,17 @@ impl MessageType {
     }
 
     pub(crate) fn validate_for_generation(&self, format: generation::OutputFormat) -> Result<()> {
-        fn validate<T: VersionedNdm>(message: &T, format: generation::OutputFormat) -> Result<()> {
+        fn validate<T: VersionedNdm + traits::ToKvn>(
+            message: &T,
+            format: generation::OutputFormat,
+        ) -> Result<()> {
             let result = generation::validate_output_version(T::KIND, message.version(), format)
                 .and_then(|()| match format {
-                    generation::OutputFormat::Kvn => message.validate_kvn_output(),
+                    // A validation-only API is asking "would generation succeed?", so it runs
+                    // the model checks and the serialization pass, exactly as streaming does.
+                    generation::OutputFormat::Kvn => message
+                        .validate_kvn_model()
+                        .and_then(|()| traits::ToKvn::validate_kvn(message)),
                     generation::OutputFormat::Xml => {
                         traits::Validate::validate(message)?;
                         message.validate_xml_output()
@@ -280,7 +274,6 @@ impl MessageType {
                         generation::OutputFormat::Kvn => error::DiagnosticNotation::Kvn,
                         generation::OutputFormat::Xml => error::DiagnosticNotation::Xml,
                     },
-                    message.version(),
                     message.version(),
                 )
             })
@@ -315,16 +308,16 @@ impl MessageType {
     /// Returns an error when the stored edition cannot be generated or the model is invalid.
     pub fn to_kvn(&self) -> Result<String> {
         match self {
-            MessageType::Oem(msg) => msg.to_kvn_with(&GenerateOptions::source()),
-            MessageType::Cdm(msg) => msg.to_kvn_with(&GenerateOptions::source()),
-            MessageType::Opm(msg) => msg.to_kvn_with(&GenerateOptions::source()),
-            MessageType::Omm(msg) => msg.to_kvn_with(&GenerateOptions::source()),
-            MessageType::Rdm(msg) => msg.to_kvn_with(&GenerateOptions::source()),
-            MessageType::Tdm(msg) => msg.to_kvn_with(&GenerateOptions::source()),
-            MessageType::Ocm(msg) => msg.to_kvn_with(&GenerateOptions::source()),
-            MessageType::Acm(msg) => msg.to_kvn_with(&GenerateOptions::source()),
-            MessageType::Aem(msg) => msg.to_kvn_with(&GenerateOptions::source()),
-            MessageType::Apm(msg) => msg.to_kvn_with(&GenerateOptions::source()),
+            MessageType::Oem(msg) => traits::Ndm::to_kvn(msg),
+            MessageType::Cdm(msg) => traits::Ndm::to_kvn(msg),
+            MessageType::Opm(msg) => traits::Ndm::to_kvn(msg),
+            MessageType::Omm(msg) => traits::Ndm::to_kvn(msg),
+            MessageType::Rdm(msg) => traits::Ndm::to_kvn(msg),
+            MessageType::Tdm(msg) => traits::Ndm::to_kvn(msg),
+            MessageType::Ocm(msg) => traits::Ndm::to_kvn(msg),
+            MessageType::Acm(msg) => traits::Ndm::to_kvn(msg),
+            MessageType::Aem(msg) => traits::Ndm::to_kvn(msg),
+            MessageType::Apm(msg) => traits::Ndm::to_kvn(msg),
             MessageType::Ndm(msg) => crate::traits::Ndm::to_kvn(msg),
         }
     }
@@ -339,99 +332,51 @@ impl MessageType {
     /// serialization fails.
     pub fn to_xml(&self) -> Result<String> {
         match self {
-            MessageType::Oem(msg) => msg.to_xml_with(&GenerateOptions::source()),
-            MessageType::Cdm(msg) => msg.to_xml_with(&GenerateOptions::source()),
-            MessageType::Opm(msg) => msg.to_xml_with(&GenerateOptions::source()),
-            MessageType::Omm(msg) => msg.to_xml_with(&GenerateOptions::source()),
-            MessageType::Rdm(msg) => msg.to_xml_with(&GenerateOptions::source()),
-            MessageType::Tdm(msg) => msg.to_xml_with(&GenerateOptions::source()),
-            MessageType::Ocm(msg) => msg.to_xml_with(&GenerateOptions::source()),
-            MessageType::Acm(msg) => msg.to_xml_with(&GenerateOptions::source()),
-            MessageType::Aem(msg) => msg.to_xml_with(&GenerateOptions::source()),
-            MessageType::Apm(msg) => msg.to_xml_with(&GenerateOptions::source()),
+            MessageType::Oem(msg) => traits::Ndm::to_xml(msg),
+            MessageType::Cdm(msg) => traits::Ndm::to_xml(msg),
+            MessageType::Opm(msg) => traits::Ndm::to_xml(msg),
+            MessageType::Omm(msg) => traits::Ndm::to_xml(msg),
+            MessageType::Rdm(msg) => traits::Ndm::to_xml(msg),
+            MessageType::Tdm(msg) => traits::Ndm::to_xml(msg),
+            MessageType::Ocm(msg) => traits::Ndm::to_xml(msg),
+            MessageType::Acm(msg) => traits::Ndm::to_xml(msg),
+            MessageType::Aem(msg) => traits::Ndm::to_xml(msg),
+            MessageType::Apm(msg) => traits::Ndm::to_xml(msg),
             MessageType::Ndm(msg) => crate::traits::Ndm::to_xml(msg),
         }
     }
 
-    /// Generate KVN using an explicit target-edition policy.
-    ///
-    /// The selected message is fully validated before serialization. Selecting a different
-    /// edition does not mutate the contained message. A combined NDM accepts only
-    /// [`TargetVersion::Source`] because it has no single root edition.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the selected edition cannot be generated, the model is invalid, or
-    /// the target policy is not applicable to a combined NDM.
-    pub fn to_kvn_with(&self, options: &GenerateOptions) -> Result<String> {
+    /// Stream KVN using the edition stored on the message.
+    pub fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
         match self {
-            MessageType::Oem(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
-            MessageType::Cdm(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
-            MessageType::Opm(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
-            MessageType::Omm(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
-            MessageType::Rdm(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
-            MessageType::Tdm(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
-            MessageType::Ocm(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
-            MessageType::Acm(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
-            MessageType::Aem(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
-            MessageType::Apm(msg) => generation::VersionedNdm::to_kvn_with(msg, options),
-            MessageType::Ndm(msg) => match &options.target_version {
-                TargetVersion::Source => crate::traits::Ndm::to_kvn(msg).and_then(|output| {
-                    generation::enforce_output_limit(output.len(), options).map_err(|error| {
-                        error.with_generation_context(
-                            validation::MessageKind::Ndm,
-                            error::DiagnosticNotation::Kvn,
-                            "combined",
-                            "combined",
-                        )
-                    })?;
-                    Ok(output)
-                }),
-                _ => Err(CcsdsNdmError::UnsupportedMessage(
-                    "A combined NDM has no single target version".into(),
-                )),
-            },
+            MessageType::Oem(msg) => VersionedNdm::write_kvn_to(msg, output),
+            MessageType::Cdm(msg) => VersionedNdm::write_kvn_to(msg, output),
+            MessageType::Opm(msg) => VersionedNdm::write_kvn_to(msg, output),
+            MessageType::Omm(msg) => VersionedNdm::write_kvn_to(msg, output),
+            MessageType::Rdm(msg) => VersionedNdm::write_kvn_to(msg, output),
+            MessageType::Tdm(msg) => VersionedNdm::write_kvn_to(msg, output),
+            MessageType::Ocm(msg) => VersionedNdm::write_kvn_to(msg, output),
+            MessageType::Acm(msg) => VersionedNdm::write_kvn_to(msg, output),
+            MessageType::Aem(msg) => VersionedNdm::write_kvn_to(msg, output),
+            MessageType::Apm(msg) => VersionedNdm::write_kvn_to(msg, output),
+            MessageType::Ndm(msg) => msg.write_kvn_to(output),
         }
     }
 
-    /// Generate XML using an explicit target-edition policy.
-    ///
-    /// The selected message is fully validated before serialization. Selecting a different
-    /// edition does not mutate the contained message. A combined NDM accepts only
-    /// [`TargetVersion::Source`] because it has no single root edition.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the selected edition cannot be generated, the model is invalid, the
-    /// target policy is not applicable to a combined NDM, or XML serialization fails.
-    pub fn to_xml_with(&self, options: &GenerateOptions) -> Result<String> {
+    /// Stream XML using the edition stored on the message.
+    pub fn write_xml_to<W: Write>(&self, output: &mut W) -> Result<()> {
         match self {
-            MessageType::Oem(msg) => generation::VersionedNdm::to_xml_with(msg, options),
-            MessageType::Cdm(msg) => generation::VersionedNdm::to_xml_with(msg, options),
-            MessageType::Opm(msg) => generation::VersionedNdm::to_xml_with(msg, options),
-            MessageType::Omm(msg) => generation::VersionedNdm::to_xml_with(msg, options),
-            MessageType::Rdm(msg) => generation::VersionedNdm::to_xml_with(msg, options),
-            MessageType::Tdm(msg) => generation::VersionedNdm::to_xml_with(msg, options),
-            MessageType::Ocm(msg) => generation::VersionedNdm::to_xml_with(msg, options),
-            MessageType::Acm(msg) => generation::VersionedNdm::to_xml_with(msg, options),
-            MessageType::Aem(msg) => generation::VersionedNdm::to_xml_with(msg, options),
-            MessageType::Apm(msg) => generation::VersionedNdm::to_xml_with(msg, options),
-            MessageType::Ndm(msg) => match &options.target_version {
-                TargetVersion::Source => crate::traits::Ndm::to_xml(msg).and_then(|output| {
-                    generation::enforce_output_limit(output.len(), options).map_err(|error| {
-                        error.with_generation_context(
-                            validation::MessageKind::Ndm,
-                            error::DiagnosticNotation::Xml,
-                            "combined",
-                            "combined",
-                        )
-                    })?;
-                    Ok(output)
-                }),
-                _ => Err(CcsdsNdmError::UnsupportedMessage(
-                    "A combined NDM has no single target version".into(),
-                )),
-            },
+            MessageType::Oem(msg) => VersionedNdm::write_xml_to(msg, output),
+            MessageType::Cdm(msg) => VersionedNdm::write_xml_to(msg, output),
+            MessageType::Opm(msg) => VersionedNdm::write_xml_to(msg, output),
+            MessageType::Omm(msg) => VersionedNdm::write_xml_to(msg, output),
+            MessageType::Rdm(msg) => VersionedNdm::write_xml_to(msg, output),
+            MessageType::Tdm(msg) => VersionedNdm::write_xml_to(msg, output),
+            MessageType::Ocm(msg) => VersionedNdm::write_xml_to(msg, output),
+            MessageType::Acm(msg) => VersionedNdm::write_xml_to(msg, output),
+            MessageType::Aem(msg) => VersionedNdm::write_xml_to(msg, output),
+            MessageType::Apm(msg) => VersionedNdm::write_xml_to(msg, output),
+            MessageType::Ndm(msg) => msg.write_xml_to(output),
         }
     }
 
@@ -444,12 +389,10 @@ impl MessageType {
     ///
     /// Returns a KVN-generation error or an I/O error from writing the destination.
     pub fn to_kvn_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let kvn = self.to_kvn()?;
-        fsutil::atomic_write(path.as_ref(), kvn.as_bytes()).map_err(|error| {
+        fsutil::atomic_write(path.as_ref(), |output| self.write_kvn_to(output)).map_err(|error| {
             error.with_generation_context(
                 self.kind(),
                 error::DiagnosticNotation::Kvn,
-                self.source_edition(),
                 self.source_edition(),
             )
         })
@@ -464,12 +407,10 @@ impl MessageType {
     ///
     /// Returns an XML-generation error or an I/O error from writing the destination.
     pub fn to_xml_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let xml = self.to_xml()?;
-        fsutil::atomic_write(path.as_ref(), xml.as_bytes()).map_err(|error| {
+        fsutil::atomic_write(path.as_ref(), |output| self.write_xml_to(output)).map_err(|error| {
             error.with_generation_context(
                 self.kind(),
                 error::DiagnosticNotation::Xml,
-                self.source_edition(),
                 self.source_edition(),
             )
         })

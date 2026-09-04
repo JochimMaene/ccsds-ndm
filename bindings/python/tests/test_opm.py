@@ -6,6 +6,7 @@
 Unit tests for Orbit Parameter Message (OPM) Python bindings.
 """
 
+import ccsds_ndm
 import pytest
 
 from ccsds_ndm import (
@@ -93,10 +94,10 @@ class TestOpm:
         opm = self._create_valid_opm()
         path = tmp_path / "test.opm"
 
-        opm.to_file(str(path), format="kvn")
+        opm.to_file(str(path), "kvn")
         assert path.exists()
 
-        opm2 = Opm.from_file(str(path), format="kvn")
+        opm2 = ccsds_ndm.from_file(str(path), format="kvn")
         assert opm2.header.originator == "TEST"
 
     def test_epoch_fields_require_calendar_form(self):

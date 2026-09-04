@@ -34,3 +34,50 @@ pub(crate) mod rdm;
 pub mod ser;
 pub(crate) mod strict;
 pub(crate) mod tdm;
+
+/// Normalize CR, LFCR, and CRLF terminators so line-oriented passes only have to handle LF.
+///
+/// Every rewrite is byte-length preserving (`\r` becomes `\n`, `\n\r` becomes `\r\n`). That
+/// invariant is load-bearing: parse diagnostics carry byte offsets into the normalized text, but
+/// are rendered against the caller's original input, so the two must stay aligned.
+///
+/// OEM and OPM enable this, which is what lets both accept all four normative terminators; see
+/// `docs/conformance/oem-3.0.md` and `docs/conformance/opm-3.0-kvn-parsing.md`. The remaining
+/// families never normalize, so [`strict::validate_odm_assignments`] still rejects a lone
+/// carriage return for them — it only ever strips a trailing one, so CRLF parses everywhere.
+/// Widening the other eight is a per-family conformance decision that has not been taken.
+pub(crate) fn normalize_line_endings(input: &str) -> std::borrow::Cow<'_, str> {
+    if !input.contains('\r') {
+        return std::borrow::Cow::Borrowed(input);
+    }
+
+    let bytes = input.as_bytes();
+    let mut normalized = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'\r' if bytes.get(index + 1) == Some(&b'\n') => {
+                normalized.extend_from_slice(b"\r\n");
+                index += 2;
+            }
+            b'\n' if bytes.get(index + 1) == Some(&b'\r') => {
+                normalized.extend_from_slice(b"\r\n");
+                index += 2;
+            }
+            b'\r' => {
+                normalized.push(b'\n');
+                index += 1;
+            }
+            byte => {
+                normalized.push(byte);
+                index += 1;
+            }
+        }
+    }
+    debug_assert_eq!(
+        normalized.len(),
+        bytes.len(),
+        "normalization must preserve byte offsets for diagnostics"
+    );
+    std::borrow::Cow::Owned(String::from_utf8(normalized).expect("line endings preserve UTF-8"))
+}

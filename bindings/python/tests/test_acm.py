@@ -6,6 +6,7 @@
 Unit tests for Attitude Comprehensive Message (ACM) Python bindings.
 """
 
+import ccsds_ndm
 import pytest
 
 from ccsds_ndm import (
@@ -374,11 +375,11 @@ class TestAcm:
         kvn_path = tmp_path / "test.acm"
 
         # Test to_file
-        acm.to_file(str(kvn_path), format="kvn")
+        acm.to_file(str(kvn_path), "kvn")
         assert kvn_path.exists()
 
         # Test from_file
-        acm2 = Acm.from_file(str(kvn_path), format="kvn")
+        acm2 = ccsds_ndm.from_file(str(kvn_path), format="kvn")
         assert acm2.header.originator == "TEST"
 
     def test_acm_setter_parity_for_nested_sections(self):

@@ -25,6 +25,30 @@ fn all_segments_must_describe_one_object_and_one_time_system() {
 }
 
 #[test]
+fn consecutive_useable_spans_may_touch_but_not_overlap() {
+    let mut message = Oem::from_kvn(MULTI_SEGMENT).unwrap();
+    let second = &mut message.body.segment[1].metadata;
+    second.start_time = epoch("2019-12-28T21:00:00.000");
+    message
+        .validate()
+        .expect("total spans may overlap when useable spans do not");
+
+    message.body.segment[1].metadata.useable_start_time = Some(epoch("2019-12-28T21:23:00.331"));
+    message
+        .validate()
+        .expect("a shared useable-span endpoint is allowed");
+
+    message.body.segment[1].metadata.useable_start_time = Some(epoch("2019-12-28T21:22:00.331"));
+    let error = message
+        .validate()
+        .expect_err("consecutive useable spans must not overlap");
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[1].metadata.useable_start_time")
+    );
+}
+
+#[test]
 fn oem_time_tags_are_absolute_and_metadata_ranges_are_consistent() {
     let mut message = Oem::from_xml(XML).unwrap();
     message.body.segment[0].data.state_vector[0].epoch = epoch("123.5");
@@ -36,10 +60,9 @@ fn oem_time_tags_are_absolute_and_metadata_ranges_are_consistent() {
     let mut message = Oem::from_xml(XML).unwrap();
     let metadata = &mut message.body.segment[0].metadata;
     std::mem::swap(&mut metadata.start_time, &mut metadata.stop_time);
-    let errors = message.validation_errors().unwrap();
-    assert!(errors.iter().any(|error| {
-        error.code() == Some("validation.invalid_value") && error.to_string().contains("START_TIME")
-    }));
+    let error = message.validate().unwrap_err();
+    assert_eq!(error.code(), Some("validation.invalid_value"));
+    assert!(error.to_string().contains("START_TIME"));
 
     let mut message = Oem::from_xml(XML).unwrap();
     message.body.segment[0].metadata.useable_start_time = Some(epoch("2019-12-01T00:00:00"));
@@ -53,14 +76,13 @@ fn ephemeris_records_are_in_span_and_nondecreasing() {
     assert!(message.validate().is_err());
 
     let mut message = Oem::from_xml(XML).unwrap();
-    message.body.segment[0].data.state_vector[1].epoch = epoch("2019-12-17T00:00:00");
-    let errors = message.validation_errors().unwrap();
-    assert!(errors
-        .iter()
-        .any(|error| error.to_string().contains("nondecreasing")));
-    assert!(errors.iter().any(|error| {
-        error.field_path().as_deref() == Some("body.segment[0].data.state_vector[1].epoch")
-    }));
+    message.body.segment[0].data.state_vector[2].epoch = epoch("2019-12-18T12:00:30.331");
+    let error = message.validate().unwrap_err();
+    assert!(error.to_string().contains("nondecreasing"));
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[0].data.state_vector[2].epoch")
+    );
 }
 
 #[test]
@@ -71,17 +93,16 @@ fn covariance_time_tags_are_strictly_increasing() {
         .data
         .covariance_matrix
         .push(covariance);
-    let errors = message.validation_errors().unwrap();
-    assert!(errors
-        .iter()
-        .any(|error| error.to_string().contains("strictly increasing")));
-    assert!(errors.iter().any(|error| {
-        error.field_path().as_deref() == Some("body.segment[0].data.covariance_matrix[1].epoch")
-    }));
+    let error = message.validate().unwrap_err();
+    assert!(error.to_string().contains("strictly increasing"));
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[0].data.covariance_matrix[1].epoch")
+    );
 }
 
 #[test]
-fn validation_collects_independent_failures_without_stopping_at_the_first() {
+fn validation_stops_at_the_first_failure() {
     let mut message = Oem::from_xml(XML).unwrap();
     let metadata = &mut message.body.segment[0].metadata;
     metadata.object_name.clear();
@@ -89,22 +110,10 @@ fn validation_collects_independent_failures_without_stopping_at_the_first() {
     metadata.useable_stop_time = Some(epoch("2019-11-01T00:00:00"));
     message.body.segment[0].data.state_vector[0].x.value = f64::NAN;
 
-    let errors = message.validation_errors().unwrap();
-    assert!(
-        errors.len() >= 4,
-        "independent errors were lost: {errors:?}"
-    );
+    let first = message.validate().unwrap_err();
+    assert_eq!(first.code(), Some("validation.missing_required_field"));
     assert_eq!(
-        errors[0].code(),
-        Some("validation.missing_required_field"),
-        "errors should remain in model order"
-    );
-    assert_eq!(
-        errors[0].field_path().as_deref(),
+        first.field_path().as_deref(),
         Some("body.segment[0].metadata.object_name")
     );
-
-    let first = message.validate().unwrap_err();
-    assert_eq!(first.code(), errors[0].code());
-    assert_eq!(first.field_path(), errors[0].field_path());
 }

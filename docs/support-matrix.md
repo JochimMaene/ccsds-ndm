@@ -26,21 +26,21 @@ rather than silently discarded.
 | OCM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
 | CDM 1.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
 | TDM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
+| TDM 1.0 | Parse only | Parse only | Yes | Yes | Available |
 | RDM 1.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
 | APM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
+| APM 1.0 | Parse only | Parse only | Yes | Yes | Available |
 | AEM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
+| AEM 1.0 | Parse only | Parse only | Yes | Yes | Available |
 | ACM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
+| ACM 1.0 | Parse only | Parse only | Yes | Yes | Available |
 | Combined NDM | Sequential convenience form | Parse and write | Yes | Yes | Available |
 
-OPM and OEM edition 1.0 remain parse-only. They cannot be written back or converted to a newer
-edition; callers must supply a supported 2.0 or 3.0 message instead. The library rejects unsupported
-output editions instead of relabeling a document. OPM, OEM, and OMM generation supports explicit
-2.0 and 3.0 targets where the typed content can be represented without loss.
-
-## Upgrade notes
-
-This release removes parsing support for AEM, APM, ACM, and TDM edition 1.0. Use their currently
-supported editions shown above before parsing: 2.0 for AEM, APM, ACM, and TDM.
+OPM, OEM, AEM, APM, ACM, and TDM edition 1.0 remain parse-only. They cannot be written back or
+converted to a newer edition; callers must supply a supported current-edition message instead. The
+library rejects unsupported output editions instead of relabeling a document. OPM, OEM, and OMM
+generation supports explicit 2.0 and 3.0 targets where the typed content can be represented without
+loss.
 
 ## Evidence
 

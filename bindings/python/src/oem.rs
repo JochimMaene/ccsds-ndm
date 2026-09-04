@@ -10,7 +10,6 @@ use ccsds_ndm::types::{
     Acc, InterpolationDegree, Position, PositionCovariance, PositionVelocityCovariance, Velocity,
     VelocityCovariance,
 };
-use ccsds_ndm::ParseOptions;
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -113,6 +112,31 @@ fn build_covariance_matrix(
             units: None,
         },
     }
+}
+
+fn full_covariance_values(
+    values: &PyReadonlyArrayDyn<'_, f64>,
+    matrix: Option<usize>,
+) -> PyResult<[f64; 21]> {
+    let values = values.as_array();
+    let get = |row, column| match matrix {
+        Some(matrix) => values[[matrix, row, column]],
+        None => values[[row, column]],
+    };
+
+    // A CCSDS covariance is lower-triangular, and the matrices callers pass in come out of
+    // numerical filters where `P` is symmetric only to within rounding. Comparing the two
+    // triangles for equality would reject those, so the lower triangle is authoritative and the
+    // upper one is not read.
+    let mut lower = [0.0; 21];
+    let mut index = 0;
+    for row in 0..6 {
+        for column in 0..=row {
+            lower[index] = get(row, column);
+            index += 1;
+        }
+    }
+    Ok(lower)
 }
 
 /// Orbit Ephemeris Message (OEM).
@@ -344,7 +368,8 @@ impl OemData {
 ///     Epoch of the covariance matrix (ISO 8601).
 ///     values : numpy.ndarray
 ///     NumPy array of shape (21,) containing the lower-triangular values, or (6,6) for
-///     a full symmetric matrix.
+///     a full symmetric matrix. Only the lower triangle of a (6,6) input is read, so a
+///     matrix that is symmetric only to within rounding is accepted as-is.
 /// cov_ref_frame : str, optional
 ///     Reference frame for the covariance matrix.
 /// comment : list[str], optional
@@ -508,29 +533,12 @@ impl Oem {
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
-        let options = ParseOptions {
-            max_input_bytes,
-            max_records,
-            ..ParseOptions::default()
-        };
+        let options = crate::api::parse_options(max_input_bytes, max_records);
         let inner = crate::api::parse_typed_with_options(data, format, &options)?;
         Self::from_core(py, inner)
     }
 
-    /// Create an OEM message from a file.
-    ///
-    /// Parameters
-    /// ----------
-    /// path : str
-    ///     Path to the input file.
-    /// format : str, optional
-    ///     Format ('kvn' or 'xml'). Auto-detected if None.
-    ///     (Optional)
-    ///
-    /// Returns
-    /// -------
-    /// Oem
-    ///     The parsed OEM object.
+    /// Parse an OEM from a KVN or XML file.
     #[staticmethod]
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_file(
@@ -540,58 +548,23 @@ impl Oem {
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
-        let options = ParseOptions {
-            max_input_bytes,
-            max_records,
-            ..ParseOptions::default()
-        };
+        let options = crate::api::parse_options(max_input_bytes, max_records);
         let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
         Self::from_core(py, inner)
     }
 
-    /// Serialize to validated KVN or XML.
-    #[pyo3(signature = (format, version=None, max_output_bytes=None))]
-    fn to_str(
-        &self,
-        py: Python<'_>,
-        format: &str,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(
-            &self.to_core(py)?,
+    /// Atomically write this OEM as KVN or XML.
+    fn to_file(&self, py: Python<'_>, path: &str, format: &str) -> PyResult<()> {
+        crate::api::generate_file(
+            &ccsds_ndm::MessageType::Oem(self.to_core(py)?),
+            path,
             format,
-            version,
-            max_output_bytes,
         )
     }
 
-    /// Write directly to a KVN or XML file.
-    ///
-    /// Parameters
-    /// ----------
-    /// path : str
-    ///     Output file path.
-    /// format : str
-    ///     Output format ('kvn' or 'xml').
-    /// version : str, optional
-    ///     Source version by default, ``"latest"``, or an exact supported version.
-    #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
-    fn to_file(
-        &self,
-        py: Python<'_>,
-        path: &str,
-        format: &str,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<()> {
-        crate::api::generate_file_with_limit(
-            &self.to_core(py)?,
-            path,
-            format,
-            version,
-            max_output_bytes,
-        )
+    /// Serialize to validated KVN or XML.
+    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+        crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
 
@@ -1180,29 +1153,7 @@ impl OemData {
             covariance_matrices = Vec::with_capacity(num_matrices);
             for i in 0..num_matrices {
                 let v: [f64; 21] = if shape.len() == 3 {
-                    [
-                        array_view[[i, 0, 0]],
-                        array_view[[i, 1, 0]],
-                        array_view[[i, 1, 1]],
-                        array_view[[i, 2, 0]],
-                        array_view[[i, 2, 1]],
-                        array_view[[i, 2, 2]],
-                        array_view[[i, 3, 0]],
-                        array_view[[i, 3, 1]],
-                        array_view[[i, 3, 2]],
-                        array_view[[i, 3, 3]],
-                        array_view[[i, 4, 0]],
-                        array_view[[i, 4, 1]],
-                        array_view[[i, 4, 2]],
-                        array_view[[i, 4, 3]],
-                        array_view[[i, 4, 4]],
-                        array_view[[i, 5, 0]],
-                        array_view[[i, 5, 1]],
-                        array_view[[i, 5, 2]],
-                        array_view[[i, 5, 3]],
-                        array_view[[i, 5, 4]],
-                        array_view[[i, 5, 5]],
-                    ]
+                    full_covariance_values(&cov_array, Some(i))?
                 } else if shape.len() == 2 && shape[1] == 21 {
                     [
                         array_view[[i, 0]],
@@ -1252,29 +1203,7 @@ impl OemData {
                         array_view[[20]],
                     ]
                 } else {
-                    [
-                        array_view[[0, 0]],
-                        array_view[[1, 0]],
-                        array_view[[1, 1]],
-                        array_view[[2, 0]],
-                        array_view[[2, 1]],
-                        array_view[[2, 2]],
-                        array_view[[3, 0]],
-                        array_view[[3, 1]],
-                        array_view[[3, 2]],
-                        array_view[[3, 3]],
-                        array_view[[4, 0]],
-                        array_view[[4, 1]],
-                        array_view[[4, 2]],
-                        array_view[[4, 3]],
-                        array_view[[4, 4]],
-                        array_view[[5, 0]],
-                        array_view[[5, 1]],
-                        array_view[[5, 2]],
-                        array_view[[5, 3]],
-                        array_view[[5, 4]],
-                        array_view[[5, 5]],
-                    ]
+                    full_covariance_values(&cov_array, None)?
                 };
 
                 covariance_matrices.push(build_covariance_matrix(
@@ -1769,29 +1698,7 @@ impl OemData {
 
         for i in 0..num_matrices {
             let v: [f64; 21] = if shape.len() == 3 {
-                [
-                    array_view[[i, 0, 0]],
-                    array_view[[i, 1, 0]],
-                    array_view[[i, 1, 1]],
-                    array_view[[i, 2, 0]],
-                    array_view[[i, 2, 1]],
-                    array_view[[i, 2, 2]],
-                    array_view[[i, 3, 0]],
-                    array_view[[i, 3, 1]],
-                    array_view[[i, 3, 2]],
-                    array_view[[i, 3, 3]],
-                    array_view[[i, 4, 0]],
-                    array_view[[i, 4, 1]],
-                    array_view[[i, 4, 2]],
-                    array_view[[i, 4, 3]],
-                    array_view[[i, 4, 4]],
-                    array_view[[i, 5, 0]],
-                    array_view[[i, 5, 1]],
-                    array_view[[i, 5, 2]],
-                    array_view[[i, 5, 3]],
-                    array_view[[i, 5, 4]],
-                    array_view[[i, 5, 5]],
-                ]
+                full_covariance_values(&array, Some(i))?
             } else if shape.len() == 2 && shape[1] == 21 {
                 [
                     array_view[[i, 0]],
@@ -1841,29 +1748,7 @@ impl OemData {
                     array_view[[20]],
                 ]
             } else {
-                [
-                    array_view[[0, 0]],
-                    array_view[[1, 0]],
-                    array_view[[1, 1]],
-                    array_view[[2, 0]],
-                    array_view[[2, 1]],
-                    array_view[[2, 2]],
-                    array_view[[3, 0]],
-                    array_view[[3, 1]],
-                    array_view[[3, 2]],
-                    array_view[[3, 3]],
-                    array_view[[4, 0]],
-                    array_view[[4, 1]],
-                    array_view[[4, 2]],
-                    array_view[[4, 3]],
-                    array_view[[4, 4]],
-                    array_view[[5, 0]],
-                    array_view[[5, 1]],
-                    array_view[[5, 2]],
-                    array_view[[5, 3]],
-                    array_view[[5, 4]],
-                    array_view[[5, 5]],
-                ]
+                full_covariance_values(&array, None)?
             };
 
             let current = &existing[i];
@@ -1908,30 +1793,7 @@ impl OemCovarianceMatrix {
                 v[13], v[14], v[15], v[16], v[17], v[18], v[19], v[20],
             ]
         } else if shape.len() == 2 && shape[0] == 6 && shape[1] == 6 {
-            let v = values.as_array();
-            [
-                v[[0, 0]],
-                v[[1, 0]],
-                v[[1, 1]],
-                v[[2, 0]],
-                v[[2, 1]],
-                v[[2, 2]],
-                v[[3, 0]],
-                v[[3, 1]],
-                v[[3, 2]],
-                v[[3, 3]],
-                v[[4, 0]],
-                v[[4, 1]],
-                v[[4, 2]],
-                v[[4, 3]],
-                v[[4, 4]],
-                v[[5, 0]],
-                v[[5, 1]],
-                v[[5, 2]],
-                v[[5, 3]],
-                v[[5, 4]],
-                v[[5, 5]],
-            ]
+            full_covariance_values(&values, None)?
         } else {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                 "Covariance values must be shape (21,) or (6,6).",

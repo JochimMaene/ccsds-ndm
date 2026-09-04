@@ -68,8 +68,9 @@ impl<'de> Deserialize<'de> for Epoch {
     where
         D: serde::Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        Epoch::try_from(s).map_err(serde::de::Error::custom)
+        // An `Epoch` owns a fixed-size buffer, so the token is read straight out of the
+        // deserializer's view of the document rather than through an owned `String`.
+        crate::utils::deserialize_parsed(deserializer, "a CCSDS epoch value", Epoch::new)
     }
 }
 
@@ -885,8 +886,7 @@ impl<'de> Deserialize<'de> for CalendarEpoch {
     where
         D: serde::Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        Self::new(&s).map_err(serde::de::Error::custom)
+        crate::utils::deserialize_parsed(deserializer, "a CCSDS calendar epoch value", Self::new)
     }
 }
 
@@ -1035,8 +1035,7 @@ impl<'de> Deserialize<'de> for RelativeTime {
     where
         D: serde::Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        Self::new(&s).map_err(serde::de::Error::custom)
+        crate::utils::deserialize_parsed(deserializer, "a CCSDS relative time value", Self::new)
     }
 }
 
@@ -1098,6 +1097,34 @@ where
     where
         D: serde::Deserializer<'de>,
     {
+        /// The three keys a `UnitValue` map can carry. Deserializing into this instead of a
+        /// `String` keeps the value elements of a large ephemeris allocation-free: every record
+        /// carries several of them, and the key text is only ever compared, never retained.
+        enum UnitValueKey {
+            Value,
+            Units,
+            Other,
+        }
+
+        impl<'de> serde::Deserialize<'de> for UnitValueKey {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                crate::utils::deserialize_parsed(
+                    deserializer,
+                    "a UnitValue field name",
+                    |key| -> std::result::Result<UnitValueKey, std::convert::Infallible> {
+                        Ok(match key {
+                            "$value" | "$text" => UnitValueKey::Value,
+                            "@units" => UnitValueKey::Units,
+                            _ => UnitValueKey::Other,
+                        })
+                    },
+                )
+            }
+        }
+
         struct UnitValueVisitor<V, U>(std::marker::PhantomData<(V, U)>);
 
         impl<'de, V, U> serde::de::Visitor<'de> for UnitValueVisitor<V, U>
@@ -1127,19 +1154,23 @@ where
                 let mut value = None;
                 let mut units = None;
 
-                while let Some(key) = map.next_key::<String>()? {
-                    if key == "$value" || key == "$text" {
-                        if value.is_some() {
-                            return Err(serde::de::Error::duplicate_field("$value"));
+                while let Some(key) = map.next_key::<UnitValueKey>()? {
+                    match key {
+                        UnitValueKey::Value => {
+                            if value.is_some() {
+                                return Err(serde::de::Error::duplicate_field("$value"));
+                            }
+                            value = Some(map.next_value()?);
                         }
-                        value = Some(map.next_value()?);
-                    } else if key == "@units" {
-                        if units.is_some() {
-                            return Err(serde::de::Error::duplicate_field("@units"));
+                        UnitValueKey::Units => {
+                            if units.is_some() {
+                                return Err(serde::de::Error::duplicate_field("@units"));
+                            }
+                            units = Some(map.next_value()?);
                         }
-                        units = Some(map.next_value()?);
-                    } else {
-                        let _: serde::de::IgnoredAny = map.next_value()?;
+                        UnitValueKey::Other => {
+                            let _: serde::de::IgnoredAny = map.next_value()?;
+                        }
                     }
                 }
 
@@ -2975,26 +3006,16 @@ impl TargetMomentum {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ObjectDescription {
-    #[serde(rename = "PAYLOAD")]
+    #[serde(rename = "PAYLOAD", alias = "payload")]
     Payload,
-    #[serde(rename = "payload")]
-    PayloadLower,
-    #[serde(rename = "ROCKET BODY")]
+    #[serde(rename = "ROCKET BODY", alias = "rocket body")]
     RocketBody,
-    #[serde(rename = "rocket body")]
-    RocketBodyLower,
-    #[serde(rename = "DEBRIS")]
+    #[serde(rename = "DEBRIS", alias = "debris")]
     Debris,
-    #[serde(rename = "debris")]
-    DebrisLower,
-    #[serde(rename = "UNKNOWN")]
+    #[serde(rename = "UNKNOWN", alias = "unknown")]
     Unknown,
-    #[serde(rename = "unknown")]
-    UnknownLower,
-    #[serde(rename = "OTHER")]
+    #[serde(rename = "OTHER", alias = "other")]
     Other,
-    #[serde(rename = "other")]
-    OtherLower,
 }
 
 impl std::str::FromStr for ObjectDescription {
@@ -3013,11 +3034,11 @@ impl std::str::FromStr for ObjectDescription {
 impl std::fmt::Display for ObjectDescription {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            ObjectDescription::Payload | ObjectDescription::PayloadLower => "PAYLOAD",
-            ObjectDescription::RocketBody | ObjectDescription::RocketBodyLower => "ROCKET BODY",
-            ObjectDescription::Debris | ObjectDescription::DebrisLower => "DEBRIS",
-            ObjectDescription::Unknown | ObjectDescription::UnknownLower => "UNKNOWN",
-            ObjectDescription::Other | ObjectDescription::OtherLower => "OTHER",
+            ObjectDescription::Payload => "PAYLOAD",
+            ObjectDescription::RocketBody => "ROCKET BODY",
+            ObjectDescription::Debris => "DEBRIS",
+            ObjectDescription::Unknown => "UNKNOWN",
+            ObjectDescription::Other => "OTHER",
         };
         write!(f, "{}", s)
     }
@@ -3109,52 +3130,34 @@ impl std::fmt::Display for RotSeq {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum AdMethod {
-    #[serde(rename = "EKF")]
+    #[serde(rename = "EKF", alias = "ekf")]
     Ekf,
-    #[serde(rename = "ekf")]
-    EkfLower,
-    #[serde(rename = "TRIAD")]
+    #[serde(rename = "TRIAD", alias = "triad")]
     Triad,
-    #[serde(rename = "triad")]
-    TriadLower,
-    #[serde(rename = "QUEST")]
+    #[serde(rename = "QUEST", alias = "quest")]
     Quest,
-    #[serde(rename = "quest")]
-    QuestLower,
-    #[serde(rename = "BATCH")]
+    #[serde(rename = "BATCH", alias = "batch")]
     Batch,
-    #[serde(rename = "batch")]
-    BatchLower,
-    #[serde(rename = "Q_METHOD")]
+    #[serde(rename = "Q_METHOD", alias = "q_method")]
     QMethod,
-    #[serde(rename = "q_method")]
-    QMethodLower,
-    #[serde(rename = "FILTER_SMOOTHER")]
+    #[serde(rename = "FILTER_SMOOTHER", alias = "filter_smoother")]
     FilterSmoother,
-    #[serde(rename = "filter_smoother")]
-    FilterSmootherLower,
-    #[serde(rename = "OTHER")]
+    #[serde(rename = "OTHER", alias = "other")]
     Other,
-    #[serde(rename = "other")]
-    OtherLower,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum YesNo {
-    #[serde(rename = "YES")]
+    #[serde(rename = "YES", alias = "yes")]
     Yes,
-    #[serde(rename = "yes")]
-    YesLower,
-    #[serde(rename = "NO")]
+    #[serde(rename = "NO", alias = "no")]
     No,
-    #[serde(rename = "no")]
-    NoLower,
 }
 impl std::fmt::Display for YesNo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            YesNo::Yes | YesNo::YesLower => "YES",
-            YesNo::No | YesNo::NoLower => "NO",
+            YesNo::Yes => "YES",
+            YesNo::No => "NO",
         };
         write!(f, "{}", s)
     }
@@ -3486,25 +3489,19 @@ impl std::str::FromStr for CovOrder {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ControlledType {
-    #[serde(rename = "YES")]
+    #[serde(rename = "YES", alias = "yes")]
     Yes,
-    #[serde(rename = "yes")]
-    YesLower,
-    #[serde(rename = "NO")]
+    #[serde(rename = "NO", alias = "no")]
     No,
-    #[serde(rename = "no")]
-    NoLower,
-    #[serde(rename = "UNKNOWN")]
+    #[serde(rename = "UNKNOWN", alias = "unknown")]
     Unknown,
-    #[serde(rename = "unknown")]
-    UnknownLower,
 }
 impl std::fmt::Display for ControlledType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            ControlledType::Yes | ControlledType::YesLower => "YES",
-            ControlledType::No | ControlledType::NoLower => "NO",
-            ControlledType::Unknown | ControlledType::UnknownLower => "UNKNOWN",
+            ControlledType::Yes => "YES",
+            ControlledType::No => "NO",
+            ControlledType::Unknown => "UNKNOWN",
         };
         write!(f, "{}", s)
     }
@@ -3691,54 +3688,33 @@ impl FromKvnFloat for Inclination {
 // Attitude related enums (acmAttitudeType, attRateType, attBasisType, acmCovarianceLineType, attitudeTypeType)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum AcmAttitudeType {
-    #[serde(rename = "QUATERNION")]
+    #[serde(rename = "QUATERNION", alias = "quaternion")]
     Quaternion,
-    #[serde(rename = "quaternion")]
-    QuaternionLower,
-    #[serde(rename = "EULER_ANGLES")]
+    #[serde(rename = "EULER_ANGLES", alias = "euler_angles")]
     EulerAngles,
-    #[serde(rename = "euler_angles")]
-    EulerAnglesLower,
-    #[serde(rename = "DCM")]
+    #[serde(rename = "DCM", alias = "dcm")]
     Dcm,
-    #[serde(rename = "dcm")]
-    DcmLower,
-    #[serde(rename = "ANGVEL")]
+    #[serde(rename = "ANGVEL", alias = "angvel")]
     AngVel,
-    #[serde(rename = "angvel")]
-    AngVelLower,
-    #[serde(rename = "Q_DOT")]
+    #[serde(rename = "Q_DOT", alias = "q_dot")]
     QDot,
-    #[serde(rename = "q_dot")]
-    QDotLower,
-    #[serde(rename = "EULER_RATE")]
+    #[serde(rename = "EULER_RATE", alias = "euler_rate")]
     EulerRate,
-    #[serde(rename = "euler_rate")]
-    EulerRateLower,
-    #[serde(rename = "GYRO_BIAS")]
+    #[serde(rename = "GYRO_BIAS", alias = "gyro_bias")]
     GyroBias,
-    #[serde(rename = "gyro_bias")]
-    GyroBiasLower,
 }
 
 impl std::str::FromStr for AcmAttitudeType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "QUATERNION" => Ok(Self::Quaternion),
-            "quaternion" => Ok(Self::QuaternionLower),
-            "EULER_ANGLES" => Ok(Self::EulerAngles),
-            "euler_angles" => Ok(Self::EulerAnglesLower),
-            "DCM" => Ok(Self::Dcm),
-            "dcm" => Ok(Self::DcmLower),
-            "ANGVEL" => Ok(Self::AngVel),
-            "angvel" => Ok(Self::AngVelLower),
-            "Q_DOT" => Ok(Self::QDot),
-            "q_dot" => Ok(Self::QDotLower),
-            "EULER_RATE" => Ok(Self::EulerRate),
-            "euler_rate" => Ok(Self::EulerRateLower),
-            "GYRO_BIAS" => Ok(Self::GyroBias),
-            "gyro_bias" => Ok(Self::GyroBiasLower),
+            "QUATERNION" | "quaternion" => Ok(Self::Quaternion),
+            "EULER_ANGLES" | "euler_angles" => Ok(Self::EulerAngles),
+            "DCM" | "dcm" => Ok(Self::Dcm),
+            "ANGVEL" | "angvel" => Ok(Self::AngVel),
+            "Q_DOT" | "q_dot" => Ok(Self::QDot),
+            "EULER_RATE" | "euler_rate" => Ok(Self::EulerRate),
+            "GYRO_BIAS" | "gyro_bias" => Ok(Self::GyroBias),
             _ => Err(crate::error::EnumParseError {
                 field: "ATT_TYPE",
                 value: s.to_string(),
@@ -3751,13 +3727,13 @@ impl std::str::FromStr for AcmAttitudeType {
 impl std::fmt::Display for AcmAttitudeType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = match self {
-            Self::Quaternion | Self::QuaternionLower => "QUATERNION",
-            Self::EulerAngles | Self::EulerAnglesLower => "EULER_ANGLES",
-            Self::Dcm | Self::DcmLower => "DCM",
-            Self::AngVel | Self::AngVelLower => "ANGVEL",
-            Self::QDot | Self::QDotLower => "Q_DOT",
-            Self::EulerRate | Self::EulerRateLower => "EULER_RATE",
-            Self::GyroBias | Self::GyroBiasLower => "GYRO_BIAS",
+            Self::Quaternion => "QUATERNION",
+            Self::EulerAngles => "EULER_ANGLES",
+            Self::Dcm => "DCM",
+            Self::AngVel => "ANGVEL",
+            Self::QDot => "Q_DOT",
+            Self::EulerRate => "EULER_RATE",
+            Self::GyroBias => "GYRO_BIAS",
         };
         write!(f, "{}", value)
     }
@@ -3765,36 +3741,24 @@ impl std::fmt::Display for AcmAttitudeType {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum AttRateType {
-    #[serde(rename = "ANGVEL")]
+    #[serde(rename = "ANGVEL", alias = "angvel")]
     AngVel,
-    #[serde(rename = "angvel")]
-    AngVelLower,
-    #[serde(rename = "Q_DOT")]
+    #[serde(rename = "Q_DOT", alias = "q_dot")]
     QDot,
-    #[serde(rename = "q_dot")]
-    QDotLower,
-    #[serde(rename = "EULER_RATE")]
+    #[serde(rename = "EULER_RATE", alias = "euler_rate")]
     EulerRate,
-    #[serde(rename = "euler_rate")]
-    EulerRateLower,
-    #[serde(rename = "GYRO_BIAS")]
+    #[serde(rename = "GYRO_BIAS", alias = "gyro_bias")]
     GyroBias,
-    #[serde(rename = "gyro_bias")]
-    GyroBiasLower,
 }
 
 impl std::str::FromStr for AttRateType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "ANGVEL" => Ok(Self::AngVel),
-            "angvel" => Ok(Self::AngVelLower),
-            "Q_DOT" => Ok(Self::QDot),
-            "q_dot" => Ok(Self::QDotLower),
-            "EULER_RATE" => Ok(Self::EulerRate),
-            "euler_rate" => Ok(Self::EulerRateLower),
-            "GYRO_BIAS" => Ok(Self::GyroBias),
-            "gyro_bias" => Ok(Self::GyroBiasLower),
+            "ANGVEL" | "angvel" => Ok(Self::AngVel),
+            "Q_DOT" | "q_dot" => Ok(Self::QDot),
+            "EULER_RATE" | "euler_rate" => Ok(Self::EulerRate),
+            "GYRO_BIAS" | "gyro_bias" => Ok(Self::GyroBias),
             _ => Err(crate::error::EnumParseError {
                 field: "RATE_TYPE",
                 value: s.to_string(),
@@ -3807,10 +3771,10 @@ impl std::str::FromStr for AttRateType {
 impl std::fmt::Display for AttRateType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = match self {
-            Self::AngVel | Self::AngVelLower => "ANGVEL",
-            Self::QDot | Self::QDotLower => "Q_DOT",
-            Self::EulerRate | Self::EulerRateLower => "EULER_RATE",
-            Self::GyroBias | Self::GyroBiasLower => "GYRO_BIAS",
+            Self::AngVel => "ANGVEL",
+            Self::QDot => "Q_DOT",
+            Self::EulerRate => "EULER_RATE",
+            Self::GyroBias => "GYRO_BIAS",
         };
         write!(f, "{}", value)
     }
@@ -3818,36 +3782,24 @@ impl std::fmt::Display for AttRateType {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum AttBasisType {
-    #[serde(rename = "PREDICTED")]
+    #[serde(rename = "PREDICTED", alias = "predicted")]
     Predicted,
-    #[serde(rename = "predicted")]
-    PredictedLower,
-    #[serde(rename = "DETERMINED_GND")]
+    #[serde(rename = "DETERMINED_GND", alias = "determined_gnd")]
     DeterminedGnd,
-    #[serde(rename = "determined_gnd")]
-    DeterminedGndLower,
-    #[serde(rename = "DETERMINED_OBC")]
+    #[serde(rename = "DETERMINED_OBC", alias = "determined_obc")]
     DeterminedObc,
-    #[serde(rename = "determined_obc")]
-    DeterminedObcLower,
-    #[serde(rename = "SIMULATED")]
+    #[serde(rename = "SIMULATED", alias = "simulated")]
     Simulated,
-    #[serde(rename = "simulated")]
-    SimulatedLower,
 }
 
 impl std::str::FromStr for AttBasisType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "PREDICTED" => Ok(Self::Predicted),
-            "predicted" => Ok(Self::PredictedLower),
-            "DETERMINED_GND" => Ok(Self::DeterminedGnd),
-            "determined_gnd" => Ok(Self::DeterminedGndLower),
-            "DETERMINED_OBC" => Ok(Self::DeterminedObc),
-            "determined_obc" => Ok(Self::DeterminedObcLower),
-            "SIMULATED" => Ok(Self::Simulated),
-            "simulated" => Ok(Self::SimulatedLower),
+            "PREDICTED" | "predicted" => Ok(Self::Predicted),
+            "DETERMINED_GND" | "determined_gnd" => Ok(Self::DeterminedGnd),
+            "DETERMINED_OBC" | "determined_obc" => Ok(Self::DeterminedObc),
+            "SIMULATED" | "simulated" => Ok(Self::Simulated),
             _ => Err(crate::error::EnumParseError {
                 field: "ATT_BASIS",
                 value: s.to_string(),
@@ -3860,10 +3812,10 @@ impl std::str::FromStr for AttBasisType {
 impl std::fmt::Display for AttBasisType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = match self {
-            Self::Predicted | Self::PredictedLower => "PREDICTED",
-            Self::DeterminedGnd | Self::DeterminedGndLower => "DETERMINED_GND",
-            Self::DeterminedObc | Self::DeterminedObcLower => "DETERMINED_OBC",
-            Self::Simulated | Self::SimulatedLower => "SIMULATED",
+            Self::Predicted => "PREDICTED",
+            Self::DeterminedGnd => "DETERMINED_GND",
+            Self::DeterminedObc => "DETERMINED_OBC",
+            Self::Simulated => "SIMULATED",
         };
         write!(f, "{}", value)
     }
@@ -3871,48 +3823,30 @@ impl std::fmt::Display for AttBasisType {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum AcmCovarianceLineType {
-    #[serde(rename = "ANGLE")]
+    #[serde(rename = "ANGLE", alias = "angle")]
     Angle,
-    #[serde(rename = "angle")]
-    AngleLower,
-    #[serde(rename = "ANGLE_GYROBIAS")]
+    #[serde(rename = "ANGLE_GYROBIAS", alias = "angle_gyrobias")]
     AngleGyroBias,
-    #[serde(rename = "angle_gyrobias")]
-    AngleGyroBiasLower,
-    #[serde(rename = "ANGLE_ANGVEL")]
+    #[serde(rename = "ANGLE_ANGVEL", alias = "angle_angvel")]
     AngleAngVel,
-    #[serde(rename = "angle_angvel")]
-    AngleAngVelLower,
-    #[serde(rename = "QUATERNION")]
+    #[serde(rename = "QUATERNION", alias = "quaternion")]
     Quaternion,
-    #[serde(rename = "quaternion")]
-    QuaternionLower,
-    #[serde(rename = "QUATERNION_GYROBIAS")]
+    #[serde(rename = "QUATERNION_GYROBIAS", alias = "quaternion_gyrobias")]
     QuaternionGyroBias,
-    #[serde(rename = "quaternion_gyrobias")]
-    QuaternionGyroBiasLower,
-    #[serde(rename = "QUATERNION_ANGVEL")]
+    #[serde(rename = "QUATERNION_ANGVEL", alias = "quaternion_angvel")]
     QuaternionAngVel,
-    #[serde(rename = "quaternion_angvel")]
-    QuaternionAngVelLower,
 }
 
 impl std::str::FromStr for AcmCovarianceLineType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "ANGLE" => Ok(Self::Angle),
-            "angle" => Ok(Self::AngleLower),
-            "ANGLE_GYROBIAS" => Ok(Self::AngleGyroBias),
-            "angle_gyrobias" => Ok(Self::AngleGyroBiasLower),
-            "ANGLE_ANGVEL" => Ok(Self::AngleAngVel),
-            "angle_angvel" => Ok(Self::AngleAngVelLower),
-            "QUATERNION" => Ok(Self::Quaternion),
-            "quaternion" => Ok(Self::QuaternionLower),
-            "QUATERNION_GYROBIAS" => Ok(Self::QuaternionGyroBias),
-            "quaternion_gyrobias" => Ok(Self::QuaternionGyroBiasLower),
-            "QUATERNION_ANGVEL" => Ok(Self::QuaternionAngVel),
-            "quaternion_angvel" => Ok(Self::QuaternionAngVelLower),
+            "ANGLE" | "angle" => Ok(Self::Angle),
+            "ANGLE_GYROBIAS" | "angle_gyrobias" => Ok(Self::AngleGyroBias),
+            "ANGLE_ANGVEL" | "angle_angvel" => Ok(Self::AngleAngVel),
+            "QUATERNION" | "quaternion" => Ok(Self::Quaternion),
+            "QUATERNION_GYROBIAS" | "quaternion_gyrobias" => Ok(Self::QuaternionGyroBias),
+            "QUATERNION_ANGVEL" | "quaternion_angvel" => Ok(Self::QuaternionAngVel),
             _ => Err(crate::error::EnumParseError {
                 field: "COV_TYPE",
                 value: s.to_string(),
@@ -3925,12 +3859,12 @@ impl std::str::FromStr for AcmCovarianceLineType {
 impl std::fmt::Display for AcmCovarianceLineType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = match self {
-            Self::Angle | Self::AngleLower => "ANGLE",
-            Self::AngleGyroBias | Self::AngleGyroBiasLower => "ANGLE_GYROBIAS",
-            Self::AngleAngVel | Self::AngleAngVelLower => "ANGLE_ANGVEL",
-            Self::Quaternion | Self::QuaternionLower => "QUATERNION",
-            Self::QuaternionGyroBias | Self::QuaternionGyroBiasLower => "QUATERNION_GYROBIAS",
-            Self::QuaternionAngVel | Self::QuaternionAngVelLower => "QUATERNION_ANGVEL",
+            Self::Angle => "ANGLE",
+            Self::AngleGyroBias => "ANGLE_GYROBIAS",
+            Self::AngleAngVel => "ANGLE_ANGVEL",
+            Self::Quaternion => "QUATERNION",
+            Self::QuaternionGyroBias => "QUATERNION_GYROBIAS",
+            Self::QuaternionAngVel => "QUATERNION_ANGVEL",
         };
         write!(f, "{}", value)
     }
@@ -3938,66 +3872,43 @@ impl std::fmt::Display for AcmCovarianceLineType {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum AttitudeTypeType {
-    #[serde(rename = "quaternion")]
+    #[serde(rename = "QUATERNION", alias = "quaternion")]
     Quaternion,
-    #[serde(rename = "QUATERNION")]
-    QuaternionUpper,
-    #[serde(rename = "quaternion/derivative")]
+    #[serde(rename = "QUATERNION/DERIVATIVE", alias = "quaternion/derivative")]
     QuaternionDerivative,
-    #[serde(rename = "QUATERNION/DERIVATIVE")]
-    QuaternionDerivativeUpper,
-    #[serde(rename = "quaternion/angvel")]
+    #[serde(rename = "QUATERNION/ANGVEL", alias = "quaternion/angvel")]
     QuaternionAngVel,
-    #[serde(rename = "QUATERNION/ANGVEL")]
-    QuaternionAngVelUpper,
-    #[serde(rename = "euler_angle")]
+    #[serde(rename = "EULER_ANGLE", alias = "euler_angle")]
     EulerAngle,
-    #[serde(rename = "EULER_ANGLE")]
-    EulerAngleUpper,
-    #[serde(rename = "euler_angle/derivative")]
+    #[serde(rename = "EULER_ANGLE/DERIVATIVE", alias = "euler_angle/derivative")]
     EulerAngleDerivative,
-    #[serde(rename = "EULER_ANGLE/DERIVATIVE")]
-    EulerAngleDerivativeUpper,
-    #[serde(rename = "euler_angle/angvel")]
+    #[serde(rename = "EULER_ANGLE/ANGVEL", alias = "euler_angle/angvel")]
     EulerAngleAngVel,
-    #[serde(rename = "EULER_ANGLE/ANGVEL")]
-    EulerAngleAngVelUpper,
-    #[serde(rename = "spin")]
+    #[serde(rename = "SPIN", alias = "spin")]
     Spin,
-    #[serde(rename = "SPIN")]
-    SpinUpper,
-    #[serde(rename = "spin/nutation")]
+    #[serde(rename = "SPIN/NUTATION", alias = "spin/nutation")]
     SpinNutation,
-    #[serde(rename = "SPIN/NUTATION")]
-    SpinNutationUpper,
-    #[serde(rename = "spin/nutation_mom")]
+    #[serde(rename = "SPIN/NUTATION_MOM", alias = "spin/nutation_mom")]
     SpinNutationMom,
-    #[serde(rename = "SPIN/NUTATION_MOM")]
-    SpinNutationMomUpper,
 }
 
 impl std::str::FromStr for AttitudeTypeType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "quaternion" => Ok(Self::Quaternion),
-            "QUATERNION" => Ok(Self::QuaternionUpper),
-            "quaternion/derivative" => Ok(Self::QuaternionDerivative),
-            "QUATERNION/DERIVATIVE" => Ok(Self::QuaternionDerivativeUpper),
-            "quaternion/angvel" => Ok(Self::QuaternionAngVel),
-            "QUATERNION/ANGVEL" => Ok(Self::QuaternionAngVelUpper),
-            "euler_angle" => Ok(Self::EulerAngle),
-            "EULER_ANGLE" => Ok(Self::EulerAngleUpper),
-            "euler_angle/derivative" => Ok(Self::EulerAngleDerivative),
-            "EULER_ANGLE/DERIVATIVE" => Ok(Self::EulerAngleDerivativeUpper),
-            "euler_angle/angvel" => Ok(Self::EulerAngleAngVel),
-            "EULER_ANGLE/ANGVEL" => Ok(Self::EulerAngleAngVelUpper),
-            "spin" => Ok(Self::Spin),
-            "SPIN" => Ok(Self::SpinUpper),
-            "spin/nutation" => Ok(Self::SpinNutation),
-            "SPIN/NUTATION" => Ok(Self::SpinNutationUpper),
-            "spin/nutation_mom" => Ok(Self::SpinNutationMom),
-            "SPIN/NUTATION_MOM" => Ok(Self::SpinNutationMomUpper),
+            "quaternion" | "QUATERNION" => Ok(Self::Quaternion),
+            "quaternion/derivative" | "QUATERNION/DERIVATIVE" => {
+                Ok(Self::QuaternionDerivative)
+            }
+            "quaternion/angvel" | "QUATERNION/ANGVEL" => Ok(Self::QuaternionAngVel),
+            "euler_angle" | "EULER_ANGLE" => Ok(Self::EulerAngle),
+            "euler_angle/derivative" | "EULER_ANGLE/DERIVATIVE" => {
+                Ok(Self::EulerAngleDerivative)
+            }
+            "euler_angle/angvel" | "EULER_ANGLE/ANGVEL" => Ok(Self::EulerAngleAngVel),
+            "spin" | "SPIN" => Ok(Self::Spin),
+            "spin/nutation" | "SPIN/NUTATION" => Ok(Self::SpinNutation),
+            "spin/nutation_mom" | "SPIN/NUTATION_MOM" => Ok(Self::SpinNutationMom),
             _ => Err(crate::error::EnumParseError {
                 field: "ATTITUDE_TYPE",
                 value: s.to_string(),
@@ -4010,17 +3921,15 @@ impl std::str::FromStr for AttitudeTypeType {
 impl std::fmt::Display for AttitudeTypeType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = match self {
-            Self::Quaternion | Self::QuaternionUpper => "QUATERNION",
-            Self::QuaternionDerivative | Self::QuaternionDerivativeUpper => "QUATERNION/DERIVATIVE",
-            Self::QuaternionAngVel | Self::QuaternionAngVelUpper => "QUATERNION/ANGVEL",
-            Self::EulerAngle | Self::EulerAngleUpper => "EULER_ANGLE",
-            Self::EulerAngleDerivative | Self::EulerAngleDerivativeUpper => {
-                "EULER_ANGLE/DERIVATIVE"
-            }
-            Self::EulerAngleAngVel | Self::EulerAngleAngVelUpper => "EULER_ANGLE/ANGVEL",
-            Self::Spin | Self::SpinUpper => "SPIN",
-            Self::SpinNutation | Self::SpinNutationUpper => "SPIN/NUTATION",
-            Self::SpinNutationMom | Self::SpinNutationMomUpper => "SPIN/NUTATION_MOM",
+            Self::Quaternion => "QUATERNION",
+            Self::QuaternionDerivative => "QUATERNION/DERIVATIVE",
+            Self::QuaternionAngVel => "QUATERNION/ANGVEL",
+            Self::EulerAngle => "EULER_ANGLE",
+            Self::EulerAngleDerivative => "EULER_ANGLE/DERIVATIVE",
+            Self::EulerAngleAngVel => "EULER_ANGLE/ANGVEL",
+            Self::Spin => "SPIN",
+            Self::SpinNutation => "SPIN/NUTATION",
+            Self::SpinNutationMom => "SPIN/NUTATION_MOM",
         };
         write!(f, "{}", value)
     }
@@ -4241,7 +4150,7 @@ impl std::fmt::Display for AngVelFrameType {
 /// Allow for the exchange of any desired orbital data not already provided in the message.
 ///
 /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4 (OPM), Section 4.2.4 (OMM), Section 6.2.9 (OCM).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UserDefined {
     /// Comments (see 7.8 for formatting rules).
@@ -4256,6 +4165,48 @@ pub struct UserDefined {
         skip_serializing_if = "Vec::is_empty"
     )]
     pub user_defined: Vec<UserDefinedParameter>,
+}
+
+/// `userDefinedType` wraps its children in an unbounded `xsd:sequence`, so COMMENT and
+/// USER_DEFINED may alternate and each keyword can reappear after the other. The derived
+/// implementation treats the second run of a keyword as a duplicate field, so the two runs are
+/// accumulated by hand instead. Ordering between the two lists is not part of the model.
+impl<'de> Deserialize<'de> for UserDefined {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["COMMENT", "USER_DEFINED"];
+
+        struct UserDefinedVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for UserDefinedVisitor {
+            type Value = UserDefined;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("a USER DEFINED PARAMETERS block")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> std::result::Result<UserDefined, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut block = UserDefined::default();
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "COMMENT" => block.comment.extend(map.next_value::<Vec<String>>()?),
+                        "USER_DEFINED" => block
+                            .user_defined
+                            .extend(map.next_value::<Vec<UserDefinedParameter>>()?),
+                        other => return Err(serde::de::Error::unknown_field(other, FIELDS)),
+                    }
+                }
+                Ok(block)
+            }
+        }
+
+        deserializer.deserialize_map(UserDefinedVisitor)
+    }
 }
 
 /// Single USER_DEFINED parameter.
@@ -4552,8 +4503,11 @@ impl<'de> Deserialize<'de> for Vec3Double {
     where
         D: serde::Deserializer<'de>,
     {
-        let value = String::deserialize(deserializer)?;
-        Self::from_kvn_value(&value).map_err(serde::de::Error::custom)
+        crate::utils::deserialize_parsed(
+            deserializer,
+            "three space-separated numbers",
+            Self::from_kvn_value,
+        )
     }
 }
 

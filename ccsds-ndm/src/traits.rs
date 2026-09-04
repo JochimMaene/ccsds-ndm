@@ -7,7 +7,7 @@
 //! This module defines the primary traits used for parsing and serializing
 //! NDM messages in both KVN and XML formats.
 
-use crate::error::{Result, ValidationError};
+use crate::error::Result;
 use crate::kvn::ser::KvnWriter;
 
 /// Trait for types that provide semantic validation.
@@ -20,20 +20,7 @@ pub trait Validate {
     /// # Returns
     ///
     /// `Ok(())` if valid, or a `ValidationError` if invalid.
-    fn validate(&self) -> Result<()> {
-        match self.validation_errors()?.into_iter().next() {
-            Some(error) => Err(error.into()),
-            None => Ok(()),
-        }
-    }
-
-    /// Return every semantic validation error found on the object.
-    ///
-    /// Strict parsing and generation use [`Validate::validate`] to fail fast. Permissive parsing
-    /// uses this method to produce a complete audit trail. Implementations must explicitly define
-    /// exhaustive reporting so adding new validation rules cannot silently fall back to returning
-    /// only the first error.
-    fn validation_errors(&self) -> Result<Vec<ValidationError>>;
+    fn validate(&self) -> Result<()>;
 }
 
 /// Core trait for NDM message types.
@@ -57,9 +44,7 @@ pub trait Ndm: Sized + serde::Serialize + Validate {
     /// Generate KVN using the edition stored on the message.
     ///
     /// Implementations validate the complete message and confirm that KVN generation supports the
-    /// stored edition before serializing. Use
-    /// [`VersionedNdm::to_kvn_with`](crate::generation::VersionedNdm::to_kvn_with) to select a
-    /// different target edition explicitly.
+    /// stored edition before serializing.
     ///
     /// # Returns
     ///
@@ -87,9 +72,7 @@ pub trait Ndm: Sized + serde::Serialize + Validate {
     /// Generate XML using the edition stored on the message.
     ///
     /// Implementations validate the complete message and confirm that XML generation supports
-    /// the stored edition before serializing. Use
-    /// [`VersionedNdm::to_xml_with`](crate::generation::VersionedNdm::to_xml_with) to select a
-    /// different target edition explicitly.
+    /// the stored edition before serializing.
     ///
     /// # Returns
     ///
@@ -178,7 +161,10 @@ pub trait FromKvnFloat: Sized {
 pub(crate) trait ToKvn {
     /// Validate notation-specific constraints that must hold before any KVN bytes are written.
     fn validate_kvn(&self) -> Result<()> {
-        Ok(())
+        let mut sink = std::io::sink();
+        let mut writer = KvnWriter::from_io(&mut sink);
+        self.write_kvn(&mut writer);
+        writer.finish_io()
     }
 
     /// Write the KVN representation to the writer.
@@ -187,23 +173,4 @@ pub(crate) trait ToKvn {
     ///
     /// * `writer` - The KVN writer to output to
     fn write_kvn(&self, writer: &mut KvnWriter<'_>);
-}
-
-#[cfg(test)]
-mod validate_default_tests {
-    use super::Validate;
-    use crate::error::{Result, ValidationError};
-
-    struct AggregateOnly;
-
-    impl Validate for AggregateOnly {
-        fn validation_errors(&self) -> Result<Vec<ValidationError>> {
-            Ok(vec![ValidationError::generic("aggregate-only failure")])
-        }
-    }
-
-    #[test]
-    fn default_validate_fails_when_aggregate_validation_reports_an_error() {
-        assert!(AggregateOnly.validate().is_err());
-    }
 }

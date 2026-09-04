@@ -42,7 +42,7 @@ create_exception!(
 create_exception!(
     ccsds_ndm,
     NdmValidationError,
-    PyValueError,
+    NdmError,
     "Validation error against CCSDS rules."
 );
 
@@ -66,7 +66,7 @@ create_exception!(
 create_exception!(
     ccsds_ndm,
     NdmUnsupportedMessageError,
-    PyValueError,
+    NdmError,
     "Unsupported CCSDS message type."
 );
 
@@ -85,8 +85,7 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
                 "generate",
                 Some(context.notation),
                 Some(context.message_kind.as_str()),
-                Some(context.source_edition),
-                Some(context.target_edition),
+                Some(context.edition),
                 code,
                 field_path,
                 None,
@@ -116,7 +115,6 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
                 Some(context.notation),
                 Some(context.message_kind.as_str()),
                 context.source_edition,
-                None,
                 code,
                 field_path,
                 context.line,
@@ -154,7 +152,6 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
                 None,
                 None,
                 None,
-                None,
                 code,
                 field_path,
                 None,
@@ -178,7 +175,6 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
             None,
             Some(message_type),
             Some(version),
-            None,
             Some("parse.unsupported_input_version"),
             None,
             None,
@@ -205,7 +201,6 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
                 "generate",
                 notation,
                 Some(message_type),
-                Some(version.clone()),
                 Some(version),
                 Some("generation.unsupported_output_version"),
                 None,
@@ -216,28 +211,6 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
                 None,
             )
         }
-        CcsdsNdmError::UnsupportedVersionConversion {
-            message_type,
-            source_version,
-            target_version,
-        } => enrich_exception(
-            NdmValidationError::new_err(format!(
-                "Unsupported version conversion for {message_type}: \
-                 {source_version} to {target_version}"
-            )),
-            "generate",
-            None,
-            Some(message_type),
-            Some(source_version),
-            Some(target_version),
-            Some("generation.unsupported_version_conversion"),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        ),
         CcsdsNdmError::UnexpectedEof { context } => {
             NdmFormatError::new_err(format!("Unexpected end of input: {}", context))
         }
@@ -253,7 +226,6 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
             enrich_exception(
                 NdmError::new_err(error.to_string()),
                 operation,
-                None,
                 None,
                 None,
                 None,
@@ -290,7 +262,6 @@ pub fn file_parse_error_to_pyerr(
         }),
         message_kind.map(MessageKind::as_str),
         None,
-        None,
         code,
         None,
         None,
@@ -308,7 +279,6 @@ fn enrich_exception(
     notation: Option<DiagnosticNotation>,
     message_kind: Option<&'static str>,
     source_edition: Option<String>,
-    target_edition: Option<String>,
     code: Option<&'static str>,
     field_path: Option<String>,
     line: Option<usize>,
@@ -323,7 +293,6 @@ fn enrich_exception(
     });
     Python::attach(|py| {
         let value = error.value(py);
-        let _ = value.setattr("severity", "error");
         let _ = value.setattr("operation", operation);
         let _ = value.setattr("notation", notation);
         let _ = value.setattr(
@@ -331,7 +300,6 @@ fn enrich_exception(
             message_kind.map(|kind| kind.to_ascii_lowercase()),
         );
         let _ = value.setattr("source_edition", source_edition);
-        let _ = value.setattr("target_edition", target_edition);
         let _ = value.setattr("code", code);
         let _ = value.setattr("field_path", field_path);
         let _ = value.setattr("line", line);
@@ -340,7 +308,6 @@ fn enrich_exception(
         let _ = value.setattr("original_token", original_token);
         let _ = value.setattr("expected", expected);
         let _ = value.setattr("requirement", Option::<&str>::None);
-        let _ = value.setattr("recovery", Option::<&str>::None);
     });
     error
 }

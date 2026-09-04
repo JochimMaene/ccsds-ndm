@@ -2,63 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-//! Parsing and generation options.
-
-/// Selects the CCSDS edition used for generation.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum TargetVersion {
-    /// Preserve the version stored on the message.
-    #[default]
-    Source,
-    /// Use the latest edition implemented by the library.
-    Latest,
-    /// Generate a specific edition.
-    Exact(String),
-}
-
-/// Configuration for generating an NDM message.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct GenerateOptions {
-    /// Target CCSDS edition.
-    pub target_version: TargetVersion,
-    /// Maximum complete generated document size in bytes.
-    ///
-    /// `None` keeps generation unlimited. This is a caller resource policy, not a CCSDS validity
-    /// rule. Streaming writers preflight a configured limit before emitting any bytes.
-    pub max_output_bytes: Option<usize>,
-}
-
-impl GenerateOptions {
-    /// Preserve the version stored on the message.
-    pub const fn source() -> Self {
-        Self {
-            target_version: TargetVersion::Source,
-            max_output_bytes: None,
-        }
-    }
-
-    /// Generate the latest implemented edition.
-    pub const fn latest() -> Self {
-        Self {
-            target_version: TargetVersion::Latest,
-            max_output_bytes: None,
-        }
-    }
-
-    /// Generate a specific edition.
-    pub fn version(version: impl Into<String>) -> Self {
-        Self {
-            target_version: TargetVersion::Exact(version.into()),
-            max_output_bytes: None,
-        }
-    }
-
-    /// Apply a caller-selected total generated-document limit.
-    pub const fn with_max_output_bytes(mut self, max_output_bytes: usize) -> Self {
-        self.max_output_bytes = Some(max_output_bytes);
-        self
-    }
-}
+//! Parsing options.
 
 /// Resource policy for parsing a complete NDM document.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -125,20 +125,14 @@ fn attitude_state_line(
         .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
 
     let expected_values = match attitude_type {
-        AttitudeTypeType::Quaternion | AttitudeTypeType::QuaternionUpper => 4,
-        AttitudeTypeType::QuaternionDerivative | AttitudeTypeType::QuaternionDerivativeUpper => 8,
+        AttitudeTypeType::Quaternion => 4,
+        AttitudeTypeType::QuaternionDerivative => 8,
         AttitudeTypeType::QuaternionAngVel
-        | AttitudeTypeType::QuaternionAngVelUpper
         | AttitudeTypeType::SpinNutation
-        | AttitudeTypeType::SpinNutationUpper
-        | AttitudeTypeType::SpinNutationMom
-        | AttitudeTypeType::SpinNutationMomUpper => 7,
-        AttitudeTypeType::EulerAngle | AttitudeTypeType::EulerAngleUpper => 3,
-        AttitudeTypeType::EulerAngleDerivative
-        | AttitudeTypeType::EulerAngleDerivativeUpper
-        | AttitudeTypeType::EulerAngleAngVel
-        | AttitudeTypeType::EulerAngleAngVelUpper => 6,
-        AttitudeTypeType::Spin | AttitudeTypeType::SpinUpper => 4,
+        | AttitudeTypeType::SpinNutationMom => 7,
+        AttitudeTypeType::EulerAngle => 3,
+        AttitudeTypeType::EulerAngleDerivative | AttitudeTypeType::EulerAngleAngVel => 6,
+        AttitudeTypeType::Spin => 4,
     };
     let mut values = [0.0; 8];
     let mut value_count = 0usize;
@@ -161,7 +155,7 @@ fn attitude_state_line(
     }
 
     match attitude_type {
-        AttitudeTypeType::Quaternion | AttitudeTypeType::QuaternionUpper => {
+        AttitudeTypeType::Quaternion => {
             let q = Quaternion::new(values[0], values[1], values[2], values[3])
                 .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
             Ok(AemAttitudeState::QuaternionEphemeris(QuaternionEphemeris {
@@ -169,7 +163,7 @@ fn attitude_state_line(
                 quaternion: q,
             }))
         }
-        AttitudeTypeType::QuaternionDerivative | AttitudeTypeType::QuaternionDerivativeUpper => {
+        AttitudeTypeType::QuaternionDerivative => {
             let q = Quaternion::new(values[0], values[1], values[2], values[3])
                 .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
             let q_dot = QuaternionDot {
@@ -186,7 +180,7 @@ fn attitude_state_line(
                 },
             ))
         }
-        AttitudeTypeType::QuaternionAngVel | AttitudeTypeType::QuaternionAngVelUpper => {
+        AttitudeTypeType::QuaternionAngVel => {
             let q = Quaternion::new(values[0], values[1], values[2], values[3])
                 .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
             let ang_vel = AngVel {
@@ -200,22 +194,17 @@ fn attitude_state_line(
                 ang_vel,
             }))
         }
-        AttitudeTypeType::EulerAngle | AttitudeTypeType::EulerAngleUpper => {
-            Ok(AemAttitudeState::EulerAngle(EulerAngle {
-                epoch,
-                angle_1: Angle::new(values[0], None).map_err(|e| {
-                    ErrMode::Cut(InternalParserError::from_external_error(input, e))
-                })?,
-                angle_2: Angle::new(values[1], None).map_err(|e| {
-                    ErrMode::Cut(InternalParserError::from_external_error(input, e))
-                })?,
-                angle_3: Angle::new(values[2], None).map_err(|e| {
-                    ErrMode::Cut(InternalParserError::from_external_error(input, e))
-                })?,
-            }))
-        }
-        AttitudeTypeType::EulerAngleDerivative | AttitudeTypeType::EulerAngleDerivativeUpper => Ok(
-            AemAttitudeState::EulerAngleDerivative(crate::common::EulerAngleDerivative {
+        AttitudeTypeType::EulerAngle => Ok(AemAttitudeState::EulerAngle(EulerAngle {
+            epoch,
+            angle_1: Angle::new(values[0], None)
+                .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+            angle_2: Angle::new(values[1], None)
+                .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+            angle_3: Angle::new(values[2], None)
+                .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+        })),
+        AttitudeTypeType::EulerAngleDerivative => Ok(AemAttitudeState::EulerAngleDerivative(
+            crate::common::EulerAngleDerivative {
                 epoch,
                 angle_1: Angle::new(values[0], None).map_err(|e| {
                     ErrMode::Cut(InternalParserError::from_external_error(input, e))
@@ -229,10 +218,10 @@ fn attitude_state_line(
                 angle_1_dot: crate::types::AngleRate::new(values[3], None),
                 angle_2_dot: crate::types::AngleRate::new(values[4], None),
                 angle_3_dot: crate::types::AngleRate::new(values[5], None),
-            }),
-        ),
-        AttitudeTypeType::EulerAngleAngVel | AttitudeTypeType::EulerAngleAngVelUpper => Ok(
-            AemAttitudeState::EulerAngleAngVel(crate::common::EulerAngleAngVel {
+            },
+        )),
+        AttitudeTypeType::EulerAngleAngVel => Ok(AemAttitudeState::EulerAngleAngVel(
+            crate::common::EulerAngleAngVel {
                 epoch,
                 angle_1: Angle::new(values[0], None).map_err(|e| {
                     ErrMode::Cut(InternalParserError::from_external_error(input, e))
@@ -246,25 +235,20 @@ fn attitude_state_line(
                 angvel_x: crate::types::AngleRate::new(values[3], None),
                 angvel_y: crate::types::AngleRate::new(values[4], None),
                 angvel_z: crate::types::AngleRate::new(values[5], None),
-            }),
-        ),
-        AttitudeTypeType::Spin | AttitudeTypeType::SpinUpper => {
-            Ok(AemAttitudeState::Spin(crate::common::Spin {
-                epoch,
-                spin_alpha: Angle::new(values[0], None).map_err(|e| {
-                    ErrMode::Cut(InternalParserError::from_external_error(input, e))
-                })?,
-                spin_delta: Angle::new(values[1], None).map_err(|e| {
-                    ErrMode::Cut(InternalParserError::from_external_error(input, e))
-                })?,
-                spin_angle: Angle::new(values[2], None).map_err(|e| {
-                    ErrMode::Cut(InternalParserError::from_external_error(input, e))
-                })?,
-                spin_angle_vel: crate::types::AngleRate::new(values[3], None),
-            }))
-        }
-        AttitudeTypeType::SpinNutation | AttitudeTypeType::SpinNutationUpper => Ok(
-            AemAttitudeState::SpinNutation(crate::common::SpinNutation {
+            },
+        )),
+        AttitudeTypeType::Spin => Ok(AemAttitudeState::Spin(crate::common::Spin {
+            epoch,
+            spin_alpha: Angle::new(values[0], None)
+                .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+            spin_delta: Angle::new(values[1], None)
+                .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+            spin_angle: Angle::new(values[2], None)
+                .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
+            spin_angle_vel: crate::types::AngleRate::new(values[3], None),
+        })),
+        AttitudeTypeType::SpinNutation => Ok(AemAttitudeState::SpinNutation(
+            crate::common::SpinNutation {
                 epoch,
                 spin_alpha: Angle::new(values[0], None).map_err(|e| {
                     ErrMode::Cut(InternalParserError::from_external_error(input, e))
@@ -285,10 +269,10 @@ fn attitude_state_line(
                 nutation_phase: Angle::new(values[6], None).map_err(|e| {
                     ErrMode::Cut(InternalParserError::from_external_error(input, e))
                 })?,
-            }),
-        ),
-        AttitudeTypeType::SpinNutationMom | AttitudeTypeType::SpinNutationMomUpper => Ok(
-            AemAttitudeState::SpinNutationMom(crate::common::SpinNutationMom {
+            },
+        )),
+        AttitudeTypeType::SpinNutationMom => Ok(AemAttitudeState::SpinNutationMom(
+            crate::common::SpinNutationMom {
                 epoch,
                 spin_alpha: Angle::new(values[0], None).map_err(|e| {
                     ErrMode::Cut(InternalParserError::from_external_error(input, e))
@@ -307,8 +291,8 @@ fn attitude_state_line(
                     ErrMode::Cut(InternalParserError::from_external_error(input, e))
                 })?,
                 nutation_vel: crate::types::AngleRate::new(values[6], None),
-            }),
-        ),
+            },
+        )),
     }
 }
 

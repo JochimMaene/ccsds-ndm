@@ -1,4 +1,4 @@
-use ccsds_ndm::error::{DiagnosticNotation, DiagnosticOperation, DiagnosticSeverity};
+use ccsds_ndm::error::{DiagnosticNotation, DiagnosticOperation};
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::validation::MessageKind;
@@ -16,7 +16,6 @@ fn kvn_syntax_diagnostics_are_located_and_machine_readable() {
     let error = Oem::from_kvn(&input).expect_err("unknown keyword should fail");
     let diagnostic = error.diagnostic().expect("parse context should be present");
 
-    assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
     assert_eq!(diagnostic.operation, DiagnosticOperation::Parse);
     assert_eq!(diagnostic.notation, DiagnosticNotation::Kvn);
     assert_eq!(diagnostic.message_kind, MessageKind::Oem);
@@ -25,7 +24,22 @@ fn kvn_syntax_diagnostics_are_located_and_machine_readable() {
     assert_eq!(diagnostic.original_token, Some("UNKNOWN = value"));
     assert_eq!(diagnostic.expected, Some("strict OEM KVN"));
     assert!(diagnostic.source_location.is_some());
-    assert_eq!(diagnostic.recovery, None);
+}
+
+#[test]
+fn carriage_return_diagnostics_keep_the_edition_and_excerpt_to_one_record() {
+    let object_name = KVN
+        .lines()
+        .find(|line| line.trim_start().starts_with("OBJECT_NAME"))
+        .unwrap();
+    let input = KVN
+        .replace(object_name, &format!("{object_name}\nUNKNOWN = value"))
+        .replace('\n', "\r");
+    let error = Oem::from_kvn(&input).expect_err("unknown keyword should fail");
+    let diagnostic = error.diagnostic().unwrap();
+
+    assert_eq!(diagnostic.source_edition, Some("3.0"));
+    assert_eq!(diagnostic.original_token, Some("UNKNOWN = value"));
 }
 
 #[test]
@@ -54,5 +68,4 @@ fn xml_syntax_diagnostics_identify_the_notation_without_inventing_a_location() {
     assert_eq!(diagnostic.message_kind, MessageKind::Oem);
     assert_eq!(diagnostic.code, Some("parse.xml.syntax"));
     assert_eq!(diagnostic.source_location, None);
-    assert_eq!(diagnostic.recovery, None);
 }

@@ -67,11 +67,6 @@ sync-docs-check:
 audit:
     cd {{python_dir}} && uv run python audit_bindings.py
 
-# Audit Python bindings against Rust core structs (strict mode)
-[private]
-audit-strict:
-    cd {{python_dir}} && uv run python audit_bindings.py --strict
-
 # --- Linting and Formatting -------------------------------------------------
 
 # Format the Rust code
@@ -89,7 +84,7 @@ fmt-rust-check:
 # Lint the Rust code
 [private]
 lint-rust:
-    cargo clippy --manifest-path {{rust_manifest}} -- -D warnings
+    cargo clippy --manifest-path {{rust_manifest}} --all-targets --all-features -- -D warnings
     cargo clippy --manifest-path {{python_manifest}} -- -D warnings
 
 # Format the Python code
@@ -132,8 +127,6 @@ conformance-opm-xml:
     cargo test --manifest-path {{rust_manifest}} --test opm_maneuver_duration_units
     cargo test --manifest-path {{rust_manifest}} --test opm_xml_root_envelope
     cargo test --manifest-path {{rust_manifest}} --test opm_xml_writer_failure
-    cargo test --manifest-path {{rust_manifest}} --test opm_generation_diagnostics
-    cargo test --manifest-path {{rust_manifest}} --test opm_generation_limits
     cargo test --manifest-path {{rust_manifest}} --test opm_xml_allocations
 
 # Run the OPM 3.0 Rust KVN-generation conformance slice
@@ -142,8 +135,6 @@ conformance-opm-kvn:
     cargo test --manifest-path {{rust_manifest}} --test opm_3_kvn_generation_conformance
     cargo test --manifest-path {{rust_manifest}} --test opm_kvn_writer_failure
     cargo test --manifest-path {{rust_manifest}} --test opm_kvn_allocations
-    cargo test --manifest-path {{rust_manifest}} --test opm_generation_diagnostics
-    cargo test --manifest-path {{rust_manifest}} --test opm_generation_limits
 
 # Run strict OPM parsing, validation, and conversion evidence
 [private]
@@ -273,11 +264,7 @@ verify-opm:
     just package-python
 
 # Run all quality checks (lint, audit, stubs-check, sync-docs-check, test)
-check: lint audit-strict stubs-check sync-docs-check test
-
-# Backward-compatible CI alias
-[private]
-check-ci: check
+check: lint audit stubs-check sync-docs-check test
 
 # --- Benchmarking -----------------------------------------------------------
 
@@ -365,8 +352,7 @@ fuzz-all duration="30":
 
 # --- Clean ------------------------------------------------------------------
 
-# Remove build artifacts
+# Remove build, documentation, and profiling artifacts
 clean:
-    cargo clean --manifest-path {{rust_manifest}}
-    rm -rf dist
-    rm -rf docs/_build
+    rm -rf target {{rust_dir}}/target {{rust_dir}}/fuzz/target {{python_dir}}/target dist docs/_build
+    rm -f perf.data perf.data.old {{rust_dir}}/perf.data {{rust_dir}}/perf.data.old

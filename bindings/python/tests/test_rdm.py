@@ -6,6 +6,7 @@
 Unit tests for Reentry Data Message (RDM) Python bindings.
 """
 
+import ccsds_ndm
 import pytest
 
 from ccsds_ndm import (
@@ -81,10 +82,10 @@ class TestRdm:
         rdm = self._create_valid_rdm()
         path = tmp_path / "test.rdm"
 
-        rdm.to_file(str(path), format="kvn")
+        rdm.to_file(str(path), "kvn")
         assert path.exists()
 
-        rdm2 = Rdm.from_file(str(path), format="kvn")
+        rdm2 = ccsds_ndm.from_file(str(path), format="kvn")
         assert rdm2.header.originator == "TEST"
 
     def test_epoch_fields_reject_numeric_xsd_branch(self):

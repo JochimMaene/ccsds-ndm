@@ -8,8 +8,6 @@ def convert(
     *,
     max_input_bytes: Optional[int] = None,
     max_records: Optional[int] = None,
-    max_output_bytes: Optional[int] = None,
-    version: Optional[str] = None,
 ) -> str:
     """
     Convert any recognized NDM message between KVN and XML through the shared generation gate.
@@ -23,8 +21,6 @@ def convert_file(
     *,
     max_input_bytes: Optional[int] = None,
     max_records: Optional[int] = None,
-    max_output_bytes: Optional[int] = None,
-    version: Optional[str] = None,
 ) -> None:
     """
     Convert any recognized NDM file and atomically replace the destination on success.
@@ -105,7 +101,9 @@ class Acm:
         max_input_bytes: Optional[int] = None,
         max_records: Optional[int] = None,
     ) -> Acm:
-        """ """
+        """
+        Parse an ACM from a KVN or XML file.
+        """
         ...
 
     @staticmethod
@@ -155,24 +153,13 @@ class Acm:
 
     @segment.setter
     def segment(self, value: AcmSegment) -> None: ...
-    def to_file(
-        self,
-        path: str,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> None:
+    def to_file(self, path: str, format: str) -> None:
         """
-        Write validated KVN or XML directly to a file.
+        Atomically write this ACM as KVN or XML.
         """
         ...
 
-    def to_str(
-        self,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> str:
+    def to_str(self, format: str) -> str:
         """
         Serialize to validated KVN or XML.
         """
@@ -1466,7 +1453,9 @@ class Aem:
         max_input_bytes: Optional[int] = None,
         max_records: Optional[int] = None,
     ) -> Aem:
-        """ """
+        """
+        Parse an AEM from a KVN or XML file.
+        """
         ...
 
     @staticmethod
@@ -1516,24 +1505,13 @@ class Aem:
 
     @segments.setter
     def segments(self, value: list[AemSegment]) -> None: ...
-    def to_file(
-        self,
-        path: str,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> None:
+    def to_file(self, path: str, format: str) -> None:
         """
-        Write validated KVN or XML directly to a file.
+        Atomically write this AEM as KVN or XML.
         """
         ...
 
-    def to_str(
-        self,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> str:
+    def to_str(self, format: str) -> str:
         """
         Serialize to validated KVN or XML.
         """
@@ -1991,7 +1969,9 @@ class Apm:
         *,
         max_input_bytes: Optional[int] = None,
     ) -> Apm:
-        """ """
+        """
+        Parse an APM from a KVN or XML file.
+        """
         ...
 
     @staticmethod
@@ -2038,24 +2018,13 @@ class Apm:
 
     @segment.setter
     def segment(self, value: ApmSegment) -> None: ...
-    def to_file(
-        self,
-        path: str,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> None:
+    def to_file(self, path: str, format: str) -> None:
         """
-        Write validated KVN or XML directly to a file.
+        Atomically write this APM as KVN or XML.
         """
         ...
 
-    def to_str(
-        self,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> str:
+    def to_str(self, format: str) -> str:
         """
         Serialize to validated KVN or XML.
         """
@@ -2550,36 +2519,7 @@ class Cdm:
         max_input_bytes: Optional[int] = None,
     ) -> Cdm:
         """
-        Parse a CDM from a file path with optional format.
-
-        Parameters
-        ----------
-        path : str
-            The path to the file.
-        format : str, optional
-            The format of the file ('kvn' or 'xml'). If None, it will be auto-detected.
-
-        Returns
-        -------
-        Cdm
-            The parsed CDM object.
-        """
-        ...
-
-    @staticmethod
-    def from_kvn(kvn: str) -> Cdm:
-        """
-        Parse a CDM from a KVN formatted string.
-
-        Parameters
-        ----------
-        kvn : str
-            The KVN string to parse.
-
-        Returns
-        -------
-        Cdm
-            The parsed CDM object.
+        Parse a CDM from a KVN or XML file.
         """
         ...
 
@@ -2633,33 +2573,13 @@ class Cdm:
         """
         ...
 
-    def to_file(
-        self,
-        path: str,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> None:
+    def to_file(self, path: str, format: str) -> None:
         """
-        Write the CDM to a file.
-
-        Parameters
-        ----------
-        path : str
-            The output file path.
-        format : str
-            The output format ('kvn' or 'xml').
-        version : str, optional
-            Source version by default, ``"latest"``, or an exact supported version.
+        Atomically write this CDM as KVN or XML.
         """
         ...
 
-    def to_str(
-        self,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> str:
+    def to_str(self, format: str) -> str:
         """
         Serialize to validated KVN or XML.
         """
@@ -5168,7 +5088,7 @@ class Ndm:
         max_records: Optional[int] = None,
     ) -> Ndm:
         """
-        Parse an NDM combined instantiation from a file.
+        Parse a combined NDM from a KVN or XML file.
         """
         ...
 
@@ -5203,22 +5123,13 @@ class Ndm:
     def messages(
         self, value: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]
     ) -> None: ...
-    def to_file(
-        self, path: str, format: str, max_output_bytes: Optional[int] = None
-    ) -> None:
+    def to_file(self, path: str, format: str) -> None:
         """
-        Write to file.
-
-        Parameters
-        ----------
-        path : str
-            Output file path.
-        format : str
-            Output format ('kvn' or 'xml').
+        Atomically write this combined NDM as KVN or XML.
         """
         ...
 
-    def to_str(self, format: str, max_output_bytes: Optional[int] = None) -> str:
+    def to_str(self, format: str) -> str:
         """
         Serialize to a string.
         """
@@ -5264,19 +5175,7 @@ class Ocm:
         max_records: Optional[int] = None,
     ) -> Ocm:
         """
-        Create an OCM message from a file.
-
-        Parameters
-        ----------
-        path : str
-            Path to the input file.
-        format : str, optional
-            Format ('kvn' or 'xml'). Auto-detected if None.
-
-        Returns
-        -------
-        Ocm
-            The parsed OCM object.
+        Parse an OCM from a KVN or XML file.
         """
         ...
 
@@ -5341,33 +5240,13 @@ class Ocm:
 
     @segment.setter
     def segment(self, value: OcmSegment) -> None: ...
-    def to_file(
-        self,
-        path: str,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> None:
+    def to_file(self, path: str, format: str) -> None:
         """
-        Write to file.
-
-        Parameters
-        ----------
-        path : str
-            Output file path.
-        format : str
-            Output format ('kvn' or 'xml').
-        version : str, optional
-            Source version by default, ``"latest"``, or an exact supported version.
+        Atomically write this OCM as KVN or XML.
         """
         ...
 
-    def to_str(
-        self,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> str:
+    def to_str(self, format: str) -> str:
         """
         Serialize to KVN or XML after mandatory CCSDS validation.
         """
@@ -9096,20 +8975,7 @@ class Oem:
         max_records: Optional[int] = None,
     ) -> Oem:
         """
-        Create an OEM message from a file.
-
-        Parameters
-        ----------
-        path : str
-            Path to the input file.
-        format : str, optional
-            Format ('kvn' or 'xml'). Auto-detected if None.
-            (Optional)
-
-        Returns
-        -------
-        Oem
-            The parsed OEM object.
+        Parse an OEM from a KVN or XML file.
         """
         ...
 
@@ -9164,33 +9030,13 @@ class Oem:
 
     @segments.setter
     def segments(self, value: list[OemSegment]) -> None: ...
-    def to_file(
-        self,
-        path: str,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> None:
+    def to_file(self, path: str, format: str) -> None:
         """
-        Write directly to a KVN or XML file.
-
-        Parameters
-        ----------
-        path : str
-            Output file path.
-        format : str
-            Output format ('kvn' or 'xml').
-        version : str, optional
-            Source version by default, ``"latest"``, or an exact supported version.
+        Atomically write this OEM as KVN or XML.
         """
         ...
 
-    def to_str(
-        self,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> str:
+    def to_str(self, format: str) -> str:
         """
         Serialize to validated KVN or XML.
         """
@@ -9225,7 +9071,8 @@ class OemCovarianceMatrix:
         Epoch of the covariance matrix (ISO 8601).
         values : numpy.ndarray
         NumPy array of shape (21,) containing the lower-triangular values, or (6,6) for
-        a full symmetric matrix.
+        a full symmetric matrix. Only the lower triangle of a (6,6) input is read, so a
+        matrix that is symmetric only to within rounding is accepted as-is.
     cov_ref_frame : str, optional
         Reference frame for the covariance matrix.
     comment : list[str], optional
@@ -9985,19 +9832,7 @@ class Omm:
         max_input_bytes: Optional[int] = None,
     ) -> Omm:
         """
-        Create an OMM message from a file.
-
-        Parameters
-        ----------
-        path : str
-            Path to the input file.
-        format : str, optional
-            Format ('kvn' or 'xml'). Auto-detected if None.
-
-        Returns
-        -------
-        Omm
-            The parsed OMM object.
+        Parse an OMM from a KVN or XML file.
         """
         ...
 
@@ -10077,33 +9912,13 @@ class Omm:
 
     @segment.setter
     def segment(self, value: OmmSegment) -> None: ...
-    def to_file(
-        self,
-        path: str,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> None:
+    def to_file(self, path: str, format: str) -> None:
         """
-        Write to file.
-
-        Parameters
-        ----------
-        path : str
-            Output file path.
-        format : str
-            Output format ('kvn' or 'xml').
-        version : str, optional
-            Source version by default, ``"latest"``, or an exact supported version.
+        Atomically write this OMM as KVN or XML.
         """
         ...
 
-    def to_str(
-        self,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> str:
+    def to_str(self, format: str) -> str:
         """
         Serialize to validated KVN or XML.
         """
@@ -10402,19 +10217,7 @@ class Opm:
         max_input_bytes: Optional[int] = None,
     ) -> Opm:
         """
-        Create an OPM message from a file.
-
-        Parameters
-        ----------
-        path : str
-            Path to the input file.
-        format : str, optional
-            Format ('kvn' or 'xml'). Auto-detected if None.
-
-        Returns
-        -------
-        Opm
-            The parsed OPM object.
+        Parse an OPM from a KVN or XML file.
         """
         ...
 
@@ -10461,33 +10264,13 @@ class Opm:
 
     @segment.setter
     def segment(self, value: OpmSegment) -> None: ...
-    def to_file(
-        self,
-        path: str,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> None:
+    def to_file(self, path: str, format: str) -> None:
         """
-        Write to file.
-
-        Parameters
-        ----------
-        path : str
-            Output file path.
-        format : str
-            Output format ('kvn' or 'xml').
-        version : str, optional
-            Source version by default, ``"latest"``, or an exact supported version.
+        Atomically write this OPM as KVN or XML.
         """
         ...
 
-    def to_str(
-        self,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> str:
+    def to_str(self, format: str) -> str:
         """
         Serialize to KVN or XML after mandatory CCSDS validation.
         """
@@ -11343,20 +11126,7 @@ class Rdm:
         max_input_bytes: Optional[int] = None,
     ) -> Rdm:
         """
-        Create an RDM message from a file.
-
-        Parameters
-        ----------
-        path : str
-            Path to the input file.
-        format : str, optional
-            Format ('kvn' or 'xml'). Auto-detected if None.
-            (Optional)
-
-        Returns
-        -------
-        Rdm
-            The parsed RDM object.
+        Parse an RDM from a KVN or XML file.
         """
         ...
 
@@ -11420,33 +11190,13 @@ class Rdm:
 
     @segment.setter
     def segment(self, value: RdmSegment) -> None: ...
-    def to_file(
-        self,
-        path: str,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> None:
+    def to_file(self, path: str, format: str) -> None:
         """
-        Write to a file.
-
-        Parameters
-        ----------
-        path : str
-            Output file path.
-        format : str
-            Format ('kvn' or 'xml').
-        version : str, optional
-            Source version by default, ``"latest"``, or an exact supported version.
+        Atomically write this RDM as KVN or XML.
         """
         ...
 
-    def to_str(
-        self,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> str:
+    def to_str(self, format: str) -> str:
         """
         Serialize to string (generic).
 
@@ -11458,7 +11208,6 @@ class Rdm:
         -------
         str
             The serialized string.
-        ``version`` preserves the source version unless explicitly overridden.
         """
         ...
 
@@ -13167,20 +12916,7 @@ class Tdm:
         max_records: Optional[int] = None,
     ) -> Tdm:
         """
-        Create a TDM message from a file.
-
-        Parameters
-        ----------
-        path : str
-            Path to the input file.
-        format : str, optional
-            Format ('kvn' or 'xml'). Auto-detected if None.
-            (Optional)
-
-        Returns
-        -------
-        Tdm
-            The parsed TDM object.
+        Parse a TDM from a KVN or XML file.
         """
         ...
 
@@ -13246,33 +12982,13 @@ class Tdm:
         """
         ...
 
-    def to_file(
-        self,
-        path: str,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> None:
+    def to_file(self, path: str, format: str) -> None:
         """
-        Write to file.
-
-        Parameters
-        ----------
-        path : str
-            Output file path.
-        format : str
-            Output format ('kvn' or 'xml').
-        version : str, optional
-            Source version by default, ``"latest"``, or an exact supported version.
+        Atomically write this TDM as KVN or XML.
         """
         ...
 
-    def to_str(
-        self,
-        format: str,
-        version: Optional[str] = None,
-        max_output_bytes: Optional[int] = None,
-    ) -> str:
+    def to_str(self, format: str) -> str:
         """
         Serialize to validated KVN or XML.
         """
@@ -14593,12 +14309,12 @@ class NdmIoError(OSError):
     I/O error during file operations.
     """
 
-class NdmUnsupportedMessageError(ValueError):
+class NdmUnsupportedMessageError(NdmError):
     """
     Unsupported CCSDS message type.
     """
 
-class NdmValidationError(ValueError):
+class NdmValidationError(NdmError):
     """
     Validation error against CCSDS rules.
     """

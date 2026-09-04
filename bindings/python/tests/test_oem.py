@@ -6,6 +6,7 @@
 Unit tests for Orbit Ephemeris Message (OEM) Python bindings.
 """
 
+import ccsds_ndm
 import numpy as np
 import pytest
 
@@ -134,10 +135,10 @@ class TestOem:
         oem = self._create_valid_oem()
         path = tmp_path / "test.oem"
 
-        oem.to_file(str(path), format="kvn")
+        oem.to_file(str(path), "kvn")
         assert path.exists()
 
-        oem2 = Oem.from_file(str(path), format="kvn")
+        oem2 = ccsds_ndm.from_file(str(path), format="kvn")
         assert oem2.header.originator == "TEST"
 
     def test_oem_data_numpy_api(self):
@@ -168,6 +169,31 @@ class TestOem:
         new_state = state + 1.0
         data.state_vector_numpy = new_state
         assert np.allclose(data.state_vector_numpy, new_state)
+
+    def test_full_covariance_inputs_read_the_lower_triangle(self):
+        # Filter output is symmetric only to within rounding, so the upper triangle is ignored
+        # rather than compared for equality.
+        asymmetric = np.eye(6, dtype=float)
+        asymmetric[0, 1] = 1.0
+
+        epochs = ["2023-01-01T00:00:00"]
+        state = np.zeros((1, 6), dtype=float)
+        data = OemData.from_numpy(
+            state_vector_epochs=epochs,
+            state_vector_numpy=state,
+            covariance_matrix_epochs=epochs,
+            covariance_matrix_numpy=asymmetric.reshape(1, 6, 6),
+        )
+        assert np.allclose(data.covariance_matrix_numpy[0], np.eye(6, dtype=float))
+
+        matrix = OemCovarianceMatrix("2023-01-01T00:00:00", asymmetric, None, [])
+        assert matrix.cx_x == 1.0
+        assert matrix.cy_x == 0.0
+
+        nearly = np.eye(6, dtype=float)
+        nearly[1, 0] = 1e-17
+        data.covariance_matrix_numpy = nearly.reshape(1, 6, 6)
+        assert np.allclose(data.covariance_matrix_numpy[0], np.eye(6, dtype=float))
 
 
 if __name__ == "__main__":

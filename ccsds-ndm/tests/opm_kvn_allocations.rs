@@ -4,7 +4,6 @@
 
 use ccsds_ndm::generation::VersionedNdm;
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::options::GenerateOptions;
 use ccsds_ndm::traits::Ndm;
 use stats_alloc::{Region, StatsAlloc, INSTRUMENTED_SYSTEM};
 use std::alloc::System;
@@ -18,7 +17,6 @@ static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 fn opm_kvn_generation_has_bounded_allocations() {
     let opm = Opm::from_kvn(include_str!("../data/kvn/opm_g4.kvn")).unwrap();
     let expected_len = opm.to_kvn().unwrap().len();
-    let options = GenerateOptions::source();
 
     let materialized_region = Region::new(GLOBAL);
     let materialized = black_box(&opm).to_kvn().unwrap();
@@ -28,7 +26,7 @@ fn opm_kvn_generation_has_bounded_allocations() {
     let mut streamed = Vec::with_capacity(expected_len);
     let streaming_region = Region::new(GLOBAL);
     black_box(&opm)
-        .write_kvn_to(black_box(&mut streamed), black_box(&options))
+        .write_kvn_to(black_box(&mut streamed))
         .unwrap();
     let streaming_stats = streaming_region.change();
     black_box(&streamed);
@@ -65,5 +63,19 @@ fn opm_kvn_generation_has_bounded_allocations() {
     assert!(
         streaming_stats.bytes_reallocated <= 128,
         "streaming reallocated bytes exceeded its budget: {streaming_stats:?}"
+    );
+
+    // Repeated blocks report indexed diagnostic paths, which must stay unbuilt while validation
+    // is finding nothing wrong.
+    let maneuvers = Opm::from_kvn(include_str!("../data/kvn/opm_g2.kvn")).unwrap();
+    assert_eq!(maneuvers.body.segment.data.maneuver_parameters.len(), 2);
+    let _ = maneuvers.to_kvn().unwrap();
+    let maneuver_region = Region::new(GLOBAL);
+    let generated = black_box(&maneuvers).to_kvn().unwrap();
+    let maneuver_stats = maneuver_region.change();
+    black_box(&generated);
+    assert!(
+        maneuver_stats.allocations <= 16,
+        "maneuver allocation count exceeded its budget: {maneuver_stats:?}"
     );
 }

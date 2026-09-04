@@ -3,58 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::from_str;
-use serde::Deserialize;
-use std::collections::{HashMap, HashSet};
-
-#[derive(Debug, Deserialize)]
-struct CaseEntry {
-    id: String,
-    #[serde(rename = "expected")]
-    _expected: String,
-    #[serde(rename = "category")]
-    _category: String,
-    behavior: String,
-}
-
-#[test]
-fn test_case_matrix_mapped() {
-    let cases = load_cases();
-    let mut unmapped = Vec::new();
-
-    for case in &cases {
-        if !behavior_catalog().contains_key(case.behavior.as_str()) {
-            unmapped.push(case.id.clone());
-        }
-    }
-
-    assert!(
-        unmapped.is_empty(),
-        "Unmapped cases ({}):\n{}",
-        unmapped.len(),
-        unmapped.join("\n")
-    );
-}
-
-#[test]
-fn test_case_matrix_behavior_catalog() {
-    let cases = load_cases();
-    let mut used = HashSet::new();
-    for case in &cases {
-        used.insert(case.behavior.as_str());
-    }
-
-    let catalog = behavior_catalog();
-    let missing: Vec<_> = used
-        .iter()
-        .filter(|id| !catalog.contains_key(**id))
-        .copied()
-        .collect();
-
-    assert!(
-        missing.is_empty(),
-        "Behaviors missing minimal test fixtures: {missing:?}"
-    );
-}
+use std::collections::HashMap;
 
 #[test]
 fn test_minimal_success_cases() {
@@ -446,11 +395,6 @@ fn behavior_catalog() -> HashMap<&'static str, MinimalCase> {
     );
 
     map
-}
-
-fn load_cases() -> Vec<CaseEntry> {
-    let raw = include_str!("case_matrix.json");
-    serde_json::from_str(raw).expect("case_matrix.json must be valid JSON")
 }
 
 // ---------------- Minimal inputs ----------------

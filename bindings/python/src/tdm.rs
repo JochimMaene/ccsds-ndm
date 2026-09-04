@@ -196,20 +196,7 @@ impl Tdm {
         Self::from_core(py, inner)
     }
 
-    /// Create a TDM message from a file.
-    ///
-    /// Parameters
-    /// ----------
-    /// path : str
-    ///     Path to the input file.
-    /// format : str, optional
-    ///     Format ('kvn' or 'xml'). Auto-detected if None.
-    ///     (Optional)
-    ///
-    /// Returns
-    /// -------
-    /// Tdm
-    ///     The parsed TDM object.
+    /// Parse a TDM from a KVN or XML file.
     #[staticmethod]
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_file(
@@ -224,49 +211,18 @@ impl Tdm {
         Self::from_core(py, inner)
     }
 
-    /// Serialize to validated KVN or XML.
-    #[pyo3(signature = (format, version=None, max_output_bytes=None))]
-    fn to_str(
-        &self,
-        py: Python<'_>,
-        format: &str,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(
-            &self.to_core(py)?,
+    /// Atomically write this TDM as KVN or XML.
+    fn to_file(&self, py: Python<'_>, path: &str, format: &str) -> PyResult<()> {
+        crate::api::generate_file(
+            &ccsds_ndm::MessageType::Tdm(self.to_core(py)?),
+            path,
             format,
-            version,
-            max_output_bytes,
         )
     }
 
-    /// Write to file.
-    ///
-    /// Parameters
-    /// ----------
-    /// path : str
-    ///     Output file path.
-    /// format : str
-    ///     Output format ('kvn' or 'xml').
-    /// version : str, optional
-    ///     Source version by default, ``"latest"``, or an exact supported version.
-    #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
-    fn to_file(
-        &self,
-        py: Python<'_>,
-        path: &str,
-        format: &str,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<()> {
-        crate::api::generate_file_with_limit(
-            &self.to_core(py)?,
-            path,
-            format,
-            version,
-            max_output_bytes,
-        )
+    /// Serialize to validated KVN or XML.
+    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+        crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
 

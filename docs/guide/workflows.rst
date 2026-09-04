@@ -18,8 +18,8 @@ Retained child references preserve their identity, and structural changes to rep
 such as OEM state-vector lists affect the owning message. Generation always validates the complete
 message. There is no commit step and no unchecked ``validate=False`` mode.
 
-Converting notation and edition
--------------------------------
+Converting notation
+-------------------
 
 Use the same generic API for every recognized message family:
 

@@ -126,6 +126,7 @@ impl Acm {
         Self::from_core(py, inner)
     }
 
+    /// Parse an ACM from a KVN or XML file.
     #[staticmethod]
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_file(
@@ -140,40 +141,18 @@ impl Acm {
         Self::from_core(py, inner)
     }
 
-    /// Serialize to validated KVN or XML.
-    #[pyo3(signature = (format, version=None, max_output_bytes=None))]
-    fn to_str(
-        &self,
-        py: Python<'_>,
-        format: &str,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(
-            &self.to_core(py)?,
+    /// Atomically write this ACM as KVN or XML.
+    fn to_file(&self, py: Python<'_>, path: &str, format: &str) -> PyResult<()> {
+        crate::api::generate_file(
+            &ccsds_ndm::MessageType::Acm(self.to_core(py)?),
+            path,
             format,
-            version,
-            max_output_bytes,
         )
     }
 
-    /// Write validated KVN or XML directly to a file.
-    #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
-    fn to_file(
-        &self,
-        py: Python<'_>,
-        path: &str,
-        format: &str,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<()> {
-        crate::api::generate_file_with_limit(
-            &self.to_core(py)?,
-            path,
-            format,
-            version,
-            max_output_bytes,
-        )
+    /// Serialize to validated KVN or XML.
+    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+        crate::api::generate_string(&self.to_core(py)?, format)
     }
 
     /// Attitude Comprehensive Message (ACM).

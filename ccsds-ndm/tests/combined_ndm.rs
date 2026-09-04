@@ -6,12 +6,12 @@ use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{from_str, GenerateOptions, MessageType};
+use ccsds_ndm::{from_str, MessageType};
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 
 #[test]
-fn combined_generation_preserves_child_checks_and_aggregate_output_limits() {
+fn combined_generation_preserves_child_checks() {
     let opm = Opm::from_kvn(OPM_KVN).unwrap();
     let combined = CombinedNdm {
         id: None,
@@ -20,16 +20,7 @@ fn combined_generation_preserves_child_checks_and_aggregate_output_limits() {
     };
     let message = MessageType::Ndm(combined.clone());
 
-    let exact_xml = message.to_xml().unwrap();
-    let exact = GenerateOptions::source().with_max_output_bytes(exact_xml.len());
-    assert_eq!(message.to_xml_with(&exact).unwrap(), exact_xml);
-    let too_small = GenerateOptions::source().with_max_output_bytes(exact_xml.len() - 1);
-    let error = message.to_xml_with(&too_small).unwrap_err();
-    assert_eq!(error.code(), Some("resource.output_limit_exceeded"));
-    assert_eq!(
-        error.diagnostic().unwrap().message_kind,
-        ccsds_ndm::validation::MessageKind::Ndm
-    );
+    message.to_xml().unwrap();
 
     let mut invalid_kvn = opm.clone();
     invalid_kvn.header.originator = "non-ASCII é".into();

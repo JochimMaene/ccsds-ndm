@@ -52,30 +52,11 @@ impl crate::traits::Validate for Rdm {
         self.header.validate()?;
         self.body.validate()
     }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        crate::validation::collect_message_validation_errors(
-            crate::validation::MessageKind::Rdm,
-            &self.id,
-            &self.version,
-            &self.header,
-            &self.body,
-        )
-    }
 }
 
 impl Ndm for Rdm {
     fn to_kvn(&self) -> Result<String> {
-        crate::generation::validate_for_generation(
-            crate::validation::MessageKind::Rdm,
-            &self.version,
-            crate::generation::OutputFormat::Kvn,
-            self,
-        )?;
-        self.validate_kvn_representability()?;
-        let mut writer = KvnWriter::new();
-        self.write_kvn(&mut writer);
-        writer.finish_checked()
+        crate::generation::to_kvn_string(self)
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
@@ -86,13 +67,7 @@ impl Ndm for Rdm {
     }
 
     fn to_xml(&self) -> Result<String> {
-        crate::generation::validate_for_generation(
-            crate::validation::MessageKind::Rdm,
-            &self.version,
-            crate::generation::OutputFormat::Xml,
-            self,
-        )?;
-        crate::xml::to_string(self)
+        crate::generation::to_xml_string(self)
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
@@ -264,13 +239,23 @@ fn validate_xml_sequences(xml: &str) -> Result<()> {
     const USER_DEFINED: &[&[u8]] = &[b"COMMENT", b"USER_DEFINED"];
 
     fn in_sequence(child: &[u8], sequence: &[&[u8]]) -> Option<XmlSequenceRule> {
+        rank_of(child, sequence)
+            .map(|rank| XmlSequenceRule::new(rank, matches!(child, b"COMMENT" | b"USER_DEFINED")))
+    }
+
+    /// `userDefinedType` wraps its children in a repeating sequence, so a COMMENT may open a new
+    /// iteration after a USER_DEFINED.
+    fn in_repeating_sequence(child: &[u8], sequence: &[&[u8]]) -> Option<XmlSequenceRule> {
+        rank_of(child, sequence).map(|rank| {
+            XmlSequenceRule::restarting(rank, matches!(child, b"COMMENT" | b"USER_DEFINED"))
+        })
+    }
+
+    fn rank_of(child: &[u8], sequence: &[&[u8]]) -> Option<u16> {
         sequence
             .iter()
             .position(|candidate| *candidate == child)
-            .map(|rank| XmlSequenceRule {
-                rank: rank as u16,
-                repeatable: matches!(child, b"COMMENT" | b"USER_DEFINED"),
-            })
+            .map(|rank| rank as u16)
     }
 
     crate::xml::validate_element_sequences(
@@ -289,7 +274,7 @@ fn validate_xml_sequences(xml: &str) -> Result<()> {
             b"covarianceMatrix" => in_sequence(child, COVARIANCE),
             b"spacecraftParameters" => in_sequence(child, SPACECRAFT),
             b"odParameters" => in_sequence(child, OD),
-            b"userDefinedParameters" => in_sequence(child, USER_DEFINED),
+            b"userDefinedParameters" => in_repeating_sequence(child, USER_DEFINED),
             _ => None,
         },
         |element, attribute| match attribute {
@@ -533,10 +518,10 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             message_name: "RDM",
             rank,
             comment_starts_block: comments_start_block,
-            allows_non_increasing: |previous, current, key| {
-                current == KEYS.len() as u16
-                    && previous == current
-                    && key.starts_with("USER_DEFINED_")
+            allows_non_increasing: |previous, current| {
+                current.rank == KEYS.len() as u16
+                    && previous.rank == current.rank
+                    && current.key.starts_with("USER_DEFINED_")
             },
         },
     )
@@ -605,17 +590,6 @@ impl crate::traits::Validate for RdmHeader {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        Ok(crate::validation::missing_required_fields(
-            "RDM Header",
-            [
-                ("CREATION_DATE", self.creation_date.is_empty()),
-                ("ORIGINATOR", self.originator.trim().is_empty()),
-                ("MESSAGE_ID", self.message_id.trim().is_empty()),
-            ],
-        ))
-    }
 }
 
 impl ToKvn for RdmHeader {
@@ -641,10 +615,6 @@ pub struct RdmBody {
 impl crate::traits::Validate for RdmBody {
     fn validate(&self) -> Result<()> {
         self.segment.validate()
-    }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        self.segment.validation_errors()
     }
 }
 
@@ -682,26 +652,6 @@ impl crate::traits::Validate for RdmSegment {
             .into());
         }
         self.data.validate()
-    }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = self.metadata.validation_errors()?;
-        if self.data.state_vector.is_some()
-            && self
-                .metadata
-                .ref_frame
-                .as_deref()
-                .map(str::trim)
-                .is_none_or(str::is_empty)
-        {
-            errors.push(crate::error::ValidationError::MissingRequiredField {
-                block: "RDM Metadata".into(),
-                field: "REF_FRAME (required when state vector is provided)".into(),
-                line: None,
-            });
-        }
-        errors.extend(self.data.validation_errors()?);
-        Ok(errors)
     }
 }
 
@@ -1263,22 +1213,6 @@ impl crate::traits::Validate for RdmMetadata {
         }
         Ok(())
     }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        Ok(crate::validation::missing_required_fields(
-            "RDM Metadata",
-            [
-                ("OBJECT_NAME", self.object_name.trim().is_empty()),
-                (
-                    "INTERNATIONAL_DESIGNATOR",
-                    self.international_designator.trim().is_empty(),
-                ),
-                ("CENTER_NAME", self.center_name.trim().is_empty()),
-                ("TIME_SYSTEM", self.time_system.trim().is_empty()),
-                ("EPOCH_TZERO", self.epoch_tzero.is_empty()),
-            ],
-        ))
-    }
 }
 
 impl crate::traits::Validate for RdmData {
@@ -1309,33 +1243,6 @@ impl crate::traits::Validate for RdmData {
             state_vector.validate()?;
         }
         Ok(())
-    }
-
-    fn validation_errors(&self) -> Result<Vec<crate::error::ValidationError>> {
-        let mut errors = crate::validation::missing_required_fields(
-            "RDM Data",
-            [(
-                "stateVector (required when covarianceMatrix is provided)",
-                self.covariance_matrix.is_some() && self.state_vector.is_none(),
-            )],
-        );
-        let reentry = &self.atmospheric_reentry_parameters;
-        if let (Some(start), Some(end)) = (
-            &reentry.orbit_lifetime_window_start,
-            &reentry.orbit_lifetime_window_end,
-        ) {
-            if start.value > end.value {
-                errors.push(crate::error::ValidationError::Generic {
-                    message: "ORBIT_LIFETIME_WINDOW_START must be <= ORBIT_LIFETIME_WINDOW_END"
-                        .into(),
-                    line: None,
-                });
-            }
-        }
-        if let Some(state_vector) = &self.state_vector {
-            errors.extend(state_vector.validation_errors()?);
-        }
-        Ok(errors)
     }
 }
 

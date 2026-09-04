@@ -21,7 +21,7 @@ fn opm_xml_generation_rejects_day_as_maneuver_duration_unit() {
     assert_eq!(error.code(), Some("validation.invalid_value"));
     assert_eq!(
         error.field_path().as_deref(),
-        Some("body.segment.data.maneuver_parameters.man_duration.units")
+        Some("body.segment.data.maneuver_parameters[0].man_duration.units")
     );
     assert!(error.as_validation_error().is_some());
 }

@@ -6,7 +6,6 @@ use crate::common::{parse_reference_frame, parse_time_system};
 use crate::common::{OdmHeader, StateVector};
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::opm as core_opm;
-use ccsds_ndm::options::ParseOptions;
 use ccsds_ndm::types::{Angle, Distance, Gm, Inclination};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -156,42 +155,12 @@ impl Opm {
         format: Option<&str>,
         max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
-        let options = ParseOptions {
-            max_input_bytes,
-            ..ParseOptions::default()
-        };
-        let parsed = match format {
-            Some("kvn") => core_opm::Opm::from_kvn_with_options(data, &options),
-            Some("xml") => core_opm::Opm::from_xml_with_options(data, &options),
-            Some(other) => {
-                return Err(PyValueError::new_err(format!(
-                    "Unsupported format '{other}'. Use 'kvn' or 'xml'"
-                )))
-            }
-            None => match ccsds_ndm::detect::detect_notation(data)
-                .map_err(crate::errors::ccsds_error_to_pyerr)?
-            {
-                ccsds_ndm::Notation::Kvn => core_opm::Opm::from_kvn_with_options(data, &options),
-                ccsds_ndm::Notation::Xml => core_opm::Opm::from_xml_with_options(data, &options),
-            },
-        };
-        let inner = parsed.map_err(crate::errors::ccsds_error_to_pyerr)?;
+        let options = crate::api::parse_options(max_input_bytes, None);
+        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
         Self::from_core(py, inner)
     }
 
-    /// Create an OPM message from a file.
-    ///
-    /// Parameters
-    /// ----------
-    /// path : str
-    ///     Path to the input file.
-    /// format : str, optional
-    ///     Format ('kvn' or 'xml'). Auto-detected if None.
-    ///
-    /// Returns
-    /// -------
-    /// Opm
-    ///     The parsed OPM object.
+    /// Parse an OPM from a KVN or XML file.
     #[staticmethod]
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
     fn from_file(
@@ -200,57 +169,23 @@ impl Opm {
         format: Option<&str>,
         max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
-        let options = ParseOptions {
-            max_input_bytes,
-            ..ParseOptions::default()
-        };
+        let options = crate::api::parse_options(max_input_bytes, None);
         let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
         Self::from_core(py, inner)
     }
 
-    /// Serialize to KVN or XML after mandatory CCSDS validation.
-    #[pyo3(signature = (format, version=None, max_output_bytes=None))]
-    fn to_str(
-        &self,
-        py: Python<'_>,
-        format: &str,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<String> {
-        crate::api::generate_string_with_limit(
-            &self.to_core(py)?,
+    /// Atomically write this OPM as KVN or XML.
+    fn to_file(&self, py: Python<'_>, path: &str, format: &str) -> PyResult<()> {
+        crate::api::generate_file(
+            &ccsds_ndm::MessageType::Opm(self.to_core(py)?),
+            path,
             format,
-            version,
-            max_output_bytes,
         )
     }
 
-    /// Write to file.
-    ///
-    /// Parameters
-    /// ----------
-    /// path : str
-    ///     Output file path.
-    /// format : str
-    ///     Output format ('kvn' or 'xml').
-    /// version : str, optional
-    ///     Source version by default, ``"latest"``, or an exact supported version.
-    #[pyo3(signature = (path, format, version=None, max_output_bytes=None))]
-    fn to_file(
-        &self,
-        py: Python<'_>,
-        path: &str,
-        format: &str,
-        version: Option<&str>,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<()> {
-        crate::api::generate_file_with_limit(
-            &self.to_core(py)?,
-            path,
-            format,
-            version,
-            max_output_bytes,
-        )
+    /// Serialize to KVN or XML after mandatory CCSDS validation.
+    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+        crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
 

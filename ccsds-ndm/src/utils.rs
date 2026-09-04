@@ -4,7 +4,48 @@
 
 //! Utility functions and serialization helpers for CCSDS NDM.
 
-use serde::{Deserialize, Deserializer, Serializer};
+use serde::{Deserializer, Serializer};
+
+/// Deserialize a value from the deserializer's own view of the token, without an owned `String`.
+///
+/// Every caller parses a short lexical token into a fixed-size or numeric value, so routing
+/// through `String` puts one heap allocation on each record of a large history. Measured on
+/// `xml_parse_oem_10k`, removing it from the epoch path alone cut parse time by about a quarter.
+pub(crate) fn deserialize_parsed<'de, D, T, E>(
+    deserializer: D,
+    expecting: &'static str,
+    parse: impl Fn(&str) -> Result<T, E>,
+) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    E: std::fmt::Display,
+{
+    struct ParsedVisitor<F> {
+        expecting: &'static str,
+        parse: F,
+    }
+
+    impl<T, E, F> serde::de::Visitor<'_> for ParsedVisitor<F>
+    where
+        E: std::fmt::Display,
+        F: Fn(&str) -> Result<T, E>,
+    {
+        type Value = T;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str(self.expecting)
+        }
+
+        fn visit_str<A>(self, value: &str) -> Result<T, A>
+        where
+            A: serde::de::Error,
+        {
+            (self.parse)(value).map_err(serde::de::Error::custom)
+        }
+    }
+
+    deserializer.deserialize_str(ParsedVisitor { expecting, parse })
+}
 
 /// Serialization helper for `Vec<f64>` that uses space separation.
 pub mod vec_f64_space_sep {
@@ -26,13 +67,14 @@ pub mod vec_f64_space_sep {
     where
         D: Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        if s.trim().is_empty() {
-            return Ok(Vec::new());
-        }
-        s.split_whitespace()
-            .map(|part| part.parse::<f64>().map_err(serde::de::Error::custom))
-            .collect()
+        super::deserialize_parsed(deserializer, "space-separated numbers", |s| {
+            if s.trim().is_empty() {
+                return Ok(Vec::new());
+            }
+            s.split_whitespace()
+                .map(|part| part.parse::<f64>())
+                .collect::<Result<Vec<f64>, _>>()
+        })
     }
 }
 
@@ -155,6 +197,11 @@ pub mod nullable {
                     }
                 }
 
+                // A nilled element is absent regardless of what else it carries. XSD lets a
+                // nillable element keep its attributes, and the schemas use that: `MASS`,
+                // `TRUE_ANOMALY` and friends may be spelled `<MASS units="kg" xsi:nil="true"/>`.
+                // Which attributes are legal on which element is the envelope validator's call,
+                // so accepting them here is not a gap.
                 if nil {
                     return Ok(None);
                 }
@@ -165,7 +212,7 @@ pub mod nullable {
                 // Strategy 1: Deserialize T from object representation (handles structured wrappers).
                 match serde_json::from_value::<T>(JsonValue::Object(values.clone())) {
                     Ok(val) => Ok(Some(val)),
-                    Err(_) => {
+                    Err(error) => {
                         // Strategy 2: Fallback to deserializing T as a Primitive (e.g., f64, u32)
                         // If T is a primitive, Strategy 1 fails because it receives a Map.
                         // We extract just the text content and try again.
@@ -178,9 +225,9 @@ pub mod nullable {
                             let sd = txt.into_deserializer();
                             T::deserialize(sd).map(Some)
                         } else {
-                            // No text content but had attributes... e.g. <FIELD unit="m"/> (empty text)
-                            // Treat as None
-                            Ok(None)
+                            // An attribute-bearing element is not an empty optional value. Preserve
+                            // the typed error instead of silently discarding invalid attributes.
+                            Err(de::Error::custom(error))
                         }
                     }
                 }
@@ -290,5 +337,22 @@ mod tests {
                 units: Some(TimeUnits::Seconds),
             })
         );
+    }
+
+    #[test]
+    fn nullable_accepts_attributes_alongside_nil() {
+        // XSD lets a nillable element keep its attributes, and the ODM schemas use that: a
+        // nilled element is absent no matter what else it carries.
+        let json = r#"{ "duration_field": { "@nil": "true", "@units": "s" } }"#;
+        let w: NullableDurationWrapper = serde_json::from_str(json).unwrap();
+        assert_eq!(w.duration_field, None);
+    }
+
+    #[test]
+    fn nullable_does_not_discard_attributes_on_a_valueless_element() {
+        // Without `nil` the element is present, so an unusable attribute set is an error rather
+        // than a silently absent value.
+        let json = r#"{ "duration_field": { "@units": "km" } }"#;
+        assert!(serde_json::from_str::<NullableDurationWrapper>(json).is_err());
     }
 }

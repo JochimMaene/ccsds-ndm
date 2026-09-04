@@ -6,7 +6,7 @@ use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::{Ndm, Validate};
-use ccsds_ndm::{from_str_with_options, GenerateOptions, MessageType, Notation, ParseOptions};
+use ccsds_ndm::{from_str_with_options, MessageType, Notation, ParseOptions};
 use tempfile::NamedTempFile;
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
@@ -135,7 +135,7 @@ fn opm_maneuvers_are_not_history_records_in_standalone_or_combined_messages() {
 }
 
 #[test]
-fn streaming_generation_preflights_the_complete_envelope() {
+fn streaming_generation_matches_string_generation() {
     let opm = Opm::from_kvn(OPM_KVN).unwrap();
     let message = CombinedNdm {
         id: None,
@@ -145,33 +145,12 @@ fn streaming_generation_preflights_the_complete_envelope() {
 
     let xml = message.to_xml().unwrap();
     let mut xml_output = Vec::new();
-    message
-        .write_xml_to(&mut xml_output, &GenerateOptions::source())
-        .unwrap();
+    message.write_xml_to(&mut xml_output).unwrap();
     assert_eq!(xml_output, xml.as_bytes());
-    let mut limited = Vec::new();
-    assert!(message
-        .write_xml_to(
-            &mut limited,
-            &GenerateOptions::source().with_max_output_bytes(xml.len() - 1),
-        )
-        .is_err());
-    assert!(limited.is_empty());
-
     let kvn = message.to_kvn().unwrap();
     let mut kvn_output = Vec::new();
-    message
-        .write_kvn_to(&mut kvn_output, &GenerateOptions::source())
-        .unwrap();
+    message.write_kvn_to(&mut kvn_output).unwrap();
     assert_eq!(kvn_output, kvn.as_bytes());
-    let mut limited = Vec::new();
-    assert!(message
-        .write_kvn_to(
-            &mut limited,
-            &GenerateOptions::source().with_max_output_bytes(kvn.len() - 1),
-        )
-        .is_err());
-    assert!(limited.is_empty());
 }
 
 #[test]

@@ -61,7 +61,7 @@ impl Ndm {
     }
 }
 
-fn py_message_to_core(py: Python<'_>, msg: &Py<PyAny>) -> PyResult<MessageType> {
+pub(crate) fn py_message_to_core(py: Python<'_>, msg: &Py<PyAny>) -> PyResult<MessageType> {
     if let Ok(oem) = msg.bind(py).extract::<PyRef<'_, Oem>>() {
         Ok(MessageType::Oem(oem.to_core(py)?))
     } else if let Ok(cdm) = msg.bind(py).extract::<PyRef<'_, Cdm>>() {
@@ -136,7 +136,7 @@ impl Ndm {
         Self::from_core(py, inner)
     }
 
-    /// Parse an NDM combined instantiation from a file.
+    /// Parse a combined NDM from a KVN or XML file.
     #[staticmethod]
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_file(
@@ -151,48 +151,19 @@ impl Ndm {
         Self::from_core(py, inner)
     }
 
-    /// Serialize to a string.
-    #[pyo3(signature = (format, max_output_bytes=None))]
-    fn to_str(
-        &self,
-        py: Python<'_>,
-        format: &str,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<String> {
-        let mut options = ccsds_ndm::GenerateOptions::source();
-        options.max_output_bytes = max_output_bytes;
-        let message = MessageType::Ndm(self.to_core(py)?);
-        match format {
-            "kvn" => message.to_kvn_with(&options),
-            "xml" => message.to_xml_with(&options),
-            other => return Err(crate::api::unsupported_format(other)),
-        }
-        .map_err(crate::errors::ccsds_error_to_pyerr)
+    /// Atomically write this combined NDM as KVN or XML.
+    fn to_file(&self, py: Python<'_>, path: &str, format: &str) -> PyResult<()> {
+        crate::api::generate_file(&MessageType::Ndm(self.to_core(py)?), path, format)
     }
 
-    /// Write to file.
-    ///
-    /// Parameters
-    /// ----------
-    /// path : str
-    ///     Output file path.
-    /// format : str
-    ///     Output format ('kvn' or 'xml').
-    #[pyo3(signature = (path, format, max_output_bytes=None))]
-    fn to_file(
-        &self,
-        py: Python<'_>,
-        path: &str,
-        format: &str,
-        max_output_bytes: Option<usize>,
-    ) -> PyResult<()> {
-        let data = self.to_str(py, format, max_output_bytes)?;
-        crate::api::atomic_write(path, |output| {
-            use std::io::Write;
-            output
-                .write_all(data.as_bytes())
-                .map_err(|error| pyo3::exceptions::PyOSError::new_err(error.to_string()))
-        })
+    /// Serialize to a string.
+    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+        let message = MessageType::Ndm(self.to_core(py)?);
+        match crate::api::notation(format)? {
+            ccsds_ndm::Notation::Kvn => message.to_kvn(),
+            ccsds_ndm::Notation::Xml => message.to_xml(),
+        }
+        .map_err(crate::errors::ccsds_error_to_pyerr)
     }
 
     /// List of contained navigation messages.

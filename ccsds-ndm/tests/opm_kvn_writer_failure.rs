@@ -4,7 +4,7 @@
 
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{GenerateOptions, VersionedNdm};
+use ccsds_ndm::VersionedNdm;
 use std::io::{self, Write};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
@@ -66,9 +66,7 @@ fn opm_3_kvn_writer_propagates_sink_failures_without_panicking() {
         expected.len() - 1,
     ] {
         let mut sink = FailAfter::new(limit);
-        let outcome = catch_unwind(AssertUnwindSafe(|| {
-            opm.write_kvn_to(&mut sink, &GenerateOptions::source())
-        }));
+        let outcome = catch_unwind(AssertUnwindSafe(|| opm.write_kvn_to(&mut sink)));
 
         let result = outcome.unwrap_or_else(|_| panic!("writer panicked at byte limit {limit}"));
         let error = result.unwrap_err();
@@ -86,9 +84,12 @@ fn opm_3_kvn_writer_propagates_sink_failures_without_panicking() {
             ccsds_ndm::validation::MessageKind::Opm
         );
         assert_eq!(diagnostic.field_path, None);
-        let io_error = error.as_io_error().unwrap_or_else(|| {
-            panic!("writer returned a non-I/O error at byte limit {limit}: {error}")
-        });
+        let ccsds_ndm::error::CcsdsNdmError::Generation { source, .. } = &error else {
+            panic!("writer returned an uncontextualized error: {error}");
+        };
+        let ccsds_ndm::error::CcsdsNdmError::Io(io_error) = source.as_ref() else {
+            panic!("writer returned a non-I/O error at byte limit {limit}: {error}");
+        };
 
         assert_eq!(io_error.kind(), io::ErrorKind::BrokenPipe);
         assert_eq!(io_error.to_string(), "deliberate test sink failure");

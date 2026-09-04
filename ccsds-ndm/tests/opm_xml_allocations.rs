@@ -1,6 +1,6 @@
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{GenerateOptions, VersionedNdm};
+use ccsds_ndm::VersionedNdm;
 use stats_alloc::{Region, StatsAlloc, INSTRUMENTED_SYSTEM};
 use std::alloc::System;
 use std::hint::black_box;
@@ -22,23 +22,9 @@ fn opm_xml_generation_has_bounded_allocations() {
     let mut streamed = Vec::with_capacity(expected_len);
     let streaming_region = Region::new(GLOBAL);
     black_box(&opm)
-        .write_xml_to(
-            black_box(&mut streamed),
-            black_box(&GenerateOptions::source()),
-        )
+        .write_xml_to(black_box(&mut streamed))
         .unwrap();
     let streaming_stats = streaming_region.change();
-    black_box(&streamed);
-
-    streamed.clear();
-    let limited_region = Region::new(GLOBAL);
-    black_box(&opm)
-        .write_xml_to(
-            black_box(&mut streamed),
-            black_box(&GenerateOptions::source().with_max_output_bytes(expected_len)),
-        )
-        .unwrap();
-    let limited_stats = limited_region.change();
     black_box(&streamed);
 
     assert!(
@@ -48,9 +34,5 @@ fn opm_xml_generation_has_bounded_allocations() {
     assert!(
         streaming_stats.allocations <= 60 && streaming_stats.bytes_allocated <= 30_000,
         "streaming XML allocation budget regressed: {streaming_stats:?}"
-    );
-    assert!(
-        limited_stats.allocations <= 120 && limited_stats.bytes_allocated <= 60_000,
-        "limited streaming XML allocation budget regressed: {limited_stats:?}"
     );
 }

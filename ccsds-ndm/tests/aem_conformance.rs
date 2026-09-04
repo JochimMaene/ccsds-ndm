@@ -4,7 +4,7 @@ use std::process::Command;
 
 use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{GenerateOptions, VersionedNdm};
+use ccsds_ndm::VersionedNdm;
 use tempfile::NamedTempFile;
 
 const KVN: &str = include_str!("../data/kvn/aem_g4.kvn");
@@ -13,6 +13,20 @@ const XML: &str = include_str!("../data/xml/aem_g13.xml");
 
 fn repository_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
+}
+
+#[test]
+fn aem_xml_emits_canonical_uppercase_attitude_types() {
+    let lowercase = XML
+        .replace("QUATERNION/DERIVATIVE", "quaternion/derivative")
+        .replace("QUATERNION/ANGVEL", "quaternion/angvel")
+        .replace("QUATERNION", "quaternion");
+    let generated = Aem::from_xml(&lowercase).unwrap().to_xml().unwrap();
+
+    for value in ["QUATERNION", "QUATERNION/DERIVATIVE", "QUATERNION/ANGVEL"] {
+        assert!(generated.contains(&format!("<ATTITUDE_TYPE>{value}</ATTITUDE_TYPE>")));
+    }
+    assert!(!generated.contains("<ATTITUDE_TYPE>quaternion"));
 }
 
 #[test]
@@ -146,9 +160,7 @@ fn every_kvn_generation_gate_rejects_invalid_state_before_output() {
         assert!(message.to_kvn().is_err(), "materialized accepted {label}");
         let mut output = Vec::new();
         assert!(
-            message
-                .write_kvn_to(&mut output, &GenerateOptions::source())
-                .is_err(),
+            message.write_kvn_to(&mut output).is_err(),
             "streaming accepted {label}"
         );
         assert!(output.is_empty(), "streaming wrote bytes for {label}");

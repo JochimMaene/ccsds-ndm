@@ -17,7 +17,7 @@ use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::{
     CalendarEpoch, Epoch, InterpolationDegree, Position, PositionUnits, Velocity, VelocityUnits,
 };
-use ccsds_ndm::{GenerateOptions, VersionedNdm};
+use ccsds_ndm::VersionedNdm;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::hint::black_box;
 use std::num::NonZeroU32;
@@ -392,12 +392,11 @@ fn bench_xml_generate_opm(c: &mut Criterion) {
         b.iter(|| black_box(&opm).to_xml().unwrap())
     });
 
-    let options = GenerateOptions::source();
     let mut output = Vec::with_capacity(output_bytes as usize);
     group.bench_function("streaming", |b| {
         b.iter(|| {
             output.clear();
-            black_box(&opm).write_xml_to(&mut output, &options).unwrap();
+            black_box(&opm).write_xml_to(&mut output).unwrap();
             black_box(&output);
         })
     });
