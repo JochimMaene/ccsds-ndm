@@ -170,6 +170,74 @@ class TestOem:
         data.state_vector_numpy = new_state
         assert np.allclose(data.state_vector_numpy, new_state)
 
+    def test_state_accessors_read_only_the_state_history(self):
+        # Both histories are exposed as plain Python lists, so either can be left
+        # holding an object of the wrong type. Reading one history used to rebuild
+        # the whole data section, which let an unrelated malformed covariance
+        # record break state-vector access.
+        data = self._numpy_data()
+        data.covariance_matrix.append("not a covariance matrix")
+        assert data.state_vector_numpy.shape == (2, 6)
+        assert len(data.state_vector_epochs) == 2
+
+        data.state_vector.append("not a state vector")
+        for accessor in ("state_vector_numpy", "state_vector_epochs"):
+            with pytest.raises(ValueError, match=r"state_vector\[2\]"):
+                getattr(data, accessor)
+
+    def test_covariance_accessors_read_only_the_covariance_history(self):
+        data = self._numpy_data()
+        data.state_vector.append("not a state vector")
+        assert data.covariance_matrix_numpy.shape == (1, 6, 6)
+        assert len(data.covariance_matrix_epochs) == 1
+
+        data.covariance_matrix.append("not a covariance matrix")
+        for accessor in ("covariance_matrix_numpy", "covariance_matrix_epochs"):
+            with pytest.raises(ValueError, match=r"covariance_matrix\[1\]"):
+                getattr(data, accessor)
+
+    def _numpy_data(self):
+        return OemData.from_numpy(
+            state_vector_epochs=["2023-01-01T00:00:00", "2023-01-01T00:01:00"],
+            state_vector_numpy=np.array(
+                [
+                    [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0],
+                    [7001.0, 0.1, 0.2, 0.0, 7.5, 0.0],
+                ],
+                dtype=float,
+            ),
+            covariance_matrix_epochs=["2023-01-01T00:00:00"],
+            covariance_matrix_numpy=np.eye(6, dtype=float).reshape(1, 6, 6),
+        )
+
+    def test_mixed_accelerations_produce_nine_columns_with_nan_gaps(self):
+        # The array width is shared by the whole history, so a single record
+        # carrying accelerations widens the array and the records without them
+        # are padded with NaN rather than dropped or zero-filled.
+        common = dict(x=7000.0, y=0.0, z=0.0, x_dot=0.0, y_dot=7.5, z_dot=0.0)
+        without = StateVectorAcc(epoch="2023-01-01T00:00:00", **common)
+        with_accel = StateVectorAcc(
+            epoch="2023-01-01T00:01:00",
+            x_ddot=1e-6,
+            y_ddot=2e-6,
+            z_ddot=3e-6,
+            **common,
+        )
+
+        data = OemData(state_vectors=[without, with_accel], comments=None)
+        array = data.state_vector_numpy
+
+        assert array.shape == (2, 9)
+        assert np.all(np.isnan(array[0, 6:]))
+        assert np.allclose(array[1, 6:], [1e-6, 2e-6, 3e-6])
+        # The six always-present columns must survive the widening unchanged.
+        assert np.allclose(array[0, :6], [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
+        assert np.allclose(array[1, :6], [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
+
+    def test_empty_state_history_keeps_the_six_column_shape(self):
+        data = OemData(state_vectors=[], comments=None)
+        assert data.state_vector_numpy.shape == (0, 6)
+
     def test_full_covariance_inputs_read_the_lower_triangle(self):
         # Filter output is symmetric only to within rounding, so the upper triangle is ignored
         # rather than compared for equality.

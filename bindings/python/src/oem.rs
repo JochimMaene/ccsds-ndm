@@ -14,6 +14,7 @@ use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyReadonlyArrayDyn, PyUnt
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3::PyClass;
 
 use std::num::NonZeroU32;
 
@@ -112,6 +113,31 @@ fn build_covariance_matrix(
             units: None,
         },
     }
+}
+
+/// Visit every record of a single history list.
+///
+/// The read-only accessors below each concern one history, so they must not
+/// depend on the other history being well formed, and must not rebuild the
+/// whole data section just to read numbers out of it.
+fn visit_records<T, F>(
+    list: &Py<PyList>,
+    py: Python<'_>,
+    field: &str,
+    type_name: &str,
+    mut visit: F,
+) -> PyResult<()>
+where
+    T: PyClass,
+    F: FnMut(&T),
+{
+    for (index, value) in list.bind(py).iter().enumerate() {
+        let record = value
+            .extract::<PyRef<'_, T>>()
+            .map_err(|_| PyValueError::new_err(format!("{field}[{index}] must be {type_name}")))?;
+        visit(&record);
+    }
+    Ok(())
 }
 
 fn full_covariance_values(
@@ -1253,12 +1279,15 @@ impl OemData {
     /// :type: list[str]
     #[getter]
     fn get_state_vector_epochs(&self, py: Python<'_>) -> PyResult<Vec<String>> {
-        Ok(self
-            .to_core(py)?
-            .state_vector
-            .iter()
-            .map(|sv| sv.epoch.as_str().to_string())
-            .collect())
+        let mut epochs = Vec::with_capacity(self.state_vector.bind(py).len());
+        visit_records(
+            &self.state_vector,
+            py,
+            "state_vector",
+            "StateVectorAcc",
+            |state: &StateVectorAcc| epochs.push(state.inner.epoch.as_str().to_string()),
+        )?;
+        Ok(epochs)
     }
 
     #[setter]
@@ -1353,12 +1382,15 @@ impl OemData {
     /// :type: list[str]
     #[getter]
     fn get_covariance_matrix_epochs(&self, py: Python<'_>) -> PyResult<Vec<String>> {
-        Ok(self
-            .to_core(py)?
-            .covariance_matrix
-            .iter()
-            .map(|cm| cm.epoch.as_str().to_string())
-            .collect())
+        let mut epochs = Vec::with_capacity(self.covariance_matrix.bind(py).len());
+        visit_records(
+            &self.covariance_matrix,
+            py,
+            "covariance_matrix",
+            "OemCovarianceMatrix",
+            |matrix: &OemCovarianceMatrix| epochs.push(matrix.inner.epoch.as_str().to_string()),
+        )?;
+        Ok(epochs)
     }
 
     #[setter]
@@ -1437,31 +1469,54 @@ impl OemData {
     /// :type: numpy.ndarray
     #[getter]
     fn get_state_vector_numpy<'py>(&self, py: Python<'py>) -> PyResult<Py<PyAny>> {
-        let core = self.to_core(py)?;
-        let has_accel = core
-            .state_vector
-            .iter()
-            .any(|sv| sv.x_ddot.is_some() || sv.y_ddot.is_some() || sv.z_ddot.is_some());
+        let count = self.state_vector.bind(py).len();
+        // Whether the array is six or nine columns wide is only known once every
+        // record has been seen, but walking the Python list is the expensive part
+        // and is worth doing exactly once. Accelerations are therefore collected
+        // alongside the always-present columns and merged in afterwards, so the
+        // common six-column case hands NumPy an exactly sized buffer.
+        //
+        // The buffer's capacity matters as well as its length: `PyArray::from_vec`
+        // takes ownership of the allocation rather than copying it, so any excess
+        // capacity would stay resident for as long as the array is alive.
+        let mut states = Vec::with_capacity(count * 6);
+        let mut accelerations = Vec::with_capacity(count * 3);
+        let mut has_accel = false;
+        visit_records(
+            &self.state_vector,
+            py,
+            "state_vector",
+            "StateVectorAcc",
+            |state: &StateVectorAcc| {
+                let sv = &state.inner;
+                states.push(sv.x.value);
+                states.push(sv.y.value);
+                states.push(sv.z.value);
+                states.push(sv.x_dot.value);
+                states.push(sv.y_dot.value);
+                states.push(sv.z_dot.value);
+                has_accel |= sv.x_ddot.is_some() || sv.y_ddot.is_some() || sv.z_ddot.is_some();
+                accelerations.push(sv.x_ddot.as_ref().map_or(f64::NAN, |a| a.value));
+                accelerations.push(sv.y_ddot.as_ref().map_or(f64::NAN, |a| a.value));
+                accelerations.push(sv.z_ddot.as_ref().map_or(f64::NAN, |a| a.value));
+            },
+        )?;
 
-        let num_cols = if has_accel { 9 } else { 6 };
-        let mut data = Vec::with_capacity(core.state_vector.len() * num_cols);
-
-        for sv in &core.state_vector {
-            data.push(sv.x.value);
-            data.push(sv.y.value);
-            data.push(sv.z.value);
-            data.push(sv.x_dot.value);
-            data.push(sv.y_dot.value);
-            data.push(sv.z_dot.value);
-            if has_accel {
-                data.push(sv.x_ddot.as_ref().map_or(f64::NAN, |a| a.value));
-                data.push(sv.y_ddot.as_ref().map_or(f64::NAN, |a| a.value));
-                data.push(sv.z_ddot.as_ref().map_or(f64::NAN, |a| a.value));
-            }
+        if !has_accel {
+            drop(accelerations);
+            let array = PyArray::from_vec(py, states).reshape([count, 6])?;
+            return Ok(array.into());
         }
-        let array = PyArray::from_vec(py, data)
-            .reshape([core.state_vector.len(), num_cols])
-            .unwrap();
+
+        // Records without accelerations contribute NaN, so that the column layout
+        // stays uniform across the history.
+        let mut data = Vec::with_capacity(count * 9);
+        for row in 0..count {
+            data.extend_from_slice(&states[row * 6..row * 6 + 6]);
+            data.extend_from_slice(&accelerations[row * 3..row * 3 + 3]);
+        }
+
+        let array = PyArray::from_vec(py, data).reshape([count, 9])?;
         Ok(array.into())
     }
 
@@ -1578,60 +1633,66 @@ impl OemData {
     /// :type: numpy.ndarray
     #[getter]
     fn get_covariance_matrix_numpy<'py>(&self, py: Python<'py>) -> PyResult<Py<PyAny>> {
-        let core = self.to_core(py)?;
-        let num_matrices = core.covariance_matrix.len();
+        let num_matrices = self.covariance_matrix.bind(py).len();
         // 6x6 matrix = 36 elements per epoch
         let mut data = Vec::with_capacity(num_matrices * 36);
 
-        for cm in &core.covariance_matrix {
-            // Row 0 (X)
-            data.push(cm.cx_x.value); // 0,0
-            data.push(cm.cy_x.value); // 0,1
-            data.push(cm.cz_x.value); // 0,2
-            data.push(cm.cx_dot_x.value); // 0,3
-            data.push(cm.cy_dot_x.value); // 0,4
-            data.push(cm.cz_dot_x.value); // 0,5
+        visit_records(
+            &self.covariance_matrix,
+            py,
+            "covariance_matrix",
+            "OemCovarianceMatrix",
+            |matrix: &OemCovarianceMatrix| {
+                let cm = &matrix.inner;
+                // Row 0 (X)
+                data.push(cm.cx_x.value); // 0,0
+                data.push(cm.cy_x.value); // 0,1
+                data.push(cm.cz_x.value); // 0,2
+                data.push(cm.cx_dot_x.value); // 0,3
+                data.push(cm.cy_dot_x.value); // 0,4
+                data.push(cm.cz_dot_x.value); // 0,5
 
-            // Row 1 (Y)
-            data.push(cm.cy_x.value); // 1,0 (Symmetric)
-            data.push(cm.cy_y.value); // 1,1
-            data.push(cm.cz_y.value); // 1,2
-            data.push(cm.cx_dot_y.value); // 1,3
-            data.push(cm.cy_dot_y.value); // 1,4
-            data.push(cm.cz_dot_y.value); // 1,5
+                // Row 1 (Y)
+                data.push(cm.cy_x.value); // 1,0 (Symmetric)
+                data.push(cm.cy_y.value); // 1,1
+                data.push(cm.cz_y.value); // 1,2
+                data.push(cm.cx_dot_y.value); // 1,3
+                data.push(cm.cy_dot_y.value); // 1,4
+                data.push(cm.cz_dot_y.value); // 1,5
 
-            // Row 2 (Z)
-            data.push(cm.cz_x.value); // 2,0 (Symmetric)
-            data.push(cm.cz_y.value); // 2,1 (Symmetric)
-            data.push(cm.cz_z.value); // 2,2
-            data.push(cm.cx_dot_z.value); // 2,3
-            data.push(cm.cy_dot_z.value); // 2,4
-            data.push(cm.cz_dot_z.value); // 2,5
+                // Row 2 (Z)
+                data.push(cm.cz_x.value); // 2,0 (Symmetric)
+                data.push(cm.cz_y.value); // 2,1 (Symmetric)
+                data.push(cm.cz_z.value); // 2,2
+                data.push(cm.cx_dot_z.value); // 2,3
+                data.push(cm.cy_dot_z.value); // 2,4
+                data.push(cm.cz_dot_z.value); // 2,5
 
-            // Row 3 (X_DOT)
-            data.push(cm.cx_dot_x.value); // 3,0 (Symmetric)
-            data.push(cm.cx_dot_y.value); // 3,1 (Symmetric)
-            data.push(cm.cx_dot_z.value); // 3,2 (Symmetric)
-            data.push(cm.cx_dot_x_dot.value); // 3,3
-            data.push(cm.cy_dot_x_dot.value); // 3,4
-            data.push(cm.cz_dot_x_dot.value); // 3,5
+                // Row 3 (X_DOT)
+                data.push(cm.cx_dot_x.value); // 3,0 (Symmetric)
+                data.push(cm.cx_dot_y.value); // 3,1 (Symmetric)
+                data.push(cm.cx_dot_z.value); // 3,2 (Symmetric)
+                data.push(cm.cx_dot_x_dot.value); // 3,3
+                data.push(cm.cy_dot_x_dot.value); // 3,4
+                data.push(cm.cz_dot_x_dot.value); // 3,5
 
-            // Row 4 (Y_DOT)
-            data.push(cm.cy_dot_x.value); // 4,0 (Symmetric)
-            data.push(cm.cy_dot_y.value); // 4,1 (Symmetric)
-            data.push(cm.cy_dot_z.value); // 4,2 (Symmetric)
-            data.push(cm.cy_dot_x_dot.value); // 4,3 (Symmetric)
-            data.push(cm.cy_dot_y_dot.value); // 4,4
-            data.push(cm.cz_dot_y_dot.value); // 4,5
+                // Row 4 (Y_DOT)
+                data.push(cm.cy_dot_x.value); // 4,0 (Symmetric)
+                data.push(cm.cy_dot_y.value); // 4,1 (Symmetric)
+                data.push(cm.cy_dot_z.value); // 4,2 (Symmetric)
+                data.push(cm.cy_dot_x_dot.value); // 4,3 (Symmetric)
+                data.push(cm.cy_dot_y_dot.value); // 4,4
+                data.push(cm.cz_dot_y_dot.value); // 4,5
 
-            // Row 5 (Z_DOT)
-            data.push(cm.cz_dot_x.value); // 5,0 (Symmetric)
-            data.push(cm.cz_dot_y.value); // 5,1 (Symmetric)
-            data.push(cm.cz_dot_z.value); // 5,2 (Symmetric)
-            data.push(cm.cz_dot_x_dot.value); // 5,3 (Symmetric)
-            data.push(cm.cz_dot_y_dot.value); // 5,4 (Symmetric)
-            data.push(cm.cz_dot_z_dot.value); // 5,5
-        }
+                // Row 5 (Z_DOT)
+                data.push(cm.cz_dot_x.value); // 5,0 (Symmetric)
+                data.push(cm.cz_dot_y.value); // 5,1 (Symmetric)
+                data.push(cm.cz_dot_z.value); // 5,2 (Symmetric)
+                data.push(cm.cz_dot_x_dot.value); // 5,3 (Symmetric)
+                data.push(cm.cz_dot_y_dot.value); // 5,4 (Symmetric)
+                data.push(cm.cz_dot_z_dot.value); // 5,5
+            },
+        )?;
 
         let array = PyArray::from_vec(py, data).reshape([num_matrices, 6, 6])?;
         Ok(array.into())
