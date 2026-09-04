@@ -385,7 +385,12 @@ fn validate_xml_sequences(xml: &str) -> Result<()> {
                     | b"sensorData"
                     | b"USER_DEFINED"
             );
-            Some(XmlSequenceRule { rank, repeatable })
+            // `userDefinedType` wraps its children in a repeating sequence, so a COMMENT may
+            // open a new iteration after a USER_DEFINED.
+            if parent == b"user" {
+                return Some(XmlSequenceRule::restarting(rank, repeatable));
+            }
+            Some(XmlSequenceRule::new(rank, repeatable))
         },
         |element, attribute| {
             (attribute == b"parameter" && element == b"USER_DEFINED")

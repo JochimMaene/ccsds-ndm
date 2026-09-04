@@ -88,7 +88,7 @@ fn validate_xml_sequences(xml: &str) -> Result<()> {
             let children = cdm_xml_children(parent)?;
             let rank = children.iter().position(|candidate| *candidate == child)? as u16;
             let repeatable = child == b"COMMENT" || (parent == b"body" && child == b"segment");
-            Some(XmlSequenceRule { rank, repeatable })
+            Some(XmlSequenceRule::new(rank, repeatable))
         },
         |element, attribute| {
             attribute == b"units"

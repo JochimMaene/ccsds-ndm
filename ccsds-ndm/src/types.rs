@@ -4150,7 +4150,7 @@ impl std::fmt::Display for AngVelFrameType {
 /// Allow for the exchange of any desired orbital data not already provided in the message.
 ///
 /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4 (OPM), Section 4.2.4 (OMM), Section 6.2.9 (OCM).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UserDefined {
     /// Comments (see 7.8 for formatting rules).
@@ -4165,6 +4165,48 @@ pub struct UserDefined {
         skip_serializing_if = "Vec::is_empty"
     )]
     pub user_defined: Vec<UserDefinedParameter>,
+}
+
+/// `userDefinedType` wraps its children in an unbounded `xsd:sequence`, so COMMENT and
+/// USER_DEFINED may alternate and each keyword can reappear after the other. The derived
+/// implementation treats the second run of a keyword as a duplicate field, so the two runs are
+/// accumulated by hand instead. Ordering between the two lists is not part of the model.
+impl<'de> Deserialize<'de> for UserDefined {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["COMMENT", "USER_DEFINED"];
+
+        struct UserDefinedVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for UserDefinedVisitor {
+            type Value = UserDefined;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("a USER DEFINED PARAMETERS block")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> std::result::Result<UserDefined, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut block = UserDefined::default();
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "COMMENT" => block.comment.extend(map.next_value::<Vec<String>>()?),
+                        "USER_DEFINED" => block
+                            .user_defined
+                            .extend(map.next_value::<Vec<UserDefinedParameter>>()?),
+                        other => return Err(serde::de::Error::unknown_field(other, FIELDS)),
+                    }
+                }
+                Ok(block)
+            }
+        }
+
+        deserializer.deserialize_map(UserDefinedVisitor)
+    }
 }
 
 /// Single USER_DEFINED parameter.

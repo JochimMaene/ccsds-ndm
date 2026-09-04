@@ -239,13 +239,23 @@ fn validate_xml_sequences(xml: &str) -> Result<()> {
     const USER_DEFINED: &[&[u8]] = &[b"COMMENT", b"USER_DEFINED"];
 
     fn in_sequence(child: &[u8], sequence: &[&[u8]]) -> Option<XmlSequenceRule> {
+        rank_of(child, sequence)
+            .map(|rank| XmlSequenceRule::new(rank, matches!(child, b"COMMENT" | b"USER_DEFINED")))
+    }
+
+    /// `userDefinedType` wraps its children in a repeating sequence, so a COMMENT may open a new
+    /// iteration after a USER_DEFINED.
+    fn in_repeating_sequence(child: &[u8], sequence: &[&[u8]]) -> Option<XmlSequenceRule> {
+        rank_of(child, sequence).map(|rank| {
+            XmlSequenceRule::restarting(rank, matches!(child, b"COMMENT" | b"USER_DEFINED"))
+        })
+    }
+
+    fn rank_of(child: &[u8], sequence: &[&[u8]]) -> Option<u16> {
         sequence
             .iter()
             .position(|candidate| *candidate == child)
-            .map(|rank| XmlSequenceRule {
-                rank: rank as u16,
-                repeatable: matches!(child, b"COMMENT" | b"USER_DEFINED"),
-            })
+            .map(|rank| rank as u16)
     }
 
     crate::xml::validate_element_sequences(
@@ -264,7 +274,7 @@ fn validate_xml_sequences(xml: &str) -> Result<()> {
             b"covarianceMatrix" => in_sequence(child, COVARIANCE),
             b"spacecraftParameters" => in_sequence(child, SPACECRAFT),
             b"odParameters" => in_sequence(child, OD),
-            b"userDefinedParameters" => in_sequence(child, USER_DEFINED),
+            b"userDefinedParameters" => in_repeating_sequence(child, USER_DEFINED),
             _ => None,
         },
         |element, attribute| match attribute {

@@ -23,7 +23,7 @@ This inventory records maintainer evidence for standalone OMM 3.0. The
 | Valid input and preservation | All three shipped KVN fixtures and the shipped XML fixture parse through the public strict API. Generated KVN and XML reparse to the same typed model. |
 | XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. |
 | Numeric values in every block | Validation rejects non-finite values in the mean-elements, spacecraft, TLE, and covariance blocks before either notation is generated, and restates the `inclinationType` range that the typed wrapper enforces only in its constructor. Schema range facets are comparisons, which NaN passes, so finiteness is checked in its own right. |
-| KVN number spelling | The shared ODM state-vector and covariance writers emit ODM 7.7.1 numbers, so generated KVN reparses instead of carrying `Display` spellings such as `0.30000000000000004`. |
+| KVN number spelling | Every OMM floating-point field — mean elements, spacecraft parameters, TLE parameters, and the shared covariance block — is written through the ODM 7.7.1 number writer, so generated KVN reparses instead of carrying `Display` spellings such as `0.30000000000000004`. Values whose shortest round-tripping spelling would not fit are rejected before generation rather than emitted. |
 | Shared resource and surface contract | `family_contract`, `family_generation_evidence`, the Python options tests, and family Criterion matrices provide the common bounded parsing/generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
 
 The existing OMM unit suite separately covers the mean-elements choice, TLE theory-dependent

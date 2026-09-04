@@ -90,7 +90,7 @@ fn validate_xml_sequences(xml: &str) -> Result<()> {
             let rank = children.iter().position(|candidate| *candidate == child)? as u16;
             let repeatable =
                 child == b"COMMENT" || child == b"segment" || child == b"attitudeState";
-            Some(XmlSequenceRule { rank, repeatable })
+            Some(XmlSequenceRule::new(rank, repeatable))
         },
         |element, attribute| {
             attribute == b"units"

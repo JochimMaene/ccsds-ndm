@@ -170,7 +170,6 @@ pub mod nullable {
                 // Store values as JSON so numeric-like text can be retyped for structured targets.
                 let mut values = JsonMap::new();
                 let mut nil = false;
-                let mut has_non_nil_attribute = false;
                 let mut text_val = None;
 
                 while let Some(key) = map.next_key::<String>()? {
@@ -189,7 +188,6 @@ pub mod nullable {
                             values.insert("$value".to_string(), JsonValue::String(v));
                         }
                     } else {
-                        has_non_nil_attribute = true;
                         let v: String = map.next_value()?;
                         if let Ok(json_value) = serde_json::from_str::<JsonValue>(&v) {
                             values.insert(key, json_value);
@@ -199,12 +197,12 @@ pub mod nullable {
                     }
                 }
 
+                // A nilled element is absent regardless of what else it carries. XSD lets a
+                // nillable element keep its attributes, and the schemas use that: `MASS`,
+                // `TRUE_ANOMALY` and friends may be spelled `<MASS units="kg" xsi:nil="true"/>`.
+                // Which attributes are legal on which element is the envelope validator's call,
+                // so accepting them here is not a gap.
                 if nil {
-                    if has_non_nil_attribute {
-                        return Err(de::Error::custom(
-                            "a nil optional value cannot carry additional attributes",
-                        ));
-                    }
                     return Ok(None);
                 }
                 if values.is_empty() {
@@ -342,12 +340,19 @@ mod tests {
     }
 
     #[test]
-    fn nullable_does_not_discard_attributes_on_absent_values() {
-        for json in [
-            r#"{ "duration_field": { "@nil": "true", "@units": "km" } }"#,
-            r#"{ "duration_field": { "@units": "km" } }"#,
-        ] {
-            assert!(serde_json::from_str::<NullableDurationWrapper>(json).is_err());
-        }
+    fn nullable_accepts_attributes_alongside_nil() {
+        // XSD lets a nillable element keep its attributes, and the ODM schemas use that: a
+        // nilled element is absent no matter what else it carries.
+        let json = r#"{ "duration_field": { "@nil": "true", "@units": "s" } }"#;
+        let w: NullableDurationWrapper = serde_json::from_str(json).unwrap();
+        assert_eq!(w.duration_field, None);
+    }
+
+    #[test]
+    fn nullable_does_not_discard_attributes_on_a_valueless_element() {
+        // Without `nil` the element is present, so an unusable attribute set is an error rather
+        // than a silently absent value.
+        let json = r#"{ "duration_field": { "@units": "km" } }"#;
+        assert!(serde_json::from_str::<NullableDurationWrapper>(json).is_err());
     }
 }

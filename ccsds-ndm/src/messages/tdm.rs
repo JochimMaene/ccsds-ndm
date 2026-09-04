@@ -144,7 +144,7 @@ impl Tdm {
 fn validate_xml_sequences(xml: &str) -> Result<()> {
     use crate::xml::XmlSequenceRule;
 
-    let rule = |rank, repeatable| XmlSequenceRule { rank, repeatable };
+    let rule = |rank, repeatable| XmlSequenceRule::new(rank, repeatable);
     crate::xml::validate_element_sequences(
         xml,
         "TDM",

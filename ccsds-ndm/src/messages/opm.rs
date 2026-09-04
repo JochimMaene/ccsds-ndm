@@ -388,11 +388,17 @@ fn validate_xml_envelope(
         sequence
             .iter()
             .position(|candidate| *candidate == child)
-            .map(|rank| XmlSequenceRule {
-                rank: rank as u16,
-                repeatable: child == b"COMMENT"
+            .map(|rank| {
+                let repeatable = child == b"COMMENT"
                     || child == b"maneuverParameters"
-                    || child == b"USER_DEFINED",
+                    || child == b"USER_DEFINED";
+                // `userDefinedType` wraps its children in a repeating sequence, so a COMMENT
+                // may open a new iteration after a USER_DEFINED.
+                if parent == b"userDefinedParameters" {
+                    XmlSequenceRule::restarting(rank as u16, repeatable)
+                } else {
+                    XmlSequenceRule::new(rank as u16, repeatable)
+                }
             })
     }
 
@@ -628,113 +634,7 @@ impl Opm {
         }
 
         if let Some(covariance) = &data.covariance_matrix {
-            for (field, value, path) in [
-                (
-                    "CX_X",
-                    covariance.cx_x.value,
-                    "body.segment.data.covariance_matrix.cx_x",
-                ),
-                (
-                    "CY_X",
-                    covariance.cy_x.value,
-                    "body.segment.data.covariance_matrix.cy_x",
-                ),
-                (
-                    "CY_Y",
-                    covariance.cy_y.value,
-                    "body.segment.data.covariance_matrix.cy_y",
-                ),
-                (
-                    "CZ_X",
-                    covariance.cz_x.value,
-                    "body.segment.data.covariance_matrix.cz_x",
-                ),
-                (
-                    "CZ_Y",
-                    covariance.cz_y.value,
-                    "body.segment.data.covariance_matrix.cz_y",
-                ),
-                (
-                    "CZ_Z",
-                    covariance.cz_z.value,
-                    "body.segment.data.covariance_matrix.cz_z",
-                ),
-                (
-                    "CX_DOT_X",
-                    covariance.cx_dot_x.value,
-                    "body.segment.data.covariance_matrix.cx_dot_x",
-                ),
-                (
-                    "CX_DOT_Y",
-                    covariance.cx_dot_y.value,
-                    "body.segment.data.covariance_matrix.cx_dot_y",
-                ),
-                (
-                    "CX_DOT_Z",
-                    covariance.cx_dot_z.value,
-                    "body.segment.data.covariance_matrix.cx_dot_z",
-                ),
-                (
-                    "CX_DOT_X_DOT",
-                    covariance.cx_dot_x_dot.value,
-                    "body.segment.data.covariance_matrix.cx_dot_x_dot",
-                ),
-                (
-                    "CY_DOT_X",
-                    covariance.cy_dot_x.value,
-                    "body.segment.data.covariance_matrix.cy_dot_x",
-                ),
-                (
-                    "CY_DOT_Y",
-                    covariance.cy_dot_y.value,
-                    "body.segment.data.covariance_matrix.cy_dot_y",
-                ),
-                (
-                    "CY_DOT_Z",
-                    covariance.cy_dot_z.value,
-                    "body.segment.data.covariance_matrix.cy_dot_z",
-                ),
-                (
-                    "CY_DOT_X_DOT",
-                    covariance.cy_dot_x_dot.value,
-                    "body.segment.data.covariance_matrix.cy_dot_x_dot",
-                ),
-                (
-                    "CY_DOT_Y_DOT",
-                    covariance.cy_dot_y_dot.value,
-                    "body.segment.data.covariance_matrix.cy_dot_y_dot",
-                ),
-                (
-                    "CZ_DOT_X",
-                    covariance.cz_dot_x.value,
-                    "body.segment.data.covariance_matrix.cz_dot_x",
-                ),
-                (
-                    "CZ_DOT_Y",
-                    covariance.cz_dot_y.value,
-                    "body.segment.data.covariance_matrix.cz_dot_y",
-                ),
-                (
-                    "CZ_DOT_Z",
-                    covariance.cz_dot_z.value,
-                    "body.segment.data.covariance_matrix.cz_dot_z",
-                ),
-                (
-                    "CZ_DOT_X_DOT",
-                    covariance.cz_dot_x_dot.value,
-                    "body.segment.data.covariance_matrix.cz_dot_x_dot",
-                ),
-                (
-                    "CZ_DOT_Y_DOT",
-                    covariance.cz_dot_y_dot.value,
-                    "body.segment.data.covariance_matrix.cz_dot_y_dot",
-                ),
-                (
-                    "CZ_DOT_Z_DOT",
-                    covariance.cz_dot_z_dot.value,
-                    "body.segment.data.covariance_matrix.cz_dot_z_dot",
-                ),
-            ] {
+            for (field, value, path) in covariance.kvn_numbers() {
                 check(field, value, path)?;
             }
         }

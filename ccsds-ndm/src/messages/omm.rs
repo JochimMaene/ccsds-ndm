@@ -5,7 +5,7 @@
 use crate::common::{OdmHeader, OpmCovarianceMatrix, SpacecraftParameters};
 use crate::error::{EnumParseError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
-use crate::kvn::ser::KvnWriter;
+use crate::kvn::ser::{KvnWriter, OdmFloat};
 use crate::traits::{Ndm, ToKvn, Validate};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
@@ -171,6 +171,151 @@ pub struct TleToOmmOptions {
     pub creation_date: Option<CalendarEpoch>,
 }
 
+impl Omm {
+    /// Reject values that KVN generation could not spell back to the same number.
+    ///
+    /// The schema types these fields as plain doubles, so range and finiteness checks let through
+    /// magnitudes whose shortest round-tripping spelling exceeds the 16 significant digits and
+    /// 255-character line that ODM 7.7.1 allows. Catching them here keeps generation from
+    /// emitting a document this library would refuse to read back.
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        fn check(field: &'static str, value: f64, path: &'static str) -> Result<()> {
+            if OdmFloat::is_valid(value) {
+                return Ok(());
+            }
+            Err(ValidationError::InvalidValue {
+                field: field.into(),
+                value: value.to_string(),
+                expected: "a representable CCSDS number".into(),
+                line: None,
+            }
+            .at_path(path)
+            .into())
+        }
+
+        let data = &self.body.segment.data;
+        let elements = &data.mean_elements;
+        check(
+            "ECCENTRICITY",
+            elements.eccentricity.value,
+            "body.segment.data.mean_elements.eccentricity",
+        )?;
+        check(
+            "INCLINATION",
+            elements.inclination.angle.value,
+            "body.segment.data.mean_elements.inclination",
+        )?;
+        check(
+            "RA_OF_ASC_NODE",
+            elements.ra_of_asc_node.value,
+            "body.segment.data.mean_elements.ra_of_asc_node",
+        )?;
+        check(
+            "ARG_OF_PERICENTER",
+            elements.arg_of_pericenter.value,
+            "body.segment.data.mean_elements.arg_of_pericenter",
+        )?;
+        check(
+            "MEAN_ANOMALY",
+            elements.mean_anomaly.value,
+            "body.segment.data.mean_elements.mean_anomaly",
+        )?;
+        for (field, value, path) in [
+            (
+                "SEMI_MAJOR_AXIS",
+                elements.semi_major_axis.as_ref().map(|v| v.value),
+                "body.segment.data.mean_elements.semi_major_axis",
+            ),
+            (
+                "MEAN_MOTION",
+                elements.mean_motion.as_ref().map(|v| v.value),
+                "body.segment.data.mean_elements.mean_motion",
+            ),
+            (
+                "GM",
+                elements.gm.as_ref().map(|v| v.value),
+                "body.segment.data.mean_elements.gm",
+            ),
+        ] {
+            let Some(value) = value else { continue };
+            check(field, value, path)?;
+        }
+        if let Some(parameters) = &data.spacecraft_parameters {
+            for (field, value, path) in [
+                (
+                    "MASS",
+                    parameters.mass.as_ref().map(|v| v.value),
+                    "body.segment.data.spacecraft_parameters.mass",
+                ),
+                (
+                    "SOLAR_RAD_AREA",
+                    parameters.solar_rad_area.as_ref().map(|v| v.value),
+                    "body.segment.data.spacecraft_parameters.solar_rad_area",
+                ),
+                (
+                    "SOLAR_RAD_COEFF",
+                    parameters.solar_rad_coeff.as_ref().map(|v| v.value),
+                    "body.segment.data.spacecraft_parameters.solar_rad_coeff",
+                ),
+                (
+                    "DRAG_AREA",
+                    parameters.drag_area.as_ref().map(|v| v.value),
+                    "body.segment.data.spacecraft_parameters.drag_area",
+                ),
+                (
+                    "DRAG_COEFF",
+                    parameters.drag_coeff.as_ref().map(|v| v.value),
+                    "body.segment.data.spacecraft_parameters.drag_coeff",
+                ),
+            ] {
+                let Some(value) = value else { continue };
+                check(field, value, path)?;
+            }
+        }
+
+        if let Some(tle) = &data.tle_parameters {
+            for (field, value, path) in [
+                (
+                    "BSTAR",
+                    tle.bstar.as_ref().map(|v| v.value),
+                    "body.segment.data.tle_parameters.bstar",
+                ),
+                (
+                    "BTERM",
+                    tle.bterm.as_ref().map(|v| v.value),
+                    "body.segment.data.tle_parameters.bterm",
+                ),
+                (
+                    "MEAN_MOTION_DOT",
+                    Some(tle.mean_motion_dot.value),
+                    "body.segment.data.tle_parameters.mean_motion_dot",
+                ),
+                (
+                    "MEAN_MOTION_DDOT",
+                    tle.mean_motion_ddot.as_ref().map(|v| v.value),
+                    "body.segment.data.tle_parameters.mean_motion_ddot",
+                ),
+                (
+                    "AGOM",
+                    tle.agom.as_ref().map(|v| v.value),
+                    "body.segment.data.tle_parameters.agom",
+                ),
+            ] {
+                let Some(value) = value else { continue };
+                check(field, value, path)?;
+            }
+        }
+
+        if let Some(covariance) = &data.covariance_matrix {
+            for (field, value, path) in covariance.kvn_numbers() {
+                check(field, value, path)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
 impl crate::traits::Validate for Omm {
     fn validate(&self) -> Result<()> {
         crate::versioning::validate_root(
@@ -212,7 +357,10 @@ impl Ndm for Omm {
 fn validate_xml_sequences(xml: &str) -> Result<()> {
     use crate::xml::XmlSequenceRule;
 
-    let rule = |rank, repeatable| XmlSequenceRule { rank, repeatable };
+    let rule = |rank, repeatable| XmlSequenceRule::new(rank, repeatable);
+    // `userDefinedType` wraps its children in a repeating sequence, so a COMMENT may open a new
+    // iteration after a USER_DEFINED.
+    let repeating = |rank, repeatable| XmlSequenceRule::restarting(rank, repeatable);
     crate::xml::validate_element_sequences(
         xml,
         "OMM",
@@ -289,8 +437,8 @@ fn validate_xml_sequences(xml: &str) -> Result<()> {
                 (b"covarianceMatrix", b"CZ_DOT_X_DOT") => rule(20, false),
                 (b"covarianceMatrix", b"CZ_DOT_Y_DOT") => rule(21, false),
                 (b"covarianceMatrix", b"CZ_DOT_Z_DOT") => rule(22, false),
-                (b"userDefinedParameters", b"COMMENT") => rule(0, true),
-                (b"userDefinedParameters", b"USER_DEFINED") => rule(1, true),
+                (b"userDefinedParameters", b"COMMENT") => repeating(0, true),
+                (b"userDefinedParameters", b"USER_DEFINED") => repeating(1, true),
                 _ => return None,
             })
         },
@@ -729,19 +877,19 @@ impl ToKvn for OmmData {
         if let Some(sp) = &self.spacecraft_parameters {
             writer.write_comments(&sp.comment);
             if let Some(v) = &sp.mass {
-                writer.write_measure("MASS", &v.to_unit_value());
+                writer.write_odm_float_measure("MASS", &v.to_unit_value());
             }
             if let Some(v) = &sp.solar_rad_area {
-                writer.write_measure("SOLAR_RAD_AREA", &v.to_unit_value());
+                writer.write_odm_float_measure("SOLAR_RAD_AREA", &v.to_unit_value());
             }
             if let Some(v) = &sp.solar_rad_coeff {
-                writer.write_pair("SOLAR_RAD_COEFF", v);
+                writer.write_odm_float_pair("SOLAR_RAD_COEFF", v.value);
             }
             if let Some(v) = &sp.drag_area {
-                writer.write_measure("DRAG_AREA", &v.to_unit_value());
+                writer.write_odm_float_measure("DRAG_AREA", &v.to_unit_value());
             }
             if let Some(v) = &sp.drag_coeff {
-                writer.write_pair("DRAG_COEFF", v);
+                writer.write_odm_float_pair("DRAG_COEFF", v.value);
             }
         }
 
@@ -1052,18 +1200,19 @@ impl ToKvn for MeanElements {
         writer.write_comments(&self.comment);
         writer.write_pair("EPOCH", self.epoch);
         if let Some(v) = &self.semi_major_axis {
-            writer.write_measure("SEMI_MAJOR_AXIS", v);
+            writer.write_odm_float_measure("SEMI_MAJOR_AXIS", v);
         }
         if let Some(v) = &self.mean_motion {
-            writer.write_measure("MEAN_MOTION", v);
+            writer.write_odm_float_measure("MEAN_MOTION", v);
         }
-        writer.write_pair("ECCENTRICITY", self.eccentricity);
-        writer.write_measure("INCLINATION", &self.inclination.to_unit_value());
-        writer.write_measure("RA_OF_ASC_NODE", &self.ra_of_asc_node.to_unit_value());
-        writer.write_measure("ARG_OF_PERICENTER", &self.arg_of_pericenter.to_unit_value());
-        writer.write_measure("MEAN_ANOMALY", &self.mean_anomaly.to_unit_value());
+        writer.write_odm_float_pair("ECCENTRICITY", self.eccentricity.value);
+        writer.write_odm_float_measure("INCLINATION", &self.inclination.to_unit_value());
+        writer.write_odm_float_measure("RA_OF_ASC_NODE", &self.ra_of_asc_node.to_unit_value());
+        writer
+            .write_odm_float_measure("ARG_OF_PERICENTER", &self.arg_of_pericenter.to_unit_value());
+        writer.write_odm_float_measure("MEAN_ANOMALY", &self.mean_anomaly.to_unit_value());
         if let Some(v) = &self.gm {
-            writer.write_measure("GM", &UnitValue::new(v.value, v.units.clone()));
+            writer.write_odm_float_measure("GM", &UnitValue::new(v.value, v.units.clone()));
         }
     }
 }
@@ -1217,17 +1366,17 @@ impl ToKvn for TleParameters {
             writer.write_pair("REV_AT_EPOCH", v);
         }
         if let Some(v) = &self.bstar {
-            writer.write_measure("BSTAR", v);
+            writer.write_odm_float_measure("BSTAR", v);
         }
         if let Some(v) = &self.bterm {
-            writer.write_measure("BTERM", v);
+            writer.write_odm_float_measure("BTERM", v);
         }
-        writer.write_measure("MEAN_MOTION_DOT", &self.mean_motion_dot);
+        writer.write_odm_float_measure("MEAN_MOTION_DOT", &self.mean_motion_dot);
         if let Some(v) = &self.mean_motion_ddot {
-            writer.write_measure("MEAN_MOTION_DDOT", v);
+            writer.write_odm_float_measure("MEAN_MOTION_DDOT", v);
         }
         if let Some(v) = &self.agom {
-            writer.write_measure("AGOM", v);
+            writer.write_odm_float_measure("AGOM", v);
         }
     }
 }

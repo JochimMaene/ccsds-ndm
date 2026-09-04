@@ -2024,6 +2024,122 @@ pub struct OpmCovarianceMatrix {
     pub cz_dot_z_dot: VelocityCovariance,
 }
 
+impl OpmCovarianceMatrix {
+    /// Every covariance entry paired with its KVN keyword and its path in the message model.
+    ///
+    /// The OPM and the OMM both carry this block at `body.segment.data.covariance_matrix`, so a
+    /// single table serves the representability checks of both.
+    pub(crate) fn kvn_numbers(&self) -> [(&'static str, f64, &'static str); 21] {
+        [
+            (
+                "CX_X",
+                self.cx_x.value,
+                "body.segment.data.covariance_matrix.cx_x",
+            ),
+            (
+                "CY_X",
+                self.cy_x.value,
+                "body.segment.data.covariance_matrix.cy_x",
+            ),
+            (
+                "CY_Y",
+                self.cy_y.value,
+                "body.segment.data.covariance_matrix.cy_y",
+            ),
+            (
+                "CZ_X",
+                self.cz_x.value,
+                "body.segment.data.covariance_matrix.cz_x",
+            ),
+            (
+                "CZ_Y",
+                self.cz_y.value,
+                "body.segment.data.covariance_matrix.cz_y",
+            ),
+            (
+                "CZ_Z",
+                self.cz_z.value,
+                "body.segment.data.covariance_matrix.cz_z",
+            ),
+            (
+                "CX_DOT_X",
+                self.cx_dot_x.value,
+                "body.segment.data.covariance_matrix.cx_dot_x",
+            ),
+            (
+                "CX_DOT_Y",
+                self.cx_dot_y.value,
+                "body.segment.data.covariance_matrix.cx_dot_y",
+            ),
+            (
+                "CX_DOT_Z",
+                self.cx_dot_z.value,
+                "body.segment.data.covariance_matrix.cx_dot_z",
+            ),
+            (
+                "CX_DOT_X_DOT",
+                self.cx_dot_x_dot.value,
+                "body.segment.data.covariance_matrix.cx_dot_x_dot",
+            ),
+            (
+                "CY_DOT_X",
+                self.cy_dot_x.value,
+                "body.segment.data.covariance_matrix.cy_dot_x",
+            ),
+            (
+                "CY_DOT_Y",
+                self.cy_dot_y.value,
+                "body.segment.data.covariance_matrix.cy_dot_y",
+            ),
+            (
+                "CY_DOT_Z",
+                self.cy_dot_z.value,
+                "body.segment.data.covariance_matrix.cy_dot_z",
+            ),
+            (
+                "CY_DOT_X_DOT",
+                self.cy_dot_x_dot.value,
+                "body.segment.data.covariance_matrix.cy_dot_x_dot",
+            ),
+            (
+                "CY_DOT_Y_DOT",
+                self.cy_dot_y_dot.value,
+                "body.segment.data.covariance_matrix.cy_dot_y_dot",
+            ),
+            (
+                "CZ_DOT_X",
+                self.cz_dot_x.value,
+                "body.segment.data.covariance_matrix.cz_dot_x",
+            ),
+            (
+                "CZ_DOT_Y",
+                self.cz_dot_y.value,
+                "body.segment.data.covariance_matrix.cz_dot_y",
+            ),
+            (
+                "CZ_DOT_Z",
+                self.cz_dot_z.value,
+                "body.segment.data.covariance_matrix.cz_dot_z",
+            ),
+            (
+                "CZ_DOT_X_DOT",
+                self.cz_dot_x_dot.value,
+                "body.segment.data.covariance_matrix.cz_dot_x_dot",
+            ),
+            (
+                "CZ_DOT_Y_DOT",
+                self.cz_dot_y_dot.value,
+                "body.segment.data.covariance_matrix.cz_dot_y_dot",
+            ),
+            (
+                "CZ_DOT_Z_DOT",
+                self.cz_dot_z_dot.value,
+                "body.segment.data.covariance_matrix.cz_dot_z_dot",
+            ),
+        ]
+    }
+}
+
 /// Report whether a lower-triangular covariance keyword names a diagonal entry.
 ///
 /// The six diagonal entries are variances, so a negative value is not a producer rounding

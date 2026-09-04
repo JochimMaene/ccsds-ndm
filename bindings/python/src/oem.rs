@@ -124,16 +124,10 @@ fn full_covariance_values(
         None => values[[row, column]],
     };
 
-    for row in 1..6 {
-        for column in 0..row {
-            if get(row, column) != get(column, row) {
-                return Err(PyValueError::new_err(format!(
-                    "Covariance matrix must be symmetric; entries [{row},{column}] and [{column},{row}] differ"
-                )));
-            }
-        }
-    }
-
+    // A CCSDS covariance is lower-triangular, and the matrices callers pass in come out of
+    // numerical filters where `P` is symmetric only to within rounding. Comparing the two
+    // triangles for equality would reject those, so the lower triangle is authoritative and the
+    // upper one is not read.
     let mut lower = [0.0; 21];
     let mut index = 0;
     for row in 0..6 {
@@ -374,7 +368,8 @@ impl OemData {
 ///     Epoch of the covariance matrix (ISO 8601).
 ///     values : numpy.ndarray
 ///     NumPy array of shape (21,) containing the lower-triangular values, or (6,6) for
-///     a full symmetric matrix.
+///     a full symmetric matrix. Only the lower triangle of a (6,6) input is read, so a
+///     matrix that is symmetric only to within rounding is accepted as-is.
 /// cov_ref_frame : str, optional
 ///     Reference frame for the covariance matrix.
 /// comment : list[str], optional

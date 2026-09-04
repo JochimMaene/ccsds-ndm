@@ -1390,12 +1390,14 @@ fn validate_oem_xml_envelope(
         sequence
             .iter()
             .position(|candidate| *candidate == child)
-            .map(|rank| XmlSequenceRule {
-                rank: rank as u16,
-                repeatable: matches!(
-                    child,
-                    b"COMMENT" | b"segment" | b"stateVector" | b"covarianceMatrix"
-                ),
+            .map(|rank| {
+                XmlSequenceRule::new(
+                    rank as u16,
+                    matches!(
+                        child,
+                        b"COMMENT" | b"segment" | b"stateVector" | b"covarianceMatrix"
+                    ),
+                )
             })
     }
 

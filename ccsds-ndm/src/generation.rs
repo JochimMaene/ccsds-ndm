@@ -209,8 +209,8 @@ impl VersionedNdm for crate::messages::acm::Acm {
 }
 
 impl_versioned_ndm!(crate::messages::apm::Apm, Apm);
-impl_versioned_ndm!(crate::messages::omm::Omm, Omm);
 
+impl_versioned_ndm!(crate::messages::omm::Omm, Omm, kvn_representability);
 impl_versioned_ndm!(crate::messages::cdm::Cdm, Cdm, kvn_representability);
 impl_versioned_ndm!(crate::messages::aem::Aem, Aem, kvn_representability);
 impl_versioned_ndm!(crate::messages::ocm::Ocm, Ocm, kvn_representability);

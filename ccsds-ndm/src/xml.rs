@@ -97,6 +97,31 @@ fn validate_root_start(
 pub(crate) struct XmlSequenceRule {
     pub rank: u16,
     pub repeatable: bool,
+    /// The enclosing `xsd:sequence` carries `maxOccurs="unbounded"`, so this child opens a fresh
+    /// iteration of the group instead of regressing within the current one. `userDefinedType` is
+    /// the only such content model in the shipped schemas: it lets `COMMENT` follow
+    /// `USER_DEFINED`.
+    pub restarts_sequence: bool,
+}
+
+impl XmlSequenceRule {
+    /// A child of a plain `xsd:sequence`, which every sibling must respect in order.
+    pub(crate) fn new(rank: u16, repeatable: bool) -> Self {
+        Self {
+            rank,
+            repeatable,
+            restarts_sequence: false,
+        }
+    }
+
+    /// A child that may reopen its enclosing repeating `xsd:sequence`.
+    pub(crate) fn restarting(rank: u16, repeatable: bool) -> Self {
+        Self {
+            rank,
+            repeatable,
+            restarts_sequence: true,
+        }
+    }
 }
 
 type ChildRule<'a> = dyn Fn(&[u8], &[u8]) -> Option<XmlSequenceRule> + 'a;
@@ -322,6 +347,18 @@ fn validate_document(
                     apply_sequence_rule(parent, child, child_rule, &invalid_sequence)?;
                     count_record(&mut records, child, &rules)?;
                 }
+                // A self-closing element occupies a level even though it never opens a frame,
+                // so it has to be measured against the limit the same way a start tag is.
+                if let Some(limit) = rules.max_depth {
+                    let actual = depth + 1;
+                    if actual > limit {
+                        return Err(CcsdsNdmError::ResourceLimitExceeded {
+                            resource: "xml_depth",
+                            limit,
+                            actual,
+                        });
+                    }
+                }
             }
             Ok(Event::End(_)) => {
                 event_seen = true;
@@ -373,10 +410,11 @@ fn validate_document(
                 String::from_utf8_lossy(parent.name.as_bytes())
             ))
         })?;
-        if parent
-            .last_rank
-            .is_some_and(|last| rule.rank < last || (rule.rank == last && !rule.repeatable))
-        {
+        // A child of a repeating group that steps backwards is starting the next iteration of
+        // that group, not breaking the order, so only a plain sequence rejects a lower rank.
+        if parent.last_rank.is_some_and(|last| {
+            (rule.rank < last && !rule.restarts_sequence) || (rule.rank == last && !rule.repeatable)
+        }) {
             return Err(invalid(format!(
                 "duplicate or out-of-order child '{}' in '{}'",
                 String::from_utf8_lossy(child),

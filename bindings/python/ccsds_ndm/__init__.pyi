@@ -9071,7 +9071,8 @@ class OemCovarianceMatrix:
         Epoch of the covariance matrix (ISO 8601).
         values : numpy.ndarray
         NumPy array of shape (21,) containing the lower-triangular values, or (6,6) for
-        a full symmetric matrix.
+        a full symmetric matrix. Only the lower triangle of a (6,6) input is read, so a
+        matrix that is symmetric only to within rounding is accepted as-is.
     cov_ref_frame : str, optional
         Reference frame for the covariance matrix.
     comment : list[str], optional

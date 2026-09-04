@@ -257,10 +257,9 @@ impl MessageType {
         ) -> Result<()> {
             let result = generation::validate_output_version(T::KIND, message.version(), format)
                 .and_then(|()| match format {
-                    generation::OutputFormat::Kvn => {
-                        message.validate_kvn_output()?;
-                        traits::ToKvn::validate_kvn(message)
-                    }
+                    // `validate_kvn_output` is the complete KVN preflight and already runs
+                    // `ToKvn::validate_kvn`; calling it again here would double every pass.
+                    generation::OutputFormat::Kvn => message.validate_kvn_output(),
                     generation::OutputFormat::Xml => {
                         traits::Validate::validate(message)?;
                         message.validate_xml_output()
