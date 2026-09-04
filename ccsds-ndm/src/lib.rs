@@ -257,9 +257,11 @@ impl MessageType {
         ) -> Result<()> {
             let result = generation::validate_output_version(T::KIND, message.version(), format)
                 .and_then(|()| match format {
-                    // `validate_kvn_output` is the complete KVN preflight and already runs
-                    // `ToKvn::validate_kvn`; calling it again here would double every pass.
-                    generation::OutputFormat::Kvn => message.validate_kvn_output(),
+                    // A validation-only API is asking "would generation succeed?", so it runs
+                    // the model checks and the serialization pass, exactly as streaming does.
+                    generation::OutputFormat::Kvn => message
+                        .validate_kvn_model()
+                        .and_then(|()| traits::ToKvn::validate_kvn(message)),
                     generation::OutputFormat::Xml => {
                         traits::Validate::validate(message)?;
                         message.validate_xml_output()

@@ -77,7 +77,10 @@ pub(crate) fn validate_for_generation(
 pub(crate) fn to_kvn_string<T: VersionedNdm + ToKvn>(message: &T) -> Result<String> {
     (|| {
         validate_output_version(T::KIND, message.version(), OutputFormat::Kvn)?;
-        message.validate_kvn_output()?;
+        message.validate_kvn_model()?;
+        // One pass only. The dry run this replaces was a second render into `io::sink()` whose
+        // sole outcome was `finish_io`'s lexical check, and `finish_checked` applies that same
+        // check to the real pass -- returning an error instead of the string, so nothing leaks.
         let mut writer = crate::kvn::ser::KvnWriter::new();
         ToKvn::write_kvn(message, &mut writer);
         writer.finish_checked()
@@ -89,7 +92,9 @@ pub(crate) fn to_xml_string<T: VersionedNdm>(message: &T) -> Result<String> {
     (|| {
         validate_output_version(T::KIND, message.version(), OutputFormat::Xml)?;
         message.validate()?;
-        message.validate_xml_output()?;
+        message.validate_xml_model()?;
+        // `to_string` applies the same XML 1.0 character check as the preflight and returns an
+        // error instead of a string, so a second counting pass would only double the work.
         crate::xml::to_string(message)
     })()
     .map_err(|error| generation_error(error, T::KIND, OutputFormat::Xml, message.version()))
@@ -105,18 +110,32 @@ pub trait VersionedNdm: Ndm {
     /// Return the edition stored on the message.
     fn version(&self) -> &str;
 
-    /// Apply message-specific XML lexical checks before serialization.
+    /// Model-level XML checks: representability and lexical constraints read off the model.
+    ///
+    /// Excludes the serialization preflight, so buffered generation can serialize exactly once.
+    #[doc(hidden)]
+    fn validate_xml_model(&self) -> Result<()> {
+        Ok(())
+    }
+
+    /// The full XML preflight: model checks plus a serialization pass that never emits bytes.
+    ///
+    /// Streaming needs this because it writes to the caller's sink directly.
     #[doc(hidden)]
     fn validate_xml_output(&self) -> Result<()> {
+        self.validate_xml_model()?;
         crate::xml::validate_output_text(self)
     }
 
-    /// The complete KVN preflight: model validation plus every notation-specific constraint.
+    /// Model-level KVN checks: semantic validation plus any representability constraint.
     ///
-    /// Both KVN entry points run this exactly once and nothing else, so streaming never emits
-    /// bytes for a message that would fail validation. Implementors own the whole check.
+    /// This deliberately excludes the serialization dry run. Buffered generation runs these
+    /// checks and then serializes exactly once, because `finish_checked` applies the same
+    /// lexical check to the real pass that the dry run applied to a throwaway one. Streaming
+    /// still runs the dry run: it writes to the caller's sink directly, so it needs the
+    /// separate pass to guarantee an invalid message emits zero bytes.
     #[doc(hidden)]
-    fn validate_kvn_output(&self) -> Result<()> {
+    fn validate_kvn_model(&self) -> Result<()> {
         self.validate()
     }
 
@@ -137,7 +156,10 @@ pub trait VersionedNdm: Ndm {
 fn stream_kvn<T: VersionedNdm + ToKvn, W: Write>(message: &T, output: &mut W) -> Result<()> {
     (|| {
         validate_output_version(T::KIND, message.version(), OutputFormat::Kvn)?;
-        message.validate_kvn_output()?;
+        message.validate_kvn_model()?;
+        // Streaming writes straight to the caller's sink, so the dry run is what buys the
+        // documented guarantee that an invalid message emits zero bytes.
+        ToKvn::validate_kvn(message)?;
         let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
         ToKvn::write_kvn(message, &mut writer);
         writer.finish_io()
@@ -154,9 +176,8 @@ macro_rules! impl_versioned_ndm {
                 &self.version
             }
 
-            fn validate_kvn_output(&self) -> Result<()> {
-                self.validate()?;
-                ToKvn::validate_kvn(self)
+            fn validate_kvn_model(&self) -> Result<()> {
+                self.validate()
             }
 
             fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
@@ -172,10 +193,9 @@ macro_rules! impl_versioned_ndm {
                 &self.version
             }
 
-            fn validate_kvn_output(&self) -> Result<()> {
+            fn validate_kvn_model(&self) -> Result<()> {
                 self.validate()?;
-                self.validate_kvn_representability()?;
-                ToKvn::validate_kvn(self)
+                self.validate_kvn_representability()
             }
 
             fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
@@ -192,15 +212,13 @@ impl VersionedNdm for crate::messages::acm::Acm {
         &self.version
     }
 
-    fn validate_kvn_output(&self) -> Result<()> {
+    fn validate_kvn_model(&self) -> Result<()> {
         self.validate()?;
-        self.validate_kvn_representability()?;
-        ToKvn::validate_kvn(self)
+        self.validate_kvn_representability()
     }
 
-    fn validate_xml_output(&self) -> Result<()> {
-        self.validate_xml_representability()?;
-        crate::xml::validate_output_text(self)
+    fn validate_xml_model(&self) -> Result<()> {
+        self.validate_xml_representability()
     }
 
     fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
@@ -224,12 +242,22 @@ impl VersionedNdm for crate::messages::opm::Opm {
         &self.version
     }
 
-    fn validate_xml_output(&self) -> Result<()> {
+    fn validate_xml_model(&self) -> Result<()> {
         self.validate_xml_text()
     }
 
-    fn validate_kvn_output(&self) -> Result<()> {
+    // The model walk above covers every text value this family can emit, so neither entry point
+    // runs a serialization preflight. Streaming XML writes the prolog before serializing, so it
+    // never promised zero bytes here in the first place.
+    fn validate_xml_output(&self) -> Result<()> {
+        self.validate_xml_model()
+    }
+
+    fn validate_kvn_model(&self) -> Result<()> {
         self.validate()?;
+        // OPM's `validate_kvn` walks the model -- it derives line lengths from key and value
+        // widths rather than rendering -- so it is a model check, not a serialization preflight,
+        // and buffered generation still needs it.
         ToKvn::validate_kvn(self)
     }
 
@@ -245,13 +273,20 @@ impl VersionedNdm for crate::messages::oem::Oem {
         &self.version
     }
 
-    fn validate_xml_output(&self) -> Result<()> {
+    fn validate_xml_model(&self) -> Result<()> {
         self.validate_xml_text()
     }
 
-    fn validate_kvn_output(&self) -> Result<()> {
-        // OEM validates each record as it renders it, so its ToKvn pass is already complete.
-        ToKvn::validate_kvn(self)
+    // The model walk above covers every text value this family can emit, so neither entry point
+    // runs a serialization preflight. Streaming XML writes the prolog before serializing, so it
+    // never promised zero bytes here in the first place.
+    fn validate_xml_output(&self) -> Result<()> {
+        self.validate_xml_model()
+    }
+
+    fn validate_kvn_model(&self) -> Result<()> {
+        // OEM has no separate model pass: its render pass validates every record as it emits it.
+        Ok(())
     }
 
     fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
