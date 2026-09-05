@@ -4,8 +4,8 @@
 
 use crate::common::{parse_object_description, ObjectDescription, OdParameters};
 use ccsds_ndm::messages::cdm as core_cdm;
-use ccsds_ndm::traits::Validate;
 use ccsds_ndm::types::{self as core_types, *};
+use ccsds_ndm::Validate;
 use numpy::{PyArray1, PyArray2, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -294,22 +294,18 @@ impl Cdm {
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
     fn from_file(
         py: Python<'_>,
-        path: &str,
+        path: std::path::PathBuf,
         format: Option<&str>,
         max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
         let options = crate::api::parse_options(max_input_bytes, None);
-        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        let inner = crate::api::parse_typed_file_with_options(&path, format, &options)?;
         Self::from_core(py, inner)
     }
 
     /// Atomically write this CDM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: &str, format: &str) -> PyResult<()> {
-        crate::api::generate_file(
-            &ccsds_ndm::MessageType::Cdm(self.to_core(py)?),
-            path,
-            format,
-        )
+    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+        crate::api::generate_file(&ccsds_ndm::Message::Cdm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to validated KVN or XML.

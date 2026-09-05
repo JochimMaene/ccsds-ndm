@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use crate::common::parse_object_description;
 use crate::common::OdmHeader;
-use crate::common::{parse_object_description, parse_time_system};
 use crate::types::{parse_calendar_epoch, parse_epoch};
 use ccsds_ndm::messages::ocm as core_ocm;
 use ccsds_ndm::types::Duration;
@@ -99,23 +99,19 @@ impl Ocm {
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_file(
         py: Python<'_>,
-        path: &str,
+        path: std::path::PathBuf,
         format: Option<&str>,
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
         let options = crate::api::parse_options(max_input_bytes, max_records);
-        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        let inner = crate::api::parse_typed_file_with_options(&path, format, &options)?;
         Self::from_core(py, inner)
     }
 
     /// Atomically write this OCM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: &str, format: &str) -> PyResult<()> {
-        crate::api::generate_file(
-            &ccsds_ndm::MessageType::Ocm(self.to_core(py)?),
-            path,
-            format,
-        )
+    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+        crate::api::generate_file(&ccsds_ndm::Message::Ocm(self.to_core(py)?), &path, format)
     }
 
     /// Create a new OCM message.
@@ -473,7 +469,7 @@ impl OcmMetadata {
     #[allow(clippy::too_many_arguments)]
     fn new(
         epoch_tzero: String,
-        time_system: Option<Bound<'_, PyAny>>,
+        time_system: Option<String>,
         object_name: Option<String>,
 
         international_designator: Option<String>,
@@ -524,10 +520,7 @@ impl OcmMetadata {
     ) -> PyResult<Self> {
         use ccsds_ndm::types::{DayInterval, TimeOffset};
 
-        let time_system = match time_system {
-            Some(ref ob) => parse_time_system(ob)?,
-            None => "UTC".to_string(),
-        };
+        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
 
         let object_type_enum = match object_type {
             Some(ref ob) => Some(parse_object_description(ob)?),

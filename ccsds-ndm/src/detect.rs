@@ -4,7 +4,7 @@
 
 use crate::error::{CcsdsNdmError, Result};
 use crate::options::ParseOptions;
-use crate::MessageType;
+use crate::Message;
 use winnow::ascii::multispace1;
 use winnow::combinator::{alt, repeat};
 use winnow::error::{ContextError, ErrMode};
@@ -77,7 +77,7 @@ pub(crate) fn detect_notation_bytes(input: &[u8]) -> Result<Notation> {
     }
 }
 
-pub(crate) fn detect_message_type(s: &str) -> Result<MessageType> {
+pub(crate) fn detect_message_type(s: &str) -> Result<Message> {
     detect_message_type_with_options(s, None, &ParseOptions::default())
 }
 
@@ -85,7 +85,7 @@ pub(crate) fn detect_message_type_with_options(
     s: &str,
     notation: Option<Notation>,
     options: &ParseOptions,
-) -> Result<MessageType> {
+) -> Result<Message> {
     let input = without_utf8_bom(s);
     let notation = notation.map_or_else(|| detect_notation(input), Ok)?;
     let result = match notation {
@@ -246,42 +246,46 @@ impl NdmKind {
         }
     }
 
-    fn parse_kvn(self, input: &str, options: &ParseOptions) -> Result<MessageType> {
+    fn parse_kvn(self, input: &str, options: &ParseOptions) -> Result<Message> {
         match self {
-            Self::Opm => crate::messages::opm::Opm::from_kvn_with_options(input, options)
-                .map(MessageType::Opm),
-            Self::Omm => crate::traits::Ndm::from_kvn(input).map(MessageType::Omm),
-            Self::Oem => crate::messages::oem::Oem::from_kvn_with_options(input, options)
-                .map(MessageType::Oem),
-            Self::Ocm => crate::traits::Ndm::from_kvn(input).map(MessageType::Ocm),
-            Self::Acm => crate::traits::Ndm::from_kvn(input).map(MessageType::Acm),
-            Self::Cdm => crate::traits::Ndm::from_kvn(input).map(MessageType::Cdm),
-            Self::Tdm => crate::traits::Ndm::from_kvn(input).map(MessageType::Tdm),
-            Self::Rdm => crate::traits::Ndm::from_kvn(input).map(MessageType::Rdm),
-            Self::Aem => crate::traits::Ndm::from_kvn(input).map(MessageType::Aem),
-            Self::Apm => crate::traits::Ndm::from_kvn(input).map(MessageType::Apm),
+            Self::Opm => {
+                crate::messages::opm::Opm::from_kvn_with_options(input, options).map(Message::Opm)
+            }
+            Self::Omm => crate::traits::Ndm::from_kvn(input).map(Message::Omm),
+            Self::Oem => {
+                crate::messages::oem::Oem::from_kvn_with_options(input, options).map(Message::Oem)
+            }
+            Self::Ocm => crate::traits::Ndm::from_kvn(input).map(Message::Ocm),
+            Self::Acm => crate::traits::Ndm::from_kvn(input).map(Message::Acm),
+            Self::Cdm => crate::traits::Ndm::from_kvn(input).map(Message::Cdm),
+            Self::Tdm => crate::traits::Ndm::from_kvn(input).map(Message::Tdm),
+            Self::Rdm => crate::traits::Ndm::from_kvn(input).map(Message::Rdm),
+            Self::Aem => crate::traits::Ndm::from_kvn(input).map(Message::Aem),
+            Self::Apm => crate::traits::Ndm::from_kvn(input).map(Message::Apm),
             Self::Ndm => Err(CcsdsNdmError::UnsupportedMessage(
                 "combined NDM is detected from multiple KVN headers".into(),
             )),
         }
     }
 
-    fn parse_xml(self, input: &str, options: &ParseOptions) -> Result<MessageType> {
+    fn parse_xml(self, input: &str, options: &ParseOptions) -> Result<Message> {
         match self {
-            Self::Opm => crate::messages::opm::Opm::from_xml_with_options(input, options)
-                .map(MessageType::Opm),
-            Self::Oem => crate::messages::oem::Oem::from_xml_with_options(input, options)
-                .map(MessageType::Oem),
-            Self::Omm => crate::traits::Ndm::from_xml(input).map(MessageType::Omm),
-            Self::Ocm => crate::traits::Ndm::from_xml(input).map(MessageType::Ocm),
-            Self::Acm => crate::traits::Ndm::from_xml(input).map(MessageType::Acm),
-            Self::Cdm => crate::traits::Ndm::from_xml(input).map(MessageType::Cdm),
-            Self::Tdm => crate::traits::Ndm::from_xml(input).map(MessageType::Tdm),
-            Self::Rdm => crate::traits::Ndm::from_xml(input).map(MessageType::Rdm),
-            Self::Aem => crate::traits::Ndm::from_xml(input).map(MessageType::Aem),
-            Self::Apm => crate::traits::Ndm::from_xml(input).map(MessageType::Apm),
+            Self::Opm => {
+                crate::messages::opm::Opm::from_xml_with_options(input, options).map(Message::Opm)
+            }
+            Self::Oem => {
+                crate::messages::oem::Oem::from_xml_with_options(input, options).map(Message::Oem)
+            }
+            Self::Omm => crate::traits::Ndm::from_xml(input).map(Message::Omm),
+            Self::Ocm => crate::traits::Ndm::from_xml(input).map(Message::Ocm),
+            Self::Acm => crate::traits::Ndm::from_xml(input).map(Message::Acm),
+            Self::Cdm => crate::traits::Ndm::from_xml(input).map(Message::Cdm),
+            Self::Tdm => crate::traits::Ndm::from_xml(input).map(Message::Tdm),
+            Self::Rdm => crate::traits::Ndm::from_xml(input).map(Message::Rdm),
+            Self::Aem => crate::traits::Ndm::from_xml(input).map(Message::Aem),
+            Self::Apm => crate::traits::Ndm::from_xml(input).map(Message::Apm),
             Self::Ndm => crate::messages::ndm::CombinedNdm::from_xml_with_options(input, options)
-                .map(MessageType::Ndm),
+                .map(Message::Ndm),
         }
     }
 }
@@ -343,7 +347,7 @@ fn parse_kvn_kind(input: &mut &str) -> PResult<NdmKind> {
 }
 
 /// Detects and parses KVN message type
-fn detect_kvn_type(s: &str, options: &ParseOptions) -> Result<MessageType> {
+fn detect_kvn_type(s: &str, options: &ParseOptions) -> Result<Message> {
     // We need a mutable slice for winnow, but we don't want to consume "s" for the final parsing.
     let mut input = s;
     let kind = parse_kvn_kind
@@ -377,7 +381,7 @@ fn detect_kvn_type(s: &str, options: &ParseOptions) -> Result<MessageType> {
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 
-fn detect_xml_type(s: &str, options: &ParseOptions) -> Result<MessageType> {
+fn detect_xml_type(s: &str, options: &ParseOptions) -> Result<Message> {
     let mut reader = Reader::from_str(s);
     reader.config_mut().trim_text_start = true;
     reader.config_mut().trim_text_end = true;

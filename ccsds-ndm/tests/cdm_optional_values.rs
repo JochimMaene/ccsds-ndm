@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::messages::cdm::Cdm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 
 #[test]
 fn empty_optional_kvn_values_are_none() {

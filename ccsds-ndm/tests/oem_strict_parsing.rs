@@ -1,5 +1,5 @@
 use ccsds_ndm::messages::oem::Oem;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 use ccsds_ndm::ParseOptions;
 
 const KVN_FIXTURES: [&str; 3] = [
@@ -185,8 +185,9 @@ fn input_depth_and_history_limits_are_exact() {
         .map(|segment| segment.data.state_vector.len() + segment.data.covariance_matrix.len())
         .sum();
 
-    Oem::from_xml_with_options(
+    ccsds_ndm::from_str_with_options(
         XML,
+        None,
         &ParseOptions::default()
             .with_max_input_bytes(XML.len())
             .with_max_records(record_count),
@@ -199,7 +200,7 @@ fn input_depth_and_history_limits_are_exact() {
         ParseOptions::default().with_max_xml_depth(1),
     ] {
         assert!(
-            Oem::from_xml_with_options(XML, &options).is_err(),
+            ccsds_ndm::from_str_with_options(XML, None, &options).is_err(),
             "undersized resource limit was ignored"
         );
     }
@@ -244,7 +245,12 @@ fn kvn_rejects_ephemeris_records_packed_onto_one_line() {
     }
     let packed = source.replace(record, line.trim_end());
     assert!(
-        Oem::from_kvn_with_options(&packed, &ParseOptions::default().with_max_records(2)).is_err(),
+        ccsds_ndm::from_str_with_options(
+            &packed,
+            None,
+            &ParseOptions::default().with_max_records(2)
+        )
+        .is_err(),
         "packed records bypassed the max_records limit"
     );
 }

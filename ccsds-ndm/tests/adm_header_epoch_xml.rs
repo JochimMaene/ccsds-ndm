@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::messages::aem::Aem;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 
 const AEM_XML: &str = include_str!("../data/xml/aem_g11.xml");
 

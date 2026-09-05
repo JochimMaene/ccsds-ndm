@@ -1047,7 +1047,7 @@ impl<'de> Deserialize<'de> for RelativeTime {
 ///
 /// This trait provides a standardized way to parse key-value pairs from KVN files,
 /// where a value might have an associated unit in brackets (e.g., `KEY = 123.45 [km]`).
-pub trait FromKvn: Sized {
+pub(crate) trait FromKvn: Sized {
     /// Creates an instance from a KVN value string and an optional unit string.
     ///
     /// # Arguments
@@ -5355,6 +5355,18 @@ mod extra_tests {
 
         let gm = Gm::from_kvn_float(1.0, Some("KM**3/S**2")).unwrap();
         assert_eq!(gm.value, 1.0);
+    }
+
+    #[test]
+    fn required_kvn_units_accept_only_the_ccsds_unit() {
+        let position = PositionRequired::from_kvn_float(42.0, Some("km")).unwrap();
+        assert_eq!(position.units, PositionUnits::Km);
+
+        let inferred = PositionRequired::from_kvn_float(42.0, None).unwrap();
+        assert_eq!(inferred.units, PositionUnits::Km);
+
+        let error = PositionRequired::from_kvn_float(42.0, Some("m")).unwrap_err();
+        assert!(error.to_string().contains("expected one of: \"km\""));
     }
 
     #[test]

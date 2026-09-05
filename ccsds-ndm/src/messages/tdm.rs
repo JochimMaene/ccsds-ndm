@@ -82,6 +82,14 @@ impl Ndm for Tdm {
         crate::traits::Validate::validate(&tdm)?;
         Ok(tdm)
     }
+
+    fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
+        crate::generation::write_kvn_to(self, output)
+    }
+
+    fn write_xml_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
+        crate::generation::write_xml_to(self, output)
+    }
 }
 
 impl Tdm {

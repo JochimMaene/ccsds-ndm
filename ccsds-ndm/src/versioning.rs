@@ -13,7 +13,7 @@ use crate::validation::MessageKind;
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct VersionSpec {
     pub id_keyword: &'static str,
-    pub supported_versions: &'static [&'static str],
+    pub input_versions: &'static [&'static str],
     pub output_versions: &'static [&'static str],
 }
 
@@ -21,52 +21,52 @@ pub(crate) fn spec(kind: MessageKind) -> Option<VersionSpec> {
     match kind {
         MessageKind::Opm => Some(VersionSpec {
             id_keyword: "CCSDS_OPM_VERS",
-            supported_versions: &["1.0", "2.0", "3.0"],
+            input_versions: &["1.0", "2.0", "3.0"],
             output_versions: &["2.0", "3.0"],
         }),
         MessageKind::Omm => Some(VersionSpec {
             id_keyword: "CCSDS_OMM_VERS",
-            supported_versions: &["2.0", "3.0"],
+            input_versions: &["2.0", "3.0"],
             output_versions: &["2.0", "3.0"],
         }),
         MessageKind::Oem => Some(VersionSpec {
             id_keyword: "CCSDS_OEM_VERS",
-            supported_versions: &["1.0", "2.0", "3.0"],
+            input_versions: &["1.0", "2.0", "3.0"],
             output_versions: &["2.0", "3.0"],
         }),
         MessageKind::Ocm => Some(VersionSpec {
             id_keyword: "CCSDS_OCM_VERS",
-            supported_versions: &["3.0"],
+            input_versions: &["3.0"],
             output_versions: &["3.0"],
         }),
         MessageKind::Aem => Some(VersionSpec {
             id_keyword: "CCSDS_AEM_VERS",
-            supported_versions: &["1.0", "2.0"],
+            input_versions: &["1.0", "2.0"],
             output_versions: &["2.0"],
         }),
         MessageKind::Apm => Some(VersionSpec {
             id_keyword: "CCSDS_APM_VERS",
-            supported_versions: &["1.0", "2.0"],
+            input_versions: &["1.0", "2.0"],
             output_versions: &["2.0"],
         }),
         MessageKind::Acm => Some(VersionSpec {
             id_keyword: "CCSDS_ACM_VERS",
-            supported_versions: &["1.0", "2.0"],
+            input_versions: &["1.0", "2.0"],
             output_versions: &["2.0"],
         }),
         MessageKind::Cdm => Some(VersionSpec {
             id_keyword: "CCSDS_CDM_VERS",
-            supported_versions: &["1.0"],
+            input_versions: &["1.0"],
             output_versions: &["1.0"],
         }),
         MessageKind::Tdm => Some(VersionSpec {
             id_keyword: "CCSDS_TDM_VERS",
-            supported_versions: &["1.0", "2.0"],
+            input_versions: &["1.0", "2.0"],
             output_versions: &["2.0"],
         }),
         MessageKind::Rdm => Some(VersionSpec {
             id_keyword: "CCSDS_RDM_VERS",
-            supported_versions: &["1.0"],
+            input_versions: &["1.0"],
             output_versions: &["1.0"],
         }),
         MessageKind::Ndm => None,
@@ -74,8 +74,13 @@ pub(crate) fn spec(kind: MessageKind) -> Option<VersionSpec> {
 }
 
 /// Return the input editions accepted for a message family.
-pub fn supported_versions(kind: MessageKind) -> Option<&'static [&'static str]> {
-    spec(kind).map(|spec| spec.supported_versions)
+pub fn supported_input_versions(kind: MessageKind) -> Option<&'static [&'static str]> {
+    spec(kind).map(|spec| spec.input_versions)
+}
+
+/// Return the editions that can be generated for a message family.
+pub fn supported_output_versions(kind: MessageKind) -> Option<&'static [&'static str]> {
+    spec(kind).map(|spec| spec.output_versions)
 }
 
 pub(crate) fn validate_root(kind: MessageKind, id: &Option<String>, version: &str) -> Result<()> {
@@ -105,11 +110,11 @@ pub(crate) fn validate_root(kind: MessageKind, id: &Option<String>, version: &st
         }
     }
 
-    if !spec.supported_versions.contains(&version) {
+    if !spec.input_versions.contains(&version) {
         return Err(CcsdsNdmError::UnsupportedInputVersion {
             message_type: kind.as_str(),
             version: version.to_string(),
-            supported: spec.supported_versions.join(", "),
+            supported: spec.input_versions.join(", "),
         });
     }
 

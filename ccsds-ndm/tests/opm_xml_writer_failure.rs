@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::VersionedNdm;
+use ccsds_ndm::Ndm;
 use std::io::{self, Write};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 

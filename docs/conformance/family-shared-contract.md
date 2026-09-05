@@ -10,8 +10,8 @@ message-by-message normative mapping required to promote a capability cell to `v
 
 | Shared requirement | Current evidence | Remaining verification work |
 | --- | --- | --- |
-| Version-aware generation gate | Every standalone `MessageType` output dispatches through `VersionedNdm` and preserves its stored edition. | Prove each advertised edition against its exact publication and notation rules. |
-| Validated generation | String, streaming, Python, and conversion paths delegate to the Rust `Ndm` / `VersionedNdm` boundary. | Complete message-specific semantic and notation inventories, invalid-model tests, KVN golden ordering, and official-XSD generation evidence. |
+| Version-aware generation gate | Every standalone `Message` output dispatches through `Ndm` and preserves its stored edition. | Prove each advertised edition against its exact publication and notation rules. |
+| Validated generation | String, streaming, Python, and conversion paths delegate to the Rust `Ndm` boundary. | Complete message-specific semantic and notation inventories, invalid-model tests, KVN golden ordering, and official-XSD generation evidence. |
 | Bounded parsing | `ParseOptions` applies input, XML-depth, and applicable history-record limits; bounded file reads occur before full materialisation. | Establish exact record semantics and adversarial boundary cases for each history-bearing message. |
 | Structured diagnostics | Shared parsing and generation wrappers retain notation, message kind, edition context, stable resource codes, and bounded token excerpts. | Map field paths and normative requirements for each message's syntax and semantic failures. |
 | Rust/Python consistency | `family_contract` and `test_parse_and_generation_options.py` exercise generic dispatch and shared limits without per-message adapter semantics. | Add exact capability-cell surface evidence and packaged-artifact checks before advertising parity. |

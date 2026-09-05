@@ -1,7 +1,7 @@
 use ccsds_ndm::common::{OdmHeader, StateVector};
 use ccsds_ndm::messages::opm::{Opm, OpmBody, OpmData, OpmMetadata, OpmSegment};
-use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{Position, Velocity};
+use ccsds_ndm::Ndm;
 
 fn main() {
     // 1. Construct OPM using the Builder Pattern

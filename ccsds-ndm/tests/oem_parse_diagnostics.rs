@@ -1,7 +1,7 @@
 use ccsds_ndm::error::{DiagnosticNotation, DiagnosticOperation};
 use ccsds_ndm::messages::oem::Oem;
-use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::validation::MessageKind;
+use ccsds_ndm::Ndm;
 
 const KVN: &str = include_str!("../data/kvn/oem_g11.kvn");
 const XML: &str = include_str!("../data/xml/oem_g14.xml");

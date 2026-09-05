@@ -52,7 +52,7 @@ If you know the file type (e.g., OPM), you can parse it directly into the struct
    .. code-tab:: rust
 
         use ccsds_ndm::messages::opm::Opm;
-        use ccsds_ndm::traits::Ndm;
+        use ccsds_ndm::Ndm;
         use std::fs;
 
         let text = fs::read_to_string("example.opm")?;
@@ -80,9 +80,9 @@ Once parsed, you can access the nested data structures.
 
    .. code-tab:: rust
 
-        use ccsds_ndm::MessageType;
+        use ccsds_ndm::Message;
 
-        if let MessageType::Oem(oem) = ndm {
+        if let Message::Oem(oem) = ndm {
             for segment in oem.body.segment {
                 let meta = segment.metadata;
                 println!("Object: {} ({})", meta.object_name, meta.object_id);

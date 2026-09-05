@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::AdmHeader;
-use crate::common::{parse_reference_frame, parse_time_system};
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::aem as core_aem;
 use ccsds_ndm::types::{
@@ -531,11 +530,6 @@ impl Aem {
         self.id.clone()
     }
 
-    #[setter]
-    fn set_id(&mut self, value: Option<String>) {
-        self.id = value;
-    }
-
     /// The message version.
     ///
     /// :type: str
@@ -617,23 +611,19 @@ impl Aem {
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_file(
         py: Python<'_>,
-        path: &str,
+        path: std::path::PathBuf,
         format: Option<&str>,
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
         let options = crate::api::parse_options(max_input_bytes, max_records);
-        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        let inner = crate::api::parse_typed_file_with_options(&path, format, &options)?;
         Self::from_core(py, inner)
     }
 
     /// Atomically write this AEM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: &str, format: &str) -> PyResult<()> {
-        crate::api::generate_file(
-            &ccsds_ndm::MessageType::Aem(self.to_core(py)?),
-            path,
-            format,
-        )
+    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+        crate::api::generate_file(&ccsds_ndm::Message::Aem(self.to_core(py)?), &path, format)
     }
 }
 
@@ -737,11 +727,11 @@ impl AemMetadata {
     fn new(
         object_name: String,
         object_id: String,
-        ref_frame_a: Option<Bound<'_, PyAny>>,
-        ref_frame_b: Option<Bound<'_, PyAny>>,
+        ref_frame_a: Option<String>,
+        ref_frame_b: Option<String>,
         start_time: Option<String>,
         stop_time: Option<String>,
-        time_system: Option<Bound<'_, PyAny>>,
+        time_system: Option<String>,
         attitude_type: String,
         center_name: Option<String>,
         useable_start_time: Option<String>,
@@ -754,18 +744,9 @@ impl AemMetadata {
     ) -> PyResult<Self> {
         use std::num::NonZeroU32;
 
-        let time_system = match time_system {
-            Some(ref ob) => parse_time_system(ob)?,
-            None => "UTC".to_string(),
-        };
-        let ref_frame_a = match ref_frame_a {
-            Some(ref ob) => parse_reference_frame(ob)?,
-            None => "GCRF".to_string(),
-        };
-        let ref_frame_b = match ref_frame_b {
-            Some(ref ob) => parse_reference_frame(ob)?,
-            None => "GCRF".to_string(),
-        };
+        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
+        let ref_frame_a = ref_frame_a.unwrap_or_else(|| "GCRF".to_string());
+        let ref_frame_b = ref_frame_b.unwrap_or_else(|| "GCRF".to_string());
         let start_time =
             start_time.ok_or_else(|| PyValueError::new_err("start_time is required"))?;
         let stop_time = stop_time.ok_or_else(|| PyValueError::new_err("stop_time is required"))?;
@@ -898,9 +879,8 @@ impl AemMetadata {
     }
 
     #[setter]
-    fn set_ref_frame_a(&mut self, value: Bound<'_, PyAny>) -> PyResult<()> {
-        self.inner.ref_frame_a = parse_reference_frame(&value)?;
-        Ok(())
+    fn set_ref_frame_a(&mut self, value: String) {
+        self.inner.ref_frame_a = value;
     }
 
     /// Name of the reference frame that defines the end point of the transformation. The set of
@@ -915,9 +895,8 @@ impl AemMetadata {
     }
 
     #[setter]
-    fn set_ref_frame_b(&mut self, value: Bound<'_, PyAny>) -> PyResult<()> {
-        self.inner.ref_frame_b = parse_reference_frame(&value)?;
-        Ok(())
+    fn set_ref_frame_b(&mut self, value: String) {
+        self.inner.ref_frame_b = value;
     }
 
     /// Time system used for both attitude ephemeris data and metadata. The set of allowed values
@@ -932,9 +911,8 @@ impl AemMetadata {
     }
 
     #[setter]
-    fn set_time_system(&mut self, value: Bound<'_, PyAny>) -> PyResult<()> {
-        self.inner.time_system = parse_time_system(&value)?;
-        Ok(())
+    fn set_time_system(&mut self, value: String) {
+        self.inner.time_system = value;
     }
 
     /// Start of TOTAL time span covered by attitude ephemeris data immediately following this

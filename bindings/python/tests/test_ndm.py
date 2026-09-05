@@ -20,7 +20,7 @@ from ccsds_ndm import (
     CdmMetadata,
     CdmSegment,
     CdmStateVector,
-    Ndm,
+    CombinedNdm,
     NdmValidationError,
     OdmHeader,  # Correct header for OEM
     Oem,
@@ -156,7 +156,7 @@ class TestNdm:
             str(root / "ccsds-ndm/data/xml/tdm_e21.xml"), format="xml"
         )
 
-        combined = Ndm([tdm])
+        combined = CombinedNdm([tdm])
 
         assert isinstance(combined.messages[0], Tdm)
 
@@ -171,7 +171,7 @@ class TestNdm:
         assert parsed.value.notation == "kvn"
         assert parsed.value.message_kind == "ndm"
 
-        ndm = Ndm(messages=[self._create_valid_cdm()])
+        ndm = CombinedNdm(messages=[self._create_valid_cdm()])
 
         with pytest.raises(ccsds_ndm.NdmUnsupportedNotationError) as generated:
             ndm.to_str(format="kvn")
@@ -185,26 +185,26 @@ class TestNdm:
         opm = (root / "ccsds-ndm/data/kvn/opm_g1.kvn").read_text()
 
         for format_hint in (None, "kvn"):
-            with pytest.raises(ValueError, match="different CCSDS NDM message type"):
-                Ndm.from_str(opm, format=format_hint)
+            with pytest.raises(ValueError, match="expected NDM, found OPM"):
+                CombinedNdm.from_str(opm, format=format_hint)
 
     def test_ndm_roundtrip_xml(self):
         oem = self._create_valid_oem()
         cdm = self._create_valid_cdm()
 
-        ndm = Ndm(messages=[oem, cdm])
+        ndm = CombinedNdm(messages=[oem, cdm])
 
         xml = ndm.to_str(format="xml")
         assert "<ndm" in xml
         assert "<oem" in xml
         assert "<cdm" in xml
 
-        ndm2 = Ndm.from_str(xml, format="xml")
+        ndm2 = CombinedNdm.from_str(xml, format="xml")
         assert len(ndm2.messages) == 2
 
     def test_file_io(self, tmp_path):
         oem = self._create_valid_oem()
-        ndm = Ndm([oem])
+        ndm = CombinedNdm([oem])
         path = tmp_path / "test.ndm"
 
         ndm.to_file(str(path), "xml")
@@ -214,9 +214,14 @@ class TestNdm:
         assert len(ndm2.messages) == 1
 
     def test_failed_file_generation_preserves_existing_file(self, tmp_path):
-        oem = self._create_valid_oem()
-        oem.version = "1.0"
-        ndm = Ndm([oem])
+        # 1.0 is readable but withdrawn as an output edition, so it can only be reached by parsing.
+        source = (
+            Path(__file__).parents[3] / "ccsds-ndm/data/kvn/oem_g11.kvn"
+        ).read_text()
+        oem = Oem.from_str(
+            source.replace("CCSDS_OEM_VERS = 3.0", "CCSDS_OEM_VERS = 1.0"), format="kvn"
+        )
+        ndm = CombinedNdm([oem])
         path = tmp_path / "test.ndm"
         path.write_text("keep me")
 
@@ -230,7 +235,7 @@ class TestNdm:
         oem = self._create_valid_oem()
         cdm = self._create_valid_cdm()
 
-        ndm = Ndm(messages=[oem], comments=["initial"])
+        ndm = CombinedNdm(messages=[oem], comments=["initial"])
         assert len(ndm.messages) == 1
         assert ndm.comments == ["initial"]
 

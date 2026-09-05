@@ -1,13 +1,14 @@
 # Generated content DO NOT EDIT
-from typing import Optional, Union
+import os
+from typing import Literal
 import numpy
 
 def convert(
     data: str,
-    to_format: str,
+    to_format: Literal["kvn", "xml"],
     *,
-    max_input_bytes: Optional[int] = None,
-    max_records: Optional[int] = None,
+    max_input_bytes: int | None = None,
+    max_records: int | None = None,
 ) -> str:
     """
     Convert any recognized NDM message between KVN and XML through the shared generation gate.
@@ -15,12 +16,12 @@ def convert(
     ...
 
 def convert_file(
-    source_path: str,
-    destination_path: str,
-    to_format: str,
+    source_path: str | os.PathLike[str],
+    destination_path: str | os.PathLike[str],
+    to_format: Literal["kvn", "xml"],
     *,
-    max_input_bytes: Optional[int] = None,
-    max_records: Optional[int] = None,
+    max_input_bytes: int | None = None,
+    max_records: int | None = None,
 ) -> None:
     """
     Convert any recognized NDM file and atomically replace the destination on success.
@@ -28,33 +29,33 @@ def convert_file(
     ...
 
 def from_file(
-    path: str,
-    format: Optional[str] = None,
+    path: str | os.PathLike[str],
+    format: Literal["kvn", "xml"] | None = None,
     *,
-    max_input_bytes: Optional[int] = None,
-    max_records: Optional[int] = None,
-) -> Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]:
+    max_input_bytes: int | None = None,
+    max_records: int | None = None,
+) -> Oem | Cdm | Omm | Opm | Ocm | Tdm | Rdm | CombinedNdm | Aem | Apm | Acm:
     """
     Parse from a file path (KVN or XML).
 
     Parameters
     ----------
-    path : str
+    path : str or os.PathLike
         Path to the file.
     Returns
     -------
-    Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
+    Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, CombinedNdm, Aem, Apm, Acm]
         The parsed NDM object.
     """
     ...
 
 def from_str(
     data: str,
-    format: Optional[str] = None,
+    format: Literal["kvn", "xml"] | None = None,
     *,
-    max_input_bytes: Optional[int] = None,
-    max_records: Optional[int] = None,
-) -> Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]:
+    max_input_bytes: int | None = None,
+    max_records: int | None = None,
+) -> Oem | Cdm | Omm | Opm | Ocm | Tdm | Rdm | CombinedNdm | Aem | Apm | Acm:
     """
     Parse a string containing KVN or XML.
 
@@ -67,7 +68,7 @@ def from_str(
 
     Returns
     -------
-    Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
+    Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, CombinedNdm, Aem, Apm, Acm]
         The parsed NDM object.
 
     Raises
@@ -95,11 +96,11 @@ class Acm:
     def __init__(self, header, segment) -> None: ...
     @staticmethod
     def from_file(
-        path: str,
-        format: Optional[str] = None,
+        path: str | os.PathLike[str],
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
-        max_records: Optional[int] = None,
+        max_input_bytes: int | None = None,
+        max_records: int | None = None,
     ) -> Acm:
         """
         Parse an ACM from a KVN or XML file.
@@ -109,14 +110,11 @@ class Acm:
     @staticmethod
     def from_str(
         data: str,
-        format: Optional[str] = None,
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
-        max_records: Optional[int] = None,
-    ) -> Acm:
-        """ """
-        ...
-
+        max_input_bytes: int | None = None,
+        max_records: int | None = None,
+    ) -> Acm: ...
     @property
     def header(self) -> AdmHeader:
         """
@@ -138,7 +136,7 @@ class Acm:
     @header.setter
     def header(self, value: AdmHeader) -> None: ...
     @property
-    def id(self) -> Optional[str]:
+    def id(self) -> str | None:
         """
         The message identifier.
         """
@@ -153,13 +151,15 @@ class Acm:
 
     @segment.setter
     def segment(self, value: AcmSegment) -> None: ...
-    def to_file(self, path: str, format: str) -> None:
+    def to_file(
+        self, path: str | os.PathLike[str], format: Literal["kvn", "xml"]
+    ) -> None:
         """
         Atomically write this ACM as KVN or XML.
         """
         ...
 
-    def to_str(self, format: str) -> str:
+    def to_str(self, format: Literal["kvn", "xml"]) -> str:
         """
         Serialize to validated KVN or XML.
         """
@@ -1244,18 +1244,18 @@ class AdditionalParameters:
     """
     def __init__(
         self,
-        area_pc: Optional[float],
-        area_drg: Optional[float],
-        area_srp: Optional[float],
-        mass: Optional[float],
-        cd_area_over_mass: Optional[float],
-        cr_area_over_mass: Optional[float],
-        thrust_acceleration: Optional[float],
-        sedr: Optional[float],
-        comment: Optional[list[str]],
+        area_pc: float | None,
+        area_drg: float | None,
+        area_srp: float | None,
+        mass: float | None,
+        cd_area_over_mass: float | None,
+        cr_area_over_mass: float | None,
+        thrust_acceleration: float | None,
+        sedr: float | None,
+        comment: list[str] | None,
     ) -> None: ...
     @property
-    def area_drg(self) -> Optional[float]:
+    def area_drg(self) -> float | None:
         """
         The effective area of the object exposed to atmospheric drag. (See annex E for
         definition.)
@@ -1265,9 +1265,9 @@ class AdditionalParameters:
         ...
 
     @area_drg.setter
-    def area_drg(self, value: Optional[float]) -> None: ...
+    def area_drg(self, value: float | None) -> None: ...
     @property
-    def area_pc(self) -> Optional[float]:
+    def area_pc(self) -> float | None:
         """
         The actual area of the object. (See annex E for definition.)
 
@@ -1276,9 +1276,9 @@ class AdditionalParameters:
         ...
 
     @area_pc.setter
-    def area_pc(self, value: Optional[float]) -> None: ...
+    def area_pc(self, value: float | None) -> None: ...
     @property
-    def area_srp(self) -> Optional[float]:
+    def area_srp(self) -> float | None:
         """
         The effective area of the object exposed to solar radiation pressure. (See annex E for
         definition.)
@@ -1288,9 +1288,9 @@ class AdditionalParameters:
         ...
 
     @area_srp.setter
-    def area_srp(self, value: Optional[float]) -> None: ...
+    def area_srp(self, value: float | None) -> None: ...
     @property
-    def cd_area_over_mass(self) -> Optional[float]:
+    def cd_area_over_mass(self) -> float | None:
         """
         The object's CD•A/m used to propagate the state vector and covariance to TCA. (See
         annex E for definition.)
@@ -1300,7 +1300,7 @@ class AdditionalParameters:
         ...
 
     @cd_area_over_mass.setter
-    def cd_area_over_mass(self, value: Optional[float]) -> None: ...
+    def cd_area_over_mass(self, value: float | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -1311,7 +1311,7 @@ class AdditionalParameters:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def cr_area_over_mass(self) -> Optional[float]:
+    def cr_area_over_mass(self) -> float | None:
         """
         The object's CR•A/m used to propagate the state vector and covariance to TCA. (See
         annex E for definition.)
@@ -1321,9 +1321,9 @@ class AdditionalParameters:
         ...
 
     @cr_area_over_mass.setter
-    def cr_area_over_mass(self, value: Optional[float]) -> None: ...
+    def cr_area_over_mass(self, value: float | None) -> None: ...
     @property
-    def mass(self) -> Optional[float]:
+    def mass(self) -> float | None:
         """
         The mass of the object.
 
@@ -1332,9 +1332,9 @@ class AdditionalParameters:
         ...
 
     @mass.setter
-    def mass(self, value: Optional[float]) -> None: ...
+    def mass(self, value: float | None) -> None: ...
     @property
-    def sedr(self) -> Optional[float]:
+    def sedr(self) -> float | None:
         """
         The amount of energy being removed from the object's orbit by atmospheric drag. This
         value is an average calculated during the OD.
@@ -1344,9 +1344,9 @@ class AdditionalParameters:
         ...
 
     @sedr.setter
-    def sedr(self, value: Optional[float]) -> None: ...
+    def sedr(self, value: float | None) -> None: ...
     @property
-    def thrust_acceleration(self) -> Optional[float]:
+    def thrust_acceleration(self) -> float | None:
         """
         The object's acceleration due to in-track thrust used to propagate the state vector and
         covariance to TCA. (See annex E for definition.)
@@ -1356,7 +1356,7 @@ class AdditionalParameters:
         ...
 
     @thrust_acceleration.setter
-    def thrust_acceleration(self, value: Optional[float]) -> None: ...
+    def thrust_acceleration(self, value: float | None) -> None: ...
 
 class AdmHeader:
     """
@@ -1371,7 +1371,7 @@ class AdmHeader:
         comment=None,
     ) -> None: ...
     @property
-    def classification(self) -> Optional[str]:
+    def classification(self) -> str | None:
         """
         User-defined free-text message classification/caveats of this ADM. It is recommended
         that selected values be pre-coordinated between exchanging entities by mutual agreement.
@@ -1381,7 +1381,7 @@ class AdmHeader:
         ...
 
     @classification.setter
-    def classification(self, value: Optional[str]) -> None: ...
+    def classification(self, value: str | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -1405,7 +1405,7 @@ class AdmHeader:
     @creation_date.setter
     def creation_date(self, value: str) -> None: ...
     @property
-    def message_id(self) -> Optional[str]:
+    def message_id(self) -> str | None:
         """
         ID that uniquely identifies a message from a given originator. The format and content of
         the message identifier value are at the discretion of the originator.
@@ -1415,7 +1415,7 @@ class AdmHeader:
         ...
 
     @message_id.setter
-    def message_id(self, value: Optional[str]) -> None: ...
+    def message_id(self, value: str | None) -> None: ...
     @property
     def originator(self) -> str:
         """
@@ -1447,11 +1447,11 @@ class Aem:
     def __init__(self, header, segments) -> None: ...
     @staticmethod
     def from_file(
-        path: str,
-        format: Optional[str] = None,
+        path: str | os.PathLike[str],
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
-        max_records: Optional[int] = None,
+        max_input_bytes: int | None = None,
+        max_records: int | None = None,
     ) -> Aem:
         """
         Parse an AEM from a KVN or XML file.
@@ -1461,14 +1461,11 @@ class Aem:
     @staticmethod
     def from_str(
         data: str,
-        format: Optional[str] = None,
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
-        max_records: Optional[int] = None,
-    ) -> Aem:
-        """ """
-        ...
-
+        max_input_bytes: int | None = None,
+        max_records: int | None = None,
+    ) -> Aem: ...
     @property
     def header(self) -> AdmHeader:
         """
@@ -1488,14 +1485,12 @@ class Aem:
     @header.setter
     def header(self, value: AdmHeader) -> None: ...
     @property
-    def id(self) -> Optional[str]:
+    def id(self) -> str | None:
         """
         The message identifier.
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def segments(self) -> list[AemSegment]:
         """
@@ -1505,13 +1500,15 @@ class Aem:
 
     @segments.setter
     def segments(self, value: list[AemSegment]) -> None: ...
-    def to_file(self, path: str, format: str) -> None:
+    def to_file(
+        self, path: str | os.PathLike[str], format: Literal["kvn", "xml"]
+    ) -> None:
         """
         Atomically write this AEM as KVN or XML.
         """
         ...
 
-    def to_str(self, format: str) -> str:
+    def to_str(self, format: Literal["kvn", "xml"]) -> str:
         """
         Serialize to validated KVN or XML.
         """
@@ -1580,10 +1577,12 @@ class AemData:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @staticmethod
-    def from_numpy(epochs, array, attitude_type=None, comment=None) -> AemData:
-        """ """
-        ...
-
+    def from_numpy(
+        epochs: list[str],
+        array: numpy.ndarray,
+        attitude_type: str | None = None,
+        comment: list[str] | None = None,
+    ) -> AemData: ...
     def validate(self, attitude_type) -> None:
         """
         Validate the data section against CCSDS rules.
@@ -1964,10 +1963,10 @@ class Apm:
     def __init__(self, header, segment) -> None: ...
     @staticmethod
     def from_file(
-        path: str,
-        format: Optional[str] = None,
+        path: str | os.PathLike[str],
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
+        max_input_bytes: int | None = None,
     ) -> Apm:
         """
         Parse an APM from a KVN or XML file.
@@ -1977,13 +1976,10 @@ class Apm:
     @staticmethod
     def from_str(
         data: str,
-        format: Optional[str] = None,
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
-    ) -> Apm:
-        """ """
-        ...
-
+        max_input_bytes: int | None = None,
+    ) -> Apm: ...
     @property
     def header(self) -> AdmHeader:
         """
@@ -2001,14 +1997,12 @@ class Apm:
     @header.setter
     def header(self, value: AdmHeader) -> None: ...
     @property
-    def id(self) -> Optional[str]:
+    def id(self) -> str | None:
         """
         The message identifier.
         """
         ...
 
-    @id.setter
-    def id(self, value: Optional[str]) -> None: ...
     @property
     def segment(self) -> ApmSegment:
         """
@@ -2018,13 +2012,15 @@ class Apm:
 
     @segment.setter
     def segment(self, value: ApmSegment) -> None: ...
-    def to_file(self, path: str, format: str) -> None:
+    def to_file(
+        self, path: str | os.PathLike[str], format: Literal["kvn", "xml"]
+    ) -> None:
         """
         Atomically write this APM as KVN or XML.
         """
         ...
 
-    def to_str(self, format: str) -> str:
+    def to_str(self, format: Literal["kvn", "xml"]) -> str:
         """
         Serialize to validated KVN or XML.
         """
@@ -2166,7 +2162,7 @@ class ApmManeuverParameters:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def man_delta_mass(self) -> Optional[float]:
+    def man_delta_mass(self) -> float | None:
         """
         Mass change during maneuver (value is < 0)
 
@@ -2178,7 +2174,7 @@ class ApmManeuverParameters:
         ...
 
     @man_delta_mass.setter
-    def man_delta_mass(self, value: Optional[float]) -> None: ...
+    def man_delta_mass(self, value: float | None) -> None: ...
     @property
     def man_duration(self) -> float:
         """
@@ -2377,7 +2373,7 @@ class AtmosphericReentryParameters:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def nominal_reentry_epoch(self) -> Optional[str]:
+    def nominal_reentry_epoch(self) -> str | None:
         """
         Predicted epoch at which the object’s altitude permanently drops below
         NOMINAL_REENTRY_ALTITUDE (formatting rules specified in 5.3.3.5).
@@ -2385,7 +2381,7 @@ class AtmosphericReentryParameters:
         ...
 
     @nominal_reentry_epoch.setter
-    def nominal_reentry_epoch(self, value: Optional[str]) -> None: ...
+    def nominal_reentry_epoch(self, value: str | None) -> None: ...
     @property
     def orbit_lifetime(self) -> float:
         """
@@ -2402,7 +2398,7 @@ class AtmosphericReentryParameters:
     @orbit_lifetime.setter
     def orbit_lifetime(self, value: float) -> None: ...
     @property
-    def orbit_lifetime_confidence_level(self) -> Optional[float]:
+    def orbit_lifetime_confidence_level(self) -> float | None:
         """
         Confidence level of the orbit lifetime or re-entry epoch being inside the window
         defined by ORBIT_LIFETIME_WINDOW_START and ORBIT_LIFETIME_WINDOW_END or
@@ -2413,9 +2409,9 @@ class AtmosphericReentryParameters:
         ...
 
     @orbit_lifetime_confidence_level.setter
-    def orbit_lifetime_confidence_level(self, value: Optional[float]) -> None: ...
+    def orbit_lifetime_confidence_level(self, value: float | None) -> None: ...
     @property
-    def orbit_lifetime_window_end(self) -> Optional[float]:
+    def orbit_lifetime_window_end(self) -> float | None:
         """
         End of the predicted orbital lifetime window from the EPOCH_TZERO epoch in the metadata
         (days—double precision values allowed; integer values assumed to have .0 fractional
@@ -2427,9 +2423,9 @@ class AtmosphericReentryParameters:
         ...
 
     @orbit_lifetime_window_end.setter
-    def orbit_lifetime_window_end(self, value: Optional[float]) -> None: ...
+    def orbit_lifetime_window_end(self, value: float | None) -> None: ...
     @property
-    def orbit_lifetime_window_start(self) -> Optional[float]:
+    def orbit_lifetime_window_start(self) -> float | None:
         """
         Start of the predicted orbital lifetime window from the EPOCH_TZERO epoch in the
         metadata (days—double precision values allowed; integer values assumed to have .0
@@ -2441,7 +2437,7 @@ class AtmosphericReentryParameters:
         ...
 
     @orbit_lifetime_window_start.setter
-    def orbit_lifetime_window_start(self, value: Optional[float]) -> None: ...
+    def orbit_lifetime_window_start(self, value: float | None) -> None: ...
     @property
     def reentry_altitude(self) -> float:
         """
@@ -2456,7 +2452,7 @@ class AtmosphericReentryParameters:
     @reentry_altitude.setter
     def reentry_altitude(self, value: float) -> None: ...
     @property
-    def reentry_window_end(self) -> Optional[str]:
+    def reentry_window_end(self) -> str | None:
         """
         End epoch of the predicted atmospheric re-entry window (formatting rules specified in
         5.3.3.5).
@@ -2464,9 +2460,9 @@ class AtmosphericReentryParameters:
         ...
 
     @reentry_window_end.setter
-    def reentry_window_end(self, value: Optional[str]) -> None: ...
+    def reentry_window_end(self, value: str | None) -> None: ...
     @property
-    def reentry_window_start(self) -> Optional[str]:
+    def reentry_window_start(self) -> str | None:
         """
         Start epoch of the predicted atmospheric re-entry window (formatting rules specified in
         5.3.3.5).
@@ -2474,7 +2470,7 @@ class AtmosphericReentryParameters:
         ...
 
     @reentry_window_start.setter
-    def reentry_window_start(self, value: Optional[str]) -> None: ...
+    def reentry_window_start(self, value: str | None) -> None: ...
 
 class AttitudeState:
     def __init__(self, epoch, values) -> None: ...
@@ -2513,10 +2509,10 @@ class Cdm:
     def body(self, value: CdmBody) -> None: ...
     @staticmethod
     def from_file(
-        path: str,
-        format: Optional[str] = None,
+        path: str | os.PathLike[str],
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
+        max_input_bytes: int | None = None,
     ) -> Cdm:
         """
         Parse a CDM from a KVN or XML file.
@@ -2526,9 +2522,9 @@ class Cdm:
     @staticmethod
     def from_str(
         data: str,
-        format: Optional[str] = None,
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
+        max_input_bytes: int | None = None,
     ) -> Cdm:
         """
         Parse a CDM from a string with optional format.
@@ -2567,19 +2563,21 @@ class Cdm:
     @header.setter
     def header(self, value: CdmHeader) -> None: ...
     @property
-    def id(self) -> Optional[str]:
+    def id(self) -> str | None:
         """
         Unique ID for this message.
         """
         ...
 
-    def to_file(self, path: str, format: str) -> None:
+    def to_file(
+        self, path: str | os.PathLike[str], format: Literal["kvn", "xml"]
+    ) -> None:
         """
         Atomically write this CDM as KVN or XML.
         """
         ...
 
-    def to_str(self, format: str) -> str:
+    def to_str(self, format: Literal["kvn", "xml"]) -> str:
         """
         Serialize to validated KVN or XML.
         """
@@ -2759,34 +2757,34 @@ class CdmCovarianceMatrix:
         cndot_rdot: float,
         cndot_tdot: float,
         cndot_ndot: float,
-        cdrg_r: Optional[float] = None,
-        cdrg_t: Optional[float] = None,
-        cdrg_n: Optional[float] = None,
-        cdrg_rdot: Optional[float] = None,
-        cdrg_tdot: Optional[float] = None,
-        cdrg_ndot: Optional[float] = None,
-        cdrg_drg: Optional[float] = None,
-        csrp_r: Optional[float] = None,
-        csrp_t: Optional[float] = None,
-        csrp_n: Optional[float] = None,
-        csrp_rdot: Optional[float] = None,
-        csrp_tdot: Optional[float] = None,
-        csrp_ndot: Optional[float] = None,
-        csrp_drg: Optional[float] = None,
-        csrp_srp: Optional[float] = None,
-        cthr_r: Optional[float] = None,
-        cthr_t: Optional[float] = None,
-        cthr_n: Optional[float] = None,
-        cthr_rdot: Optional[float] = None,
-        cthr_tdot: Optional[float] = None,
-        cthr_ndot: Optional[float] = None,
-        cthr_drg: Optional[float] = None,
-        cthr_srp: Optional[float] = None,
-        cthr_thr: Optional[float] = None,
-        comment: Optional[list[str]] = None,
+        cdrg_r: float | None = None,
+        cdrg_t: float | None = None,
+        cdrg_n: float | None = None,
+        cdrg_rdot: float | None = None,
+        cdrg_tdot: float | None = None,
+        cdrg_ndot: float | None = None,
+        cdrg_drg: float | None = None,
+        csrp_r: float | None = None,
+        csrp_t: float | None = None,
+        csrp_n: float | None = None,
+        csrp_rdot: float | None = None,
+        csrp_tdot: float | None = None,
+        csrp_ndot: float | None = None,
+        csrp_drg: float | None = None,
+        csrp_srp: float | None = None,
+        cthr_r: float | None = None,
+        cthr_t: float | None = None,
+        cthr_n: float | None = None,
+        cthr_rdot: float | None = None,
+        cthr_tdot: float | None = None,
+        cthr_ndot: float | None = None,
+        cthr_drg: float | None = None,
+        cthr_srp: float | None = None,
+        cthr_thr: float | None = None,
+        comment: list[str] | None = None,
     ) -> None: ...
     @property
-    def cdrg_drg(self) -> Optional[float]:
+    def cdrg_drg(self) -> float | None:
         """
         Object covariance matrix `[7,7]`.
 
@@ -2795,9 +2793,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_drg.setter
-    def cdrg_drg(self, value: Optional[float]) -> None: ...
+    def cdrg_drg(self, value: float | None) -> None: ...
     @property
-    def cdrg_n(self) -> Optional[float]:
+    def cdrg_n(self) -> float | None:
         """
         Object covariance matrix `[7,3]`.
 
@@ -2806,9 +2804,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_n.setter
-    def cdrg_n(self, value: Optional[float]) -> None: ...
+    def cdrg_n(self, value: float | None) -> None: ...
     @property
-    def cdrg_ndot(self) -> Optional[float]:
+    def cdrg_ndot(self) -> float | None:
         """
         Object covariance matrix `[7,6]`.
 
@@ -2817,9 +2815,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_ndot.setter
-    def cdrg_ndot(self, value: Optional[float]) -> None: ...
+    def cdrg_ndot(self, value: float | None) -> None: ...
     @property
-    def cdrg_r(self) -> Optional[float]:
+    def cdrg_r(self) -> float | None:
         """
         Object covariance matrix `[7,1]`.
 
@@ -2828,9 +2826,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_r.setter
-    def cdrg_r(self, value: Optional[float]) -> None: ...
+    def cdrg_r(self, value: float | None) -> None: ...
     @property
-    def cdrg_rdot(self) -> Optional[float]:
+    def cdrg_rdot(self) -> float | None:
         """
         Object covariance matrix `[7,4]`.
 
@@ -2839,9 +2837,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_rdot.setter
-    def cdrg_rdot(self, value: Optional[float]) -> None: ...
+    def cdrg_rdot(self, value: float | None) -> None: ...
     @property
-    def cdrg_t(self) -> Optional[float]:
+    def cdrg_t(self) -> float | None:
         """
         Object covariance matrix `[7,2]`.
 
@@ -2850,9 +2848,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_t.setter
-    def cdrg_t(self, value: Optional[float]) -> None: ...
+    def cdrg_t(self, value: float | None) -> None: ...
     @property
-    def cdrg_tdot(self) -> Optional[float]:
+    def cdrg_tdot(self) -> float | None:
         """
         Object covariance matrix `[7,5]`.
 
@@ -2861,7 +2859,7 @@ class CdmCovarianceMatrix:
         ...
 
     @cdrg_tdot.setter
-    def cdrg_tdot(self, value: Optional[float]) -> None: ...
+    def cdrg_tdot(self, value: float | None) -> None: ...
     @property
     def cn_n(self) -> float:
         """
@@ -3026,7 +3024,7 @@ class CdmCovarianceMatrix:
     @crdot_t.setter
     def crdot_t(self, value: float) -> None: ...
     @property
-    def csrp_drg(self) -> Optional[float]:
+    def csrp_drg(self) -> float | None:
         """
         Object covariance matrix `[8,7]`.
 
@@ -3035,9 +3033,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_drg.setter
-    def csrp_drg(self, value: Optional[float]) -> None: ...
+    def csrp_drg(self, value: float | None) -> None: ...
     @property
-    def csrp_n(self) -> Optional[float]:
+    def csrp_n(self) -> float | None:
         """
         Object covariance matrix `[8,3]`.
 
@@ -3046,9 +3044,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_n.setter
-    def csrp_n(self, value: Optional[float]) -> None: ...
+    def csrp_n(self, value: float | None) -> None: ...
     @property
-    def csrp_ndot(self) -> Optional[float]:
+    def csrp_ndot(self) -> float | None:
         """
         Object covariance matrix `[8,6]`.
 
@@ -3057,9 +3055,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_ndot.setter
-    def csrp_ndot(self, value: Optional[float]) -> None: ...
+    def csrp_ndot(self, value: float | None) -> None: ...
     @property
-    def csrp_r(self) -> Optional[float]:
+    def csrp_r(self) -> float | None:
         """
         Object covariance matrix `[8,1]`.
 
@@ -3068,9 +3066,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_r.setter
-    def csrp_r(self, value: Optional[float]) -> None: ...
+    def csrp_r(self, value: float | None) -> None: ...
     @property
-    def csrp_rdot(self) -> Optional[float]:
+    def csrp_rdot(self) -> float | None:
         """
         Object covariance matrix `[8,4]`.
 
@@ -3079,9 +3077,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_rdot.setter
-    def csrp_rdot(self, value: Optional[float]) -> None: ...
+    def csrp_rdot(self, value: float | None) -> None: ...
     @property
-    def csrp_srp(self) -> Optional[float]:
+    def csrp_srp(self) -> float | None:
         """
         Object covariance matrix `[8,8]`.
 
@@ -3090,9 +3088,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_srp.setter
-    def csrp_srp(self, value: Optional[float]) -> None: ...
+    def csrp_srp(self, value: float | None) -> None: ...
     @property
-    def csrp_t(self) -> Optional[float]:
+    def csrp_t(self) -> float | None:
         """
         Object covariance matrix `[8,2]`.
 
@@ -3101,9 +3099,9 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_t.setter
-    def csrp_t(self, value: Optional[float]) -> None: ...
+    def csrp_t(self, value: float | None) -> None: ...
     @property
-    def csrp_tdot(self) -> Optional[float]:
+    def csrp_tdot(self) -> float | None:
         """
         Object covariance matrix `[8,5]`.
 
@@ -3112,7 +3110,7 @@ class CdmCovarianceMatrix:
         ...
 
     @csrp_tdot.setter
-    def csrp_tdot(self, value: Optional[float]) -> None: ...
+    def csrp_tdot(self, value: float | None) -> None: ...
     @property
     def ct_r(self) -> float:
         """
@@ -3191,7 +3189,7 @@ class CdmCovarianceMatrix:
     @ctdot_tdot.setter
     def ctdot_tdot(self, value: float) -> None: ...
     @property
-    def cthr_drg(self) -> Optional[float]:
+    def cthr_drg(self) -> float | None:
         """
         Object covariance matrix `[9,7]`.
 
@@ -3200,9 +3198,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_drg.setter
-    def cthr_drg(self, value: Optional[float]) -> None: ...
+    def cthr_drg(self, value: float | None) -> None: ...
     @property
-    def cthr_n(self) -> Optional[float]:
+    def cthr_n(self) -> float | None:
         """
         Object covariance matrix `[9,3]`.
 
@@ -3211,9 +3209,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_n.setter
-    def cthr_n(self, value: Optional[float]) -> None: ...
+    def cthr_n(self, value: float | None) -> None: ...
     @property
-    def cthr_ndot(self) -> Optional[float]:
+    def cthr_ndot(self) -> float | None:
         """
         Object covariance matrix `[9,6]`.
 
@@ -3222,9 +3220,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_ndot.setter
-    def cthr_ndot(self, value: Optional[float]) -> None: ...
+    def cthr_ndot(self, value: float | None) -> None: ...
     @property
-    def cthr_r(self) -> Optional[float]:
+    def cthr_r(self) -> float | None:
         """
         Object covariance matrix `[9,1]`.
 
@@ -3233,9 +3231,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_r.setter
-    def cthr_r(self, value: Optional[float]) -> None: ...
+    def cthr_r(self, value: float | None) -> None: ...
     @property
-    def cthr_rdot(self) -> Optional[float]:
+    def cthr_rdot(self) -> float | None:
         """
         Object covariance matrix `[9,4]`.
 
@@ -3244,9 +3242,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_rdot.setter
-    def cthr_rdot(self, value: Optional[float]) -> None: ...
+    def cthr_rdot(self, value: float | None) -> None: ...
     @property
-    def cthr_srp(self) -> Optional[float]:
+    def cthr_srp(self) -> float | None:
         """
         Object covariance matrix `[9,8]`.
 
@@ -3255,9 +3253,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_srp.setter
-    def cthr_srp(self, value: Optional[float]) -> None: ...
+    def cthr_srp(self, value: float | None) -> None: ...
     @property
-    def cthr_t(self) -> Optional[float]:
+    def cthr_t(self) -> float | None:
         """
         Object covariance matrix `[9,2]`.
 
@@ -3266,9 +3264,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_t.setter
-    def cthr_t(self, value: Optional[float]) -> None: ...
+    def cthr_t(self, value: float | None) -> None: ...
     @property
-    def cthr_tdot(self) -> Optional[float]:
+    def cthr_tdot(self) -> float | None:
         """
         Object covariance matrix `[9,5]`.
 
@@ -3277,9 +3275,9 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_tdot.setter
-    def cthr_tdot(self, value: Optional[float]) -> None: ...
+    def cthr_tdot(self, value: float | None) -> None: ...
     @property
-    def cthr_thr(self) -> Optional[float]:
+    def cthr_thr(self) -> float | None:
         """
         Object covariance matrix `[9,9]`.
 
@@ -3288,12 +3286,11 @@ class CdmCovarianceMatrix:
         ...
 
     @cthr_thr.setter
-    def cthr_thr(self, value: Optional[float]) -> None: ...
+    def cthr_thr(self, value: float | None) -> None: ...
     @staticmethod
-    def from_numpy(array, comment=None) -> CdmCovarianceMatrix:
-        """ """
-        ...
-
+    def from_numpy(
+        array: numpy.ndarray, comment: list[str] | None = None
+    ) -> CdmCovarianceMatrix: ...
     def to_numpy(self) -> numpy.ndarray:
         """
         Returns the covariance matrix as a NumPy array.
@@ -3319,20 +3316,20 @@ class CdmData:
     def __init__(
         self,
         state_vector: CdmStateVector,
-        covariance_matrix: Optional[CdmCovarianceMatrix] = None,
+        covariance_matrix: CdmCovarianceMatrix | None = None,
         od_parameters=None,
         additional_parameters=None,
         comments=None,
     ) -> None: ...
     @property
-    def additional_parameters(self) -> Optional[AdditionalParameters]:
+    def additional_parameters(self) -> AdditionalParameters | None:
         """
         Additional Parameters.
         """
         ...
 
     @additional_parameters.setter
-    def additional_parameters(self, value: Optional[AdditionalParameters]) -> None: ...
+    def additional_parameters(self, value: AdditionalParameters | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -3343,14 +3340,14 @@ class CdmData:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def covariance_matrix(self) -> Optional[CdmCovarianceMatrix]:
+    def covariance_matrix(self) -> CdmCovarianceMatrix | None:
         """
         Covariance Matrix.
         """
         ...
 
     @covariance_matrix.setter
-    def covariance_matrix(self, value: Optional[CdmCovarianceMatrix]) -> None: ...
+    def covariance_matrix(self, value: CdmCovarianceMatrix | None) -> None: ...
     @property
     def covariance_matrix_numpy(self) -> numpy.ndarray:
         """
@@ -3365,24 +3362,21 @@ class CdmData:
     def covariance_matrix_numpy(self, value: numpy.ndarray) -> None: ...
     @staticmethod
     def from_numpy(
-        state_vector,
-        covariance_matrix=None,
-        od_parameters=None,
-        additional_parameters=None,
-        comments=None,
-    ) -> CdmData:
-        """ """
-        ...
-
+        state_vector: numpy.ndarray,
+        covariance_matrix: numpy.ndarray | None = None,
+        od_parameters: OdParameters | None = None,
+        additional_parameters: AdditionalParameters | None = None,
+        comments: list[str] | None = None,
+    ) -> CdmData: ...
     @property
-    def od_parameters(self) -> Optional[OdParameters]:
+    def od_parameters(self) -> OdParameters | None:
         """
         Orbit Determination Parameters.
         """
         ...
 
     @od_parameters.setter
-    def od_parameters(self, value: Optional[OdParameters]) -> None: ...
+    def od_parameters(self, value: OdParameters | None) -> None: ...
     @property
     def state_vector(self) -> CdmStateVector:
         """
@@ -3428,8 +3422,8 @@ class CdmHeader:
         creation_date: str,
         originator: str,
         message_id: str,
-        message_for: Optional[str] = None,
-        comment: Optional[list[str]] = ...,
+        message_for: str | None = None,
+        comment: list[str] | None = ...,
     ) -> None: ...
     @property
     def comment(self) -> list[str]:
@@ -3456,7 +3450,7 @@ class CdmHeader:
     @creation_date.setter
     def creation_date(self, value: str) -> None: ...
     @property
-    def message_for(self) -> Optional[str]:
+    def message_for(self) -> str | None:
         """
         Spacecraft name(s) for which the CDM is provided.
 
@@ -3465,7 +3459,7 @@ class CdmHeader:
         ...
 
     @message_for.setter
-    def message_for(self, value: Optional[str]) -> None: ...
+    def message_for(self, value: str | None) -> None: ...
     @property
     def message_id(self) -> str:
         """
@@ -3550,31 +3544,31 @@ class CdmMetadata:
     """
     def __init__(
         self,
-        object: Union[CdmObjectType, str],
+        object: CdmObjectType | str,
         object_designator: str,
         catalog_name: str,
         object_name: str,
         international_designator: str,
-        ref_frame: Union[ReferenceFrameType, str],
+        ref_frame: ReferenceFrameType | str,
         ephemeris_name: str = ...,
-        covariance_method: Optional[Union[CovarianceMethodType, str]] = None,
-        maneuverable: Optional[Union[ManeuverableType, str]] = None,
-        object_type: Optional[Union[ObjectDescription, str]] = None,
-        operator_contact_position: Optional[str] = None,
-        operator_organization: Optional[str] = None,
-        operator_phone: Optional[str] = None,
-        operator_email: Optional[str] = None,
-        orbit_center: Optional[str] = None,
-        gravity_model: Optional[str] = None,
-        atmospheric_model: Optional[str] = None,
-        n_body_perturbations: Optional[str] = None,
-        solar_rad_pressure: Optional[bool] = None,
-        earth_tides: Optional[bool] = None,
-        intrack_thrust: Optional[bool] = None,
-        comment: Optional[list[str]] = ...,
+        covariance_method: CovarianceMethodType | str | None = None,
+        maneuverable: ManeuverableType | str | None = None,
+        object_type: ObjectDescription | str | None = None,
+        operator_contact_position: str | None = None,
+        operator_organization: str | None = None,
+        operator_phone: str | None = None,
+        operator_email: str | None = None,
+        orbit_center: str | None = None,
+        gravity_model: str | None = None,
+        atmospheric_model: str | None = None,
+        n_body_perturbations: str | None = None,
+        solar_rad_pressure: bool | None = None,
+        earth_tides: bool | None = None,
+        intrack_thrust: bool | None = None,
+        comment: list[str] | None = ...,
     ) -> None: ...
     @property
-    def atmospheric_model(self) -> Optional[str]:
+    def atmospheric_model(self) -> str | None:
         """
         The atmospheric density model used for the OD of the object. If 'NONE' is specified,
         then no atmospheric model was used.
@@ -3584,7 +3578,7 @@ class CdmMetadata:
         ...
 
     @atmospheric_model.setter
-    def atmospheric_model(self, value: Optional[str]) -> None: ...
+    def atmospheric_model(self, value: str | None) -> None: ...
     @property
     def catalog_name(self) -> str:
         """
@@ -3621,7 +3615,7 @@ class CdmMetadata:
     @covariance_method.setter
     def covariance_method(self, value: CovarianceMethodType) -> None: ...
     @property
-    def earth_tides(self) -> Optional[bool]:
+    def earth_tides(self) -> bool | None:
         """
         Indication of whether solid Earth and ocean tides were used for the OD of the object.
 
@@ -3630,7 +3624,7 @@ class CdmMetadata:
         ...
 
     @earth_tides.setter
-    def earth_tides(self, value: Optional[bool]) -> None: ...
+    def earth_tides(self, value: bool | None) -> None: ...
     @property
     def ephemeris_name(self) -> str:
         """
@@ -3646,7 +3640,7 @@ class CdmMetadata:
     @ephemeris_name.setter
     def ephemeris_name(self, value: str) -> None: ...
     @property
-    def gravity_model(self) -> Optional[str]:
+    def gravity_model(self) -> str | None:
         """
         The gravity model used for the OD of the object. (See annex E under GRAVITY_MODEL for
         definition).
@@ -3656,7 +3650,7 @@ class CdmMetadata:
         ...
 
     @gravity_model.setter
-    def gravity_model(self, value: Optional[str]) -> None: ...
+    def gravity_model(self, value: str | None) -> None: ...
     @property
     def international_designator(self) -> str:
         """
@@ -3673,7 +3667,7 @@ class CdmMetadata:
     @international_designator.setter
     def international_designator(self, value: str) -> None: ...
     @property
-    def intrack_thrust(self) -> Optional[bool]:
+    def intrack_thrust(self) -> bool | None:
         """
         Indication of whether in-track thrust modeling was used for the OD of the object.
 
@@ -3682,7 +3676,7 @@ class CdmMetadata:
         ...
 
     @intrack_thrust.setter
-    def intrack_thrust(self, value: Optional[bool]) -> None: ...
+    def intrack_thrust(self, value: bool | None) -> None: ...
     @property
     def maneuverable(self) -> ManeuverableType:
         """
@@ -3695,7 +3689,7 @@ class CdmMetadata:
     @maneuverable.setter
     def maneuverable(self, value: ManeuverableType) -> None: ...
     @property
-    def n_body_perturbations(self) -> Optional[str]:
+    def n_body_perturbations(self) -> str | None:
         """
         The N-body gravitational perturbations used for the OD of the object. If 'NONE' is
         specified, then no third-body gravitational perturbations were used.
@@ -3705,7 +3699,7 @@ class CdmMetadata:
         ...
 
     @n_body_perturbations.setter
-    def n_body_perturbations(self, value: Optional[str]) -> None: ...
+    def n_body_perturbations(self, value: str | None) -> None: ...
     @property
     def object(self) -> CdmObjectType:
         """
@@ -3740,7 +3734,7 @@ class CdmMetadata:
     @object_name.setter
     def object_name(self, value: str) -> None: ...
     @property
-    def object_type(self) -> Optional[ObjectDescription]:
+    def object_type(self) -> ObjectDescription | None:
         """
         The object type.
 
@@ -3749,9 +3743,9 @@ class CdmMetadata:
         ...
 
     @object_type.setter
-    def object_type(self, value: Optional[ObjectDescription]) -> None: ...
+    def object_type(self, value: ObjectDescription | None) -> None: ...
     @property
-    def operator_contact_position(self) -> Optional[str]:
+    def operator_contact_position(self) -> str | None:
         """
         Contact position of the owner/operator of the object.
 
@@ -3760,9 +3754,9 @@ class CdmMetadata:
         ...
 
     @operator_contact_position.setter
-    def operator_contact_position(self, value: Optional[str]) -> None: ...
+    def operator_contact_position(self, value: str | None) -> None: ...
     @property
-    def operator_email(self) -> Optional[str]:
+    def operator_email(self) -> str | None:
         """
         Email address of the contact position or organization of the object.
 
@@ -3771,9 +3765,9 @@ class CdmMetadata:
         ...
 
     @operator_email.setter
-    def operator_email(self, value: Optional[str]) -> None: ...
+    def operator_email(self, value: str | None) -> None: ...
     @property
-    def operator_organization(self) -> Optional[str]:
+    def operator_organization(self) -> str | None:
         """
         Contact organization of the object.
 
@@ -3782,9 +3776,9 @@ class CdmMetadata:
         ...
 
     @operator_organization.setter
-    def operator_organization(self, value: Optional[str]) -> None: ...
+    def operator_organization(self, value: str | None) -> None: ...
     @property
-    def operator_phone(self) -> Optional[str]:
+    def operator_phone(self) -> str | None:
         """
         Phone number of the contact position or organization for the object.
 
@@ -3793,9 +3787,9 @@ class CdmMetadata:
         ...
 
     @operator_phone.setter
-    def operator_phone(self, value: Optional[str]) -> None: ...
+    def operator_phone(self, value: str | None) -> None: ...
     @property
-    def orbit_center(self) -> Optional[str]:
+    def orbit_center(self) -> str | None:
         """
         The central body about which Object1 and Object2 orbit. If not specified, the center is
         assumed to be Earth.
@@ -3805,7 +3799,7 @@ class CdmMetadata:
         ...
 
     @orbit_center.setter
-    def orbit_center(self, value: Optional[str]) -> None: ...
+    def orbit_center(self, value: str | None) -> None: ...
     @property
     def ref_frame(self) -> ReferenceFrameType:
         """
@@ -3820,7 +3814,7 @@ class CdmMetadata:
     @ref_frame.setter
     def ref_frame(self, value: ReferenceFrameType) -> None: ...
     @property
-    def solar_rad_pressure(self) -> Optional[bool]:
+    def solar_rad_pressure(self) -> bool | None:
         """
         Indication of whether solar radiation pressure perturbations were used for the OD of the
         object.
@@ -3830,7 +3824,7 @@ class CdmMetadata:
         ...
 
     @solar_rad_pressure.setter
-    def solar_rad_pressure(self, value: Optional[bool]) -> None: ...
+    def solar_rad_pressure(self, value: bool | None) -> None: ...
 
 class CdmObjectType:
     """
@@ -3903,10 +3897,7 @@ class CdmStateVector:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @staticmethod
-    def from_numpy(array) -> CdmStateVector:
-        """ """
-        ...
-
+    def from_numpy(array: numpy.ndarray) -> CdmStateVector: ...
     def to_numpy(self) -> numpy.ndarray:
         """
         Return the state vector as a NumPy array.
@@ -3984,6 +3975,102 @@ class CdmStateVector:
     @z_dot.setter
     def z_dot(self, value: float) -> None: ...
 
+class CombinedNdm:
+    """
+    Combined Instantiation Navigation Data Message (NDM).
+
+    It is possible to create an XML instance that incorporates any number of NDM messages in a
+    logical suite called an ‘NDM combined instantiation’. Such combined instantiations may be
+    useful for some situations, for example: (1) a constellation of spacecraft in which
+    ephemeris data for all of the spacecraft is combined in a single XML message; (2) a
+    spacecraft attitude that depends upon a particular orbital state (an APM and its
+    associated OPM could be conveniently conveyed in a single NDM); (3) an ephemeris message
+    with the set of tracking data messages used in the orbit determination.
+    """
+    def __init__(self, messages, id=None, comments=...) -> None: ...
+    @property
+    def comments(self) -> list[str]:
+        """
+        Comments (optional).
+        """
+        ...
+
+    @comments.setter
+    def comments(self, value: list[str]) -> None: ...
+    @staticmethod
+    def from_file(
+        path: str | os.PathLike[str],
+        format: Literal["kvn", "xml"] | None = None,
+        *,
+        max_input_bytes: int | None = None,
+        max_records: int | None = None,
+    ) -> CombinedNdm:
+        """
+        Parse an XML combined NDM file. KVN has no combined representation.
+        """
+        ...
+
+    @staticmethod
+    def from_str(
+        data: str,
+        format: Literal["kvn", "xml"] | None = None,
+        *,
+        max_input_bytes: int | None = None,
+        max_records: int | None = None,
+    ) -> CombinedNdm:
+        """
+        Parse an XML combined NDM. KVN has no combined representation.
+        """
+        ...
+
+    @property
+    def id(self) -> str | None:
+        """
+        Message Identifier (optional).
+        """
+        ...
+
+    @property
+    def messages(
+        self,
+    ) -> list[Oem | Cdm | Opm | Omm | Ocm | Rdm | Tdm | Aem | Apm | Acm | CombinedNdm]:
+        """
+        List of contained navigation messages.
+        """
+        ...
+
+    @messages.setter
+    def messages(
+        self,
+        value: list[
+            Oem | Cdm | Opm | Omm | Ocm | Rdm | Tdm | Aem | Apm | Acm | CombinedNdm
+        ],
+    ) -> None: ...
+    def to_file(
+        self, path: str | os.PathLike[str], format: Literal["kvn", "xml"]
+    ) -> None:
+        """
+        Atomically write this combined NDM as XML.
+
+        Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError` and leaves the
+        destination untouched.
+        """
+        ...
+
+    def to_str(self, format: Literal["kvn", "xml"]) -> str:
+        """
+        Serialize to an XML string.
+
+        Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError`.
+        """
+        ...
+
+    def validate(self) -> None:
+        """
+        Validate the combined message against CCSDS rules.
+        """
+        ...
+
 class ControlledType: ...
 
 class CovLine:
@@ -4051,7 +4138,7 @@ class EulerAngleState:
     @angle_1.setter
     def angle_1(self, value: float) -> None: ...
     @property
-    def angle_1_dot(self) -> Optional[float]:
+    def angle_1_dot(self) -> float | None:
         """
         Time derivative of angle of the first rotation.
 
@@ -4060,7 +4147,7 @@ class EulerAngleState:
         ...
 
     @angle_1_dot.setter
-    def angle_1_dot(self, value: Optional[float]) -> None: ...
+    def angle_1_dot(self, value: float | None) -> None: ...
     @property
     def angle_2(self) -> float:
         """
@@ -4073,7 +4160,7 @@ class EulerAngleState:
     @angle_2.setter
     def angle_2(self, value: float) -> None: ...
     @property
-    def angle_2_dot(self) -> Optional[float]:
+    def angle_2_dot(self) -> float | None:
         """
         Time derivative of angle of the second rotation.
 
@@ -4082,7 +4169,7 @@ class EulerAngleState:
         ...
 
     @angle_2_dot.setter
-    def angle_2_dot(self, value: Optional[float]) -> None: ...
+    def angle_2_dot(self, value: float | None) -> None: ...
     @property
     def angle_3(self) -> float:
         """
@@ -4095,7 +4182,7 @@ class EulerAngleState:
     @angle_3.setter
     def angle_3(self, value: float) -> None: ...
     @property
-    def angle_3_dot(self) -> Optional[float]:
+    def angle_3_dot(self) -> float | None:
         """
         Time derivative of angle of the third rotation.
 
@@ -4104,7 +4191,7 @@ class EulerAngleState:
         ...
 
     @angle_3_dot.setter
-    def angle_3_dot(self, value: Optional[float]) -> None: ...
+    def angle_3_dot(self, value: float | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -4220,37 +4307,37 @@ class GroundImpactParameters:
     def __init__(
         self,
         *,
-        probability_of_impact: Optional[float] = None,
-        probability_of_burn_up: Optional[float] = None,
-        probability_of_break_up: Optional[float] = None,
-        probability_of_land_impact: Optional[float] = None,
-        probability_of_casualty: Optional[float] = None,
-        nominal_impact_epoch: Optional[str] = None,
-        impact_window_start: Optional[str] = None,
-        impact_window_end: Optional[str] = None,
-        impact_ref_frame: Optional[str] = None,
-        nominal_impact_lon: Optional[float] = None,
-        nominal_impact_lat: Optional[float] = None,
-        nominal_impact_alt: Optional[float] = None,
-        impact_1_confidence: Optional[float] = None,
-        impact_1_start_lon: Optional[float] = None,
-        impact_1_start_lat: Optional[float] = None,
-        impact_1_stop_lon: Optional[float] = None,
-        impact_1_stop_lat: Optional[float] = None,
-        impact_1_cross_track: Optional[float] = None,
-        impact_2_confidence: Optional[float] = None,
-        impact_2_start_lon: Optional[float] = None,
-        impact_2_start_lat: Optional[float] = None,
-        impact_2_stop_lon: Optional[float] = None,
-        impact_2_stop_lat: Optional[float] = None,
-        impact_2_cross_track: Optional[float] = None,
-        impact_3_confidence: Optional[float] = None,
-        impact_3_start_lon: Optional[float] = None,
-        impact_3_start_lat: Optional[float] = None,
-        impact_3_stop_lon: Optional[float] = None,
-        impact_3_stop_lat: Optional[float] = None,
-        impact_3_cross_track: Optional[float] = None,
-        comment: Optional[list[str]] = None,
+        probability_of_impact: float | None = None,
+        probability_of_burn_up: float | None = None,
+        probability_of_break_up: float | None = None,
+        probability_of_land_impact: float | None = None,
+        probability_of_casualty: float | None = None,
+        nominal_impact_epoch: str | None = None,
+        impact_window_start: str | None = None,
+        impact_window_end: str | None = None,
+        impact_ref_frame: str | None = None,
+        nominal_impact_lon: float | None = None,
+        nominal_impact_lat: float | None = None,
+        nominal_impact_alt: float | None = None,
+        impact_1_confidence: float | None = None,
+        impact_1_start_lon: float | None = None,
+        impact_1_start_lat: float | None = None,
+        impact_1_stop_lon: float | None = None,
+        impact_1_stop_lat: float | None = None,
+        impact_1_cross_track: float | None = None,
+        impact_2_confidence: float | None = None,
+        impact_2_start_lon: float | None = None,
+        impact_2_start_lat: float | None = None,
+        impact_2_stop_lon: float | None = None,
+        impact_2_stop_lat: float | None = None,
+        impact_2_cross_track: float | None = None,
+        impact_3_confidence: float | None = None,
+        impact_3_start_lon: float | None = None,
+        impact_3_start_lat: float | None = None,
+        impact_3_stop_lon: float | None = None,
+        impact_3_stop_lat: float | None = None,
+        impact_3_cross_track: float | None = None,
+        comment: list[str] | None = None,
     ) -> None: ...
     @property
     def comment(self) -> list[str]:
@@ -4262,7 +4349,7 @@ class GroundImpactParameters:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def impact_1_confidence(self) -> Optional[float]:
+    def impact_1_confidence(self) -> float | None:
         """
         First (lowest) confidence interval for the impact location.
 
@@ -4271,9 +4358,9 @@ class GroundImpactParameters:
         ...
 
     @impact_1_confidence.setter
-    def impact_1_confidence(self, value: Optional[float]) -> None: ...
+    def impact_1_confidence(self, value: float | None) -> None: ...
     @property
-    def impact_1_cross_track(self) -> Optional[float]:
+    def impact_1_cross_track(self) -> float | None:
         """
         Cross-track size of the first confidence interval.
 
@@ -4282,9 +4369,9 @@ class GroundImpactParameters:
         ...
 
     @impact_1_cross_track.setter
-    def impact_1_cross_track(self, value: Optional[float]) -> None: ...
+    def impact_1_cross_track(self, value: float | None) -> None: ...
     @property
-    def impact_1_start_lat(self) -> Optional[float]:
+    def impact_1_start_lat(self) -> float | None:
         """
         Latitude of the start of the first confidence interval along the ground track with
         respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -4295,9 +4382,9 @@ class GroundImpactParameters:
         ...
 
     @impact_1_start_lat.setter
-    def impact_1_start_lat(self, value: Optional[float]) -> None: ...
+    def impact_1_start_lat(self, value: float | None) -> None: ...
     @property
-    def impact_1_start_lon(self) -> Optional[float]:
+    def impact_1_start_lon(self) -> float | None:
         """
         Longitude of the start of the first confidence interval along the ground track with
         respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -4308,9 +4395,9 @@ class GroundImpactParameters:
         ...
 
     @impact_1_start_lon.setter
-    def impact_1_start_lon(self, value: Optional[float]) -> None: ...
+    def impact_1_start_lon(self, value: float | None) -> None: ...
     @property
-    def impact_1_stop_lat(self) -> Optional[float]:
+    def impact_1_stop_lat(self) -> float | None:
         """
         Latitude of the end of the first confidence interval along the ground track with
         respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -4321,9 +4408,9 @@ class GroundImpactParameters:
         ...
 
     @impact_1_stop_lat.setter
-    def impact_1_stop_lat(self, value: Optional[float]) -> None: ...
+    def impact_1_stop_lat(self, value: float | None) -> None: ...
     @property
-    def impact_1_stop_lon(self) -> Optional[float]:
+    def impact_1_stop_lon(self) -> float | None:
         """
         Longitude of the end of the first confidence interval along the ground track with
         respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -4334,9 +4421,9 @@ class GroundImpactParameters:
         ...
 
     @impact_1_stop_lon.setter
-    def impact_1_stop_lon(self, value: Optional[float]) -> None: ...
+    def impact_1_stop_lon(self, value: float | None) -> None: ...
     @property
-    def impact_2_confidence(self) -> Optional[float]:
+    def impact_2_confidence(self) -> float | None:
         """
         Second confidence interval for the impact location. The IMPACT_1_* block must be
         present if IMPACT_2_* is used.
@@ -4346,9 +4433,9 @@ class GroundImpactParameters:
         ...
 
     @impact_2_confidence.setter
-    def impact_2_confidence(self, value: Optional[float]) -> None: ...
+    def impact_2_confidence(self, value: float | None) -> None: ...
     @property
-    def impact_2_cross_track(self) -> Optional[float]:
+    def impact_2_cross_track(self) -> float | None:
         """
         Cross-track size of the second confidence interval.
 
@@ -4357,9 +4444,9 @@ class GroundImpactParameters:
         ...
 
     @impact_2_cross_track.setter
-    def impact_2_cross_track(self, value: Optional[float]) -> None: ...
+    def impact_2_cross_track(self, value: float | None) -> None: ...
     @property
-    def impact_2_start_lat(self) -> Optional[float]:
+    def impact_2_start_lat(self) -> float | None:
         """
         Latitude of the start of the second confidence interval along the ground track with
         respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -4370,9 +4457,9 @@ class GroundImpactParameters:
         ...
 
     @impact_2_start_lat.setter
-    def impact_2_start_lat(self, value: Optional[float]) -> None: ...
+    def impact_2_start_lat(self, value: float | None) -> None: ...
     @property
-    def impact_2_start_lon(self) -> Optional[float]:
+    def impact_2_start_lon(self) -> float | None:
         """
         Longitude of the start of the second confidence interval along the ground track with
         respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -4383,9 +4470,9 @@ class GroundImpactParameters:
         ...
 
     @impact_2_start_lon.setter
-    def impact_2_start_lon(self, value: Optional[float]) -> None: ...
+    def impact_2_start_lon(self, value: float | None) -> None: ...
     @property
-    def impact_2_stop_lat(self) -> Optional[float]:
+    def impact_2_stop_lat(self) -> float | None:
         """
         Latitude of the end of the second confidence interval along the ground track with
         respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -4396,9 +4483,9 @@ class GroundImpactParameters:
         ...
 
     @impact_2_stop_lat.setter
-    def impact_2_stop_lat(self, value: Optional[float]) -> None: ...
+    def impact_2_stop_lat(self, value: float | None) -> None: ...
     @property
-    def impact_2_stop_lon(self) -> Optional[float]:
+    def impact_2_stop_lon(self) -> float | None:
         """
         Longitude of the end of the second confidence interval along the ground track with
         respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -4409,9 +4496,9 @@ class GroundImpactParameters:
         ...
 
     @impact_2_stop_lon.setter
-    def impact_2_stop_lon(self, value: Optional[float]) -> None: ...
+    def impact_2_stop_lon(self, value: float | None) -> None: ...
     @property
-    def impact_3_confidence(self) -> Optional[float]:
+    def impact_3_confidence(self) -> float | None:
         """
         Third (highest) confidence interval for the impact location. The IMPACT_2_* block must
         be present if IMPACT_3_* is used.
@@ -4421,9 +4508,9 @@ class GroundImpactParameters:
         ...
 
     @impact_3_confidence.setter
-    def impact_3_confidence(self, value: Optional[float]) -> None: ...
+    def impact_3_confidence(self, value: float | None) -> None: ...
     @property
-    def impact_3_cross_track(self) -> Optional[float]:
+    def impact_3_cross_track(self) -> float | None:
         """
         Cross-track size of the third confidence interval.
 
@@ -4432,9 +4519,9 @@ class GroundImpactParameters:
         ...
 
     @impact_3_cross_track.setter
-    def impact_3_cross_track(self, value: Optional[float]) -> None: ...
+    def impact_3_cross_track(self, value: float | None) -> None: ...
     @property
-    def impact_3_start_lat(self) -> Optional[float]:
+    def impact_3_start_lat(self) -> float | None:
         """
         Latitude of the start of the third confidence interval along the ground track with
         respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -4445,9 +4532,9 @@ class GroundImpactParameters:
         ...
 
     @impact_3_start_lat.setter
-    def impact_3_start_lat(self, value: Optional[float]) -> None: ...
+    def impact_3_start_lat(self, value: float | None) -> None: ...
     @property
-    def impact_3_start_lon(self) -> Optional[float]:
+    def impact_3_start_lon(self) -> float | None:
         """
         Longitude of the start of the third confidence interval along the ground track with
         respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -4458,9 +4545,9 @@ class GroundImpactParameters:
         ...
 
     @impact_3_start_lon.setter
-    def impact_3_start_lon(self, value: Optional[float]) -> None: ...
+    def impact_3_start_lon(self, value: float | None) -> None: ...
     @property
-    def impact_3_stop_lat(self) -> Optional[float]:
+    def impact_3_stop_lat(self) -> float | None:
         """
         Latitude of the end of the third confidence interval along the ground track with
         respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -4471,9 +4558,9 @@ class GroundImpactParameters:
         ...
 
     @impact_3_stop_lat.setter
-    def impact_3_stop_lat(self, value: Optional[float]) -> None: ...
+    def impact_3_stop_lat(self, value: float | None) -> None: ...
     @property
-    def impact_3_stop_lon(self) -> Optional[float]:
+    def impact_3_stop_lon(self) -> float | None:
         """
         Longitude of the end of the third confidence interval along the ground track with
         respect to the value of IMPACT_REF_FRAME. Values shall be double precision and follow
@@ -4484,9 +4571,9 @@ class GroundImpactParameters:
         ...
 
     @impact_3_stop_lon.setter
-    def impact_3_stop_lon(self, value: Optional[float]) -> None: ...
+    def impact_3_stop_lon(self, value: float | None) -> None: ...
     @property
-    def impact_ref_frame(self) -> Optional[str]:
+    def impact_ref_frame(self) -> str | None:
         """
         Reference frame of the impact location data. The value should be taken from the keyword
         value name column in the SANA celestial body reference frames registry, reference `[11]`.
@@ -4496,27 +4583,27 @@ class GroundImpactParameters:
         ...
 
     @impact_ref_frame.setter
-    def impact_ref_frame(self, value: Optional[str]) -> None: ...
+    def impact_ref_frame(self, value: str | None) -> None: ...
     @property
-    def impact_window_end(self) -> Optional[str]:
+    def impact_window_end(self) -> str | None:
         """
         End epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
         """
         ...
 
     @impact_window_end.setter
-    def impact_window_end(self, value: Optional[str]) -> None: ...
+    def impact_window_end(self, value: str | None) -> None: ...
     @property
-    def impact_window_start(self) -> Optional[str]:
+    def impact_window_start(self) -> str | None:
         """
         Start epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
         """
         ...
 
     @impact_window_start.setter
-    def impact_window_start(self, value: Optional[str]) -> None: ...
+    def impact_window_start(self, value: str | None) -> None: ...
     @property
-    def nominal_impact_alt(self) -> Optional[float]:
+    def nominal_impact_alt(self) -> float | None:
         """
         Altitude of the impact location with respect to the value of IMPACT_REF_FRAME.
 
@@ -4525,18 +4612,18 @@ class GroundImpactParameters:
         ...
 
     @nominal_impact_alt.setter
-    def nominal_impact_alt(self, value: Optional[float]) -> None: ...
+    def nominal_impact_alt(self, value: float | None) -> None: ...
     @property
-    def nominal_impact_epoch(self) -> Optional[str]:
+    def nominal_impact_epoch(self) -> str | None:
         """
         Epoch of the predicted impact (formatting rules specified in 5.3.3.5).
         """
         ...
 
     @nominal_impact_epoch.setter
-    def nominal_impact_epoch(self, value: Optional[str]) -> None: ...
+    def nominal_impact_epoch(self, value: str | None) -> None: ...
     @property
-    def nominal_impact_lat(self) -> Optional[float]:
+    def nominal_impact_lat(self) -> float | None:
         """
         Latitude of the predicted impact location with respect to the value of
         IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in
@@ -4547,9 +4634,9 @@ class GroundImpactParameters:
         ...
 
     @nominal_impact_lat.setter
-    def nominal_impact_lat(self, value: Optional[float]) -> None: ...
+    def nominal_impact_lat(self, value: float | None) -> None: ...
     @property
-    def nominal_impact_lon(self) -> Optional[float]:
+    def nominal_impact_lon(self) -> float | None:
         """
         Longitude of the predicted impact location with respect to the value of
         IMPACT_REF_FRAME. Values shall be double precision and follow the rules specified in
@@ -4560,18 +4647,18 @@ class GroundImpactParameters:
         ...
 
     @nominal_impact_lon.setter
-    def nominal_impact_lon(self, value: Optional[float]) -> None: ...
+    def nominal_impact_lon(self, value: float | None) -> None: ...
     @property
-    def probability_of_break_up(self) -> Optional[float]:
+    def probability_of_break_up(self) -> float | None:
         """
         Probability that the object will break up during re-entry (0 to 1).
         """
         ...
 
     @probability_of_break_up.setter
-    def probability_of_break_up(self, value: Optional[float]) -> None: ...
+    def probability_of_break_up(self, value: float | None) -> None: ...
     @property
-    def probability_of_burn_up(self) -> Optional[float]:
+    def probability_of_burn_up(self) -> float | None:
         """
         Probability that the entire object and any fragments will burn up during atmospheric
         re-entry (0 to 1).
@@ -4579,9 +4666,9 @@ class GroundImpactParameters:
         ...
 
     @probability_of_burn_up.setter
-    def probability_of_burn_up(self, value: Optional[float]) -> None: ...
+    def probability_of_burn_up(self, value: float | None) -> None: ...
     @property
-    def probability_of_casualty(self) -> Optional[float]:
+    def probability_of_casualty(self) -> float | None:
         """
         Probability that the re-entry event will cause any casualties (severe injuries or
         deaths—0 to 1).
@@ -4589,25 +4676,25 @@ class GroundImpactParameters:
         ...
 
     @probability_of_casualty.setter
-    def probability_of_casualty(self, value: Optional[float]) -> None: ...
+    def probability_of_casualty(self, value: float | None) -> None: ...
     @property
-    def probability_of_impact(self) -> Optional[float]:
+    def probability_of_impact(self) -> float | None:
         """
         Probability that any fragment will impact the Earth (either land or sea; 0 to 1).
         """
         ...
 
     @probability_of_impact.setter
-    def probability_of_impact(self, value: Optional[float]) -> None: ...
+    def probability_of_impact(self, value: float | None) -> None: ...
     @property
-    def probability_of_land_impact(self) -> Optional[float]:
+    def probability_of_land_impact(self) -> float | None:
         """
         Probability that any fragment will impact solid ground (0 to 1).
         """
         ...
 
     @probability_of_land_impact.setter
-    def probability_of_land_impact(self, value: Optional[float]) -> None: ...
+    def probability_of_land_impact(self, value: float | None) -> None: ...
 
 class InertiaState:
     """
@@ -4759,8 +4846,8 @@ class KeplerianElements:
         ra_of_asc_node: float,
         arg_of_pericenter: float,
         gm: float,
-        true_anomaly: Optional[float] = None,
-        mean_anomaly: Optional[float] = None,
+        true_anomaly: float | None = None,
+        mean_anomaly: float | None = None,
     ) -> None: ...
     @property
     def arg_of_pericenter(self) -> float:
@@ -4816,7 +4903,7 @@ class KeplerianElements:
     @inclination.setter
     def inclination(self, value: float) -> None: ...
     @property
-    def mean_anomaly(self) -> Optional[float]:
+    def mean_anomaly(self) -> float | None:
         """
         True anomaly or mean anomaly
 
@@ -4825,7 +4912,7 @@ class KeplerianElements:
         ...
 
     @mean_anomaly.setter
-    def mean_anomaly(self, value: Optional[float]) -> None: ...
+    def mean_anomaly(self, value: float | None) -> None: ...
     @property
     def ra_of_asc_node(self) -> float:
         """
@@ -4849,7 +4936,7 @@ class KeplerianElements:
     @semi_major_axis.setter
     def semi_major_axis(self, value: float) -> None: ...
     @property
-    def true_anomaly(self) -> Optional[float]:
+    def true_anomaly(self) -> float | None:
         """
         True anomaly or mean anomaly
 
@@ -4858,7 +4945,7 @@ class KeplerianElements:
         ...
 
     @true_anomaly.setter
-    def true_anomaly(self, value: Optional[float]) -> None: ...
+    def true_anomaly(self, value: float | None) -> None: ...
 
 class ManLine:
     """
@@ -4926,9 +5013,9 @@ class MeanElements:
         ra_of_asc_node: float,
         arg_of_pericenter: float,
         mean_anomaly: float,
-        semi_major_axis: Optional[float] = None,
-        mean_motion: Optional[float] = None,
-        gm: Optional[float] = None,
+        semi_major_axis: float | None = None,
+        mean_motion: float | None = None,
+        gm: float | None = None,
     ) -> None: ...
     @property
     def arg_of_pericenter(self) -> float:
@@ -4977,7 +5064,7 @@ class MeanElements:
     @epoch.setter
     def epoch(self, value: str) -> None: ...
     @property
-    def gm(self) -> Optional[float]:
+    def gm(self) -> float | None:
         """
         Gravitational Coefficient (Gravitational Constant × Central Mass)
 
@@ -4988,7 +5075,7 @@ class MeanElements:
         ...
 
     @gm.setter
-    def gm(self, value: Optional[float]) -> None: ...
+    def gm(self, value: float | None) -> None: ...
     @property
     def inclination(self) -> float:
         """
@@ -5016,7 +5103,7 @@ class MeanElements:
     @mean_anomaly.setter
     def mean_anomaly(self, value: float) -> None: ...
     @property
-    def mean_motion(self) -> Optional[float]:
+    def mean_motion(self) -> float | None:
         """
         Semi-major axis in kilometers (preferred), or, if MEAN_ELEMENT_THEORY = SGP/SGP4, the
         Keplerian Mean motion in revolutions per day
@@ -5028,7 +5115,7 @@ class MeanElements:
         ...
 
     @mean_motion.setter
-    def mean_motion(self, value: Optional[float]) -> None: ...
+    def mean_motion(self, value: float | None) -> None: ...
     @property
     def ra_of_asc_node(self) -> float:
         """
@@ -5043,7 +5130,7 @@ class MeanElements:
     @ra_of_asc_node.setter
     def ra_of_asc_node(self, value: float) -> None: ...
     @property
-    def semi_major_axis(self) -> Optional[float]:
+    def semi_major_axis(self) -> float | None:
         """
         Semi-major axis in kilometers (preferred), or, if MEAN_ELEMENT_THEORY = SGP/SGP4, the
         Keplerian Mean motion in revolutions per day
@@ -5055,96 +5142,7 @@ class MeanElements:
         ...
 
     @semi_major_axis.setter
-    def semi_major_axis(self, value: Optional[float]) -> None: ...
-
-class Ndm:
-    """
-    Combined Instantiation Navigation Data Message (NDM).
-
-    It is possible to create an XML instance that incorporates any number of NDM messages in a
-    logical suite called an ‘NDM combined instantiation’. Such combined instantiations may be
-    useful for some situations, for example: (1) a constellation of spacecraft in which
-    ephemeris data for all of the spacecraft is combined in a single XML message; (2) a
-    spacecraft attitude that depends upon a particular orbital state (an APM and its
-    associated OPM could be conveniently conveyed in a single NDM); (3) an ephemeris message
-    with the set of tracking data messages used in the orbit determination.
-    """
-    def __init__(self, messages, id=None, comments=...) -> None: ...
-    @property
-    def comments(self) -> list[str]:
-        """
-        Comments (optional).
-        """
-        ...
-
-    @comments.setter
-    def comments(self, value: list[str]) -> None: ...
-    @staticmethod
-    def from_file(
-        path: str,
-        format: Optional[str] = None,
-        *,
-        max_input_bytes: Optional[int] = None,
-        max_records: Optional[int] = None,
-    ) -> Ndm:
-        """
-        Parse an XML combined NDM file. KVN has no combined representation.
-        """
-        ...
-
-    @staticmethod
-    def from_str(
-        data: str,
-        format: Optional[str] = None,
-        *,
-        max_input_bytes: Optional[int] = None,
-        max_records: Optional[int] = None,
-    ) -> Ndm:
-        """
-        Parse an XML combined NDM. KVN has no combined representation.
-        """
-        ...
-
-    @property
-    def id(self) -> Optional[str]:
-        """
-        Message Identifier (optional).
-        """
-        ...
-
-    @property
-    def messages(self) -> list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]:
-        """
-        List of contained navigation messages.
-        """
-        ...
-
-    @messages.setter
-    def messages(
-        self, value: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]
-    ) -> None: ...
-    def to_file(self, path: str, format: str) -> None:
-        """
-        Atomically write this combined NDM as XML.
-
-        Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError` and leaves the
-        destination untouched.
-        """
-        ...
-
-    def to_str(self, format: str) -> str:
-        """
-        Serialize to an XML string.
-
-        Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError`.
-        """
-        ...
-
-    def validate(self) -> None:
-        """
-        Validate the combined message against CCSDS rules.
-        """
-        ...
+    def semi_major_axis(self, value: float | None) -> None: ...
 
 class ObjectDescription: ...
 
@@ -5173,11 +5171,11 @@ class Ocm:
     def __init__(self, header: OdmHeader, segment: OcmSegment) -> None: ...
     @staticmethod
     def from_file(
-        path: str,
-        format: Optional[str] = None,
+        path: str | os.PathLike[str],
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
-        max_records: Optional[int] = None,
+        max_input_bytes: int | None = None,
+        max_records: int | None = None,
     ) -> Ocm:
         """
         Parse an OCM from a KVN or XML file.
@@ -5187,10 +5185,10 @@ class Ocm:
     @staticmethod
     def from_str(
         data: str,
-        format: Optional[str] = None,
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
-        max_records: Optional[int] = None,
+        max_input_bytes: int | None = None,
+        max_records: int | None = None,
     ) -> Ocm:
         """
         Create an OCM message from a string.
@@ -5230,7 +5228,7 @@ class Ocm:
     @header.setter
     def header(self, value: OdmHeader) -> None: ...
     @property
-    def id(self) -> Optional[str]:
+    def id(self) -> str | None:
         """
         The message identifier.
         """
@@ -5245,13 +5243,15 @@ class Ocm:
 
     @segment.setter
     def segment(self, value: OcmSegment) -> None: ...
-    def to_file(self, path: str, format: str) -> None:
+    def to_file(
+        self, path: str | os.PathLike[str], format: Literal["kvn", "xml"]
+    ) -> None:
         """
         Atomically write this OCM as KVN or XML.
         """
         ...
 
-    def to_str(self, format: str) -> str:
+    def to_str(self, format: Literal["kvn", "xml"]) -> str:
         """
         Serialize to KVN or XML after mandatory CCSDS validation.
         """
@@ -5326,17 +5326,17 @@ class OcmCovarianceMatrix:
         cov_type: str,
         cov_ordering,
         cov_lines,
-        cov_id: Optional[str] = None,
-        cov_prev_id: Optional[str] = None,
-        cov_next_id: Optional[str] = None,
-        cov_basis: Optional[str] = None,
-        cov_basis_id: Optional[str] = None,
+        cov_id: str | None = None,
+        cov_prev_id: str | None = None,
+        cov_next_id: str | None = None,
+        cov_basis: str | None = None,
+        cov_basis_id: str | None = None,
         cov_frame_epoch=None,
         cov_scale_min=None,
         cov_scale_max=None,
-        cov_confidence: Optional[float] = None,
-        cov_units: Optional[str] = None,
-        comment: Optional[list[str]] = None,
+        cov_confidence: float | None = None,
+        cov_units: str | None = None,
+        comment: list[str] | None = None,
     ) -> None: ...
     @property
     def comment(self) -> list[str]:
@@ -5350,7 +5350,7 @@ class OcmCovarianceMatrix:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def cov_basis(self) -> Optional[str]:
+    def cov_basis(self) -> str | None:
         """
         Basis of this covariance time history data. This is free-text field with the following
         suggested values: a) 'PREDICTED'. b) 'DETERMINED' when estimated from observation-based
@@ -5366,9 +5366,9 @@ class OcmCovarianceMatrix:
         ...
 
     @cov_basis.setter
-    def cov_basis(self, value: Optional[str]) -> None: ...
+    def cov_basis(self, value: str | None) -> None: ...
     @property
-    def cov_basis_id(self) -> Optional[str]:
+    def cov_basis_id(self) -> str | None:
         """
         Free-text field containing the identification number for the orbit determination,
         navigation solution, or simulation upon which this covariance time history block is
@@ -5380,9 +5380,9 @@ class OcmCovarianceMatrix:
         ...
 
     @cov_basis_id.setter
-    def cov_basis_id(self, value: Optional[str]) -> None: ...
+    def cov_basis_id(self, value: str | None) -> None: ...
     @property
-    def cov_confidence(self) -> Optional[float]:
+    def cov_confidence(self) -> float | None:
         """
         A measure of the confidence in the covariance errors matching reality, as characterized
         via a Wald test, a Chi-squared test, the log of likelihood, or a numerical
@@ -5395,9 +5395,9 @@ class OcmCovarianceMatrix:
         ...
 
     @cov_confidence.setter
-    def cov_confidence(self, value: Optional[float]) -> None: ...
+    def cov_confidence(self, value: float | None) -> None: ...
     @property
-    def cov_frame_epoch(self) -> Optional[str]:
+    def cov_frame_epoch(self) -> str | None:
         """
         Epoch of the covariance data reference frame, if not intrinsic to the definition of the
         reference frame. (See 7.5.10 for formatting rules.)
@@ -5407,9 +5407,9 @@ class OcmCovarianceMatrix:
         ...
 
     @cov_frame_epoch.setter
-    def cov_frame_epoch(self, value: Optional[str]) -> None: ...
+    def cov_frame_epoch(self, value: str | None) -> None: ...
     @property
-    def cov_id(self) -> Optional[str]:
+    def cov_id(self) -> str | None:
         """
         Free-text field containing the identification number for this covariance time history
         block.
@@ -5419,7 +5419,7 @@ class OcmCovarianceMatrix:
         ...
 
     @cov_id.setter
-    def cov_id(self, value: Optional[str]) -> None: ...
+    def cov_id(self, value: str | None) -> None: ...
     @property
     def cov_lines(self) -> list[CovLine]:
         """
@@ -5430,7 +5430,7 @@ class OcmCovarianceMatrix:
     @cov_lines.setter
     def cov_lines(self, value: list[CovLine]) -> None: ...
     @property
-    def cov_next_id(self) -> Optional[str]:
+    def cov_next_id(self) -> str | None:
         """
         Free-text field containing the identification number for the next covariance time
         history, contained either within this message, or presented in a future OCM. NOTE—If
@@ -5443,7 +5443,7 @@ class OcmCovarianceMatrix:
         ...
 
     @cov_next_id.setter
-    def cov_next_id(self, value: Optional[str]) -> None: ...
+    def cov_next_id(self, value: str | None) -> None: ...
     @property
     def cov_ordering(self) -> str:
         """
@@ -5459,7 +5459,7 @@ class OcmCovarianceMatrix:
     @cov_ordering.setter
     def cov_ordering(self, value: str) -> None: ...
     @property
-    def cov_prev_id(self) -> Optional[str]:
+    def cov_prev_id(self) -> str | None:
         """
         Free-text field containing the identification number for the previous covariance time
         history, contained either within this message or presented in a previous OCM. NOTE—If
@@ -5472,7 +5472,7 @@ class OcmCovarianceMatrix:
         ...
 
     @cov_prev_id.setter
-    def cov_prev_id(self, value: Optional[str]) -> None: ...
+    def cov_prev_id(self, value: str | None) -> None: ...
     @property
     def cov_ref_frame(self) -> str:
         """
@@ -5486,7 +5486,7 @@ class OcmCovarianceMatrix:
     @cov_ref_frame.setter
     def cov_ref_frame(self, value: str) -> None: ...
     @property
-    def cov_scale_max(self) -> Optional[float]:
+    def cov_scale_max(self) -> float | None:
         """
         Maximum scale factor to apply to this covariance data to achieve realism.
 
@@ -5495,9 +5495,9 @@ class OcmCovarianceMatrix:
         ...
 
     @cov_scale_max.setter
-    def cov_scale_max(self, value: Optional[float]) -> None: ...
+    def cov_scale_max(self, value: float | None) -> None: ...
     @property
-    def cov_scale_min(self) -> Optional[float]:
+    def cov_scale_min(self) -> float | None:
         """
         Minimum scale factor to apply to this covariance data to achieve realism.
 
@@ -5506,7 +5506,7 @@ class OcmCovarianceMatrix:
         ...
 
     @cov_scale_min.setter
-    def cov_scale_min(self, value: Optional[float]) -> None: ...
+    def cov_scale_min(self, value: float | None) -> None: ...
     @property
     def cov_type(self) -> str:
         """
@@ -5519,7 +5519,7 @@ class OcmCovarianceMatrix:
     @cov_type.setter
     def cov_type(self, value: str) -> None: ...
     @property
-    def cov_units(self) -> Optional[str]:
+    def cov_units(self) -> str | None:
         """
         A comma-delimited set of SI unit designations for each element of the covariance time
         history following the covariance time tag, solely for informational purposes, provided
@@ -5537,7 +5537,7 @@ class OcmCovarianceMatrix:
         ...
 
     @cov_units.setter
-    def cov_units(self, value: Optional[str]) -> None: ...
+    def cov_units(self, value: str | None) -> None: ...
 
 class OcmData:
     """
@@ -5567,32 +5567,32 @@ class OcmData:
     @man.setter
     def man(self, value: list[OcmManeuverParameters]) -> None: ...
     @property
-    def od(self) -> Optional[OcmOdParameters]:
+    def od(self) -> OcmOdParameters | None:
         """
         Orbit determination data.
         """
         ...
 
     @od.setter
-    def od(self, value: Optional[OcmOdParameters]) -> None: ...
+    def od(self, value: OcmOdParameters | None) -> None: ...
     @property
-    def pert(self) -> Optional[OcmPerturbations]:
+    def pert(self) -> OcmPerturbations | None:
         """
         Perturbation parameters.
         """
         ...
 
     @pert.setter
-    def pert(self, value: Optional[OcmPerturbations]) -> None: ...
+    def pert(self, value: OcmPerturbations | None) -> None: ...
     @property
-    def phys(self) -> Optional[OcmPhysicalDescription]:
+    def phys(self) -> OcmPhysicalDescription | None:
         """
         Space object physical characteristics.
         """
         ...
 
     @phys.setter
-    def phys(self, value: Optional[OcmPhysicalDescription]) -> None: ...
+    def phys(self, value: OcmPhysicalDescription | None) -> None: ...
     @property
     def traj(self) -> list[OcmTrajState]:
         """
@@ -5663,17 +5663,17 @@ class OcmManeuverParameters:
         man_composition: str,
         man_ref_frame: str,
         man_lines: list[ManLine],
-        man_prev_id: Optional[str] = None,
-        man_next_id: Optional[str] = None,
-        man_basis: Optional[str] = None,
-        man_basis_id: Optional[str] = None,
-        man_prev_epoch: Optional[str] = None,
-        man_next_epoch: Optional[str] = None,
-        man_purpose: Optional[str] = None,
-        man_pred_source: Optional[str] = None,
-        man_frame_epoch: Optional[str] = None,
-        grav_assist_name: Optional[str] = None,
-        dc_type: Optional[str] = None,
+        man_prev_id: str | None = None,
+        man_next_id: str | None = None,
+        man_basis: str | None = None,
+        man_basis_id: str | None = None,
+        man_prev_epoch: str | None = None,
+        man_next_epoch: str | None = None,
+        man_purpose: str | None = None,
+        man_pred_source: str | None = None,
+        man_frame_epoch: str | None = None,
+        grav_assist_name: str | None = None,
+        dc_type: str | None = None,
         dc_win_open=None,
         dc_win_close=None,
         dc_min_cycles=None,
@@ -5688,8 +5688,8 @@ class OcmManeuverParameters:
         dc_body_trigger=None,
         dc_pa_start_angle=None,
         dc_pa_stop_angle=None,
-        man_units: Optional[str] = None,
-        comment: Optional[list[str]] = None,
+        man_units: str | None = None,
+        comment: list[str] | None = None,
     ) -> None: ...
     @property
     def comment(self) -> list[str]:
@@ -5703,7 +5703,7 @@ class OcmManeuverParameters:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def dc_body_frame(self) -> Optional[str]:
+    def dc_body_frame(self) -> str | None:
         """
         For phase angle thruster duty cycles (DC_TYPE=TIME_AND_ANGLE); specifies the body
         reference frame in which DC_BODY_TRIGGER will be specified. Select from the accepted
@@ -5713,9 +5713,9 @@ class OcmManeuverParameters:
         ...
 
     @dc_body_frame.setter
-    def dc_body_frame(self, value: Optional[str]) -> None: ...
+    def dc_body_frame(self, value: str | None) -> None: ...
     @property
-    def dc_body_trigger(self) -> Optional[list[float]]:
+    def dc_body_trigger(self) -> list[float] | None:
         """
         For phase angle thruster duty cycles (DC_TYPE=TIME_AND_ANGLE); specifies the body frame
         reference vector direction in the 'DC_BODY_FRAME' reference frame at which, when its
@@ -5726,9 +5726,9 @@ class OcmManeuverParameters:
         ...
 
     @dc_body_trigger.setter
-    def dc_body_trigger(self, value: Optional[list[float]]) -> None: ...
+    def dc_body_trigger(self, value: list[float] | None) -> None: ...
     @property
-    def dc_exec_start(self) -> Optional[str]:
+    def dc_exec_start(self) -> str | None:
         """
         Start time of the initial duty cycle-based maneuver sequence execution. DC_EXEC_START
         is defined to occur on or prior to the first maneuver 'ON' portion within the duty
@@ -5738,9 +5738,9 @@ class OcmManeuverParameters:
         ...
 
     @dc_exec_start.setter
-    def dc_exec_start(self, value: Optional[str]) -> None: ...
+    def dc_exec_start(self, value: str | None) -> None: ...
     @property
-    def dc_exec_stop(self) -> Optional[str]:
+    def dc_exec_stop(self) -> str | None:
         """
         End time of the final duty cycle-based maneuver sequence execution. DC_EXEC_STOP
         typically occurs on or after the end of the final maneuver 'ON' portion within the duty
@@ -5750,9 +5750,9 @@ class OcmManeuverParameters:
         ...
 
     @dc_exec_stop.setter
-    def dc_exec_stop(self, value: Optional[str]) -> None: ...
+    def dc_exec_stop(self, value: str | None) -> None: ...
     @property
-    def dc_max_cycles(self) -> Optional[int]:
+    def dc_max_cycles(self) -> int | None:
         """
         Maximum number of 'ON' duty cycles (may override DC_EXEC_STOP). This value is optional
         even if DC_TYPE = 'CONTINUOUS'.
@@ -5760,9 +5760,9 @@ class OcmManeuverParameters:
         ...
 
     @dc_max_cycles.setter
-    def dc_max_cycles(self, value: Optional[int]) -> None: ...
+    def dc_max_cycles(self, value: int | None) -> None: ...
     @property
-    def dc_min_cycles(self) -> Optional[int]:
+    def dc_min_cycles(self) -> int | None:
         """
         Minimum number of 'ON' duty cycles (may override DC_EXEC_STOP). This value is optional
         even if DC_TYPE = 'CONTINUOUS'.
@@ -5770,9 +5770,9 @@ class OcmManeuverParameters:
         ...
 
     @dc_min_cycles.setter
-    def dc_min_cycles(self, value: Optional[int]) -> None: ...
+    def dc_min_cycles(self, value: int | None) -> None: ...
     @property
-    def dc_pa_start_angle(self) -> Optional[float]:
+    def dc_pa_start_angle(self) -> float | None:
         """
         For phase angle thruster duty cycles (DC_TYPE=TIME_AND_ANGLE); specifies the phase angle
         offset of thruster pulse start, measured with respect to the occurrence of a
@@ -5788,9 +5788,9 @@ class OcmManeuverParameters:
         ...
 
     @dc_pa_start_angle.setter
-    def dc_pa_start_angle(self, value: Optional[float]) -> None: ...
+    def dc_pa_start_angle(self, value: float | None) -> None: ...
     @property
-    def dc_pa_stop_angle(self) -> Optional[float]:
+    def dc_pa_stop_angle(self) -> float | None:
         """
         For phase angle thruster duty cycles (DC_TYPE=TIME_AND_ANGLE); specifies the phase angle
         of thruster pulse stop, measured with respect to the DC_BODY_TRIGGER crossing of the
@@ -5805,9 +5805,9 @@ class OcmManeuverParameters:
         ...
 
     @dc_pa_stop_angle.setter
-    def dc_pa_stop_angle(self, value: Optional[float]) -> None: ...
+    def dc_pa_stop_angle(self, value: float | None) -> None: ...
     @property
-    def dc_ref_dir(self) -> Optional[list[float]]:
+    def dc_ref_dir(self) -> list[float] | None:
         """
         For phase angle thruster duty cycles (DC_TYPE=TIME_AND_ANGLE); specifies the reference
         vector direction in the 'MAN_REF_FRAME' reference frame at which, when mapped into the
@@ -5819,9 +5819,9 @@ class OcmManeuverParameters:
         ...
 
     @dc_ref_dir.setter
-    def dc_ref_dir(self, value: Optional[list[float]]) -> None: ...
+    def dc_ref_dir(self, value: list[float] | None) -> None: ...
     @property
-    def dc_ref_time(self) -> Optional[str]:
+    def dc_ref_time(self) -> str | None:
         """
         Reference time for the THRUST duty cycle, specified as either time in seconds (relative
         to EPOCH_TZERO), or as an absolute '`<epoch>`' (see 7.5.10 for formatting rules).
@@ -5831,9 +5831,9 @@ class OcmManeuverParameters:
         ...
 
     @dc_ref_time.setter
-    def dc_ref_time(self, value: Optional[str]) -> None: ...
+    def dc_ref_time(self, value: str | None) -> None: ...
     @property
-    def dc_time_pulse_duration(self) -> Optional[float]:
+    def dc_time_pulse_duration(self) -> float | None:
         """
         Thruster pulse 'ON' duration, initiated at first satisfaction of the burn 'ON' time
         constraint or upon completion of the previous DC_TIME_PULSE_PERIOD cycle. This keyword
@@ -5844,9 +5844,9 @@ class OcmManeuverParameters:
         ...
 
     @dc_time_pulse_duration.setter
-    def dc_time_pulse_duration(self, value: Optional[float]) -> None: ...
+    def dc_time_pulse_duration(self, value: float | None) -> None: ...
     @property
-    def dc_time_pulse_period(self) -> Optional[float]:
+    def dc_time_pulse_period(self) -> float | None:
         """
         Elapsed time between the start of one pulse and the start of the next. Must be greater
         than or equal to DC_TIME_PULSE_DURATION. This keyword shall be set if DC_TYPE ≠
@@ -5857,7 +5857,7 @@ class OcmManeuverParameters:
         ...
 
     @dc_time_pulse_period.setter
-    def dc_time_pulse_period(self, value: Optional[float]) -> None: ...
+    def dc_time_pulse_period(self, value: float | None) -> None: ...
     @property
     def dc_type(self) -> str:
         """
@@ -5872,7 +5872,7 @@ class OcmManeuverParameters:
     @dc_type.setter
     def dc_type(self, value: str) -> None: ...
     @property
-    def dc_win_close(self) -> Optional[str]:
+    def dc_win_close(self) -> str | None:
         """
         End time of the duty cycle-based maneuver window that occurs on or after the actual
         maneuver execution end time. For example, this may identify the time at which the
@@ -5882,9 +5882,9 @@ class OcmManeuverParameters:
         ...
 
     @dc_win_close.setter
-    def dc_win_close(self, value: Optional[str]) -> None: ...
+    def dc_win_close(self, value: str | None) -> None: ...
     @property
-    def dc_win_open(self) -> Optional[str]:
+    def dc_win_open(self) -> str | None:
         """
         Start time of the duty cycle-based maneuver window that occurs on or prior to the
         actual maneuver execution start time. For example, this may identify the time at which
@@ -5894,9 +5894,9 @@ class OcmManeuverParameters:
         ...
 
     @dc_win_open.setter
-    def dc_win_open(self, value: Optional[str]) -> None: ...
+    def dc_win_open(self, value: str | None) -> None: ...
     @property
-    def grav_assist_name(self) -> Optional[str]:
+    def grav_assist_name(self) -> str | None:
         """
         Origin of maneuver gravitational assist body, which may be a natural solar system body
         (planets, asteroids, comets, and natural satellites), including any planet barycenter
@@ -5906,9 +5906,9 @@ class OcmManeuverParameters:
         ...
 
     @grav_assist_name.setter
-    def grav_assist_name(self, value: Optional[str]) -> None: ...
+    def grav_assist_name(self, value: str | None) -> None: ...
     @property
-    def man_basis(self) -> Optional[str]:
+    def man_basis(self) -> str | None:
         """
         Basis of this maneuver time history data, which shall be selected from one of the
         following values: 'CANDIDATE' for a proposed operational or a hypothetical (i.e.,
@@ -5924,9 +5924,9 @@ class OcmManeuverParameters:
         ...
 
     @man_basis.setter
-    def man_basis(self, value: Optional[str]) -> None: ...
+    def man_basis(self, value: str | None) -> None: ...
     @property
-    def man_basis_id(self) -> Optional[str]:
+    def man_basis_id(self) -> str | None:
         """
         Free-text field containing the identification number for the orbit determination,
         navigation solution, or simulation upon which this maneuver time history block is
@@ -5936,7 +5936,7 @@ class OcmManeuverParameters:
         ...
 
     @man_basis_id.setter
-    def man_basis_id(self, value: Optional[str]) -> None: ...
+    def man_basis_id(self, value: str | None) -> None: ...
     @property
     def man_composition(self) -> str:
         """
@@ -5961,7 +5961,7 @@ class OcmManeuverParameters:
     @man_device_id.setter
     def man_device_id(self, value: str) -> None: ...
     @property
-    def man_frame_epoch(self) -> Optional[str]:
+    def man_frame_epoch(self) -> str | None:
         """
         Epoch of the maneuver data reference frame, if not intrinsic to the definition of the
         reference frame. (See 7.5.10 for formatting rules.)
@@ -5969,7 +5969,7 @@ class OcmManeuverParameters:
         ...
 
     @man_frame_epoch.setter
-    def man_frame_epoch(self, value: Optional[str]) -> None: ...
+    def man_frame_epoch(self, value: str | None) -> None: ...
     @property
     def man_id(self) -> str:
         """
@@ -5992,16 +5992,16 @@ class OcmManeuverParameters:
     @man_lines.setter
     def man_lines(self, value: list[ManLine]) -> None: ...
     @property
-    def man_next_epoch(self) -> Optional[str]:
+    def man_next_epoch(self) -> str | None:
         """
         Identifies the start time of the next maneuver for this MAN_BASIS.
         """
         ...
 
     @man_next_epoch.setter
-    def man_next_epoch(self, value: Optional[str]) -> None: ...
+    def man_next_epoch(self, value: str | None) -> None: ...
     @property
-    def man_next_id(self) -> Optional[str]:
+    def man_next_id(self) -> str | None:
         """
         Free-text field containing the identification number of the next maneuver for this
         MAN_BASIS, contained either within this message, or presented in a future OCM. If this
@@ -6011,9 +6011,9 @@ class OcmManeuverParameters:
         ...
 
     @man_next_id.setter
-    def man_next_id(self, value: Optional[str]) -> None: ...
+    def man_next_id(self, value: str | None) -> None: ...
     @property
-    def man_pred_source(self) -> Optional[str]:
+    def man_pred_source(self) -> str | None:
         """
         For future maneuvers, specifies the source of the orbit and/or attitude state(s) upon
         which the maneuver is based. While there is no CCSDS-based restriction on the value for
@@ -6023,18 +6023,18 @@ class OcmManeuverParameters:
         ...
 
     @man_pred_source.setter
-    def man_pred_source(self, value: Optional[str]) -> None: ...
+    def man_pred_source(self, value: str | None) -> None: ...
     @property
-    def man_prev_epoch(self) -> Optional[str]:
+    def man_prev_epoch(self) -> str | None:
         """
         Identifies the completion time of the previous maneuver for this MAN_BASIS.
         """
         ...
 
     @man_prev_epoch.setter
-    def man_prev_epoch(self, value: Optional[str]) -> None: ...
+    def man_prev_epoch(self, value: str | None) -> None: ...
     @property
-    def man_prev_id(self) -> Optional[str]:
+    def man_prev_id(self) -> str | None:
         """
         Free-text field containing the identification number of the previous maneuver for this
         MAN_BASIS, contained either within this message, or presented in a previous OCM. If
@@ -6045,9 +6045,9 @@ class OcmManeuverParameters:
         ...
 
     @man_prev_id.setter
-    def man_prev_id(self, value: Optional[str]) -> None: ...
+    def man_prev_id(self, value: str | None) -> None: ...
     @property
-    def man_purpose(self) -> Optional[str]:
+    def man_purpose(self) -> str | None:
         """
         A free-text field used to specify the intention(s) of the maneuver. Multiple maneuver
         purposes can be provided as a comma-delimited list.
@@ -6055,7 +6055,7 @@ class OcmManeuverParameters:
         ...
 
     @man_purpose.setter
-    def man_purpose(self, value: Optional[str]) -> None: ...
+    def man_purpose(self, value: str | None) -> None: ...
     @property
     def man_ref_frame(self) -> str:
         """
@@ -6069,7 +6069,7 @@ class OcmManeuverParameters:
     @man_ref_frame.setter
     def man_ref_frame(self, value: str) -> None: ...
     @property
-    def man_units(self) -> Optional[str]:
+    def man_units(self) -> str | None:
         """
         A comma-delimited set of SI unit designations for each and every element of the
         maneuver time history following the maneuver time tag(s), solely for informational
@@ -6083,7 +6083,7 @@ class OcmManeuverParameters:
         ...
 
     @man_units.setter
-    def man_units(self, value: Optional[str]) -> None: ...
+    def man_units(self, value: str | None) -> None: ...
 
 class OcmMetadata:
     """
@@ -6200,56 +6200,56 @@ class OcmMetadata:
         self,
         *,
         epoch_tzero: str,
-        time_system: Optional[str] = None,
-        object_name: Optional[str] = None,
-        international_designator: Optional[str] = None,
-        catalog_name: Optional[str] = None,
-        object_designator: Optional[str] = None,
-        alternate_names: Optional[str] = None,
-        originator_poc: Optional[str] = None,
-        originator_position: Optional[str] = None,
-        originator_phone: Optional[str] = None,
-        originator_email: Optional[str] = None,
-        originator_address: Optional[str] = None,
-        tech_org: Optional[str] = None,
-        tech_poc: Optional[str] = None,
-        tech_position: Optional[str] = None,
-        tech_phone: Optional[str] = None,
-        tech_email: Optional[str] = None,
-        tech_address: Optional[str] = None,
-        previous_message_id: Optional[str] = None,
-        next_message_id: Optional[str] = None,
-        adm_msg_link: Optional[str] = None,
-        cdm_msg_link: Optional[str] = None,
-        prm_msg_link: Optional[str] = None,
-        rdm_msg_link: Optional[str] = None,
-        tdm_msg_link: Optional[str] = None,
-        operator: Optional[str] = None,
-        owner: Optional[str] = None,
-        country: Optional[str] = None,
-        constellation: Optional[str] = None,
-        object_type: Optional[str] = None,
-        ops_status: Optional[str] = None,
-        orbit_category: Optional[str] = None,
-        ocm_data_elements: Optional[str] = None,
-        sclk_offset_at_epoch: Optional[float] = None,
-        sclk_sec_per_si_sec: Optional[float] = None,
-        previous_message_epoch: Optional[str] = None,
-        next_message_epoch: Optional[str] = None,
-        start_time: Optional[str] = None,
-        stop_time: Optional[str] = None,
-        time_span: Optional[float] = None,
-        taimutc_at_tzero: Optional[float] = None,
-        next_leap_epoch: Optional[str] = None,
-        next_leap_taimutc: Optional[float] = None,
-        ut1mutc_at_tzero: Optional[float] = None,
-        eop_source: Optional[str] = None,
-        interp_method_eop: Optional[str] = None,
-        celestial_source: Optional[str] = None,
-        comment: Optional[list[str]] = None,
+        time_system: str | None = None,
+        object_name: str | None = None,
+        international_designator: str | None = None,
+        catalog_name: str | None = None,
+        object_designator: str | None = None,
+        alternate_names: str | None = None,
+        originator_poc: str | None = None,
+        originator_position: str | None = None,
+        originator_phone: str | None = None,
+        originator_email: str | None = None,
+        originator_address: str | None = None,
+        tech_org: str | None = None,
+        tech_poc: str | None = None,
+        tech_position: str | None = None,
+        tech_phone: str | None = None,
+        tech_email: str | None = None,
+        tech_address: str | None = None,
+        previous_message_id: str | None = None,
+        next_message_id: str | None = None,
+        adm_msg_link: str | None = None,
+        cdm_msg_link: str | None = None,
+        prm_msg_link: str | None = None,
+        rdm_msg_link: str | None = None,
+        tdm_msg_link: str | None = None,
+        operator: str | None = None,
+        owner: str | None = None,
+        country: str | None = None,
+        constellation: str | None = None,
+        object_type: str | None = None,
+        ops_status: str | None = None,
+        orbit_category: str | None = None,
+        ocm_data_elements: str | None = None,
+        sclk_offset_at_epoch: float | None = None,
+        sclk_sec_per_si_sec: float | None = None,
+        previous_message_epoch: str | None = None,
+        next_message_epoch: str | None = None,
+        start_time: str | None = None,
+        stop_time: str | None = None,
+        time_span: float | None = None,
+        taimutc_at_tzero: float | None = None,
+        next_leap_epoch: str | None = None,
+        next_leap_taimutc: float | None = None,
+        ut1mutc_at_tzero: float | None = None,
+        eop_source: str | None = None,
+        interp_method_eop: str | None = None,
+        celestial_source: str | None = None,
+        comment: list[str] | None = None,
     ) -> None: ...
     @property
-    def adm_msg_link(self) -> Optional[str]:
+    def adm_msg_link(self) -> str | None:
         """
         Free-text field containing a unique identifier of Attitude Data Message (ADM)
         (reference `[10]`) that are linked (relevant) to this Orbit Data Message.
@@ -6259,9 +6259,9 @@ class OcmMetadata:
         ...
 
     @adm_msg_link.setter
-    def adm_msg_link(self, value: Optional[str]) -> None: ...
+    def adm_msg_link(self, value: str | None) -> None: ...
     @property
-    def alternate_names(self) -> Optional[str]:
+    def alternate_names(self) -> str | None:
         """
         Free-text comma-delimited field containing alternate name(s) of this space object,
         including assigned names used by spacecraft operator, State Actors, commercial SSA
@@ -6272,9 +6272,9 @@ class OcmMetadata:
         ...
 
     @alternate_names.setter
-    def alternate_names(self, value: Optional[str]) -> None: ...
+    def alternate_names(self, value: str | None) -> None: ...
     @property
-    def catalog_name(self) -> Optional[str]:
+    def catalog_name(self) -> str | None:
         """
         Free-text field containing the satellite catalog source (or source agency or operator,
         value to be drawn from the SANA registry list of Space Object Catalogs at
@@ -6288,9 +6288,9 @@ class OcmMetadata:
         ...
 
     @catalog_name.setter
-    def catalog_name(self, value: Optional[str]) -> None: ...
+    def catalog_name(self, value: str | None) -> None: ...
     @property
-    def cdm_msg_link(self) -> Optional[str]:
+    def cdm_msg_link(self) -> str | None:
         """
         Free-text field containing a unique identifier of Conjunction Data Message (CDM)
         (reference `[14]`) that are linked (relevant) to this Orbit Data Message.
@@ -6300,9 +6300,9 @@ class OcmMetadata:
         ...
 
     @cdm_msg_link.setter
-    def cdm_msg_link(self, value: Optional[str]) -> None: ...
+    def cdm_msg_link(self, value: str | None) -> None: ...
     @property
-    def celestial_source(self) -> Optional[str]:
+    def celestial_source(self) -> str | None:
         """
         Free-text field specifying the source and version of the message originator's celestial
         body (e.g., Sun/Earth/Planetary) ephemeris data used in the creation of this message.
@@ -6312,7 +6312,7 @@ class OcmMetadata:
         ...
 
     @celestial_source.setter
-    def celestial_source(self, value: Optional[str]) -> None: ...
+    def celestial_source(self, value: str | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -6324,7 +6324,7 @@ class OcmMetadata:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def constellation(self) -> Optional[str]:
+    def constellation(self) -> str | None:
         """
         Free-text field containing the name of the constellation to which this space object
         belongs.
@@ -6334,9 +6334,9 @@ class OcmMetadata:
         ...
 
     @constellation.setter
-    def constellation(self, value: Optional[str]) -> None: ...
+    def constellation(self, value: str | None) -> None: ...
     @property
-    def country(self) -> Optional[str]:
+    def country(self) -> str | None:
         """
         Free-text field containing the name of the country, country code, or country
         abbreviation where the space object owner is based.
@@ -6346,9 +6346,9 @@ class OcmMetadata:
         ...
 
     @country.setter
-    def country(self, value: Optional[str]) -> None: ...
+    def country(self, value: str | None) -> None: ...
     @property
-    def eop_source(self) -> Optional[str]:
+    def eop_source(self) -> str | None:
         """
         Free-text field specifying the source and version of the message originator's Earth
         Orientation Parameters (EOP) used in the creation of this message, including leap
@@ -6359,7 +6359,7 @@ class OcmMetadata:
         ...
 
     @eop_source.setter
-    def eop_source(self, value: Optional[str]) -> None: ...
+    def eop_source(self, value: str | None) -> None: ...
     @property
     def epoch_tzero(self) -> str:
         """
@@ -6376,7 +6376,7 @@ class OcmMetadata:
     @epoch_tzero.setter
     def epoch_tzero(self, value: str) -> None: ...
     @property
-    def international_designator(self) -> Optional[str]:
+    def international_designator(self) -> str | None:
         """
         Free-text field containing an international designator for the object as assigned by
         the UN Committee on Space Research (COSPAR). Such designator values shall have the
@@ -6393,9 +6393,9 @@ class OcmMetadata:
         ...
 
     @international_designator.setter
-    def international_designator(self, value: Optional[str]) -> None: ...
+    def international_designator(self, value: str | None) -> None: ...
     @property
-    def interp_method_eop(self) -> Optional[str]:
+    def interp_method_eop(self) -> str | None:
         """
         Free-text field specifying the method used to select or interpolate sequential EOP data.
 
@@ -6404,9 +6404,9 @@ class OcmMetadata:
         ...
 
     @interp_method_eop.setter
-    def interp_method_eop(self, value: Optional[str]) -> None: ...
+    def interp_method_eop(self, value: str | None) -> None: ...
     @property
-    def next_leap_epoch(self) -> Optional[str]:
+    def next_leap_epoch(self) -> str | None:
         """
         Epoch of next leap second, specified as an absolute time tag.
 
@@ -6415,9 +6415,9 @@ class OcmMetadata:
         ...
 
     @next_leap_epoch.setter
-    def next_leap_epoch(self, value: Optional[str]) -> None: ...
+    def next_leap_epoch(self, value: str | None) -> None: ...
     @property
-    def next_leap_taimutc(self) -> Optional[float]:
+    def next_leap_taimutc(self) -> float | None:
         """
         Difference (TAI – UTC) in seconds (i.e., total number of leap seconds elapsed since
         1958) incorporated by the message originator at epoch 'NEXT_LEAP_EPOCH'. This keyword
@@ -6428,9 +6428,9 @@ class OcmMetadata:
         ...
 
     @next_leap_taimutc.setter
-    def next_leap_taimutc(self, value: Optional[float]) -> None: ...
+    def next_leap_taimutc(self, value: float | None) -> None: ...
     @property
-    def next_message_epoch(self) -> Optional[str]:
+    def next_message_epoch(self) -> str | None:
         """
         Anticipated (or actual) epoch of the next message from this originator for this space
         object. (For format specification, see 7.5.10.) NOTE—One may provide the next message
@@ -6441,9 +6441,9 @@ class OcmMetadata:
         ...
 
     @next_message_epoch.setter
-    def next_message_epoch(self, value: Optional[str]) -> None: ...
+    def next_message_epoch(self, value: str | None) -> None: ...
     @property
-    def next_message_id(self) -> Optional[str]:
+    def next_message_id(self) -> str | None:
         """
         Free-text field containing an ID that uniquely identifies the next message from this
         message originator for this space object. The format and content of the message
@@ -6455,9 +6455,9 @@ class OcmMetadata:
         ...
 
     @next_message_id.setter
-    def next_message_id(self, value: Optional[str]) -> None: ...
+    def next_message_id(self, value: str | None) -> None: ...
     @property
-    def object_designator(self) -> Optional[str]:
+    def object_designator(self) -> str | None:
         """
         Free-text field specification of the unique satellite identification designator for the
         object, as reflected in the catalog whose name is 'CATALOG_NAME'. If the ID is not known
@@ -6469,9 +6469,9 @@ class OcmMetadata:
         ...
 
     @object_designator.setter
-    def object_designator(self, value: Optional[str]) -> None: ...
+    def object_designator(self, value: str | None) -> None: ...
     @property
-    def object_name(self) -> Optional[str]:
+    def object_name(self) -> str | None:
         """
         Free-text field containing the name of the object. While there is no CCSDS-based
         restriction on the value for this keyword, it is recommended to use names from either
@@ -6487,9 +6487,9 @@ class OcmMetadata:
         ...
 
     @object_name.setter
-    def object_name(self, value: Optional[str]) -> None: ...
+    def object_name(self, value: str | None) -> None: ...
     @property
-    def object_type(self) -> Optional[str]:
+    def object_type(self) -> str | None:
         """
         Specification of the type of object. Select from the accepted set of values indicated
         in annex B, subsection B11.
@@ -6499,9 +6499,9 @@ class OcmMetadata:
         ...
 
     @object_type.setter
-    def object_type(self, value: Optional[str]) -> None: ...
+    def object_type(self, value: str | None) -> None: ...
     @property
-    def ocm_data_elements(self) -> Optional[str]:
+    def ocm_data_elements(self) -> str | None:
         """
         Comma-delimited list of elements of information data blocks included in this message.
         The order shall be the same as the order of the data blocks in the message. Values shall
@@ -6514,9 +6514,9 @@ class OcmMetadata:
         ...
 
     @ocm_data_elements.setter
-    def ocm_data_elements(self, value: Optional[str]) -> None: ...
+    def ocm_data_elements(self, value: str | None) -> None: ...
     @property
-    def operator(self) -> Optional[str]:
+    def operator(self) -> str | None:
         """
         Free-text field containing the operator of the space object.
 
@@ -6525,9 +6525,9 @@ class OcmMetadata:
         ...
 
     @operator.setter
-    def operator(self, value: Optional[str]) -> None: ...
+    def operator(self, value: str | None) -> None: ...
     @property
-    def ops_status(self) -> Optional[str]:
+    def ops_status(self) -> str | None:
         """
         Specification of the operational status of the space object. Select from the accepted
         set of values indicated in annex B, subsection B12.
@@ -6537,9 +6537,9 @@ class OcmMetadata:
         ...
 
     @ops_status.setter
-    def ops_status(self, value: Optional[str]) -> None: ...
+    def ops_status(self, value: str | None) -> None: ...
     @property
-    def orbit_category(self) -> Optional[str]:
+    def orbit_category(self) -> str | None:
         """
         Specification of the type of orbit. Select from the accepted set of values indicated in
         annex B, subsection B14.
@@ -6549,9 +6549,9 @@ class OcmMetadata:
         ...
 
     @orbit_category.setter
-    def orbit_category(self, value: Optional[str]) -> None: ...
+    def orbit_category(self, value: str | None) -> None: ...
     @property
-    def originator_address(self) -> Optional[str]:
+    def originator_address(self) -> str | None:
         """
         Free-text field containing originator's physical address information for OCM creator
         (suggest comma-delimited address lines).
@@ -6561,9 +6561,9 @@ class OcmMetadata:
         ...
 
     @originator_address.setter
-    def originator_address(self, value: Optional[str]) -> None: ...
+    def originator_address(self, value: str | None) -> None: ...
     @property
-    def originator_email(self) -> Optional[str]:
+    def originator_email(self) -> str | None:
         """
         Free-text field containing originator PoC email address.
 
@@ -6572,9 +6572,9 @@ class OcmMetadata:
         ...
 
     @originator_email.setter
-    def originator_email(self, value: Optional[str]) -> None: ...
+    def originator_email(self, value: str | None) -> None: ...
     @property
-    def originator_phone(self) -> Optional[str]:
+    def originator_phone(self) -> str | None:
         """
         Free-text field containing originator PoC phone number.
 
@@ -6583,9 +6583,9 @@ class OcmMetadata:
         ...
 
     @originator_phone.setter
-    def originator_phone(self, value: Optional[str]) -> None: ...
+    def originator_phone(self, value: str | None) -> None: ...
     @property
-    def originator_poc(self) -> Optional[str]:
+    def originator_poc(self) -> str | None:
         """
         Free-text field containing originator or programmatic Point-of-Contact (POC) for OCM.
 
@@ -6594,9 +6594,9 @@ class OcmMetadata:
         ...
 
     @originator_poc.setter
-    def originator_poc(self, value: Optional[str]) -> None: ...
+    def originator_poc(self, value: str | None) -> None: ...
     @property
-    def originator_position(self) -> Optional[str]:
+    def originator_position(self) -> str | None:
         """
         Free-text field containing contact position of the originator PoC.
 
@@ -6605,9 +6605,9 @@ class OcmMetadata:
         ...
 
     @originator_position.setter
-    def originator_position(self, value: Optional[str]) -> None: ...
+    def originator_position(self, value: str | None) -> None: ...
     @property
-    def owner(self) -> Optional[str]:
+    def owner(self) -> str | None:
         """
         Free-text field containing the owner of the space object.
 
@@ -6616,9 +6616,9 @@ class OcmMetadata:
         ...
 
     @owner.setter
-    def owner(self, value: Optional[str]) -> None: ...
+    def owner(self, value: str | None) -> None: ...
     @property
-    def previous_message_epoch(self) -> Optional[str]:
+    def previous_message_epoch(self) -> str | None:
         """
         Creation epoch of the previous message from this originator for this space object. (For
         format specification, see 7.5.10.) NOTE—One may provide the previous message epoch
@@ -6629,9 +6629,9 @@ class OcmMetadata:
         ...
 
     @previous_message_epoch.setter
-    def previous_message_epoch(self, value: Optional[str]) -> None: ...
+    def previous_message_epoch(self, value: str | None) -> None: ...
     @property
-    def previous_message_id(self) -> Optional[str]:
+    def previous_message_id(self) -> str | None:
         """
         Free-text field containing an ID that uniquely identifies the previous message from
         this message originator for this space object. The format and content of the message
@@ -6644,9 +6644,9 @@ class OcmMetadata:
         ...
 
     @previous_message_id.setter
-    def previous_message_id(self, value: Optional[str]) -> None: ...
+    def previous_message_id(self, value: str | None) -> None: ...
     @property
-    def prm_msg_link(self) -> Optional[str]:
+    def prm_msg_link(self) -> str | None:
         """
         Free-text field containing a unique identifier of Pointing Request Message (PRM)
         (reference `[13]`) that are linked (relevant) to this Orbit Data Message.
@@ -6656,9 +6656,9 @@ class OcmMetadata:
         ...
 
     @prm_msg_link.setter
-    def prm_msg_link(self, value: Optional[str]) -> None: ...
+    def prm_msg_link(self, value: str | None) -> None: ...
     @property
-    def rdm_msg_link(self) -> Optional[str]:
+    def rdm_msg_link(self) -> str | None:
         """
         Free-text field containing a unique identifier of Reentry Data Message (RDM)
         (reference `[12]`) that are linked (relevant) to this Orbit Data Message.
@@ -6668,9 +6668,9 @@ class OcmMetadata:
         ...
 
     @rdm_msg_link.setter
-    def rdm_msg_link(self, value: Optional[str]) -> None: ...
+    def rdm_msg_link(self, value: str | None) -> None: ...
     @property
-    def sclk_offset_at_epoch(self) -> Optional[float]:
+    def sclk_offset_at_epoch(self) -> float | None:
         """
         Defines the number of spacecraft clock counts existing at EPOCH_TZERO. This is only
         used if the SCLK timescale is employed by the user.
@@ -6680,9 +6680,9 @@ class OcmMetadata:
         ...
 
     @sclk_offset_at_epoch.setter
-    def sclk_offset_at_epoch(self, value: Optional[float]) -> None: ...
+    def sclk_offset_at_epoch(self, value: float | None) -> None: ...
     @property
-    def sclk_sec_per_si_sec(self) -> Optional[float]:
+    def sclk_sec_per_si_sec(self) -> float | None:
         """
         Defines the current number of clock seconds occurring during one SI second. It should be
         noted that this clock rate may vary with time and is the current approximate value.
@@ -6693,9 +6693,9 @@ class OcmMetadata:
         ...
 
     @sclk_sec_per_si_sec.setter
-    def sclk_sec_per_si_sec(self, value: Optional[float]) -> None: ...
+    def sclk_sec_per_si_sec(self, value: float | None) -> None: ...
     @property
-    def start_time(self) -> Optional[str]:
+    def start_time(self) -> str | None:
         """
         Time of the earliest data contained in the OCM, specified as either a relative or
         absolute time tag.
@@ -6705,9 +6705,9 @@ class OcmMetadata:
         ...
 
     @start_time.setter
-    def start_time(self, value: Optional[str]) -> None: ...
+    def start_time(self, value: str | None) -> None: ...
     @property
-    def stop_time(self) -> Optional[str]:
+    def stop_time(self) -> str | None:
         """
         Time of the latest data contained in the OCM, specified as either a relative or absolute
         time tag.
@@ -6717,9 +6717,9 @@ class OcmMetadata:
         ...
 
     @stop_time.setter
-    def stop_time(self, value: Optional[str]) -> None: ...
+    def stop_time(self, value: str | None) -> None: ...
     @property
-    def taimutc_at_tzero(self) -> Optional[float]:
+    def taimutc_at_tzero(self) -> float | None:
         """
         Difference (TAI – UTC) in seconds (i.e., total number of leap seconds elapsed since
         1958) as modeled by the message originator at epoch 'EPOCH_TZERO'.
@@ -6729,9 +6729,9 @@ class OcmMetadata:
         ...
 
     @taimutc_at_tzero.setter
-    def taimutc_at_tzero(self, value: Optional[float]) -> None: ...
+    def taimutc_at_tzero(self, value: float | None) -> None: ...
     @property
-    def tdm_msg_link(self) -> Optional[str]:
+    def tdm_msg_link(self) -> str | None:
         """
         Free-text string containing a comma-separated list of file name(s) and/or associated
         identification number(s) of Tracking Data Message (TDM) (reference `[9]`) observations
@@ -6742,9 +6742,9 @@ class OcmMetadata:
         ...
 
     @tdm_msg_link.setter
-    def tdm_msg_link(self, value: Optional[str]) -> None: ...
+    def tdm_msg_link(self, value: str | None) -> None: ...
     @property
-    def tech_address(self) -> Optional[str]:
+    def tech_address(self) -> str | None:
         """
         Free-text field containing technical PoC physical address information for OCM creator
         (suggest comma-delimited address lines).
@@ -6754,9 +6754,9 @@ class OcmMetadata:
         ...
 
     @tech_address.setter
-    def tech_address(self, value: Optional[str]) -> None: ...
+    def tech_address(self, value: str | None) -> None: ...
     @property
-    def tech_email(self) -> Optional[str]:
+    def tech_email(self) -> str | None:
         """
         Free-text field containing technical PoC email address.
 
@@ -6765,9 +6765,9 @@ class OcmMetadata:
         ...
 
     @tech_email.setter
-    def tech_email(self, value: Optional[str]) -> None: ...
+    def tech_email(self, value: str | None) -> None: ...
     @property
-    def tech_org(self) -> Optional[str]:
+    def tech_org(self) -> str | None:
         """
         Free-text field containing the creating agency or operator (value should be drawn from
         the 'Abbreviation' column of the SANA Organizations registry at
@@ -6778,9 +6778,9 @@ class OcmMetadata:
         ...
 
     @tech_org.setter
-    def tech_org(self, value: Optional[str]) -> None: ...
+    def tech_org(self, value: str | None) -> None: ...
     @property
-    def tech_phone(self) -> Optional[str]:
+    def tech_phone(self) -> str | None:
         """
         Free-text field containing technical PoC phone number.
 
@@ -6789,9 +6789,9 @@ class OcmMetadata:
         ...
 
     @tech_phone.setter
-    def tech_phone(self, value: Optional[str]) -> None: ...
+    def tech_phone(self, value: str | None) -> None: ...
     @property
-    def tech_poc(self) -> Optional[str]:
+    def tech_poc(self) -> str | None:
         """
         Free-text field containing technical PoC for OCM.
 
@@ -6800,9 +6800,9 @@ class OcmMetadata:
         ...
 
     @tech_poc.setter
-    def tech_poc(self, value: Optional[str]) -> None: ...
+    def tech_poc(self, value: str | None) -> None: ...
     @property
-    def tech_position(self) -> Optional[str]:
+    def tech_position(self) -> str | None:
         """
         Free-text field containing contact position of the technical PoC.
 
@@ -6811,9 +6811,9 @@ class OcmMetadata:
         ...
 
     @tech_position.setter
-    def tech_position(self, value: Optional[str]) -> None: ...
+    def tech_position(self, value: str | None) -> None: ...
     @property
-    def time_span(self) -> Optional[float]:
+    def time_span(self) -> float | None:
         """
         Span of time that the OCM covers, measured in days. TIME_SPAN is defined as
         (STOP_TIME-START_TIME), measured in days, irrespective of whether START_TIME or
@@ -6824,7 +6824,7 @@ class OcmMetadata:
         ...
 
     @time_span.setter
-    def time_span(self, value: Optional[float]) -> None: ...
+    def time_span(self, value: float | None) -> None: ...
     @property
     def time_system(self) -> str:
         """
@@ -6841,7 +6841,7 @@ class OcmMetadata:
     @time_system.setter
     def time_system(self, value: str) -> None: ...
     @property
-    def ut1mutc_at_tzero(self) -> Optional[float]:
+    def ut1mutc_at_tzero(self) -> float | None:
         """
         Difference (UT1 – UTC) in seconds, as modeled by the originator at epoch 'EPOCH_TZERO'.
 
@@ -6850,7 +6850,7 @@ class OcmMetadata:
         ...
 
     @ut1mutc_at_tzero.setter
-    def ut1mutc_at_tzero(self, value: Optional[float]) -> None: ...
+    def ut1mutc_at_tzero(self, value: float | None) -> None: ...
 
 class OcmOdParameters:
     """
@@ -6880,11 +6880,11 @@ class OcmOdParameters:
         od_id: str,
         od_method: str,
         od_epoch: str,
-        od_prev_id: Optional[str] = None,
-        comment: Optional[list[str]] = None,
+        od_prev_id: str | None = None,
+        comment: list[str] | None = None,
     ) -> None: ...
     @property
-    def actual_od_span(self) -> Optional[float]:
+    def actual_od_span(self) -> float | None:
         """
         Actual time span in days used for the OD of the object. NOTE—Should equal
         (DAYS_SINCE_FIRST_OBS - DAYS_SINCE_LAST_OBS).
@@ -6894,7 +6894,7 @@ class OcmOdParameters:
         ...
 
     @actual_od_span.setter
-    def actual_od_span(self, value: Optional[float]) -> None: ...
+    def actual_od_span(self, value: float | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -6905,16 +6905,16 @@ class OcmOdParameters:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def consider_n(self) -> Optional[int]:
+    def consider_n(self) -> int | None:
         """
         The number of consider parameters used in the orbit determination.
         """
         ...
 
     @consider_n.setter
-    def consider_n(self, value: Optional[int]) -> None: ...
+    def consider_n(self, value: int | None) -> None: ...
     @property
-    def consider_params(self) -> Optional[str]:
+    def consider_params(self) -> str | None:
         """
         Free-text comma-delimited description of the consider parameters used in the orbit
         determination.
@@ -6922,9 +6922,9 @@ class OcmOdParameters:
         ...
 
     @consider_params.setter
-    def consider_params(self, value: Optional[str]) -> None: ...
+    def consider_params(self, value: str | None) -> None: ...
     @property
-    def data_types(self) -> Optional[str]:
+    def data_types(self) -> str | None:
         """
         Comma-separated list of observation data types utilized in this orbit determination.
         Although this is a free-text field, it is recommended at a minimum to use data type
@@ -6937,9 +6937,9 @@ class OcmOdParameters:
         ...
 
     @data_types.setter
-    def data_types(self, value: Optional[str]) -> None: ...
+    def data_types(self, value: str | None) -> None: ...
     @property
-    def days_since_first_obs(self) -> Optional[float]:
+    def days_since_first_obs(self) -> float | None:
         """
         Days elapsed between first accepted observation and OD_EPOCH.
 
@@ -6955,9 +6955,9 @@ class OcmOdParameters:
         ...
 
     @days_since_first_obs.setter
-    def days_since_first_obs(self, value: Optional[float]) -> None: ...
+    def days_since_first_obs(self, value: float | None) -> None: ...
     @property
-    def days_since_last_obs(self) -> Optional[float]:
+    def days_since_last_obs(self) -> float | None:
         """
         Days elapsed between last accepted observation and OD_EPOCH. NOTE—May be positive or
         negative.
@@ -6967,9 +6967,9 @@ class OcmOdParameters:
         ...
 
     @days_since_last_obs.setter
-    def days_since_last_obs(self, value: Optional[float]) -> None: ...
+    def days_since_last_obs(self, value: float | None) -> None: ...
     @property
-    def gdop(self) -> Optional[float]:
+    def gdop(self) -> float | None:
         """
         Generalized Dilution Of Precision for this orbit determination, based on the
         observability grammian as defined in references `[H15]` and `[H16]` and expressed in
@@ -6980,9 +6980,9 @@ class OcmOdParameters:
         ...
 
     @gdop.setter
-    def gdop(self, value: Optional[float]) -> None: ...
+    def gdop(self, value: float | None) -> None: ...
     @property
-    def maximum_obs_gap(self) -> Optional[float]:
+    def maximum_obs_gap(self) -> float | None:
         """
         The maximum time between observations in the OD of the object.
 
@@ -6991,27 +6991,27 @@ class OcmOdParameters:
         ...
 
     @maximum_obs_gap.setter
-    def maximum_obs_gap(self, value: Optional[float]) -> None: ...
+    def maximum_obs_gap(self, value: float | None) -> None: ...
     @property
-    def obs_available(self) -> Optional[int]:
+    def obs_available(self) -> int | None:
         """
         The number of observations available within the actual OD time span.
         """
         ...
 
     @obs_available.setter
-    def obs_available(self, value: Optional[int]) -> None: ...
+    def obs_available(self, value: int | None) -> None: ...
     @property
-    def obs_used(self) -> Optional[int]:
+    def obs_used(self) -> int | None:
         """
         The number of observations accepted within the actual OD time span.
         """
         ...
 
     @obs_used.setter
-    def obs_used(self, value: Optional[int]) -> None: ...
+    def obs_used(self, value: int | None) -> None: ...
     @property
-    def od_confidence(self) -> Optional[float]:
+    def od_confidence(self) -> float | None:
         """
         OD confidence metric, which spans 0 to 100% (useful only for Filter-based OD systems).
         The OD confidence metric shall be as mutually defined by message exchange
@@ -7022,7 +7022,7 @@ class OcmOdParameters:
         ...
 
     @od_confidence.setter
-    def od_confidence(self, value: Optional[float]) -> None: ...
+    def od_confidence(self, value: float | None) -> None: ...
     @property
     def od_epoch(self) -> str:
         """
@@ -7036,7 +7036,7 @@ class OcmOdParameters:
     @od_epoch.setter
     def od_epoch(self, value: str) -> None: ...
     @property
-    def od_epoch_eigint(self) -> Optional[float]:
+    def od_epoch_eigint(self) -> float | None:
         """
         Positional error ellipsoid 1σ intermediate eigenvalue at the epoch of the OD.
 
@@ -7045,9 +7045,9 @@ class OcmOdParameters:
         ...
 
     @od_epoch_eigint.setter
-    def od_epoch_eigint(self, value: Optional[float]) -> None: ...
+    def od_epoch_eigint(self, value: float | None) -> None: ...
     @property
-    def od_epoch_eigmaj(self) -> Optional[float]:
+    def od_epoch_eigmaj(self) -> float | None:
         """
         Positional error ellipsoid 1σ major eigenvalue at the epoch of the OD.
 
@@ -7056,9 +7056,9 @@ class OcmOdParameters:
         ...
 
     @od_epoch_eigmaj.setter
-    def od_epoch_eigmaj(self, value: Optional[float]) -> None: ...
+    def od_epoch_eigmaj(self, value: float | None) -> None: ...
     @property
-    def od_epoch_eigmin(self) -> Optional[float]:
+    def od_epoch_eigmin(self) -> float | None:
         """
         Positional error ellipsoid 1σ minor eigenvalue at the epoch of the OD.
 
@@ -7067,7 +7067,7 @@ class OcmOdParameters:
         ...
 
     @od_epoch_eigmin.setter
-    def od_epoch_eigmin(self, value: Optional[float]) -> None: ...
+    def od_epoch_eigmin(self, value: float | None) -> None: ...
     @property
     def od_id(self) -> str:
         """
@@ -7080,7 +7080,7 @@ class OcmOdParameters:
     @od_id.setter
     def od_id(self, value: str) -> None: ...
     @property
-    def od_max_pred_eigmaj(self) -> Optional[float]:
+    def od_max_pred_eigmaj(self) -> float | None:
         """
         The resulting maximum predicted major eigenvalue of the 1σ positional error ellipsoid
         over the entire TIME_SPAN of the OCM, stemming from this OD.
@@ -7090,7 +7090,7 @@ class OcmOdParameters:
         ...
 
     @od_max_pred_eigmaj.setter
-    def od_max_pred_eigmaj(self, value: Optional[float]) -> None: ...
+    def od_max_pred_eigmaj(self, value: float | None) -> None: ...
     @property
     def od_method(self) -> str:
         """
@@ -7103,7 +7103,7 @@ class OcmOdParameters:
     @od_method.setter
     def od_method(self, value: str) -> None: ...
     @property
-    def od_min_pred_eigmin(self) -> Optional[float]:
+    def od_min_pred_eigmin(self) -> float | None:
         """
         The resulting minimum predicted minor eigenvalue of the 1σ positional error ellipsoid
         over the entire TIME_SPAN of the OCM, stemming from this OD.
@@ -7113,9 +7113,9 @@ class OcmOdParameters:
         ...
 
     @od_min_pred_eigmin.setter
-    def od_min_pred_eigmin(self, value: Optional[float]) -> None: ...
+    def od_min_pred_eigmin(self, value: float | None) -> None: ...
     @property
-    def od_prev_id(self) -> Optional[str]:
+    def od_prev_id(self) -> str | None:
         """
         Optional identification number for the previous orbit determination.
 
@@ -7124,9 +7124,9 @@ class OcmOdParameters:
         ...
 
     @od_prev_id.setter
-    def od_prev_id(self, value: Optional[str]) -> None: ...
+    def od_prev_id(self, value: str | None) -> None: ...
     @property
-    def recommended_od_span(self) -> Optional[float]:
+    def recommended_od_span(self) -> float | None:
         """
         Number of days of observations recommended for the OD of the object (useful only for
         Batch OD systems).
@@ -7136,9 +7136,9 @@ class OcmOdParameters:
         ...
 
     @recommended_od_span.setter
-    def recommended_od_span(self, value: Optional[float]) -> None: ...
+    def recommended_od_span(self, value: float | None) -> None: ...
     @property
-    def sedr(self) -> Optional[float]:
+    def sedr(self) -> float | None:
         """
         The Specific Energy Dissipation Rate, which is the amount of energy being removed from
         the object's orbit by the non-conservative forces. This value is an average
@@ -7149,36 +7149,36 @@ class OcmOdParameters:
         ...
 
     @sedr.setter
-    def sedr(self, value: Optional[float]) -> None: ...
+    def sedr(self, value: float | None) -> None: ...
     @property
-    def sensors(self) -> Optional[str]:
+    def sensors(self) -> str | None:
         """
         Free-text comma-delimited description of the sensors used in the orbit determination.
         """
         ...
 
     @sensors.setter
-    def sensors(self, value: Optional[str]) -> None: ...
+    def sensors(self, value: str | None) -> None: ...
     @property
-    def sensors_n(self) -> Optional[int]:
+    def sensors_n(self) -> int | None:
         """
         The number of sensors used in the orbit determination.
         """
         ...
 
     @sensors_n.setter
-    def sensors_n(self, value: Optional[int]) -> None: ...
+    def sensors_n(self, value: int | None) -> None: ...
     @property
-    def solve_n(self) -> Optional[int]:
+    def solve_n(self) -> int | None:
         """
         The number of solve-for states in the orbit determination.
         """
         ...
 
     @solve_n.setter
-    def solve_n(self, value: Optional[int]) -> None: ...
+    def solve_n(self, value: int | None) -> None: ...
     @property
-    def solve_states(self) -> Optional[str]:
+    def solve_states(self) -> str | None:
         """
         Free-text comma-delimited description of the state elements solved for in the orbit
         determination.
@@ -7186,9 +7186,9 @@ class OcmOdParameters:
         ...
 
     @solve_states.setter
-    def solve_states(self, value: Optional[str]) -> None: ...
+    def solve_states(self, value: str | None) -> None: ...
     @property
-    def tracks_available(self) -> Optional[int]:
+    def tracks_available(self) -> int | None:
         """
         The number of sensor tracks available for the OD within the actual time span (see
         definition of 'tracks', 1.5.2).
@@ -7196,9 +7196,9 @@ class OcmOdParameters:
         ...
 
     @tracks_available.setter
-    def tracks_available(self, value: Optional[int]) -> None: ...
+    def tracks_available(self, value: int | None) -> None: ...
     @property
-    def tracks_used(self) -> Optional[int]:
+    def tracks_used(self) -> int | None:
         """
         The number of sensor tracks accepted for the OD within the actual time span (see
         definition of 'tracks', 1.5.2).
@@ -7206,9 +7206,9 @@ class OcmOdParameters:
         ...
 
     @tracks_used.setter
-    def tracks_used(self, value: Optional[int]) -> None: ...
+    def tracks_used(self, value: int | None) -> None: ...
     @property
-    def weighted_rms(self) -> Optional[float]:
+    def weighted_rms(self) -> float | None:
         """
         (Useful/valid only for Batch OD systems.) The weighted RMS residual ratio, defined as:
         .. math:: \text{Weighted RMS} = \sqrt{\frac{\sum_{i=1}^{N} w_i(y_i - \hat{y}_i)^2}{N}}
@@ -7221,7 +7221,7 @@ class OcmOdParameters:
         ...
 
     @weighted_rms.setter
-    def weighted_rms(self, value: Optional[float]) -> None: ...
+    def weighted_rms(self, value: float | None) -> None: ...
 
 class OcmPerturbations:
     """
@@ -7235,25 +7235,25 @@ class OcmPerturbations:
     """
     def __init__(self) -> None: ...
     @property
-    def albedo_grid_size(self) -> Optional[int]:
+    def albedo_grid_size(self) -> int | None:
         """
         Size of the albedo grid.
         """
         ...
 
     @albedo_grid_size.setter
-    def albedo_grid_size(self, value: Optional[int]) -> None: ...
+    def albedo_grid_size(self, value: int | None) -> None: ...
     @property
-    def albedo_model(self) -> Optional[str]:
+    def albedo_model(self) -> str | None:
         """
         Name of the albedo model.
         """
         ...
 
     @albedo_model.setter
-    def albedo_model(self, value: Optional[str]) -> None: ...
+    def albedo_model(self, value: str | None) -> None: ...
     @property
-    def atmospheric_model(self) -> Optional[str]:
+    def atmospheric_model(self) -> str | None:
         """
         Name of atmosphere model, which shall be selected from the accepted set of values
         indicated in annex B, subsection B9.
@@ -7263,9 +7263,9 @@ class OcmPerturbations:
         ...
 
     @atmospheric_model.setter
-    def atmospheric_model(self, value: Optional[str]) -> None: ...
+    def atmospheric_model(self, value: str | None) -> None: ...
     @property
-    def central_body_rotation(self) -> Optional[float]:
+    def central_body_rotation(self) -> float | None:
         """
         Central body angular rotation rate, measured about the major principal axis of the
         inertia tensor of the central body, relating inertial, and central-body-fixed
@@ -7277,7 +7277,7 @@ class OcmPerturbations:
         ...
 
     @central_body_rotation.setter
-    def central_body_rotation(self, value: Optional[float]) -> None: ...
+    def central_body_rotation(self, value: float | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -7290,7 +7290,7 @@ class OcmPerturbations:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def equatorial_radius(self) -> Optional[float]:
+    def equatorial_radius(self) -> float | None:
         """
         Oblate spheroid equatorial radius of the central body used in the message, if
         different from the gravity model.
@@ -7300,9 +7300,9 @@ class OcmPerturbations:
         ...
 
     @equatorial_radius.setter
-    def equatorial_radius(self, value: Optional[float]) -> None: ...
+    def equatorial_radius(self, value: float | None) -> None: ...
     @property
-    def fixed_f10p7(self) -> Optional[float]:
+    def fixed_f10p7(self) -> float | None:
         """
         Fixed F10.7 solar flux.
 
@@ -7311,9 +7311,9 @@ class OcmPerturbations:
         ...
 
     @fixed_f10p7.setter
-    def fixed_f10p7(self, value: Optional[float]) -> None: ...
+    def fixed_f10p7(self, value: float | None) -> None: ...
     @property
-    def fixed_f10p7_mean(self) -> Optional[float]:
+    def fixed_f10p7_mean(self) -> float | None:
         """
         Fixed 81-day average F10.7 solar flux.
 
@@ -7322,36 +7322,36 @@ class OcmPerturbations:
         ...
 
     @fixed_f10p7_mean.setter
-    def fixed_f10p7_mean(self, value: Optional[float]) -> None: ...
+    def fixed_f10p7_mean(self, value: float | None) -> None: ...
     @property
-    def fixed_geomag_ap(self) -> Optional[float]:
+    def fixed_geomag_ap(self) -> float | None:
         """
         Fixed geomagnetic Ap index.
         """
         ...
 
     @fixed_geomag_ap.setter
-    def fixed_geomag_ap(self, value: Optional[float]) -> None: ...
+    def fixed_geomag_ap(self, value: float | None) -> None: ...
     @property
-    def fixed_geomag_dst(self) -> Optional[float]:
+    def fixed_geomag_dst(self) -> float | None:
         """
         Fixed geomagnetic Dst index.
         """
         ...
 
     @fixed_geomag_dst.setter
-    def fixed_geomag_dst(self, value: Optional[float]) -> None: ...
+    def fixed_geomag_dst(self, value: float | None) -> None: ...
     @property
-    def fixed_geomag_kp(self) -> Optional[float]:
+    def fixed_geomag_kp(self) -> float | None:
         """
         Fixed geomagnetic Kp index.
         """
         ...
 
     @fixed_geomag_kp.setter
-    def fixed_geomag_kp(self, value: Optional[float]) -> None: ...
+    def fixed_geomag_kp(self, value: float | None) -> None: ...
     @property
-    def fixed_m10p7(self) -> Optional[float]:
+    def fixed_m10p7(self) -> float | None:
         """
         Fixed M10.7 solar flux.
 
@@ -7360,9 +7360,9 @@ class OcmPerturbations:
         ...
 
     @fixed_m10p7.setter
-    def fixed_m10p7(self, value: Optional[float]) -> None: ...
+    def fixed_m10p7(self, value: float | None) -> None: ...
     @property
-    def fixed_m10p7_mean(self) -> Optional[float]:
+    def fixed_m10p7_mean(self) -> float | None:
         """
         Fixed 81-day average M10.7 solar flux.
 
@@ -7371,9 +7371,9 @@ class OcmPerturbations:
         ...
 
     @fixed_m10p7_mean.setter
-    def fixed_m10p7_mean(self, value: Optional[float]) -> None: ...
+    def fixed_m10p7_mean(self, value: float | None) -> None: ...
     @property
-    def fixed_s10p7(self) -> Optional[float]:
+    def fixed_s10p7(self) -> float | None:
         """
         Fixed S10.7 solar flux.
 
@@ -7382,9 +7382,9 @@ class OcmPerturbations:
         ...
 
     @fixed_s10p7.setter
-    def fixed_s10p7(self, value: Optional[float]) -> None: ...
+    def fixed_s10p7(self, value: float | None) -> None: ...
     @property
-    def fixed_s10p7_mean(self) -> Optional[float]:
+    def fixed_s10p7_mean(self) -> float | None:
         """
         Fixed 81-day average S10.7 solar flux.
 
@@ -7393,9 +7393,9 @@ class OcmPerturbations:
         ...
 
     @fixed_s10p7_mean.setter
-    def fixed_s10p7_mean(self, value: Optional[float]) -> None: ...
+    def fixed_s10p7_mean(self, value: float | None) -> None: ...
     @property
-    def fixed_y10p7(self) -> Optional[float]:
+    def fixed_y10p7(self) -> float | None:
         """
         Fixed Y10.7 solar flux.
 
@@ -7404,9 +7404,9 @@ class OcmPerturbations:
         ...
 
     @fixed_y10p7.setter
-    def fixed_y10p7(self, value: Optional[float]) -> None: ...
+    def fixed_y10p7(self, value: float | None) -> None: ...
     @property
-    def fixed_y10p7_mean(self) -> Optional[float]:
+    def fixed_y10p7_mean(self) -> float | None:
         """
         Fixed 81-day average Y10.7 solar flux.
 
@@ -7415,9 +7415,9 @@ class OcmPerturbations:
         ...
 
     @fixed_y10p7_mean.setter
-    def fixed_y10p7_mean(self, value: Optional[float]) -> None: ...
+    def fixed_y10p7_mean(self, value: float | None) -> None: ...
     @property
-    def gm(self) -> Optional[float]:
+    def gm(self) -> float | None:
         """
         Gravitational coefficient of attracting body (Gravitational Constant × Central Mass),
         if different from the gravity model.
@@ -7427,9 +7427,9 @@ class OcmPerturbations:
         ...
 
     @gm.setter
-    def gm(self, value: Optional[float]) -> None: ...
+    def gm(self, value: float | None) -> None: ...
     @property
-    def gravity_model(self) -> Optional[str]:
+    def gravity_model(self) -> str | None:
         """
         The gravity model (selected from the accepted set of gravity model names indicated in
         annex B, subsection B10), followed by the degree (D) and order (O) of the applied
@@ -7441,9 +7441,9 @@ class OcmPerturbations:
         ...
 
     @gravity_model.setter
-    def gravity_model(self, value: Optional[str]) -> None: ...
+    def gravity_model(self, value: str | None) -> None: ...
     @property
-    def n_body_perturbations(self) -> Optional[str]:
+    def n_body_perturbations(self) -> str | None:
         """
         One OR MORE (N-body) gravitational perturbations bodies used. Values, listed serially
         in comma-delimited fashion, denote a natural solar or extra-solar system body (stars,
@@ -7455,9 +7455,9 @@ class OcmPerturbations:
         ...
 
     @n_body_perturbations.setter
-    def n_body_perturbations(self, value: Optional[str]) -> None: ...
+    def n_body_perturbations(self, value: str | None) -> None: ...
     @property
-    def oblate_flattening(self) -> Optional[float]:
+    def oblate_flattening(self) -> float | None:
         """
         Central body's oblate spheroid oblateness for the polar-symmetric oblate central body
         model (e.g., for the Earth, it is approximately 1.0/298.257223563).
@@ -7465,9 +7465,9 @@ class OcmPerturbations:
         ...
 
     @oblate_flattening.setter
-    def oblate_flattening(self, value: Optional[float]) -> None: ...
+    def oblate_flattening(self, value: float | None) -> None: ...
     @property
-    def ocean_tides_model(self) -> Optional[str]:
+    def ocean_tides_model(self) -> str | None:
         """
         Name of ocean tides model (optionally specify order or constituent effects, diurnal,
         semi-diurnal, etc.). This is a free-text field, so if the examples on the right are
@@ -7478,9 +7478,9 @@ class OcmPerturbations:
         ...
 
     @ocean_tides_model.setter
-    def ocean_tides_model(self, value: Optional[str]) -> None: ...
+    def ocean_tides_model(self, value: str | None) -> None: ...
     @property
-    def reduction_theory(self) -> Optional[str]:
+    def reduction_theory(self) -> str | None:
         """
         Specification of the reduction theory used for precession and nutation modeling. This
         is a free-text field, so if the examples on the right are insufficient, others may be
@@ -7491,9 +7491,9 @@ class OcmPerturbations:
         ...
 
     @reduction_theory.setter
-    def reduction_theory(self, value: Optional[str]) -> None: ...
+    def reduction_theory(self, value: str | None) -> None: ...
     @property
-    def shadow_bodies(self) -> Optional[str]:
+    def shadow_bodies(self) -> str | None:
         """
         List of bodies included in shadow calculations (value(s) to be drawn from the SANA
         registry list of Orbit Centers at <https://sanaregistry.org/r/orbit_centers>).
@@ -7503,9 +7503,9 @@ class OcmPerturbations:
         ...
 
     @shadow_bodies.setter
-    def shadow_bodies(self, value: Optional[str]) -> None: ...
+    def shadow_bodies(self, value: str | None) -> None: ...
     @property
-    def shadow_model(self) -> Optional[str]:
+    def shadow_model(self) -> str | None:
         """
         Shadow model used for Solar Radiation Pressure; dual cone uses both umbra/penumbra
         regions. Selected option should be one of ‘NONE’, ‘CYLINDRICAL’, ‘CONE’, or
@@ -7516,9 +7516,9 @@ class OcmPerturbations:
         ...
 
     @shadow_model.setter
-    def shadow_model(self, value: Optional[str]) -> None: ...
+    def shadow_model(self, value: str | None) -> None: ...
     @property
-    def solid_tides_model(self) -> Optional[str]:
+    def solid_tides_model(self) -> str | None:
         """
         Name of solid tides model (optionally specify order or constituent effects, diurnal,
         semi-diurnal, etc.).
@@ -7528,9 +7528,9 @@ class OcmPerturbations:
         ...
 
     @solid_tides_model.setter
-    def solid_tides_model(self, value: Optional[str]) -> None: ...
+    def solid_tides_model(self, value: str | None) -> None: ...
     @property
-    def srp_model(self) -> Optional[str]:
+    def srp_model(self) -> str | None:
         """
         Name of the Solar Radiation Pressure (SRP) model.
 
@@ -7539,18 +7539,18 @@ class OcmPerturbations:
         ...
 
     @srp_model.setter
-    def srp_model(self, value: Optional[str]) -> None: ...
+    def srp_model(self, value: str | None) -> None: ...
     @property
-    def sw_data_epoch(self) -> Optional[str]:
+    def sw_data_epoch(self) -> str | None:
         """
         Epoch of the space weather data.
         """
         ...
 
     @sw_data_epoch.setter
-    def sw_data_epoch(self, value: Optional[str]) -> None: ...
+    def sw_data_epoch(self, value: str | None) -> None: ...
     @property
-    def sw_data_source(self) -> Optional[str]:
+    def sw_data_source(self) -> str | None:
         """
         Space weather data source.
 
@@ -7559,9 +7559,9 @@ class OcmPerturbations:
         ...
 
     @sw_data_source.setter
-    def sw_data_source(self, value: Optional[str]) -> None: ...
+    def sw_data_source(self, value: str | None) -> None: ...
     @property
-    def sw_interp_method(self) -> Optional[str]:
+    def sw_interp_method(self) -> str | None:
         """
         Free-text field specifying the method used to select or interpolate any and all
         sequential space weather data (Kp, ap, Dst, F10.7, M10.7, S10.7, Y10.7, etc.). While
@@ -7573,7 +7573,7 @@ class OcmPerturbations:
         ...
 
     @sw_interp_method.setter
-    def sw_interp_method(self, value: Optional[str]) -> None: ...
+    def sw_interp_method(self, value: str | None) -> None: ...
 
 class OcmPhysicalDescription:
     """
@@ -7591,7 +7591,7 @@ class OcmPhysicalDescription:
     def __init__(
         self,
         *,
-        manufacturer: Optional[str] = None,
+        manufacturer: str | None = None,
         bus_model=None,
         docked_with=None,
         drag_const_area=None,
@@ -7641,10 +7641,10 @@ class OcmPhysicalDescription:
         ixy=None,
         ixz=None,
         iyz=None,
-        comment: Optional[list[str]] = None,
+        comment: list[str] | None = None,
     ) -> None: ...
     @property
-    def area_along_oeb_int(self) -> Optional[float]:
+    def area_along_oeb_int(self) -> float | None:
         """
         Attitude-dependent cross-sectional area of space object (not already included in
         DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along intermediate OEB (Ŷoeb) direction
@@ -7657,9 +7657,9 @@ class OcmPhysicalDescription:
         ...
 
     @area_along_oeb_int.setter
-    def area_along_oeb_int(self, value: Optional[float]) -> None: ...
+    def area_along_oeb_int(self, value: float | None) -> None: ...
     @property
-    def area_along_oeb_max(self) -> Optional[float]:
+    def area_along_oeb_max(self) -> float | None:
         """
         Attitude-dependent cross-sectional area of space object (not already included in
         DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along max OEB (Xoeb) direction as
@@ -7672,9 +7672,9 @@ class OcmPhysicalDescription:
         ...
 
     @area_along_oeb_max.setter
-    def area_along_oeb_max(self, value: Optional[float]) -> None: ...
+    def area_along_oeb_max(self, value: float | None) -> None: ...
     @property
-    def area_along_oeb_min(self) -> Optional[float]:
+    def area_along_oeb_min(self) -> float | None:
         """
         Attitude-dependent cross-sectional area of space object (not already included in
         DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along minimum OEB (Ẑoeb) direction as
@@ -7687,9 +7687,9 @@ class OcmPhysicalDescription:
         ...
 
     @area_along_oeb_min.setter
-    def area_along_oeb_min(self, value: Optional[float]) -> None: ...
+    def area_along_oeb_min(self, value: float | None) -> None: ...
     @property
-    def area_max_for_pc(self) -> Optional[float]:
+    def area_max_for_pc(self) -> float | None:
         """
         Maximum cross-sectional area for collision probability estimation purposes.
 
@@ -7700,9 +7700,9 @@ class OcmPhysicalDescription:
         ...
 
     @area_max_for_pc.setter
-    def area_max_for_pc(self, value: Optional[float]) -> None: ...
+    def area_max_for_pc(self, value: float | None) -> None: ...
     @property
-    def area_min_for_pc(self) -> Optional[float]:
+    def area_min_for_pc(self) -> float | None:
         """
         Minimum cross-sectional area for collision probability estimation purposes.
 
@@ -7713,9 +7713,9 @@ class OcmPhysicalDescription:
         ...
 
     @area_min_for_pc.setter
-    def area_min_for_pc(self, value: Optional[float]) -> None: ...
+    def area_min_for_pc(self, value: float | None) -> None: ...
     @property
-    def area_typ_for_pc(self) -> Optional[float]:
+    def area_typ_for_pc(self) -> float | None:
         """
         Typical (50th percentile) cross-sectional area sampled over all space object
         orientations for collision probability estimation purposes.
@@ -7725,9 +7725,9 @@ class OcmPhysicalDescription:
         ...
 
     @area_typ_for_pc.setter
-    def area_typ_for_pc(self, value: Optional[float]) -> None: ...
+    def area_typ_for_pc(self, value: float | None) -> None: ...
     @property
-    def att_actuator_type(self) -> Optional[str]:
+    def att_actuator_type(self) -> str | None:
         """
         Free-text specification of type of actuator for attitude control. Suggested examples
         include: ATT_THRUSTERS, ACTIVE_MAG_TORQUE, PASSIVE_MAG_TORQUE, REACTION_WHEELS,
@@ -7738,9 +7738,9 @@ class OcmPhysicalDescription:
         ...
 
     @att_actuator_type.setter
-    def att_actuator_type(self, value: Optional[str]) -> None: ...
+    def att_actuator_type(self, value: str | None) -> None: ...
     @property
-    def att_control(self) -> Optional[float]:
+    def att_control(self) -> float | None:
         """
         Accuracy of attitude control system (ACS) to maintain attitude, assuming attitude
         knowledge was perfect (i.e., deadbands).
@@ -7752,9 +7752,9 @@ class OcmPhysicalDescription:
         ...
 
     @att_control.setter
-    def att_control(self, value: Optional[float]) -> None: ...
+    def att_control(self, value: float | None) -> None: ...
     @property
-    def att_control_mode(self) -> Optional[str]:
+    def att_control_mode(self) -> str | None:
         """
         Free-text specification of primary mode of attitude control for the space object.
         Suggested examples include: THREE_AXIS, SPIN, DUAL_SPIN, TUMBLING, GRAVITY_GRADIENT
@@ -7764,9 +7764,9 @@ class OcmPhysicalDescription:
         ...
 
     @att_control_mode.setter
-    def att_control_mode(self, value: Optional[str]) -> None: ...
+    def att_control_mode(self, value: str | None) -> None: ...
     @property
-    def att_knowledge(self) -> Optional[float]:
+    def att_knowledge(self) -> float | None:
         """
         Accuracy of attitude knowledge.
 
@@ -7777,9 +7777,9 @@ class OcmPhysicalDescription:
         ...
 
     @att_knowledge.setter
-    def att_knowledge(self, value: Optional[float]) -> None: ...
+    def att_knowledge(self, value: float | None) -> None: ...
     @property
-    def att_pointing(self) -> Optional[float]:
+    def att_pointing(self) -> float | None:
         """
         Overall accuracy of spacecraft to maintain attitude, including attitude knowledge
         errors and ACS operation.
@@ -7791,9 +7791,9 @@ class OcmPhysicalDescription:
         ...
 
     @att_pointing.setter
-    def att_pointing(self, value: Optional[float]) -> None: ...
+    def att_pointing(self, value: float | None) -> None: ...
     @property
-    def avg_maneuver_freq(self) -> Optional[float]:
+    def avg_maneuver_freq(self) -> float | None:
         """
         Average maneuver frequency, measured in the number of orbit- or attitude-adjust
         maneuvers per year.
@@ -7805,9 +7805,9 @@ class OcmPhysicalDescription:
         ...
 
     @avg_maneuver_freq.setter
-    def avg_maneuver_freq(self, value: Optional[float]) -> None: ...
+    def avg_maneuver_freq(self, value: float | None) -> None: ...
     @property
-    def bus_model(self) -> Optional[str]:
+    def bus_model(self) -> str | None:
         """
         Free-text field containing the satellite manufacturer's spacecraft bus model name.
 
@@ -7816,7 +7816,7 @@ class OcmPhysicalDescription:
         ...
 
     @bus_model.setter
-    def bus_model(self, value: Optional[str]) -> None: ...
+    def bus_model(self, value: str | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -7829,7 +7829,7 @@ class OcmPhysicalDescription:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def docked_with(self) -> Optional[str]:
+    def docked_with(self) -> str | None:
         """
         Free-text field containing a comma-separated list of other space objects that this
         object is docked to.
@@ -7839,9 +7839,9 @@ class OcmPhysicalDescription:
         ...
 
     @docked_with.setter
-    def docked_with(self, value: Optional[str]) -> None: ...
+    def docked_with(self, value: str | None) -> None: ...
     @property
-    def drag_coeff_nom(self) -> Optional[float]:
+    def drag_coeff_nom(self) -> float | None:
         """
         Nominal drag Coefficient (CD Nom). If the atmospheric drag coefficient, CD, is set to
         zero, no atmospheric drag shall be considered.
@@ -7851,9 +7851,9 @@ class OcmPhysicalDescription:
         ...
 
     @drag_coeff_nom.setter
-    def drag_coeff_nom(self, value: Optional[float]) -> None: ...
+    def drag_coeff_nom(self, value: float | None) -> None: ...
     @property
-    def drag_const_area(self) -> Optional[float]:
+    def drag_const_area(self) -> float | None:
         """
         Attitude-independent drag cross-sectional area (AD) facing the relative wind vector,
         not already incorporated into the attitude-dependent 'AREA_ALONG_OEB' parameters.
@@ -7865,9 +7865,9 @@ class OcmPhysicalDescription:
         ...
 
     @drag_const_area.setter
-    def drag_const_area(self, value: Optional[float]) -> None: ...
+    def drag_const_area(self, value: float | None) -> None: ...
     @property
-    def drag_uncertainty(self) -> Optional[float]:
+    def drag_uncertainty(self) -> float | None:
         """
         Drag coefficient one sigma (1σ) percent uncertainty, where the actual range of drag
         coefficients to within 1σ shall be obtained from [1.0 ± DRAG_UNCERTAINTY/100.0] * (CD
@@ -7881,9 +7881,9 @@ class OcmPhysicalDescription:
         ...
 
     @drag_uncertainty.setter
-    def drag_uncertainty(self, value: Optional[float]) -> None: ...
+    def drag_uncertainty(self, value: float | None) -> None: ...
     @property
-    def dry_mass(self) -> Optional[float]:
+    def dry_mass(self) -> float | None:
         """
         Space object dry mass (without propellant).
 
@@ -7894,9 +7894,9 @@ class OcmPhysicalDescription:
         ...
 
     @dry_mass.setter
-    def dry_mass(self, value: Optional[float]) -> None: ...
+    def dry_mass(self, value: float | None) -> None: ...
     @property
-    def dv_bol(self) -> Optional[float]:
+    def dv_bol(self) -> float | None:
         """
         Total ΔV capability of the spacecraft at beginning of life.
 
@@ -7907,9 +7907,9 @@ class OcmPhysicalDescription:
         ...
 
     @dv_bol.setter
-    def dv_bol(self, value: Optional[float]) -> None: ...
+    def dv_bol(self, value: float | None) -> None: ...
     @property
-    def dv_remaining(self) -> Optional[float]:
+    def dv_remaining(self) -> float | None:
         """
         Total ΔV remaining for the spacecraft.
 
@@ -7920,9 +7920,9 @@ class OcmPhysicalDescription:
         ...
 
     @dv_remaining.setter
-    def dv_remaining(self, value: Optional[float]) -> None: ...
+    def dv_remaining(self, value: float | None) -> None: ...
     @property
-    def initial_wet_mass(self) -> Optional[float]:
+    def initial_wet_mass(self) -> float | None:
         """
         Space object total mass at beginning of life.
 
@@ -7933,9 +7933,9 @@ class OcmPhysicalDescription:
         ...
 
     @initial_wet_mass.setter
-    def initial_wet_mass(self, value: Optional[float]) -> None: ...
+    def initial_wet_mass(self, value: float | None) -> None: ...
     @property
-    def ixx(self) -> Optional[float]:
+    def ixx(self) -> float | None:
         """
         Moment of Inertia about the X-axis of the space object's primary body frame (e.g.,
         SC_Body_1) (see reference `[H1]`).
@@ -7947,9 +7947,9 @@ class OcmPhysicalDescription:
         ...
 
     @ixx.setter
-    def ixx(self, value: Optional[float]) -> None: ...
+    def ixx(self, value: float | None) -> None: ...
     @property
-    def ixy(self) -> Optional[float]:
+    def ixy(self) -> float | None:
         """
         Inertia Cross Product of the X & Y axes.
 
@@ -7960,9 +7960,9 @@ class OcmPhysicalDescription:
         ...
 
     @ixy.setter
-    def ixy(self, value: Optional[float]) -> None: ...
+    def ixy(self, value: float | None) -> None: ...
     @property
-    def ixz(self) -> Optional[float]:
+    def ixz(self) -> float | None:
         """
         Inertia Cross Product of the X & Z axes.
 
@@ -7973,9 +7973,9 @@ class OcmPhysicalDescription:
         ...
 
     @ixz.setter
-    def ixz(self, value: Optional[float]) -> None: ...
+    def ixz(self, value: float | None) -> None: ...
     @property
-    def iyy(self) -> Optional[float]:
+    def iyy(self) -> float | None:
         """
         Moment of Inertia about the Y-axis.
 
@@ -7986,9 +7986,9 @@ class OcmPhysicalDescription:
         ...
 
     @iyy.setter
-    def iyy(self, value: Optional[float]) -> None: ...
+    def iyy(self, value: float | None) -> None: ...
     @property
-    def iyz(self) -> Optional[float]:
+    def iyz(self) -> float | None:
         """
         Inertia Cross Product of the Y & Z axes.
 
@@ -7999,9 +7999,9 @@ class OcmPhysicalDescription:
         ...
 
     @iyz.setter
-    def iyz(self, value: Optional[float]) -> None: ...
+    def iyz(self, value: float | None) -> None: ...
     @property
-    def izz(self) -> Optional[float]:
+    def izz(self) -> float | None:
         """
         Moment of Inertia about the Z-axis.
 
@@ -8012,9 +8012,9 @@ class OcmPhysicalDescription:
         ...
 
     @izz.setter
-    def izz(self, value: Optional[float]) -> None: ...
+    def izz(self, value: float | None) -> None: ...
     @property
-    def manufacturer(self) -> Optional[str]:
+    def manufacturer(self) -> str | None:
         """
         Free-text field containing the satellite manufacturer's name.
 
@@ -8023,9 +8023,9 @@ class OcmPhysicalDescription:
         ...
 
     @manufacturer.setter
-    def manufacturer(self, value: Optional[str]) -> None: ...
+    def manufacturer(self, value: str | None) -> None: ...
     @property
-    def max_thrust(self) -> Optional[float]:
+    def max_thrust(self) -> float | None:
         """
         Maximum composite thrust the spacecraft can accomplish in any single body-fixed
         direction.
@@ -8037,9 +8037,9 @@ class OcmPhysicalDescription:
         ...
 
     @max_thrust.setter
-    def max_thrust(self, value: Optional[float]) -> None: ...
+    def max_thrust(self, value: float | None) -> None: ...
     @property
-    def oeb_int(self) -> Optional[float]:
+    def oeb_int(self) -> float | None:
         """
         Intermediate physical dimension (along Ŷoeb) of OEB normal to OEB_MAX direction.
 
@@ -8050,9 +8050,9 @@ class OcmPhysicalDescription:
         ...
 
     @oeb_int.setter
-    def oeb_int(self, value: Optional[float]) -> None: ...
+    def oeb_int(self, value: float | None) -> None: ...
     @property
-    def oeb_max(self) -> Optional[float]:
+    def oeb_max(self) -> float | None:
         """
         Maximum physical dimension (along Xoeb) of the OEB.
 
@@ -8063,9 +8063,9 @@ class OcmPhysicalDescription:
         ...
 
     @oeb_max.setter
-    def oeb_max(self, value: Optional[float]) -> None: ...
+    def oeb_max(self, value: float | None) -> None: ...
     @property
-    def oeb_min(self) -> Optional[float]:
+    def oeb_min(self) -> float | None:
         """
         Minimum physical dimension (along Ẑoeb) of OEB in direction normal to both OEB_MAX and
         OEB_INT directions.
@@ -8077,9 +8077,9 @@ class OcmPhysicalDescription:
         ...
 
     @oeb_min.setter
-    def oeb_min(self, value: Optional[float]) -> None: ...
+    def oeb_min(self, value: float | None) -> None: ...
     @property
-    def oeb_parent_frame(self) -> Optional[str]:
+    def oeb_parent_frame(self) -> str | None:
         """
         Parent reference frame that maps to the OEB frame via the quaternion-based
         transformation defined in annex F, subsection F1. Select from the accepted set of
@@ -8091,9 +8091,9 @@ class OcmPhysicalDescription:
         ...
 
     @oeb_parent_frame.setter
-    def oeb_parent_frame(self, value: Optional[str]) -> None: ...
+    def oeb_parent_frame(self, value: str | None) -> None: ...
     @property
-    def oeb_parent_frame_epoch(self) -> Optional[str]:
+    def oeb_parent_frame_epoch(self) -> str | None:
         """
         Epoch of the OEB parent frame, if OEB_PARENT_FRAME is provided and its epoch is not
         intrinsic to the definition of the reference frame. (See 7.5.10 for formatting rules.)
@@ -8103,9 +8103,9 @@ class OcmPhysicalDescription:
         ...
 
     @oeb_parent_frame_epoch.setter
-    def oeb_parent_frame_epoch(self, value: Optional[str]) -> None: ...
+    def oeb_parent_frame_epoch(self, value: str | None) -> None: ...
     @property
-    def oeb_q1(self) -> Optional[float]:
+    def oeb_q1(self) -> float | None:
         """
         q1 = e1 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e1 = 1st
         component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
@@ -8117,9 +8117,9 @@ class OcmPhysicalDescription:
         ...
 
     @oeb_q1.setter
-    def oeb_q1(self, value: Optional[float]) -> None: ...
+    def oeb_q1(self, value: float | None) -> None: ...
     @property
-    def oeb_q2(self) -> Optional[float]:
+    def oeb_q2(self) -> float | None:
         """
         q2 = e2 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e2 = 2nd
         component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
@@ -8131,9 +8131,9 @@ class OcmPhysicalDescription:
         ...
 
     @oeb_q2.setter
-    def oeb_q2(self, value: Optional[float]) -> None: ...
+    def oeb_q2(self, value: float | None) -> None: ...
     @property
-    def oeb_q3(self) -> Optional[float]:
+    def oeb_q3(self) -> float | None:
         """
         q3 = e3 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e3 = 3rd
         component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
@@ -8145,9 +8145,9 @@ class OcmPhysicalDescription:
         ...
 
     @oeb_q3.setter
-    def oeb_q3(self, value: Optional[float]) -> None: ...
+    def oeb_q3(self, value: float | None) -> None: ...
     @property
-    def oeb_qc(self) -> Optional[float]:
+    def oeb_qc(self) -> float | None:
         """
         qc = cos(φ/2), where per reference `[H1]`, φ = the Euler rotation angle for the rotation
         that maps from the OEB_PARENT_FRAME (defined above) to the frame aligned with the
@@ -8159,9 +8159,9 @@ class OcmPhysicalDescription:
         ...
 
     @oeb_qc.setter
-    def oeb_qc(self, value: Optional[float]) -> None: ...
+    def oeb_qc(self, value: float | None) -> None: ...
     @property
-    def rcs(self) -> Optional[float]:
+    def rcs(self) -> float | None:
         """
         Typical (50th percentile) effective Radar Cross Section of the space object sampled
         over all possible viewing angles.
@@ -8171,9 +8171,9 @@ class OcmPhysicalDescription:
         ...
 
     @rcs.setter
-    def rcs(self, value: Optional[float]) -> None: ...
+    def rcs(self, value: float | None) -> None: ...
     @property
-    def rcs_max(self) -> Optional[float]:
+    def rcs_max(self) -> float | None:
         """
         Maximum Radar Cross Section observed for this object.
 
@@ -8182,9 +8182,9 @@ class OcmPhysicalDescription:
         ...
 
     @rcs_max.setter
-    def rcs_max(self, value: Optional[float]) -> None: ...
+    def rcs_max(self, value: float | None) -> None: ...
     @property
-    def rcs_min(self) -> Optional[float]:
+    def rcs_min(self) -> float | None:
         """
         Minimum Radar Cross Section observed for this object.
 
@@ -8193,9 +8193,9 @@ class OcmPhysicalDescription:
         ...
 
     @rcs_min.setter
-    def rcs_min(self, value: Optional[float]) -> None: ...
+    def rcs_min(self, value: float | None) -> None: ...
     @property
-    def reflectance(self) -> Optional[float]:
+    def reflectance(self) -> float | None:
         """
         Typical (50th percentile) coefficient of REFLECTANCE of the space object over all
         possible viewing angles, ranging from 0 (none) to 1 (perfect reflectance).
@@ -8205,9 +8205,9 @@ class OcmPhysicalDescription:
         ...
 
     @reflectance.setter
-    def reflectance(self, value: Optional[float]) -> None: ...
+    def reflectance(self, value: float | None) -> None: ...
     @property
-    def solar_rad_coeff(self) -> Optional[float]:
+    def solar_rad_coeff(self) -> float | None:
         """
         Nominal Solar Radiation Pressure Coefficient (CR NOM). If the solar radiation
         coefficient, CR, is set to zero, no solar radiation pressure shall be considered.
@@ -8215,9 +8215,9 @@ class OcmPhysicalDescription:
         ...
 
     @solar_rad_coeff.setter
-    def solar_rad_coeff(self, value: Optional[float]) -> None: ...
+    def solar_rad_coeff(self, value: float | None) -> None: ...
     @property
-    def solar_rad_uncertainty(self) -> Optional[float]:
+    def solar_rad_uncertainty(self) -> float | None:
         """
         SRP one sigma (1σ) percent uncertainty, where the actual range of SRP coefficients to
         within 1σ shall be obtained from [1.0 ± 0.01*SRP_UNCERTAINTY] (CR NOM). This factor is
@@ -8229,9 +8229,9 @@ class OcmPhysicalDescription:
         ...
 
     @solar_rad_uncertainty.setter
-    def solar_rad_uncertainty(self, value: Optional[float]) -> None: ...
+    def solar_rad_uncertainty(self, value: float | None) -> None: ...
     @property
-    def srp_const_area(self) -> Optional[float]:
+    def srp_const_area(self) -> float | None:
         """
         Attitude-independent solar radiation pressure cross-sectional area (AR) facing the Sun,
         not already incorporated into the attitude-dependent ‘AREA_ALONG_OEB’ parameters.
@@ -8241,9 +8241,9 @@ class OcmPhysicalDescription:
         ...
 
     @srp_const_area.setter
-    def srp_const_area(self, value: Optional[float]) -> None: ...
+    def srp_const_area(self, value: float | None) -> None: ...
     @property
-    def vm_absolute(self) -> Optional[float]:
+    def vm_absolute(self) -> float | None:
         """
         Typical (50th percentile) Visual Magnitude of the space object sampled over all
         possible viewing angles and sampled over all possible viewing angles and ‘normalized’
@@ -8256,9 +8256,9 @@ class OcmPhysicalDescription:
         ...
 
     @vm_absolute.setter
-    def vm_absolute(self, value: Optional[float]) -> None: ...
+    def vm_absolute(self, value: float | None) -> None: ...
     @property
-    def vm_apparent(self) -> Optional[float]:
+    def vm_apparent(self) -> float | None:
         """
         Typical (50th percentile) apparent Visual Magnitude observed for this space object.
 
@@ -8267,9 +8267,9 @@ class OcmPhysicalDescription:
         ...
 
     @vm_apparent.setter
-    def vm_apparent(self, value: Optional[float]) -> None: ...
+    def vm_apparent(self, value: float | None) -> None: ...
     @property
-    def vm_apparent_max(self) -> Optional[float]:
+    def vm_apparent_max(self) -> float | None:
         """
         Maximum apparent Visual Magnitude observed for this space object. NOTE—The 'MAX' value
         represents the brightest observation, which associates with a lower Vmag.
@@ -8279,9 +8279,9 @@ class OcmPhysicalDescription:
         ...
 
     @vm_apparent_max.setter
-    def vm_apparent_max(self, value: Optional[float]) -> None: ...
+    def vm_apparent_max(self, value: float | None) -> None: ...
     @property
-    def vm_apparent_min(self) -> Optional[float]:
+    def vm_apparent_min(self) -> float | None:
         """
         Minimum apparent Visual Magnitude observed for this space object.
 
@@ -8290,9 +8290,9 @@ class OcmPhysicalDescription:
         ...
 
     @vm_apparent_min.setter
-    def vm_apparent_min(self, value: Optional[float]) -> None: ...
+    def vm_apparent_min(self, value: float | None) -> None: ...
     @property
-    def wet_mass(self) -> Optional[float]:
+    def wet_mass(self) -> float | None:
         """
         Space object total mass (including propellant, i.e., 'wet mass') at the current
         reference epoch 'EPOCH_TZERO'.
@@ -8304,7 +8304,7 @@ class OcmPhysicalDescription:
         ...
 
     @wet_mass.setter
-    def wet_mass(self, value: Optional[float]) -> None: ...
+    def wet_mass(self, value: float | None) -> None: ...
 
 class OcmSegment:
     """
@@ -8395,22 +8395,22 @@ class OcmTrajState:
         traj_ref_frame: str,
         traj_type: str,
         traj_lines: list[TrajLine],
-        traj_id: Optional[str] = None,
-        traj_prev_id: Optional[str] = None,
-        traj_next_id: Optional[str] = None,
-        traj_basis: Optional[str] = None,
-        traj_basis_id: Optional[str] = None,
-        interpolation: Optional[str] = None,
-        interpolation_degree: Optional[int] = None,
-        propagator: Optional[str] = None,
-        traj_frame_epoch: Optional[str] = None,
-        useable_start_time: Optional[str] = None,
-        useable_stop_time: Optional[str] = None,
-        orb_revnum: Optional[float] = None,
-        orb_revnum_basis: Optional[str] = None,
-        orb_averaging: Optional[str] = None,
-        traj_units: Optional[str] = None,
-        comment: Optional[list[str]] = None,
+        traj_id: str | None = None,
+        traj_prev_id: str | None = None,
+        traj_next_id: str | None = None,
+        traj_basis: str | None = None,
+        traj_basis_id: str | None = None,
+        interpolation: str | None = None,
+        interpolation_degree: int | None = None,
+        propagator: str | None = None,
+        traj_frame_epoch: str | None = None,
+        useable_start_time: str | None = None,
+        useable_stop_time: str | None = None,
+        orb_revnum: float | None = None,
+        orb_revnum_basis: str | None = None,
+        orb_averaging: str | None = None,
+        traj_units: str | None = None,
+        comment: list[str] | None = None,
     ) -> None: ...
     @property
     def center_name(self) -> str:
@@ -8444,7 +8444,7 @@ class OcmTrajState:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def interpolation(self) -> Optional[str]:
+    def interpolation(self) -> str | None:
         """
         This keyword may be used to specify the recommended interpolation method for ephemeris
         data in the immediately following set of ephemeris lines. PROPAGATE indicates that orbit
@@ -8456,9 +8456,9 @@ class OcmTrajState:
         ...
 
     @interpolation.setter
-    def interpolation(self, value: Optional[str]) -> None: ...
+    def interpolation(self, value: str | None) -> None: ...
     @property
-    def interpolation_degree(self) -> Optional[int]:
+    def interpolation_degree(self) -> int | None:
         """
         Recommended interpolation degree for ephemeris data in the immediately following set of
         ephemeris lines. Must be an integer value. This keyword must be provided if the
@@ -8469,9 +8469,9 @@ class OcmTrajState:
         ...
 
     @interpolation_degree.setter
-    def interpolation_degree(self, value: Optional[int]) -> None: ...
+    def interpolation_degree(self, value: int | None) -> None: ...
     @property
-    def orb_averaging(self) -> Optional[str]:
+    def orb_averaging(self) -> str | None:
         """
         If orbital elements are provided, specifies whether those elements are osculating
         elements or mean elements, and if mean elements, which mean element definition is
@@ -8489,9 +8489,9 @@ class OcmTrajState:
         ...
 
     @orb_averaging.setter
-    def orb_averaging(self, value: Optional[str]) -> None: ...
+    def orb_averaging(self, value: str | None) -> None: ...
     @property
-    def orb_revnum(self) -> Optional[float]:
+    def orb_revnum(self) -> float | None:
         """
         The integer orbit revolution number associated with the first trajectory state in this
         trajectory state time history block. NOTE—The first ascending node crossing that occurs
@@ -8503,9 +8503,9 @@ class OcmTrajState:
         ...
 
     @orb_revnum.setter
-    def orb_revnum(self, value: Optional[float]) -> None: ...
+    def orb_revnum(self, value: float | None) -> None: ...
     @property
-    def orb_revnum_basis(self) -> Optional[str]:
+    def orb_revnum_basis(self) -> str | None:
         """
         Specifies the message creator's basis for their orbit revolution counter, with '0',
         designating that the first launch or deployment trajectory state corresponds to a
@@ -8521,9 +8521,9 @@ class OcmTrajState:
         ...
 
     @orb_revnum_basis.setter
-    def orb_revnum_basis(self, value: Optional[str]) -> None: ...
+    def orb_revnum_basis(self, value: str | None) -> None: ...
     @property
-    def propagator(self) -> Optional[str]:
+    def propagator(self) -> str | None:
         """
         Free-text field containing the name of the orbit propagator used to create this
         trajectory state time history.
@@ -8533,9 +8533,9 @@ class OcmTrajState:
         ...
 
     @propagator.setter
-    def propagator(self, value: Optional[str]) -> None: ...
+    def propagator(self, value: str | None) -> None: ...
     @property
-    def traj_basis(self) -> Optional[str]:
+    def traj_basis(self) -> str | None:
         """
         The basis of this trajectory state time history data. This is a free-text field with the
         following suggested values: a) 'PREDICTED'. b) 'DETERMINED' when estimated from
@@ -8551,9 +8551,9 @@ class OcmTrajState:
         ...
 
     @traj_basis.setter
-    def traj_basis(self, value: Optional[str]) -> None: ...
+    def traj_basis(self, value: str | None) -> None: ...
     @property
-    def traj_basis_id(self) -> Optional[str]:
+    def traj_basis_id(self) -> str | None:
         """
         Free-text field containing the identification number for the telemetry dataset, orbit
         determination, navigation solution, or simulation upon which this trajectory state time
@@ -8566,9 +8566,9 @@ class OcmTrajState:
         ...
 
     @traj_basis_id.setter
-    def traj_basis_id(self, value: Optional[str]) -> None: ...
+    def traj_basis_id(self, value: str | None) -> None: ...
     @property
-    def traj_frame_epoch(self) -> Optional[str]:
+    def traj_frame_epoch(self) -> str | None:
         """
         Epoch of the orbit data reference frame, if not intrinsic to the definition of the
         reference frame. (See 7.5.10 for formatting rules.)
@@ -8578,9 +8578,9 @@ class OcmTrajState:
         ...
 
     @traj_frame_epoch.setter
-    def traj_frame_epoch(self, value: Optional[str]) -> None: ...
+    def traj_frame_epoch(self, value: str | None) -> None: ...
     @property
-    def traj_id(self) -> Optional[str]:
+    def traj_id(self) -> str | None:
         """
         Free-text field containing the identification number for this trajectory state time
         history block.
@@ -8590,7 +8590,7 @@ class OcmTrajState:
         ...
 
     @traj_id.setter
-    def traj_id(self, value: Optional[str]) -> None: ...
+    def traj_id(self, value: str | None) -> None: ...
     @property
     def traj_lines(self) -> list[TrajLine]:
         """
@@ -8601,7 +8601,7 @@ class OcmTrajState:
     @traj_lines.setter
     def traj_lines(self, value: list[TrajLine]) -> None: ...
     @property
-    def traj_next_id(self) -> Optional[str]:
+    def traj_next_id(self) -> str | None:
         """
         Free-text field containing the identification number for the next trajectory state
         time history, contained either within this message, or presented in a future OCM.
@@ -8614,9 +8614,9 @@ class OcmTrajState:
         ...
 
     @traj_next_id.setter
-    def traj_next_id(self, value: Optional[str]) -> None: ...
+    def traj_next_id(self, value: str | None) -> None: ...
     @property
-    def traj_prev_id(self) -> Optional[str]:
+    def traj_prev_id(self) -> str | None:
         """
         Free-text field containing the identification number for the previous trajectory state
         time history, contained either within this message or presented in a previous OCM.
@@ -8629,7 +8629,7 @@ class OcmTrajState:
         ...
 
     @traj_prev_id.setter
-    def traj_prev_id(self, value: Optional[str]) -> None: ...
+    def traj_prev_id(self, value: str | None) -> None: ...
     @property
     def traj_ref_frame(self) -> str:
         """
@@ -8654,7 +8654,7 @@ class OcmTrajState:
     @traj_type.setter
     def traj_type(self, value: str) -> None: ...
     @property
-    def traj_units(self) -> Optional[str]:
+    def traj_units(self) -> str | None:
         """
         A comma-delimited set of SI unit designations for each element of the trajectory state
         time history following the trajectory state time tag solely for informational purposes,
@@ -8669,9 +8669,9 @@ class OcmTrajState:
         ...
 
     @traj_units.setter
-    def traj_units(self, value: Optional[str]) -> None: ...
+    def traj_units(self, value: str | None) -> None: ...
     @property
-    def useable_start_time(self) -> Optional[str]:
+    def useable_start_time(self) -> str | None:
         """
         Start time of USEABLE time span covered by ephemeris data immediately following this
         metadata block. (For format specification, see 7.5.10.) NOTES 1. This optional keyword
@@ -8686,9 +8686,9 @@ class OcmTrajState:
         ...
 
     @useable_start_time.setter
-    def useable_start_time(self, value: Optional[str]) -> None: ...
+    def useable_start_time(self, value: str | None) -> None: ...
     @property
-    def useable_stop_time(self) -> Optional[str]:
+    def useable_stop_time(self) -> str | None:
         """
         Stop time of USEABLE time span covered by ephemeris data immediately following this
         metadata block. (For format specification, see 7.5.10.) NOTES 1. This optional keyword
@@ -8703,7 +8703,7 @@ class OcmTrajState:
         ...
 
     @useable_stop_time.setter
-    def useable_stop_time(self, value: Optional[str]) -> None: ...
+    def useable_stop_time(self, value: str | None) -> None: ...
 
 class OdParameters:
     """
@@ -8736,20 +8736,20 @@ class OdParameters:
     """
     def __init__(
         self,
-        time_lastob_start: Optional[str] = None,
-        time_lastob_end: Optional[str] = None,
-        recommended_od_span: Optional[float] = None,
-        actual_od_span: Optional[float] = None,
-        obs_available: Optional[int] = None,
-        obs_used: Optional[int] = None,
-        tracks_available: Optional[int] = None,
-        tracks_used: Optional[int] = None,
-        residuals_accepted: Optional[float] = None,
-        weighted_rms: Optional[float] = None,
-        comment: Optional[list[str]] = ...,
+        time_lastob_start: str | None = None,
+        time_lastob_end: str | None = None,
+        recommended_od_span: float | None = None,
+        actual_od_span: float | None = None,
+        obs_available: int | None = None,
+        obs_used: int | None = None,
+        tracks_available: int | None = None,
+        tracks_used: int | None = None,
+        residuals_accepted: float | None = None,
+        weighted_rms: float | None = None,
+        comment: list[str] | None = ...,
     ) -> None: ...
     @property
-    def actual_od_span(self) -> Optional[float]:
+    def actual_od_span(self) -> float | None:
         """
         Based on the observations available and the RECOMMENDED_OD_SPAN, the actual
         time span used for the OD of the object. (See annex E for definition.)
@@ -8761,7 +8761,7 @@ class OdParameters:
         ...
 
     @actual_od_span.setter
-    def actual_od_span(self, value: Optional[float]) -> None: ...
+    def actual_od_span(self, value: float | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -8772,25 +8772,25 @@ class OdParameters:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def obs_available(self) -> Optional[int]:
+    def obs_available(self) -> int | None:
         """
         The total number of observations available for orbit determination.
         """
         ...
 
     @obs_available.setter
-    def obs_available(self, value: Optional[int]) -> None: ...
+    def obs_available(self, value: int | None) -> None: ...
     @property
-    def obs_used(self) -> Optional[int]:
+    def obs_used(self) -> int | None:
         """
         The number of observations used in the orbit determination.
         """
         ...
 
     @obs_used.setter
-    def obs_used(self, value: Optional[int]) -> None: ...
+    def obs_used(self, value: int | None) -> None: ...
     @property
-    def recommended_od_span(self) -> Optional[float]:
+    def recommended_od_span(self) -> float | None:
         """
         The recommended OD time span calculated for the object.
 
@@ -8801,9 +8801,9 @@ class OdParameters:
         ...
 
     @recommended_od_span.setter
-    def recommended_od_span(self, value: Optional[float]) -> None: ...
+    def recommended_od_span(self, value: float | None) -> None: ...
     @property
-    def residuals_accepted(self) -> Optional[float]:
+    def residuals_accepted(self) -> float | None:
         """
         The percentage of residuals accepted during orbit determination.
 
@@ -8812,9 +8812,9 @@ class OdParameters:
         ...
 
     @residuals_accepted.setter
-    def residuals_accepted(self, value: Optional[float]) -> None: ...
+    def residuals_accepted(self, value: float | None) -> None: ...
     @property
-    def time_lastob_end(self) -> Optional[str]:
+    def time_lastob_end(self) -> str | None:
         """
         The end of a time interval (UTC) that contains the time of the last accepted
         observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
@@ -8823,9 +8823,9 @@ class OdParameters:
         ...
 
     @time_lastob_end.setter
-    def time_lastob_end(self, value: Optional[str]) -> None: ...
+    def time_lastob_end(self, value: str | None) -> None: ...
     @property
-    def time_lastob_start(self) -> Optional[str]:
+    def time_lastob_start(self) -> str | None:
         """
         The start of a time interval (UTC) that contains the time of the last accepted
         observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
@@ -8834,34 +8834,34 @@ class OdParameters:
         ...
 
     @time_lastob_start.setter
-    def time_lastob_start(self, value: Optional[str]) -> None: ...
+    def time_lastob_start(self, value: str | None) -> None: ...
     @property
-    def tracks_available(self) -> Optional[int]:
+    def tracks_available(self) -> int | None:
         """
         The total number of tracks available for orbit determination.
         """
         ...
 
     @tracks_available.setter
-    def tracks_available(self, value: Optional[int]) -> None: ...
+    def tracks_available(self, value: int | None) -> None: ...
     @property
-    def tracks_used(self) -> Optional[int]:
+    def tracks_used(self) -> int | None:
         """
         The number of tracks used in the orbit determination.
         """
         ...
 
     @tracks_used.setter
-    def tracks_used(self, value: Optional[int]) -> None: ...
+    def tracks_used(self, value: int | None) -> None: ...
     @property
-    def weighted_rms(self) -> Optional[float]:
+    def weighted_rms(self) -> float | None:
         """
         The weighted root mean square (RMS) of the residuals.
         """
         ...
 
     @weighted_rms.setter
-    def weighted_rms(self, value: Optional[float]) -> None: ...
+    def weighted_rms(self, value: float | None) -> None: ...
 
 class OdmHeader:
     """
@@ -8884,12 +8884,12 @@ class OdmHeader:
         self,
         creation_date: str,
         originator: str,
-        classification: Optional[str] = None,
-        message_id: Optional[str] = None,
-        comment: Optional[list[str]] = None,
+        classification: str | None = None,
+        message_id: str | None = None,
+        comment: list[str] | None = None,
     ) -> None: ...
     @property
-    def classification(self) -> Optional[str]:
+    def classification(self) -> str | None:
         """
         User-defined free-text message classification/caveats of this ODM. It is recommended
         that selected values be pre-coordinated between exchanging entities by mutual agreement.
@@ -8899,7 +8899,7 @@ class OdmHeader:
         ...
 
     @classification.setter
-    def classification(self, value: Optional[str]) -> None: ...
+    def classification(self, value: str | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -8924,7 +8924,7 @@ class OdmHeader:
     @creation_date.setter
     def creation_date(self, value: str) -> None: ...
     @property
-    def message_id(self) -> Optional[str]:
+    def message_id(self) -> str | None:
         """
         ID that uniquely identifies a message from a given originator. The format and content of
         the message identifier value are at the discretion of the originator.
@@ -8934,7 +8934,7 @@ class OdmHeader:
         ...
 
     @message_id.setter
-    def message_id(self, value: Optional[str]) -> None: ...
+    def message_id(self, value: str | None) -> None: ...
     @property
     def originator(self) -> str:
         """
@@ -8973,11 +8973,11 @@ class Oem:
     def __init__(self, header: OdmHeader, segments: list[OemSegment]) -> None: ...
     @staticmethod
     def from_file(
-        path: str,
-        format: Optional[str] = None,
+        path: str | os.PathLike[str],
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
-        max_records: Optional[int] = None,
+        max_input_bytes: int | None = None,
+        max_records: int | None = None,
     ) -> Oem:
         """
         Parse an OEM from a KVN or XML file.
@@ -8987,10 +8987,10 @@ class Oem:
     @staticmethod
     def from_str(
         data: str,
-        format: Optional[str] = None,
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
-        max_records: Optional[int] = None,
+        max_input_bytes: int | None = None,
+        max_records: int | None = None,
     ) -> Oem:
         """
         Create an OEM message from a string.
@@ -9020,7 +9020,7 @@ class Oem:
     @header.setter
     def header(self, value: OdmHeader) -> None: ...
     @property
-    def id(self) -> Optional[str]:
+    def id(self) -> str | None:
         """
         The message identifier.
         """
@@ -9035,13 +9035,15 @@ class Oem:
 
     @segments.setter
     def segments(self, value: list[OemSegment]) -> None: ...
-    def to_file(self, path: str, format: str) -> None:
+    def to_file(
+        self, path: str | os.PathLike[str], format: Literal["kvn", "xml"]
+    ) -> None:
         """
         Atomically write this OEM as KVN or XML.
         """
         ...
 
-    def to_str(self, format: str) -> str:
+    def to_str(self, format: Literal["kvn", "xml"]) -> str:
         """
         Serialize to validated KVN or XML.
         """
@@ -9134,8 +9136,8 @@ class OemCovarianceMatrix:
         self,
         epoch: str,
         values: numpy.ndarray,
-        cov_ref_frame: Optional[str],
-        comment: Optional[list[str]],
+        cov_ref_frame: str | None,
+        comment: list[str] | None,
     ) -> None: ...
     @property
     def comment(self) -> list[str]:
@@ -9147,7 +9149,7 @@ class OemCovarianceMatrix:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def cov_ref_frame(self) -> Optional[str]:
+    def cov_ref_frame(self) -> str | None:
         """
         Reference frame in which the covariance data are given. Select from the accepted set of
         values indicated in 3.2.3.3 or 3.2.4.11.
@@ -9157,7 +9159,7 @@ class OemCovarianceMatrix:
         ...
 
     @cov_ref_frame.setter
-    def cov_ref_frame(self, value: Optional[str]) -> None: ...
+    def cov_ref_frame(self, value: str | None) -> None: ...
     @property
     def cx_dot_x(self) -> float:
         """
@@ -9416,7 +9418,7 @@ class OemData:
         self,
         state_vectors: list[StateVectorAcc],
         covariance_matrix=None,
-        comments: Optional[list[str]] = None,
+        comments: list[str] | None = None,
     ) -> None: ...
     @property
     def comment(self) -> list[str]:
@@ -9470,17 +9472,14 @@ class OemData:
     def covariance_matrix_numpy(self, value: numpy.ndarray) -> None: ...
     @staticmethod
     def from_numpy(
-        state_vector_epochs,
-        state_vector_numpy,
-        covariance_matrix_epochs=None,
-        covariance_matrix_numpy=None,
-        cov_ref_frames=None,
-        cov_comments=None,
-        comments=None,
-    ) -> OemData:
-        """ """
-        ...
-
+        state_vector_epochs: list[str],
+        state_vector_numpy: numpy.ndarray,
+        covariance_matrix_epochs: list[str] | None = None,
+        covariance_matrix_numpy: numpy.ndarray | None = None,
+        cov_ref_frames: list[str | None] | None = None,
+        cov_comments: list[list[str]] | None = None,
+        comments: list[str] | None = None,
+    ) -> OemData: ...
     @property
     def state_vector(self) -> list[StateVectorAcc]:
         """
@@ -9573,14 +9572,14 @@ class OemMetadata:
         start_time: str,
         stop_time: str,
         center_name: str = ...,
-        ref_frame: Optional[str] = None,
-        time_system: Optional[str] = None,
-        ref_frame_epoch: Optional[str] = None,
-        useable_start_time: Optional[str] = None,
-        useable_stop_time: Optional[str] = None,
-        interpolation: Optional[str] = None,
-        interpolation_degree: Optional[int] = None,
-        comment: Optional[list[str]] = None,
+        ref_frame: str | None = None,
+        time_system: str | None = None,
+        ref_frame_epoch: str | None = None,
+        useable_start_time: str | None = None,
+        useable_stop_time: str | None = None,
+        interpolation: str | None = None,
+        interpolation_degree: int | None = None,
+        comment: list[str] | None = None,
     ) -> None: ...
     @property
     def center_name(self) -> str:
@@ -9611,7 +9610,7 @@ class OemMetadata:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def interpolation(self) -> Optional[str]:
+    def interpolation(self) -> str | None:
         """
         This keyword may be used to specify the recommended interpolation method for ephemeris
         data in the immediately following set of ephemeris lines.
@@ -9621,9 +9620,9 @@ class OemMetadata:
         ...
 
     @interpolation.setter
-    def interpolation(self, value: Optional[str]) -> None: ...
+    def interpolation(self, value: str | None) -> None: ...
     @property
-    def interpolation_degree(self) -> Optional[int]:
+    def interpolation_degree(self) -> int | None:
         """
         Recommended interpolation degree for ephemeris data in the immediately following set of
         ephemeris lines. Must be an integer value. This keyword must be used if the
@@ -9634,7 +9633,7 @@ class OemMetadata:
         ...
 
     @interpolation_degree.setter
-    def interpolation_degree(self, value: Optional[int]) -> None: ...
+    def interpolation_degree(self, value: int | None) -> None: ...
     @property
     def object_id(self) -> str:
         """
@@ -9683,7 +9682,7 @@ class OemMetadata:
     @ref_frame.setter
     def ref_frame(self, value: str) -> None: ...
     @property
-    def ref_frame_epoch(self) -> Optional[str]:
+    def ref_frame_epoch(self) -> str | None:
         """
         Epoch of reference frame, if not intrinsic to the definition of the reference frame.
         (See 7.5.10 for formatting rules.)
@@ -9693,7 +9692,7 @@ class OemMetadata:
         ...
 
     @ref_frame_epoch.setter
-    def ref_frame_epoch(self, value: Optional[str]) -> None: ...
+    def ref_frame_epoch(self, value: str | None) -> None: ...
     @property
     def start_time(self) -> str:
         """
@@ -9731,7 +9730,7 @@ class OemMetadata:
     @time_system.setter
     def time_system(self, value: str) -> None: ...
     @property
-    def useable_start_time(self) -> Optional[str]:
+    def useable_start_time(self) -> str | None:
         """
         Start time of USEABLE time span covered by ephemeris data immediately following this
         metadata block. (For format specification, see 7.5.10.) This optional keyword allows the
@@ -9745,9 +9744,9 @@ class OemMetadata:
         ...
 
     @useable_start_time.setter
-    def useable_start_time(self, value: Optional[str]) -> None: ...
+    def useable_start_time(self, value: str | None) -> None: ...
     @property
-    def useable_stop_time(self) -> Optional[str]:
+    def useable_stop_time(self) -> str | None:
         """
         Stop time of USEABLE time span covered by ephemeris data immediately following this
         metadata block. (For format specification, see 7.5.10.) This optional keyword allows the
@@ -9761,7 +9760,7 @@ class OemMetadata:
         ...
 
     @useable_stop_time.setter
-    def useable_stop_time(self, value: Optional[str]) -> None: ...
+    def useable_stop_time(self, value: str | None) -> None: ...
     def validate(self) -> None:
         """
         Validate the metadata against CCSDS rules.
@@ -9831,10 +9830,10 @@ class Omm:
     def __init__(self, header: OdmHeader, segment: OmmSegment) -> None: ...
     @staticmethod
     def from_file(
-        path: str,
-        format: Optional[str] = None,
+        path: str | os.PathLike[str],
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
+        max_input_bytes: int | None = None,
     ) -> Omm:
         """
         Parse an OMM from a KVN or XML file.
@@ -9844,22 +9843,19 @@ class Omm:
     @staticmethod
     def from_str(
         data: str,
-        format: Optional[str] = None,
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
-    ) -> Omm:
-        """ """
-        ...
-
+        max_input_bytes: int | None = None,
+    ) -> Omm: ...
     @staticmethod
     def from_tle_lines(
         line1: str,
         line2: str,
-        object_name: Optional[str] = None,
-        object_id: Optional[str] = None,
-        originator: Optional[str] = None,
-        message_id: Optional[str] = None,
-        creation_date: Optional[str] = None,
+        object_name: str | None = None,
+        object_id: str | None = None,
+        originator: str | None = None,
+        message_id: str | None = None,
+        creation_date: str | None = None,
     ) -> Omm:
         """
         Build a minimal OMM from NORAD TLE line 1 and line 2.
@@ -9902,7 +9898,7 @@ class Omm:
     @header.setter
     def header(self, value: OdmHeader) -> None: ...
     @property
-    def id(self) -> Optional[str]:
+    def id(self) -> str | None:
         """
         The message identifier.
         """
@@ -9917,13 +9913,15 @@ class Omm:
 
     @segment.setter
     def segment(self, value: OmmSegment) -> None: ...
-    def to_file(self, path: str, format: str) -> None:
+    def to_file(
+        self, path: str | os.PathLike[str], format: Literal["kvn", "xml"]
+    ) -> None:
         """
         Atomically write this OMM as KVN or XML.
         """
         ...
 
-    def to_str(self, format: str) -> str:
+    def to_str(self, format: Literal["kvn", "xml"]) -> str:
         """
         Serialize to validated KVN or XML.
         """
@@ -9971,14 +9969,14 @@ class OmmData:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def covariance_matrix(self) -> Optional[OpmCovarianceMatrix]:
+    def covariance_matrix(self) -> OpmCovarianceMatrix | None:
         """
         Position/Velocity Covariance Matrix (6x6 Lower Triangular Form).
         """
         ...
 
     @covariance_matrix.setter
-    def covariance_matrix(self, value: Optional[OpmCovarianceMatrix]) -> None: ...
+    def covariance_matrix(self, value: OpmCovarianceMatrix | None) -> None: ...
     @property
     def mean_elements(self) -> MeanElements:
         """
@@ -9989,23 +9987,23 @@ class OmmData:
     @mean_elements.setter
     def mean_elements(self, value: MeanElements) -> None: ...
     @property
-    def spacecraft_parameters(self) -> Optional[SpacecraftParameters]:
+    def spacecraft_parameters(self) -> SpacecraftParameters | None:
         """
         Spacecraft Parameters.
         """
         ...
 
     @spacecraft_parameters.setter
-    def spacecraft_parameters(self, value: Optional[SpacecraftParameters]) -> None: ...
+    def spacecraft_parameters(self, value: SpacecraftParameters | None) -> None: ...
     @property
-    def tle_parameters(self) -> Optional[TleParameters]:
+    def tle_parameters(self) -> TleParameters | None:
         """
         TLE Related Parameters (Only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
         """
         ...
 
     @tle_parameters.setter
-    def tle_parameters(self, value: Optional[TleParameters]) -> None: ...
+    def tle_parameters(self, value: TleParameters | None) -> None: ...
     @property
     def user_defined_parameters(self) -> UserDefined | None:
         """
@@ -10044,11 +10042,11 @@ class OmmMetadata:
         object_name: str,
         object_id: str,
         center_name: str = ...,
-        ref_frame: Optional[str] = None,
-        time_system: Optional[str] = None,
+        ref_frame: str | None = None,
+        time_system: str | None = None,
         mean_element_theory: str = ...,
-        ref_frame_epoch: Optional[str] = None,
-        comment: Optional[list[str]] = None,
+        ref_frame_epoch: str | None = None,
+        comment: list[str] | None = None,
     ) -> None: ...
     @property
     def center_name(self) -> str:
@@ -10141,7 +10139,7 @@ class OmmMetadata:
     @ref_frame.setter
     def ref_frame(self, value: str) -> None: ...
     @property
-    def ref_frame_epoch(self) -> Optional[str]:
+    def ref_frame_epoch(self) -> str | None:
         """
         Epoch of reference frame, if not intrinsic to the definition of the reference frame.
         (See 7.5.10 for formatting rules.)
@@ -10151,7 +10149,7 @@ class OmmMetadata:
         ...
 
     @ref_frame_epoch.setter
-    def ref_frame_epoch(self, value: Optional[str]) -> None: ...
+    def ref_frame_epoch(self, value: str | None) -> None: ...
     @property
     def time_system(self) -> str:
         """
@@ -10216,10 +10214,10 @@ class Opm:
     def __init__(self, header: OdmHeader, segment: OpmSegment) -> None: ...
     @staticmethod
     def from_file(
-        path: str,
-        format: Optional[str] = None,
+        path: str | os.PathLike[str],
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
+        max_input_bytes: int | None = None,
     ) -> Opm:
         """
         Parse an OPM from a KVN or XML file.
@@ -10229,9 +10227,9 @@ class Opm:
     @staticmethod
     def from_str(
         data: str,
-        format: Optional[str] = None,
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
+        max_input_bytes: int | None = None,
     ) -> Opm:
         """
         Create an OPM message from a string.
@@ -10254,7 +10252,7 @@ class Opm:
     @header.setter
     def header(self, value: OdmHeader) -> None: ...
     @property
-    def id(self) -> Optional[str]:
+    def id(self) -> str | None:
         """
         The message identifier.
         """
@@ -10269,13 +10267,15 @@ class Opm:
 
     @segment.setter
     def segment(self, value: OpmSegment) -> None: ...
-    def to_file(self, path: str, format: str) -> None:
+    def to_file(
+        self, path: str | os.PathLike[str], format: Literal["kvn", "xml"]
+    ) -> None:
         """
         Atomically write this OPM as KVN or XML.
         """
         ...
 
-    def to_str(self, format: str) -> str:
+    def to_str(self, format: Literal["kvn", "xml"]) -> str:
         """
         Serialize to KVN or XML after mandatory CCSDS validation.
         """
@@ -10359,29 +10359,29 @@ class OpmCovarianceMatrix:
     """
     def __init__(
         self,
-        cx_x: Optional[float] = None,
-        cy_x: Optional[float] = None,
-        cy_y: Optional[float] = None,
-        cz_x: Optional[float] = None,
-        cz_y: Optional[float] = None,
-        cz_z: Optional[float] = None,
-        cx_dot_x: Optional[float] = None,
-        cx_dot_y: Optional[float] = None,
-        cx_dot_z: Optional[float] = None,
-        cy_dot_x: Optional[float] = None,
-        cy_dot_y: Optional[float] = None,
-        cy_dot_z: Optional[float] = None,
-        cz_dot_x: Optional[float] = None,
-        cz_dot_y: Optional[float] = None,
-        cz_dot_z: Optional[float] = None,
-        cx_dot_x_dot: Optional[float] = None,
-        cy_dot_x_dot: Optional[float] = None,
-        cy_dot_y_dot: Optional[float] = None,
-        cz_dot_x_dot: Optional[float] = None,
-        cz_dot_y_dot: Optional[float] = None,
-        cz_dot_z_dot: Optional[float] = None,
-        cov_ref_frame: Optional[str] = None,
-        comments: Optional[list[str]] = None,
+        cx_x: float | None = None,
+        cy_x: float | None = None,
+        cy_y: float | None = None,
+        cz_x: float | None = None,
+        cz_y: float | None = None,
+        cz_z: float | None = None,
+        cx_dot_x: float | None = None,
+        cx_dot_y: float | None = None,
+        cx_dot_z: float | None = None,
+        cy_dot_x: float | None = None,
+        cy_dot_y: float | None = None,
+        cy_dot_z: float | None = None,
+        cz_dot_x: float | None = None,
+        cz_dot_y: float | None = None,
+        cz_dot_z: float | None = None,
+        cx_dot_x_dot: float | None = None,
+        cy_dot_x_dot: float | None = None,
+        cy_dot_y_dot: float | None = None,
+        cz_dot_x_dot: float | None = None,
+        cz_dot_y_dot: float | None = None,
+        cz_dot_z_dot: float | None = None,
+        cov_ref_frame: str | None = None,
+        comments: list[str] | None = None,
     ) -> None: ...
     @property
     def comment(self) -> list[str]:
@@ -10393,7 +10393,7 @@ class OpmCovarianceMatrix:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def cov_ref_frame(self) -> Optional[str]:
+    def cov_ref_frame(self) -> str | None:
         """
         Reference frame in which the covariance data are given. Select from the accepted set of
         values indicated in 3.2.4.11.
@@ -10401,7 +10401,7 @@ class OpmCovarianceMatrix:
         ...
 
     @cov_ref_frame.setter
-    def cov_ref_frame(self, value: Optional[str]) -> None: ...
+    def cov_ref_frame(self, value: str | None) -> None: ...
     @property
     def cx_dot_x(self) -> float:
         """
@@ -10654,23 +10654,23 @@ class OpmData:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def covariance_matrix(self) -> Optional[OpmCovarianceMatrix]:
+    def covariance_matrix(self) -> OpmCovarianceMatrix | None:
         """
         Covariance matrix.
         """
         ...
 
     @covariance_matrix.setter
-    def covariance_matrix(self, value: Optional[OpmCovarianceMatrix]) -> None: ...
+    def covariance_matrix(self, value: OpmCovarianceMatrix | None) -> None: ...
     @property
-    def keplerian_elements(self) -> Optional[KeplerianElements]:
+    def keplerian_elements(self) -> KeplerianElements | None:
         """
         Keplerian elements.
         """
         ...
 
     @keplerian_elements.setter
-    def keplerian_elements(self, value: Optional[KeplerianElements]) -> None: ...
+    def keplerian_elements(self, value: KeplerianElements | None) -> None: ...
     @property
     def maneuver_parameters(self) -> list[OpmManeuverParameters]:
         """
@@ -10681,14 +10681,14 @@ class OpmData:
     @maneuver_parameters.setter
     def maneuver_parameters(self, value: list[OpmManeuverParameters]) -> None: ...
     @property
-    def spacecraft_parameters(self) -> Optional[SpacecraftParameters]:
+    def spacecraft_parameters(self) -> SpacecraftParameters | None:
         """
         Spacecraft parameters.
         """
         ...
 
     @spacecraft_parameters.setter
-    def spacecraft_parameters(self, value: Optional[SpacecraftParameters]) -> None: ...
+    def spacecraft_parameters(self, value: SpacecraftParameters | None) -> None: ...
     @property
     def state_vector(self) -> StateVector:
         """
@@ -10855,10 +10855,10 @@ class OpmMetadata:
         object_name: str,
         object_id: str,
         center_name: str = ...,
-        ref_frame: Optional[str] = None,
-        time_system: Optional[str] = None,
-        ref_frame_epoch: Optional[str] = None,
-        comment: Optional[list[str]] = None,
+        ref_frame: str | None = None,
+        time_system: str | None = None,
+        ref_frame_epoch: str | None = None,
+        comment: list[str] | None = None,
     ) -> None: ...
     @property
     def center_name(self) -> str:
@@ -10934,7 +10934,7 @@ class OpmMetadata:
     @ref_frame.setter
     def ref_frame(self, value: str) -> None: ...
     @property
-    def ref_frame_epoch(self) -> Optional[str]:
+    def ref_frame_epoch(self) -> str | None:
         """
         Epoch of reference frame, if not intrinsic to the definition of the reference frame. (See
         7.5.10 for formatting rules.)
@@ -10944,7 +10944,7 @@ class OpmMetadata:
         ...
 
     @ref_frame_epoch.setter
-    def ref_frame_epoch(self, value: Optional[str]) -> None: ...
+    def ref_frame_epoch(self, value: str | None) -> None: ...
     @property
     def time_system(self) -> str:
         """
@@ -11125,10 +11125,10 @@ class Rdm:
     def __init__(self, *, header: RdmHeader, segment: RdmSegment) -> None: ...
     @staticmethod
     def from_file(
-        path: str,
-        format: Optional[str] = None,
+        path: str | os.PathLike[str],
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
+        max_input_bytes: int | None = None,
     ) -> Rdm:
         """
         Parse an RDM from a KVN or XML file.
@@ -11138,9 +11138,9 @@ class Rdm:
     @staticmethod
     def from_str(
         data: str,
-        format: Optional[str] = None,
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
+        max_input_bytes: int | None = None,
     ) -> Rdm:
         """
         Create an RDM message from a string.
@@ -11180,7 +11180,7 @@ class Rdm:
     @header.setter
     def header(self, value: RdmHeader) -> None: ...
     @property
-    def id(self) -> Optional[str]:
+    def id(self) -> str | None:
         """
         The message identifier.
         """
@@ -11195,13 +11195,15 @@ class Rdm:
 
     @segment.setter
     def segment(self, value: RdmSegment) -> None: ...
-    def to_file(self, path: str, format: str) -> None:
+    def to_file(
+        self, path: str | os.PathLike[str], format: Literal["kvn", "xml"]
+    ) -> None:
         """
         Atomically write this RDM as KVN or XML.
         """
         ...
 
-    def to_str(self, format: str) -> str:
+    def to_str(self, format: Literal["kvn", "xml"]) -> str:
         """
         Serialize to string (generic).
 
@@ -11259,13 +11261,13 @@ class RdmData:
         self,
         *,
         atmospheric_reentry_parameters: AtmosphericReentryParameters,
-        ground_impact_parameters: Optional[GroundImpactParameters] = None,
-        state_vector: Optional[StateVector] = None,
-        covariance_matrix: Optional[OpmCovarianceMatrix] = None,
-        spacecraft_parameters: Optional[RdmSpacecraftParameters] = None,
-        od_parameters: Optional[OdParameters] = None,
-        user_defined_parameters: Optional[UserDefined] = None,
-        comment: Optional[list[str]] = None,
+        ground_impact_parameters: GroundImpactParameters | None = None,
+        state_vector: StateVector | None = None,
+        covariance_matrix: OpmCovarianceMatrix | None = None,
+        spacecraft_parameters: RdmSpacecraftParameters | None = None,
+        od_parameters: OdParameters | None = None,
+        user_defined_parameters: UserDefined | None = None,
+        comment: list[str] | None = None,
     ) -> None: ...
     @property
     def atmospheric_reentry_parameters(self) -> AtmosphericReentryParameters:
@@ -11288,16 +11290,16 @@ class RdmData:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def covariance_matrix(self) -> Optional[OpmCovarianceMatrix]:
+    def covariance_matrix(self) -> OpmCovarianceMatrix | None:
         """
         Covariance matrix.
         """
         ...
 
     @covariance_matrix.setter
-    def covariance_matrix(self, value: Optional[OpmCovarianceMatrix]) -> None: ...
+    def covariance_matrix(self, value: OpmCovarianceMatrix | None) -> None: ...
     @property
-    def ground_impact_parameters(self) -> Optional[GroundImpactParameters]:
+    def ground_impact_parameters(self) -> GroundImpactParameters | None:
         """
         Ground impact parameters.
         """
@@ -11305,37 +11307,35 @@ class RdmData:
 
     @ground_impact_parameters.setter
     def ground_impact_parameters(
-        self, value: Optional[GroundImpactParameters]
+        self, value: GroundImpactParameters | None
     ) -> None: ...
     @property
-    def od_parameters(self) -> Optional[OdParameters]:
+    def od_parameters(self) -> OdParameters | None:
         """
         Orbit determination parameters.
         """
         ...
 
     @od_parameters.setter
-    def od_parameters(self, value: Optional[OdParameters]) -> None: ...
+    def od_parameters(self, value: OdParameters | None) -> None: ...
     @property
-    def spacecraft_parameters(self) -> Optional[RdmSpacecraftParameters]:
+    def spacecraft_parameters(self) -> RdmSpacecraftParameters | None:
         """
         Spacecraft parameters.
         """
         ...
 
     @spacecraft_parameters.setter
-    def spacecraft_parameters(
-        self, value: Optional[RdmSpacecraftParameters]
-    ) -> None: ...
+    def spacecraft_parameters(self, value: RdmSpacecraftParameters | None) -> None: ...
     @property
-    def state_vector(self) -> Optional[StateVector]:
+    def state_vector(self) -> StateVector | None:
         """
         State vector.
         """
         ...
 
     @state_vector.setter
-    def state_vector(self, value: Optional[StateVector]) -> None: ...
+    def state_vector(self, value: StateVector | None) -> None: ...
     @property
     def user_defined_parameters(self) -> UserDefined | None:
         """
@@ -11371,7 +11371,7 @@ class RdmHeader:
         originator: str,
         creation_date: str,
         message_id: str,
-        comment: Optional[list[str]] = None,
+        comment: list[str] | None = None,
     ) -> None: ...
     @property
     def comment(self) -> list[str]:
@@ -11443,9 +11443,9 @@ class RdmMetadata:
         object_name: str,
         international_designator: str,
         epoch_tzero: str,
-        controlled_reentry: Optional[str] = None,
+        controlled_reentry: str | None = None,
         center_name: str = ...,
-        time_system: Optional[str] = None,
+        time_system: str | None = None,
         catalog_name=None,
         object_designator=None,
         object_type=None,
@@ -11472,7 +11472,7 @@ class RdmMetadata:
         comment=None,
     ) -> None: ...
     @property
-    def atmospheric_model(self) -> Optional[str]:
+    def atmospheric_model(self) -> str | None:
         """
         The atmosphere model(s) used in the simulation. If more than one model is used they
         should be listed on the same line and separated by a comma.
@@ -11482,9 +11482,9 @@ class RdmMetadata:
         ...
 
     @atmospheric_model.setter
-    def atmospheric_model(self, value: Optional[str]) -> None: ...
+    def atmospheric_model(self, value: str | None) -> None: ...
     @property
-    def catalog_name(self) -> Optional[str]:
+    def catalog_name(self) -> str | None:
         """
         The satellite catalog used for the object (formatting rules specified in 5.2.3.3). The
         name should be taken from the appropriate SANA registry for catalog names, reference
@@ -11495,7 +11495,7 @@ class RdmMetadata:
         ...
 
     @catalog_name.setter
-    def catalog_name(self, value: Optional[str]) -> None: ...
+    def catalog_name(self, value: str | None) -> None: ...
     @property
     def center_name(self) -> str:
         """
@@ -11531,7 +11531,7 @@ class RdmMetadata:
     @controlled_reentry.setter
     def controlled_reentry(self, value: str) -> None: ...
     @property
-    def drag_parameters_altitude(self) -> Optional[float]:
+    def drag_parameters_altitude(self) -> float | None:
         """
         The altitude (in km) at which the object drag parameters (DRAG_AREA, DRAG_COEFF, and/or
         BALLISTIC_COEFF) are valid. The units shall be kilometers, and the conventions
@@ -11544,9 +11544,9 @@ class RdmMetadata:
         ...
 
     @drag_parameters_altitude.setter
-    def drag_parameters_altitude(self, value: Optional[float]) -> None: ...
+    def drag_parameters_altitude(self, value: float | None) -> None: ...
     @property
-    def drag_parameters_source(self) -> Optional[str]:
+    def drag_parameters_source(self) -> str | None:
         """
         The method used to estimate the drag parameters of the object (DRAG_AREA, DRAG_COEFF,
         and/or BALLISTIC_COEFF).
@@ -11556,9 +11556,9 @@ class RdmMetadata:
         ...
 
     @drag_parameters_source.setter
-    def drag_parameters_source(self, value: Optional[str]) -> None: ...
+    def drag_parameters_source(self, value: str | None) -> None: ...
     @property
-    def earth_tides(self) -> Optional[str]:
+    def earth_tides(self) -> str | None:
         """
         Model used for solid Earth and ocean tides: either model name, or NO if tides were not
         modelled.
@@ -11568,9 +11568,9 @@ class RdmMetadata:
         ...
 
     @earth_tides.setter
-    def earth_tides(self, value: Optional[str]) -> None: ...
+    def earth_tides(self, value: str | None) -> None: ...
     @property
-    def ephemeris_name(self) -> Optional[str]:
+    def ephemeris_name(self) -> str | None:
         """
         Unique identifier of an external ephemeris file used or NONE.
 
@@ -11579,7 +11579,7 @@ class RdmMetadata:
         ...
 
     @ephemeris_name.setter
-    def ephemeris_name(self, value: Optional[str]) -> None: ...
+    def ephemeris_name(self, value: str | None) -> None: ...
     @property
     def epoch_tzero(self) -> str:
         """
@@ -11593,7 +11593,7 @@ class RdmMetadata:
     @epoch_tzero.setter
     def epoch_tzero(self, value: str) -> None: ...
     @property
-    def gravity_model(self) -> Optional[str]:
+    def gravity_model(self) -> str | None:
         """
         The gravity model used in the simulation. The degree (D) and order (O) of the spherical
         harmonic coefficients applied should be given along with the name of the model.
@@ -11603,9 +11603,9 @@ class RdmMetadata:
         ...
 
     @gravity_model.setter
-    def gravity_model(self, value: Optional[str]) -> None: ...
+    def gravity_model(self, value: str | None) -> None: ...
     @property
-    def impact_uncertainty_method(self) -> Optional[str]:
+    def impact_uncertainty_method(self) -> str | None:
         """
         The method used to determine the impact location confidence interval(s).
 
@@ -11614,7 +11614,7 @@ class RdmMetadata:
         ...
 
     @impact_uncertainty_method.setter
-    def impact_uncertainty_method(self, value: Optional[str]) -> None: ...
+    def impact_uncertainty_method(self, value: str | None) -> None: ...
     @property
     def international_designator(self) -> str:
         """
@@ -11632,7 +11632,7 @@ class RdmMetadata:
     @international_designator.setter
     def international_designator(self, value: str) -> None: ...
     @property
-    def intrack_thrust(self) -> Optional[str]:
+    def intrack_thrust(self) -> str | None:
         """
         Indicator on whether in-track thrust modeling was used in the simulation.
 
@@ -11641,9 +11641,9 @@ class RdmMetadata:
         ...
 
     @intrack_thrust.setter
-    def intrack_thrust(self, value: Optional[str]) -> None: ...
+    def intrack_thrust(self, value: str | None) -> None: ...
     @property
-    def n_body_perturbations(self) -> Optional[str]:
+    def n_body_perturbations(self) -> str | None:
         """
         Comma separated list of other bodies used in the simulation. The names of the bodies
         should be taken from the SANA registry for orbit centers, reference `[9]`. If no other
@@ -11654,9 +11654,9 @@ class RdmMetadata:
         ...
 
     @n_body_perturbations.setter
-    def n_body_perturbations(self, value: Optional[str]) -> None: ...
+    def n_body_perturbations(self, value: str | None) -> None: ...
     @property
-    def next_message_epoch(self) -> Optional[str]:
+    def next_message_epoch(self) -> str | None:
         """
         Scheduled UTC epoch of the next RDM for the same object (formatting rules specified in
         5.3.3.5); N/A if no other message is scheduled.
@@ -11666,9 +11666,9 @@ class RdmMetadata:
         ...
 
     @next_message_epoch.setter
-    def next_message_epoch(self, value: Optional[str]) -> None: ...
+    def next_message_epoch(self, value: str | None) -> None: ...
     @property
-    def object_designator(self) -> Optional[str]:
+    def object_designator(self) -> str | None:
         """
         The CATALOG_NAME satellite catalog designator for the object (formatting rules
         specified in 5.2.3.3).
@@ -11678,7 +11678,7 @@ class RdmMetadata:
         ...
 
     @object_designator.setter
-    def object_designator(self, value: Optional[str]) -> None: ...
+    def object_designator(self, value: str | None) -> None: ...
     @property
     def object_name(self) -> str:
         """
@@ -11696,7 +11696,7 @@ class RdmMetadata:
     @object_name.setter
     def object_name(self, value: str) -> None: ...
     @property
-    def object_operator(self) -> Optional[str]:
+    def object_operator(self) -> str | None:
         """
         Operator of the object (e.g., company, agency, or country operating the satellite).
         The value should be taken from the abbreviation column in the SANA organizations
@@ -11707,9 +11707,9 @@ class RdmMetadata:
         ...
 
     @object_operator.setter
-    def object_operator(self, value: Optional[str]) -> None: ...
+    def object_operator(self, value: str | None) -> None: ...
     @property
-    def object_owner(self) -> Optional[str]:
+    def object_owner(self) -> str | None:
         """
         Owner of the object (e.g., company, agency, or country owning the satellite). The value
         should be taken from the abbreviation column in the SANA organizations registry,
@@ -11720,9 +11720,9 @@ class RdmMetadata:
         ...
 
     @object_owner.setter
-    def object_owner(self, value: Optional[str]) -> None: ...
+    def object_owner(self, value: str | None) -> None: ...
     @property
-    def object_type(self) -> Optional[str]:
+    def object_type(self) -> str | None:
         """
         The object type.
 
@@ -11731,9 +11731,9 @@ class RdmMetadata:
         ...
 
     @object_type.setter
-    def object_type(self, value: Optional[str]) -> None: ...
+    def object_type(self, value: str | None) -> None: ...
     @property
-    def previous_message_epoch(self) -> Optional[str]:
+    def previous_message_epoch(self) -> str | None:
         """
         UTC Epoch of the previous RDM issued for this object (formatting rules specified in
         5.3.3.5).
@@ -11743,9 +11743,9 @@ class RdmMetadata:
         ...
 
     @previous_message_epoch.setter
-    def previous_message_epoch(self, value: Optional[str]) -> None: ...
+    def previous_message_epoch(self, value: str | None) -> None: ...
     @property
-    def previous_message_id(self) -> Optional[str]:
+    def previous_message_id(self) -> str | None:
         """
         ID of the previous RDM issued for this object.
 
@@ -11754,9 +11754,9 @@ class RdmMetadata:
         ...
 
     @previous_message_id.setter
-    def previous_message_id(self, value: Optional[str]) -> None: ...
+    def previous_message_id(self, value: str | None) -> None: ...
     @property
-    def reentry_disintegration(self) -> Optional[str]:
+    def reentry_disintegration(self) -> str | None:
         """
         The aspects of disintegration during re-entry considered during simulations: none (the
         object was treated as a point mass), mass loss, break-ups (including explosion), or
@@ -11768,9 +11768,9 @@ class RdmMetadata:
         ...
 
     @reentry_disintegration.setter
-    def reentry_disintegration(self, value: Optional[str]) -> None: ...
+    def reentry_disintegration(self, value: str | None) -> None: ...
     @property
-    def reentry_uncertainty_method(self) -> Optional[str]:
+    def reentry_uncertainty_method(self) -> str | None:
         """
         The method used to determine the orbit lifetime uncertainty or the re-entry windows.
 
@@ -11779,9 +11779,9 @@ class RdmMetadata:
         ...
 
     @reentry_uncertainty_method.setter
-    def reentry_uncertainty_method(self, value: Optional[str]) -> None: ...
+    def reentry_uncertainty_method(self, value: str | None) -> None: ...
     @property
-    def ref_frame(self) -> Optional[str]:
+    def ref_frame(self) -> str | None:
         """
         Reference frame in which the (optional) orbit information will be provided. The value
         should be taken from the keyword value name column in the SANA celestial body reference
@@ -11795,9 +11795,9 @@ class RdmMetadata:
         ...
 
     @ref_frame.setter
-    def ref_frame(self, value: Optional[str]) -> None: ...
+    def ref_frame(self, value: str | None) -> None: ...
     @property
-    def ref_frame_epoch(self) -> Optional[str]:
+    def ref_frame_epoch(self) -> str | None:
         """
         Epoch of reference frame, if not intrinsic to the definition of the reference frame
         (formatting rules specified in 5.3.3.5).
@@ -11807,9 +11807,9 @@ class RdmMetadata:
         ...
 
     @ref_frame_epoch.setter
-    def ref_frame_epoch(self, value: Optional[str]) -> None: ...
+    def ref_frame_epoch(self, value: str | None) -> None: ...
     @property
-    def solar_flux_prediction(self) -> Optional[str]:
+    def solar_flux_prediction(self) -> str | None:
         """
         The method used to predict the solar flux and geomagnetic indices.
 
@@ -11818,9 +11818,9 @@ class RdmMetadata:
         ...
 
     @solar_flux_prediction.setter
-    def solar_flux_prediction(self, value: Optional[str]) -> None: ...
+    def solar_flux_prediction(self, value: str | None) -> None: ...
     @property
-    def solar_rad_pressure(self) -> Optional[str]:
+    def solar_rad_pressure(self) -> str | None:
         """
         Model used for the solar radiation pressure: either model name, or NO if solar
         radiation pressure was not modelled.
@@ -11830,7 +11830,7 @@ class RdmMetadata:
         ...
 
     @solar_rad_pressure.setter
-    def solar_rad_pressure(self, value: Optional[str]) -> None: ...
+    def solar_rad_pressure(self, value: str | None) -> None: ...
     @property
     def time_system(self) -> str:
         """
@@ -11885,7 +11885,7 @@ class RdmSpacecraftParameters:
     """
     def __init__(self, *, wet_mass=None, dry_mass=None, comment=None) -> None: ...
     @property
-    def ballistic_coeff(self) -> Optional[float]:
+    def ballistic_coeff(self) -> float | None:
         """
         Object ballistic coefficient.
 
@@ -11894,7 +11894,7 @@ class RdmSpacecraftParameters:
         ...
 
     @ballistic_coeff.setter
-    def ballistic_coeff(self, value: Optional[float]) -> None: ...
+    def ballistic_coeff(self, value: float | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -11905,7 +11905,7 @@ class RdmSpacecraftParameters:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def drag_area(self) -> Optional[float]:
+    def drag_area(self) -> float | None:
         """
         Object cross-sectional area.
 
@@ -11914,18 +11914,18 @@ class RdmSpacecraftParameters:
         ...
 
     @drag_area.setter
-    def drag_area(self, value: Optional[float]) -> None: ...
+    def drag_area(self, value: float | None) -> None: ...
     @property
-    def drag_coeff(self) -> Optional[float]:
+    def drag_coeff(self) -> float | None:
         """
         Object drag coefficient.
         """
         ...
 
     @drag_coeff.setter
-    def drag_coeff(self, value: Optional[float]) -> None: ...
+    def drag_coeff(self, value: float | None) -> None: ...
     @property
-    def dry_mass(self) -> Optional[float]:
+    def dry_mass(self) -> float | None:
         """
         Object dry mass (without propellant).
 
@@ -11934,18 +11934,18 @@ class RdmSpacecraftParameters:
         ...
 
     @dry_mass.setter
-    def dry_mass(self, value: Optional[float]) -> None: ...
+    def dry_mass(self, value: float | None) -> None: ...
     @property
-    def hazardous_substances(self) -> Optional[str]:
+    def hazardous_substances(self) -> str | None:
         """
         Comma separated list of hazardous substances contained by the object.
         """
         ...
 
     @hazardous_substances.setter
-    def hazardous_substances(self, value: Optional[str]) -> None: ...
+    def hazardous_substances(self, value: str | None) -> None: ...
     @property
-    def rcs(self) -> Optional[float]:
+    def rcs(self) -> float | None:
         """
         Object radar cross section.
 
@@ -11954,9 +11954,9 @@ class RdmSpacecraftParameters:
         ...
 
     @rcs.setter
-    def rcs(self, value: Optional[float]) -> None: ...
+    def rcs(self, value: float | None) -> None: ...
     @property
-    def solar_rad_area(self) -> Optional[float]:
+    def solar_rad_area(self) -> float | None:
         """
         Object area exposed to Solar Radiation Pressure (SRP).
 
@@ -11965,18 +11965,18 @@ class RdmSpacecraftParameters:
         ...
 
     @solar_rad_area.setter
-    def solar_rad_area(self, value: Optional[float]) -> None: ...
+    def solar_rad_area(self, value: float | None) -> None: ...
     @property
-    def solar_rad_coeff(self) -> Optional[float]:
+    def solar_rad_coeff(self) -> float | None:
         """
         Object solar radiation coefficient.
         """
         ...
 
     @solar_rad_coeff.setter
-    def solar_rad_coeff(self, value: Optional[float]) -> None: ...
+    def solar_rad_coeff(self, value: float | None) -> None: ...
     @property
-    def thrust_acceleration(self) -> Optional[float]:
+    def thrust_acceleration(self) -> float | None:
         """
         The object’s acceleration due to in-track thrust used to propagate the state vector and
         covariance to NOMINAL_RENTRY_EPOCH (if a controlled re-entry).
@@ -11986,9 +11986,9 @@ class RdmSpacecraftParameters:
         ...
 
     @thrust_acceleration.setter
-    def thrust_acceleration(self, value: Optional[float]) -> None: ...
+    def thrust_acceleration(self, value: float | None) -> None: ...
     @property
-    def wet_mass(self) -> Optional[float]:
+    def wet_mass(self) -> float | None:
         """
         Total object mass at EPOCH_TZERO.
 
@@ -11997,9 +11997,8 @@ class RdmSpacecraftParameters:
         ...
 
     @wet_mass.setter
-    def wet_mass(self, value: Optional[float]) -> None: ...
+    def wet_mass(self, value: float | None) -> None: ...
 
-class ReferenceFrame: ...
 class ReferenceFrameType: ...
 
 class RelativeMetadataData:
@@ -12052,25 +12051,25 @@ class RelativeMetadataData:
         self,
         tca: str,
         miss_distance: float,
-        relative_speed: Optional[float] = None,
-        relative_position: Optional[list[float]] = None,
-        relative_velocity: Optional[list[float]] = None,
-        start_screen_period: Optional[str] = None,
-        stop_screen_period: Optional[str] = None,
-        screen_volume_frame: Optional[Union[ScreenVolumeFrameType, str]] = None,
-        screen_volume_shape: Optional[Union[ScreenVolumeShapeType, str]] = None,
-        screen_volume_x: Optional[float] = None,
-        screen_volume_y: Optional[float] = None,
-        screen_volume_z: Optional[float] = None,
-        screen_entry_time: Optional[str] = None,
-        screen_exit_time: Optional[str] = None,
-        collision_probability: Optional[float] = None,
-        collision_probability_method: Optional[str] = None,
-        comment: Optional[list[str]] = ...,
-        miss_distance_unit: Optional[str] = None,
+        relative_speed: float | None = None,
+        relative_position: list[float] | None = None,
+        relative_velocity: list[float] | None = None,
+        start_screen_period: str | None = None,
+        stop_screen_period: str | None = None,
+        screen_volume_frame: ScreenVolumeFrameType | str | None = None,
+        screen_volume_shape: ScreenVolumeShapeType | str | None = None,
+        screen_volume_x: float | None = None,
+        screen_volume_y: float | None = None,
+        screen_volume_z: float | None = None,
+        screen_entry_time: str | None = None,
+        screen_exit_time: str | None = None,
+        collision_probability: float | None = None,
+        collision_probability_method: str | None = None,
+        comment: list[str] | None = ...,
+        miss_distance_unit: str | None = None,
     ) -> None: ...
     @property
-    def collision_probability(self) -> Optional[float]:
+    def collision_probability(self) -> float | None:
         """
         The probability (denoted 'p' where 0.0<=p<=1.0), that Object1 and Object2 will collide.
         Data type = double.
@@ -12078,9 +12077,9 @@ class RelativeMetadataData:
         ...
 
     @collision_probability.setter
-    def collision_probability(self, value: Optional[float]) -> None: ...
+    def collision_probability(self, value: float | None) -> None: ...
     @property
-    def collision_probability_method(self) -> Optional[str]:
+    def collision_probability_method(self) -> str | None:
         """
         The method that was used to calculate the collision probability. (See annex E for
         definition.)
@@ -12088,7 +12087,7 @@ class RelativeMetadataData:
         ...
 
     @collision_probability_method.setter
-    def collision_probability_method(self, value: Optional[str]) -> None: ...
+    def collision_probability_method(self, value: str | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -12111,7 +12110,7 @@ class RelativeMetadataData:
     @miss_distance.setter
     def miss_distance(self, value: float) -> None: ...
     @property
-    def relative_speed(self) -> Optional[float]:
+    def relative_speed(self) -> float | None:
         """
         The norm of the relative velocity vector. It indicates how fast the two objects are
         moving relative to each other at TCA. Data type = double.
@@ -12121,18 +12120,18 @@ class RelativeMetadataData:
         ...
 
     @relative_speed.setter
-    def relative_speed(self, value: Optional[float]) -> None: ...
+    def relative_speed(self, value: float | None) -> None: ...
     @property
-    def relative_state_vector(self) -> Optional[RelativeStateVector]:
+    def relative_state_vector(self) -> RelativeStateVector | None:
         """
         Relative state vector [R, T, N, VR, VT, VN] (combined position and velocity).
         """
         ...
 
     @relative_state_vector.setter
-    def relative_state_vector(self, value: Optional[RelativeStateVector]) -> None: ...
+    def relative_state_vector(self, value: RelativeStateVector | None) -> None: ...
     @property
-    def screen_entry_time(self) -> Optional[str]:
+    def screen_entry_time(self) -> str | None:
         """
         The time in UTC when Object2 enters the screening volume. (See 6.3.2.6 for formatting
         rules.)
@@ -12140,9 +12139,9 @@ class RelativeMetadataData:
         ...
 
     @screen_entry_time.setter
-    def screen_entry_time(self, value: Optional[str]) -> None: ...
+    def screen_entry_time(self, value: str | None) -> None: ...
     @property
-    def screen_exit_time(self) -> Optional[str]:
+    def screen_exit_time(self) -> str | None:
         """
         The time in UTC when Object2 exits the screening volume. (See 6.3.2.6 for formatting
         rules.)
@@ -12150,9 +12149,9 @@ class RelativeMetadataData:
         ...
 
     @screen_exit_time.setter
-    def screen_exit_time(self, value: Optional[str]) -> None: ...
+    def screen_exit_time(self, value: str | None) -> None: ...
     @property
-    def screen_volume_frame(self) -> Optional[ScreenVolumeFrameType]:
+    def screen_volume_frame(self) -> ScreenVolumeFrameType | None:
         """
         Name of the Object1 centered reference frame in which the screening volume data are
         given. Available options are RTN and Transverse, Velocity, and Normal (TVN). (See annex
@@ -12161,18 +12160,18 @@ class RelativeMetadataData:
         ...
 
     @screen_volume_frame.setter
-    def screen_volume_frame(self, value: Optional[ScreenVolumeFrameType]) -> None: ...
+    def screen_volume_frame(self, value: ScreenVolumeFrameType | None) -> None: ...
     @property
-    def screen_volume_shape(self) -> Optional[ScreenVolumeShapeType]:
+    def screen_volume_shape(self) -> ScreenVolumeShapeType | None:
         """
         Shape of the screening volume: ELLIPSOID or BOX.
         """
         ...
 
     @screen_volume_shape.setter
-    def screen_volume_shape(self, value: Optional[ScreenVolumeShapeType]) -> None: ...
+    def screen_volume_shape(self, value: ScreenVolumeShapeType | None) -> None: ...
     @property
-    def screen_volume_x(self) -> Optional[float]:
+    def screen_volume_x(self) -> float | None:
         """
         The R or T (depending on if RTN or TVN is selected) component size of the screening
         volume in the SCREEN_VOLUME_FRAME. Data type = double.
@@ -12182,9 +12181,9 @@ class RelativeMetadataData:
         ...
 
     @screen_volume_x.setter
-    def screen_volume_x(self, value: Optional[float]) -> None: ...
+    def screen_volume_x(self, value: float | None) -> None: ...
     @property
-    def screen_volume_y(self) -> Optional[float]:
+    def screen_volume_y(self) -> float | None:
         """
         The T or V (depending on if RTN or TVN is selected) component size of the screening
         volume in the SCREEN_VOLUME_FRAME. Data type = double.
@@ -12194,9 +12193,9 @@ class RelativeMetadataData:
         ...
 
     @screen_volume_y.setter
-    def screen_volume_y(self, value: Optional[float]) -> None: ...
+    def screen_volume_y(self, value: float | None) -> None: ...
     @property
-    def screen_volume_z(self) -> Optional[float]:
+    def screen_volume_z(self) -> float | None:
         """
         The N component size of the screening volume in the SCREEN_VOLUME_FRAME. Data type =
         double.
@@ -12206,9 +12205,9 @@ class RelativeMetadataData:
         ...
 
     @screen_volume_z.setter
-    def screen_volume_z(self, value: Optional[float]) -> None: ...
+    def screen_volume_z(self, value: float | None) -> None: ...
     @property
-    def start_screen_period(self) -> Optional[str]:
+    def start_screen_period(self) -> str | None:
         """
         The start time in UTC of the screening period for the conjunction assessment. (See
         6.3.2.6 for formatting rules.)
@@ -12216,9 +12215,9 @@ class RelativeMetadataData:
         ...
 
     @start_screen_period.setter
-    def start_screen_period(self, value: Optional[str]) -> None: ...
+    def start_screen_period(self, value: str | None) -> None: ...
     @property
-    def stop_screen_period(self) -> Optional[str]:
+    def stop_screen_period(self) -> str | None:
         """
         The stop time in UTC of the screening period for the conjunction assessment. (See
         6.3.2.6 for formatting rules.)
@@ -12226,7 +12225,7 @@ class RelativeMetadataData:
         ...
 
     @stop_screen_period.setter
-    def stop_screen_period(self, value: Optional[str]) -> None: ...
+    def stop_screen_period(self, value: str | None) -> None: ...
     @property
     def tca(self) -> str:
         """
@@ -12366,11 +12365,11 @@ class SpacecraftParameters:
     """
     def __init__(
         self,
-        mass: Optional[float] = None,
-        solar_rad_area: Optional[float] = None,
-        solar_rad_coeff: Optional[float] = None,
-        drag_area: Optional[float] = None,
-        drag_coeff: Optional[float] = None,
+        mass: float | None = None,
+        solar_rad_area: float | None = None,
+        solar_rad_coeff: float | None = None,
+        drag_area: float | None = None,
+        drag_coeff: float | None = None,
     ) -> None: ...
     @property
     def comment(self) -> list[str]:
@@ -12382,7 +12381,7 @@ class SpacecraftParameters:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def drag_area(self) -> Optional[float]:
+    def drag_area(self) -> float | None:
         """
         Drag Area (AD).
 
@@ -12393,9 +12392,9 @@ class SpacecraftParameters:
         ...
 
     @drag_area.setter
-    def drag_area(self, value: Optional[float]) -> None: ...
+    def drag_area(self, value: float | None) -> None: ...
     @property
-    def drag_coeff(self) -> Optional[float]:
+    def drag_coeff(self) -> float | None:
         """
         Drag Coefficient (CD).
 
@@ -12406,9 +12405,9 @@ class SpacecraftParameters:
         ...
 
     @drag_coeff.setter
-    def drag_coeff(self, value: Optional[float]) -> None: ...
+    def drag_coeff(self, value: float | None) -> None: ...
     @property
-    def mass(self) -> Optional[float]:
+    def mass(self) -> float | None:
         """
         Spacecraft mass.
 
@@ -12419,9 +12418,9 @@ class SpacecraftParameters:
         ...
 
     @mass.setter
-    def mass(self, value: Optional[float]) -> None: ...
+    def mass(self, value: float | None) -> None: ...
     @property
-    def solar_rad_area(self) -> Optional[float]:
+    def solar_rad_area(self) -> float | None:
         """
         Solar Radiation Pressure Area (AR).
 
@@ -12432,9 +12431,9 @@ class SpacecraftParameters:
         ...
 
     @solar_rad_area.setter
-    def solar_rad_area(self, value: Optional[float]) -> None: ...
+    def solar_rad_area(self, value: float | None) -> None: ...
     @property
-    def solar_rad_coeff(self) -> Optional[float]:
+    def solar_rad_coeff(self) -> float | None:
         """
         Solar Radiation Pressure Coefficient (CR).
 
@@ -12445,7 +12444,7 @@ class SpacecraftParameters:
         ...
 
     @solar_rad_coeff.setter
-    def solar_rad_coeff(self, value: Optional[float]) -> None: ...
+    def solar_rad_coeff(self, value: float | None) -> None: ...
 
 class SpinState:
     """
@@ -12480,7 +12479,7 @@ class SpinState:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def momentum_alpha(self) -> Optional[float]:
+    def momentum_alpha(self) -> float | None:
         """
         Right ascension of angular momentum vector in frame A.
 
@@ -12489,9 +12488,9 @@ class SpinState:
         ...
 
     @momentum_alpha.setter
-    def momentum_alpha(self, value: Optional[float]) -> None: ...
+    def momentum_alpha(self, value: float | None) -> None: ...
     @property
-    def momentum_delta(self) -> Optional[float]:
+    def momentum_delta(self) -> float | None:
         """
         Declination of angular momentum vector in frame A.
 
@@ -12500,9 +12499,9 @@ class SpinState:
         ...
 
     @momentum_delta.setter
-    def momentum_delta(self, value: Optional[float]) -> None: ...
+    def momentum_delta(self, value: float | None) -> None: ...
     @property
-    def nutation(self) -> Optional[float]:
+    def nutation(self) -> float | None:
         """
         Nutation angle of spin axis.
 
@@ -12511,9 +12510,9 @@ class SpinState:
         ...
 
     @nutation.setter
-    def nutation(self, value: Optional[float]) -> None: ...
+    def nutation(self, value: float | None) -> None: ...
     @property
-    def nutation_per(self) -> Optional[float]:
+    def nutation_per(self) -> float | None:
         """
         Body nutation period of the spin axis.
 
@@ -12522,9 +12521,9 @@ class SpinState:
         ...
 
     @nutation_per.setter
-    def nutation_per(self, value: Optional[float]) -> None: ...
+    def nutation_per(self, value: float | None) -> None: ...
     @property
-    def nutation_phase(self) -> Optional[float]:
+    def nutation_phase(self) -> float | None:
         """
         Inertial nutation phase.
 
@@ -12533,9 +12532,9 @@ class SpinState:
         ...
 
     @nutation_phase.setter
-    def nutation_phase(self, value: Optional[float]) -> None: ...
+    def nutation_phase(self, value: float | None) -> None: ...
     @property
-    def nutation_vel(self) -> Optional[float]:
+    def nutation_vel(self) -> float | None:
         """
         Angular velocity of spin vector around the angular momentum vector.
 
@@ -12544,7 +12543,7 @@ class SpinState:
         ...
 
     @nutation_vel.setter
-    def nutation_vel(self, value: Optional[float]) -> None: ...
+    def nutation_vel(self, value: float | None) -> None: ...
     @property
     def ref_frame_a(self) -> str:
         """
@@ -12763,9 +12762,9 @@ class StateVectorAcc:
         x_dot: float,
         y_dot: float,
         z_dot: float,
-        x_ddot: Optional[float] = None,
-        y_ddot: Optional[float] = None,
-        z_ddot: Optional[float] = None,
+        x_ddot: float | None = None,
+        y_ddot: float | None = None,
+        z_ddot: float | None = None,
     ) -> None: ...
     @property
     def epoch(self) -> str:
@@ -12788,7 +12787,7 @@ class StateVectorAcc:
     @x.setter
     def x(self, value: float) -> None: ...
     @property
-    def x_ddot(self) -> Optional[float]:
+    def x_ddot(self) -> float | None:
         """
         Acceleration vector X-component.
 
@@ -12797,7 +12796,7 @@ class StateVectorAcc:
         ...
 
     @x_ddot.setter
-    def x_ddot(self, value: Optional[float]) -> None: ...
+    def x_ddot(self, value: float | None) -> None: ...
     @property
     def x_dot(self) -> float:
         """
@@ -12821,7 +12820,7 @@ class StateVectorAcc:
     @y.setter
     def y(self, value: float) -> None: ...
     @property
-    def y_ddot(self) -> Optional[float]:
+    def y_ddot(self) -> float | None:
         """
         Acceleration vector Y-component.
 
@@ -12830,7 +12829,7 @@ class StateVectorAcc:
         ...
 
     @y_ddot.setter
-    def y_ddot(self, value: Optional[float]) -> None: ...
+    def y_ddot(self, value: float | None) -> None: ...
     @property
     def y_dot(self) -> float:
         """
@@ -12854,7 +12853,7 @@ class StateVectorAcc:
     @z.setter
     def z(self, value: float) -> None: ...
     @property
-    def z_ddot(self) -> Optional[float]:
+    def z_ddot(self) -> float | None:
         """
         Acceleration vector Z-component.
 
@@ -12863,7 +12862,7 @@ class StateVectorAcc:
         ...
 
     @z_ddot.setter
-    def z_ddot(self, value: Optional[float]) -> None: ...
+    def z_ddot(self, value: float | None) -> None: ...
     @property
     def z_dot(self) -> float:
         """
@@ -12914,11 +12913,11 @@ class Tdm:
     def body(self, value: TdmBody) -> None: ...
     @staticmethod
     def from_file(
-        path: str,
-        format: Optional[str] = None,
+        path: str | os.PathLike[str],
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
-        max_records: Optional[int] = None,
+        max_input_bytes: int | None = None,
+        max_records: int | None = None,
     ) -> Tdm:
         """
         Parse a TDM from a KVN or XML file.
@@ -12928,10 +12927,10 @@ class Tdm:
     @staticmethod
     def from_str(
         data: str,
-        format: Optional[str] = None,
+        format: Literal["kvn", "xml"] | None = None,
         *,
-        max_input_bytes: Optional[int] = None,
-        max_records: Optional[int] = None,
+        max_input_bytes: int | None = None,
+        max_records: int | None = None,
     ) -> Tdm:
         """
         Create a TDM message from a string.
@@ -12974,7 +12973,7 @@ class Tdm:
     @header.setter
     def header(self, value: TdmHeader) -> None: ...
     @property
-    def id(self) -> Optional[str]:
+    def id(self) -> str | None:
         """
         The message identifier.
         """
@@ -12987,13 +12986,15 @@ class Tdm:
         """
         ...
 
-    def to_file(self, path: str, format: str) -> None:
+    def to_file(
+        self, path: str | os.PathLike[str], format: Literal["kvn", "xml"]
+    ) -> None:
         """
         Atomically write this TDM as KVN or XML.
         """
         ...
 
-    def to_str(self, format: str) -> str:
+    def to_str(self, format: Literal["kvn", "xml"]) -> str:
         """
         Serialize to validated KVN or XML.
         """
@@ -13052,8 +13053,8 @@ class TdmData:
     """
     def __init__(
         self,
-        observations: Optional[list[TdmObservation]] = None,
-        comment: Optional[list[str]] = None,
+        observations: list[TdmObservation] | None = None,
+        comment: list[str] | None = None,
     ) -> None: ...
     @property
     def comment(self) -> list[TdmObservation]:
@@ -13098,8 +13099,8 @@ class TdmHeader:
         *,
         originator: str,
         creation_date: str,
-        message_id: Optional[str] = None,
-        comment: Optional[list[str]] = None,
+        message_id: str | None = None,
+        comment: list[str] | None = None,
     ) -> None: ...
     @property
     def comment(self) -> list[str]:
@@ -13125,7 +13126,7 @@ class TdmHeader:
     @creation_date.setter
     def creation_date(self, value: str) -> None: ...
     @property
-    def message_id(self) -> Optional[str]:
+    def message_id(self) -> str | None:
         """
         ID that uniquely identifies a message from a given originator. The format and content
         of the message identifier value are at the discretion of the originator.
@@ -13135,7 +13136,7 @@ class TdmHeader:
         ...
 
     @message_id.setter
-    def message_id(self, value: Optional[str]) -> None: ...
+    def message_id(self, value: str | None) -> None: ...
     @property
     def originator(self) -> str:
         """
@@ -13233,7 +13234,7 @@ class TdmMetadata:
         comment=None,
     ) -> None: ...
     @property
-    def angle_type(self) -> Optional[str]:
+    def angle_type(self) -> str | None:
         """
         The ANGLE_TYPE keyword shall indicate the type of antenna geometry represented in the
         angle data (ANGLE_1 and ANGLE_2 keywords).
@@ -13243,7 +13244,7 @@ class TdmMetadata:
         ...
 
     @angle_type.setter
-    def angle_type(self, value: Optional[str]) -> None: ...
+    def angle_type(self, value: str | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -13254,7 +13255,7 @@ class TdmMetadata:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def correction_aberration_diurnal(self) -> Optional[float]:
+    def correction_aberration_diurnal(self) -> float | None:
         """
         A correction value for diurnal aberration.
 
@@ -13263,9 +13264,9 @@ class TdmMetadata:
         ...
 
     @correction_aberration_diurnal.setter
-    def correction_aberration_diurnal(self, value: Optional[float]) -> None: ...
+    def correction_aberration_diurnal(self, value: float | None) -> None: ...
     @property
-    def correction_aberration_yearly(self) -> Optional[float]:
+    def correction_aberration_yearly(self) -> float | None:
         """
         A correction value for yearly aberration.
 
@@ -13274,9 +13275,9 @@ class TdmMetadata:
         ...
 
     @correction_aberration_yearly.setter
-    def correction_aberration_yearly(self, value: Optional[float]) -> None: ...
+    def correction_aberration_yearly(self, value: float | None) -> None: ...
     @property
-    def correction_angle_1(self) -> Optional[float]:
+    def correction_angle_1(self) -> float | None:
         """
         The set of CORRECTION_* keywords may be used to reflect the values of corrections that
         have been added to the data or should be added to the data (e.g., ranging station delay
@@ -13287,9 +13288,9 @@ class TdmMetadata:
         ...
 
     @correction_angle_1.setter
-    def correction_angle_1(self, value: Optional[float]) -> None: ...
+    def correction_angle_1(self, value: float | None) -> None: ...
     @property
-    def correction_angle_2(self) -> Optional[float]:
+    def correction_angle_2(self) -> float | None:
         """
         A correction value to be added to the ANGLE_2 data.
 
@@ -13298,9 +13299,9 @@ class TdmMetadata:
         ...
 
     @correction_angle_2.setter
-    def correction_angle_2(self, value: Optional[float]) -> None: ...
+    def correction_angle_2(self, value: float | None) -> None: ...
     @property
-    def correction_doppler(self) -> Optional[float]:
+    def correction_doppler(self) -> float | None:
         """
         A correction value to be added to the Doppler data.
 
@@ -13309,9 +13310,9 @@ class TdmMetadata:
         ...
 
     @correction_doppler.setter
-    def correction_doppler(self, value: Optional[float]) -> None: ...
+    def correction_doppler(self, value: float | None) -> None: ...
     @property
-    def correction_mag(self) -> Optional[float]:
+    def correction_mag(self) -> float | None:
         """
         A correction value to be added to the magnitude data.
 
@@ -13320,9 +13321,9 @@ class TdmMetadata:
         ...
 
     @correction_mag.setter
-    def correction_mag(self, value: Optional[float]) -> None: ...
+    def correction_mag(self, value: float | None) -> None: ...
     @property
-    def correction_range(self) -> Optional[float]:
+    def correction_range(self) -> float | None:
         """
         A correction value to be added to the range data.
 
@@ -13331,9 +13332,9 @@ class TdmMetadata:
         ...
 
     @correction_range.setter
-    def correction_range(self, value: Optional[float]) -> None: ...
+    def correction_range(self, value: float | None) -> None: ...
     @property
-    def correction_rcs(self) -> Optional[float]:
+    def correction_rcs(self) -> float | None:
         """
         A correction value to be added to the RCS data.
 
@@ -13342,9 +13343,9 @@ class TdmMetadata:
         ...
 
     @correction_rcs.setter
-    def correction_rcs(self, value: Optional[float]) -> None: ...
+    def correction_rcs(self, value: float | None) -> None: ...
     @property
-    def correction_receive(self) -> Optional[float]:
+    def correction_receive(self) -> float | None:
         """
         A correction value to be added to the received frequency or phase count data.
 
@@ -13353,9 +13354,9 @@ class TdmMetadata:
         ...
 
     @correction_receive.setter
-    def correction_receive(self, value: Optional[float]) -> None: ...
+    def correction_receive(self, value: float | None) -> None: ...
     @property
-    def correction_transmit(self) -> Optional[float]:
+    def correction_transmit(self) -> float | None:
         """
         A correction value to be added to the transmitted frequency or phase count data.
 
@@ -13364,9 +13365,9 @@ class TdmMetadata:
         ...
 
     @correction_transmit.setter
-    def correction_transmit(self, value: Optional[float]) -> None: ...
+    def correction_transmit(self, value: float | None) -> None: ...
     @property
-    def corrections_applied(self) -> Optional[str]:
+    def corrections_applied(self) -> str | None:
         """
         This keyword is used to indicate whether or not the values associated with the
         CORRECTION_* keywords have been applied to the tracking data. Required if any of the
@@ -13377,9 +13378,9 @@ class TdmMetadata:
         ...
 
     @corrections_applied.setter
-    def corrections_applied(self, value: Optional[str]) -> None: ...
+    def corrections_applied(self, value: str | None) -> None: ...
     @property
-    def data_quality(self) -> Optional[str]:
+    def data_quality(self) -> str | None:
         """
         Provides an estimate of the quality of the data, based on indicators from the producers
         of the data (e.g., bad time synchronization flags, marginal lock status indicators,
@@ -13390,9 +13391,9 @@ class TdmMetadata:
         ...
 
     @data_quality.setter
-    def data_quality(self, value: Optional[str]) -> None: ...
+    def data_quality(self, value: str | None) -> None: ...
     @property
-    def data_types(self) -> Optional[str]:
+    def data_types(self) -> str | None:
         """
         Comma-separated list of data types in the Data Section. The elements of the list shall
         be selected from the data types shown in table 3-5, with the exception of the
@@ -13403,9 +13404,9 @@ class TdmMetadata:
         ...
 
     @data_types.setter
-    def data_types(self, value: Optional[str]) -> None: ...
+    def data_types(self, value: str | None) -> None: ...
     @property
-    def doppler_count_bias(self) -> Optional[float]:
+    def doppler_count_bias(self) -> float | None:
         """
         Doppler counts are generally biased so as to accommodate negative Doppler within an
         accumulator. In order to reconstruct the measurement, the bias shall be subtracted from
@@ -13418,9 +13419,9 @@ class TdmMetadata:
         ...
 
     @doppler_count_bias.setter
-    def doppler_count_bias(self, value: Optional[float]) -> None: ...
+    def doppler_count_bias(self, value: float | None) -> None: ...
     @property
-    def doppler_count_rollover(self) -> Optional[str]:
+    def doppler_count_rollover(self) -> str | None:
         """
         Doppler counts may overflow the accumulator and roll over in cases where the track is
         of long duration or very high Doppler shift. This flag indicates whether or not a
@@ -13431,9 +13432,9 @@ class TdmMetadata:
         ...
 
     @doppler_count_rollover.setter
-    def doppler_count_rollover(self, value: Optional[str]) -> None: ...
+    def doppler_count_rollover(self, value: str | None) -> None: ...
     @property
-    def doppler_count_scale(self) -> Optional[int]:
+    def doppler_count_scale(self) -> int | None:
         """
         Doppler counts are generally scaled so as to capture partial cycles in an integer
         count. In order to reconstruct the measurement, the DOPPLER_COUNT data value shall be
@@ -13444,9 +13445,9 @@ class TdmMetadata:
         ...
 
     @doppler_count_scale.setter
-    def doppler_count_scale(self, value: Optional[int]) -> None: ...
+    def doppler_count_scale(self, value: int | None) -> None: ...
     @property
-    def ephemeris_name_1(self) -> Optional[str]:
+    def ephemeris_name_1(self) -> str | None:
         """
         Unique name of the external ephemeris file used for participant 1.
 
@@ -13455,9 +13456,9 @@ class TdmMetadata:
         ...
 
     @ephemeris_name_1.setter
-    def ephemeris_name_1(self, value: Optional[str]) -> None: ...
+    def ephemeris_name_1(self, value: str | None) -> None: ...
     @property
-    def ephemeris_name_2(self) -> Optional[str]:
+    def ephemeris_name_2(self) -> str | None:
         """
         Unique name of the external ephemeris file used for participant 2.
 
@@ -13466,9 +13467,9 @@ class TdmMetadata:
         ...
 
     @ephemeris_name_2.setter
-    def ephemeris_name_2(self, value: Optional[str]) -> None: ...
+    def ephemeris_name_2(self, value: str | None) -> None: ...
     @property
-    def ephemeris_name_3(self) -> Optional[str]:
+    def ephemeris_name_3(self) -> str | None:
         """
         Unique name of the external ephemeris file used for participant 3.
 
@@ -13477,9 +13478,9 @@ class TdmMetadata:
         ...
 
     @ephemeris_name_3.setter
-    def ephemeris_name_3(self, value: Optional[str]) -> None: ...
+    def ephemeris_name_3(self, value: str | None) -> None: ...
     @property
-    def ephemeris_name_4(self) -> Optional[str]:
+    def ephemeris_name_4(self) -> str | None:
         """
         Unique name of the external ephemeris file used for participant 4.
 
@@ -13488,9 +13489,9 @@ class TdmMetadata:
         ...
 
     @ephemeris_name_4.setter
-    def ephemeris_name_4(self, value: Optional[str]) -> None: ...
+    def ephemeris_name_4(self, value: str | None) -> None: ...
     @property
-    def ephemeris_name_5(self) -> Optional[str]:
+    def ephemeris_name_5(self) -> str | None:
         """
         Unique name of the external ephemeris file used for participant 5.
 
@@ -13499,9 +13500,9 @@ class TdmMetadata:
         ...
 
     @ephemeris_name_5.setter
-    def ephemeris_name_5(self, value: Optional[str]) -> None: ...
+    def ephemeris_name_5(self, value: str | None) -> None: ...
     @property
-    def freq_offset(self) -> Optional[float]:
+    def freq_offset(self) -> float | None:
         """
         The FREQ_OFFSET keyword represents a frequency in Hz that must be added to every
         RECEIVE_FREQ to reconstruct it. One use is if a Doppler shift frequency observable is
@@ -13514,9 +13515,9 @@ class TdmMetadata:
         ...
 
     @freq_offset.setter
-    def freq_offset(self, value: Optional[float]) -> None: ...
+    def freq_offset(self, value: float | None) -> None: ...
     @property
-    def integration_interval(self) -> Optional[float]:
+    def integration_interval(self) -> float | None:
         """
         The INTEGRATION_INTERVAL keyword shall provide the Doppler count time in seconds for
         Doppler data or for the creation of normal points.
@@ -13528,9 +13529,9 @@ class TdmMetadata:
         ...
 
     @integration_interval.setter
-    def integration_interval(self, value: Optional[float]) -> None: ...
+    def integration_interval(self, value: float | None) -> None: ...
     @property
-    def integration_ref(self) -> Optional[str]:
+    def integration_ref(self) -> str | None:
         """
         Indicates the relationship between the INTEGRATION_INTERVAL and the timetag on the
         data, i.e., whether the timetag represents the start, middle, or end of the integration
@@ -13541,9 +13542,9 @@ class TdmMetadata:
         ...
 
     @integration_ref.setter
-    def integration_ref(self, value: Optional[str]) -> None: ...
+    def integration_ref(self, value: str | None) -> None: ...
     @property
-    def interpolation(self) -> Optional[str]:
+    def interpolation(self) -> str | None:
         """
         The INTERPOLATION keyword shall specify the interpolation method to be used to calculate
         a transmit phase count at an arbitrary time in tracking data where the uplink frequency
@@ -13554,9 +13555,9 @@ class TdmMetadata:
         ...
 
     @interpolation.setter
-    def interpolation(self, value: Optional[str]) -> None: ...
+    def interpolation(self, value: str | None) -> None: ...
     @property
-    def interpolation_degree(self) -> Optional[int]:
+    def interpolation_degree(self) -> int | None:
         """
         The INTERPOLATION_DEGREE keyword shall specify the recommended degree of the
         interpolating polynomial used to calculate a transmit phase count at an arbitrary time
@@ -13567,9 +13568,9 @@ class TdmMetadata:
         ...
 
     @interpolation_degree.setter
-    def interpolation_degree(self, value: Optional[int]) -> None: ...
+    def interpolation_degree(self, value: int | None) -> None: ...
     @property
-    def mode(self) -> Optional[str]:
+    def mode(self) -> str | None:
         """
         The MODE keyword shall reflect the tracking mode associated with the Data Section of
         the segment. The value ‘SEQUENTIAL’ applies for most sequential signal paths; the name
@@ -13581,7 +13582,7 @@ class TdmMetadata:
         ...
 
     @mode.setter
-    def mode(self, value: Optional[str]) -> None: ...
+    def mode(self, value: str | None) -> None: ...
     @property
     def participant_1(self) -> str:
         """
@@ -13597,43 +13598,43 @@ class TdmMetadata:
     @participant_1.setter
     def participant_1(self, value: str) -> None: ...
     @property
-    def participant_2(self) -> Optional[str]:
+    def participant_2(self) -> str | None:
         """
         The second participant in a tracking data session.
         """
         ...
 
     @participant_2.setter
-    def participant_2(self, value: Optional[str]) -> None: ...
+    def participant_2(self, value: str | None) -> None: ...
     @property
-    def participant_3(self) -> Optional[str]:
+    def participant_3(self) -> str | None:
         """
         The third participant in a tracking data session.
         """
         ...
 
     @participant_3.setter
-    def participant_3(self, value: Optional[str]) -> None: ...
+    def participant_3(self, value: str | None) -> None: ...
     @property
-    def participant_4(self) -> Optional[str]:
+    def participant_4(self) -> str | None:
         """
         The fourth participant in a tracking data session.
         """
         ...
 
     @participant_4.setter
-    def participant_4(self, value: Optional[str]) -> None: ...
+    def participant_4(self, value: str | None) -> None: ...
     @property
-    def participant_5(self) -> Optional[str]:
+    def participant_5(self) -> str | None:
         """
         The fifth participant in a tracking data session.
         """
         ...
 
     @participant_5.setter
-    def participant_5(self, value: Optional[str]) -> None: ...
+    def participant_5(self, value: str | None) -> None: ...
     @property
-    def path(self) -> Optional[str]:
+    def path(self) -> str | None:
         """
         The PATH keywords shall reflect the signal path by listing the index of each participant
         in order, separated by commas, with no inserted white space. Correlated with the
@@ -13645,27 +13646,27 @@ class TdmMetadata:
         ...
 
     @path.setter
-    def path(self, value: Optional[str]) -> None: ...
+    def path(self, value: str | None) -> None: ...
     @property
-    def path_1(self) -> Optional[str]:
+    def path_1(self) -> str | None:
         """
         The first signal path where the MODE is 'SINGLE_DIFF'.
         """
         ...
 
     @path_1.setter
-    def path_1(self, value: Optional[str]) -> None: ...
+    def path_1(self, value: str | None) -> None: ...
     @property
-    def path_2(self) -> Optional[str]:
+    def path_2(self) -> str | None:
         """
         The second signal path where the MODE is 'SINGLE_DIFF'.
         """
         ...
 
     @path_2.setter
-    def path_2(self, value: Optional[str]) -> None: ...
+    def path_2(self, value: str | None) -> None: ...
     @property
-    def range_mode(self) -> Optional[str]:
+    def range_mode(self) -> str | None:
         """
         The value of the RANGE_MODE keyword shall be ‘COHERENT’, in which case the range tones
         are coherent with the uplink carrier; ‘CONSTANT’, in which case the range tones have a
@@ -13676,9 +13677,9 @@ class TdmMetadata:
         ...
 
     @range_mode.setter
-    def range_mode(self, value: Optional[str]) -> None: ...
+    def range_mode(self, value: str | None) -> None: ...
     @property
-    def range_modulus(self) -> Optional[float]:
+    def range_modulus(self) -> float | None:
         """
         The value associated with the RANGE_MODULUS keyword shall be the modulus of the range
         observable in the units as specified by the RANGE_UNITS keyword; that is, the actual
@@ -13690,9 +13691,9 @@ class TdmMetadata:
         ...
 
     @range_modulus.setter
-    def range_modulus(self, value: Optional[float]) -> None: ...
+    def range_modulus(self, value: float | None) -> None: ...
     @property
-    def range_units(self) -> Optional[str]:
+    def range_units(self) -> str | None:
         """
         The RANGE_UNITS keyword specifies the units for the range observable. ‘km’ shall be
         used if the range is measured in kilometers. ‘s’ shall be used if the range is measured
@@ -13704,9 +13705,9 @@ class TdmMetadata:
         ...
 
     @range_units.setter
-    def range_units(self, value: Optional[str]) -> None: ...
+    def range_units(self, value: str | None) -> None: ...
     @property
-    def receive_band(self) -> Optional[str]:
+    def receive_band(self) -> str | None:
         """
         The RECEIVE_BAND keyword shall indicate the frequency band for received frequencies.
         Although not required in general, the RECEIVE_BAND must be present if the MODE is
@@ -13718,9 +13719,9 @@ class TdmMetadata:
         ...
 
     @receive_band.setter
-    def receive_band(self, value: Optional[str]) -> None: ...
+    def receive_band(self, value: str | None) -> None: ...
     @property
-    def receive_delay_1(self) -> Optional[float]:
+    def receive_delay_1(self) -> float | None:
         """
         The RECEIVE_DELAY_n keyword shall specify a fixed interval of time, in seconds,
         required for the signal to travel from the tracking point to the receiving electronics.
@@ -13733,9 +13734,9 @@ class TdmMetadata:
         ...
 
     @receive_delay_1.setter
-    def receive_delay_1(self, value: Optional[float]) -> None: ...
+    def receive_delay_1(self, value: float | None) -> None: ...
     @property
-    def receive_delay_2(self) -> Optional[float]:
+    def receive_delay_2(self) -> float | None:
         """
         Fixed interval of time, in seconds, required for the signal to travel from the tracking
         point to the receiving electronics for participant 2.
@@ -13745,9 +13746,9 @@ class TdmMetadata:
         ...
 
     @receive_delay_2.setter
-    def receive_delay_2(self, value: Optional[float]) -> None: ...
+    def receive_delay_2(self, value: float | None) -> None: ...
     @property
-    def receive_delay_3(self) -> Optional[float]:
+    def receive_delay_3(self) -> float | None:
         """
         Fixed interval of time, in seconds, required for the signal to travel from the tracking
         point to the receiving electronics for participant 3.
@@ -13757,9 +13758,9 @@ class TdmMetadata:
         ...
 
     @receive_delay_3.setter
-    def receive_delay_3(self, value: Optional[float]) -> None: ...
+    def receive_delay_3(self, value: float | None) -> None: ...
     @property
-    def receive_delay_4(self) -> Optional[float]:
+    def receive_delay_4(self) -> float | None:
         """
         Fixed interval of time, in seconds, required for the signal to travel from the tracking
         point to the receiving electronics for participant 4.
@@ -13769,9 +13770,9 @@ class TdmMetadata:
         ...
 
     @receive_delay_4.setter
-    def receive_delay_4(self, value: Optional[float]) -> None: ...
+    def receive_delay_4(self, value: float | None) -> None: ...
     @property
-    def receive_delay_5(self) -> Optional[float]:
+    def receive_delay_5(self) -> float | None:
         """
         Fixed interval of time, in seconds, required for the signal to travel from the tracking
         point to the receiving electronics for participant 5.
@@ -13781,9 +13782,9 @@ class TdmMetadata:
         ...
 
     @receive_delay_5.setter
-    def receive_delay_5(self, value: Optional[float]) -> None: ...
+    def receive_delay_5(self, value: float | None) -> None: ...
     @property
-    def reference_frame(self) -> Optional[str]:
+    def reference_frame(self) -> str | None:
         """
         The REFERENCE_FRAME keyword shall be used in conjunction with the ‘ANGLE_TYPE=RADEC’
         keyword/value combination, indicating the inertial reference frame to which the antenna
@@ -13794,9 +13795,9 @@ class TdmMetadata:
         ...
 
     @reference_frame.setter
-    def reference_frame(self, value: Optional[str]) -> None: ...
+    def reference_frame(self, value: str | None) -> None: ...
     @property
-    def start_time(self) -> Optional[str]:
+    def start_time(self) -> str | None:
         """
         The START_TIME keyword shall specify the UTC start time of the total time span covered
         by the tracking data immediately following this Metadata Section. (For format
@@ -13807,9 +13808,9 @@ class TdmMetadata:
         ...
 
     @start_time.setter
-    def start_time(self, value: Optional[str]) -> None: ...
+    def start_time(self, value: str | None) -> None: ...
     @property
-    def stop_time(self) -> Optional[str]:
+    def stop_time(self) -> str | None:
         """
         The STOP_TIME keyword shall specify the UTC stop time of the total time span covered by
         the tracking data immediately following this Metadata Section. (For format
@@ -13820,7 +13821,7 @@ class TdmMetadata:
         ...
 
     @stop_time.setter
-    def stop_time(self, value: Optional[str]) -> None: ...
+    def stop_time(self, value: str | None) -> None: ...
     @property
     def time_system(self) -> str:
         """
@@ -13837,7 +13838,7 @@ class TdmMetadata:
     @time_system.setter
     def time_system(self, value: str) -> None: ...
     @property
-    def timetag_ref(self) -> Optional[str]:
+    def timetag_ref(self) -> str | None:
         """
         The TIMETAG_REF keyword shall provide a reference for time tags in the tracking data.
         This keyword indicates whether the timetag associated with the data is the transmit
@@ -13848,9 +13849,9 @@ class TdmMetadata:
         ...
 
     @timetag_ref.setter
-    def timetag_ref(self, value: Optional[str]) -> None: ...
+    def timetag_ref(self, value: str | None) -> None: ...
     @property
-    def track_id(self) -> Optional[str]:
+    def track_id(self) -> str | None:
         """
         The TRACK_ID keyword specifies a unique identifier for the tracking data in the
         associated data section. The value may be a freely selected string of characters and
@@ -13863,9 +13864,9 @@ class TdmMetadata:
         ...
 
     @track_id.setter
-    def track_id(self, value: Optional[str]) -> None: ...
+    def track_id(self, value: str | None) -> None: ...
     @property
-    def transmit_band(self) -> Optional[str]:
+    def transmit_band(self) -> str | None:
         """
         The TRANSMIT_BAND keyword shall indicate the frequency band for transmitted
         frequencies. The frequency ranges associated with each band should be specified in the
@@ -13876,9 +13877,9 @@ class TdmMetadata:
         ...
 
     @transmit_band.setter
-    def transmit_band(self, value: Optional[str]) -> None: ...
+    def transmit_band(self, value: str | None) -> None: ...
     @property
-    def transmit_delay_1(self) -> Optional[float]:
+    def transmit_delay_1(self) -> float | None:
         """
         The TRANSMIT_DELAY_n keyword shall specify a fixed interval of time, in seconds,
         required for the signal to travel from the transmitting electronics to the transmit
@@ -13891,9 +13892,9 @@ class TdmMetadata:
         ...
 
     @transmit_delay_1.setter
-    def transmit_delay_1(self, value: Optional[float]) -> None: ...
+    def transmit_delay_1(self, value: float | None) -> None: ...
     @property
-    def transmit_delay_2(self) -> Optional[float]:
+    def transmit_delay_2(self) -> float | None:
         """
         Fixed interval of time, in seconds, required for the signal to travel from the
         transmitting electronics to the transmit point for participant 2.
@@ -13903,9 +13904,9 @@ class TdmMetadata:
         ...
 
     @transmit_delay_2.setter
-    def transmit_delay_2(self, value: Optional[float]) -> None: ...
+    def transmit_delay_2(self, value: float | None) -> None: ...
     @property
-    def transmit_delay_3(self) -> Optional[float]:
+    def transmit_delay_3(self) -> float | None:
         """
         Fixed interval of time, in seconds, required for the signal to travel from the
         transmitting electronics to the transmit point for participant 3.
@@ -13915,9 +13916,9 @@ class TdmMetadata:
         ...
 
     @transmit_delay_3.setter
-    def transmit_delay_3(self, value: Optional[float]) -> None: ...
+    def transmit_delay_3(self, value: float | None) -> None: ...
     @property
-    def transmit_delay_4(self) -> Optional[float]:
+    def transmit_delay_4(self) -> float | None:
         """
         Fixed interval of time, in seconds, required for the signal to travel from the
         transmitting electronics to the transmit point for participant 4.
@@ -13927,9 +13928,9 @@ class TdmMetadata:
         ...
 
     @transmit_delay_4.setter
-    def transmit_delay_4(self, value: Optional[float]) -> None: ...
+    def transmit_delay_4(self, value: float | None) -> None: ...
     @property
-    def transmit_delay_5(self) -> Optional[float]:
+    def transmit_delay_5(self) -> float | None:
         """
         Fixed interval of time, in seconds, required for the signal to travel from the
         transmitting electronics to the transmit point for participant 5.
@@ -13939,9 +13940,9 @@ class TdmMetadata:
         ...
 
     @transmit_delay_5.setter
-    def transmit_delay_5(self, value: Optional[float]) -> None: ...
+    def transmit_delay_5(self, value: float | None) -> None: ...
     @property
-    def turnaround_denominator(self) -> Optional[int]:
+    def turnaround_denominator(self) -> int | None:
         """
         The TURNAROUND_DENOMINATOR keyword shall indicate the denominator of the turnaround
         ratio that is necessary to calculate the coherent downlink from the uplink frequency.
@@ -13951,9 +13952,9 @@ class TdmMetadata:
         ...
 
     @turnaround_denominator.setter
-    def turnaround_denominator(self, value: Optional[int]) -> None: ...
+    def turnaround_denominator(self, value: int | None) -> None: ...
     @property
-    def turnaround_numerator(self) -> Optional[int]:
+    def turnaround_numerator(self) -> int | None:
         """
         The TURNAROUND_NUMERATOR keyword shall indicate the numerator of the turnaround ratio
         that is necessary to calculate the coherent downlink from the uplink frequency.
@@ -13963,7 +13964,7 @@ class TdmMetadata:
         ...
 
     @turnaround_numerator.setter
-    def turnaround_numerator(self, value: Optional[int]) -> None: ...
+    def turnaround_numerator(self, value: int | None) -> None: ...
 
 class TdmMode: ...
 
@@ -14000,7 +14001,7 @@ class TdmObservation:
         ...
 
     @property
-    def value(self) -> Optional[float]:
+    def value(self) -> float | None:
         """
         Measurement value as float.
 
@@ -14055,8 +14056,6 @@ class TdmSegment:
     @metadata.setter
     def metadata(self, value: TdmMetadata) -> None: ...
 
-class TimeSystem: ...
-
 class TleParameters:
     """
     TLE Related Parameters (This section is only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
@@ -14087,18 +14086,18 @@ class TleParameters:
     def __init__(
         self,
         mean_motion_dot: float,
-        ephemeris_type: Optional[int] = None,
-        classification_type: Optional[str] = None,
-        norad_cat_id: Optional[int] = None,
-        element_set_no: Optional[int] = None,
-        rev_at_epoch: Optional[int] = None,
-        bstar: Optional[float] = None,
-        bterm: Optional[float] = None,
-        mean_motion_ddot: Optional[float] = None,
-        agom: Optional[float] = None,
+        ephemeris_type: int | None = None,
+        classification_type: str | None = None,
+        norad_cat_id: int | None = None,
+        element_set_no: int | None = None,
+        rev_at_epoch: int | None = None,
+        bstar: float | None = None,
+        bterm: float | None = None,
+        mean_motion_ddot: float | None = None,
+        agom: float | None = None,
     ) -> None: ...
     @property
-    def agom(self) -> Optional[float]:
+    def agom(self) -> float | None:
         """
         Solar radiation pressure coefficient AY/m, where y = reflectivity, A = average
         cross-sectional area, m = mass. Example values AGOM = 0.01 (rocket body) and 0.001
@@ -14110,9 +14109,9 @@ class TleParameters:
         ...
 
     @agom.setter
-    def agom(self, value: Optional[float]) -> None: ...
+    def agom(self, value: float | None) -> None: ...
     @property
-    def bstar(self) -> Optional[float]:
+    def bstar(self) -> float | None:
         """
         Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
         MEAN_ELEMENT_THEORY= SGP4 (BSTAR = drag parameter for SGP4).
@@ -14122,9 +14121,9 @@ class TleParameters:
         ...
 
     @bstar.setter
-    def bstar(self, value: Optional[float]) -> None: ...
+    def bstar(self, value: float | None) -> None: ...
     @property
-    def bterm(self) -> Optional[float]:
+    def bterm(self) -> float | None:
         """
         Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
         MEAN_ELEMENT_THEORY= SGP4-XP (BTERM ballistic coefficient CDA/m, where CD = drag
@@ -14137,16 +14136,16 @@ class TleParameters:
         ...
 
     @bterm.setter
-    def bterm(self, value: Optional[float]) -> None: ...
+    def bterm(self, value: float | None) -> None: ...
     @property
-    def classification_type(self) -> Optional[str]:
+    def classification_type(self) -> str | None:
         """
         Classification type. Default value = U. (See 4.2.4.7.)
         """
         ...
 
     @classification_type.setter
-    def classification_type(self, value: Optional[str]) -> None: ...
+    def classification_type(self, value: str | None) -> None: ...
     @property
     def comment(self) -> list[str]:
         """
@@ -14157,7 +14156,7 @@ class TleParameters:
     @comment.setter
     def comment(self, value: list[str]) -> None: ...
     @property
-    def element_set_no(self) -> Optional[int]:
+    def element_set_no(self) -> int | None:
         """
         Element set number for this satellite. Normally incremented sequentially but may be out
         of sync if it is generated from a backup source. Used to distinguish different TLEs,
@@ -14167,18 +14166,18 @@ class TleParameters:
         ...
 
     @element_set_no.setter
-    def element_set_no(self, value: Optional[int]) -> None: ...
+    def element_set_no(self, value: int | None) -> None: ...
     @property
-    def ephemeris_type(self) -> Optional[int]:
+    def ephemeris_type(self) -> int | None:
         """
         Ephemeris type. Default value = 0. (See 4.2.4.7.)
         """
         ...
 
     @ephemeris_type.setter
-    def ephemeris_type(self, value: Optional[int]) -> None: ...
+    def ephemeris_type(self, value: int | None) -> None: ...
     @property
-    def mean_motion_ddot(self) -> Optional[float]:
+    def mean_motion_ddot(self) -> float | None:
         """
         Second Time Derivative of Mean Motion (i.e., a drag term). (See 4.2.4.7 for important
         details). Required when MEAN_ELEMENT_THEORY= SGP or PPT3.
@@ -14188,7 +14187,7 @@ class TleParameters:
         ...
 
     @mean_motion_ddot.setter
-    def mean_motion_ddot(self, value: Optional[float]) -> None: ...
+    def mean_motion_ddot(self, value: float | None) -> None: ...
     @property
     def mean_motion_dot(self) -> float:
         """
@@ -14202,7 +14201,7 @@ class TleParameters:
     @mean_motion_dot.setter
     def mean_motion_dot(self, value: float) -> None: ...
     @property
-    def norad_cat_id(self) -> Optional[int]:
+    def norad_cat_id(self) -> int | None:
         """
         NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword
         is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
@@ -14210,16 +14209,16 @@ class TleParameters:
         ...
 
     @norad_cat_id.setter
-    def norad_cat_id(self, value: Optional[int]) -> None: ...
+    def norad_cat_id(self, value: int | None) -> None: ...
     @property
-    def rev_at_epoch(self) -> Optional[int]:
+    def rev_at_epoch(self) -> int | None:
         """
         Revolution Number
         """
         ...
 
     @rev_at_epoch.setter
-    def rev_at_epoch(self, value: Optional[int]) -> None: ...
+    def rev_at_epoch(self, value: int | None) -> None: ...
 
 class TrajLine:
     """
@@ -14269,9 +14268,7 @@ class UserDefined:
         Comments.
     """
     def __init__(
-        self,
-        parameters: Optional[dict[str, str]] = None,
-        comment: Optional[list[str]] = None,
+        self, parameters: dict[str, str] | None = None, comment: list[str] | None = None
     ) -> None: ...
     @property
     def comment(self) -> list[str]:

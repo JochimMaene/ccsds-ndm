@@ -3,8 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use ccsds_ndm::messages::aem::Aem;
-use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::VersionedNdm;
+use ccsds_ndm::Ndm;
 use tempfile::NamedTempFile;
 
 const KVN: &str = include_str!("../data/kvn/aem_g4.kvn");

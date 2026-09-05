@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::error::CcsdsNdmError;
-use ccsds_ndm::{from_file, from_str, MessageType};
+use ccsds_ndm::{from_file, from_str, Message};
 use std::fs;
 use std::path::PathBuf;
 
@@ -16,10 +16,10 @@ fn test_from_file_kvn_and_xml_minimal() {
     let xml_path = write_temp_file("opm_minimal.xml", xml);
 
     let kvn_msg = from_file(&kvn_path).expect("OPM KVN should parse");
-    assert!(matches!(kvn_msg, MessageType::Opm(_)));
+    assert!(matches!(kvn_msg, Message::Opm(_)));
 
     let xml_msg = from_file(&xml_path).expect("OPM XML should parse");
-    assert!(matches!(xml_msg, MessageType::Opm(_)));
+    assert!(matches!(xml_msg, Message::Opm(_)));
 }
 
 #[test]

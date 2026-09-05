@@ -2188,84 +2188,9 @@ pub fn parse_controlled_type(ob: &Bound<'_, PyAny>) -> PyResult<ccsds_ndm::types
     }
 }
 
-#[pyclass(eq, eq_int)]
-#[derive(Clone, PartialEq, Copy)]
-pub enum ReferenceFrame {
-    Gcrf,
-    Teme,
-    Itrf,
-    J2000,
-    Eme2000,
-}
-
-#[pymethods]
-impl ReferenceFrame {
-    fn __str__(&self) -> &'static str {
-        match self {
-            ReferenceFrame::Gcrf => "GCRF",
-            ReferenceFrame::Teme => "TEME",
-            ReferenceFrame::Itrf => "ITRF",
-            ReferenceFrame::J2000 => "J2000",
-            ReferenceFrame::Eme2000 => "EME2000",
-        }
-    }
-    fn __repr__(&self) -> String {
-        format!("ReferenceFrame.{}", self.__str__())
-    }
-}
-
-pub fn parse_reference_frame(ob: &Bound<'_, PyAny>) -> PyResult<String> {
-    if let Ok(val) = ob.extract::<ReferenceFrame>() {
-        Ok(val.__str__().to_string())
-    } else if let Ok(s) = ob.extract::<String>() {
-        Ok(s)
-    } else {
-        Err(PyValueError::new_err(
-            "Expected ReferenceFrame enum or string",
-        ))
-    }
-}
-
-#[pyclass(eq, eq_int)]
-#[derive(Clone, PartialEq, Copy)]
-pub enum TimeSystem {
-    Utc,
-    Tai,
-    Gps,
-    Sclk,
-    Tdb,
-    Ut1,
-}
-
-#[pymethods]
-impl TimeSystem {
-    fn __str__(&self) -> &'static str {
-        match self {
-            TimeSystem::Utc => "UTC",
-            TimeSystem::Tai => "TAI",
-            TimeSystem::Gps => "GPS",
-            TimeSystem::Sclk => "SCLK",
-            TimeSystem::Tdb => "TDB",
-            TimeSystem::Ut1 => "UT1",
-        }
-    }
-    fn __repr__(&self) -> String {
-        format!("TimeSystem.{}", self.__str__())
-    }
-}
-
-pub fn parse_time_system(ob: &Bound<'_, PyAny>) -> PyResult<String> {
-    if let Ok(val) = ob.extract::<TimeSystem>() {
-        Ok(val.__str__().to_string())
-    } else if let Ok(s) = ob.extract::<String>() {
-        Ok(s)
-    } else {
-        Err(PyValueError::new_err("Expected TimeSystem enum or string"))
-    }
-}
-
 pub fn validate_version(kind: ccsds_ndm::validation::MessageKind, value: &str) -> PyResult<()> {
-    if let Some(versions) = ccsds_ndm::versioning::supported_versions(kind) {
+    // Setting an edition only affects generation, so gate on the writable editions.
+    if let Some(versions) = ccsds_ndm::versioning::supported_output_versions(kind) {
         if !versions.contains(&value) {
             return Err(PyValueError::new_err(format!(
                 "Invalid version '{}'; expected one of: {}",

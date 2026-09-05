@@ -74,6 +74,14 @@ impl Ndm for Apm {
         crate::traits::Validate::validate(&apm)?;
         Ok(apm)
     }
+
+    fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
+        crate::generation::write_kvn_to(self, output)
+    }
+
+    fn write_xml_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
+        crate::generation::write_xml_to(self, output)
+    }
 }
 
 fn validate_xml_sequences(xml: &str) -> Result<()> {

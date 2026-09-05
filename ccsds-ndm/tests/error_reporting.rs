@@ -1,6 +1,6 @@
 use ccsds_ndm::error::{CcsdsNdmError, ValidationError};
 use ccsds_ndm::messages::ocm::Ocm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 
 #[test]
 fn test_validation_error_is_preserved() {

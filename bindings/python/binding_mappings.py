@@ -140,10 +140,16 @@ READ_ONLY_FIELDS: dict[str, dict[str, str]] = {
     "Acm": {
         "id": "protocol_managed",
     },
+    "Aem": {
+        "id": "protocol_managed",
+    },
+    "Apm": {
+        "id": "protocol_managed",
+    },
     "Cdm": {
         "id": "protocol_managed",
     },
-    "Ndm": {
+    "CombinedNdm": {
         "id": "protocol_managed",
     },
     "Oem": {
@@ -214,7 +220,6 @@ RUST_SKIP_FIELDS: dict[str, list[str]] = {
 # Usually not needed as names are kept consistent.
 
 STRUCT_MAPPINGS: dict[str, str] = {
-    "Ndm": "CombinedNdm",
     "ApmManeuverParameters": "AttManeuverState",
     "OpmManeuverParameters": "ManeuverParameters",
 }

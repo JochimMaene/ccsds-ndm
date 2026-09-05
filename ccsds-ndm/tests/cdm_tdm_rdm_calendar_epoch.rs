@@ -1,5 +1,5 @@
 use ccsds_ndm::messages::{cdm::Cdm, rdm::Rdm, tdm::Tdm};
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 
 const CDM_KVN: &str = include_str!("../data/kvn/cdm_362.kvn");
 const CDM_XML: &str = include_str!("../data/xml/cdm_44.xml");

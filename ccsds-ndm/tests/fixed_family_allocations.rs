@@ -4,8 +4,7 @@ use std::hint::black_box;
 use ccsds_ndm::messages::apm::Apm;
 use ccsds_ndm::messages::omm::Omm;
 use ccsds_ndm::messages::rdm::Rdm;
-use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::VersionedNdm;
+use ccsds_ndm::Ndm;
 use stats_alloc::{Region, Stats, StatsAlloc, INSTRUMENTED_SYSTEM};
 
 #[global_allocator]

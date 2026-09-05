@@ -4,23 +4,7 @@
 
 use ccsds_ndm::messages::apm::Apm;
 use ccsds_ndm::messages::cdm::Cdm;
-use ccsds_ndm::traits::{FromKvnFloat, Ndm};
-use ccsds_ndm::types::{PositionRequired, PositionUnits};
-
-#[test]
-fn required_kvn_units_accept_only_the_ccsds_unit() {
-    let position = PositionRequired::from_kvn_float(42.0, Some("km"))
-        .expect("CCSDS position units should be accepted");
-    assert_eq!(position.units, PositionUnits::Km);
-
-    let inferred = PositionRequired::from_kvn_float(42.0, None)
-        .expect("KVN permits an omitted documented unit");
-    assert_eq!(inferred.units, PositionUnits::Km);
-
-    let error = PositionRequired::from_kvn_float(42.0, Some("m"))
-        .expect_err("a non-CCSDS position unit must not be reinterpreted as kilometres");
-    assert!(error.to_string().contains("expected one of: \"km\""));
-}
+use ccsds_ndm::Ndm;
 
 #[test]
 fn cdm_kvn_rejects_a_state_vector_with_metre_units() {

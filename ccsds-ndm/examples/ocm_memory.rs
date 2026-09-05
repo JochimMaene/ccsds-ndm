@@ -15,8 +15,8 @@ use ccsds_ndm::messages::ocm::{
     CovLine, ManLine, Ocm, OcmBody, OcmCovarianceMatrix, OcmData, OcmManeuverParameters,
     OcmMetadata, OcmSegment, OcmTrajState, TrajLine,
 };
-use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::Epoch;
+use ccsds_ndm::Ndm;
 use std::str::FromStr;
 
 const RECORDS: usize = 10_000;

@@ -2,9 +2,8 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::generation::VersionedNdm;
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 use stats_alloc::{Region, StatsAlloc, INSTRUMENTED_SYSTEM};
 use std::alloc::System;
 use std::hint::black_box;

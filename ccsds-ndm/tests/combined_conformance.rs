@@ -5,8 +5,8 @@ use std::process::Command;
 use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::traits::{Ndm, Validate};
-use ccsds_ndm::{from_str_with_options, MessageType, Notation, ParseOptions};
+use ccsds_ndm::{from_str_with_options, Message, Notation, ParseOptions};
+use ccsds_ndm::{Ndm, Validate};
 use tempfile::NamedTempFile;
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
@@ -21,7 +21,7 @@ fn every_shipped_combined_fixture_preserves_children_and_generates_valid_xml() {
     for name in ["ndm_g12.xml", "ndm_g21.xml"] {
         let source = fs::read_to_string(repository_path(&format!("data/xml/{name}"))).unwrap();
         let message = CombinedNdm::from_xml(&source).unwrap();
-        let kinds: Vec<_> = message.messages.iter().map(MessageType::kind).collect();
+        let kinds: Vec<_> = message.messages.iter().map(Message::kind).collect();
         let xml = message.to_xml().unwrap();
         let reparsed = CombinedNdm::from_xml(&xml).unwrap();
         assert_eq!(reparsed, message, "{name} typed model");
@@ -29,7 +29,7 @@ fn every_shipped_combined_fixture_preserves_children_and_generates_valid_xml() {
             reparsed
                 .messages
                 .iter()
-                .map(MessageType::kind)
+                .map(Message::kind)
                 .collect::<Vec<_>>(),
             kinds,
             "{name} child order"
@@ -74,14 +74,16 @@ fn combined_xml_rejects_illegal_root_and_constituent_attributes() {
 #[test]
 fn aggregate_parse_limits_apply_to_direct_combined_entry_points() {
     let source = fs::read_to_string(repository_path("data/xml/ndm_g21.xml")).unwrap();
-    let error = CombinedNdm::from_xml_with_options(
+    let error = from_str_with_options(
         &source,
+        Some(Notation::Xml),
         &ParseOptions::default().with_max_input_bytes(source.len() - 1),
     )
     .unwrap_err();
     assert_eq!(error.code(), Some("resource.input_limit_exceeded"));
-    assert!(CombinedNdm::from_xml_with_options(
+    assert!(from_str_with_options(
         &source,
+        Some(Notation::Xml),
         &ParseOptions::default().with_max_xml_depth(1)
     )
     .is_err());
@@ -90,12 +92,13 @@ fn aggregate_parse_limits_apply_to_direct_combined_entry_points() {
     let two_children = CombinedNdm {
         id: None,
         comments: Vec::new(),
-        messages: vec![MessageType::Aem(aem.clone()), MessageType::Aem(aem)],
+        messages: vec![Message::Aem(aem.clone()), Message::Aem(aem)],
     }
     .to_xml()
     .unwrap();
-    let error = CombinedNdm::from_xml_with_options(
+    let error = from_str_with_options(
         &two_children,
+        Some(Notation::Xml),
         &ParseOptions::default().with_max_records(1),
     )
     .unwrap_err();
@@ -109,16 +112,19 @@ fn aggregate_parse_limits_apply_to_direct_combined_entry_points() {
 #[test]
 fn opm_maneuvers_are_not_history_records_in_standalone_or_combined_messages() {
     let options = ParseOptions::default().with_max_records(0);
-    let opm = Opm::from_kvn_with_options(OPM_WITH_MANEUVERS_KVN, &options).unwrap();
+    let Message::Opm(opm) =
+        from_str_with_options(OPM_WITH_MANEUVERS_KVN, Some(Notation::Kvn), &options).unwrap()
+    else {
+        unreachable!()
+    };
     assert!(!opm.body.segment.data.maneuver_parameters.is_empty());
 
     let combined = CombinedNdm {
         id: None,
         comments: Vec::new(),
-        messages: vec![MessageType::Opm(opm)],
+        messages: vec![Message::Opm(opm)],
     };
     let xml = combined.to_xml().unwrap();
-    CombinedNdm::from_xml_with_options(&xml, &options).unwrap();
     from_str_with_options(&xml, Some(Notation::Xml), &options).unwrap();
 }
 
@@ -128,7 +134,7 @@ fn streaming_generation_matches_string_generation() {
     let message = CombinedNdm {
         id: None,
         comments: vec!["two OPM messages".into()],
-        messages: vec![MessageType::Opm(opm.clone()), MessageType::Opm(opm)],
+        messages: vec![Message::Opm(opm.clone()), Message::Opm(opm)],
     };
 
     let xml = message.to_xml().unwrap();
@@ -142,7 +148,7 @@ fn loss_or_non_schema_model_states_are_rejected() {
     let nested = CombinedNdm {
         id: None,
         comments: Vec::new(),
-        messages: vec![MessageType::Ndm(CombinedNdm {
+        messages: vec![Message::Ndm(CombinedNdm {
             id: None,
             comments: Vec::new(),
             messages: Vec::new(),

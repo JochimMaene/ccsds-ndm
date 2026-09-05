@@ -4,10 +4,12 @@
 
 use crate::errors::ccsds_error_to_pyerr;
 use ccsds_ndm::options::ParseOptions;
-use ccsds_ndm::traits::{Ndm, Validate};
-use ccsds_ndm::{MessageType, Notation};
+use ccsds_ndm::validation::MessageKind;
+use ccsds_ndm::{Message, Notation};
+use ccsds_ndm::{Ndm, Validate};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use std::path::Path;
 
 /// Build an optional validated core value, surfacing a rejection as a Python exception
 /// instead of panicking.
@@ -18,16 +20,20 @@ pub fn checked_optional<T>(
     value.map(make).transpose().map_err(ccsds_error_to_pyerr)
 }
 
-pub trait FromMessageType: Ndm {
-    fn from_message_type(message: MessageType) -> Option<Self>;
+pub trait FromMessage: Ndm {
+    const KIND: MessageKind;
+
+    fn from_message_type(message: Message) -> Option<Self>;
 }
 
 macro_rules! impl_from_message_type {
     ($type:path, $variant:ident) => {
-        impl FromMessageType for $type {
-            fn from_message_type(message: MessageType) -> Option<Self> {
+        impl FromMessage for $type {
+            const KIND: MessageKind = MessageKind::$variant;
+
+            fn from_message_type(message: Message) -> Option<Self> {
                 match message {
-                    MessageType::$variant(message) => Some(message),
+                    Message::$variant(message) => Some(message),
                     _ => None,
                 }
             }
@@ -61,9 +67,15 @@ pub fn notation(format: &str) -> PyResult<Notation> {
     }
 }
 
-fn expect_typed<T: FromMessageType>(message: MessageType) -> PyResult<T> {
-    T::from_message_type(message)
-        .ok_or_else(|| PyValueError::new_err("input contains a different CCSDS NDM message type"))
+fn expect_typed<T: FromMessage>(message: Message) -> PyResult<T> {
+    let actual = message.kind();
+    T::from_message_type(message).ok_or_else(|| {
+        PyValueError::new_err(format!(
+            "expected {}, found {}",
+            T::KIND.as_str(),
+            actual.as_str()
+        ))
+    })
 }
 
 pub fn parse_options(max_input_bytes: Option<usize>, max_records: Option<usize>) -> ParseOptions {
@@ -74,7 +86,7 @@ pub fn parse_options(max_input_bytes: Option<usize>, max_records: Option<usize>)
     }
 }
 
-pub fn parse_typed_with_options<T: FromMessageType>(
+pub fn parse_typed_with_options<T: FromMessage>(
     data: &str,
     format: Option<&str>,
     options: &ParseOptions,
@@ -84,8 +96,8 @@ pub fn parse_typed_with_options<T: FromMessageType>(
     expect_typed(message)
 }
 
-pub fn parse_typed_file_with_options<T: FromMessageType>(
-    path: &str,
+pub fn parse_typed_file_with_options<T: FromMessage>(
+    path: &Path,
     format: Option<&str>,
     options: &ParseOptions,
 ) -> PyResult<T> {
@@ -106,7 +118,7 @@ pub fn generate_string<T: Ndm>(message: &T, format: &str) -> PyResult<String> {
     .map_err(ccsds_error_to_pyerr)
 }
 
-pub fn generate_file(message: &MessageType, path: &str, format: &str) -> PyResult<()> {
+pub fn generate_file(message: &Message, path: &Path, format: &str) -> PyResult<()> {
     match notation(format)? {
         Notation::Kvn => message.to_kvn_file(path),
         Notation::Xml => message.to_xml_file(path),

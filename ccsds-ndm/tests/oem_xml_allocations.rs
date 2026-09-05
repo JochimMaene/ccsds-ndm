@@ -9,7 +9,7 @@
 //! buffer for the same reason. Both are invisible to a correctness test, so they are pinned here.
 
 use ccsds_ndm::messages::oem::Oem;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 use stats_alloc::{Region, Stats, StatsAlloc, INSTRUMENTED_SYSTEM};
 use std::alloc::System;
 use std::hint::black_box;

@@ -12,7 +12,7 @@ use ccsds_ndm::messages::omm::Omm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::messages::tdm::Tdm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 use tempfile::NamedTempFile;
 
 fn xmllint_available() -> bool {

@@ -82,6 +82,14 @@ impl Ndm for Ocm {
         crate::traits::Validate::validate(&ocm)?;
         Ok(ocm)
     }
+
+    fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
+        crate::generation::write_kvn_to(self, output)
+    }
+
+    fn write_xml_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
+        crate::generation::write_xml_to(self, output)
+    }
 }
 
 fn ocm_xml_children(parent: &[u8]) -> Option<&'static [&'static [u8]]> {

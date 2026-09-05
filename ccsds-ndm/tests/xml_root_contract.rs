@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::{from_str, MessageType};
+use ccsds_ndm::{from_str, Message};
 
 #[test]
 fn standalone_xml_roots_allow_schema_hints_but_reject_unknown_attributes() {
@@ -70,5 +70,5 @@ fn standalone_xml_metadata_rejects_unknown_elements() {
 #[test]
 fn generated_acm_is_still_detected_as_acm() {
     let message = from_str(include_str!("../data/kvn/acm_g6.kvn")).unwrap();
-    assert!(matches!(message, MessageType::Acm(_)));
+    assert!(matches!(message, Message::Acm(_)));
 }

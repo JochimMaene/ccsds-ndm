@@ -1,5 +1,5 @@
 use ccsds_ndm::messages::acm::Acm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 
 const ACM_KVN: &str = include_str!("../data/kvn/acm_g7.kvn");
 

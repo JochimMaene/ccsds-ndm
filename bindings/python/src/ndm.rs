@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::messages::ndm as core_ndm;
-use ccsds_ndm::MessageType;
+use ccsds_ndm::Message;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -26,13 +26,13 @@ use crate::tdm::Tdm;
 /// associated OPM could be conveniently conveyed in a single NDM); (3) an ephemeris message
 /// with the set of tracking data messages used in the orbit determination.
 #[pyclass]
-pub struct Ndm {
+pub struct CombinedNdm {
     id: Option<String>,
     comments: Vec<String>,
     messages: Py<PyList>,
 }
 
-impl Ndm {
+impl CombinedNdm {
     pub(crate) fn from_core(py: Python<'_>, value: core_ndm::CombinedNdm) -> PyResult<Self> {
         let messages = value
             .messages
@@ -61,29 +61,29 @@ impl Ndm {
     }
 }
 
-pub(crate) fn py_message_to_core(py: Python<'_>, msg: &Py<PyAny>) -> PyResult<MessageType> {
+pub(crate) fn py_message_to_core(py: Python<'_>, msg: &Py<PyAny>) -> PyResult<Message> {
     if let Ok(oem) = msg.bind(py).extract::<PyRef<'_, Oem>>() {
-        Ok(MessageType::Oem(oem.to_core(py)?))
+        Ok(Message::Oem(oem.to_core(py)?))
     } else if let Ok(cdm) = msg.bind(py).extract::<PyRef<'_, Cdm>>() {
-        Ok(MessageType::Cdm(cdm.to_core(py)?))
+        Ok(Message::Cdm(cdm.to_core(py)?))
     } else if let Ok(opm) = msg.bind(py).extract::<PyRef<'_, Opm>>() {
-        Ok(MessageType::Opm(opm.to_core(py)?))
+        Ok(Message::Opm(opm.to_core(py)?))
     } else if let Ok(omm) = msg.bind(py).extract::<PyRef<'_, Omm>>() {
-        Ok(MessageType::Omm(omm.to_core(py)?))
+        Ok(Message::Omm(omm.to_core(py)?))
     } else if let Ok(ocm) = msg.bind(py).extract::<PyRef<'_, Ocm>>() {
-        Ok(MessageType::Ocm(ocm.to_core(py)?))
+        Ok(Message::Ocm(ocm.to_core(py)?))
     } else if let Ok(rdm) = msg.bind(py).extract::<PyRef<'_, Rdm>>() {
-        Ok(MessageType::Rdm(rdm.to_core(py)?))
+        Ok(Message::Rdm(rdm.to_core(py)?))
     } else if let Ok(tdm) = msg.bind(py).extract::<PyRef<'_, Tdm>>() {
-        Ok(MessageType::Tdm(tdm.to_core(py)?))
+        Ok(Message::Tdm(tdm.to_core(py)?))
     } else if let Ok(aem) = msg.bind(py).extract::<PyRef<'_, crate::aem::Aem>>() {
-        Ok(MessageType::Aem(aem.to_core(py)?))
+        Ok(Message::Aem(aem.to_core(py)?))
     } else if let Ok(apm) = msg.bind(py).extract::<PyRef<'_, crate::apm::Apm>>() {
-        Ok(MessageType::Apm(apm.to_core(py)?))
+        Ok(Message::Apm(apm.to_core(py)?))
     } else if let Ok(acm) = msg.bind(py).extract::<PyRef<'_, crate::acm::Acm>>() {
-        Ok(MessageType::Acm(acm.to_core(py)?))
-    } else if let Ok(ndm) = msg.bind(py).extract::<PyRef<'_, Ndm>>() {
-        Ok(MessageType::Ndm(ndm.to_core(py)?))
+        Ok(Message::Acm(acm.to_core(py)?))
+    } else if let Ok(ndm) = msg.bind(py).extract::<PyRef<'_, CombinedNdm>>() {
+        Ok(Message::Ndm(ndm.to_core(py)?))
     } else {
         Err(PyValueError::new_err(
             "Unsupported message type in NDM combined instantiation",
@@ -91,7 +91,7 @@ pub(crate) fn py_message_to_core(py: Python<'_>, msg: &Py<PyAny>) -> PyResult<Me
     }
 }
 
-fn py_messages_to_core(py: Python<'_>, messages: &[Py<PyAny>]) -> PyResult<Vec<MessageType>> {
+fn py_messages_to_core(py: Python<'_>, messages: &[Py<PyAny>]) -> PyResult<Vec<Message>> {
     messages
         .iter()
         .map(|msg| py_message_to_core(py, msg))
@@ -99,7 +99,7 @@ fn py_messages_to_core(py: Python<'_>, messages: &[Py<PyAny>]) -> PyResult<Vec<M
 }
 
 #[pymethods]
-impl Ndm {
+impl CombinedNdm {
     #[new]
     #[pyo3(signature = (messages, id=None, comments=vec![]))]
     fn new(
@@ -141,13 +141,13 @@ impl Ndm {
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_file(
         py: Python<'_>,
-        path: &str,
+        path: std::path::PathBuf,
         format: Option<&str>,
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
         let options = crate::api::parse_options(max_input_bytes, max_records);
-        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        let inner = crate::api::parse_typed_file_with_options(&path, format, &options)?;
         Self::from_core(py, inner)
     }
 
@@ -155,15 +155,15 @@ impl Ndm {
     ///
     /// Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError` and leaves the
     /// destination untouched.
-    fn to_file(&self, py: Python<'_>, path: &str, format: &str) -> PyResult<()> {
-        crate::api::generate_file(&MessageType::Ndm(self.to_core(py)?), path, format)
+    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+        crate::api::generate_file(&Message::Ndm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to an XML string.
     ///
     /// Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError`.
     fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
-        let message = MessageType::Ndm(self.to_core(py)?);
+        let message = Message::Ndm(self.to_core(py)?);
         match crate::api::notation(format)? {
             ccsds_ndm::Notation::Kvn => message.to_kvn(),
             ccsds_ndm::Notation::Xml => message.to_xml(),
@@ -173,7 +173,7 @@ impl Ndm {
 
     /// List of contained navigation messages.
     ///
-    /// :type: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Ndm]]
+    /// :type: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]]
     #[getter]
     fn messages(&self, py: Python<'_>) -> Py<PyList> {
         self.messages.clone_ref(py)
@@ -209,7 +209,7 @@ impl Ndm {
 
     fn __repr__(&self, py: Python<'_>) -> String {
         format!(
-            "Ndm(messages={}, id={:?})",
+            "CombinedNdm(messages={}, id={:?})",
             self.messages.bind(py).len(),
             self.id
         )

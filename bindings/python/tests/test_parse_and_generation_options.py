@@ -11,6 +11,8 @@ import ccsds_ndm
 
 REPOSITORY_ROOT = Path(__file__).parents[3]
 OPM_KVN = (REPOSITORY_ROOT / "ccsds-ndm/data/kvn/opm_g1.kvn").read_text()
+# 1.0 is readable but withdrawn as an output edition, so it can only be reached by parsing.
+OPM_KVN_V1 = OPM_KVN.replace("CCSDS_OPM_VERS = 3.0", "CCSDS_OPM_VERS = 1.0")
 OEM_KVN = (REPOSITORY_ROOT / "ccsds-ndm/data/kvn/oem_g11.kvn").read_text()
 COMBINED_XML = (REPOSITORY_ROOT / "ccsds-ndm/data/xml/ndm_g12.xml").read_text()
 PERMISSIVE_XML = (REPOSITORY_ROOT / "ccsds-ndm/data/xml/ndm_g22.xml").read_text()
@@ -64,8 +66,7 @@ def test_python_opm_validation_raises_the_first_error():
 
 
 def test_unsupported_version_errors_expose_the_common_diagnostic_attributes():
-    message = ccsds_ndm.Opm.from_str(OPM_KVN, format="kvn")
-    message.version = "1.0"
+    message = ccsds_ndm.Opm.from_str(OPM_KVN_V1, format="kvn")
 
     with pytest.raises(ccsds_ndm.NdmValidationError) as unsupported:
         message.to_str("xml")
@@ -98,11 +99,10 @@ def test_format_names_are_case_insensitive(tmp_path):
 
 
 def test_failed_generation_preserves_existing_file(tmp_path):
-    message = ccsds_ndm.Opm.from_str(OPM_KVN, format="kvn")
+    message = ccsds_ndm.Opm.from_str(OPM_KVN_V1, format="kvn")
     output = tmp_path / "output.ndm"
     output.write_text("keep me")
 
-    message.version = "1.0"
     with pytest.raises(
         ccsds_ndm.NdmValidationError, match="Unsupported KVN output version 1.0"
     ):
@@ -237,24 +237,24 @@ def test_generic_python_conversion_dispatches_non_opm_messages(tmp_path):
 
 def test_combined_python_message_keeps_identity_and_shared_limits():
     empty = ccsds_ndm.from_str("<ndm/>", format="xml")
-    assert isinstance(empty, ccsds_ndm.Ndm)
+    assert isinstance(empty, ccsds_ndm.CombinedNdm)
     assert empty.messages == []
 
     message = ccsds_ndm.from_str(COMBINED_XML, format="xml")
-    assert isinstance(message, ccsds_ndm.Ndm)
+    assert isinstance(message, ccsds_ndm.CombinedNdm)
 
     with pytest.raises(ccsds_ndm.NdmError) as input_limit:
-        ccsds_ndm.Ndm.from_str(COMBINED_XML, format="xml", max_input_bytes=1)
+        ccsds_ndm.CombinedNdm.from_str(COMBINED_XML, format="xml", max_input_bytes=1)
     assert input_limit.value.code == "resource.input_limit_exceeded"
     assert input_limit.value.message_kind == "ndm"
 
     with pytest.raises(ccsds_ndm.NdmError) as record_limit:
-        ccsds_ndm.Ndm.from_str(COMBINED_XML, format="xml", max_records=0)
+        ccsds_ndm.CombinedNdm.from_str(COMBINED_XML, format="xml", max_records=0)
     assert record_limit.value.code == "resource.record_limit_exceeded"
     assert record_limit.value.message_kind == "ndm"
 
     xml = message.to_str("xml")
-    assert isinstance(ccsds_ndm.from_str(xml, format="xml"), ccsds_ndm.Ndm)
+    assert isinstance(ccsds_ndm.from_str(xml, format="xml"), ccsds_ndm.CombinedNdm)
 
 
 def test_python_conversion_delegates_to_strict_rust_core(tmp_path):

@@ -81,6 +81,14 @@ impl Ndm for Acm {
         crate::traits::Validate::validate(&acm)?;
         Ok(acm)
     }
+
+    fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
+        crate::generation::write_kvn_to(self, output)
+    }
+
+    fn write_xml_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
+        crate::generation::write_xml_to(self, output)
+    }
 }
 
 impl Acm {

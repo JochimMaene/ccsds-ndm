@@ -74,7 +74,7 @@ pub(crate) fn validate_for_generation(
     .map_err(|error| generation_error(error, kind, format, version))
 }
 
-pub(crate) fn to_kvn_string<T: VersionedNdm + ToKvn>(message: &T) -> Result<String> {
+pub(crate) fn to_kvn_string<T: GenerationMetadata + ToKvn>(message: &T) -> Result<String> {
     (|| {
         validate_output_version(T::KIND, message.version(), OutputFormat::Kvn)?;
         message.validate_kvn_model()?;
@@ -88,7 +88,7 @@ pub(crate) fn to_kvn_string<T: VersionedNdm + ToKvn>(message: &T) -> Result<Stri
     .map_err(|error| generation_error(error, T::KIND, OutputFormat::Kvn, message.version()))
 }
 
-pub(crate) fn to_xml_string<T: VersionedNdm>(message: &T) -> Result<String> {
+pub(crate) fn to_xml_string<T: GenerationMetadata>(message: &T) -> Result<String> {
     (|| {
         validate_output_version(T::KIND, message.version(), OutputFormat::Xml)?;
         message.validate()?;
@@ -100,10 +100,7 @@ pub(crate) fn to_xml_string<T: VersionedNdm>(message: &T) -> Result<String> {
     .map_err(|error| generation_error(error, T::KIND, OutputFormat::Xml, message.version()))
 }
 
-/// Complete NDM messages that support validated streaming generation.
-///
-/// Generation always preserves the edition stored on the message.
-pub trait VersionedNdm: Ndm {
+pub(crate) trait GenerationMetadata: Ndm {
     /// Message family used to resolve supported editions.
     const KIND: MessageKind;
 
@@ -138,22 +135,12 @@ pub trait VersionedNdm: Ndm {
     fn validate_kvn_model(&self) -> Result<()> {
         self.validate()
     }
-
-    /// Stream KVN using the edition stored on the message.
-    fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()>;
-
-    /// Stream XML using the edition stored on the message.
-    fn write_xml_to<W: Write>(&self, output: &mut W) -> Result<()> {
-        (|| {
-            validate_for_generation(Self::KIND, self.version(), OutputFormat::Xml, self)?;
-            self.validate_xml_output()?;
-            crate::xml::to_writer(output, self)
-        })()
-        .map_err(|error| generation_error(error, Self::KIND, OutputFormat::Xml, self.version()))
-    }
 }
 
-fn stream_kvn<T: VersionedNdm + ToKvn, W: Write>(message: &T, output: &mut W) -> Result<()> {
+pub(crate) fn write_kvn_to<T: GenerationMetadata + ToKvn, W: Write>(
+    message: &T,
+    output: &mut W,
+) -> Result<()> {
     (|| {
         validate_output_version(T::KIND, message.version(), OutputFormat::Kvn)?;
         message.validate_kvn_model()?;
@@ -167,9 +154,21 @@ fn stream_kvn<T: VersionedNdm + ToKvn, W: Write>(message: &T, output: &mut W) ->
     .map_err(|error| generation_error(error, T::KIND, OutputFormat::Kvn, message.version()))
 }
 
-macro_rules! impl_versioned_ndm {
+pub(crate) fn write_xml_to<T: GenerationMetadata, W: Write>(
+    message: &T,
+    output: &mut W,
+) -> Result<()> {
+    (|| {
+        validate_for_generation(T::KIND, message.version(), OutputFormat::Xml, message)?;
+        message.validate_xml_output()?;
+        crate::xml::to_writer(output, message)
+    })()
+    .map_err(|error| generation_error(error, T::KIND, OutputFormat::Xml, message.version()))
+}
+
+macro_rules! impl_generation_metadata {
     ($type:path, $kind:ident) => {
-        impl VersionedNdm for $type {
+        impl GenerationMetadata for $type {
             const KIND: MessageKind = MessageKind::$kind;
 
             fn version(&self) -> &str {
@@ -179,14 +178,10 @@ macro_rules! impl_versioned_ndm {
             fn validate_kvn_model(&self) -> Result<()> {
                 self.validate()
             }
-
-            fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
-                stream_kvn(self, output)
-            }
         }
     };
     ($type:path, $kind:ident, kvn_representability) => {
-        impl VersionedNdm for $type {
+        impl GenerationMetadata for $type {
             const KIND: MessageKind = MessageKind::$kind;
 
             fn version(&self) -> &str {
@@ -197,15 +192,11 @@ macro_rules! impl_versioned_ndm {
                 self.validate()?;
                 self.validate_kvn_representability()
             }
-
-            fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
-                stream_kvn(self, output)
-            }
         }
     };
 }
 
-impl VersionedNdm for crate::messages::acm::Acm {
+impl GenerationMetadata for crate::messages::acm::Acm {
     const KIND: MessageKind = MessageKind::Acm;
 
     fn version(&self) -> &str {
@@ -220,22 +211,18 @@ impl VersionedNdm for crate::messages::acm::Acm {
     fn validate_xml_model(&self) -> Result<()> {
         self.validate_xml_representability()
     }
-
-    fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
-        stream_kvn(self, output)
-    }
 }
 
-impl_versioned_ndm!(crate::messages::apm::Apm, Apm);
+impl_generation_metadata!(crate::messages::apm::Apm, Apm);
 
-impl_versioned_ndm!(crate::messages::omm::Omm, Omm, kvn_representability);
-impl_versioned_ndm!(crate::messages::cdm::Cdm, Cdm, kvn_representability);
-impl_versioned_ndm!(crate::messages::aem::Aem, Aem, kvn_representability);
-impl_versioned_ndm!(crate::messages::ocm::Ocm, Ocm, kvn_representability);
-impl_versioned_ndm!(crate::messages::tdm::Tdm, Tdm, kvn_representability);
-impl_versioned_ndm!(crate::messages::rdm::Rdm, Rdm, kvn_representability);
+impl_generation_metadata!(crate::messages::omm::Omm, Omm, kvn_representability);
+impl_generation_metadata!(crate::messages::cdm::Cdm, Cdm, kvn_representability);
+impl_generation_metadata!(crate::messages::aem::Aem, Aem, kvn_representability);
+impl_generation_metadata!(crate::messages::ocm::Ocm, Ocm, kvn_representability);
+impl_generation_metadata!(crate::messages::tdm::Tdm, Tdm, kvn_representability);
+impl_generation_metadata!(crate::messages::rdm::Rdm, Rdm, kvn_representability);
 
-impl VersionedNdm for crate::messages::opm::Opm {
+impl GenerationMetadata for crate::messages::opm::Opm {
     const KIND: MessageKind = MessageKind::Opm;
 
     fn version(&self) -> &str {
@@ -260,13 +247,9 @@ impl VersionedNdm for crate::messages::opm::Opm {
         // and buffered generation still needs it.
         ToKvn::validate_kvn(self)
     }
-
-    fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
-        stream_kvn(self, output)
-    }
 }
 
-impl VersionedNdm for crate::messages::oem::Oem {
+impl GenerationMetadata for crate::messages::oem::Oem {
     const KIND: MessageKind = MessageKind::Oem;
 
     fn version(&self) -> &str {
@@ -287,9 +270,5 @@ impl VersionedNdm for crate::messages::oem::Oem {
     fn validate_kvn_model(&self) -> Result<()> {
         // OEM has no separate model pass: its render pass validates every record as it emits it.
         Ok(())
-    }
-
-    fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()> {
-        stream_kvn(self, output)
     }
 }

@@ -6,6 +6,7 @@ use crate::error::{CcsdsNdmError, Result, ValidationError};
 use std::borrow::Cow;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum MessageKind {
     Opm,
     Omm,

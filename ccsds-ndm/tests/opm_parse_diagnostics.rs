@@ -1,7 +1,7 @@
 use ccsds_ndm::error::{DiagnosticNotation, DiagnosticOperation};
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::validation::MessageKind;
+use ccsds_ndm::Ndm;
 
 const KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 

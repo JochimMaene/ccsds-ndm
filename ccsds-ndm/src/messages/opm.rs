@@ -99,11 +99,19 @@ impl Ndm for Opm {
     fn from_xml(xml: &str) -> Result<Self> {
         Self::from_xml_with_options(xml, &crate::options::ParseOptions::default())
     }
+
+    fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
+        crate::generation::write_kvn_to(self, output)
+    }
+
+    fn write_xml_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
+        crate::generation::write_xml_to(self, output)
+    }
 }
 
 impl Opm {
     /// Strictly parse and validate an OPM KVN document with caller resource limits.
-    pub fn from_kvn_with_options(
+    pub(crate) fn from_kvn_with_options(
         kvn: &str,
         options: &crate::options::ParseOptions,
     ) -> Result<Self> {
@@ -131,7 +139,7 @@ impl Opm {
     }
 
     /// Strictly parse and validate an OPM XML document with caller resource limits.
-    pub fn from_xml_with_options(
+    pub(crate) fn from_xml_with_options(
         xml: &str,
         options: &crate::options::ParseOptions,
     ) -> Result<Self> {

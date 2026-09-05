@@ -4,23 +4,22 @@
 
 use crate::error::{CcsdsNdmError, FormatError, Result};
 use crate::traits::Ndm;
-use crate::MessageType;
+use crate::Message;
 use serde::{Deserialize, Serialize};
-use std::io::Write;
 
 fn is_ascii_whitespace(bytes: &[u8]) -> bool {
     bytes.iter().all(u8::is_ascii_whitespace)
 }
 
-fn history_record_count(message: &MessageType) -> usize {
+fn history_record_count(message: &Message) -> usize {
     match message {
-        MessageType::Oem(message) => message
+        Message::Oem(message) => message
             .body
             .segment
             .iter()
             .map(|segment| segment.data.state_vector.len() + segment.data.covariance_matrix.len())
             .sum(),
-        MessageType::Ocm(message) => {
+        Message::Ocm(message) => {
             let data = &message.body.segment.data;
             data.traj
                 .iter()
@@ -37,19 +36,19 @@ fn history_record_count(message: &MessageType) -> usize {
                     .map(|block| block.man_lines.len())
                     .sum::<usize>()
         }
-        MessageType::Tdm(message) => message
+        Message::Tdm(message) => message
             .body
             .segments
             .iter()
             .map(|segment| segment.data.observations.len())
             .sum(),
-        MessageType::Aem(message) => message
+        Message::Aem(message) => message
             .body
             .segment
             .iter()
             .map(|segment| segment.data.attitude_states.len())
             .sum(),
-        MessageType::Acm(message) => {
+        Message::Acm(message) => {
             let data = &message.body.segment.data;
             data.att
                 .iter()
@@ -62,12 +61,10 @@ fn history_record_count(message: &MessageType) -> usize {
                     .sum::<usize>()
                 + data.man.len()
         }
-        MessageType::Ndm(message) => message.messages.iter().map(history_record_count).sum(),
-        MessageType::Opm(_)
-        | MessageType::Omm(_)
-        | MessageType::Cdm(_)
-        | MessageType::Rdm(_)
-        | MessageType::Apm(_) => 0,
+        Message::Ndm(message) => message.messages.iter().map(history_record_count).sum(),
+        Message::Opm(_) | Message::Omm(_) | Message::Cdm(_) | Message::Rdm(_) | Message::Apm(_) => {
+            0
+        }
     }
 }
 
@@ -186,24 +183,24 @@ pub struct CombinedNdm {
     /// List of contained navigation messages.
     #[serde(rename = "$value", default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default)]
-    pub messages: Vec<MessageType>,
+    pub messages: Vec<Message>,
 }
 
 impl crate::traits::Validate for CombinedNdm {
     fn validate(&self) -> Result<()> {
         for msg in &self.messages {
             match msg {
-                MessageType::Opm(m) => m.validate()?,
-                MessageType::Omm(m) => m.validate()?,
-                MessageType::Oem(m) => m.validate()?,
-                MessageType::Ocm(m) => m.validate()?,
-                MessageType::Acm(m) => m.validate()?,
-                MessageType::Cdm(m) => m.validate()?,
-                MessageType::Tdm(m) => m.validate()?,
-                MessageType::Rdm(m) => m.validate()?,
-                MessageType::Aem(m) => m.validate()?,
-                MessageType::Apm(m) => m.validate()?,
-                MessageType::Ndm(_) => {
+                Message::Opm(m) => m.validate()?,
+                Message::Omm(m) => m.validate()?,
+                Message::Oem(m) => m.validate()?,
+                Message::Ocm(m) => m.validate()?,
+                Message::Acm(m) => m.validate()?,
+                Message::Cdm(m) => m.validate()?,
+                Message::Tdm(m) => m.validate()?,
+                Message::Rdm(m) => m.validate()?,
+                Message::Aem(m) => m.validate()?,
+                Message::Apm(m) => m.validate()?,
+                Message::Ndm(_) => {
                     return Err(crate::error::ValidationError::InvalidValue {
                         field: "ndm".into(),
                         value: "nested combined NDM".into(),
@@ -247,10 +244,7 @@ impl Ndm for CombinedNdm {
 
     fn to_xml(&self) -> Result<String> {
         self.validate_xml_envelope()?;
-        crate::traits::Validate::validate(self)?;
-        for message in &self.messages {
-            message.validate_for_generation(crate::generation::OutputFormat::Xml)?;
-        }
+        self.validate_children_for_generation(crate::generation::OutputFormat::Xml)?;
         crate::xml::to_string(self).map_err(|error| {
             error.with_generation_context(
                 crate::validation::MessageKind::Ndm,
@@ -262,6 +256,27 @@ impl Ndm for CombinedNdm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         Self::from_xml_with_options(xml, &crate::options::ParseOptions::default())
+    }
+
+    /// Always returns `UnsupportedNotation`; combined NDM has no KVN representation.
+    fn write_kvn_to<W: std::io::Write>(&self, _output: &mut W) -> Result<()> {
+        Err(combined_kvn_unsupported().with_generation_context(
+            crate::validation::MessageKind::Ndm,
+            crate::error::DiagnosticNotation::Kvn,
+            "combined",
+        ))
+    }
+
+    fn write_xml_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
+        self.validate_xml_envelope()?;
+        self.validate_children_for_generation(crate::generation::OutputFormat::Xml)?;
+        crate::xml::to_writer(output, self).map_err(|error| {
+            error.with_generation_context(
+                crate::validation::MessageKind::Ndm,
+                crate::error::DiagnosticNotation::Xml,
+                "combined",
+            )
+        })
     }
 }
 
@@ -291,21 +306,8 @@ impl CombinedNdm {
         Ok(())
     }
 
-    /// Stream the normative XML combined instantiation.
-    pub fn write_xml_to<W: Write>(&self, output: &mut W) -> Result<()> {
-        self.validate_xml_envelope()?;
-        self.validate_children_for_generation(crate::generation::OutputFormat::Xml)?;
-        crate::xml::to_writer(output, self).map_err(|error| {
-            error.with_generation_context(
-                crate::validation::MessageKind::Ndm,
-                crate::error::DiagnosticNotation::Xml,
-                "combined",
-            )
-        })
-    }
-
     /// Strictly parse a combined XML instantiation with bounded child parsing.
-    pub fn from_xml_with_options(
+    pub(crate) fn from_xml_with_options(
         xml: &str,
         options: &crate::options::ParseOptions,
     ) -> Result<Self> {
@@ -547,7 +549,7 @@ mod tests {
         let mut output = Vec::new();
         for error in [
             message.to_kvn().unwrap_err(),
-            crate::MessageType::Ndm(message)
+            crate::Message::Ndm(message)
                 .write_kvn_to(&mut output)
                 .unwrap_err(),
         ] {

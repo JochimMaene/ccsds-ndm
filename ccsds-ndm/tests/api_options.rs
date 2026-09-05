@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::generation::VersionedNdm;
 use ccsds_ndm::messages::acm::Acm;
 use ccsds_ndm::messages::cdm::Cdm;
 use ccsds_ndm::messages::ocm::{Ocm, OcmPhysicalDescription};
@@ -10,8 +9,9 @@ use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::messages::tdm::{Tdm, TdmObservationData};
-use ccsds_ndm::traits::{Ndm, Validate};
-use ccsds_ndm::{from_str, from_str_with_options, MessageType, Notation, ParseOptions};
+use ccsds_ndm::Ndm;
+use ccsds_ndm::Validate;
+use ccsds_ndm::{from_str, from_str_with_options, Message, Notation, ParseOptions};
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 const OPM_XML: &str = include_str!("../data/xml/opm_g5.xml");
@@ -31,7 +31,7 @@ fn generic_parse_options_bound_non_opm_inputs_and_xml_depth() {
     let exact = ParseOptions::default().with_max_input_bytes(OMM_KVN.len());
     assert!(matches!(
         from_str_with_options(OMM_KVN, Some(Notation::Kvn), &exact).unwrap(),
-        MessageType::Omm(_)
+        Message::Omm(_)
     ));
 
     let too_small = ParseOptions::default().with_max_input_bytes(OMM_KVN.len() - 1);
@@ -45,7 +45,7 @@ fn generic_parse_options_bound_non_opm_inputs_and_xml_depth() {
 
 #[test]
 fn history_record_limits_cover_each_concrete_history_message() {
-    use ccsds_ndm::{from_str_with_options, MessageType, Notation, ParseOptions};
+    use ccsds_ndm::{from_str_with_options, Message, Notation, ParseOptions};
 
     let cases = [
         (
@@ -88,7 +88,7 @@ fn history_record_limits_cover_each_concrete_history_message() {
     }
 
     let acm = ccsds_ndm::from_str(include_str!("../data/kvn/acm_g6.kvn")).unwrap();
-    let MessageType::Acm(acm) = acm else {
+    let Message::Acm(acm) = acm else {
         panic!("expected ACM fixture");
     };
     let xml = acm.to_xml().unwrap();
@@ -268,4 +268,44 @@ fn sink_writers_match_string_generation() {
     let mut xml = Vec::new();
     opm.write_xml_to(&mut xml).unwrap();
     assert_eq!(xml, expected_xml.as_bytes());
+}
+
+/// Output editions are a subset of input editions: legacy documents parse but are not regenerated.
+#[test]
+fn supported_editions_separate_input_from_output() {
+    use ccsds_ndm::validation::MessageKind;
+    use ccsds_ndm::versioning::{supported_input_versions, supported_output_versions};
+
+    for kind in [
+        MessageKind::Opm,
+        MessageKind::Omm,
+        MessageKind::Oem,
+        MessageKind::Ocm,
+        MessageKind::Aem,
+        MessageKind::Apm,
+        MessageKind::Acm,
+        MessageKind::Cdm,
+        MessageKind::Tdm,
+        MessageKind::Rdm,
+    ] {
+        let input = supported_input_versions(kind).expect("standalone family has editions");
+        let output = supported_output_versions(kind).expect("standalone family has editions");
+        assert!(!output.is_empty(), "{kind:?}");
+        assert!(
+            output.iter().all(|version| input.contains(version)),
+            "{kind:?}: {output:?} not a subset of {input:?}"
+        );
+    }
+
+    // OPM 1.0 is readable but was withdrawn as an output edition.
+    assert!(supported_input_versions(MessageKind::Opm)
+        .unwrap()
+        .contains(&"1.0"));
+    assert!(!supported_output_versions(MessageKind::Opm)
+        .unwrap()
+        .contains(&"1.0"));
+
+    // The combined envelope carries no edition of its own.
+    assert!(supported_input_versions(MessageKind::Ndm).is_none());
+    assert!(supported_output_versions(MessageKind::Ndm).is_none());
 }

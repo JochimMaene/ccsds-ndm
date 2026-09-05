@@ -2,9 +2,11 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::MessageType;
+use ccsds_ndm::Message;
+use pyo3::exceptions::PyNotImplementedError;
 use pyo3::prelude::*;
 use pyo3::Py;
+use std::path::PathBuf;
 
 pub mod acm;
 pub mod aem;
@@ -25,61 +27,63 @@ pub mod types;
 
 use cdm::*;
 use common::{
-    AdmHeader, ControlledType, ObjectDescription, OdmHeader, ReferenceFrame, StateVector,
-    StateVectorAcc, TimeSystem, YesNo,
+    AdmHeader, ControlledType, ObjectDescription, OdmHeader, StateVector, StateVectorAcc, YesNo,
 };
 use errors::{ccsds_error_to_pyerr, file_parse_error_to_pyerr};
-use ndm::Ndm;
+use ndm::CombinedNdm;
 use oem::*;
 use omm::*;
 use opm::*;
 
-pub(crate) fn message_to_py(py: Python<'_>, message: MessageType) -> PyResult<Py<PyAny>> {
+pub(crate) fn message_to_py(py: Python<'_>, message: Message) -> PyResult<Py<PyAny>> {
     match message {
-        MessageType::Oem(oem) => {
+        Message::Oem(oem) => {
             let py_obj = Py::new(py, Oem::from_core(py, oem)?)?;
             Ok(py_obj.into_any())
         }
-        MessageType::Cdm(cdm) => {
+        Message::Cdm(cdm) => {
             let py_obj = Py::new(py, Cdm::from_core(py, cdm)?)?;
             Ok(py_obj.into_any())
         }
-        MessageType::Opm(opm) => {
+        Message::Opm(opm) => {
             let py_obj = Py::new(py, Opm::from_core(py, opm)?)?;
             Ok(py_obj.into_any())
         }
-        MessageType::Omm(omm) => {
+        Message::Omm(omm) => {
             let py_obj = Py::new(py, Omm::from_core(py, omm)?)?;
             Ok(py_obj.into_any())
         }
-        MessageType::Ocm(ocm) => {
+        Message::Ocm(ocm) => {
             let py_obj = Py::new(py, ocm::Ocm::from_core(py, ocm)?)?;
             Ok(py_obj.into_any())
         }
-        MessageType::Rdm(rdm) => {
+        Message::Rdm(rdm) => {
             let py_obj = Py::new(py, rdm::Rdm::from_core(py, rdm)?)?;
             Ok(py_obj.into_any())
         }
-        MessageType::Tdm(tdm) => {
+        Message::Tdm(tdm) => {
             let py_obj = Py::new(py, tdm::Tdm::from_core(py, tdm)?)?;
             Ok(py_obj.into_any())
         }
-        MessageType::Ndm(ndm) => {
-            let py_obj = Py::new(py, Ndm::from_core(py, ndm)?)?;
+        Message::Ndm(ndm) => {
+            let py_obj = Py::new(py, CombinedNdm::from_core(py, ndm)?)?;
             Ok(py_obj.into_any())
         }
-        MessageType::Aem(aem) => {
+        Message::Aem(aem) => {
             let py_obj = Py::new(py, aem::Aem::from_core(py, aem)?)?;
             Ok(py_obj.into_any())
         }
-        MessageType::Apm(apm) => {
+        Message::Apm(apm) => {
             let py_obj = Py::new(py, apm::Apm::from_core(py, apm)?)?;
             Ok(py_obj.into_any())
         }
-        MessageType::Acm(acm) => {
+        Message::Acm(acm) => {
             let py_obj = Py::new(py, acm::Acm::from_core(py, acm)?)?;
             Ok(py_obj.into_any())
         }
+        _ => Err(PyNotImplementedError::new_err(
+            "message family is not exposed by this Python binding",
+        )),
     }
 }
 
@@ -94,7 +98,7 @@ pub(crate) fn message_to_py(py: Python<'_>, message: MessageType) -> PyResult<Py
 ///
 /// Returns
 /// -------
-/// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
+/// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, CombinedNdm, Aem, Apm, Acm]
 ///     The parsed NDM object.
 ///
 /// Raises
@@ -121,24 +125,24 @@ fn from_str(
 ///
 /// Parameters
 /// ----------
-/// path : str
+/// path : str or os.PathLike
 ///     Path to the file.
 /// Returns
 /// -------
-/// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, Ndm, Aem, Apm, Acm]
+/// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, CombinedNdm, Aem, Apm, Acm]
 ///     The parsed NDM object.
 #[pyfunction]
 #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
 fn from_file(
     py: Python,
-    path: &str,
+    path: PathBuf,
     format: Option<&str>,
     max_input_bytes: Option<usize>,
     max_records: Option<usize>,
 ) -> PyResult<Py<PyAny>> {
     let options = api::parse_options(max_input_bytes, max_records);
     let notation = format.map(api::notation).transpose()?;
-    let message = ccsds_ndm::from_file_with_options(path, notation, &options)
+    let message = ccsds_ndm::from_file_with_options(&path, notation, &options)
         .map_err(|error| file_parse_error_to_pyerr(error, notation, None))?;
     message_to_py(py, message)
 }
@@ -161,16 +165,16 @@ fn convert(
 #[pyfunction]
 #[pyo3(signature = (source_path, destination_path, to_format, *, max_input_bytes=None, max_records=None))]
 fn convert_file(
-    source_path: &str,
-    destination_path: &str,
+    source_path: PathBuf,
+    destination_path: PathBuf,
     to_format: &str,
     max_input_bytes: Option<usize>,
     max_records: Option<usize>,
 ) -> PyResult<()> {
     let parse = api::parse_options(max_input_bytes, max_records);
     ccsds_ndm::convert_file_with_options(
-        source_path,
-        destination_path,
+        &source_path,
+        &destination_path,
         api::notation(to_format)?,
         &parse,
     )
@@ -260,7 +264,7 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<common::OdParameters>()?;
 
     // Register NDM wrapper classes
-    m.add_class::<Ndm>()?;
+    m.add_class::<CombinedNdm>()?;
 
     // Register AEM wrapper classes
     m.add_class::<aem::Aem>()?;
@@ -319,8 +323,6 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ObjectDescription>()?;
     m.add_class::<YesNo>()?;
     m.add_class::<ControlledType>()?;
-    m.add_class::<ReferenceFrame>()?;
-    m.add_class::<TimeSystem>()?;
 
     Ok(())
 }

@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::TimeUnits;
+use ccsds_ndm::Ndm;
 
 const OPM_3_WITH_MANEUVER: &str = include_str!("../data/kvn/opm_g2.kvn");
 

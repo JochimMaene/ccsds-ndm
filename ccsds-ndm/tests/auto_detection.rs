@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::messages::ndm::CombinedNdm;
-use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{detect::detect_notation, from_str, MessageType, Notation};
+use ccsds_ndm::Ndm;
+use ccsds_ndm::{detect::detect_notation, from_str, Message, Notation};
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 const OPM_XML: &str = include_str!("../data/xml/opm_g5.xml");
@@ -20,11 +20,11 @@ fn notation_detection_and_auto_parse_are_bom_safe() {
 
     assert!(matches!(
         from_str(&format!("\u{feff}{OPM_KVN}")).unwrap(),
-        MessageType::Opm(_)
+        Message::Opm(_)
     ));
     assert!(matches!(
         from_str(&format!("\u{feff}{OPM_XML}")).unwrap(),
-        MessageType::Opm(_)
+        Message::Opm(_)
     ));
 }
 
@@ -121,7 +121,7 @@ fn kvn_header_names_inside_values_do_not_create_a_combined_message() {
         "COMMENT GEOCENTRIC, CARTESIAN, EARTH FIXED",
         "COMMENT text mentioning CCSDS_OEM_VERS is not an OEM header",
     );
-    assert!(matches!(from_str(&input).unwrap(), MessageType::Opm(_)));
+    assert!(matches!(from_str(&input).unwrap(), Message::Opm(_)));
 }
 
 #[test]
@@ -131,22 +131,22 @@ fn xml_detection_rejects_nonstandard_wrappers_and_preserves_combined_identity() 
     let error = from_str(&wrapped).expect_err("unknown wrappers are not strict NDM XML");
     assert!(error.to_string().contains("unsupported XML root tag"));
 
-    let MessageType::Opm(opm) = from_str(OPM_XML).unwrap() else {
+    let Message::Opm(opm) = from_str(OPM_XML).unwrap() else {
         panic!("fixture should be an OPM");
     };
     let combined = CombinedNdm {
         id: None,
         comments: Vec::new(),
-        messages: vec![MessageType::Opm(opm)],
+        messages: vec![Message::Opm(opm)],
     }
     .to_xml()
     .unwrap();
-    assert!(matches!(from_str(&combined).unwrap(), MessageType::Ndm(_)));
+    assert!(matches!(from_str(&combined).unwrap(), Message::Ndm(_)));
 }
 
 #[test]
 fn xml_detection_accepts_an_empty_combined_instantiation() {
-    let MessageType::Ndm(message) = from_str("<ndm/>").unwrap() else {
+    let Message::Ndm(message) = from_str("<ndm/>").unwrap() else {
         panic!("an empty combined instantiation should preserve its NDM identity");
     };
     assert!(message.messages.is_empty());

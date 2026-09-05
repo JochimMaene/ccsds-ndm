@@ -8,7 +8,7 @@ Core & Common Types
 .. autofunction:: convert
 .. autofunction:: convert_file
 
-.. autoclass:: Ndm
+.. autoclass:: CombinedNdm
    :members:
    :undoc-members:
 
@@ -33,12 +33,6 @@ Enums
    :members:
    :undoc-members:
 .. autoclass:: ControlledType
-   :members:
-   :undoc-members:
-.. autoclass:: ReferenceFrame
-   :members:
-   :undoc-members:
-.. autoclass:: TimeSystem
    :members:
    :undoc-members:
 

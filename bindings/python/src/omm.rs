@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::OdmHeader;
-use crate::common::{parse_reference_frame, parse_time_system};
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::omm as core_omm;
 use ccsds_ndm::types::{Angle, Distance, Gm, Inclination};
@@ -171,22 +170,18 @@ impl Omm {
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
     fn from_file(
         py: Python<'_>,
-        path: &str,
+        path: std::path::PathBuf,
         format: Option<&str>,
         max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
         let options = crate::api::parse_options(max_input_bytes, None);
-        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        let inner = crate::api::parse_typed_file_with_options(&path, format, &options)?;
         Self::from_core(py, inner)
     }
 
     /// Atomically write this OMM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: &str, format: &str) -> PyResult<()> {
-        crate::api::generate_file(
-            &ccsds_ndm::MessageType::Omm(self.to_core(py)?),
-            path,
-            format,
-        )
+    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+        crate::api::generate_file(&ccsds_ndm::Message::Omm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to validated KVN or XML.
@@ -381,20 +376,14 @@ impl OmmMetadata {
         object_name: String,
         object_id: String,
         center_name: String,
-        ref_frame: Option<Bound<'_, PyAny>>,
-        time_system: Option<Bound<'_, PyAny>>,
+        ref_frame: Option<String>,
+        time_system: Option<String>,
         mean_element_theory: String,
         ref_frame_epoch: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let ref_frame = match ref_frame {
-            Some(ref ob) => parse_reference_frame(ob)?,
-            None => "TEME".to_string(),
-        };
-        let time_system = match time_system {
-            Some(ref ob) => parse_time_system(ob)?,
-            None => "UTC".to_string(),
-        };
+        let ref_frame = ref_frame.unwrap_or_else(|| "TEME".to_string());
+        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
 
         Ok(Self {
             inner: core_omm::OmmMetadata {

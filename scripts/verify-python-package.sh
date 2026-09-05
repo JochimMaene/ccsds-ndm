@@ -49,7 +49,7 @@ xml = message.to_str("xml")
 assert "<OBJECT_NAME>EDITED</OBJECT_NAME>" in xml
 kvn = ccsds_ndm.convert(xml, "kvn")
 assert isinstance(ccsds_ndm.from_str(kvn, format="kvn"), ccsds_ndm.Opm)
-assert isinstance(ccsds_ndm.from_str("<ndm/>", format="xml"), ccsds_ndm.Ndm)
+assert isinstance(ccsds_ndm.from_str("<ndm/>", format="xml"), ccsds_ndm.CombinedNdm)
 
 for wrapper, kvn_path, xml_path in [
     (ccsds_ndm.Oem, sys.argv[1], sys.argv[2]),

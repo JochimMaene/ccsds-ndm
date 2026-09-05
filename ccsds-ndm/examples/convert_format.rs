@@ -1,5 +1,5 @@
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 
 fn main() {
     let kvn_input = r#"CCSDS_OPM_VERS = 3.0
