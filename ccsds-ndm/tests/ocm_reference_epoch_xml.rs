@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::messages::ocm::Ocm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 
 const OCM_XML: &str = include_str!("../data/xml/ocm_g20.xml");
 

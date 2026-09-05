@@ -1,5 +1,5 @@
 use ccsds_ndm::messages::oem::Oem;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 use ccsds_ndm::{Message, ParseOptions};
 use stats_alloc::{Region, Stats, StatsAlloc, INSTRUMENTED_SYSTEM};
 use std::alloc::System;

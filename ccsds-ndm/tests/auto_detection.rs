@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::messages::ndm::CombinedNdm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 use ccsds_ndm::{detect::detect_notation, from_str, Message, Notation};
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");

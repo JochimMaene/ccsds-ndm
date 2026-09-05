@@ -1,5 +1,5 @@
 use ccsds_ndm::messages::{aem::Aem, apm::Apm};
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 
 const APM_KVN: &str = include_str!("../data/kvn/apm_g1.kvn");
 const AEM_KVN: &str = include_str!("../data/kvn/aem_g4.kvn");

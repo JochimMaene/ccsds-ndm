@@ -4,9 +4,9 @@
 
 use crate::errors::ccsds_error_to_pyerr;
 use ccsds_ndm::options::ParseOptions;
-use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::validation::MessageKind;
 use ccsds_ndm::{Message, Notation};
+use ccsds_ndm::{Ndm, Validate};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::path::Path;

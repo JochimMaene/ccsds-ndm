@@ -269,3 +269,43 @@ fn sink_writers_match_string_generation() {
     opm.write_xml_to(&mut xml).unwrap();
     assert_eq!(xml, expected_xml.as_bytes());
 }
+
+/// Output editions are a subset of input editions: legacy documents parse but are not regenerated.
+#[test]
+fn supported_editions_separate_input_from_output() {
+    use ccsds_ndm::validation::MessageKind;
+    use ccsds_ndm::versioning::{supported_input_versions, supported_output_versions};
+
+    for kind in [
+        MessageKind::Opm,
+        MessageKind::Omm,
+        MessageKind::Oem,
+        MessageKind::Ocm,
+        MessageKind::Aem,
+        MessageKind::Apm,
+        MessageKind::Acm,
+        MessageKind::Cdm,
+        MessageKind::Tdm,
+        MessageKind::Rdm,
+    ] {
+        let input = supported_input_versions(kind).expect("standalone family has editions");
+        let output = supported_output_versions(kind).expect("standalone family has editions");
+        assert!(!output.is_empty(), "{kind:?}");
+        assert!(
+            output.iter().all(|version| input.contains(version)),
+            "{kind:?}: {output:?} not a subset of {input:?}"
+        );
+    }
+
+    // OPM 1.0 is readable but was withdrawn as an output edition.
+    assert!(supported_input_versions(MessageKind::Opm)
+        .unwrap()
+        .contains(&"1.0"));
+    assert!(!supported_output_versions(MessageKind::Opm)
+        .unwrap()
+        .contains(&"1.0"));
+
+    // The combined envelope carries no edition of its own.
+    assert!(supported_input_versions(MessageKind::Ndm).is_none());
+    assert!(supported_output_versions(MessageKind::Ndm).is_none());
+}

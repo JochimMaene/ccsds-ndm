@@ -458,7 +458,7 @@ impl ValidationError {
 /// # Example: Handling Parse Errors
 /// ```no_run
 /// use ccsds_ndm::messages::opm::Opm;
-/// use ccsds_ndm::traits::Ndm;
+/// use ccsds_ndm::Ndm;
 ///
 /// match Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...") {
 ///     Ok(opm) => println!("Parsed: {:?}", opm),

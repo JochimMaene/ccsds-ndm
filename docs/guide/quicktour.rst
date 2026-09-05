@@ -52,7 +52,7 @@ If you know the file type (e.g., OPM), you can parse it directly into the struct
    .. code-tab:: rust
 
         use ccsds_ndm::messages::opm::Opm;
-        use ccsds_ndm::traits::Ndm;
+        use ccsds_ndm::Ndm;
         use std::fs;
 
         let text = fs::read_to_string("example.opm")?;

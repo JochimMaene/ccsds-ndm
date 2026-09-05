@@ -2188,16 +2188,9 @@ pub fn parse_controlled_type(ob: &Bound<'_, PyAny>) -> PyResult<ccsds_ndm::types
     }
 }
 
-pub fn parse_reference_frame(ob: &Bound<'_, PyAny>) -> PyResult<String> {
-    ob.extract()
-}
-
-pub fn parse_time_system(ob: &Bound<'_, PyAny>) -> PyResult<String> {
-    ob.extract()
-}
-
 pub fn validate_version(kind: ccsds_ndm::validation::MessageKind, value: &str) -> PyResult<()> {
-    if let Some(versions) = ccsds_ndm::versioning::supported_input_versions(kind) {
+    // Setting an edition only affects generation, so gate on the writable editions.
+    if let Some(versions) = ccsds_ndm::versioning::supported_output_versions(kind) {
         if !versions.contains(&value) {
             return Err(PyValueError::new_err(format!(
                 "Invalid version '{}'; expected one of: {}",

@@ -33,7 +33,7 @@ pub trait Validate {
 ///
 /// ```no_run
 /// use ccsds_ndm::messages::opm::Opm;
-/// use ccsds_ndm::traits::Ndm;
+/// use ccsds_ndm::Ndm;
 ///
 /// // Parse from KVN
 /// let opm = Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...").unwrap();

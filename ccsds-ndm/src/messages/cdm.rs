@@ -958,7 +958,7 @@ pub struct RelativeMetadataData {
 impl crate::traits::Validate for RelativeMetadataData {
     fn validate(&self) -> Result<()> {
         if let Some(prob) = &self.collision_probability {
-            if prob.value < 0.0 || prob.value > 1.0 {
+            if !(0.0..=1.0).contains(&prob.value) {
                 return Err(crate::error::ValidationError::OutOfRange {
                     name: "COLLISION_PROBABILITY".into(),
                     value: prob.value.to_string(),
@@ -1461,6 +1461,9 @@ impl crate::traits::Validate for CdmData {
             }
             .into());
         }
+        if let Some(parameters) = &self.additional_parameters {
+            parameters.validate()?;
+        }
         self.state_vector.validate()?;
         if let Some(covariance_matrix) = &self.covariance_matrix {
             covariance_matrix.validate()?;
@@ -1653,6 +1656,50 @@ pub struct AdditionalParameters {
         with = "crate::utils::nullable"
     )]
     pub sedr: Option<Wkg>,
+}
+
+impl Validate for AdditionalParameters {
+    fn validate(&self) -> Result<()> {
+        // NDM/XML 4.0: areaType, massType, m2kgType and wkgType extend
+        // nonNegativeDouble; only thrust acceleration is a signed double.
+        for (field, value, nonnegative) in [
+            ("AREA_PC", self.area_pc.as_ref().map(|v| v.value), true),
+            ("AREA_DRG", self.area_drg.as_ref().map(|v| v.value), true),
+            ("AREA_SRP", self.area_srp.as_ref().map(|v| v.value), true),
+            ("MASS", self.mass.as_ref().map(|v| v.value), true),
+            (
+                "CD_AREA_OVER_MASS",
+                self.cd_area_over_mass.as_ref().map(|v| v.value),
+                true,
+            ),
+            (
+                "CR_AREA_OVER_MASS",
+                self.cr_area_over_mass.as_ref().map(|v| v.value),
+                true,
+            ),
+            (
+                "THRUST_ACCELERATION",
+                self.thrust_acceleration.as_ref().map(|v| v.value),
+                false,
+            ),
+            ("SEDR", self.sedr.as_ref().map(|v| v.value), true),
+        ] {
+            let Some(value) = value else { continue };
+            if let Some(error) = non_finite_error(field, value) {
+                return Err(error.into());
+            }
+            if nonnegative && value < 0.0 {
+                return Err(ValidationError::OutOfRange {
+                    name: field.into(),
+                    value: value.to_string(),
+                    expected: ">= 0".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]

@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use crate::common::parse_object_description;
 use crate::common::OdmHeader;
-use crate::common::{parse_object_description, parse_time_system};
 use crate::types::{parse_calendar_epoch, parse_epoch};
 use ccsds_ndm::messages::ocm as core_ocm;
 use ccsds_ndm::types::Duration;
@@ -469,7 +469,7 @@ impl OcmMetadata {
     #[allow(clippy::too_many_arguments)]
     fn new(
         epoch_tzero: String,
-        time_system: Option<Bound<'_, PyAny>>,
+        time_system: Option<String>,
         object_name: Option<String>,
 
         international_designator: Option<String>,
@@ -520,10 +520,7 @@ impl OcmMetadata {
     ) -> PyResult<Self> {
         use ccsds_ndm::types::{DayInterval, TimeOffset};
 
-        let time_system = match time_system {
-            Some(ref ob) => parse_time_system(ob)?,
-            None => "UTC".to_string(),
-        };
+        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
 
         let object_type_enum = match object_type {
             Some(ref ob) => Some(parse_object_description(ob)?),

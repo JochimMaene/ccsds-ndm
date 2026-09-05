@@ -13,10 +13,10 @@ use ccsds_ndm::messages::oem::{Oem, OemBody, OemData, OemMetadata, OemSegment};
 use ccsds_ndm::messages::omm::Omm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::messages::tdm::Tdm;
-use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::{
     CalendarEpoch, Epoch, InterpolationDegree, Position, PositionUnits, Velocity, VelocityUnits,
 };
+use ccsds_ndm::{Ndm, Validate};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::hint::black_box;
 use std::num::NonZeroU32;

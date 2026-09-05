@@ -5,8 +5,8 @@ use std::process::Command;
 use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::{from_str_with_options, Message, Notation, ParseOptions};
+use ccsds_ndm::{Ndm, Validate};
 use tempfile::NamedTempFile;
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");

@@ -4,7 +4,7 @@
 
 use ccsds_ndm::error::{Result, ValidationError};
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 
 const OPM_WITH_KEPLERIAN_ELEMENTS: &str = include_str!("../data/kvn/opm_g2.kvn");
 

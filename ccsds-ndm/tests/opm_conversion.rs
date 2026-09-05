@@ -1,5 +1,5 @@
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 use ccsds_ndm::{convert, convert_file, convert_file_with_options, Notation, ParseOptions};
 
 const KVN_FIXTURES: [&str; 4] = [

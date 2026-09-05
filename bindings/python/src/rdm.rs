@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::{
-    parse_controlled_type, parse_object_description, parse_reference_frame, parse_time_system,
-    GroundImpactParameters, OdParameters, StateVector,
+    parse_controlled_type, parse_object_description, GroundImpactParameters, OdParameters,
+    StateVector,
 };
 use crate::opm::OpmCovarianceMatrix;
 use crate::types::parse_calendar_epoch;
@@ -484,14 +484,14 @@ impl RdmMetadata {
         epoch_tzero: String,
         controlled_reentry: Option<Bound<'_, PyAny>>,
         center_name: String,
-        time_system: Option<Bound<'_, PyAny>>,
+        time_system: Option<String>,
 
         catalog_name: Option<String>,
         object_designator: Option<String>,
         object_type: Option<Bound<'_, PyAny>>,
         object_owner: Option<String>,
         object_operator: Option<String>,
-        ref_frame: Option<Bound<'_, PyAny>>,
+        ref_frame: Option<String>,
 
         ref_frame_epoch: Option<String>,
         ephemeris_name: Option<String>,
@@ -524,15 +524,7 @@ impl RdmMetadata {
             None => None,
         };
 
-        let time_system = match time_system {
-            Some(ref ob) => parse_time_system(ob)?,
-            None => "UTC".to_string(),
-        };
-
-        let ref_frame = match ref_frame {
-            Some(ref ob) => Some(parse_reference_frame(ob)?),
-            None => None,
-        };
+        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
 
         let intrack_thrust_enum = match intrack_thrust {
             Some(s) => Some(YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))?),

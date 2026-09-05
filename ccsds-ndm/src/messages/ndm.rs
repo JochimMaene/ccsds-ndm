@@ -244,10 +244,7 @@ impl Ndm for CombinedNdm {
 
     fn to_xml(&self) -> Result<String> {
         self.validate_xml_envelope()?;
-        crate::traits::Validate::validate(self)?;
-        for message in &self.messages {
-            message.validate_for_generation(crate::generation::OutputFormat::Xml)?;
-        }
+        self.validate_children_for_generation(crate::generation::OutputFormat::Xml)?;
         crate::xml::to_string(self).map_err(|error| {
             error.with_generation_context(
                 crate::validation::MessageKind::Ndm,

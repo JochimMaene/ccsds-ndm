@@ -57,7 +57,7 @@
 //!
 //! ```no_run
 //! use ccsds_ndm::messages::opm::Opm;
-//! use ccsds_ndm::traits::Ndm;
+//! use ccsds_ndm::Ndm;
 //!
 //! // Parses strict KVN for OPM
 //! let opm = Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...").unwrap();
@@ -73,7 +73,7 @@
 //! use ccsds_ndm::messages::opm::{Opm, OpmBody, OpmSegment, OpmMetadata, OpmData};
 //! use ccsds_ndm::common::{OdmHeader, StateVector};
 //! use ccsds_ndm::types::{Epoch, Position, Velocity};
-//! use ccsds_ndm::traits::Ndm;
+//! use ccsds_ndm::Ndm;
 //!
 //! let opm = Opm::builder()
 //!     .version("3.0")
@@ -143,7 +143,7 @@ mod generation;
 pub(crate) mod kvn;
 pub mod messages;
 pub mod options;
-pub mod traits;
+mod traits;
 pub mod types;
 mod utils;
 pub mod validation;

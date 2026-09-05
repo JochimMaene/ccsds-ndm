@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::messages::omm::Omm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 
 #[test]
 fn xml_reference_frame_epoch_requires_calendar_form() {

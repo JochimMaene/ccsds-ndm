@@ -1,7 +1,7 @@
 use ccsds_ndm::error::Result;
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::Message;
+use ccsds_ndm::Ndm;
 use std::path::PathBuf;
 
 #[test]

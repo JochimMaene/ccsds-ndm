@@ -1,6 +1,6 @@
 use ccsds_ndm::messages::aem::Aem;
-use ccsds_ndm::traits::{Ndm, Validate};
 use ccsds_ndm::types::CalendarEpoch;
+use ccsds_ndm::{Ndm, Validate};
 
 const KVN: &str = include_str!("../data/kvn/aem_g4.kvn");
 

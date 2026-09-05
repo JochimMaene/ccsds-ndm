@@ -68,7 +68,7 @@ if isinstance(msg, ccsds_ndm.Opm):
 ### Rust
 
 ```rust
-use ccsds_ndm::traits::{Ndm, Validate};
+use ccsds_ndm::{Ndm, Validate};
 use ccsds_ndm::{from_file, Message};
 
 fn main() -> ccsds_ndm::error::Result<()> {

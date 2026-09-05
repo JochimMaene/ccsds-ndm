@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use ccsds_ndm::messages::cdm::Cdm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 use tempfile::NamedTempFile;
 
 const KVN: &str = include_str!("../data/kvn/cdm_363.kvn");
@@ -11,6 +11,98 @@ const XML: &str = include_str!("../data/xml/cdm_44.xml");
 
 fn repository_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
+}
+
+#[test]
+fn edited_cdm_numeric_values_are_validated_before_any_output() {
+    for field in [
+        "MASS",
+        "AREA_PC",
+        "AREA_DRG",
+        "AREA_SRP",
+        "CD_AREA_OVER_MASS",
+        "CR_AREA_OVER_MASS",
+        "SEDR",
+        "THRUST_ACCELERATION",
+        "COLLISION_PROBABILITY",
+    ] {
+        for value in [-1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            if field == "THRUST_ACCELERATION" && value == -1.0 {
+                continue; // The schema permits signed acceleration.
+            }
+            let mut message = Cdm::from_kvn(KVN).unwrap();
+            let parameters = message.body.segments[0]
+                .data
+                .additional_parameters
+                .as_mut()
+                .unwrap();
+            parameters.area_drg = parameters.area_pc.clone();
+            parameters.area_srp = parameters.area_pc.clone();
+            let target = match field {
+                "MASS" => &mut parameters.mass.as_mut().unwrap().value,
+                "AREA_PC" => &mut parameters.area_pc.as_mut().unwrap().value,
+                "AREA_DRG" => &mut parameters.area_drg.as_mut().unwrap().value,
+                "AREA_SRP" => &mut parameters.area_srp.as_mut().unwrap().value,
+                "CD_AREA_OVER_MASS" => &mut parameters.cd_area_over_mass.as_mut().unwrap().value,
+                "CR_AREA_OVER_MASS" => &mut parameters.cr_area_over_mass.as_mut().unwrap().value,
+                "SEDR" => &mut parameters.sedr.as_mut().unwrap().value,
+                "THRUST_ACCELERATION" => {
+                    &mut parameters.thrust_acceleration.as_mut().unwrap().value
+                }
+                _ => {
+                    &mut message
+                        .body
+                        .relative_metadata_data
+                        .collision_probability
+                        .as_mut()
+                        .unwrap()
+                        .value
+                }
+            };
+            *target = value;
+            let error = message
+                .validate()
+                .expect_err("invalid edited value accepted");
+            assert!(error.to_string().contains(field), "{field}: {error}");
+            assert!(message.to_xml().is_err(), "{field}={value}");
+            assert!(message.to_kvn().is_err(), "{field}={value}");
+            let mut output = Vec::new();
+            assert!(message.write_xml_to(&mut output).is_err());
+            assert!(output.is_empty());
+            assert!(message.write_kvn_to(&mut output).is_err());
+            assert!(output.is_empty());
+        }
+    }
+    for probability in [0.0, 1.0] {
+        let mut message = Cdm::from_kvn(KVN).unwrap();
+        message
+            .body
+            .relative_metadata_data
+            .collision_probability
+            .as_mut()
+            .unwrap()
+            .value = probability;
+        message.body.segments[0]
+            .data
+            .additional_parameters
+            .as_mut()
+            .unwrap()
+            .mass
+            .as_mut()
+            .unwrap()
+            .value = 0.0;
+        message.body.segments[0]
+            .data
+            .additional_parameters
+            .as_mut()
+            .unwrap()
+            .thrust_acceleration
+            .as_mut()
+            .unwrap()
+            .value = -1.0;
+        validate_xml("numeric boundaries", &message.to_xml().unwrap());
+        assert_eq!(Cdm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    }
 }
 
 #[test]

@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use ccsds_ndm::messages::ocm::Ocm;
-use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{Duration, ManDc, Vec3Double};
+use ccsds_ndm::Ndm;
 use tempfile::NamedTempFile;
 
 const KVN: &str = include_str!("../data/kvn/ocm_g18.kvn");

@@ -1,5 +1,5 @@
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::traits::{Ndm, Validate};
+use ccsds_ndm::{Ndm, Validate};
 
 const OPM: &str = include_str!("../data/kvn/opm_g1.kvn");
 

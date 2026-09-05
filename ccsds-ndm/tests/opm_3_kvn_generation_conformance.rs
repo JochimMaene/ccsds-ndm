@@ -1,7 +1,7 @@
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{CalendarEpoch, GmUnits};
 use ccsds_ndm::Message;
+use ccsds_ndm::Ndm;
 use std::str::FromStr;
 
 fn opm() -> Opm {

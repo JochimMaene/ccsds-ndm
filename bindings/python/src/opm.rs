@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::common::{parse_reference_frame, parse_time_system};
 use crate::common::{OdmHeader, StateVector};
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::opm as core_opm;
@@ -313,19 +312,13 @@ impl OpmMetadata {
         object_name: String,
         object_id: String,
         center_name: String,
-        ref_frame: Option<Bound<'_, PyAny>>,
-        time_system: Option<Bound<'_, PyAny>>,
+        ref_frame: Option<String>,
+        time_system: Option<String>,
         ref_frame_epoch: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let ref_frame = match ref_frame {
-            Some(ref ob) => parse_reference_frame(ob)?,
-            None => "GCRF".to_string(),
-        };
-        let time_system = match time_system {
-            Some(ref ob) => parse_time_system(ob)?,
-            None => "UTC".to_string(),
-        };
+        let ref_frame = ref_frame.unwrap_or_else(|| "GCRF".to_string());
+        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
 
         Ok(Self {
             inner: core_opm::OpmMetadata {

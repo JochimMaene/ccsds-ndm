@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::attitude::{AngVelState, EulerAngleState, InertiaState, QuaternionState, SpinState};
-use crate::common::parse_time_system;
 use crate::common::AdmHeader;
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::apm as core_apm;
@@ -258,14 +257,11 @@ impl ApmMetadata {
     fn new(
         object_name: String,
         object_id: String,
-        time_system: Option<Bound<'_, PyAny>>,
+        time_system: Option<String>,
         center_name: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let time_system = match time_system {
-            Some(ref ob) => parse_time_system(ob)?,
-            None => "UTC".to_string(),
-        };
+        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
 
         Ok(Self {
             inner: core_apm::ApmMetadata {
@@ -365,9 +361,8 @@ impl ApmMetadata {
     }
 
     #[setter]
-    fn set_time_system(&mut self, value: Bound<'_, PyAny>) -> PyResult<()> {
-        self.inner.time_system = parse_time_system(&value)?;
-        Ok(())
+    fn set_time_system(&mut self, value: String) {
+        self.inner.time_system = value;
     }
 }
 

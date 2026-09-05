@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::messages::{oem::Oem, omm::Omm, opm::Opm};
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 use std::path::Path;
 use std::process::Command;
 

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use ccsds_ndm::messages::tdm::Tdm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 use tempfile::NamedTempFile;
 
 const KVN: &str = include_str!("../data/kvn/tdm_e1.kvn");

@@ -5,7 +5,7 @@
 use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::traits::Ndm;
+use ccsds_ndm::Ndm;
 use ccsds_ndm::{from_str, from_str_with_options, Message, ParseOptions};
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
@@ -314,4 +314,38 @@ fn test_combined_ndm_xml_attitude() {
         }
         _ => panic!("Expected Message::Ndm, got {:?}", msg),
     }
+}
+
+/// The combined envelope dispatches per-family validation and generation for every constituent.
+#[test]
+fn combined_envelope_carries_one_message_of_every_family() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("data/kvn");
+    let messages: Vec<Message> = [
+        "acm_g6.kvn",
+        "aem_g4.kvn",
+        "apm_g1.kvn",
+        "cdm_362.kvn",
+        "ocm_g15.kvn",
+        "oem_g11.kvn",
+        "omm_g7.kvn",
+        "opm_g1.kvn",
+        "rdm_c1.kvn",
+        "tdm_e1.kvn",
+    ]
+    .iter()
+    .map(|fixture| ccsds_ndm::from_file(root.join(fixture)).unwrap())
+    .collect();
+
+    let combined = CombinedNdm {
+        id: None,
+        comments: Vec::new(),
+        messages: messages.clone(),
+    };
+    ccsds_ndm::Validate::validate(&combined).unwrap();
+
+    let xml = Message::Ndm(combined).to_xml().unwrap();
+    let Message::Ndm(reparsed) = ccsds_ndm::from_str(&xml).unwrap() else {
+        panic!("combined envelope did not round-trip");
+    };
+    assert_eq!(reparsed.messages.len(), messages.len());
 }

@@ -214,8 +214,11 @@ class TestNdm:
         assert len(ndm2.messages) == 1
 
     def test_failed_file_generation_preserves_existing_file(self, tmp_path):
-        oem = self._create_valid_oem()
-        oem.version = "1.0"
+        # 1.0 is readable but withdrawn as an output edition, so it can only be reached by parsing.
+        source = (Path(__file__).parents[3] / "ccsds-ndm/data/kvn/oem_g11.kvn").read_text()
+        oem = Oem.from_str(
+            source.replace("CCSDS_OEM_VERS = 3.0", "CCSDS_OEM_VERS = 1.0"), format="kvn"
+        )
         ndm = CombinedNdm([oem])
         path = tmp_path / "test.ndm"
         path.write_text("keep me")
