@@ -80,9 +80,9 @@ Once parsed, you can access the nested data structures.
 
    .. code-tab:: rust
 
-        use ccsds_ndm::MessageType;
+        use ccsds_ndm::Message;
 
-        if let MessageType::Oem(oem) = ndm {
+        if let Message::Oem(oem) = ndm {
             for segment in oem.body.segment {
                 let meta = segment.metadata;
                 println!("Object: {} ({})", meta.object_name, meta.object_id);

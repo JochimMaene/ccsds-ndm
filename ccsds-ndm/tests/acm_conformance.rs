@@ -4,7 +4,6 @@ use std::process::Command;
 
 use ccsds_ndm::messages::acm::Acm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::VersionedNdm;
 use tempfile::NamedTempFile;
 
 const ATT_KVN: &str = include_str!("../data/kvn/acm_g7.kvn");

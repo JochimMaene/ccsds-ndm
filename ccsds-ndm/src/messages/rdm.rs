@@ -77,6 +77,14 @@ impl Ndm for Rdm {
         crate::traits::Validate::validate(&rdm)?;
         Ok(rdm)
     }
+
+    fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
+        crate::generation::write_kvn_to(self, output)
+    }
+
+    fn write_xml_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
+        crate::generation::write_xml_to(self, output)
+    }
 }
 
 impl Rdm {

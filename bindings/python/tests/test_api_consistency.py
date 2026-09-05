@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 import ccsds_ndm
-from ccsds_ndm import Acm, Aem, Apm, Cdm, Ndm, Ocm, Oem, Omm, Opm, Rdm, Tdm
+from ccsds_ndm import Acm, Aem, Apm, Cdm, CombinedNdm, Ocm, Oem, Omm, Opm, Rdm, Tdm
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -18,7 +18,7 @@ CLASS_FIXTURES = [
     (Aem, ROOT / "ccsds-ndm/data/kvn/aem_g4.kvn"),
     (Apm, ROOT / "ccsds-ndm/data/kvn/apm_g1.kvn"),
     (Cdm, ROOT / "ccsds-ndm/data/kvn/cdm_362.kvn"),
-    (Ndm, ROOT / "ccsds-ndm/data/xml/ndm_g12.xml"),
+    (CombinedNdm, ROOT / "ccsds-ndm/data/xml/ndm_g12.xml"),
     (Ocm, ROOT / "ccsds-ndm/data/kvn/ocm_g15.kvn"),
     (Oem, ROOT / "ccsds-ndm/data/kvn/oem_g11.kvn"),
     (Omm, ROOT / "ccsds-ndm/data/kvn/omm_g7.kvn"),
@@ -64,7 +64,11 @@ LIVE_LIST_CASES = [
         lambda value: value.segment.data.quaternion_state,
     ),
     (Cdm, ROOT / "ccsds-ndm/data/kvn/cdm_362.kvn", lambda value: value.body.segments),
-    (Ndm, ROOT / "ccsds-ndm/data/xml/ndm_g12.xml", lambda value: value.messages),
+    (
+        CombinedNdm,
+        ROOT / "ccsds-ndm/data/xml/ndm_g12.xml",
+        lambda value: value.messages,
+    ),
     (
         Ocm,
         ROOT / "ccsds-ndm/data/kvn/ocm_g15.kvn",
@@ -77,15 +81,22 @@ LIVE_LIST_CASES = [
 
 @pytest.mark.parametrize(("cls", "path"), CLASS_FIXTURES)
 def test_type_specific_from_file_allows_default_format(cls, path):
-    parsed = cls.from_file(str(path))
+    parsed = cls.from_file(path)
     assert isinstance(parsed, cls)
 
 
 @pytest.mark.parametrize(("cls", "path"), CLASS_FIXTURES)
 def test_type_specific_file_round_trip(cls, path, tmp_path):
     output = tmp_path / f"{cls.__name__.lower()}.xml"
-    cls.from_file(str(path)).to_file(str(output), "xml")
-    assert isinstance(cls.from_file(str(output)), cls)
+    cls.from_file(path).to_file(output, "xml")
+    assert isinstance(cls.from_file(output), cls)
+
+
+def test_top_level_file_api_accepts_pathlike(tmp_path):
+    source = ROOT / "ccsds-ndm/data/kvn/opm_g1.kvn"
+    destination = tmp_path / "opm.xml"
+    ccsds_ndm.convert_file(source, destination, "xml")
+    assert isinstance(ccsds_ndm.from_file(destination), Opm)
 
 
 @pytest.mark.parametrize(("cls", "path"), CLASS_FIXTURES)
@@ -145,7 +156,7 @@ def test_nested_model_changes_are_live_without_an_editor():
         for line in cdm.to_str("kvn").splitlines()
     )
 
-    combined = Ndm([opm])
+    combined = CombinedNdm([opm])
     assert combined.messages[0] is opm
     assert isinstance(combined.messages[0], Opm)
 

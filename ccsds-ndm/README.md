@@ -35,13 +35,13 @@ The crate contains typed models, parsers, and serializers for the message famili
 
 ```rust
 use ccsds_ndm::traits::{Ndm, Validate};
-use ccsds_ndm::{from_file, MessageType};
+use ccsds_ndm::{from_file, Message};
 
 fn main() -> ccsds_ndm::error::Result<()> {
     // Auto-detect format (KVN/XML) and message type
     let msg = from_file("example.ndm")?;
 
-    if let MessageType::Opm(opm) = msg {
+    if let Message::Opm(opm) = msg {
         opm.validate()?;
         println!("Object: {}", opm.body.segment.metadata.object_name);
         std::fs::write("output.xml", opm.to_xml()?)?;

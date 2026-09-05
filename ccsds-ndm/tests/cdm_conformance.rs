@@ -4,7 +4,6 @@ use std::process::Command;
 
 use ccsds_ndm::messages::cdm::Cdm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::VersionedNdm;
 use tempfile::NamedTempFile;
 
 const KVN: &str = include_str!("../data/kvn/cdm_363.kvn");

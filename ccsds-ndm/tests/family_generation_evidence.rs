@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use ccsds_ndm::{from_str, MessageType};
+use ccsds_ndm::{from_str, Message};
 use tempfile::NamedTempFile;
 
 const REMAINING_PREFIXES: [&str; 8] = [
@@ -49,7 +49,7 @@ fn validate_official_xsd(label: &str, xml: &str) {
     );
 }
 
-fn assert_standalone_generation(label: &str, message: &MessageType) {
+fn assert_standalone_generation(label: &str, message: &Message) {
     let kvn = message
         .to_kvn()
         .unwrap_or_else(|error| panic!("{label} KVN generation failed: {error}"));
@@ -114,7 +114,7 @@ fn acm_physical_description_survives_kvn_to_xml_conversion() {
     let message = from_str(&input).unwrap();
     let xml = message.to_xml().unwrap();
     let reparsed = from_str(&xml).unwrap();
-    let MessageType::Acm(acm) = reparsed else {
+    let Message::Acm(acm) = reparsed else {
         panic!("generated ACM XML changed message type");
     };
     let physical = acm
@@ -149,7 +149,7 @@ fn aem_optional_xml_unit_annotations_are_normatively_normalized_through_kvn() {
 fn cdm_kvn_comments_keep_their_normative_block_association() {
     let input = fs::read_to_string(repository_path("data/kvn/cdm_363.kvn")).unwrap();
     let message = from_str(&input).unwrap();
-    let MessageType::Cdm(cdm) = message else {
+    let Message::Cdm(cdm) = message else {
         panic!("CDM fixture changed message type");
     };
 
@@ -188,7 +188,7 @@ fn cdm_kvn_comments_keep_their_normative_block_association() {
         ["Object1 Covariance in the RTN Coordinate Frame"]
     );
 
-    let original = MessageType::Cdm(cdm.clone());
+    let original = Message::Cdm(cdm.clone());
     let regenerated = original.to_kvn().unwrap();
     assert_eq!(from_str(&regenerated).unwrap(), original);
 }

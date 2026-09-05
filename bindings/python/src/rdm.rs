@@ -195,22 +195,18 @@ impl Rdm {
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
     fn from_file(
         py: Python<'_>,
-        path: &str,
+        path: std::path::PathBuf,
         format: Option<&str>,
         max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
         let options = crate::api::parse_options(max_input_bytes, None);
-        let inner = crate::api::parse_typed_file_with_options(path, format, &options)?;
+        let inner = crate::api::parse_typed_file_with_options(&path, format, &options)?;
         Self::from_core(py, inner)
     }
 
     /// Atomically write this RDM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: &str, format: &str) -> PyResult<()> {
-        crate::api::generate_file(
-            &ccsds_ndm::MessageType::Rdm(self.to_core(py)?),
-            path,
-            format,
-        )
+    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+        crate::api::generate_file(&ccsds_ndm::Message::Rdm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to string (generic).

@@ -3,7 +3,6 @@ use std::hint::black_box;
 
 use ccsds_ndm::messages::ocm::{CovLine, ManLine, Ocm, TrajLine};
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::VersionedNdm;
 use stats_alloc::{Region, Stats, StatsAlloc, INSTRUMENTED_SYSTEM};
 
 #[global_allocator]

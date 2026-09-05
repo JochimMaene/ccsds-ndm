@@ -1,4 +1,4 @@
-use ccsds_ndm::{from_str, MessageType};
+use ccsds_ndm::{from_str, Message};
 
 fn main() {
     let input = r#"CCSDS_OPM_VERS = 3.0
@@ -20,7 +20,7 @@ Z_DOT = 0.0 [km/s]
 
     match from_str(input) {
         Ok(message) => match message {
-            MessageType::Opm(opm) => {
+            Message::Opm(opm) => {
                 println!(
                     "Parsed OPM: Object {} ({})",
                     opm.body.segment.metadata.object_name, opm.body.segment.metadata.object_id

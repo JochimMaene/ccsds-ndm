@@ -6,11 +6,11 @@ The implemented scope is standalone CCSDS OPM 2.0 and 3.0 in KVN and XML. The
 ## Rust
 
 Parse and validate with `Opm::from_kvn` or `Opm::from_xml`. Use
-`Opm::from_kvn_with_options` / `from_xml_with_options` for an aggregate input bound or XML-depth
+`from_str_with_options` for an aggregate input bound or XML-depth
 policy. Input bytes are unlimited by default; XML depth defaults to 16 because valid OPM has a small
 fixed schema depth.
 
-Generate with `Ndm::to_kvn` / `to_xml`, or use `VersionedNdm::write_kvn_to` /
+Generate with `Ndm::to_kvn` / `to_xml`, or use `Ndm::write_kvn_to` /
 `write_xml_to` for a streaming sink. Generation validates first and preserves the edition stored
 on the message.
 

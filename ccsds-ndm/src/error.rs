@@ -96,54 +96,11 @@ pub struct Diagnostic<'a> {
     pub expected: Option<&'static str>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct ParseDiagnostic {
-    pub line: usize,
-    pub column: usize,
-    pub message: String,
-    pub contexts: Vec<&'static str>,
-}
-
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct RawParsePosition {
-    pub offset: usize,
-    pub message: Cow<'static, str>,
-    pub contexts: ContextStack,
-}
-
-impl RawParsePosition {
-    pub fn into_parse_error(self, input: &str) -> KvnParseError {
-        // Use 0 as default if we don't have location info yet,
-        // to_ccsds_error + with_location will fix this.
-        // Actually, with_location recalculates from offset.
-        // But ParseDiagnostic computes everything.
-        let diag = ParseDiagnostic::new(input, self.offset, &*self.message);
-        KvnParseError {
-            line: diag.line,
-            column: diag.column,
-            message: self.message.into_owned(),
-            contexts: self.contexts.to_vec(),
-            offset: self.offset,
-        }
-    }
-}
-
-impl ParseDiagnostic {
-    /// Creates a new diagnostic from an input string and byte offset.
-    pub fn new(input: &str, offset: usize, message: impl Into<String>) -> Self {
-        let offset = offset.min(input.len());
-        let prefix = &input[..offset];
-        let line = prefix.as_bytes().iter().filter(|&&b| b == b'\n').count() + 1;
-        let line_start = prefix.rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let column = prefix[line_start..].chars().count();
-
-        Self {
-            line,
-            column: column + 1,
-            message: message.into(),
-            contexts: Vec::new(),
-        }
-    }
+pub(crate) fn line_column(input: &str, offset: usize) -> (usize, usize) {
+    let prefix = &input[..offset.min(input.len())];
+    let line = prefix.as_bytes().iter().filter(|&&b| b == b'\n').count() + 1;
+    let line_start = prefix.rfind('\n').map_or(0, |index| index + 1);
+    (line, prefix[line_start..].chars().count() + 1)
 }
 
 /// Detailed error information for KVN parsing failures.
@@ -493,19 +450,6 @@ impl ValidationError {
     }
 }
 
-/// Trait for errors that can be enriched with line/column info.
-pub trait WithLocation: Sized {
-    /// Adds location information to the error.
-    fn with_line(self, line: usize) -> Self;
-}
-
-impl WithLocation for ValidationError {
-    fn with_line(mut self, line: usize) -> Self {
-        self.set_line_if_missing(line);
-        self
-    }
-}
-
 /// The top-level error type for the CCSDS NDM library.
 ///
 /// This enum wraps all possible errors that can occur during NDM parsing,
@@ -614,47 +558,42 @@ pub enum CcsdsNdmError {
 /// **Note**: Capacity is limited to 3 contexts. Additional contexts are silently ignored.
 /// This is a deliberate trade-off for performance in the hot parsing path.
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct ContextStack {
+pub(crate) struct ContextStack {
     contexts: [&'static str; 3],
     len: usize,
 }
 
 impl ContextStack {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
-    pub fn push(&mut self, context: &'static str) {
+    pub(crate) fn push(&mut self, context: &'static str) {
         if self.len < self.contexts.len() {
             self.contexts[self.len] = context;
             self.len += 1;
         }
     }
 
-    pub fn last(&self) -> Option<&&'static str> {
-        if self.len > 0 {
-            Some(&self.contexts[self.len - 1])
-        } else {
-            None
-        }
+    pub(crate) fn last(&self) -> Option<&&'static str> {
+        self.contexts[..self.len].last()
     }
 
-    pub fn to_vec(&self) -> Vec<&'static str> {
+    pub(crate) fn to_vec(&self) -> Vec<&'static str> {
         self.contexts[..self.len].to_vec()
     }
 }
 
 /// A lightweight internal error type for winnow parsers.
 #[derive(Debug, Clone, PartialEq)]
-pub struct InternalParserError {
-    pub message: Cow<'static, str>,
-    pub contexts: ContextStack,
-    pub kind: Box<ParserErrorKind>,
+pub(crate) struct InternalParserError {
+    pub(crate) message: Cow<'static, str>,
+    pub(crate) contexts: ContextStack,
+    pub(crate) kind: Box<ParserErrorKind>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
-#[non_exhaustive]
-pub enum ParserErrorKind {
+pub(crate) enum ParserErrorKind {
     #[default]
     Kvn,
     MissingRequiredField {
@@ -1171,7 +1110,7 @@ impl CcsdsNdmError {
     }
 
     /// Populates location information for variants with line info.
-    pub fn with_location(mut self, input: &str, offset: usize) -> Self {
+    pub(crate) fn with_location(mut self, input: &str, offset: usize) -> Self {
         match self {
             CcsdsNdmError::Format(ref mut format_err) => {
                 if let FormatError::Kvn(ref mut inner) = **format_err {
@@ -1188,15 +1127,15 @@ impl CcsdsNdmError {
                         0
                     };
 
-                    let diag = ParseDiagnostic::new(input, target_offset, "");
-                    inner.line = diag.line;
-                    inner.column = diag.column;
+                    let (line, column) = line_column(input, target_offset);
+                    inner.line = line;
+                    inner.column = column;
                     inner.offset = target_offset;
                 }
             }
             CcsdsNdmError::Validation(ref mut val_err) => {
-                let diag = ParseDiagnostic::new(input, offset, "");
-                val_err.set_line_if_missing(diag.line);
+                let (line, _) = line_column(input, offset);
+                val_err.set_line_if_missing(line);
             }
             _ => {} // Other variants don't have location info
         }
@@ -1258,9 +1197,8 @@ mod tests {
     fn validation_path_preserves_error_behavior() {
         let error = ValidationError::invalid_value("X", "NaN", "a finite number");
         let display = error.to_string();
-        let error = error
-            .at_field_in("body.segment.data.state_vector")
-            .with_line(12);
+        let mut error = error.at_field_in("body.segment.data.state_vector");
+        error.set_line_if_missing(12);
 
         assert_eq!(error.code(), Some("validation.invalid_value"));
         assert_eq!(
@@ -1313,7 +1251,7 @@ mod tests {
             line: None,
         };
         // Should set line
-        err = err.with_line(123);
+        err.set_line_if_missing(123);
         if let ValidationError::OutOfRange { line, .. } = err {
             assert_eq!(line, Some(123));
         } else {
@@ -1321,7 +1259,7 @@ mod tests {
         }
 
         // Should NOT overwrite line if already set
-        err = err.with_line(456);
+        err.set_line_if_missing(456);
         if let ValidationError::OutOfRange { line, .. } = err {
             assert_eq!(line, Some(123));
         } else {

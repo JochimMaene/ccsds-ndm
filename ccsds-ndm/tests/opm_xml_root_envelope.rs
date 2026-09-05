@@ -4,7 +4,6 @@
 
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::VersionedNdm;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 

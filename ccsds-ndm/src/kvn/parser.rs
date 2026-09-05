@@ -120,15 +120,15 @@ pub fn to_ccsds_error(
             .with_location(input, offset);
         }
         _ => {
-            let message = inner.message;
-
-            let raw = crate::error::RawParsePosition {
-                offset,
-                message,
-                contexts: inner.contexts,
-            };
+            let (line, column) = crate::error::line_column(input, offset);
             CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(
-                raw.into_parse_error(input),
+                crate::error::KvnParseError {
+                    line,
+                    column,
+                    message: inner.message.into_owned(),
+                    contexts: inner.contexts.to_vec(),
+                    offset,
+                },
             ))))
         }
     };

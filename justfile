@@ -263,8 +263,8 @@ verify-opm:
     just package-rust
     just package-python
 
-# Run all quality checks (lint, audit, stubs-check, sync-docs-check, test)
-check: lint audit stubs-check sync-docs-check test
+# Run all quality checks
+check: lint audit stubs-check sync-docs-check test docs
 
 # --- Benchmarking -----------------------------------------------------------
 

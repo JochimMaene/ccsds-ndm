@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::generation::VersionedNdm;
 use ccsds_ndm::messages::acm::Acm;
 use ccsds_ndm::messages::cdm::Cdm;
 use ccsds_ndm::messages::ocm::{Ocm, OcmPhysicalDescription};
@@ -10,8 +9,9 @@ use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::messages::tdm::{Tdm, TdmObservationData};
-use ccsds_ndm::traits::{Ndm, Validate};
-use ccsds_ndm::{from_str, from_str_with_options, MessageType, Notation, ParseOptions};
+use ccsds_ndm::Ndm;
+use ccsds_ndm::Validate;
+use ccsds_ndm::{from_str, from_str_with_options, Message, Notation, ParseOptions};
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 const OPM_XML: &str = include_str!("../data/xml/opm_g5.xml");
@@ -31,7 +31,7 @@ fn generic_parse_options_bound_non_opm_inputs_and_xml_depth() {
     let exact = ParseOptions::default().with_max_input_bytes(OMM_KVN.len());
     assert!(matches!(
         from_str_with_options(OMM_KVN, Some(Notation::Kvn), &exact).unwrap(),
-        MessageType::Omm(_)
+        Message::Omm(_)
     ));
 
     let too_small = ParseOptions::default().with_max_input_bytes(OMM_KVN.len() - 1);
@@ -45,7 +45,7 @@ fn generic_parse_options_bound_non_opm_inputs_and_xml_depth() {
 
 #[test]
 fn history_record_limits_cover_each_concrete_history_message() {
-    use ccsds_ndm::{from_str_with_options, MessageType, Notation, ParseOptions};
+    use ccsds_ndm::{from_str_with_options, Message, Notation, ParseOptions};
 
     let cases = [
         (
@@ -88,7 +88,7 @@ fn history_record_limits_cover_each_concrete_history_message() {
     }
 
     let acm = ccsds_ndm::from_str(include_str!("../data/kvn/acm_g6.kvn")).unwrap();
-    let MessageType::Acm(acm) = acm else {
+    let Message::Acm(acm) = acm else {
         panic!("expected ACM fixture");
     };
     let xml = acm.to_xml().unwrap();

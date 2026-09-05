@@ -4,7 +4,7 @@ use std::hint::black_box;
 use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::MessageType;
+use ccsds_ndm::Message;
 use stats_alloc::{Region, Stats, StatsAlloc, INSTRUMENTED_SYSTEM};
 
 #[global_allocator]
@@ -13,7 +13,7 @@ static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 
 fn combined(children: usize) -> CombinedNdm {
-    let child = MessageType::Opm(Opm::from_kvn(OPM_KVN).unwrap());
+    let child = Message::Opm(Opm::from_kvn(OPM_KVN).unwrap());
     CombinedNdm {
         id: None,
         comments: vec!["allocation evidence".into()],

@@ -5,7 +5,6 @@
 //! KVN parsing and generation benchmarks for all message types.
 
 use ccsds_ndm::common::{OdmHeader, StateVectorAcc};
-use ccsds_ndm::generation::VersionedNdm;
 use ccsds_ndm::messages::acm::Acm;
 use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::messages::oem::{Oem, OemBody, OemData, OemMetadata, OemSegment};
@@ -155,8 +154,9 @@ fn bench_parse_opm_failures(c: &mut Criterion) {
     });
     group.bench_function("input_limit", |b| {
         b.iter(|| {
-            black_box(Opm::from_kvn_with_options(
+            black_box(ccsds_ndm::from_str_with_options(
                 black_box(valid),
+                None,
                 black_box(&limited),
             ))
             .unwrap_err()

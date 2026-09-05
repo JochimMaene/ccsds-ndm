@@ -237,24 +237,24 @@ def test_generic_python_conversion_dispatches_non_opm_messages(tmp_path):
 
 def test_combined_python_message_keeps_identity_and_shared_limits():
     empty = ccsds_ndm.from_str("<ndm/>", format="xml")
-    assert isinstance(empty, ccsds_ndm.Ndm)
+    assert isinstance(empty, ccsds_ndm.CombinedNdm)
     assert empty.messages == []
 
     message = ccsds_ndm.from_str(COMBINED_XML, format="xml")
-    assert isinstance(message, ccsds_ndm.Ndm)
+    assert isinstance(message, ccsds_ndm.CombinedNdm)
 
     with pytest.raises(ccsds_ndm.NdmError) as input_limit:
-        ccsds_ndm.Ndm.from_str(COMBINED_XML, format="xml", max_input_bytes=1)
+        ccsds_ndm.CombinedNdm.from_str(COMBINED_XML, format="xml", max_input_bytes=1)
     assert input_limit.value.code == "resource.input_limit_exceeded"
     assert input_limit.value.message_kind == "ndm"
 
     with pytest.raises(ccsds_ndm.NdmError) as record_limit:
-        ccsds_ndm.Ndm.from_str(COMBINED_XML, format="xml", max_records=0)
+        ccsds_ndm.CombinedNdm.from_str(COMBINED_XML, format="xml", max_records=0)
     assert record_limit.value.code == "resource.record_limit_exceeded"
     assert record_limit.value.message_kind == "ndm"
 
     xml = message.to_str("xml")
-    assert isinstance(ccsds_ndm.from_str(xml, format="xml"), ccsds_ndm.Ndm)
+    assert isinstance(ccsds_ndm.from_str(xml, format="xml"), ccsds_ndm.CombinedNdm)
 
 
 def test_python_conversion_delegates_to_strict_rust_core(tmp_path):

@@ -9,6 +9,7 @@
 
 use crate::error::Result;
 use crate::kvn::ser::KvnWriter;
+use std::io::Write;
 
 /// Trait for types that provide semantic validation.
 pub trait Validate {
@@ -97,12 +98,18 @@ pub trait Ndm: Sized + serde::Serialize + Validate {
     ///
     /// Returns an error when the input is malformed, unsupported, or invalid.
     fn from_xml(xml: &str) -> Result<Self>;
+
+    /// Stream KVN using the edition stored on the message.
+    fn write_kvn_to<W: Write>(&self, output: &mut W) -> Result<()>;
+
+    /// Stream XML using the edition stored on the message.
+    fn write_xml_to<W: Write>(&self, output: &mut W) -> Result<()>;
 }
 
 /// Trait for types that can be parsed from a KVN value string.
 ///
 /// This is automatically implemented for any type that implements `FromStr`.
-pub trait FromKvnValue: Sized {
+pub(crate) trait FromKvnValue: Sized {
     /// Parse a value from its KVN string representation.
     ///
     /// # Arguments
@@ -114,7 +121,7 @@ pub trait FromKvnValue: Sized {
 /// Trait to check if a value is considered "null" or "empty" in CCSDS context.
 ///
 /// This unifies the logic for XML (nil="true" or empty text) and KVN (empty value).
-pub trait CcsdsNullable {
+pub(crate) trait CcsdsNullable {
     /// Returns true if the value represents a null/empty state.
     fn is_null(&self) -> bool;
 }
@@ -144,7 +151,7 @@ where
 /// Trait for types that can be parsed directly from a float and optional unit.
 ///
 /// This avoids the overhead of formatting a float to a string and then parsing it back.
-pub trait FromKvnFloat: Sized {
+pub(crate) trait FromKvnFloat: Sized {
     /// Create an instance from a float value and optional unit string.
     ///
     /// # Arguments

@@ -176,10 +176,9 @@ class TestApm:
     def test_apm_setters(self):
         apm = self._create_valid_apm()
 
-        # Top-level setters
-        apm.id = None
+        # Top-level protocol identifier is read-only; version remains selectable.
         apm.version = "2.0"
-        assert apm.id is None
+        assert apm.id == "CCSDS_APM_VERS"
         assert apm.version == "2.0"
 
         # Segment setters

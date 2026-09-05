@@ -4,8 +4,7 @@
 
 use ccsds_ndm::error::{Result, ValidationError};
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{MessageType, VersionedNdm};
+use ccsds_ndm::{Message, Ndm};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -22,10 +21,10 @@ const OPM_3_XML_FIXTURES: [(&str, &str); 1] =
 fn public_opm_xml_generation_signatures_remain_compatible() {
     let _typed: fn(&Opm) -> ccsds_ndm::error::Result<String> = <Opm as Ndm>::to_xml;
     let _typed_streaming: fn(&Opm, &mut Vec<u8>) -> ccsds_ndm::error::Result<()> =
-        <Opm as VersionedNdm>::write_xml_to::<Vec<u8>>;
-    let _generic: fn(&MessageType) -> ccsds_ndm::error::Result<String> = MessageType::to_xml;
-    let _generic_file: fn(&MessageType, PathBuf) -> ccsds_ndm::error::Result<()> =
-        MessageType::to_xml_file::<PathBuf>;
+        <Opm as Ndm>::write_xml_to::<Vec<u8>>;
+    let _generic: fn(&Message) -> ccsds_ndm::error::Result<String> = Message::to_xml;
+    let _generic_file: fn(&Message, PathBuf) -> ccsds_ndm::error::Result<()> =
+        Message::to_xml_file::<PathBuf>;
 }
 
 fn schema_path() -> PathBuf {
@@ -127,7 +126,7 @@ fn opm_3_xml_generation_is_deterministic_across_rust_entry_points() {
         .expect("streaming generation failed");
     assert_eq!(streamed, expected.as_bytes());
 
-    let generic = MessageType::Opm(opm);
+    let generic = Message::Opm(opm);
     assert_eq!(
         generic.to_xml().expect("generic generation failed"),
         expected
@@ -142,20 +141,17 @@ fn every_opm_3_xml_generation_entry_point_rejects_an_invalid_model() {
 
     assert_missing_object_name("Ndm::to_xml", opm.to_xml());
     let mut streamed = Vec::new();
-    assert_missing_object_name(
-        "VersionedNdm::write_xml_to",
-        opm.write_xml_to(&mut streamed),
-    );
+    assert_missing_object_name("Ndm::write_xml_to", opm.write_xml_to(&mut streamed));
     assert!(
         streamed.is_empty(),
         "invalid streaming output was partially written"
     );
 
-    let generic = MessageType::Opm(opm);
-    assert_missing_object_name("MessageType::to_xml", generic.to_xml());
+    let generic = Message::Opm(opm);
+    assert_missing_object_name("Message::to_xml", generic.to_xml());
     let directory = tempfile::tempdir().expect("failed to create temporary directory");
     let path = directory.path().join("invalid-opm.xml");
-    assert_missing_object_name("MessageType::to_xml_file", generic.to_xml_file(&path));
+    assert_missing_object_name("Message::to_xml_file", generic.to_xml_file(&path));
     assert!(
         !path.exists(),
         "invalid file generation created an output file"
@@ -182,7 +178,7 @@ fn opm_3_xml_generation_rejects_unaudited_editions_across_rust_entry_points() {
     );
     let mut streamed = Vec::new();
     assert_unsupported_version(
-        "VersionedNdm::write_xml_to",
+        "Ndm::write_xml_to",
         "1.0",
         "generation.unsupported_output_version",
         historical.write_xml_to(&mut streamed),
@@ -192,9 +188,9 @@ fn opm_3_xml_generation_rejects_unaudited_editions_across_rust_entry_points() {
         "unsupported streaming generation wrote partial output"
     );
 
-    let historical = MessageType::Opm(historical);
+    let historical = Message::Opm(historical);
     assert_unsupported_version(
-        "MessageType::to_xml",
+        "Message::to_xml",
         "1.0",
         "generation.unsupported_output_version",
         historical.to_xml(),
@@ -202,7 +198,7 @@ fn opm_3_xml_generation_rejects_unaudited_editions_across_rust_entry_points() {
     let directory = tempfile::tempdir().expect("failed to create temporary directory");
     let path = directory.path().join("unsupported-opm.xml");
     assert_unsupported_version(
-        "MessageType::to_xml_file",
+        "Message::to_xml_file",
         "1.0",
         "generation.unsupported_output_version",
         historical.to_xml_file(&path),
@@ -218,7 +214,7 @@ fn opm_3_xml_file_generation_reports_output_failures_without_a_field_path() {
     let opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse OPM fixture");
     let directory = tempfile::tempdir().expect("failed to create temporary directory");
 
-    let error = MessageType::Opm(opm)
+    let error = Message::Opm(opm)
         .to_xml_file(directory.path())
         .expect_err("writing XML to a directory must fail");
 

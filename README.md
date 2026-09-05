@@ -69,14 +69,14 @@ if isinstance(msg, ccsds_ndm.Opm):
 
 ```rust
 use ccsds_ndm::traits::{Ndm, Validate};
-use ccsds_ndm::{from_file, MessageType};
+use ccsds_ndm::{from_file, Message};
 
 fn main() -> ccsds_ndm::error::Result<()> {
     // Parse any NDM file
     let msg = from_file("example.ndm")?;
 
     // Match on the message type
-    if let MessageType::Opm(opm) = msg {
+    if let Message::Opm(opm) = msg {
         opm.validate()?;
         println!("Object: {}", opm.body.segment.metadata.object_name);
 

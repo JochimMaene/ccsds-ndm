@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::generation::VersionedNdm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 use stats_alloc::{Region, StatsAlloc, INSTRUMENTED_SYSTEM};

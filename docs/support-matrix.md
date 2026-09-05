@@ -47,6 +47,13 @@ library rejects unsupported output editions instead of relabeling a document. OP
 generation supports explicit 2.0 and 3.0 targets where the typed content can be represented without
 loss.
 
+## Scope boundaries
+
+The library validates and preserves CCSDS units but does not provide general unit conversion.
+Reference-frame and time-system identifiers are parsed and preserved, but coordinate-frame and
+time-scale transformations are outside its scope. Interpolation declarations are also parsed and
+preserved; the library does not evaluate ephemerides or attitudes at arbitrary epochs.
+
 ## Evidence
 
 Maintainer-facing evidence lives in [`docs/conformance/`](conformance/). Those inventories link

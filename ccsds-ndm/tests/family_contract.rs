@@ -1,4 +1,4 @@
-use ccsds_ndm::{from_str, from_str_with_options, MessageType, Notation, ParseOptions};
+use ccsds_ndm::{from_str, from_str_with_options, Message, Notation, ParseOptions};
 
 fn standalone_cases() -> [(&'static str, &'static str); 10] {
     [
@@ -86,8 +86,8 @@ fn legacy_adm_and_tdm_editions_remain_parse_only() {
 fn combined_ndm_keeps_its_identity() {
     let input = include_str!("../data/xml/ndm_g12.xml");
     let message = from_str(input).expect("combined NDM fixture should parse");
-    assert!(matches!(message, MessageType::Ndm(_)));
+    assert!(matches!(message, Message::Ndm(_)));
 
     let output = message.to_xml().expect("combined NDM should generate");
-    assert!(matches!(from_str(&output).unwrap(), MessageType::Ndm(_)));
+    assert!(matches!(from_str(&output).unwrap(), Message::Ndm(_)));
 }

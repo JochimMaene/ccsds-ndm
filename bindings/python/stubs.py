@@ -27,7 +27,8 @@ from binding_source import braced_blocks
 INDENT = "    "
 GENERATED_HEADER = """\
 # Generated content DO NOT EDIT
-from typing import Optional, Union
+import os
+from typing import Literal
 import numpy
 
 """
@@ -35,35 +36,52 @@ import numpy
 PUBLIC_API_PARAMETER_TYPES = {
     "convert": {
         "data": "str",
-        "to_format": "str",
-        "max_input_bytes": "Optional[int]",
-        "max_records": "Optional[int]",
+        "to_format": 'Literal["kvn", "xml"]',
+        "max_input_bytes": "int | None",
+        "max_records": "int | None",
     },
     "convert_file": {
-        "source_path": "str",
-        "destination_path": "str",
-        "to_format": "str",
-        "max_input_bytes": "Optional[int]",
-        "max_records": "Optional[int]",
+        "source_path": "str | os.PathLike[str]",
+        "destination_path": "str | os.PathLike[str]",
+        "to_format": 'Literal["kvn", "xml"]',
+        "max_input_bytes": "int | None",
+        "max_records": "int | None",
     },
     "from_file": {
-        "format": "str",
-        "max_input_bytes": "Optional[int]",
-        "max_records": "Optional[int]",
-        "path": "str",
+        "format": 'Literal["kvn", "xml"] | None',
+        "max_input_bytes": "int | None",
+        "max_records": "int | None",
+        "path": "str | os.PathLike[str]",
     },
     "from_str": {
         "data": "str",
-        "format": "str",
-        "max_input_bytes": "Optional[int]",
-        "max_records": "Optional[int]",
+        "format": 'Literal["kvn", "xml"] | None',
+        "max_input_bytes": "int | None",
+        "max_records": "int | None",
     },
     "to_file": {
-        "format": "str",
-        "path": "str",
+        "format": 'Literal["kvn", "xml"]',
+        "path": "str | os.PathLike[str]",
     },
     "to_str": {
-        "format": "str",
+        "format": 'Literal["kvn", "xml"]',
+    },
+    "from_numpy": {
+        "epochs": "list[str]",
+        "array": "numpy.ndarray",
+        "attitude_type": "str | None",
+        "comment": "list[str] | None",
+        "comments": "list[str] | None",
+        "state_vector": "numpy.ndarray",
+        "covariance_matrix": "numpy.ndarray | None",
+        "od_parameters": "OdParameters | None",
+        "additional_parameters": "AdditionalParameters | None",
+        "state_vector_epochs": "list[str]",
+        "state_vector_numpy": "numpy.ndarray",
+        "covariance_matrix_epochs": "list[str] | None",
+        "covariance_matrix_numpy": "numpy.ndarray | None",
+        "cov_ref_frames": "list[str | None] | None",
+        "cov_comments": "list[list[str]] | None",
     },
 }
 
@@ -221,7 +239,40 @@ def _normalize_type_hint(raw: str) -> str:
     except SyntaxError:
         hint = "object"
 
-    return hint
+    return _modernize_type_hint(hint)
+
+
+def _modernize_type_hint(hint: str) -> str:
+    """Use PEP 604 unions consistently in generated stubs."""
+
+    class Modernize(ast.NodeTransformer):
+        def visit_Subscript(self, node: ast.Subscript) -> ast.expr:
+            node = self.generic_visit(node)
+            if not isinstance(node.value, ast.Name):
+                return node
+            if node.value.id == "Optional":
+                return ast.BinOp(
+                    left=node.slice, op=ast.BitOr(), right=ast.Constant(None)
+                )
+            if node.value.id == "Union":
+                members = (
+                    node.slice.elts
+                    if isinstance(node.slice, ast.Tuple)
+                    else [node.slice]
+                )
+                return functools.reduce(
+                    lambda left, right: ast.BinOp(
+                        left=left, op=ast.BitOr(), right=right
+                    ),
+                    members,
+                )
+            return node
+
+    try:
+        expression = ast.parse(hint, mode="eval")
+    except SyntaxError:
+        return hint
+    return ast.unparse(Modernize().visit(expression).body)
 
 
 def _extract_numpy_parameter_types(doc: str | None) -> dict[str, str]:
@@ -362,7 +413,7 @@ def _annotate_signature(sig: str, param_types: dict[str, str]) -> str:
         if ":" in left:
             name, annotation = left.split(":", 1)
             name = name.strip()
-            annotation = annotation.strip()
+            annotation = _modernize_type_hint(annotation.strip())
         else:
             name = left
             annotation = ""
@@ -370,12 +421,8 @@ def _annotate_signature(sig: str, param_types: dict[str, str]) -> str:
         if not annotation:
             inferred = param_types.get(name)
             if inferred:
-                if (
-                    default == "=None"
-                    and not inferred.startswith("Optional[")
-                    and "None" not in inferred
-                ):
-                    inferred = f"Optional[{inferred}]"
+                if default == "=None" and "None" not in inferred:
+                    inferred = f"{inferred} | None"
                 left = f"{name}: {inferred}"
             else:
                 left = name
@@ -408,7 +455,7 @@ def _format_docstring(doc: str | None, indent: str) -> str:
     """Format a docstring with proper indentation."""
     cleaned = _clean_docstring(doc)
     if not cleaned:
-        return f'{indent}"""\n{indent}"""\n'
+        return ""
     return f'{indent}"""\n{indent}{_indent_text(cleaned, indent)}\n{indent}"""\n'
 
 
@@ -453,6 +500,8 @@ def _generate_function(obj: Any, indent: str, owner_class: str | None = None) ->
         # PyO3 static factory methods usually expose no runtime return annotation.
         # Use class context so type checkers infer `Cdm.from_str(...) -> Cdm`, etc.
         return_type = owner_class
+    if return_type:
+        return_type = _normalize_type_hint(return_type)
     return_annotation = f" -> {return_type}" if return_type else ""
 
     inner_indent = indent + INDENT
@@ -468,6 +517,8 @@ def _generate_property(obj: Any, indent: str, *, has_setter: bool) -> str:
     name = obj.__name__
     doc = obj.__doc__ or ""
     prop_type = _extract_annotation(doc, "type")
+    if prop_type:
+        prop_type = _normalize_type_hint(prop_type)
     return_annotation = f" -> {prop_type}" if prop_type else ""
     inner_indent = indent + INDENT
     cleaned_doc = _clean_docstring(doc)

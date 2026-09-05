@@ -6,7 +6,7 @@ use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{from_str, from_str_with_options, MessageType, ParseOptions};
+use ccsds_ndm::{from_str, from_str_with_options, Message, ParseOptions};
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 
@@ -16,9 +16,9 @@ fn combined_generation_preserves_child_checks() {
     let combined = CombinedNdm {
         id: None,
         comments: Vec::new(),
-        messages: vec![MessageType::Opm(opm.clone())],
+        messages: vec![Message::Opm(opm.clone())],
     };
-    let message = MessageType::Ndm(combined.clone());
+    let message = Message::Ndm(combined.clone());
 
     message.to_xml().unwrap();
 
@@ -27,7 +27,7 @@ fn combined_generation_preserves_child_checks() {
     let invalid_xml = CombinedNdm {
         id: None,
         comments: Vec::new(),
-        messages: vec![MessageType::Opm(invalid_xml)],
+        messages: vec![Message::Opm(invalid_xml)],
     };
     let error = invalid_xml.to_xml().unwrap_err();
     assert_eq!(
@@ -55,12 +55,12 @@ fn combined_xml_parser_enforces_the_normative_envelope() {
     let input = CombinedNdm {
         id: None,
         comments: Vec::new(),
-        messages: vec![MessageType::Aem(aem)],
+        messages: vec![Message::Aem(aem)],
     }
     .to_xml()
     .unwrap();
     let options = ccsds_ndm::ParseOptions::default().with_max_records(0);
-    let error = CombinedNdm::from_xml_with_options(&input, &options).unwrap_err();
+    let error = ccsds_ndm::from_str_with_options(&input, None, &options).unwrap_err();
     assert_eq!(error.code(), Some("resource.record_limit_exceeded"));
 }
 
@@ -196,14 +196,14 @@ fn test_combined_ndm_xml() {
 
     let msg = from_str(input).unwrap();
     match msg {
-        MessageType::Ndm(ndm) => {
+        Message::Ndm(ndm) => {
             assert_eq!(ndm.id, Some("TEST_ID_123".to_string()));
             assert_eq!(ndm.comments, vec!["Global NDM comment".to_string()]);
             assert_eq!(ndm.messages.len(), 2);
-            assert!(matches!(ndm.messages[0], MessageType::Opm(_)));
-            assert!(matches!(ndm.messages[1], MessageType::Omm(_)));
+            assert!(matches!(ndm.messages[0], Message::Opm(_)));
+            assert!(matches!(ndm.messages[1], Message::Omm(_)));
         }
-        _ => panic!("Expected MessageType::Ndm, got {:?}", msg),
+        _ => panic!("Expected Message::Ndm, got {:?}", msg),
     }
 }
 
@@ -302,16 +302,16 @@ fn test_combined_ndm_xml_attitude() {
 
     let msg = from_str(input).unwrap();
     match msg {
-        MessageType::Ndm(ndm) => {
+        Message::Ndm(ndm) => {
             assert_eq!(
                 ndm.comments,
                 vec!["Example: 1 each APM, AEM, ACM in combined instantiation".to_string()]
             );
             assert_eq!(ndm.messages.len(), 3);
-            assert!(matches!(ndm.messages[0], MessageType::Apm(_)));
-            assert!(matches!(ndm.messages[1], MessageType::Aem(_)));
-            assert!(matches!(ndm.messages[2], MessageType::Acm(_)));
+            assert!(matches!(ndm.messages[0], Message::Apm(_)));
+            assert!(matches!(ndm.messages[1], Message::Aem(_)));
+            assert!(matches!(ndm.messages[2], Message::Acm(_)));
         }
-        _ => panic!("Expected MessageType::Ndm, got {:?}", msg),
+        _ => panic!("Expected Message::Ndm, got {:?}", msg),
     }
 }

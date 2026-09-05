@@ -1,6 +1,6 @@
 use ccsds_ndm::messages::oem::Oem;
-use ccsds_ndm::traits::{Ndm, Validate};
-use ccsds_ndm::{MessageType, VersionedNdm};
+use ccsds_ndm::Validate;
+use ccsds_ndm::{Message, Ndm};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -67,7 +67,7 @@ fn public_generation_surfaces_are_identical_and_preflight_invalid_models() {
     streamed.clear();
     message.write_xml_to(&mut streamed).unwrap();
     assert_eq!(streamed, expected_xml.as_bytes());
-    let erased = MessageType::Oem(message.clone());
+    let erased = Message::Oem(message.clone());
     assert_eq!(erased.to_kvn().unwrap(), expected_kvn);
     assert_eq!(erased.to_xml().unwrap(), expected_xml);
 
@@ -76,8 +76,8 @@ fn public_generation_surfaces_are_identical_and_preflight_invalid_models() {
     for error in [
         invalid.to_kvn().unwrap_err(),
         invalid.to_xml().unwrap_err(),
-        MessageType::Oem(invalid.clone()).to_kvn().unwrap_err(),
-        MessageType::Oem(invalid).to_xml().unwrap_err(),
+        Message::Oem(invalid.clone()).to_kvn().unwrap_err(),
+        Message::Oem(invalid).to_xml().unwrap_err(),
     ] {
         assert_eq!(error.code(), Some("validation.missing_required_field"));
         assert_eq!(

@@ -1,8 +1,7 @@
-use ccsds_ndm::generation::VersionedNdm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::traits::Ndm;
 use ccsds_ndm::types::{CalendarEpoch, GmUnits};
-use ccsds_ndm::MessageType;
+use ccsds_ndm::Message;
 use std::str::FromStr;
 
 fn opm() -> Opm {
@@ -272,7 +271,7 @@ fn opm_kvn_is_identical_across_public_generation_entry_points() {
         .expect("streaming generation should succeed");
     assert_eq!(streamed, expected.as_bytes());
 
-    let erased = MessageType::Opm(message);
+    let erased = Message::Opm(message);
     assert_eq!(
         erased
             .to_kvn()
@@ -490,7 +489,7 @@ fn invalid_opm_kvn_is_rejected_across_public_generation_entry_points() {
     assert_eq!(error.field_path().as_deref(), Some("header.originator"));
     assert!(output.is_empty());
 
-    let erased = MessageType::Opm(message);
+    let erased = Message::Opm(message);
     assert!(erased.to_kvn().is_err());
     assert!(erased.to_kvn().is_err());
 

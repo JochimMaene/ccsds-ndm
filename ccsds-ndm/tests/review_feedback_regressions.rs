@@ -3,7 +3,7 @@ use ccsds_ndm::messages::{
     tdm::Tdm,
 };
 use ccsds_ndm::traits::Ndm;
-use ccsds_ndm::{from_str_with_options, MessageType, Notation, ParseOptions, VersionedNdm};
+use ccsds_ndm::{from_str_with_options, Message, Notation, ParseOptions};
 
 #[test]
 fn opm_preserves_comment_before_user_defined_after_optional_maneuvers() {
@@ -169,7 +169,7 @@ fn kvn_generation_rejects_non_ascii_and_control_text_before_streaming() {
 
 #[test]
 fn type_erased_file_errors_keep_non_opm_generation_context() {
-    let message = MessageType::Oem(Oem::from_kvn(include_str!("../data/kvn/oem_g11.kvn")).unwrap());
+    let message = Message::Oem(Oem::from_kvn(include_str!("../data/kvn/oem_g11.kvn")).unwrap());
     let directory = tempfile::tempdir().unwrap();
 
     for error in [
@@ -377,7 +377,7 @@ fn self_closing_elements_count_towards_the_xml_depth_limit() {
         "<header><COMMENT/></header></opm>",
     );
     let options = ParseOptions::default().with_max_xml_depth(2);
-    let error = Opm::from_xml_with_options(document, &options)
+    let error = ccsds_ndm::from_str_with_options(document, None, &options)
         .unwrap_err()
         .to_string();
     assert!(error.contains("xml_depth"), "unexpected error: {error}");
