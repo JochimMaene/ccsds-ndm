@@ -21,12 +21,13 @@ This inventory records maintainer evidence for standalone APM 2.0. The
 | KVN lexical and structural strictness | The APM marked-block scanner rejects non-ASCII/control input, overlong lines, malformed assignments, unknown and duplicate keywords, fixed-order violations within logical blocks, misplaced comments, unknown/nested blocks, and mismatched block ends. It accepts both the optional metadata delimiters and repeated attitude block families represented by the standard fixtures. |
 | XML structure | The shared XML sequence engine is registered for the complete APM root, header, metadata, data, and six attitude logical-block families, including nested quaternion components. It rejects unknown, duplicate, and reordered children and non-schema attributes. |
 | Valid input and preservation | All three shipped KVN fixtures and the shipped XML fixture parse through the public strict API. Generated KVN and XML reparse to the same typed model. |
-| XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. |
+| XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
 | Shared resource and surface contract | `family_contract`, `family_generation_evidence`, the Python options tests, and family Criterion matrices provide the common bounded parsing/generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
 
 The existing APM unit suite separately covers each attitude logical-block family, optional
-quaternion/Euler derivatives, maneuver delta mass, the spin nutation choice, root versioning,
-required metadata, and the requirement for at least one attitude block.
+quaternion/Euler derivatives, maneuver delta mass, the spin nutation choice and the values inside
+both of its branches, root versioning, required metadata, and the requirement for at least one
+attitude block.
 
 ## Complete ICS reconciliation
 
@@ -41,12 +42,12 @@ executable evidence:
 | 14-26 | Quaternion block and optional derivatives | `QuaternionState`, complete block/choice tests |
 | 27-38 | Euler block and optional derivatives | `EulerAngleState`, sequence and optional-field tests |
 | 39-47 | Angular-velocity block | `AngVelState`, frame/three-component tests |
-| 48-62 | Spin block and mutually exclusive nutation descriptions | `SpinState`, conditional-choice tests |
+| 48-62 | Spin block and mutually exclusive nutation descriptions | `SpinState`, conditional-choice tests plus value validation of both branches: non-empty reference frames, angle bounds on `SPIN_ALPHA`/`SPIN_DELTA`/`SPIN_ANGLE` and on the optional nutation and momentum angles, finite `SPIN_ANGLE_VEL` and `NUTATION_VEL`, and a non-negative `NUTATION_PER` |
 | 63-72 | Inertia block | `InertiaState`, complete tensor tests |
 | 73-82 | Maneuver block | `ApmManeuverParameters`, required torque/duration and optional mass tests |
 
-No annex-A APM keyword or block is absent. External SANA frame/time values remain caller-provided
-strings rather than a bundled, time-sensitive registry snapshot.
+No annex-A APM keyword or block is absent. APM's frame and time values are SANA-governed and so
+remain caller-provided under the shared policy on [externally governed values](family-shared-contract.md#externally-governed-values).
 
 ## Allocation and packaged-surface evidence
 
@@ -72,5 +73,5 @@ benchmarks provide the CodSpeed comparison surface for subsequent changes.
 
 ## Remaining verification work
 
-APM remains available rather than verified. Its complete ICS feature inventory and packaged
-surfaces are reconciled; final message-level review remains.
+APM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its ICS feature inventory and packaged
+surfaces are reconciled, and no family-specific promotion blocker is known.

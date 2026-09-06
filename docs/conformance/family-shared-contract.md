@@ -24,22 +24,53 @@ all generated XML against the official master XSD. It regression-tests preservat
 physical-description block, which was previously lost by applying the scalar nullable adapter to a
 complex XML element. The focused OCM evidence applies the same correction to its perturbation,
 orbit-determination, and user-defined blocks, and separately proves the schema's scalar lexical form
-for TIME_AND_ANGLE direction vectors.
+for TIME_AND_ANGLE direction vectors, which is described in [ocm-3.0.md](ocm-3.0.md).
 
-This evidence intentionally does not claim complete cross-notation semantic preservation. CDM now
-retains the distinct header, relative, metadata, additional-parameter, state-vector, and covariance
-comment associations and has a KVN model fixed-point regression. KVN supplies no delimiter between
-the outer data comments and the immediately following first nested block's comments, however, so
-strict parsing preserves that leading run on the outer block and every KVN generation path rejects
-a populated first-nested comment rather than guessing a split. AEM's fixed XML unit
-attributes are optional (504.0-B-2 section 7.6.10), while units are forbidden in AEM KVN data lines
-(section 6.9.2); an XML-to-KVN-to-XML hop therefore deliberately normalises explicit unit
-annotations to omission. The dedicated regression verifies that this output remains schema-valid.
+This evidence intentionally does not claim complete cross-notation semantic preservation. Two
+families resolve a notation asymmetry in a way that is documented where the decision belongs, not
+restated here: CDM's delimiter-free COMMENT decision in [cdm-1.0.md](cdm-1.0.md), and AEM's
+normalisation of optional fixed XML units to omission across an XML-to-KVN-to-XML hop in
+[aem-2.0.md](aem-2.0.md). Both are backed by dedicated regressions.
 
 CDM and RDM now share the routed-block KVN parser that associates a comment run with the nested
 logical block selected by the following keyword; each message retains only its keyword routing.
 RDM additionally rejects the XML-only outer data comment position at every KVN generation gate,
 because flattened KVN cannot distinguish it from the first atmospheric-block comment.
+
+## Externally governed values
+
+Every family delegates some vocabulary to sources outside the message. The policy is one rule, not
+a per-family decision, and it is stated here so the family documents do not restate it:
+
+- Values the book delegates to a **living SANA registry** remain caller-supplied open strings. The
+  library validates locally decidable syntax and message semantics, and does not embed a mutable
+  registry snapshot. Runtime validation is offline, so current registry membership cannot be an
+  acceptance boundary.
+- Values a book defines as a **closed edition-specific list** are rejected when unknown. CDM and
+  RDM `OBJECT_TYPE` are the worked example; OCM's `OBJECT_TYPE` is registry-governed instead. The
+  authoritative statement is "Registry-governed values" in the
+  [validation contract](../design/validation-contract.md).
+- **Mission truth, physical correctness, sensor models, and external identifier resolution** are
+  outside self-contained message validation in every family. A message can be fully valid and still
+  describe an operationally wrong situation.
+
+A family document should record only its own exception to this policy, not the policy itself.
+
+## Promotion policy
+
+Most families in these documents are marked `implemented-unverified`, which is the same state the
+[support matrix](../support-matrix.md) calls **Available**: implemented and tested, but without the
+complete message-specific review that promotion requires. The two vocabularies are reconciled here
+so they do not drift apart.
+
+Grouped ICS reconciliation and shared artifact gates are evidence *for* that later review; they do
+not themselves promote a capability cell. Promotion requires review into exact
+operation × notation × surface cells.
+
+A family document should therefore state its status in one line and then record only its own
+promotion blockers — the parts that actually differ between families. Known family-specific
+blockers today are AEM's interpolation-degree/example conflict, TDM's unverified edition 1.0
+exposure, and combined NDM's XSD-valid/book-invalid conflict.
 
 The shared family tests use one representative fixture per message to prove registration and
 contract routing. They do not prove complete valid-input coverage, semantic preservation of every

@@ -21,7 +21,7 @@ This inventory records maintainer evidence for standalone RDM 1.0. The
 | XML structure | The shared XML sequence engine is registered for the complete RDM root, header, metadata, data, and seven nested logical-block families. It rejects unknown, duplicate, and reordered children and non-schema attributes. |
 | Conversion preservation | The routed-comment parser associates KVN comments with the logical block selected by the following keyword. KVN generation retains required/optional units for atmospheric, impact, state, covariance, spacecraft, and OD measures. The Annex C XML fixture survives XML-to-KVN conversion modulo the KVN COMMENT separator's non-semantic surrounding-whitespace normalization. |
 | Unrepresentable XML state | An XML `<data><COMMENT>` cannot be distinguished from the first atmospheric logical-block comment in flattened KVN. All materialized and streaming KVN gates reject that state before output instead of silently moving the comment. |
-| Valid input and generation | Both shipped KVN and both shipped XML fixtures preserve their typed model in their source notation; every generated XML document validates against the official 4.0.0 master schema. |
+| Valid input and generation | Both shipped KVN and both shipped XML fixtures preserve their typed model in their source notation; every generated XML document validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
 | Shared resource and surface contract | `family_contract`, `family_generation_evidence`, the Python options tests, and family Criterion matrices provide the common bounded parsing/generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
 
 The existing RDM unit suite separately covers required metadata and atmospheric data, controlled
@@ -38,16 +38,25 @@ logical ranges:
 | 1-6 | Mandatory header and message ID | `Rdm`, `RdmHeader`, strict required/root tests |
 | 7-20 | Object identity, controlled-reentry, center, time and reference epoch metadata | `RdmMetadata`, enums, required-field and epoch tests |
 | 21-41 | Optional orbit, propagator, uncertainty, previous/next-message metadata | complete optional metadata roundtrip and strict sequence evidence |
-| 42-52 | Mandatory atmospheric-reentry block and optional windows/confidence | `AtmosphericReentryData`, window/order and numeric tests |
-| 53-84 | Ground-impact probabilities, location, and three confidence regions | `GroundImpactData`, complete optional/probability/bounds tests |
+| 42-52 | Mandatory atmospheric-reentry block and optional windows/confidence | `AtmosphericReentryParameters`, whose validator covers `ORBIT_LIFETIME` and its optional start/end window, with window/order and numeric tests |
+| 53-84 | Ground-impact probabilities, location, and three confidence regions | `GroundImpactParameters`, whose validator covers the probabilities and every latitude/longitude bound, the nominal-impact frame/longitude/latitude co-requirement, all-or-none population and consecutive numbering per confidence interval, and strictly increasing `IMPACT_*_CONFIDENCE` |
 | 85-93 | Optional state vector | `StateVector`, completeness/reference-frame tests |
 | 94-117 | Optional 6x6 covariance | `OpmCovarianceMatrix`, state dependency and complete 21-element roundtrips |
-| 118-129 | Optional spacecraft properties | `SpacecraftParameters`, typed units and complete optional fixtures |
-| 130-141 | Optional orbit-determination information | `OdParameters`, count/span/percentage tests and roundtrips |
+| 118-129 | Optional spacecraft properties | `RdmSpacecraftParameters` (not the OPM/OMM `SpacecraftParameters`), whose validator covers the masses, areas, and coefficients, and permits signed `THRUST_ACCELERATION` while requiring it finite |
+| 130-141 | Optional orbit-determination information | `OdParameters`, shared with CDM and routed from `RdmData::validate`; its validator covers the counts, spans, and percentages |
 | 142 | User-defined parameters | typed user-defined map, strict scanner and roundtrips |
 
-No annex-A RDM feature is absent. The standard’s SANA-sourced vocabulary remains external and
-caller supplied; locally decidable controlled values and numeric ranges are typed and validated.
+No annex-A RDM feature is absent. `OBJECT_TYPE` is the exception to caller-supplied vocabulary:
+RDM defines it as a closed edition-specific list, so unknown values are rejected rather than
+preserved — see "Registry-governed values" in the [validation contract](../design/validation-contract.md).
+Other SANA-sourced vocabulary remains external and caller supplied, while locally decidable
+controlled values and numeric ranges are typed and validated.
+
+`NOMINAL_IMPACT_ALT` separates semantics from representability. RDM states no numeric range and
+permits non-Earth body-fixed frames, while the common 4.0 XSD applies an Earth-derived range, so
+the model preserves any finite altitude and validation enforces only finiteness. KVN writes such a
+value; XML generation refuses it with the offending field path rather than altering it to fit.
+Both XSD boundaries generate schema-valid XML.
 
 ## Allocation and packaged-surface evidence
 
@@ -71,6 +80,6 @@ benchmarks provide the CodSpeed comparison surface for subsequent changes.
 
 ## Remaining verification work
 
-RDM remains `implemented-unverified`. Its complete ICS feature inventory and packaged surfaces are
-reconciled, but the grouped evidence still requires exact operation/notation/surface cell review
-under the conformance policy before promotion.
+RDM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its ICS feature inventory and packaged
+surfaces are reconciled, and the `NOMINAL_IMPACT_ALT` book/XSD conflict recorded above is now
+resolved. No family-specific promotion blocker remains; only the exact-cell review.

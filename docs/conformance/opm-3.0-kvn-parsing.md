@@ -17,4 +17,5 @@ Normative authority is CCSDS 502.0-B-3 with editorial corrigendum 1, especially 
 | Performance and fuzzing | Covered | `kvn_parse_opm` plus early/late-invalid and configured-limit workloads are present in the existing Criterion/CodSpeed-compatible benchmark corpus. The generic KVN fuzz target reaches OPM from a checked-in minimal OPM seed, and the reproducible smoke command completes without a crash. Wall-clock thresholds and sustained fuzzing are optional discovery/maturity work, not deterministic pre-1.0 gates. |
 
 Caller-context facts such as registry membership, ICD-defined frame meaning, and physical
-time-system consistency are not self-contained parse requirements and are not guessed.
+time-system consistency are not self-contained parse requirements and are not guessed; see
+[externally governed values](family-shared-contract.md#externally-governed-values).
