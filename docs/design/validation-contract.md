@@ -13,7 +13,7 @@ defines the complete accepted domain.
 - **P3 — `Validate::validate`:** enforce notation-neutral, self-contained model semantics,
   including rules specific to the edition recorded on the message. P3 is notation-neutral but not
   edition-neutral: `Opm`, `Oem`, and `Omm` already resolve edition-specific value domains through
-  `versioning::validate_*_edition`. See [Edition-aware validation](edition-aware-validation.md).
+  `versioning::validate_*_edition`.
 - **P4 — generation:** enforce P3 plus the selected notation and edition's representability rules.
 
 Models remain conveniently mutable. They may be temporarily invalid between edits, but every
@@ -127,7 +127,9 @@ field paths, so it is not the default design.
 Static field-name searches are useful for triage only. Same-name fields, parent-validates-child
 patterns, helper functions, and notation-specific preflights make them unsound as coverage proof.
 
-Per-family evidence lives in [the conformance set](../conformance/). What remains unresolved is
-listed in [Validation: outstanding work](validation-rollout.md), and the consolidation experiments
-— including the ones rejected with reasons — are in
-[Consolidation findings](consolidation-findings.md).
+Per-family evidence lives in [the conformance set](../conformance/). Open conformance
+decisions are recorded beside the rule they govern in the applicable family document and
+summarized in [the support matrix](../support-matrix.md). Deliberate alias behavior (accepted
+versus advertised spellings) is documented beside its `FromStr` implementation in
+`ccsds-ndm/src/types.rs`; the OPM KVN ordering rationale lives beside `OPM_KVN_BLOCKS` in
+`ccsds-ndm/src/messages/opm.rs`.

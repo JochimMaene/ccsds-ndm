@@ -1,9 +1,8 @@
 # CCSDS NDM
 
-[![Python](https://github.com/JochimMaene/ccsds-ndm/actions/workflows/python.yml/badge.svg)](https://github.com/JochimMaene/ccsds-ndm/actions/workflows/python.yml)
-[![Rust](https://github.com/JochimMaene/ccsds-ndm/actions/workflows/rust.yml/badge.svg)](https://github.com/JochimMaene/ccsds-ndm/actions/workflows/rust.yml)
+[![CI](https://github.com/JochimMaene/ccsds-ndm/actions/workflows/rust.yml/badge.svg)](https://github.com/JochimMaene/ccsds-ndm/actions/workflows/rust.yml)
+[![Release](https://github.com/JochimMaene/ccsds-ndm/actions/workflows/python.yml/badge.svg)](https://github.com/JochimMaene/ccsds-ndm/actions/workflows/python.yml)
 [![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://codspeed.io/JochimMaene/ccsds-ndm?utm_source=badge)
-[![codecov](https://codecov.io/gh/JochimMaene/ccsds-ndm/branch/main/graph/badge.svg)](https://codecov.io/gh/JochimMaene/ccsds-ndm)
 [![PyPI](https://img.shields.io/pypi/v/ccsds-ndm-py)](https://pypi.org/project/ccsds-ndm-py/)
 [![crates.io](https://img.shields.io/crates/v/ccsds-ndm)](https://crates.io/crates/ccsds-ndm)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
@@ -46,23 +45,30 @@ cargo add ccsds-ndm
 
 ```python
 import ccsds_ndm
+from ccsds_ndm import OdmHeader, Opm, OpmData, OpmMetadata, OpmSegment, StateVector
 
-# Parse any NDM file (auto-detects format and type)
-msg = ccsds_ndm.from_file("example.ndm")
+# Construct a small complete OPM from explicit metadata and caller data.
+header = OdmHeader("2023-01-01T00:00:00", "TEST")
+meta = OpmMetadata(
+    object_name="SAT1",
+    object_id="2023-001A",
+    center_name="EARTH",
+    ref_frame="GCRF",
+    time_system="UTC",
+)
+state = StateVector(
+    epoch="2023-01-01T00:00:00",
+    x=7000.0, y=0.0, z=0.0, x_dot=0.0, y_dot=7.5, z_dot=0.0,
+    comments=None,
+)
+opm = Opm(header=header, segment=OpmSegment(metadata=meta, data=OpmData(state_vector=state, comment=[])))
 
-if isinstance(msg, ccsds_ndm.Opm):
-    print(f"Object: {msg.segment.metadata.object_name}")
-    print(f"Epoch: {msg.segment.data.state_vector.epoch}")
+# Generation validates the complete message before writing.
+opm.to_file("output.opm", "kvn")
 
-    # Nested objects are live: direct changes affect the message.
-    msg.segment.metadata.object_name = "UPDATED"
-
-    # Validate explicitly when useful; generation always validates.
-    msg.validate()
-
-    # Serialize
-    msg.to_file("output.opm", "kvn")
-    msg.to_file("output.xml", "xml")
+# Parsing remains fully supported.
+msg = ccsds_ndm.from_file("output.opm")
+assert isinstance(msg, ccsds_ndm.Opm)
 ```
 
 ### Rust

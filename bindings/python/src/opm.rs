@@ -302,9 +302,9 @@ impl OpmMetadata {
     #[pyo3(signature = (
         object_name,
         object_id,
-        center_name=String::from("EARTH"),
-        ref_frame=None,
-        time_system=None,
+        center_name,
+        ref_frame,
+        time_system,
         ref_frame_epoch=None,
         comment=None
     ))]
@@ -312,14 +312,11 @@ impl OpmMetadata {
         object_name: String,
         object_id: String,
         center_name: String,
-        ref_frame: Option<String>,
-        time_system: Option<String>,
+        ref_frame: String,
+        time_system: String,
         ref_frame_epoch: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let ref_frame = ref_frame.unwrap_or_else(|| "GCRF".to_string());
-        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
-
         Ok(Self {
             inner: core_opm::OpmMetadata {
                 object_name,

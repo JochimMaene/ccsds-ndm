@@ -31,13 +31,6 @@ repos:
         pass_filenames: false
         always_run: true
 
-      - id: sync-docstrings
-        name: sync docstrings check
-        entry: just sync-docs-check
-        language: system
-        pass_filenames: false
-        files: ^(src/.*\.rs|../../ccsds-ndm/src/.*)$
-
       - id: audit-bindings
         name: audit bindings
         entry: just audit

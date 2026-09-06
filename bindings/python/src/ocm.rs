@@ -417,7 +417,7 @@ impl OcmMetadata {
     #[pyo3(signature = (
         *,
         epoch_tzero,
-        time_system=None,
+        time_system,
         object_name=None,
 
         international_designator=None,
@@ -469,7 +469,7 @@ impl OcmMetadata {
     #[allow(clippy::too_many_arguments)]
     fn new(
         epoch_tzero: String,
-        time_system: Option<String>,
+        time_system: String,
         object_name: Option<String>,
 
         international_designator: Option<String>,
@@ -519,8 +519,6 @@ impl OcmMetadata {
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         use ccsds_ndm::types::{DayInterval, TimeOffset};
-
-        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
 
         let object_type_enum = match object_type {
             Some(ref ob) => Some(parse_object_description(ob)?),

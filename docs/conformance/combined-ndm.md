@@ -41,7 +41,7 @@ CCSDS 505.0-B-3 sections 4.11.3–4.11.8 define the envelope rather than a separ
 | Requirement | Decision and evidence |
 | --- | --- |
 | Root element is `ndm` | Exact-root and trailing-content tests reject any other document envelope. |
-| Root uses the standard attributes; `id` and `version` apply to the root | The strict attribute contract accepts only the schema/root namespace attributes plus `id` and `version`; unknown attributes are rejected. |
+| Root carries no `id`/`version`; they apply to constituents | `ndmxml-4.0.0-ndm-4.0.xsd` `ndmType` declares no attributes and shipped `ndm_g12/g21.xml` carry none on the root; the strict root contract therefore accepts only namespace/schema attributes and rejects `id`/`version` there. Constituent `id`/`version` remain required per child. |
 | Constituent application elements use only their own `id` and `version` attributes | Every registered child family is sequence-validated by its standalone parser; envelope tests reject illegal constituent attributes and nested message roots. |
 | Any combination of constituent NDM types is permitted, in document order | The typed `Vec<Message>` preserves heterogeneous order; G12 and G21 prove multi-message and multi-family preservation. |
 | A combined message should contain at least one constituent | This is a `SHOULD`, while the official XSD permits zero children. The parser accepts an empty envelope and documents the recommendation rather than inventing a schema-incompatible `SHALL`. |

@@ -13,7 +13,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from ccsds_ndm import Oem
+from ccsds_ndm import OdmHeader, Oem, OemData, OemMetadata, OemSegment, StateVectorAcc
 
 
 def timed(operation, iterations: int, warmup: int) -> float:
@@ -38,10 +38,69 @@ def timed(operation, iterations: int, warmup: int) -> float:
     return statistics.median(samples) / 1_000_000
 
 
+def caller_arrays(count: int):
+    """Caller-owned epoch strings and six-column state values with a valid timeline."""
+    import datetime
+
+    base = datetime.datetime(2023, 1, 1, tzinfo=datetime.timezone.utc)
+    epochs = [
+        (base + datetime.timedelta(seconds=60 * i)).strftime("%Y-%m-%dT%H:%M:%S")
+        for i in range(count)
+    ]
+    values = [(7000.0 + i * 0.1, float(i), 0.0, 0.0, 7.5, 0.0) for i in range(count)]
+    return epochs, values
+
+
+def build_oem_from_records(epochs, values):
+    header = OdmHeader("2023-01-01T00:00:00", "BENCH")
+    meta = OemMetadata(
+        "BENCH",
+        "2023-001A",
+        epochs[0],
+        epochs[-1],
+        center_name="EARTH",
+        ref_frame="EME2000",
+        time_system="UTC",
+    )
+    states = [
+        StateVectorAcc(
+            epoch=epoch, x=v[0], y=v[1], z=v[2], x_dot=v[3], y_dot=v[4], z_dot=v[5]
+        )
+        for epoch, v in zip(epochs, values)
+    ]
+    return Oem(header, [OemSegment(meta, OemData(state_vectors=states, comments=None))])
+
+
+def build_oem_from_numpy(epochs, values):
+    import numpy as np
+
+    header = OdmHeader("2023-01-01T00:00:00", "BENCH")
+    meta = OemMetadata(
+        "BENCH",
+        "2023-001A",
+        epochs[0],
+        epochs[-1],
+        center_name="EARTH",
+        ref_frame="EME2000",
+        time_system="UTC",
+    )
+    array = np.array(values, dtype=float)
+    data = OemData.from_numpy(
+        state_vector_epochs=list(epochs),
+        state_vector_numpy=array,
+        comments=[],
+    )
+    return Oem(header, [OemSegment(meta, data)])
+
+
 def worker(document: Path, operation: str, iterations: int, warmup: int) -> None:
     notation = "kvn" if operation.endswith("_kvn") else "xml"
     source = document.read_text()
-    message = None if operation.startswith("parse") else Oem.from_str(source, notation)
+    record_count = int(document.stem.split("-")[-1])
+    needs_message = not (
+        operation.startswith("parse") or operation.startswith("construct")
+    )
+    message = None if not needs_message else Oem.from_str(source, notation)
 
     if operation == "parse":
 
@@ -82,6 +141,50 @@ def worker(document: Path, operation: str, iterations: int, warmup: int) -> None
             message.validate()
             state.x = original
 
+    elif operation == "construct_records":
+        epochs, values = caller_arrays(record_count)
+
+        def run():
+            build_oem_from_records(epochs, values)
+
+    elif operation == "construct_numpy":
+        epochs, values = caller_arrays(record_count)
+
+        def run():
+            build_oem_from_numpy(epochs, values)
+
+    elif operation == "construct_to_kvn":
+        epochs, values = caller_arrays(record_count)
+
+        def run():
+            build_oem_from_records(epochs, values).to_str("kvn")
+
+    elif operation == "construct_numpy_to_kvn":
+        epochs, values = caller_arrays(record_count)
+
+        def run():
+            build_oem_from_numpy(epochs, values).to_str("kvn")
+
+    elif operation == "construct_to_xml":
+        epochs, values = caller_arrays(record_count)
+
+        def run():
+            build_oem_from_records(epochs, values).to_str("xml")
+
+    elif operation == "construct_numpy_to_xml":
+        epochs, values = caller_arrays(record_count)
+
+        def run():
+            build_oem_from_numpy(epochs, values).to_str("xml")
+
+    elif operation == "numeric_access":
+        import numpy as np
+
+        def run():
+            data = message.segments[0].data
+            array = data.state_vector_numpy
+            float(np.sum(array[:, 0]))
+
     else:
         raise ValueError(operation)
 
@@ -107,7 +210,7 @@ def make_document(source: str, records: int, destination: Path, notation: str) -
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--records", type=int, nargs="+", default=[4, 10_000])
+    parser.add_argument("--records", type=int, nargs="+", default=[10, 1_000, 100_000])
     parser.add_argument("--iterations", type=int, default=10)
     parser.add_argument("--warmup", type=int, default=3)
     parser.add_argument("--worker", action="store_true")
@@ -130,6 +233,13 @@ def main() -> None:
         ("validate", "xml"),
         ("retained_edit", "xml"),
         ("edit_and_validate", "xml"),
+        ("construct_records", "xml"),
+        ("construct_numpy", "xml"),
+        ("construct_to_kvn", "xml"),
+        ("construct_numpy_to_kvn", "xml"),
+        ("construct_to_xml", "xml"),
+        ("construct_numpy_to_xml", "xml"),
+        ("numeric_access", "xml"),
     ]
     results = []
     with tempfile.TemporaryDirectory() as directory:

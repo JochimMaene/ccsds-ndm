@@ -40,6 +40,7 @@ class TestAem:
             ref_frame_b="SC_BODY_1",
             start_time="2023-01-01T00:00:00",
             stop_time="2023-01-01T01:00:00",
+            time_system="UTC",
             attitude_type="QUATERNION",
             interpolation_method="LINEAR",
             interpolation_degree=1,
@@ -57,6 +58,7 @@ class TestAem:
                 ref_frame_b="SC_BODY_1",
                 start_time="2023-01-01T00:00:00",
                 stop_time="2023-01-01T01:00:00",
+                time_system="UTC",
                 attitude_type="NOT_IN_XSD_ENUM",
             )
 
@@ -83,6 +85,7 @@ class TestAem:
             ref_frame_b="SC_BODY_1",
             start_time="2023-01-01T00:00:00",
             stop_time="2023-01-01T01:00:00",
+            time_system="UTC",
         )
         with pytest.raises(ValueError):
             meta.start_time = "123.5"
@@ -137,6 +140,7 @@ class TestAem:
             ref_frame_b="SC_BODY_1",
             start_time="2023-01-01T00:00:00",
             stop_time="2023-01-01T01:00:00",
+            time_system="UTC",
             attitude_type="QUATERNION",
         )
         state1 = AttitudeState("2023-01-01T00:00:00", [0.0, 0.0, 0.0, 1.0])
@@ -221,6 +225,29 @@ class TestAem:
         aem = self._create_valid_aem()
         assert aem.header.originator == "TEST"
         assert len(aem.segments) == 1
+
+    def test_interpolation_degree_zero_is_rejected_not_dropped(self):
+        with pytest.raises(ValueError, match="positive integer"):
+            AemMetadata(
+                object_name="SAT1",
+                object_id="2023-001A",
+                ref_frame_a="EME2000",
+                ref_frame_b="SC_BODY_1",
+                start_time="2023-01-01T00:00:00",
+                stop_time="2023-01-01T01:00:00",
+                time_system="UTC",
+                interpolation_degree=0,
+            )
+
+        meta = self._create_valid_aem().segments[0].metadata
+        meta.interpolation_degree = 5
+        assert meta.interpolation_degree == 5
+        with pytest.raises(ValueError, match="positive integer"):
+            meta.interpolation_degree = 0
+        assert meta.interpolation_degree == 5
+
+        meta.interpolation_degree = None
+        assert meta.interpolation_degree is None
 
 
 if __name__ == "__main__":

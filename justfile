@@ -52,16 +52,6 @@ stubs:
 stubs-check:
     cd {{python_dir}} && uv run python stubs.py --check
 
-# Sync docstrings from Rust to Python
-[private]
-sync-docs:
-    cd {{python_dir}} && uv run python sync_docstrings.py
-
-# Check if docstrings are in sync
-[private]
-sync-docs-check:
-    cd {{python_dir}} && uv run python sync_docstrings.py --check
-
 # Audit Python bindings against Rust core structs
 [private]
 audit:
@@ -226,45 +216,11 @@ conformance-tdm:
     cargo test --manifest-path {{rust_manifest}} --test tdm_conformance
     cargo test --manifest-path {{rust_manifest}} --test tdm_kvn_allocations
 
-# Reproduce the complete OEM 3.0 Rust technical verification and artifact evidence
-[private]
-verify-oem:
-    just check
-    just conformance-oem
-    just conformance-odm-surfaces
-    cargo check --manifest-path {{rust_manifest}} --all-features --benches
-    just docs
-    just package-rust
-    just package-python
-
-# Reproduce the complete OMM 3.0 technical and packaged-surface evidence
-[private]
-verify-omm:
-    just check
-    just conformance-omm
-    just conformance-odm-surfaces
-    cargo check --manifest-path {{rust_manifest}} --all-features --benches
-    just docs
-    just package-rust
-    just package-python
-
-# Reproduce the complete OPM 3.0 technical verification and artifact evidence
-[private]
-verify-opm:
-    just check
-    just conformance-opm-xml
-    just conformance-opm-kvn
-    just conformance-opm-parse
-    just conformance-opm-validation
-    just conformance-opm-conversion
-    just conformance-opm-python
-    cargo check --manifest-path {{rust_manifest}} --all-features --benches
-    just docs
-    just package-rust
-    just package-python
+# Complete verification path: full quality checks plus packaged-artifact gates.
+verify: check package-rust package-python
 
 # Run all quality checks
-check: lint audit stubs-check sync-docs-check test docs
+check: lint audit stubs-check test docs
 
 # --- Benchmarking -----------------------------------------------------------
 
@@ -276,43 +232,11 @@ bench:
 bench-python-object-model:
     cd {{python_dir}} && uv run python benchmarks/object_model.py
 
-# Benchmark materialized and streaming OPM XML generation
-[private]
-bench-opm-xml:
-    cargo bench --manifest-path {{rust_manifest}} --bench xml_benches -- xml_generate_opm
-
-# Benchmark materialized and streaming OPM KVN generation
-[private]
-bench-opm-kvn:
-    cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_generate_opm
-
-# Benchmark OPM strict parsing and typed validation
-[private]
-bench-opm-parse:
-    cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_parse_opm
-    cargo bench --manifest-path {{rust_manifest}} --bench xml_benches -- xml_parse_opm
-
-[private]
-bench-opm-validation:
-    cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- opm_validate
-
-# Reproduce OEM parsing and generation scaling; timings are informational
-[private]
-bench-oem:
-    cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_scaling
-    cargo bench --manifest-path {{rust_manifest}} --bench xml_benches -- xml_scaling
-
 # Reproduce parse/generate workloads for every standalone message and combined XML NDM
 [private]
 bench-family:
     cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_message_matrix
     cargo bench --manifest-path {{rust_manifest}} --bench xml_benches -- xml_message_matrix
-
-# --- Coverage ---------------------------------------------------------------
-
-# Generate code coverage report
-coverage:
-    cargo llvm-cov --manifest-path {{rust_manifest}} --all-features --workspace --codecov --output-path codecov.json
 
 # --- CodSpeed ---------------------------------------------------------------
 

@@ -18,7 +18,7 @@ schema 3.0. Python delegation is reviewed separately in `odm-3.0-surfaces.md`.
 | XML generation | OEM 3.0 XSD in NDM/XML 4.0.0 | Deterministic validated XML; every shipped OEM fixture generates output accepted by the official schema | `oem_generation_conformance` |
 | Conversion | ODM 5 and project semantic-preservation policy | KVN↔XML preserves the complete normalized typed model and edition; XML states with partial acceleration fail KVN conversion instead of becoming ambiguous | `oem_conversion` |
 | Resource behavior | Project conformance policy | Optional exact input/output, XML-depth, and history-record limits; atomic file replacement; allocation-stable streaming KVN generation | `oem_strict_parsing`, `oem_conversion`, `oem_generation_conformance`, `oem_kvn_allocations` |
-| Scale | Project performance contract | Reproducible KVN parse/generate workloads at 10–50,000 records and XML workloads at 100–10,000 records; timing remains informational | `just bench-oem` |
+| Scale | Project performance contract | Reproducible KVN parse/generate workloads at 10–50,000 records and XML workloads at 100–10,000 records; timing remains informational | `cargo bench -p ccsds-ndm --bench kvn_benches -- kvn_scaling` and `cargo bench -p ccsds-ndm --bench xml_benches -- xml_scaling` |
 
 ## Deliberate boundaries
 
@@ -51,6 +51,5 @@ schema 3.0. Python delegation is reviewed separately in `odm-3.0-surfaces.md`.
 
 ## Reproduction
 
-Run `just verify-oem` for the full Rust, Python, documentation, binding-audit, and packaged
-artifact verification. Run `just bench-oem` separately to collect informational scaling
+Run `just verify` for the full quality checks plus packaged-artifact gates. Run `cargo bench -p ccsds-ndm --bench kvn_benches -- kvn_scaling` and `cargo bench -p ccsds-ndm --bench xml_benches -- xml_scaling` separately to collect informational scaling
 measurements on the current host.

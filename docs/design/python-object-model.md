@@ -30,14 +30,16 @@ This is simpler and more familiar than introducing a custom ownership rule solel
 
 ## Why this design
 
-- Direct mutation is the shortest common workflow and is understood by Python users without
-  library-specific concepts.
+- Generation from caller data is the primary workflow; parsing remains core. Direct mutation stays supported and is understood by Python users without
+  library-specific concepts, but it is no longer claimed to be the shortest common workflow.
 - Child identity makes retained references predictable, including after a child is removed from a
   collection.
 - The complete edited graph is what validation and generation observe, so there is no stale
   shadow copy or forgotten commit.
 - Ordinary lists are preferable to a custom repeated-field framework unless a benchmark proves
-  that a specialized representation is needed.
+  that a specialized representation is needed. The reproducible benchmark shows extra per-record
+  cost at large sizes, but no equivalent Rust-owned alternative has been measured. The existing
+  model therefore remains provisional.
 
 The rejected long-term alternatives are immutable rebuilding and an editor/proxy API. Immutable
 rebuilding adds ceremony to routine edits. An editor hides copy/write-back behavior behind a second
@@ -52,12 +54,10 @@ time-sensitive paths were measured before extending the graph to every message f
 - repeated scalar edits through a retained state-vector reference; and
 - the same end-to-end workloads in the competing Python package.
 
-Those historical measurements were not retained in a reproducible repository workload, so they do
-not support a current comparative-performance claim. `just bench-python-object-model` now measures
-small and 10,000-record OEM parsing, Rust-graph reconstruction and validation, XML generation,
-retained-child edits, edit-plus-validation, and isolated-process peak RSS. Results are comparison
-evidence, not release thresholds. The initial machine-local measurements and limitations are
-recorded in [Python object-model performance baseline](python-object-model-performance.md).
+Those historical measurements were not retained and do not support a comparative claim.
+`just bench-python-object-model` measures OEM parsing, construction from records and NumPy arrays,
+validation, generation, numeric access, editing, and isolated-process peak RSS. Results are local
+comparison evidence, not release thresholds.
 
 A comparison with another package is valid only when both libraries process the same generated
 document on the same machine. A specialized native repeated sequence still must preserve direct

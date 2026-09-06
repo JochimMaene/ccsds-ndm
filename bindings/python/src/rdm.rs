@@ -450,8 +450,8 @@ impl RdmMetadata {
         international_designator,
         epoch_tzero,
         controlled_reentry=None,
-        center_name=String::from("EARTH"),
-        time_system=None,
+        center_name,
+        time_system,
         catalog_name=None,
         object_designator=None,
         object_type=None,
@@ -484,7 +484,7 @@ impl RdmMetadata {
         epoch_tzero: String,
         controlled_reentry: Option<Bound<'_, PyAny>>,
         center_name: String,
-        time_system: Option<String>,
+        time_system: String,
 
         catalog_name: Option<String>,
         object_designator: Option<String>,
@@ -523,8 +523,6 @@ impl RdmMetadata {
             Some(ref ob) => Some(parse_object_description(ob)?),
             None => None,
         };
-
-        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
 
         let intrack_thrust_enum = match intrack_thrust {
             Some(s) => Some(YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))?),
