@@ -16,7 +16,7 @@ Status: implemented slice, not a blanket ADM conformance claim. Scope: the share
 
 ## Decision
 
-`AdmHeader.creation_date` now uses `CalendarEpoch`, matching the earlier ODM header slice. KVN and
+`AdmHeader.creation_date` uses `CalendarEpoch`, matching the ODM header rule. KVN and
 XML parsing/deserialization reject numeric, empty, and invalid calendar values before a message is
 constructed. The Python `AdmHeader` constructor/getter/setter remains a string API and raises
 `ValueError` for the same invalid values.

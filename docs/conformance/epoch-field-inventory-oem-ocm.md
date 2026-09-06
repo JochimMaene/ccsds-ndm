@@ -52,15 +52,15 @@ tag. `TIME_SYSTEM` and the SCLK parameters change the interpretation of the refe
 the required calendar/ordinal spelling; for SCLK, the book specifically interprets `EPOCH_TZERO`
 in UTC.
 
-Accordingly, these four metadata fields now use `CalendarEpoch` in Rust. KVN and XML parsing and
+Accordingly, these four metadata fields use `CalendarEpoch` in Rust. KVN and XML parsing and
 Serde deserialization reject numeric or invalid calendar spellings at construction, while Python
-continues to expose the established `str`/`str | None` API and validates through the same parser.
+exposes a `str`/`str | None` API and validates through the same parser.
 `START_TIME`, `STOP_TIME`, history-line epochs, and nested frame epochs remain `Epoch` because
 their legal relative/absolute form still depends on OCM context or a separate conditional rule.
 
-Metadata validation also now preserves the SCLK conditional boundary from ODM table 6-3: when
+Metadata validation preserves the SCLK conditional boundary from ODM table 6-3: when
 `TIME_SYSTEM=SCLK`, both `SCLK_OFFSET_AT_EPOCH` and `SCLK_SEC_PER_SI_SEC` must be present. KVN
-parsing no longer manufactures those optional values, so KVN and XML retain the same omission
+parsing does not manufacture those optional values, so KVN and XML share the same omission
 semantics. Their XSD time-unit restrictions and the conditional `NEXT_LEAP_TAIMUTC` requirement
 are checked without resolving physical time.
 
@@ -68,7 +68,7 @@ The same absolute-format rule applies to the four nested reference-frame epochs
 (`TRAJ_FRAME_EPOCH`, `OEB_PARENT_FRAME_EPOCH`, `COV_FRAME_EPOCH`, and `MAN_FRAME_EPOCH`). It also
 applies to trajectory `USEABLE_START_TIME` and `USEABLE_STOP_TIME`: ODM §6.2.5 and table 6-4
 explicitly refer these values to §7.5.10, even though the XSD uses the broad `epochType` union.
-They now use `CalendarEpoch` in Rust with the unchanged Python string surface. Their ordering and
+They use `CalendarEpoch` in Rust with a Python string surface. Their ordering and
 relation to the data history still need the OCM time context; that ordering question is separate
 from the already-established absolute lexical form.
 
@@ -118,13 +118,13 @@ enforces that conditional presence and the XSD seconds-only units without resolv
 | `cov[*].cov_lines[*].epoch` / `covLine` first token | required repeated `xsd:string` | Time tag followed by the selected covariance elements | Rust `Epoch`; Python `str` | contextual `Epoch` implemented |
 | `man[*].man_lines[*].epoch` / `manLine` first token | required repeated `xsd:string` | First `MAN_COMPOSITION` element must be exactly one of `TIME_ABSOLUTE` or `TIME_RELATIVE`; absolute uses calendar/ordinal format and relative uses SI seconds from `EPOCH_TZERO` | Rust `Epoch`; Python `str` | contextual `Epoch` implemented with composition validation |
 
-These three fields were the highest-risk finding from the inventory. All three now parse their first
+These three fields were the highest-risk finding from the inventory. All three parse their first
 token into `Epoch`, and OCM validation rejects invalid calendar fields and degenerate numeric
 spellings. Trajectory and covariance validation also enforces ODM §§6.2.2.4–6.2.2.5 and
 §§6.2.5.6/6.2.7.6: every history record within one block must use the same calendar or numeric
 branch, must not duplicate a time value, and must be strictly increasing. Maneuver validation
 additionally requires the composition time tag to be first, selects the legal epoch branch
-(`TIME_ABSOLUTE` or `TIME_RELATIVE`), and rejects duplicate values. Python continues to expose the
+(`TIME_ABSOLUTE` or `TIME_RELATIVE`), and rejects duplicate values. Python exposes the
 value as `str` while sharing the same mutation-time validation.
 
 The 10k trajectory benchmark records 5.85–6.03 ms XML parsing, 4.02–4.03 ms KVN parsing, and about
@@ -142,7 +142,7 @@ An OCM `TimeContext` needs, at minimum:
 - external MET/MRT reference-event information when applicable;
 - the message-provided leap-second/EOP values without silently replacing them with a library table.
 
-The typed wire parser now classifies spelling, calendar-field validity, and a compact same-branch
+The typed wire parser classifies spelling, calendar-field validity, and a compact same-branch
 ordering key once without attempting physical-time conversion. Contextual adoption outside OPM still
 covers scalar field categories and time-system-aware comparisons; no OCM parsed or generated message
 accepts an unvalidated history epoch token. Ordering rules such as `START_TIME <= STOP_TIME`,

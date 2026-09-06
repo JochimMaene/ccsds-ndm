@@ -13,7 +13,7 @@ Status: implemented slice, not a blanket OMM conformance claim. Scope: OMM 3.0.
 
 ## Decision
 
-`OmmMetadata.ref_frame_epoch` and `MeanElements.epoch` now use `Option<CalendarEpoch>` and
+`OmmMetadata.ref_frame_epoch` and `MeanElements.epoch` use `Option<CalendarEpoch>` and
 `CalendarEpoch`, respectively, in Rust. KVN and XML parsing reject numeric or invalid calendar
 spellings, while Python keeps the existing string constructor, getter, and setter surfaces and
 raises `ValueError` for the same invalid values.

@@ -17,7 +17,7 @@ the lexical representation rules that the shared `epochType` union cannot encode
 | RDM | state-vector `EPOCH` | common `stateVectorType`, `ndm:epochType` | RDM §3.5 and §5.3.3.5 | `CalendarEpoch` (already shared with OPM) |
 
 The XSD union also accepts signed numeric spellings for every row above. The corresponding book
-sections require the two calendar-date or ordinal-date formats, so the typed boundary now rejects
+sections require the two calendar-date or ordinal-date formats, so the typed boundary rejects
 numeric values while preserving the original spelling. TDM `EPOCH` remains semantically dependent
 on the segment's `TIME_SYSTEM`; `CalendarEpoch` expresses only the mandated lexical branch and
 does not perform time-system conversion.
