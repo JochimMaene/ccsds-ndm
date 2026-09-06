@@ -1021,7 +1021,6 @@ impl crate::traits::Validate for OcmData {
         if let Some(od) = &self.od {
             od.validate()?;
         }
-        OcmTrajState::validate_all(&self.traj)?;
         Ok(())
     }
 }
@@ -1137,12 +1136,6 @@ impl OcmTrajState {
                 }
             }
         }
-        Ok(())
-    }
-
-    // Example of cross-block validation (not strictly required by spec but good practice)
-    fn validate_all(_trajs: &[OcmTrajState]) -> Result<()> {
-        // Could check for overlapping time spans or duplicate IDs
         Ok(())
     }
 }
