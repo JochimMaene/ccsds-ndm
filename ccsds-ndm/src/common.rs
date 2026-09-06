@@ -502,6 +502,34 @@ pub struct OdParameters {
     pub weighted_rms: Option<NonNegativeDouble>,
 }
 
+impl crate::traits::Validate for OdParameters {
+    fn validate(&self) -> Result<()> {
+        if let Some(value) = &self.recommended_od_span {
+            DayInterval::validate_value(value.value, "RECOMMENDED_OD_SPAN")?;
+        }
+        if let Some(value) = &self.actual_od_span {
+            DayInterval::validate_value(value.value, "ACTUAL_OD_SPAN")?;
+        }
+        for (name, value) in [
+            ("OBS_AVAILABLE", &self.obs_available),
+            ("OBS_USED", &self.obs_used),
+            ("TRACKS_AVAILABLE", &self.tracks_available),
+            ("TRACKS_USED", &self.tracks_used),
+        ] {
+            if let Some(value) = value {
+                PositiveInteger::validate_value(value.value, name)?;
+            }
+        }
+        if let Some(value) = &self.residuals_accepted {
+            Percentage::validate_value(value.value, "RESIDUALS_ACCEPTED")?;
+        }
+        if let Some(value) = &self.weighted_rms {
+            NonNegativeDouble::validate_value(value.value, "WEIGHTED_RMS")?;
+        }
+        Ok(())
+    }
+}
+
 /// State Vector Components in the Specified Coordinate System.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
@@ -1144,6 +1172,47 @@ impl crate::traits::Validate for SpinState {
             .into());
         }
 
+        for (name, value) in [
+            ("SPIN_ALPHA", self.spin_alpha.value),
+            ("SPIN_DELTA", self.spin_delta.value),
+            ("SPIN_ANGLE", self.spin_angle.value),
+        ] {
+            Angle::validate_value(value, name)?;
+        }
+        if !self.spin_angle_vel.value.is_finite() {
+            return Err(ValidationError::InvalidValue {
+                field: "SPIN_ANGLE_VEL".into(),
+                value: self.spin_angle_vel.value.to_string(),
+                expected: "a finite number".into(),
+                line: None,
+            }
+            .into());
+        }
+        for (name, value) in [
+            ("NUTATION", self.nutation.as_ref()),
+            ("NUTATION_PHASE", self.nutation_phase.as_ref()),
+            ("MOMENTUM_ALPHA", self.momentum_alpha.as_ref()),
+            ("MOMENTUM_DELTA", self.momentum_delta.as_ref()),
+        ] {
+            if let Some(value) = value {
+                Angle::validate_value(value.value, name)?;
+            }
+        }
+        if let Some(value) = &self.nutation_per {
+            Duration::validate_value(value.value, "NUTATION_PER")?;
+        }
+        if let Some(value) = &self.nutation_vel {
+            if !value.value.is_finite() {
+                return Err(ValidationError::InvalidValue {
+                    field: "NUTATION_VEL".into(),
+                    value: value.value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+
         let nutation_present =
             self.nutation.is_some() || self.nutation_per.is_some() || self.nutation_phase.is_some();
         let momentum_present = self.momentum_alpha.is_some()
@@ -1695,6 +1764,57 @@ impl ToKvn for QuaternionState {
             writer.write_pair("Q3_DOT", dot.q3_dot.value);
             writer.write_pair("QC_DOT", dot.qc_dot.value);
         }
+    }
+}
+
+impl crate::traits::Validate for EulerAngleState {
+    fn validate(&self) -> Result<()> {
+        for (field, angle) in [
+            ("EULER_ANGLE_1", &self.angle_1),
+            ("EULER_ANGLE_2", &self.angle_2),
+            ("EULER_ANGLE_3", &self.angle_3),
+        ] {
+            Angle::validate_value(angle.value, field)?;
+        }
+        for (field, rate) in [
+            ("EULER_ANGLE_1_DOT", &self.angle_1_dot),
+            ("EULER_ANGLE_2_DOT", &self.angle_2_dot),
+            ("EULER_ANGLE_3_DOT", &self.angle_3_dot),
+        ] {
+            if let Some(rate) = rate {
+                require_finite(field, rate.value)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl crate::traits::Validate for AngVelState {
+    fn validate(&self) -> Result<()> {
+        for (field, rate) in [
+            ("ANGVEL_X", &self.angvel_x),
+            ("ANGVEL_Y", &self.angvel_y),
+            ("ANGVEL_Z", &self.angvel_z),
+        ] {
+            require_finite(field, rate.value)?;
+        }
+        Ok(())
+    }
+}
+
+impl crate::traits::Validate for InertiaState {
+    fn validate(&self) -> Result<()> {
+        for (field, moment) in [
+            ("IXX", &self.ixx),
+            ("IYY", &self.iyy),
+            ("IZZ", &self.izz),
+            ("IXY", &self.ixy),
+            ("IXZ", &self.ixz),
+            ("IYZ", &self.iyz),
+        ] {
+            require_finite(field, moment.value)?;
+        }
+        Ok(())
     }
 }
 
@@ -2338,6 +2458,27 @@ pub struct AtmosphericReentryParameters {
     pub orbit_lifetime_confidence_level: Option<PercentageRequired>,
 }
 
+impl crate::traits::Validate for AtmosphericReentryParameters {
+    fn validate(&self) -> Result<()> {
+        for (name, interval) in [
+            ("ORBIT_LIFETIME", Some(&self.orbit_lifetime)),
+            (
+                "ORBIT_LIFETIME_WINDOW_START",
+                self.orbit_lifetime_window_start.as_ref(),
+            ),
+            (
+                "ORBIT_LIFETIME_WINDOW_END",
+                self.orbit_lifetime_window_end.as_ref(),
+            ),
+        ] {
+            if let Some(interval) = interval {
+                DayIntervalRequired::validate_value(interval.value, name)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 impl ToKvn for AtmosphericReentryParameters {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
@@ -2722,6 +2863,182 @@ pub struct GroundImpactParameters {
     pub impact_3_cross_track: Option<Distance>,
 }
 
+impl crate::traits::Validate for GroundImpactParameters {
+    fn validate(&self) -> Result<()> {
+        for (name, value) in [
+            ("PROBABILITY_OF_IMPACT", &self.probability_of_impact),
+            ("PROBABILITY_OF_BURN_UP", &self.probability_of_burn_up),
+            ("PROBABILITY_OF_BREAK_UP", &self.probability_of_break_up),
+            (
+                "PROBABILITY_OF_LAND_IMPACT",
+                &self.probability_of_land_impact,
+            ),
+            ("PROBABILITY_OF_CASUALTY", &self.probability_of_casualty),
+        ] {
+            if let Some(value) = value {
+                Probability::validate_value(value.value, name)?;
+            }
+        }
+
+        if let Some(value) = &self.nominal_impact_lon {
+            LongitudeRequired::validate_value(value.value, "NOMINAL_IMPACT_LON")?;
+        }
+        if let Some(value) = &self.nominal_impact_lat {
+            LatitudeRequired::validate_value(value.value, "NOMINAL_IMPACT_LAT")?;
+        }
+
+        for (name, value) in [
+            ("IMPACT_1_CONFIDENCE", &self.impact_1_confidence),
+            ("IMPACT_2_CONFIDENCE", &self.impact_2_confidence),
+            ("IMPACT_3_CONFIDENCE", &self.impact_3_confidence),
+        ] {
+            if let Some(value) = value {
+                PercentageRequired::validate_value(value.value, name)?;
+            }
+        }
+        for (name, value) in [
+            ("IMPACT_1_START_LON", &self.impact_1_start_lon),
+            ("IMPACT_1_STOP_LON", &self.impact_1_stop_lon),
+            ("IMPACT_2_START_LON", &self.impact_2_start_lon),
+            ("IMPACT_2_STOP_LON", &self.impact_2_stop_lon),
+            ("IMPACT_3_START_LON", &self.impact_3_start_lon),
+            ("IMPACT_3_STOP_LON", &self.impact_3_stop_lon),
+        ] {
+            if let Some(value) = value {
+                LongitudeRequired::validate_value(value.value, name)?;
+            }
+        }
+        for (name, value) in [
+            ("IMPACT_1_START_LAT", &self.impact_1_start_lat),
+            ("IMPACT_1_STOP_LAT", &self.impact_1_stop_lat),
+            ("IMPACT_2_START_LAT", &self.impact_2_start_lat),
+            ("IMPACT_2_STOP_LAT", &self.impact_2_stop_lat),
+            ("IMPACT_3_START_LAT", &self.impact_3_start_lat),
+            ("IMPACT_3_STOP_LAT", &self.impact_3_stop_lat),
+        ] {
+            if let Some(value) = value {
+                LatitudeRequired::validate_value(value.value, name)?;
+            }
+        }
+        for (name, value) in [
+            ("IMPACT_1_CROSS_TRACK", &self.impact_1_cross_track),
+            ("IMPACT_2_CROSS_TRACK", &self.impact_2_cross_track),
+            ("IMPACT_3_CROSS_TRACK", &self.impact_3_cross_track),
+        ] {
+            if let Some(value) = value {
+                if !value.value.is_finite() {
+                    return Err(ValidationError::InvalidValue {
+                        field: name.into(),
+                        value: value.value.to_string(),
+                        expected: "a finite number".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+
+        // RDM gives no range for the altitude, so P3 enforces only that it is a real number; the
+        // XSD's Earth-derived range is a P4 representability limit, checked at XML generation.
+        if let Some(altitude) = &self.nominal_impact_alt {
+            require_finite("NOMINAL_IMPACT_ALT", altitude.value)?;
+        }
+
+        let has_location = self.nominal_impact_lon.is_some()
+            || self.nominal_impact_lat.is_some()
+            || self.nominal_impact_alt.is_some();
+        if has_location {
+            for (field, present) in [
+                (
+                    "IMPACT_REF_FRAME",
+                    self.impact_ref_frame
+                        .as_deref()
+                        .is_some_and(|value| !value.trim().is_empty()),
+                ),
+                ("NOMINAL_IMPACT_LON", self.nominal_impact_lon.is_some()),
+                ("NOMINAL_IMPACT_LAT", self.nominal_impact_lat.is_some()),
+            ] {
+                if !present {
+                    return Err(ValidationError::MissingRequiredField {
+                        block: "Ground Impact Parameters".into(),
+                        field: field.into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+
+        let intervals = [
+            [
+                ("IMPACT_1_CONFIDENCE", self.impact_1_confidence.is_some()),
+                ("IMPACT_1_START_LON", self.impact_1_start_lon.is_some()),
+                ("IMPACT_1_START_LAT", self.impact_1_start_lat.is_some()),
+                ("IMPACT_1_STOP_LON", self.impact_1_stop_lon.is_some()),
+                ("IMPACT_1_STOP_LAT", self.impact_1_stop_lat.is_some()),
+                ("IMPACT_1_CROSS_TRACK", self.impact_1_cross_track.is_some()),
+            ],
+            [
+                ("IMPACT_2_CONFIDENCE", self.impact_2_confidence.is_some()),
+                ("IMPACT_2_START_LON", self.impact_2_start_lon.is_some()),
+                ("IMPACT_2_START_LAT", self.impact_2_start_lat.is_some()),
+                ("IMPACT_2_STOP_LON", self.impact_2_stop_lon.is_some()),
+                ("IMPACT_2_STOP_LAT", self.impact_2_stop_lat.is_some()),
+                ("IMPACT_2_CROSS_TRACK", self.impact_2_cross_track.is_some()),
+            ],
+            [
+                ("IMPACT_3_CONFIDENCE", self.impact_3_confidence.is_some()),
+                ("IMPACT_3_START_LON", self.impact_3_start_lon.is_some()),
+                ("IMPACT_3_START_LAT", self.impact_3_start_lat.is_some()),
+                ("IMPACT_3_STOP_LON", self.impact_3_stop_lon.is_some()),
+                ("IMPACT_3_STOP_LAT", self.impact_3_stop_lat.is_some()),
+                ("IMPACT_3_CROSS_TRACK", self.impact_3_cross_track.is_some()),
+            ],
+        ];
+        for interval in &intervals {
+            if interval.iter().any(|(_, present)| *present) {
+                if let Some((field, _)) = interval.iter().find(|(_, present)| !present) {
+                    return Err(ValidationError::MissingRequiredField {
+                        block: "Ground Impact Parameters".into(),
+                        field: (*field).into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+        for index in 1..intervals.len() {
+            if intervals[index].iter().any(|(_, present)| *present)
+                && !intervals[index - 1].iter().any(|(_, present)| *present)
+            {
+                return Err(ValidationError::MissingRequiredField {
+                    block: "Ground Impact Parameters".into(),
+                    field: format!("IMPACT_{index}_*").into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        for (lower, upper) in [
+            (&self.impact_1_confidence, &self.impact_2_confidence),
+            (&self.impact_2_confidence, &self.impact_3_confidence),
+        ] {
+            if let (Some(lower), Some(upper)) = (lower, upper) {
+                if lower.value >= upper.value {
+                    return Err(ValidationError::InvalidValue {
+                        field: "IMPACT_*_CONFIDENCE".into(),
+                        value: format!("{} followed by {}", lower.value, upper.value),
+                        expected: "strictly increasing confidence levels".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 impl ToKvn for GroundImpactParameters {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
@@ -2935,6 +3252,48 @@ pub struct RdmSpacecraftParameters {
         with = "crate::utils::nullable"
     )]
     pub thrust_acceleration: Option<Ms2>,
+}
+
+impl crate::traits::Validate for RdmSpacecraftParameters {
+    fn validate(&self) -> Result<()> {
+        for (name, value) in [("WET_MASS", &self.wet_mass), ("DRY_MASS", &self.dry_mass)] {
+            if let Some(value) = value {
+                Mass::validate_value(value.value, name)?;
+            }
+        }
+        for (name, value) in [
+            ("SOLAR_RAD_AREA", &self.solar_rad_area),
+            ("DRAG_AREA", &self.drag_area),
+            ("RCS", &self.rcs),
+        ] {
+            if let Some(value) = value {
+                Area::validate_value(value.value, name)?;
+            }
+        }
+        for (name, value) in [
+            ("SOLAR_RAD_COEFF", &self.solar_rad_coeff),
+            ("DRAG_COEFF", &self.drag_coeff),
+        ] {
+            if let Some(value) = value {
+                NonNegativeDouble::validate_value(value.value, name)?;
+            }
+        }
+        if let Some(value) = &self.ballistic_coeff {
+            NonNegativeDouble::validate_value(value.value, "BALLISTIC_COEFF")?;
+        }
+        if let Some(value) = &self.thrust_acceleration {
+            if !value.value.is_finite() {
+                return Err(ValidationError::InvalidValue {
+                    field: "THRUST_ACCELERATION".into(),
+                    value: value.value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

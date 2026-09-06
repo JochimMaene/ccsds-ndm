@@ -6,6 +6,8 @@
 Unit tests for Conjunction Data Message (CDM) Python bindings.
 """
 
+from pathlib import Path
+
 import ccsds_ndm
 import numpy as np
 import pytest
@@ -275,6 +277,26 @@ class TestCdm:
         assert rel.screen_volume_x is None
         assert rel.screen_volume_y is None
         assert rel.screen_volume_z is None
+
+
+class TestCdmRealWorldCorpus:
+    """An operational CDM that strict parsing rejects, kept as evidence.
+
+    `test_cdm.xml` is an unedited CSpOC conjunction message. It spells its
+    null-valued elements as a bare `nil="true"` attribute, 35 times, where the
+    NDM XSD requires the namespaced `xsi:nil`. Strict parsing rejects it, and
+    that rejection is the point: the document records what real operator output
+    looks like and pins the cost of the strict-parsing decision, so the choice
+    stays visible rather than being rediscovered against a live feed.
+    """
+
+    def test_operational_cdm_with_bare_nil_is_rejected(self):
+        path = Path(__file__).resolve().parent / "test_cdm.xml"
+
+        with pytest.raises(ccsds_ndm.NdmFormatError) as excinfo:
+            ccsds_ndm.from_file(str(path), format="xml")
+
+        assert "nil" in str(excinfo.value)
 
 
 if __name__ == "__main__":

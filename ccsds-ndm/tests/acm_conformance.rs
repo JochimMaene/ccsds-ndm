@@ -1,10 +1,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use ccsds_ndm::messages::acm::Acm;
+use ccsds_ndm::types::{AngleRate, Vec4Double};
 use ccsds_ndm::Ndm;
-use tempfile::NamedTempFile;
+
+mod common;
+use common::{assert_rejects, validate_xml};
 
 const ATT_KVN: &str = include_str!("../data/kvn/acm_g7.kvn");
 const COV_KVN: &str = include_str!("../data/kvn/acm_g9.kvn");
@@ -148,6 +150,117 @@ fn every_kvn_generation_gate_rejects_invalid_state_before_output() {
 }
 
 #[test]
+fn acm_physical_and_maneuver_values_are_revalidated_after_edits() {
+    let physical = Acm::from_kvn(include_str!("../data/kvn/acm_g8.kvn")).unwrap();
+    let mut value = physical.clone();
+    value.body.segment.data.phys.as_mut().unwrap().drag_coeff = Some(f64::NAN);
+    assert_rejects(&value, "DRAG_COEFF");
+    let mut value = physical.clone();
+    value
+        .body
+        .segment
+        .data
+        .phys
+        .as_mut()
+        .unwrap()
+        .wet_mass
+        .as_mut()
+        .unwrap()
+        .value = -1.0;
+    assert_rejects(&value, "WET_MASS");
+    let mut value = physical.clone();
+    let phys = value.body.segment.data.phys.as_mut().unwrap();
+    phys.dry_mass = phys.wet_mass.clone();
+    phys.dry_mass.as_mut().unwrap().value = f64::INFINITY;
+    assert_rejects(&value, "DRY_MASS");
+    let mut value = physical.clone();
+    value
+        .body
+        .segment
+        .data
+        .phys
+        .as_mut()
+        .unwrap()
+        .cp
+        .as_mut()
+        .unwrap()
+        .elements[1] = f64::NAN;
+    assert_rejects(&value, "CP");
+    for field in ["IXX", "IYY", "IZZ", "IXY", "IXZ", "IYZ"] {
+        let mut value = physical.clone();
+        let phys = value.body.segment.data.phys.as_mut().unwrap();
+        match field {
+            "IXX" => phys.ixx.as_mut().unwrap().value = f64::NAN,
+            "IYY" => phys.iyy.as_mut().unwrap().value = f64::NAN,
+            "IZZ" => phys.izz.as_mut().unwrap().value = f64::NAN,
+            "IXY" => phys.ixy.as_mut().unwrap().value = f64::NAN,
+            "IXZ" => phys.ixz.as_mut().unwrap().value = f64::NAN,
+            "IYZ" => phys.iyz.as_mut().unwrap().value = f64::NAN,
+            _ => unreachable!(),
+        }
+        assert_rejects(&value, field);
+    }
+
+    let maneuver = Acm::from_kvn(ATT_KVN).unwrap();
+    let mut value = maneuver.clone();
+    value.body.segment.data.man[0]
+        .man_duration
+        .as_mut()
+        .unwrap()
+        .value = -1.0;
+    assert_rejects(&value, "MAN_DURATION");
+    let mut value = maneuver.clone();
+    value.body.segment.data.man[0]
+        .target_momentum
+        .as_mut()
+        .unwrap()
+        .elements[1] = f64::NAN;
+    assert_rejects(&value, "TARGET_MOMENTUM");
+    let mut value = maneuver.clone();
+    let man = &mut value.body.segment.data.man[0];
+    man.target_momentum = None;
+    man.target_mom_frame = None;
+    man.target_attitude = Some(Vec4Double {
+        values: vec![0.0, 0.0, 0.0, f64::NAN],
+    });
+    assert_rejects(&value, "TARGET_ATTITUDE");
+    let mut value = maneuver;
+    let man = &mut value.body.segment.data.man[0];
+    man.target_momentum = None;
+    man.target_mom_frame = None;
+    man.target_spinrate = Some(AngleRate {
+        value: f64::INFINITY,
+        units: None,
+    });
+    assert_rejects(&value, "TARGET_SPINRATE");
+}
+
+#[test]
+fn acm_mass_and_duration_zero_boundaries_generate_valid_xml() {
+    let mut physical = Acm::from_kvn(include_str!("../data/kvn/acm_g8.kvn")).unwrap();
+    physical
+        .body
+        .segment
+        .data
+        .phys
+        .as_mut()
+        .unwrap()
+        .wet_mass
+        .as_mut()
+        .unwrap()
+        .value = 0.0;
+    validate_xml("ACM zero mass", &physical.to_xml().unwrap());
+
+    let mut maneuver = Acm::from_kvn(ATT_KVN).unwrap();
+    maneuver.body.segment.data.man[0]
+        .man_duration
+        .as_mut()
+        .unwrap()
+        .value = 0.0;
+    validate_xml("ACM zero duration", &maneuver.to_xml().unwrap());
+}
+
+#[test]
 fn kvn_generation_rounds_history_numbers_to_the_ccsds_digit_limit() {
     let mut message = Acm::from_kvn(ATT_KVN).unwrap();
     message.body.segment.data.att[0].att_lines[0].values[1] = 1.234_567_890_123_456_7;
@@ -172,21 +285,4 @@ fn xml_generation_rejects_kvn_only_sensor_comments_before_output() {
     let mut output = Vec::new();
     assert!(message.write_xml_to(&mut output).is_err());
     assert!(output.is_empty());
-}
-
-fn validate_xml(label: &str, xml: &str) {
-    let document = NamedTempFile::new().unwrap();
-    fs::write(document.path(), xml).unwrap();
-    let output = Command::new("xmllint")
-        .arg("--noout")
-        .arg("--schema")
-        .arg(repository_path("data/xsd/ndmxml-4.0.0-master-4.0.xsd"))
-        .arg(document.path())
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "{label} generated invalid XML: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
 }

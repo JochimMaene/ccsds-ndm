@@ -2578,14 +2578,10 @@ impl AdditionalParameters {
         Ok(Self {
             inner: core_cdm::AdditionalParameters {
                 comment,
-                area_pc: crate::api::checked_optional(area_pc, |v| core_types::Area::new(v, None))?,
-                area_drg: crate::api::checked_optional(area_drg, |v| {
-                    core_types::Area::new(v, None)
-                })?,
-                area_srp: crate::api::checked_optional(area_srp, |v| {
-                    core_types::Area::new(v, None)
-                })?,
-                mass: crate::api::checked_optional(mass, |v| core_types::Mass::new(v, None))?,
+                area_pc: area_pc.map(|value| core_types::Area { value, units: None }),
+                area_drg: area_drg.map(|value| core_types::Area { value, units: None }),
+                area_srp: area_srp.map(|value| core_types::Area { value, units: None }),
+                mass: mass.map(|value| core_types::Mass { value, units: None }),
                 cd_area_over_mass: cd_area_over_mass.map(core_types::M2kgRequired::new),
                 cr_area_over_mass: cr_area_over_mass.map(core_types::M2kgRequired::new),
                 thrust_acceleration: thrust_acceleration.map(core_types::Ms2::new),
@@ -2616,9 +2612,8 @@ impl AdditionalParameters {
         self.inner.area_pc.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_area_pc(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.area_pc = crate::api::checked_optional(v, |x| core_types::Area::new(x, None))?;
-        Ok(())
+    fn set_area_pc(&mut self, v: Option<f64>) {
+        self.inner.area_pc = v.map(|value| core_types::Area { value, units: None });
     }
 
     /// The effective area of the object exposed to atmospheric drag. (See annex E for
@@ -2632,9 +2627,8 @@ impl AdditionalParameters {
         self.inner.area_drg.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_area_drg(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.area_drg = crate::api::checked_optional(v, |x| core_types::Area::new(x, None))?;
-        Ok(())
+    fn set_area_drg(&mut self, v: Option<f64>) {
+        self.inner.area_drg = v.map(|value| core_types::Area { value, units: None });
     }
 
     /// The effective area of the object exposed to solar radiation pressure. (See annex E for
@@ -2648,9 +2642,8 @@ impl AdditionalParameters {
         self.inner.area_srp.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_area_srp(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.area_srp = crate::api::checked_optional(v, |x| core_types::Area::new(x, None))?;
-        Ok(())
+    fn set_area_srp(&mut self, v: Option<f64>) {
+        self.inner.area_srp = v.map(|value| core_types::Area { value, units: None });
     }
 
     /// The mass of the object.
@@ -2663,9 +2656,8 @@ impl AdditionalParameters {
         self.inner.mass.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_mass(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.mass = crate::api::checked_optional(v, |x| core_types::Mass::new(x, None))?;
-        Ok(())
+    fn set_mass(&mut self, v: Option<f64>) {
+        self.inner.mass = v.map(|value| core_types::Mass { value, units: None });
     }
 
     /// The object's CD•A/m used to propagate the state vector and covariance to TCA. (See

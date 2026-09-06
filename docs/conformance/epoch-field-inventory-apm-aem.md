@@ -21,8 +21,8 @@ calendar/ordinal spelling (including an optional time-zone suffix accepted by th
 branch). This is a narrower rule than changing the global `Epoch` type, which remains necessary for
 other NDM fields whose XSD union branch is contextual or relative.
 
-`AdmHeader::creation_date` was already migrated to `CalendarEpoch`; it is UTC by the APM/AEM header
-rules in §3.2.2.2 and §4.2.2.2.
+`AdmHeader::creation_date` is `CalendarEpoch`; it is UTC by the APM/AEM header rules in
+§3.2.2.2 and §4.2.2.2.
 
 ## Executable evidence
 

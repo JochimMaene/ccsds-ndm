@@ -36,8 +36,12 @@ schema 3.0. Python delegation is reviewed separately in `odm-3.0-surfaces.md`.
   10-field ephemeris records, so partial acceleration remains valid XML but is rejected at the KVN
   generation boundary.
 - The library does not require `INTERPOLATION_DEGREE + 1` records because the shipped normative
-  examples intentionally omit intermediate records. Such a check would reject the reference
-  corpus without the complete exchanged data set.
+  examples intentionally omit intermediate records; such a check would reject the reference corpus
+  without the complete exchanged data set. AEM resolves the same question the same way for a
+  concrete published fixture — `aem_g4.kvn` declares degree 7 and carries four records — and
+  records it as a promotion blocker. See
+  [aem-2.0.md](aem-2.0.md#normative-inventory-reconciliation). The degree field and its conditional
+  presence are validated in both families; record-count capacity is not used as a rejection rule.
 - Covariance epochs are required to be strictly increasing. They are not forced inside the
   metadata total span because the normative XML example `oem_g14.xml` places its covariance epoch
   beyond `STOP_TIME`; the library does not invent a stricter rule where the authoritative inputs

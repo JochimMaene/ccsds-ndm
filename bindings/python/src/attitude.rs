@@ -325,10 +325,8 @@ impl EulerAngleState {
         self.inner.angle_1.value
     }
     #[setter]
-    fn set_angle_1(&mut self, value: f64) -> PyResult<()> {
-        self.inner.angle_1 = Angle::new(value, None)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-        Ok(())
+    fn set_angle_1(&mut self, value: f64) {
+        self.inner.angle_1 = Angle { value, units: None };
     }
 
     /// Angle of the second rotation.
@@ -341,10 +339,8 @@ impl EulerAngleState {
         self.inner.angle_2.value
     }
     #[setter]
-    fn set_angle_2(&mut self, value: f64) -> PyResult<()> {
-        self.inner.angle_2 = Angle::new(value, None)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-        Ok(())
+    fn set_angle_2(&mut self, value: f64) {
+        self.inner.angle_2 = Angle { value, units: None };
     }
 
     /// Angle of the third rotation.
@@ -357,10 +353,8 @@ impl EulerAngleState {
         self.inner.angle_3.value
     }
     #[setter]
-    fn set_angle_3(&mut self, value: f64) -> PyResult<()> {
-        self.inner.angle_3 = Angle::new(value, None)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-        Ok(())
+    fn set_angle_3(&mut self, value: f64) {
+        self.inner.angle_3 = Angle { value, units: None };
     }
 
     /// Time derivative of angle of the first rotation.
@@ -673,10 +667,8 @@ impl SpinState {
         self.inner.spin_alpha.value
     }
     #[setter]
-    fn set_spin_alpha(&mut self, value: f64) -> PyResult<()> {
-        self.inner.spin_alpha = Angle::new(value, None)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-        Ok(())
+    fn set_spin_alpha(&mut self, value: f64) {
+        self.inner.spin_alpha = Angle { value, units: None };
     }
 
     /// Declination of the spin axis vector in frame A.
@@ -689,10 +681,8 @@ impl SpinState {
         self.inner.spin_delta.value
     }
     #[setter]
-    fn set_spin_delta(&mut self, value: f64) -> PyResult<()> {
-        self.inner.spin_delta = Angle::new(value, None)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-        Ok(())
+    fn set_spin_delta(&mut self, value: f64) {
+        self.inner.spin_delta = Angle { value, units: None };
     }
 
     /// Phase of the satellite about the spin axis.
@@ -705,10 +695,8 @@ impl SpinState {
         self.inner.spin_angle.value
     }
     #[setter]
-    fn set_spin_angle(&mut self, value: f64) -> PyResult<()> {
-        self.inner.spin_angle = Angle::new(value, None)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-        Ok(())
+    fn set_spin_angle(&mut self, value: f64) {
+        self.inner.spin_angle = Angle { value, units: None };
     }
 
     /// Angular velocity of satellite around spin axis.
@@ -735,12 +723,8 @@ impl SpinState {
         self.inner.nutation.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_nutation(&mut self, value: Option<f64>) -> PyResult<()> {
-        self.inner.nutation = value
-            .map(|v| Angle::new(v, None))
-            .transpose()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-        Ok(())
+    fn set_nutation(&mut self, value: Option<f64>) {
+        self.inner.nutation = value.map(|value| ccsds_ndm::types::Angle { value, units: None });
     }
 
     /// Body nutation period of the spin axis.
@@ -770,12 +754,9 @@ impl SpinState {
         self.inner.nutation_phase.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_nutation_phase(&mut self, value: Option<f64>) -> PyResult<()> {
-        self.inner.nutation_phase = value
-            .map(|v| Angle::new(v, None))
-            .transpose()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-        Ok(())
+    fn set_nutation_phase(&mut self, value: Option<f64>) {
+        self.inner.nutation_phase =
+            value.map(|value| ccsds_ndm::types::Angle { value, units: None });
     }
 
     /// Right ascension of angular momentum vector in frame A.
@@ -788,12 +769,9 @@ impl SpinState {
         self.inner.momentum_alpha.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_momentum_alpha(&mut self, value: Option<f64>) -> PyResult<()> {
-        self.inner.momentum_alpha = value
-            .map(|v| Angle::new(v, None))
-            .transpose()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-        Ok(())
+    fn set_momentum_alpha(&mut self, value: Option<f64>) {
+        self.inner.momentum_alpha =
+            value.map(|value| ccsds_ndm::types::Angle { value, units: None });
     }
 
     /// Declination of angular momentum vector in frame A.
@@ -806,12 +784,9 @@ impl SpinState {
         self.inner.momentum_delta.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_momentum_delta(&mut self, value: Option<f64>) -> PyResult<()> {
-        self.inner.momentum_delta = value
-            .map(|v| Angle::new(v, None))
-            .transpose()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-        Ok(())
+    fn set_momentum_delta(&mut self, value: Option<f64>) {
+        self.inner.momentum_delta =
+            value.map(|value| ccsds_ndm::types::Angle { value, units: None });
     }
 
     /// Angular velocity of spin vector around the angular momentum vector.

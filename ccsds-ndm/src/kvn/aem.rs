@@ -497,7 +497,7 @@ DATA_STOP
     fn test_parse_aem_quaternion_types() {
         // QUATERNION (4 values)
         let q_input = format!(
-            "{}{}\nDATA_START\n2002-11-04T17:22:31 0.1 0.2 0.3 0.4\nDATA_STOP\n",
+            "{}{}\nDATA_START\n2002-11-04T17:22:31 0.5 0.5 0.5 0.5\nDATA_STOP\n",
             sample_aem_header(),
             sample_aem_meta()
         );
@@ -507,7 +507,7 @@ DATA_STOP
         .content()
         .unwrap()
         {
-            assert_eq!(q.quaternion.q1, 0.1);
+            assert_eq!(q.quaternion.q1, 0.5);
         } else {
             panic!("Wrong type parsed");
         }
@@ -515,7 +515,7 @@ DATA_STOP
         // QUATERNION/DERIVATIVE (8 values)
         let qd_meta = sample_aem_meta().replace("QUATERNION", "QUATERNION/DERIVATIVE");
         let qd_input = format!(
-            "{}{}\nDATA_START\n2002-11-04T17:22:31 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8\nDATA_STOP\n",
+            "{}{}\nDATA_START\n2002-11-04T17:22:31 0.5 0.5 0.5 0.5 0.5 0.6 0.7 0.8\nDATA_STOP\n",
             sample_aem_header(),
             qd_meta
         );
@@ -535,7 +535,7 @@ DATA_STOP
             .replace("QUATERNION", "QUATERNION/ANGVEL")
             .replace("META_STOP", "RATE_FRAME = SC_BODY_1\nMETA_STOP");
         let qr_input = format!(
-            "{}{}\nDATA_START\n2002-11-04T17:22:31 0.1 0.2 0.3 0.4 0.01 0.02 0.03\nDATA_STOP\n",
+            "{}{}\nDATA_START\n2002-11-04T17:22:31 0.5 0.5 0.5 0.5 0.01 0.02 0.03\nDATA_STOP\n",
             sample_aem_header(),
             qr_meta
         );
@@ -686,7 +686,7 @@ META_STOP
             sample_aem_meta()
         );
         let seg2 = format!(
-            "{}\nDATA_START\n2002-11-04T17:23:00 0.6 0.6 0.6 0.6\nDATA_STOP\n",
+            "{}\nDATA_START\n2002-11-04T17:23:00 0.5 0.5 0.5 0.5\nDATA_STOP\n",
             sample_aem_meta()
         ); // Re-use meta for simplicity
 

@@ -1,251 +1,67 @@
+// SPDX-FileCopyrightText: 2026 Jochim Maene <jochim.maene+github@gmail.com>
+//
+// SPDX-License-Identifier: MPL-2.0
+
+//! A CCSDS XML message must appear at the document root. Wrapping one in any
+//! outer element is rejected during notation/type detection, whether the
+//! wrapper looks plausible (`<message>`) or arbitrary (`<somethingExtra>`).
+
+mod common;
+
+use ccsds_ndm::error::CcsdsNdmError;
 use ccsds_ndm::from_str;
 
-#[test]
-fn nonstandard_message_wrapper_is_rejected() {
-    let xml = r#"<?xml version="1.0" encoding="utf-8"?>
-<message xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-    <cdm id="CCSDS_CDM_VERS" version="1.0">
-        <header>
-            <CREATION_DATE>2025-01-01T00:00:00</CREATION_DATE>
-            <ORIGINATOR>TEST</ORIGINATOR>
-            <MESSAGE_ID>MSG-001</MESSAGE_ID>
-        </header>
-        <body>
-            <relativeMetadataData>
-                <TCA>2025-01-02T12:00:00</TCA>
-                <MISS_DISTANCE units="m">100.0</MISS_DISTANCE>
-                <RELATIVE_SPEED units="m/s">10.0</RELATIVE_SPEED>
-                <relativeStateVector>
-                    <RELATIVE_POSITION_R units="m">10.0</RELATIVE_POSITION_R>
-                    <RELATIVE_POSITION_T units="m">20.0</RELATIVE_POSITION_T>
-                    <RELATIVE_POSITION_N units="m">30.0</RELATIVE_POSITION_N>
-                    <RELATIVE_VELOCITY_R units="m/s">0.1</RELATIVE_VELOCITY_R>
-                    <RELATIVE_VELOCITY_T units="m/s">0.2</RELATIVE_VELOCITY_T>
-                    <RELATIVE_VELOCITY_N units="m/s">0.3</RELATIVE_VELOCITY_N>
-                </relativeStateVector>
-            </relativeMetadataData>
-            <segment>
-                <metadata>
-                    <OBJECT>OBJECT1</OBJECT>
-                    <OBJECT_DESIGNATOR>12345</OBJECT_DESIGNATOR>
-                    <CATALOG_NAME>SATCAT</CATALOG_NAME>
-                    <OBJECT_NAME>SAT A</OBJECT_NAME>
-                    <INTERNATIONAL_DESIGNATOR>1998-067A</INTERNATIONAL_DESIGNATOR>
-                    <OBJECT_TYPE>PAYLOAD</OBJECT_TYPE>
-                    <EPHEMERIS_NAME>EPH1</EPHEMERIS_NAME>
-                    <COVARIANCE_METHOD>CALCULATED</COVARIANCE_METHOD>
-                    <MANEUVERABLE>YES</MANEUVERABLE>
-                    <REF_FRAME>GCRF</REF_FRAME>
-                </metadata>
-                <data>
-                    <stateVector>
-                        <X units="km">1000.0</X>
-                        <Y units="km">2000.0</Y>
-                        <Z units="km">3000.0</Z>
-                        <X_DOT units="km/s">1.0</X_DOT>
-                        <Y_DOT units="km/s">2.0</Y_DOT>
-                        <Z_DOT units="km/s">3.0</Z_DOT>
-                    </stateVector>
-                    <covarianceMatrix>
-                        <CR_R units="m**2">1.0</CR_R>
-                        <CT_R units="m**2">0.0</CT_R>
-                        <CT_T units="m**2">1.0</CT_T>
-                        <CN_R units="m**2">0.0</CN_R>
-                        <CN_T units="m**2">0.0</CN_T>
-                        <CN_N units="m**2">1.0</CN_N>
-                        <CRDOT_R units="m**2/s">0.0</CRDOT_R>
-                        <CRDOT_T units="m**2/s">0.0</CRDOT_T>
-                        <CRDOT_N units="m**2/s">0.0</CRDOT_N>
-                        <CRDOT_RDOT units="m**2/s**2">1.0</CRDOT_RDOT>
-                        <CTDOT_R units="m**2/s">0.0</CTDOT_R>
-                        <CTDOT_T units="m**2/s">0.0</CTDOT_T>
-                        <CTDOT_N units="m**2/s">0.0</CTDOT_N>
-                        <CTDOT_RDOT units="m**2/s**2">0.0</CTDOT_RDOT>
-                        <CTDOT_TDOT units="m**2/s**2">1.0</CTDOT_TDOT>
-                        <CNDOT_R units="m**2/s">0.0</CNDOT_R>
-                        <CNDOT_T units="m**2/s">0.0</CNDOT_T>
-                        <CNDOT_N units="m**2/s">0.0</CNDOT_N>
-                        <CNDOT_RDOT units="m**2/s**2">0.0</CNDOT_RDOT>
-                        <CNDOT_TDOT units="m**2/s**2">0.0</CNDOT_TDOT>
-                        <CNDOT_NDOT units="m**2/s**2">1.0</CNDOT_NDOT>
-                    </covarianceMatrix>
-                </data>
-            </segment>
-            <segment>
-                <metadata>
-                    <OBJECT>OBJECT2</OBJECT>
-                    <OBJECT_DESIGNATOR>67890</OBJECT_DESIGNATOR>
-                    <CATALOG_NAME>SATCAT</CATALOG_NAME>
-                    <OBJECT_NAME>SAT B</OBJECT_NAME>
-                    <INTERNATIONAL_DESIGNATOR>2000-001A</INTERNATIONAL_DESIGNATOR>
-                    <OBJECT_TYPE>PAYLOAD</OBJECT_TYPE>
-                    <EPHEMERIS_NAME>EPH1</EPHEMERIS_NAME>
-                    <COVARIANCE_METHOD>CALCULATED</COVARIANCE_METHOD>
-                    <MANEUVERABLE>NO</MANEUVERABLE>
-                    <REF_FRAME>GCRF</REF_FRAME>
-                </metadata>
-                <data>
-                    <stateVector>
-                        <X units="km">1500.0</X>
-                        <Y units="km">2500.0</Y>
-                        <Z units="km">3500.0</Z>
-                        <X_DOT units="km/s">1.5</X_DOT>
-                        <Y_DOT units="km/s">2.5</Y_DOT>
-                        <Z_DOT units="km/s">3.5</Z_DOT>
-                    </stateVector>
-                    <covarianceMatrix>
-                        <CR_R units="m**2">1.0</CR_R>
-                        <CT_R units="m**2">0.0</CT_R>
-                        <CT_T units="m**2">1.0</CT_T>
-                        <CN_R units="m**2">0.0</CN_R>
-                        <CN_T units="m**2">0.0</CN_T>
-                        <CN_N units="m**2">1.0</CN_N>
-                        <CRDOT_R units="m**2/s">0.0</CRDOT_R>
-                        <CRDOT_T units="m**2/s">0.0</CRDOT_T>
-                        <CRDOT_N units="m**2/s">0.0</CRDOT_N>
-                        <CRDOT_RDOT units="m**2/s**2">1.0</CRDOT_RDOT>
-                        <CTDOT_R units="m**2/s">0.0</CTDOT_R>
-                        <CTDOT_T units="m**2/s">0.0</CTDOT_T>
-                        <CTDOT_N units="m**2/s">0.0</CTDOT_N>
-                        <CTDOT_RDOT units="m**2/s**2">0.0</CTDOT_RDOT>
-                        <CTDOT_TDOT units="m**2/s**2">1.0</CTDOT_TDOT>
-                        <CNDOT_R units="m**2/s">0.0</CNDOT_R>
-                        <CNDOT_T units="m**2/s">0.0</CNDOT_T>
-                        <CNDOT_N units="m**2/s">0.0</CNDOT_N>
-                        <CNDOT_RDOT units="m**2/s**2">0.0</CNDOT_RDOT>
-                        <CNDOT_TDOT units="m**2/s**2">0.0</CNDOT_TDOT>
-                        <CNDOT_NDOT units="m**2/s**2">1.0</CNDOT_NDOT>
-                    </covarianceMatrix>
-                </data>
-            </segment>
-        </body>
-    </cdm>
-</message>"#;
+const XML_DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
 
-    assert!(from_str(xml).is_err());
+fn valid_cdm() -> String {
+    std::fs::read_to_string(common::data_dir().join("xml").join("cdm_44.xml"))
+        .expect("CDM fixture is readable")
+}
+
+/// Wrap the fixture's root element in `wrapper`, keeping the XML declaration
+/// first so the document stays well-formed and only the nesting is at fault.
+fn wrapped_in(wrapper: &str) -> String {
+    let cdm = valid_cdm();
+    let body = cdm
+        .split_once("?>")
+        .map_or(cdm.as_str(), |(_, rest)| rest)
+        .trim();
+    format!("{XML_DECL}\n<{wrapper}>\n{body}\n</{wrapper}>\n")
+}
+
+/// Baseline: the fixture parses on its own, so a rejection below is caused by
+/// the wrapper and not by an unrelated defect in the document.
+#[test]
+fn unwrapped_fixture_parses() {
+    assert!(
+        from_str(&valid_cdm()).is_ok(),
+        "CDM fixture must parse unwrapped for the wrapper cases to mean anything"
+    );
+}
+
+/// Detection reports the bad root as `UnsupportedMessage`, which `from_str`
+/// then wraps in parse context. Look through that wrapper so the assertion
+/// pins the cause rather than the layer it arrives in.
+fn unsupported_message_detail(error: &CcsdsNdmError) -> Option<&str> {
+    match error {
+        CcsdsNdmError::UnsupportedMessage(detail) => Some(detail),
+        CcsdsNdmError::Parsing { source, .. } => unsupported_message_detail(source),
+        _ => None,
+    }
 }
 
 #[test]
-fn unknown_outer_wrapper_is_rejected() {
-    let xml = r#"<?xml version="1.0" encoding="utf-8"?>
-<somethingExtra>
-    <cdm id="CCSDS_CDM_VERS" version="1.0">
-        <header>
-            <CREATION_DATE>2025-01-01T00:00:00</CREATION_DATE>
-            <ORIGINATOR>TEST</ORIGINATOR>
-            <MESSAGE_ID>MSG-001</MESSAGE_ID>
-        </header>
-        <body>
-            <relativeMetadataData>
-                <TCA>2025-01-02T12:00:00</TCA>
-                <MISS_DISTANCE units="m">100.0</MISS_DISTANCE>
-                <RELATIVE_SPEED units="m/s">10.0</RELATIVE_SPEED>
-                <relativeStateVector>
-                    <RELATIVE_POSITION_R units="m">10.0</RELATIVE_POSITION_R>
-                    <RELATIVE_POSITION_T units="m">20.0</RELATIVE_POSITION_T>
-                    <RELATIVE_POSITION_N units="m">30.0</RELATIVE_POSITION_N>
-                    <RELATIVE_VELOCITY_R units="m/s">0.1</RELATIVE_VELOCITY_R>
-                    <RELATIVE_VELOCITY_T units="m/s">0.2</RELATIVE_VELOCITY_T>
-                    <RELATIVE_VELOCITY_N units="m/s">0.3</RELATIVE_VELOCITY_N>
-                </relativeStateVector>
-            </relativeMetadataData>
-            <segment>
-                <metadata>
-                    <OBJECT>OBJECT1</OBJECT>
-                    <OBJECT_DESIGNATOR>12345</OBJECT_DESIGNATOR>
-                    <CATALOG_NAME>SATCAT</CATALOG_NAME>
-                    <OBJECT_NAME>SAT A</OBJECT_NAME>
-                    <INTERNATIONAL_DESIGNATOR>1998-067A</INTERNATIONAL_DESIGNATOR>
-                    <OBJECT_TYPE>PAYLOAD</OBJECT_TYPE>
-                    <EPHEMERIS_NAME>EPH1</EPHEMERIS_NAME>
-                    <COVARIANCE_METHOD>CALCULATED</COVARIANCE_METHOD>
-                    <MANEUVERABLE>YES</MANEUVERABLE>
-                    <REF_FRAME>GCRF</REF_FRAME>
-                </metadata>
-                <data>
-                    <stateVector>
-                        <X units="km">1000.0</X>
-                        <Y units="km">2000.0</Y>
-                        <Z units="km">3000.0</Z>
-                        <X_DOT units="km/s">1.0</X_DOT>
-                        <Y_DOT units="km/s">2.0</Y_DOT>
-                        <Z_DOT units="km/s">3.0</Z_DOT>
-                    </stateVector>
-                    <covarianceMatrix>
-                        <CR_R units="m**2">1.0</CR_R>
-                        <CT_R units="m**2">0.0</CT_R>
-                        <CT_T units="m**2">1.0</CT_T>
-                        <CN_R units="m**2">0.0</CN_R>
-                        <CN_T units="m**2">0.0</CN_T>
-                        <CN_N units="m**2">1.0</CN_N>
-                        <CRDOT_R units="m**2/s">0.0</CRDOT_R>
-                        <CRDOT_T units="m**2/s">0.0</CRDOT_T>
-                        <CRDOT_N units="m**2/s">0.0</CRDOT_N>
-                        <CRDOT_RDOT units="m**2/s**2">1.0</CRDOT_RDOT>
-                        <CTDOT_R units="m**2/s">0.0</CTDOT_R>
-                        <CTDOT_T units="m**2/s">0.0</CTDOT_T>
-                        <CTDOT_N units="m**2/s">0.0</CTDOT_N>
-                        <CTDOT_RDOT units="m**2/s**2">0.0</CTDOT_RDOT>
-                        <CTDOT_TDOT units="m**2/s**2">1.0</CTDOT_TDOT>
-                        <CNDOT_R units="m**2/s">0.0</CNDOT_R>
-                        <CNDOT_T units="m**2/s">0.0</CNDOT_T>
-                        <CNDOT_N units="m**2/s">0.0</CNDOT_N>
-                        <CNDOT_RDOT units="m**2/s**2">0.0</CNDOT_RDOT>
-                        <CNDOT_TDOT units="m**2/s**2">0.0</CNDOT_TDOT>
-                        <CNDOT_NDOT units="m**2/s**2">1.0</CNDOT_NDOT>
-                    </covarianceMatrix>
-                </data>
-            </segment>
-            <segment>
-                <metadata>
-                    <OBJECT>OBJECT2</OBJECT>
-                    <OBJECT_DESIGNATOR>67890</OBJECT_DESIGNATOR>
-                    <CATALOG_NAME>SATCAT</CATALOG_NAME>
-                    <OBJECT_NAME>SAT B</OBJECT_NAME>
-                    <INTERNATIONAL_DESIGNATOR>2000-001A</INTERNATIONAL_DESIGNATOR>
-                    <OBJECT_TYPE>PAYLOAD</OBJECT_TYPE>
-                    <EPHEMERIS_NAME>EPH1</EPHEMERIS_NAME>
-                    <COVARIANCE_METHOD>CALCULATED</COVARIANCE_METHOD>
-                    <MANEUVERABLE>NO</MANEUVERABLE>
-                    <REF_FRAME>GCRF</REF_FRAME>
-                </metadata>
-                <data>
-                    <stateVector>
-                        <X units="km">1500.0</X>
-                        <Y units="km">2500.0</Y>
-                        <Z units="km">3500.0</Z>
-                        <X_DOT units="km/s">1.5</X_DOT>
-                        <Y_DOT units="km/s">2.5</Y_DOT>
-                        <Z_DOT units="km/s">3.5</Z_DOT>
-                    </stateVector>
-                    <covarianceMatrix>
-                        <CR_R units="m**2">1.0</CR_R>
-                        <CT_R units="m**2">0.0</CT_R>
-                        <CT_T units="m**2">1.0</CT_T>
-                        <CN_R units="m**2">0.0</CN_R>
-                        <CN_T units="m**2">0.0</CN_T>
-                        <CN_N units="m**2">1.0</CN_N>
-                        <CRDOT_R units="m**2/s">0.0</CRDOT_R>
-                        <CRDOT_T units="m**2/s">0.0</CRDOT_T>
-                        <CRDOT_N units="m**2/s">0.0</CRDOT_N>
-                        <CRDOT_RDOT units="m**2/s**2">1.0</CRDOT_RDOT>
-                        <CTDOT_R units="m**2/s">0.0</CTDOT_R>
-                        <CTDOT_T units="m**2/s">0.0</CTDOT_T>
-                        <CTDOT_N units="m**2/s">0.0</CTDOT_N>
-                        <CTDOT_RDOT units="m**2/s**2">0.0</CTDOT_RDOT>
-                        <CTDOT_TDOT units="m**2/s**2">1.0</CTDOT_TDOT>
-                        <CNDOT_R units="m**2/s">0.0</CNDOT_R>
-                        <CNDOT_T units="m**2/s">0.0</CNDOT_T>
-                        <CNDOT_N units="m**2/s">0.0</CNDOT_N>
-                        <CNDOT_RDOT units="m**2/s**2">0.0</CNDOT_RDOT>
-                        <CNDOT_TDOT units="m**2/s**2">0.0</CNDOT_TDOT>
-                        <CNDOT_NDOT units="m**2/s**2">1.0</CNDOT_NDOT>
-                    </covarianceMatrix>
-                </data>
-            </segment>
-        </body>
-    </cdm>
-</somethingExtra>"#;
+fn wrapped_message_is_rejected_by_root_detection() {
+    for wrapper in ["message", "somethingExtra"] {
+        let error = from_str(&wrapped_in(wrapper))
+            .expect_err(&format!("<{wrapper}> wrapper must be rejected"));
 
-    assert!(from_str(xml).is_err());
+        let detail = unsupported_message_detail(&error).unwrap_or_else(|| {
+            panic!("expected UnsupportedMessage for <{wrapper}>, got {error:?}")
+        });
+        assert!(
+            detail.contains(wrapper),
+            "diagnostic for <{wrapper}> should name the offending root, got: {detail}"
+        );
+    }
 }

@@ -18,7 +18,7 @@ This inventory records maintainer evidence for standalone TDM 2.0. The
 | --- | --- |
 | KVN structure | A local state scanner enforces printable ASCII, the 254-character line limit, header and `META`/`DATA` section sequencing, metadata uniqueness and the `PATH` choice, known observation keywords, and section-scoped comments. It deliberately does not impose XML metadata ordering on order-independent TDM KVN. |
 | XML structure | The shared XML sequence engine covers the root, repeated segments, metadata, data, and the complete observation choice; it rejects unknown, duplicate, reordered, and non-schema nested content while accepting the schema's optional angle/percentage units. |
-| Preservation and generation | All 21 shipped KVN fixtures and both shipped XML fixtures preserve their typed source-notation model. Generated XML validates against the official 4.0.0 master schema. Fixed optional XML units are semantically normalized when crossing unitless KVN. Bare `COMMENT` records are preserved by the shared KVN writer. |
+| Preservation and generation | All 21 shipped KVN fixtures and both shipped XML fixtures preserve their typed source-notation model. Generated XML validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). Fixed optional XML units are semantically normalized when crossing unitless KVN. Bare `COMMENT` records are preserved by the shared KVN writer. |
 | History allocation | `tdm_kvn_allocations` compares 10 and 1,000 observations. Parsing allocations grow with vector capacity rather than per record; validated streaming generation has fixed temporary-allocation overhead; materialized storage remains output-proportional. |
 | Shared surfaces and limits | `family_contract`, `family_generation_evidence`, Python option tests, and the family benchmark matrices exercise shared bounded parsing/generation, diagnostics, and dispatch. |
 
@@ -34,15 +34,21 @@ All 53 numbered features in CCSDS 503.0-B-2 corrigendum 1 annex A2.1.5 were reco
 | --- | --- | --- |
 | 1-6 | Header/version fields | `Tdm`, `TdmHeader`, strict root/version/epoch tests |
 | 7-16 | Metadata preamble, participants, mode and path choice | `TdmMetadata`, indexed-field and conditional path/mode tests |
-| 17-38 | Ephemerides, bands, turnaround, integration/range/angle/interpolation, delays, quality and corrections | complete optional metadata fixture/exhaustive tests, strict known-key scanner, unit normalization |
+| 17-38 | Ephemerides, bands, turnaround, integration/range/angle/interpolation, delays, quality and corrections | complete optional metadata fixture/exhaustive tests, strict known-key scanner, unit normalization, and numeric domains enforced per segment: positive `INTEGRATION_INTERVAL` and `DOPPLER_COUNT_BIAS`, non-negative `RANGE_MODULUS` and all ten indexed transmit/receive delays, and finite `FREQ_OFFSET` and `CORRECTION_*` values |
 | 39 | Metadata delimiter | local KVN state scanner and XML segment sequence |
 | 40-41 | Data section and comments | strict section scanner and comment preservation tests |
-| 42-52 | Every angle, carrier, clock, Doppler, media, meteorological, optical/radar, range, receive, transmit, and VLBI observation family | exhaustive typed observation-choice tests plus all 23 shipped fixtures |
+| 42-52 | Every angle, carrier, clock, Doppler, media, meteorological, optical/radar, range, receive, transmit, and VLBI observation family | exhaustive typed observation-choice tests plus all 23 shipped fixtures, and observation value domains enforced through every segment: universal finiteness, `RHUMIDITY` in `[0, 100]`, positive transmit frequencies, non-negative tropospheric delays, `ANGLE_1`/`ANGLE_2` in `[-180, 360)`, and positive `RCS`, `STEC`, and `TEMPERATURE` |
 | 53 | Data delimiter | local KVN state scanner and repeated XML segment sequence |
 
-No annex-A TDM feature is absent. Time-system and reference-frame registry membership is external
-per normative annex B, so values remain caller supplied while local syntax and conditional message
-semantics are enforced.
+No annex-A TDM feature is absent. TDM's exception to the shared policy on [externally governed values](family-shared-contract.md#externally-governed-values) is that normative
+annex B places time-system and reference-frame registry membership outside the message, so those
+values remain caller supplied while local syntax and conditional semantics are enforced.
+Concretely, every populated `PATH`, `PATH_1`, and `PATH_2` is re-parsed at
+validation and each index is checked against the `PARTICIPANT_n` fields actually supplied, so the
+XML and tuple-field routes no longer bypass the path parser; and the `SINGLE_DIFF` requirement for
+`RECEIVE_BAND` depends on whether the segment actually carries differenced frequency or range
+observations rather than on metadata alone. All six schema spellings of `RANGE_UNITS` are accepted
+in XML, while KVN remains intentionally case-insensitive.
 
 ## Packaged-surface evidence
 
@@ -76,6 +82,12 @@ claims.
 
 ## Remaining verification work
 
-TDM remains available rather than verified. Its complete ICS feature inventory and packaged
-surfaces are reconciled. The recorded timing observations below remain informational, and final
-message-level review remains.
+TDM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its ICS feature inventory and packaged
+surfaces are reconciled, and the recorded timing observations below remain informational.
+
+Both accepted input editions are covered. The observation value domains above are enforced
+regardless of edition, and 503.0-B-1 was checked directly to confirm that is correct: it specifies
+the same `-180.0 <= ANGLE_1 < 360.0` bound and the same positive `TEMPERATURE` and `STEC`, and it
+has no `RCS` keyword at all, so that rule is vacuous rather than conflicting for 1.0 input. No
+edition-conditional rule is required; see
+[Edition-aware validation](../design/edition-aware-validation.md).

@@ -21,8 +21,8 @@ This inventory records maintainer evidence for standalone OMM 3.0. The
 | KVN lexical and structural strictness | The shared ODM assignment scanner rejects non-ASCII/control input, overlong lines, malformed assignments, unknown and duplicate keywords, fixed-order violations, and comments outside the beginning of a logical block. OMM registers only its standard-derived keyword ranks and choice/repetition transitions. Members of a keyword choice share a rank, so the scanner compares keys as well as ranks: the other alternative may follow, a repeat of the same keyword may not. |
 | XML structure | The OMM sequence registration rejects unknown, duplicate, and reordered children throughout the root, header, metadata, data, mean-elements, spacecraft, TLE, covariance, and user-defined structures. It rejects non-schema attributes while allowing only the fixed unit and user-defined parameter attributes at their applicable leaves. |
 | Valid input and preservation | All three shipped KVN fixtures and the shipped XML fixture parse through the public strict API. Generated KVN and XML reparse to the same typed model. |
-| XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. |
-| Numeric values in every block | Validation rejects non-finite values in the mean-elements, spacecraft, TLE, and covariance blocks before either notation is generated, and restates the `inclinationType` range that the typed wrapper enforces only in its constructor. Schema range facets are comparisons, which NaN passes, so finiteness is checked in its own right. |
+| XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
+| Numeric values in every block | Validation rejects non-finite values in the mean-elements, spacecraft, TLE, and covariance blocks before either notation is generated, and restates the `inclinationType` and `elementSetNoType` ranges that the typed wrappers enforce only in their constructors. Schema range facets are comparisons, which NaN passes, so finiteness is checked in its own right. |
 | KVN number spelling | Every OMM floating-point field — mean elements, spacecraft parameters, TLE parameters, and the shared covariance block — is written through the ODM 7.7.1 number writer, so generated KVN reparses instead of carrying `Display` spellings such as `0.30000000000000004`. Values whose shortest round-tripping spelling would not fit are rejected before generation rather than emitted. |
 | Shared resource and surface contract | `family_contract`, `family_generation_evidence`, the Python options tests, and family Criterion matrices provide the common bounded parsing/generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
 
@@ -46,9 +46,8 @@ annex A2.5.2, has 70 numbered items. The repository copy
 | 45-68 | Optional 6x6 position/velocity covariance | `OpmCovarianceMatrix`, complete 21-element roundtrips and strict sequence registration |
 | 69-70 | User-defined logical block | typed user-defined parameters, strict keyword scanner and roundtrips |
 
-The item inventory exposes no omitted OMM keyword or logical block. Values delegated by the book
-to external SANA registries remain open strings; the library validates locally decidable syntax
-and message semantics without embedding a mutable registry snapshot.
+The item inventory exposes no omitted OMM keyword or logical block. OMM has no exception to the
+shared policy on [externally governed values](family-shared-contract.md#externally-governed-values).
 
 ## Allocation and packaged-surface evidence
 
@@ -63,5 +62,10 @@ artifact check are the reproducible packaged gates.
 
 The complete ICS inventory, strict core behavior, Python delegation, allocation budgets, and
 packaged artifacts have received message-level review. OMM 3.0 is verified on the Rust and Python
-surfaces. OMM 2.0 remains available: explicit edition conversion is tested, but it
+surfaces, where "verified" means that review — not exhaustive mutation of every editable value.
+Root-mutation probing carried out after that review found one hole it had not covered:
+`ELEMENT_SET_NO` could be set outside `elementSetNoType`'s `[0, 9999]` and was accepted by
+`validate`, KVN, and XML, emitting a document the reference schema rejects on `maxInclusive`. The
+range is now restated at the root and regression-tested at both the rejected and accepted
+boundaries. OMM 2.0 remains available: explicit edition conversion is tested, but it
 has not received this complete edition-specific review.

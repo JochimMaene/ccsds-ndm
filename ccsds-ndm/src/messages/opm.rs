@@ -175,110 +175,255 @@ fn validate_input_size(input: &str, options: &crate::options::ParseOptions) -> R
     Ok(())
 }
 
-fn validate_kvn_syntax(kvn: &str) -> Result<()> {
-    fn rank(key: &str) -> Option<u16> {
-        Some(match key {
-            "CCSDS_OPM_VERS" => 0,
-            "CLASSIFICATION" => 1,
-            "CREATION_DATE" => 2,
-            "ORIGINATOR" => 3,
-            "MESSAGE_ID" => 4,
-            "OBJECT_NAME" => 5,
-            "OBJECT_ID" => 6,
-            "CENTER_NAME" => 7,
-            "REF_FRAME" => 8,
-            "REF_FRAME_EPOCH" => 9,
-            "TIME_SYSTEM" => 10,
-            "EPOCH" => 11,
-            "X" => 12,
-            "Y" => 13,
-            "Z" => 14,
-            "X_DOT" => 15,
-            "Y_DOT" => 16,
-            "Z_DOT" => 17,
-            "SEMI_MAJOR_AXIS" => 20,
-            "ECCENTRICITY" => 21,
-            "INCLINATION" => 22,
-            "RA_OF_ASC_NODE" => 23,
-            "ARG_OF_PERICENTER" => 24,
-            "TRUE_ANOMALY" | "MEAN_ANOMALY" => 25,
-            "GM" => 26,
-            "MASS" => 30,
-            "SOLAR_RAD_AREA" => 31,
-            "SOLAR_RAD_COEFF" => 32,
-            "DRAG_AREA" => 33,
-            "DRAG_COEFF" => 34,
-            "COV_REF_FRAME" => 40,
-            "CX_X" => 41,
-            "CY_X" => 42,
-            "CY_Y" => 43,
-            "CZ_X" => 44,
-            "CZ_Y" => 45,
-            "CZ_Z" => 46,
-            "CX_DOT_X" => 47,
-            "CX_DOT_Y" => 48,
-            "CX_DOT_Z" => 49,
-            "CX_DOT_X_DOT" => 50,
-            "CY_DOT_X" => 51,
-            "CY_DOT_Y" => 52,
-            "CY_DOT_Z" => 53,
-            "CY_DOT_X_DOT" => 54,
-            "CY_DOT_Y_DOT" => 55,
-            "CZ_DOT_X" => 56,
-            "CZ_DOT_Y" => 57,
-            "CZ_DOT_Z" => 58,
-            "CZ_DOT_X_DOT" => 59,
-            "CZ_DOT_Y_DOT" => 60,
-            "CZ_DOT_Z_DOT" => 61,
-            "MAN_EPOCH_IGNITION" => 70,
-            "MAN_DURATION" => 71,
-            "MAN_DELTA_MASS" => 72,
-            "MAN_REF_FRAME" => 73,
-            "MAN_DV_1" => 74,
-            "MAN_DV_2" => 75,
-            "MAN_DV_3" => 76,
-            key if key.starts_with("USER_DEFINED_") => 80,
-            _ => return None,
-        })
-    }
+/// OPM's KVN keyword layout, declared once.
+///
+/// The ordering fact used to live in three hand-synchronised functions coupled through opaque
+/// numbers: a rank table with meaningful gaps, a `comment_starts_block` predicate written in rank
+/// literals and ranges such as `17 | 26 | 30..=34 | 61 | 76`, and a repeat predicate written in
+/// bare ranks. Adding a keyword to a block meant widening a range in two other places, with
+/// nothing but a test to catch a mistake. Rank, block starts and repeats are now derived from this
+/// table, so the layout is stated once and the numbers are an implementation detail.
+struct OpmKvnBlock {
+    keywords: &'static [&'static str],
+    /// How many leading keywords may open the block, because everything before them is optional.
+    leading_optional: usize,
+    /// How many trailing keywords may close the block, because everything after them is optional.
+    trailing_optional: usize,
+    /// The block may follow itself, as repeated maneuvers and `USER_DEFINED_*` do.
+    repeatable: bool,
+    /// A repeat may also open a fresh comment run. Maneuvers do; `USER_DEFINED_*` repeats inside
+    /// one logical block, so a comment there does not start a new one.
+    comment_restarts: bool,
+    /// The whole block may be absent. A mandatory block between two others blocks the path, which
+    /// is why the header cannot immediately precede the metadata.
+    optional: bool,
+}
 
-    fn comment_starts_block(previous: u16, key: &str) -> bool {
-        match key {
-            "CLASSIFICATION" | "CREATION_DATE" => previous == 0,
-            "OBJECT_NAME" => matches!(previous, 3 | 4),
-            "EPOCH" => previous == 10,
-            "SEMI_MAJOR_AXIS" => previous == 17,
-            "MASS" | "SOLAR_RAD_AREA" | "SOLAR_RAD_COEFF" | "DRAG_AREA" | "DRAG_COEFF" => {
-                matches!(previous, 17 | 26)
-            }
-            "COV_REF_FRAME" | "CX_X" => matches!(previous, 17 | 26 | 30..=34),
-            "MAN_EPOCH_IGNITION" => matches!(previous, 17 | 26 | 30..=34 | 61 | 76),
-            key if key.starts_with("USER_DEFINED_") => {
-                matches!(previous, 17 | 26 | 30..=34 | 61 | 76)
-            }
-            _ => false,
+const OPM_KVN_BLOCKS: &[OpmKvnBlock] = &[
+    // The version keyword anchors the document and is its own group.
+    OpmKvnBlock {
+        keywords: &["CCSDS_OPM_VERS"],
+        leading_optional: 0,
+        trailing_optional: 1,
+        repeatable: false,
+        comment_restarts: false,
+        optional: false,
+    },
+    // CLASSIFICATION is optional, so either it or CREATION_DATE may open the header content.
+    OpmKvnBlock {
+        keywords: &[
+            "CLASSIFICATION",
+            "CREATION_DATE",
+            "ORIGINATOR",
+            "MESSAGE_ID",
+        ],
+        leading_optional: 2,
+        trailing_optional: 2,
+        repeatable: false,
+        comment_restarts: false,
+        optional: false,
+    },
+    OpmKvnBlock {
+        keywords: &[
+            "OBJECT_NAME",
+            "OBJECT_ID",
+            "CENTER_NAME",
+            "REF_FRAME",
+            "REF_FRAME_EPOCH",
+            "TIME_SYSTEM",
+        ],
+        leading_optional: 1,
+        trailing_optional: 1,
+        repeatable: false,
+        comment_restarts: false,
+        optional: false,
+    },
+    OpmKvnBlock {
+        keywords: &["EPOCH", "X", "Y", "Z", "X_DOT", "Y_DOT", "Z_DOT"],
+        leading_optional: 1,
+        trailing_optional: 1,
+        repeatable: false,
+        comment_restarts: false,
+        optional: false,
+    },
+    OpmKvnBlock {
+        keywords: &[
+            "SEMI_MAJOR_AXIS",
+            "ECCENTRICITY",
+            "INCLINATION",
+            "RA_OF_ASC_NODE",
+            "ARG_OF_PERICENTER",
+            "TRUE_ANOMALY",
+            "GM",
+        ],
+        leading_optional: 1,
+        trailing_optional: 1,
+        repeatable: false,
+        comment_restarts: false,
+        optional: true,
+    },
+    // Every spacecraft keyword is optional, so any of them may open or close the block.
+    OpmKvnBlock {
+        keywords: &[
+            "MASS",
+            "SOLAR_RAD_AREA",
+            "SOLAR_RAD_COEFF",
+            "DRAG_AREA",
+            "DRAG_COEFF",
+        ],
+        leading_optional: 5,
+        trailing_optional: 5,
+        repeatable: false,
+        comment_restarts: false,
+        optional: true,
+    },
+    OpmKvnBlock {
+        keywords: &[
+            "COV_REF_FRAME",
+            "CX_X",
+            "CY_X",
+            "CY_Y",
+            "CZ_X",
+            "CZ_Y",
+            "CZ_Z",
+            "CX_DOT_X",
+            "CX_DOT_Y",
+            "CX_DOT_Z",
+            "CX_DOT_X_DOT",
+            "CY_DOT_X",
+            "CY_DOT_Y",
+            "CY_DOT_Z",
+            "CY_DOT_X_DOT",
+            "CY_DOT_Y_DOT",
+            "CZ_DOT_X",
+            "CZ_DOT_Y",
+            "CZ_DOT_Z",
+            "CZ_DOT_X_DOT",
+            "CZ_DOT_Y_DOT",
+            "CZ_DOT_Z_DOT",
+        ],
+        leading_optional: 2,
+        trailing_optional: 1,
+        repeatable: false,
+        comment_restarts: false,
+        optional: true,
+    },
+    OpmKvnBlock {
+        keywords: &[
+            "MAN_EPOCH_IGNITION",
+            "MAN_DURATION",
+            "MAN_DELTA_MASS",
+            "MAN_REF_FRAME",
+            "MAN_DV_1",
+            "MAN_DV_2",
+            "MAN_DV_3",
+        ],
+        leading_optional: 1,
+        trailing_optional: 1,
+        repeatable: true,
+        comment_restarts: true,
+        optional: true,
+    },
+    OpmKvnBlock {
+        keywords: &["USER_DEFINED_"],
+        leading_optional: 1,
+        trailing_optional: 1,
+        repeatable: true,
+        comment_restarts: false,
+        optional: true,
+    },
+];
+
+/// Ranks are spaced so each block occupies its own span; only the ordering and the grouping into
+/// blocks are meaningful, never the specific numbers.
+const OPM_BLOCK_STRIDE: u16 = 32;
+
+/// Locates a keyword in the declared layout, resolving the anomaly choice and the
+/// `USER_DEFINED_*` prefix to their declared slots.
+fn opm_kvn_position(key: &str) -> Option<(usize, usize)> {
+    for (block_index, block) in OPM_KVN_BLOCKS.iter().enumerate() {
+        if let Some(offset) = block.keywords.iter().position(|candidate| {
+            *candidate == key
+                || (*candidate == "USER_DEFINED_" && key.starts_with("USER_DEFINED_"))
+                || (*candidate == "TRUE_ANOMALY" && key == "MEAN_ANOMALY")
+        }) {
+            return Some((block_index, offset));
         }
     }
+    None
+}
 
+fn opm_kvn_rank_derived(key: &str) -> Option<u16> {
+    opm_kvn_position(key).map(|(block, offset)| block as u16 * OPM_BLOCK_STRIDE + offset as u16)
+}
+
+/// Whether `key` may open its block, i.e. everything before it in the block is optional.
+fn opm_opens_block(block: &OpmKvnBlock, offset: usize) -> bool {
+    offset < block.leading_optional
+}
+
+/// Whether `previous` is a rank that may immediately precede the start of block `index`: any
+/// closing keyword of an earlier block, and of the block itself when `self_follow` is set.
+fn opm_may_precede(index: usize, previous: u16, self_follow: bool) -> bool {
+    OPM_KVN_BLOCKS
+        .iter()
+        .enumerate()
+        .filter(|(other_index, _)| {
+            if *other_index == index {
+                return self_follow;
+            }
+            // Only reachable if every block strictly between the two may be absent.
+            *other_index < index
+                && OPM_KVN_BLOCKS[*other_index + 1..index]
+                    .iter()
+                    .all(|between| between.optional)
+        })
+        .any(|(other_index, other)| {
+            let closing_from = other.keywords.len().saturating_sub(other.trailing_optional);
+            (closing_from..other.keywords.len())
+                .any(|offset| previous == other_index as u16 * OPM_BLOCK_STRIDE + offset as u16)
+        })
+}
+
+fn opm_comment_starts_block_derived(previous: u16, key: &str) -> bool {
+    let Some((index, offset)) = opm_kvn_position(key) else {
+        return false;
+    };
+    let block = &OPM_KVN_BLOCKS[index];
+    opm_opens_block(block, offset) && opm_may_precede(index, previous, block.comment_restarts)
+}
+
+/// Whether a non-increasing step is legal: a repeatable block restarting, or the alternative
+/// spelling of a shared-rank keyword choice.
+fn opm_allows_non_increasing_derived(
+    previous: crate::kvn::strict::Assignment<'_>,
+    current: crate::kvn::strict::Assignment<'_>,
+) -> bool {
+    if current.rank == previous.rank {
+        return current.key != previous.key;
+    }
+    let (Some((current_block, current_offset)), Some((previous_block, _))) = (
+        opm_kvn_position(current.key),
+        opm_kvn_position(previous.key),
+    ) else {
+        return false;
+    };
+    let block = &OPM_KVN_BLOCKS[current_block];
+    block.repeatable
+        && current_block == previous_block
+        && opm_opens_block(block, current_offset)
+        && opm_may_precede(current_block, previous.rank, true)
+}
+
+fn validate_kvn_syntax(kvn: &str) -> Result<()> {
     crate::kvn::strict::validate_odm_assignments(
         kvn,
         &crate::kvn::strict::OdmAssignmentRules {
             context: "strict OPM KVN",
             message_name: "OPM",
-            rank,
-            comment_starts_block,
-            allows_non_increasing: |previous, current| {
-                // A new maneuver block restarts after MAN_DV_3, and USER_DEFINED_* repeats.
-                (current.rank == 70 && previous.rank == 76)
-                    || (current.rank == 80 && previous.rank == 80)
-                    // TRUE_ANOMALY and MEAN_ANOMALY share a rank so either may fill the slot;
-                    // only the *other* alternative may follow, never a repeat of the same
-                    // keyword. Both present is left to `KeplerianElements::validate`, which
-                    // reports the choice violation.
-                    || (current.rank == 25
-                        && previous.rank == 25
-                        && current.key != previous.key)
-            },
+            rank: opm_kvn_rank_derived,
+            comment_starts_block: opm_comment_starts_block_derived,
+            allows_non_increasing: opm_allows_non_increasing_derived,
         },
     )
 }
@@ -1544,25 +1689,7 @@ impl crate::traits::Validate for KeplerianElements {
                 .into());
             }
         }
-        let gm = self.gm.value;
-        if !gm.is_finite() {
-            return Err(ValidationError::InvalidValue {
-                field: "GM".into(),
-                value: gm.to_string(),
-                expected: "a finite number".into(),
-                line: None,
-            }
-            .into());
-        }
-        if gm <= 0.0 {
-            return Err(ValidationError::OutOfRange {
-                name: "GM".into(),
-                value: gm.to_string(),
-                expected: "> 0".into(),
-                line: None,
-            }
-            .into());
-        }
+        Gm::validate_value(self.gm.value, "GM")?;
         if self.true_anomaly.is_some() == self.mean_anomaly.is_some() {
             let selected = [
                 ("TRUE_ANOMALY", self.true_anomaly.is_some()),
@@ -1773,6 +1900,207 @@ impl ToKvn for ManeuverParameters {
 //----------------------------------------------------------------------
 // Tests
 //----------------------------------------------------------------------
+
+#[cfg(test)]
+mod kvn_layout {
+    use super::*;
+
+    fn rank(key: &str) -> u16 {
+        opm_kvn_rank_derived(key).expect("keyword is in the declared layout")
+    }
+
+    fn assignment(key: &'static str) -> crate::kvn::strict::Assignment<'static> {
+        crate::kvn::strict::Assignment {
+            rank: rank(key),
+            key,
+        }
+    }
+
+    /// The keyword sequence of ODM 502.0-B-3 tables 3-1 through 3-6, in normative order.
+    ///
+    /// Checking against the book rather than against a frozen copy of the previous implementation
+    /// means a future intentional change is measured against the standard, which is the thing that
+    /// actually governs.
+    const NORMATIVE_ORDER: &[&str] = &[
+        "CCSDS_OPM_VERS",
+        "CLASSIFICATION",
+        "CREATION_DATE",
+        "ORIGINATOR",
+        "MESSAGE_ID",
+        "OBJECT_NAME",
+        "OBJECT_ID",
+        "CENTER_NAME",
+        "REF_FRAME",
+        "REF_FRAME_EPOCH",
+        "TIME_SYSTEM",
+        "EPOCH",
+        "X",
+        "Y",
+        "Z",
+        "X_DOT",
+        "Y_DOT",
+        "Z_DOT",
+        "SEMI_MAJOR_AXIS",
+        "ECCENTRICITY",
+        "INCLINATION",
+        "RA_OF_ASC_NODE",
+        "ARG_OF_PERICENTER",
+        "TRUE_ANOMALY",
+        "GM",
+        "MASS",
+        "SOLAR_RAD_AREA",
+        "SOLAR_RAD_COEFF",
+        "DRAG_AREA",
+        "DRAG_COEFF",
+        "COV_REF_FRAME",
+        "CX_X",
+        "CZ_DOT_Z_DOT",
+        "MAN_EPOCH_IGNITION",
+        "MAN_DV_3",
+        "USER_DEFINED_FOO",
+    ];
+
+    #[test]
+    fn declared_layout_follows_the_normative_keyword_order() {
+        for pair in NORMATIVE_ORDER.windows(2) {
+            assert!(
+                rank(pair[0]) < rank(pair[1]),
+                "{} must precede {}",
+                pair[0],
+                pair[1]
+            );
+        }
+        assert!(opm_kvn_rank_derived("NOT_A_KEYWORD").is_none());
+    }
+
+    /// ODM 502.0-B-3 table 3-2: either anomaly spelling may fill the slot, so they share a rank
+    /// and only the alternative may follow. Both present is a choice violation reported by
+    /// `KeplerianElements::validate`, not an ordering error.
+    #[test]
+    fn the_anomaly_choice_shares_one_slot() {
+        assert_eq!(rank("TRUE_ANOMALY"), rank("MEAN_ANOMALY"));
+        assert!(opm_allows_non_increasing_derived(
+            assignment("TRUE_ANOMALY"),
+            assignment("MEAN_ANOMALY")
+        ));
+        assert!(!opm_allows_non_increasing_derived(
+            assignment("TRUE_ANOMALY"),
+            assignment("TRUE_ANOMALY")
+        ));
+    }
+
+    /// The version keyword anchors the document, so the header content following it is its own
+    /// comment group, opened by `CLASSIFICATION` or — since that is optional — `CREATION_DATE`.
+    ///
+    /// Modelling the header as a single block got this wrong while the layout was being derived.
+    #[test]
+    fn header_content_opens_a_comment_group_after_the_version_keyword() {
+        for key in ["CLASSIFICATION", "CREATION_DATE"] {
+            assert!(opm_comment_starts_block_derived(
+                rank("CCSDS_OPM_VERS"),
+                key
+            ));
+        }
+        assert!(!opm_comment_starts_block_derived(
+            rank("CCSDS_OPM_VERS"),
+            "ORIGINATOR"
+        ));
+    }
+
+    /// A mandatory block between two others blocks the path: metadata cannot immediately follow
+    /// the version keyword because the header content is required.
+    ///
+    /// Omitting this fact made the derived rule more permissive than the standard allows.
+    #[test]
+    fn a_mandatory_block_between_two_others_blocks_the_path() {
+        assert!(!opm_comment_starts_block_derived(
+            rank("CCSDS_OPM_VERS"),
+            "OBJECT_NAME"
+        ));
+        for closer in ["ORIGINATOR", "MESSAGE_ID"] {
+            assert!(opm_comment_starts_block_derived(
+                rank(closer),
+                "OBJECT_NAME"
+            ));
+        }
+    }
+
+    /// Repetition and comment restart are different facts. A second maneuver block is a new
+    /// logical block, so a comment may open it; `USER_DEFINED_*` repeats inside one block, so a
+    /// comment there does not start a new one.
+    ///
+    /// Conflating the two was the second modelling error the derivation uncovered.
+    #[test]
+    fn repetition_and_comment_restart_are_distinct() {
+        assert!(opm_comment_starts_block_derived(
+            rank("MAN_DV_3"),
+            "MAN_EPOCH_IGNITION"
+        ));
+        assert!(!opm_comment_starts_block_derived(
+            rank("USER_DEFINED_FOO"),
+            "USER_DEFINED_FOO"
+        ));
+        assert!(opm_allows_non_increasing_derived(
+            assignment("MAN_DV_3"),
+            assignment("MAN_EPOCH_IGNITION")
+        ));
+        assert!(opm_allows_non_increasing_derived(
+            assignment("USER_DEFINED_FOO"),
+            assignment("USER_DEFINED_BAR")
+        ));
+    }
+
+    /// Only a repeatable block may follow itself. Without this, a document could restate a block
+    /// that the standard allows exactly once.
+    #[test]
+    fn a_non_repeatable_block_may_not_restart() {
+        assert!(!opm_allows_non_increasing_derived(
+            assignment("Z_DOT"),
+            assignment("EPOCH")
+        ));
+        assert!(!opm_allows_non_increasing_derived(
+            assignment("DRAG_COEFF"),
+            assignment("MASS")
+        ));
+        assert!(!opm_allows_non_increasing_derived(
+            assignment("CZ_DOT_Z_DOT"),
+            assignment("COV_REF_FRAME")
+        ));
+        // A backwards step across blocks is never legal either.
+        assert!(!opm_allows_non_increasing_derived(
+            assignment("MAN_DV_3"),
+            assignment("MASS")
+        ));
+    }
+
+    /// Optional blocks may be skipped, so a block start may follow the closing keyword of any
+    /// earlier block with only optional blocks between them.
+    #[test]
+    fn optional_blocks_may_be_skipped() {
+        for closer in ["Z_DOT", "GM", "DRAG_COEFF", "CZ_DOT_Z_DOT", "MAN_DV_3"] {
+            assert!(
+                opm_comment_starts_block_derived(rank(closer), "USER_DEFINED_FOO"),
+                "USER_DEFINED_* should be reachable after {closer}"
+            );
+        }
+        // Every spacecraft keyword is optional, so any of them may close that block.
+        for closer in ["MASS", "SOLAR_RAD_AREA", "DRAG_COEFF"] {
+            assert!(opm_comment_starts_block_derived(
+                rank(closer),
+                "COV_REF_FRAME"
+            ));
+        }
+        // The state vector is mandatory, so nothing before it closes into the keplerian block.
+        assert!(!opm_comment_starts_block_derived(
+            rank("TIME_SYSTEM"),
+            "SEMI_MAJOR_AXIS"
+        ));
+        assert!(opm_comment_starts_block_derived(
+            rank("Z_DOT"),
+            "SEMI_MAJOR_AXIS"
+        ));
+    }
+}
 
 #[cfg(test)]
 mod tests {

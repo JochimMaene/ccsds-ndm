@@ -9,8 +9,9 @@ use crate::kvn::ser::KvnWriter;
 use crate::traits::Validate;
 use crate::traits::{Ndm, ToKvn};
 use crate::types::{
-    CalendarEpoch, Percentage, TdmAngleType, TdmDataQuality, TdmIntegrationRef, TdmMode, TdmPath,
-    TdmRangeMode, TdmRangeUnits, TdmReferenceFrame, TdmTimetagRef, YesNo,
+    require_non_negative, require_positive, CalendarEpoch, Percentage, TdmAngleType,
+    TdmDataQuality, TdmIntegrationRef, TdmMode, TdmPath, TdmRangeMode, TdmRangeUnits,
+    TdmReferenceFrame, TdmTimetagRef, YesNo,
 };
 use fast_float;
 use serde::de::{MapAccess, Visitor};
@@ -626,7 +627,8 @@ pub struct TdmSegment {
 impl crate::traits::Validate for TdmSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
-        self.data.validate()
+        self.data.validate()?;
+        self.metadata.validate_for(&self.data)
     }
 }
 
@@ -1386,6 +1388,118 @@ impl crate::traits::Validate for TdmMetadata {
             }
             .into());
         }
+        if self.interpolation_degree == Some(0) {
+            return Err(ValidationError::OutOfRange {
+                name: "INTERPOLATION_DEGREE".into(),
+                value: "0".into(),
+                expected: "> 0".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.doppler_count_scale == Some(0) {
+            return Err(ValidationError::OutOfRange {
+                name: "DOPPLER_COUNT_SCALE".into(),
+                value: "0".into(),
+                expected: "> 0".into(),
+                line: None,
+            }
+            .into());
+        }
+        for (field, value) in [
+            ("INTEGRATION_INTERVAL", self.integration_interval),
+            ("DOPPLER_COUNT_BIAS", self.doppler_count_bias),
+        ] {
+            if let Some(value) = value {
+                require_positive(value, field)?;
+            }
+        }
+        for (field, value) in [
+            ("RANGE_MODULUS", self.range_modulus),
+            ("TRANSMIT_DELAY_1", self.transmit_delay_1),
+            ("TRANSMIT_DELAY_2", self.transmit_delay_2),
+            ("TRANSMIT_DELAY_3", self.transmit_delay_3),
+            ("TRANSMIT_DELAY_4", self.transmit_delay_4),
+            ("TRANSMIT_DELAY_5", self.transmit_delay_5),
+            ("RECEIVE_DELAY_1", self.receive_delay_1),
+            ("RECEIVE_DELAY_2", self.receive_delay_2),
+            ("RECEIVE_DELAY_3", self.receive_delay_3),
+            ("RECEIVE_DELAY_4", self.receive_delay_4),
+            ("RECEIVE_DELAY_5", self.receive_delay_5),
+        ] {
+            if let Some(value) = value {
+                require_non_negative(value, field)?;
+            }
+        }
+        for (field, value) in [
+            ("FREQ_OFFSET", self.freq_offset),
+            ("CORRECTION_ANGLE_1", self.correction_angle_1),
+            ("CORRECTION_ANGLE_2", self.correction_angle_2),
+            ("CORRECTION_DOPPLER", self.correction_doppler),
+            ("CORRECTION_MAG", self.correction_mag),
+            ("CORRECTION_RANGE", self.correction_range),
+            ("CORRECTION_RCS", self.correction_rcs),
+            ("CORRECTION_RECEIVE", self.correction_receive),
+            ("CORRECTION_TRANSMIT", self.correction_transmit),
+            (
+                "CORRECTION_ABERRATION_YEARLY",
+                self.correction_aberration_yearly,
+            ),
+            (
+                "CORRECTION_ABERRATION_DIURNAL",
+                self.correction_aberration_diurnal,
+            ),
+        ] {
+            if let Some(value) = value {
+                if !value.is_finite() {
+                    return Err(ValidationError::InvalidValue {
+                        field: field.into(),
+                        value: value.to_string(),
+                        expected: "a finite number".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+        let participants = [
+            true,
+            self.participant_2.is_some(),
+            self.participant_3.is_some(),
+            self.participant_4.is_some(),
+            self.participant_5.is_some(),
+        ];
+        for (field, path) in [
+            ("PATH", &self.path),
+            ("PATH_1", &self.path_1),
+            ("PATH_2", &self.path_2),
+        ] {
+            if let Some(path) = path {
+                if path.0.parse::<TdmPath>().is_err() {
+                    return Err(ValidationError::InvalidValue {
+                        field: field.into(),
+                        value: path.0.clone(),
+                        expected: "at least two participant indices from 1 through 5".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+                if path
+                    .0
+                    .split(',')
+                    .map(|part| part.parse::<usize>().unwrap())
+                    .any(|index| !participants[index - 1])
+                {
+                    return Err(ValidationError::InvalidValue {
+                        field: field.into(),
+                        value: path.0.clone(),
+                        expected: "indices referring to populated PARTICIPANT_n fields".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
         let has_correction = self.correction_angle_1.is_some()
             || self.correction_angle_2.is_some()
             || self.correction_doppler.is_some()
@@ -1411,6 +1525,27 @@ impl crate::traits::Validate for TdmMetadata {
 impl TdmMetadata {
     pub fn validate(&self) -> Result<()> {
         crate::traits::Validate::validate(self)
+    }
+
+    fn validate_for(&self, data: &TdmData) -> Result<()> {
+        let has_differenced_frequency_or_range = data.observations.iter().any(|observation| {
+            matches!(
+                observation.data,
+                TdmObservationData::ReceiveFreq(_) | TdmObservationData::Range(_)
+            )
+        });
+        if self.mode == Some(TdmMode::SingleDiff)
+            && has_differenced_frequency_or_range
+            && self.receive_band.is_none()
+        {
+            return Err(ValidationError::MissingRequiredField {
+                block: "TDM Metadata".into(),
+                field: "RECEIVE_BAND (required for SINGLE_DIFF frequency or range data)".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
     }
 }
 
@@ -2111,17 +2246,50 @@ impl TdmObservationData {
 
     fn validate(&self) -> Result<()> {
         let value = self.value();
-        if value.is_finite() {
-            Ok(())
-        } else {
-            Err(ValidationError::InvalidValue {
+        if !value.is_finite() {
+            return Err(ValidationError::InvalidValue {
                 field: self.key().into(),
                 value: value.to_string(),
                 expected: "a finite number".into(),
                 line: None,
             }
-            .into())
+            .into());
         }
+        if let Self::Rhumidity(value) = self {
+            Percentage::validate_value(value.value, "RHUMIDITY")?;
+        }
+        let invalid_range = match self {
+            Self::TransmitFreq1(value)
+            | Self::TransmitFreq2(value)
+            | Self::TransmitFreq3(value)
+            | Self::TransmitFreq4(value)
+            | Self::TransmitFreq5(value) => (*value <= 0.0).then_some("a finite number > 0"),
+            Self::TropoDry(value) | Self::TropoWet(value) => {
+                (*value < 0.0).then_some("a finite number >= 0")
+            }
+            // TDM 2.0 §§3.5.4.2-3.5.4.3 bound the angles to [-180, 360); the shared XSD
+            // `angleRange` is the wider [-360, 360), so the narrower book rule applies.
+            Self::Angle1(value) | Self::Angle2(value) => {
+                (!(-180.0..360.0).contains(value)).then_some("a number in [-180, 360)")
+            }
+            // TDM 2.0 §3.5.5.2 (RCS), §3.5.7.1 (STEC), and §3.5.8.3 (TEMPERATURE) all require
+            // positive values; the TDM 2.0 XSD leaves RCS and STEC unconstrained and permits
+            // zero for TEMPERATURE, so the narrower book rule applies.
+            Self::Rcs(value) | Self::Stec(value) | Self::Temperature(value) => {
+                (*value <= 0.0).then_some("a finite number > 0")
+            }
+            _ => None,
+        };
+        if let Some(expected) = invalid_range {
+            return Err(ValidationError::InvalidValue {
+                field: self.key().into(),
+                value: value.to_string(),
+                expected: expected.into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
     }
 
     pub fn key(&self) -> &'static str {

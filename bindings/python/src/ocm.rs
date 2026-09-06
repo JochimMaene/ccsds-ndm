@@ -1098,7 +1098,7 @@ impl OcmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_object_type(&self) -> Option<String> {
-        self.inner.object_type.as_ref().map(|t| format!("{:?}", t))
+        self.inner.object_type.as_ref().map(|t| t.to_string())
     }
     #[setter]
     fn set_object_type(&mut self, value: Option<String>) -> PyResult<()> {
@@ -1749,10 +1749,17 @@ impl OcmTrajState {
         traj_units: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        // Note: traj_basis and orb_revnum_basis don't implement FromStr, so we ignore the input for now
-        // The user can access these via inner if needed
-        let _ = traj_basis; // Suppress unused warning
-        let _ = orb_revnum_basis; // Suppress unused warning
+        // `TrajBasis` and `RevNumBasis` both implement `FromStr`; parse them here so the
+        // constructor cannot silently discard what the caller passed.
+        let traj_basis = traj_basis.map(|value| value.parse()).transpose().map_err(
+            |error: ccsds_ndm::error::EnumParseError| PyValueError::new_err(error.to_string()),
+        )?;
+        let orb_revnum_basis = orb_revnum_basis
+            .map(|value| value.parse())
+            .transpose()
+            .map_err(|error: ccsds_ndm::error::EnumParseError| {
+                PyValueError::new_err(error.to_string())
+            })?;
 
         Ok(Self {
             inner: core_ocm::OcmTrajState {
@@ -1760,7 +1767,7 @@ impl OcmTrajState {
                 traj_id,
                 traj_prev_id,
                 traj_next_id,
-                traj_basis: None, // TrajBasis enum doesn't implement FromStr
+                traj_basis,
                 traj_basis_id,
                 interpolation,
                 interpolation_degree,
@@ -1777,7 +1784,7 @@ impl OcmTrajState {
                     .map(|s| parse_calendar_epoch(&s))
                     .transpose()?,
                 orb_revnum,
-                orb_revnum_basis: None, // RevNumBasis enum doesn't implement FromStr
+                orb_revnum_basis,
                 traj_type,
                 orb_averaging,
                 traj_units,
@@ -1940,7 +1947,7 @@ impl OcmTrajState {
     /// :type: Optional[str]
     #[getter]
     fn get_traj_basis(&self) -> Option<String> {
-        self.inner.traj_basis.as_ref().map(|b| format!("{:?}", b))
+        self.inner.traj_basis.as_ref().map(|b| b.to_string())
     }
     #[setter]
     fn set_traj_basis(&mut self, value: Option<String>) -> PyResult<()> {
@@ -2118,10 +2125,7 @@ impl OcmTrajState {
     /// :type: Optional[str]
     #[getter]
     fn get_orb_revnum_basis(&self) -> Option<String> {
-        self.inner
-            .orb_revnum_basis
-            .as_ref()
-            .map(|b| format!("{:?}", b))
+        self.inner.orb_revnum_basis.as_ref().map(|b| b.to_string())
     }
     #[setter]
     fn set_orb_revnum_basis(&mut self, value: Option<String>) -> PyResult<()> {
@@ -3687,7 +3691,7 @@ impl OcmCovarianceMatrix {
     /// :type: Optional[str]
     #[getter]
     fn get_cov_basis(&self) -> Option<String> {
-        self.inner.cov_basis.as_ref().map(|b| format!("{:?}", b))
+        self.inner.cov_basis.as_ref().map(|b| b.to_string())
     }
     #[setter]
     fn set_cov_basis(&mut self, value: Option<String>) -> PyResult<()> {
@@ -3822,7 +3826,7 @@ impl OcmCovarianceMatrix {
     /// :type: str
     #[getter]
     fn get_cov_ordering(&self) -> String {
-        format!("{:?}", self.inner.cov_ordering)
+        self.inner.cov_ordering.to_string()
     }
     #[setter]
     fn set_cov_ordering(&mut self, value: String) -> PyResult<()> {
@@ -4263,7 +4267,7 @@ impl OcmManeuverParameters {
     /// :type: Optional[str]
     #[getter]
     fn get_man_basis(&self) -> Option<String> {
-        self.inner.man_basis.as_ref().map(|b| format!("{:?}", b))
+        self.inner.man_basis.as_ref().map(|b| b.to_string())
     }
     #[setter]
     fn set_man_basis(&mut self, value: Option<String>) -> PyResult<()> {
@@ -4420,7 +4424,7 @@ impl OcmManeuverParameters {
     /// :type: str
     #[getter]
     fn get_dc_type(&self) -> String {
-        format!("{:?}", self.inner.dc_type)
+        self.inner.dc_type.to_string()
     }
     #[setter]
     fn set_dc_type(&mut self, value: String) -> PyResult<()> {
@@ -4949,10 +4953,9 @@ impl OcmPerturbations {
         self.inner.gm.as_ref().map(|g| g.value)
     }
     #[setter]
-    fn set_gm(&mut self, value: Option<f64>) -> PyResult<()> {
+    fn set_gm(&mut self, value: Option<f64>) {
         use ccsds_ndm::types::Gm;
-        self.inner.gm = crate::api::checked_optional(value, |v| Gm::new(v, None))?;
-        Ok(())
+        self.inner.gm = value.map(|value| Gm { value, units: None });
     }
     /// One OR MORE (N-body) gravitational perturbations bodies used. Values, listed serially
     /// in comma-delimited fashion, denote a natural solar or extra-solar system body (stars,

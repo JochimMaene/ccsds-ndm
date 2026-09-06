@@ -57,5 +57,6 @@ and `package-rust` are the shared built-artifact gates.
 
 ## Status
 
-Combined NDM remains `implemented-unverified`. Exact-cell review and resolution of the XSD-valid
-G22 versus standalone OPM maneuver/MASS semantic conflict remain explicit promotion blockers.
+Combined NDM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its family-specific blocker is the
+XSD-valid G22 versus standalone OPM maneuver/`MASS` semantic conflict, which must be resolved
+independently of the exact-cell review.

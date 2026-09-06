@@ -17,6 +17,7 @@ from ccsds_ndm import (
     ApmMetadata,
     ApmSegment,
     QuaternionState,
+    SpinState,
 )
 
 
@@ -160,6 +161,42 @@ class TestApm:
 
         apm2 = Apm.from_str(xml, format="xml")
         assert apm2.header.originator == "TEST"
+
+    def test_live_spin_angle_setter_defers_to_root_validation(self):
+        apm = self._create_valid_apm()
+        spin = SpinState(
+            ref_frame_a="J2000",
+            ref_frame_b="SC_BODY_1",
+            spin_alpha=10.0,
+            spin_delta=20.0,
+            spin_angle=30.0,
+            spin_angle_vel=0.1,
+            nutation=None,
+            nutation_per=None,
+            nutation_phase=None,
+            momentum_alpha=None,
+            momentum_delta=None,
+            nutation_vel=None,
+            comment=None,
+        )
+        data = apm.segment.data
+        data.quaternion_state = []
+        data.spin = [spin]
+
+        # Setters store what they are given; the root enforces the leaf rule. `angleType` is
+        # [-360, 360), so 360 is out of range.
+        data.spin[0].spin_alpha = 360.0
+        assert data.spin[0].spin_alpha == 360.0
+
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="SPIN_ALPHA"):
+            apm.validate()
+        with pytest.raises(ccsds_ndm.NdmValidationError):
+            apm.to_str(format="kvn")
+        with pytest.raises(ccsds_ndm.NdmValidationError):
+            apm.to_str(format="xml")
+
+        data.spin[0].spin_alpha = -360.0  # inclusive lower bound
+        apm.validate()
 
     def test_file_io(self, tmp_path):
         apm = self._create_valid_apm()

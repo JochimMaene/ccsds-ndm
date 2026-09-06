@@ -35,7 +35,11 @@ duration, and period fields; `TIME_AND_ANGLE` additionally requires its five ang
 and a pulse period cannot be shorter than its pulse duration. Pulse durations and periods are
 validated as finite, non-negative seconds, matching the XSD's `durationType` (`timeUnits="s"`).
 It also preserves the XSD's positive-integer constraint for `DC_MAX_CYCLES` and angle range for
-the optional phase-angle fields when callers mutate a typed model.
+the optional phase-angle fields when callers mutate a typed model, and rejects non-finite
+components of `DC_REF_DIR` and `DC_BODY_TRIGGER`. That last rule has no leaf-level backstop:
+`Vec3Double` exposes three public `f64` fields and its constructor checks nothing, so these two
+fields are the only route by which a non-finite number could reach a `vec3Double` element, where
+the emitted `inf 0 0` fails the schema's list type.
 The optional maneuver epoch fields are required to use the same absolute/relative branch selected
 by `MAN_COMPOSITION`, as required by ODM §6.2.2.5. The two explicit schedule inequalities in the
 ODM table are also enforced: `DC_EXEC_START >= DC_WIN_OPEN` and `DC_EXEC_STOP <= DC_WIN_CLOSE`.

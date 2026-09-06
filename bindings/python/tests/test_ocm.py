@@ -239,6 +239,84 @@ class TestOcm:
         assert od.days_since_first_obs is None
         assert od.days_since_last_obs is None
 
+    def test_mutated_physical_and_od_values_are_revalidated(self):
+        ocm = self._create_valid_ocm()
+        ocm.segment.data.phys = OcmPhysicalDescription(wet_mass=100.0)
+        phys = ocm.segment.data.phys
+        phys.wet_mass = -1.0
+
+        with pytest.raises(NdmValidationError, match="WET_MASS"):
+            ocm.validate()
+        with pytest.raises(NdmValidationError):
+            ocm.to_str(format="kvn")
+        with pytest.raises(NdmValidationError):
+            ocm.to_str(format="xml")
+
+        phys.wet_mass = 100.0
+        ocm.validate()
+
+        ocm.segment.data.od = OcmOdParameters(
+            od_id="OD-1",
+            od_method="LEAST_SQUARES",
+            od_epoch="2023-01-01T00:00:00",
+        )
+        ocm.segment.data.od.weighted_rms = float("nan")
+        with pytest.raises(NdmValidationError, match="WEIGHTED_RMS"):
+            ocm.validate()
+
+    def test_mutated_traj_line_value_is_revalidated(self):
+        ocm = self._create_valid_ocm()
+        traj = ocm.segment.data.traj[0]
+        traj.traj_lines = [
+            TrajLine(
+                epoch="2023-01-01T00:00:00",
+                values=[7000.0, 0.0, float("inf"), 0.0, 7.5, 0.0],
+            )
+        ]
+        ocm.segment.data.traj = [traj]
+
+        with pytest.raises(NdmValidationError, match="trajLine"):
+            ocm.validate()
+
+    def test_enum_constructor_arguments_are_not_discarded(self):
+        """The constructor accepted `traj_basis` and `orb_revnum_basis` and silently dropped
+        them, on the false premise that the enums lacked `FromStr`."""
+        traj = OcmTrajState(
+            center_name="EARTH",
+            traj_ref_frame="EME2000",
+            traj_type="CARTPV",
+            traj_basis="PREDICTED",
+            orb_revnum_basis="1",
+            traj_lines=[TrajLine(epoch="2023-01-01T00:00:00", values=[1.0])],
+        )
+        assert traj.traj_basis == "PREDICTED"
+        assert traj.orb_revnum_basis == "1"
+
+        with pytest.raises(ValueError):
+            OcmTrajState(
+                center_name="EARTH",
+                traj_ref_frame="EME2000",
+                traj_type="CARTPV",
+                traj_basis="NOT_A_BASIS",
+                traj_lines=[TrajLine(epoch="2023-01-01T00:00:00", values=[1.0])],
+            )
+
+    def test_enum_getters_return_the_wire_spelling(self):
+        """Getters used Rust's `Debug` spelling, so `orb_revnum_basis` read back as `'One'` and
+        assigning it straight back raised. A property's own value must be assignable to it."""
+        ocm = self._create_valid_ocm()
+        traj = ocm.segment.data.traj[0]
+        traj.traj_basis = "DETERMINED"
+        traj.orb_revnum_basis = "0"
+
+        assert traj.traj_basis == "DETERMINED"
+        assert traj.orb_revnum_basis == "0"
+
+        for name in ("traj_basis", "orb_revnum_basis"):
+            value = getattr(traj, name)
+            setattr(traj, name, value)  # must not raise
+            assert getattr(traj, name) == value
+
     def test_traj_line_epoch_is_validated_without_changing_string_api(self):
         line = TrajLine(epoch="2023-001T00:00:00", values=[1.0])
         assert line.epoch == "2023-001T00:00:00"

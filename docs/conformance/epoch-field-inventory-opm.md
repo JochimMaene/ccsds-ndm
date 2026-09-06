@@ -17,7 +17,7 @@ Status: implemented slice, not a blanket OPM conformance claim. Scope: OPM 3.0.
 
 ## Decision
 
-OPM reference-frame epochs, state-vector epochs, and maneuver ignition epochs now use
+OPM reference-frame epochs, state-vector epochs, and maneuver ignition epochs use
 `CalendarEpoch` in Rust. KVN and XML parsing reject numeric or invalid calendar spellings, while
 Python retains its string constructor/getter/setter surfaces and raises `ValueError` for the same
 invalid values. No physical-time conversion is introduced.

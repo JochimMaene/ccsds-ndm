@@ -100,6 +100,32 @@ impl Rdm {
     }
 }
 
+impl Rdm {
+    /// XML-only representability: `NOMINAL_IMPACT_ALT` is unbounded in RDM but the common 4.0
+    /// XSD's `altRange` is Earth-derived, so a book-valid altitude for a non-Earth body cannot be
+    /// expressed in this XML edition. The model keeps the value; conversion is refused rather
+    /// than the value being altered to fit.
+    pub(crate) fn validate_xml_representability(&self) -> Result<()> {
+        let Some(parameters) = &self.body.segment.data.ground_impact_parameters else {
+            return Ok(());
+        };
+        let Some(altitude) = &parameters.nominal_impact_alt else {
+            return Ok(());
+        };
+        if altitude.is_xml_representable() {
+            return Ok(());
+        }
+        Err(crate::error::ValidationError::OutOfRange {
+            name: "NOMINAL_IMPACT_ALT".into(),
+            value: altitude.value.to_string(),
+            expected: "[-430.5, 8848] for the 4.0 XML edition".into(),
+            line: None,
+        }
+        .at_path("body.segment.data.ground_impact_parameters.nominal_impact_alt")
+        .into())
+    }
+}
+
 fn validate_xml_sequences(xml: &str) -> Result<()> {
     use crate::xml::XmlSequenceRule;
 
@@ -1234,6 +1260,10 @@ impl crate::traits::Validate for RdmData {
             .into());
         }
         let arp = &self.atmospheric_reentry_parameters;
+        crate::validation::validate_at_field_path(
+            arp.validate(),
+            "body.segment.data.atmospheric_reentry_parameters",
+        )?;
         if let (Some(start), Some(end)) = (
             &arp.orbit_lifetime_window_start,
             &arp.orbit_lifetime_window_end,
@@ -1247,8 +1277,34 @@ impl crate::traits::Validate for RdmData {
                 .into());
             }
         }
+        if let Some(parameters) = &self.ground_impact_parameters {
+            crate::validation::validate_at_field_path(
+                parameters.validate(),
+                "body.segment.data.ground_impact_parameters",
+            )?;
+        }
         if let Some(state_vector) = &self.state_vector {
             state_vector.validate()?;
+        }
+        // `OpmCovarianceMatrix::validate` was correct but unreachable from this root, so RDM
+        // accepted non-finite covariance entries that OPM and OMM already rejected.
+        if let Some(covariance) = &self.covariance_matrix {
+            crate::validation::validate_at_field_path(
+                crate::traits::Validate::validate(covariance),
+                "body.segment.data.covariance_matrix",
+            )?;
+        }
+        if let Some(parameters) = &self.spacecraft_parameters {
+            crate::validation::validate_at_field_path(
+                parameters.validate(),
+                "body.segment.data.spacecraft_parameters",
+            )?;
+        }
+        if let Some(parameters) = &self.od_parameters {
+            crate::validation::validate_at_field_path(
+                parameters.validate(),
+                "body.segment.data.od_parameters",
+            )?;
         }
         Ok(())
     }

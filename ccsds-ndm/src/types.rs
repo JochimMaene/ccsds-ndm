@@ -1256,6 +1256,75 @@ fn reject_kvn_unit(unit: Option<&str>) -> Result<()> {
     }
 }
 
+/// Rejects NaN, both infinities, zero, and negative values for a field whose XSD type resolves to
+/// `positiveDouble`.
+pub(crate) fn require_positive(value: f64, name: &'static str) -> Result<()> {
+    if !value.is_finite() {
+        return Err(crate::error::ValidationError::InvalidValue {
+            field: name.into(),
+            value: value.to_string(),
+            expected: "a finite number > 0".into(),
+            line: None,
+        }
+        .into());
+    }
+    if value <= 0.0 {
+        return Err(crate::error::ValidationError::OutOfRange {
+            name: name.into(),
+            value: value.to_string(),
+            expected: "> 0".into(),
+            line: None,
+        }
+        .into());
+    }
+    Ok(())
+}
+
+/// Rejects NaN, both infinities, and negative values for a field whose XSD type resolves to
+/// `nonNegativeDouble`.
+///
+/// The finiteness and sign failures stay distinct because they mean different things to a caller:
+/// a non-finite value is not a number the standard can express at all, while a negative one is a
+/// real number outside the field's domain.
+pub(crate) fn require_non_negative(value: f64, name: &'static str) -> Result<()> {
+    if !value.is_finite() {
+        return Err(crate::error::ValidationError::InvalidValue {
+            field: name.into(),
+            value: value.to_string(),
+            expected: "a finite number >= 0".into(),
+            line: None,
+        }
+        .into());
+    }
+    if value < 0.0 {
+        return Err(crate::error::ValidationError::OutOfRange {
+            name: name.into(),
+            value: value.to_string(),
+            expected: ">= 0".into(),
+            line: None,
+        }
+        .into());
+    }
+    Ok(())
+}
+
+/// Rejects NaN and both infinities for a numeric field that has no narrower domain.
+///
+/// CCSDS books describe every numeric keyword as a real measurement, so a non-finite value is
+/// never a valid model value even where the XSD only says `xsd:double`.
+pub(crate) fn require_finite(field: &'static str, value: f64) -> Result<()> {
+    if value.is_finite() {
+        return Ok(());
+    }
+    Err(crate::error::ValidationError::InvalidValue {
+        field: field.into(),
+        value: value.to_string(),
+        expected: "a finite number".into(),
+        line: None,
+    }
+    .into())
+}
+
 //----------------------------------------------------------------------
 // Macros to reduce boilerplate for unit enums and wrappers
 //----------------------------------------------------------------------
@@ -1543,16 +1612,21 @@ impl<'de> serde::Deserialize<'de> for Angle {
 impl Angle {
     /// XSD angleRange: -360.0 <= value < 360.0
     pub fn new(value: f64, units: Option<AngleUnits>) -> Result<Self> {
+        Self::validate_value(value, "Angle")?;
+        Ok(Self { value, units })
+    }
+
+    pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
         if !(-360.0..360.0).contains(&value) {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Angle".into(),
+                name: name.into(),
                 value: value.to_string(),
                 expected: "[-360, 360)".into(),
                 line: None,
             }
             .into());
         }
-        Ok(Self { value, units })
+        Ok(())
     }
     pub fn to_unit_value(&self) -> UnitValue<f64, AngleUnits> {
         UnitValue {
@@ -1646,16 +1720,12 @@ impl<'de> serde::Deserialize<'de> for DayInterval {
 impl DayInterval {
     /// dayIntervalTypeUO: nonNegativeDouble
     pub fn new(value: f64, units: Option<DayIntervalUnits>) -> Result<Self> {
-        if value < 0.0 {
-            return Err(crate::error::ValidationError::OutOfRange {
-                name: "DayInterval".into(),
-                value: value.to_string(),
-                expected: ">= 0".into(),
-                line: None,
-            }
-            .into());
-        }
+        Self::validate_value(value, "DayInterval")?;
         Ok(Self { value, units })
+    }
+
+    pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
+        require_non_negative(value, name)
     }
     pub fn to_unit_value(&self) -> UnitValue<f64, DayIntervalUnits> {
         UnitValue {
@@ -1735,16 +1805,21 @@ impl<'de> serde::Deserialize<'de> for Percentage {
 
 impl Percentage {
     pub fn new(value: f64, units: Option<PercentageUnits>) -> Result<Self> {
+        Self::validate_value(value, "Percentage")?;
+        Ok(Self { value, units })
+    }
+
+    pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
         if !(0.0..=100.0).contains(&value) {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Percentage".into(),
+                name: name.into(),
                 value: value.to_string(),
                 expected: "[0, 100]".into(),
                 line: None,
             }
             .into());
         }
-        Ok(Self { value, units })
+        Ok(())
     }
     pub fn to_unit_value(&self) -> UnitValue<f64, PercentageUnits> {
         UnitValue {
@@ -1774,19 +1849,15 @@ pub struct DayIntervalRequired {
 impl DayIntervalRequired {
     /// dayIntervalTypeUR: positiveDouble (>0, units required)
     pub fn new(value: f64) -> Result<Self> {
-        if value <= 0.0 {
-            return Err(crate::error::ValidationError::OutOfRange {
-                name: "DayIntervalRequired".into(),
-                value: value.to_string(),
-                expected: "> 0".into(),
-                line: None,
-            }
-            .into());
-        }
+        Self::validate_value(value, "DayIntervalRequired")?;
         Ok(Self {
             value,
             units: DayIntervalUnits::D,
         })
+    }
+
+    pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
+        require_positive(value, name)
     }
     pub fn to_unit_value(&self) -> UnitValue<f64, DayIntervalUnits> {
         UnitValue {
@@ -1923,16 +1994,12 @@ impl<'de> serde::Deserialize<'de> for Gm {
 impl Gm {
     /// gmType: positiveDouble (>0)
     pub fn new(value: f64, units: Option<GmUnits>) -> Result<Self> {
-        if value <= 0.0 {
-            return Err(crate::error::ValidationError::OutOfRange {
-                name: "GM".into(),
-                value: value.to_string(),
-                expected: "> 0".into(),
-                line: None,
-            }
-            .into());
-        }
+        Self::validate_value(value, "GM")?;
         Ok(Self { value, units })
+    }
+
+    pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
+        require_positive(value, name)
     }
     pub fn to_unit_value(&self) -> UnitValue<f64, GmUnits> {
         UnitValue {
@@ -1965,21 +2032,25 @@ pub struct AltitudeRequired {
     pub units: LengthUnits,
 }
 impl AltitudeRequired {
-    /// altRange: -430.5 ..= 8848
+    /// The common 4.0 XSD's `altRange`, which is Earth-derived.
+    ///
+    /// RDM states no numeric range for `NOMINAL_IMPACT_ALT` and permits non-Earth body-fixed
+    /// frames, so this is a representability limit of the XML edition rather than a semantic rule.
+    /// The model keeps any finite value; XML generation rejects one this range cannot express.
+    pub const XML_RANGE: std::ops::RangeInclusive<f64> = -430.5..=8848.0;
+
+    /// Accepts any finite altitude, because the book imposes no range.
     pub fn new(value: f64) -> Result<Self> {
-        if !(-430.5..=8848.0).contains(&value) {
-            return Err(crate::error::ValidationError::OutOfRange {
-                name: "Altitude".into(),
-                value: value.to_string(),
-                expected: "[-430.5, 8848]".into(),
-                line: None,
-            }
-            .into());
-        }
+        require_finite("Altitude", value)?;
         Ok(Self {
             value,
             units: LengthUnits::M,
         })
+    }
+
+    /// Whether the selected XML edition can represent this altitude.
+    pub fn is_xml_representable(&self) -> bool {
+        Self::XML_RANGE.contains(&self.value)
     }
     pub fn to_unit_value(&self) -> UnitValue<f64, LengthUnits> {
         UnitValue {
@@ -2075,16 +2146,12 @@ impl<'de> serde::Deserialize<'de> for Mass {
 impl Mass {
     /// XSD massType: nonNegativeDouble
     pub fn new(value: f64, units: Option<MassUnits>) -> Result<Self> {
-        if value < 0.0 {
-            return Err(crate::error::ValidationError::OutOfRange {
-                name: "Mass".into(),
-                value: value.to_string(),
-                expected: ">= 0".into(),
-                line: None,
-            }
-            .into());
-        }
+        Self::validate_value(value, "Mass")?;
         Ok(Self { value, units })
+    }
+
+    pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
+        require_non_negative(value, name)
     }
     pub fn to_unit_value(&self) -> UnitValue<f64, MassUnits> {
         UnitValue {
@@ -2174,16 +2241,12 @@ impl<'de> serde::Deserialize<'de> for Area {
 impl Area {
     /// XSD areaType: nonNegativeDouble
     pub fn new(value: f64, units: Option<AreaUnits>) -> Result<Self> {
-        if value < 0.0 {
-            return Err(crate::error::ValidationError::OutOfRange {
-                name: "Area".into(),
-                value: value.to_string(),
-                expected: ">= 0".into(),
-                line: None,
-            }
-            .into());
-        }
+        Self::validate_value(value, "Area")?;
         Ok(Self { value, units })
+    }
+
+    pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
+        require_non_negative(value, name)
     }
     pub fn to_unit_value(&self) -> UnitValue<f64, AreaUnits> {
         UnitValue {
@@ -2310,19 +2373,24 @@ impl<'de> serde::Deserialize<'de> for PercentageRequired {
 }
 impl PercentageRequired {
     pub fn new(value: f64) -> Result<Self> {
+        Self::validate_value(value, "PercentageRequired")?;
+        Ok(Self {
+            value,
+            units: PercentageUnits::Percent,
+        })
+    }
+
+    pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
         if !(0.0..=100.0).contains(&value) {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "PercentageRequired".into(),
+                name: name.into(),
                 value: value.to_string(),
                 expected: "[0, 100]".into(),
                 line: None,
             }
             .into());
         }
-        Ok(Self {
-            value,
-            units: PercentageUnits::Percent,
-        })
+        Ok(())
     }
 
     pub fn to_unit_value(&self) -> UnitValue<f64, PercentageUnits> {
@@ -2405,16 +2473,21 @@ impl<'de> serde::Deserialize<'de> for Probability {
 
 impl Probability {
     pub fn new(value: f64) -> Result<Self> {
+        Self::validate_value(value, "Probability")?;
+        Ok(Self { value })
+    }
+
+    pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
         if !(0.0..=1.0).contains(&value) {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Probability".into(),
+                name: name.into(),
                 value: value.to_string(),
                 expected: "[0, 1]".into(),
                 line: None,
             }
             .into());
         }
-        Ok(Self { value })
+        Ok(())
     }
 }
 
@@ -2484,16 +2557,12 @@ impl<'de> serde::Deserialize<'de> for NonNegativeDouble {
 
 impl NonNegativeDouble {
     pub fn new(value: f64) -> Result<Self> {
-        if value < 0.0 {
-            return Err(crate::error::ValidationError::OutOfRange {
-                name: "NonNegativeDouble".into(),
-                value: value.to_string(),
-                expected: ">= 0".into(),
-                line: None,
-            }
-            .into());
-        }
+        Self::validate_value(value, "NonNegativeDouble")?;
         Ok(Self { value })
+    }
+
+    pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
+        require_non_negative(value, name)
     }
 }
 
@@ -2571,16 +2640,21 @@ impl<'de> serde::Deserialize<'de> for PositiveInteger {
 
 impl PositiveInteger {
     pub fn new(value: u32) -> Result<Self> {
+        Self::validate_value(value, "PositiveInteger")?;
+        Ok(Self { value })
+    }
+
+    pub(crate) fn validate_value(value: u32, name: &'static str) -> Result<()> {
         if value == 0 {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "PositiveInteger".into(),
+                name: name.into(),
                 value: value.to_string(),
                 expected: "> 0".into(),
                 line: None,
             }
             .into());
         }
-        Ok(Self { value })
+        Ok(())
     }
 }
 
@@ -2758,9 +2832,14 @@ impl<'de> serde::Deserialize<'de> for ElementSetNo {
 
 impl ElementSetNo {
     pub fn new(value: u32) -> Result<Self> {
+        Self::validate_value(value, "ElementSetNo")
+    }
+
+    /// `elementSetNoType` restricts to `[0, 9999]` in both the OMM 2.0 and 3.0 schemas.
+    pub(crate) fn validate_value(value: u32, name: &'static str) -> Result<Self> {
         if value > 9999 {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "ElementSetNo".into(),
+                name: name.into(),
                 value: value.to_string(),
                 expected: "[0, 9999]".into(),
                 line: None,
@@ -2867,19 +2946,24 @@ pub struct LatitudeRequired {
 }
 impl LatitudeRequired {
     pub fn new(value: f64) -> Result<Self> {
+        Self::validate_value(value, "Latitude")?;
+        Ok(Self {
+            value,
+            units: LatLonUnits::Deg,
+        })
+    }
+
+    pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
         if !(-90.0..=90.0).contains(&value) {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Latitude".into(),
+                name: name.into(),
                 value: value.to_string(),
                 expected: "[-90, 90]".into(),
                 line: None,
             }
             .into());
         }
-        Ok(Self {
-            value,
-            units: LatLonUnits::Deg,
-        })
+        Ok(())
     }
 
     pub fn to_unit_value(&self) -> UnitValue<f64, LatLonUnits> {
@@ -2920,19 +3004,24 @@ pub struct LongitudeRequired {
 }
 impl LongitudeRequired {
     pub fn new(value: f64) -> Result<Self> {
+        Self::validate_value(value, "Longitude")?;
+        Ok(Self {
+            value,
+            units: LatLonUnits::Deg,
+        })
+    }
+
+    pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
         if !(-180.0..=180.0).contains(&value) {
             return Err(crate::error::ValidationError::OutOfRange {
-                name: "Longitude".into(),
+                name: name.into(),
                 value: value.to_string(),
                 expected: "[-180, 180]".into(),
                 line: None,
             }
             .into());
         }
-        Ok(Self {
-            value,
-            units: LatLonUnits::Deg,
-        })
+        Ok(())
     }
 
     pub fn to_unit_value(&self) -> UnitValue<f64, LatLonUnits> {
@@ -3534,16 +3623,12 @@ pub struct Duration {
 }
 impl Duration {
     pub fn new(value: f64, units: Option<TimeUnits>) -> Result<Self> {
-        if value < 0.0 {
-            return Err(crate::error::ValidationError::OutOfRange {
-                name: "Duration".into(),
-                value: value.to_string(),
-                expected: ">= 0".into(),
-                line: None,
-            }
-            .into());
-        }
+        Self::validate_value(value, "Duration")?;
         Ok(Self { value, units })
+    }
+
+    pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
+        require_non_negative(value, name)
     }
     pub fn to_unit_value(&self) -> UnitValue<f64, TimeUnits> {
         UnitValue {
@@ -3984,6 +4069,10 @@ impl std::str::FromStr for DisintegrationType {
             "NONE" => Ok(Self::None),
             "MASS-LOSS" => Ok(Self::MassLoss),
             "BREAK-UP" => Ok(Self::BreakUp),
+            // `BREAKUP` is not an XSD spelling. It is accepted because the published RDM example
+            // `data/xml/rdm_c4.xml` uses it; generation always emits the canonical `BREAK-UP`, so
+            // the non-conforming spelling is normalised rather than propagated. The diagnostic
+            // below deliberately advertises only the conforming spellings.
             "MASS-LOSS + BREAK-UP" | "MASS-LOSS + BREAKUP" => Ok(Self::MassLossAndBreakUp),
             _ => Err(crate::error::EnumParseError {
                 field: "REENTRY_DISINTEGRATION",
@@ -4813,13 +4902,13 @@ impl std::fmt::Display for TdmRangeMode {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum TdmRangeUnits {
     /// Range is measured in kilometers.
-    #[serde(rename = "km")]
+    #[serde(rename = "km", alias = "KM")]
     Km,
     /// Range is measured in seconds.
-    #[serde(rename = "s")]
+    #[serde(rename = "s", alias = "S")]
     Seconds,
     /// Range units where the transmit frequency is changing.
-    #[serde(rename = "RU")]
+    #[serde(rename = "RU", alias = "ru")]
     Ru,
 }
 
@@ -4833,7 +4922,7 @@ impl std::str::FromStr for TdmRangeUnits {
             _ => Err(crate::error::EnumParseError {
                 field: "RANGE_UNITS",
                 value: s.to_string(),
-                expected: "km, s, or ru",
+                expected: "km, s, or RU",
             }),
         }
     }
@@ -4844,7 +4933,7 @@ impl std::fmt::Display for TdmRangeUnits {
         match self {
             Self::Km => write!(f, "km"),
             Self::Seconds => write!(f, "s"),
-            Self::Ru => write!(f, "ru"),
+            Self::Ru => write!(f, "RU"),
         }
     }
 }
@@ -4875,10 +4964,15 @@ impl std::str::FromStr for TdmReferenceFrame {
             "ITRF-93" | "ITRF1993" | "ITRF93" => Ok(Self::Itrf93),
             "ITRF-97" => Ok(Self::Itrf97),
             "TOD" | "TOD_EARTH" => Ok(Self::Tod),
+            // The TDM 2.0 XSD spells these `ITRF-93` and `TOD`, while the book's table spells the
+            // same frames `ITRF1993` and `TOD_EARTH`. Both authorities are accepted, so both
+            // spellings are advertised — listing only one set sends a reader of the other
+            // authority looking for a mistake that is not there.
             _ => Err(crate::error::EnumParseError {
                 field: "REFERENCE_FRAME",
                 value: s.to_string(),
-                expected: "EME2000, ICRF, ITRF2000, ITRF-93, ITRF-97, or TOD",
+                expected: "EME2000, ICRF, ITRF2000, ITRF-93 (or ITRF1993), ITRF-97, \
+                           or TOD (or TOD_EARTH)",
             }),
         }
     }
@@ -4988,6 +5082,21 @@ mod tests {
         assert!(NonNegativeDouble::new(0.0).is_ok());
         assert!(NonNegativeDouble::new(1.0).is_ok());
         assert!(NonNegativeDouble::new(-0.1).is_err());
+    }
+
+    #[test]
+    fn constrained_numeric_types_reject_non_finite_values() {
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(DayInterval::new(value, None).is_err());
+            assert!(Mass::new(value, None).is_err());
+            assert!(Area::new(value, None).is_err());
+            assert!(NonNegativeDouble::new(value).is_err());
+            assert!(Percentage::new(value, None).is_err());
+            assert!(PercentageRequired::new(value).is_err());
+            assert!(Probability::new(value).is_err());
+            assert!(LatitudeRequired::new(value).is_err());
+            assert!(LongitudeRequired::new(value).is_err());
+        }
     }
 
     #[test]
@@ -5263,6 +5372,9 @@ mod extra_tests {
         assert!(DayInterval::new(-0.1, None).is_err());
         assert!(DayIntervalRequired::new(0.1).is_ok());
         assert!(DayIntervalRequired::new(0.0).is_err());
+        assert!(DayIntervalRequired::new(f64::NAN).is_err());
+        assert!(DayIntervalRequired::new(f64::INFINITY).is_err());
+        assert!(DayIntervalRequired::new(f64::NEG_INFINITY).is_err());
     }
 
     #[test]
@@ -5280,9 +5392,22 @@ mod extra_tests {
 
     #[test]
     fn test_altitude_required_validation() {
+        // RDM states no range, so the model accepts any finite altitude, including values only a
+        // non-Earth body-fixed frame would produce.
         assert!(AltitudeRequired::new(0.0).is_ok());
-        assert!(AltitudeRequired::new(9000.0).is_err());
-        assert!(AltitudeRequired::new(-431.0).is_err());
+        assert!(AltitudeRequired::new(9000.0).is_ok());
+        assert!(AltitudeRequired::new(-431.0).is_ok());
+        assert!(AltitudeRequired::new(f64::NAN).is_err());
+        assert!(AltitudeRequired::new(f64::INFINITY).is_err());
+
+        // The XSD's Earth-derived range is a representability limit, reported separately.
+        assert!(AltitudeRequired::new(0.0).unwrap().is_xml_representable());
+        assert!(!AltitudeRequired::new(9000.0)
+            .unwrap()
+            .is_xml_representable());
+        assert!(!AltitudeRequired::new(-431.0)
+            .unwrap()
+            .is_xml_representable());
     }
 
     #[test]

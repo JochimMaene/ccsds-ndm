@@ -633,12 +633,10 @@ impl KeplerianElements {
     }
 
     #[setter]
-    fn set_inclination(&mut self, value: f64) -> PyResult<()> {
+    fn set_inclination(&mut self, value: f64) {
         self.inner.inclination = Inclination {
-            angle: Angle::new(value, None)
-                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?,
+            angle: Angle { value, units: None },
         };
-        Ok(())
     }
 
     /// Right ascension of ascending node
@@ -652,10 +650,8 @@ impl KeplerianElements {
     }
 
     #[setter]
-    fn set_ra_of_asc_node(&mut self, value: f64) -> PyResult<()> {
-        self.inner.ra_of_asc_node = Angle::new(value, None)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
-        Ok(())
+    fn set_ra_of_asc_node(&mut self, value: f64) {
+        self.inner.ra_of_asc_node = Angle { value, units: None };
     }
 
     /// Argument of pericenter
@@ -669,10 +665,8 @@ impl KeplerianElements {
     }
 
     #[setter]
-    fn set_arg_of_pericenter(&mut self, value: f64) -> PyResult<()> {
-        self.inner.arg_of_pericenter = Angle::new(value, None)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
-        Ok(())
+    fn set_arg_of_pericenter(&mut self, value: f64) {
+        self.inner.arg_of_pericenter = Angle { value, units: None };
     }
 
     /// Gravitational Coefficient (Gravitational Constant × Central Mass)
@@ -686,10 +680,8 @@ impl KeplerianElements {
     }
 
     #[setter]
-    fn set_gm(&mut self, value: f64) -> PyResult<()> {
-        self.inner.gm = Gm::new(value, None)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
-        Ok(())
+    fn set_gm(&mut self, value: f64) {
+        self.inner.gm = Gm { value, units: None };
     }
 
     /// True anomaly or mean anomaly
@@ -703,12 +695,8 @@ impl KeplerianElements {
     }
 
     #[setter]
-    fn set_true_anomaly(&mut self, value: Option<f64>) -> PyResult<()> {
-        self.inner.true_anomaly = value
-            .map(|v| Angle::new(v, None))
-            .transpose()
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
-        Ok(())
+    fn set_true_anomaly(&mut self, value: Option<f64>) {
+        self.inner.true_anomaly = value.map(|value| ccsds_ndm::types::Angle { value, units: None });
     }
 
     /// True anomaly or mean anomaly
@@ -722,12 +710,8 @@ impl KeplerianElements {
     }
 
     #[setter]
-    fn set_mean_anomaly(&mut self, value: Option<f64>) -> PyResult<()> {
-        self.inner.mean_anomaly = value
-            .map(|v| Angle::new(v, None))
-            .transpose()
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
-        Ok(())
+    fn set_mean_anomaly(&mut self, value: Option<f64>) {
+        self.inner.mean_anomaly = value.map(|value| ccsds_ndm::types::Angle { value, units: None });
     }
 }
 

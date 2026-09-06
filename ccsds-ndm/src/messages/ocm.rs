@@ -880,6 +880,50 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
 }
 
 impl Ocm {
+    /// XML-only representability for the three OCM values whose book domain is wider than the
+    /// 3.0 schema's. The model keeps the book-valid value and conversion is refused rather than
+    /// the value being altered to fit.
+    pub(crate) fn validate_xml_representability(&self) -> Result<()> {
+        let data = &self.body.segment.data;
+        for (index, man) in data.man.iter().enumerate() {
+            for (field, angle) in [
+                ("DC_PA_START_ANGLE", man.dc_pa_start_angle.as_ref()),
+                ("DC_PA_STOP_ANGLE", man.dc_pa_stop_angle.as_ref()),
+            ] {
+                let Some(angle) = angle else { continue };
+                if !(-360.0..360.0).contains(&angle.value) {
+                    return Err(ValidationError::OutOfRange {
+                        name: field.into(),
+                        value: angle.value.to_string(),
+                        expected: "[-360, 360) for the 3.0 XML edition".into(),
+                        line: None,
+                    }
+                    .at_path(format!("body.segment.data.man[{index}]"))
+                    .into());
+                }
+            }
+        }
+        if let Some(od) = &data.od {
+            for (field, value) in [
+                ("DAYS_SINCE_FIRST_OBS", &od.days_since_first_obs),
+                ("DAYS_SINCE_LAST_OBS", &od.days_since_last_obs),
+            ] {
+                let Some(value) = value else { continue };
+                if value.value < 0.0 {
+                    return Err(ValidationError::OutOfRange {
+                        name: field.into(),
+                        value: value.value.to_string(),
+                        expected: ">= 0 for the 3.0 XML edition".into(),
+                        line: None,
+                    }
+                    .at_path("body.segment.data.od")
+                    .into());
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
         for trajectory in &self.body.segment.data.traj {
             for line in &trajectory.traj_lines {
@@ -1021,7 +1065,6 @@ impl crate::traits::Validate for OcmData {
         if let Some(od) = &self.od {
             od.validate()?;
         }
-        OcmTrajState::validate_all(&self.traj)?;
         Ok(())
     }
 }
@@ -1038,15 +1081,96 @@ impl OcmData {
 
 impl OcmPhysicalDescription {
     fn validate(&self) -> Result<()> {
+        // DRAG_COEFF_NOM is `positiveDouble` in the OCM 3.0 XSD.
         if let Some(v) = self.drag_coeff_nom {
-            if v <= 0.0 {
-                return Err(ValidationError::OutOfRange {
-                    name: "DRAG_COEFF_NOM".into(),
-                    value: v.to_string(),
-                    expected: "> 0".into(),
-                    line: None,
-                }
-                .into());
+            require_positive(v, "DRAG_COEFF_NOM")?;
+        }
+        // `areaType` and `massType` are `nonNegativeDouble`.
+        for (field, value) in [
+            ("DRAG_CONST_AREA", &self.drag_const_area),
+            ("AREA_ALONG_OEB_MAX", &self.area_along_oeb_max),
+            ("AREA_ALONG_OEB_INT", &self.area_along_oeb_int),
+            ("AREA_ALONG_OEB_MIN", &self.area_along_oeb_min),
+            ("AREA_MIN_FOR_PC", &self.area_min_for_pc),
+            ("AREA_MAX_FOR_PC", &self.area_max_for_pc),
+            ("AREA_TYP_FOR_PC", &self.area_typ_for_pc),
+            ("RCS", &self.rcs),
+            ("RCS_MIN", &self.rcs_min),
+            ("RCS_MAX", &self.rcs_max),
+            ("SRP_CONST_AREA", &self.srp_const_area),
+        ] {
+            if let Some(value) = value {
+                Area::validate_value(value.value, field)?;
+            }
+        }
+        for (field, value) in [
+            ("INITIAL_WET_MASS", &self.initial_wet_mass),
+            ("WET_MASS", &self.wet_mass),
+            ("DRY_MASS", &self.dry_mass),
+        ] {
+            if let Some(value) = value {
+                Mass::validate_value(value.value, field)?;
+            }
+        }
+        // `percentageTypeUO` restricts to [0, 100] and `probabilityType` to [0, 1].
+        for (field, value) in [
+            ("DRAG_UNCERTAINTY", &self.drag_uncertainty),
+            ("SOLAR_RAD_UNCERTAINTY", &self.solar_rad_uncertainty),
+        ] {
+            if let Some(value) = value {
+                Percentage::validate_value(value.value, field)?;
+            }
+        }
+        if let Some(value) = &self.reflectance {
+            Probability::validate_value(value.value, "REFLECTANCE")?;
+        }
+        // `angleType` restricts to [-360, 360).
+        for (field, value) in [
+            ("ATT_KNOWLEDGE", &self.att_knowledge),
+            ("ATT_CONTROL", &self.att_control),
+            ("ATT_POINTING", &self.att_pointing),
+        ] {
+            if let Some(value) = value {
+                Angle::validate_value(value.value, field)?;
+            }
+        }
+        // The remaining keywords are plain doubles in both the book and the XSD. ODM permits a
+        // tumbling object to be flagged with OEB_Q* = -999, so no quaternion norm is imposed.
+        for (field, value) in [
+            ("OEB_MAX", self.oeb_max.as_ref().map(|value| value.value)),
+            ("OEB_INT", self.oeb_int.as_ref().map(|value| value.value)),
+            ("OEB_MIN", self.oeb_min.as_ref().map(|value| value.value)),
+            ("OEB_Q1", self.oeb_q1),
+            ("OEB_Q2", self.oeb_q2),
+            ("OEB_Q3", self.oeb_q3),
+            ("OEB_QC", self.oeb_qc),
+            ("SOLAR_RAD_COEFF", self.solar_rad_coeff),
+            ("VM_ABSOLUTE", self.vm_absolute),
+            ("VM_APPARENT_MIN", self.vm_apparent_min),
+            ("VM_APPARENT", self.vm_apparent),
+            ("VM_APPARENT_MAX", self.vm_apparent_max),
+            (
+                "AVG_MANEUVER_FREQ",
+                self.avg_maneuver_freq.as_ref().map(|value| value.value),
+            ),
+            (
+                "MAX_THRUST",
+                self.max_thrust.as_ref().map(|value| value.value),
+            ),
+            ("DV_BOL", self.dv_bol.as_ref().map(|value| value.value)),
+            (
+                "DV_REMAINING",
+                self.dv_remaining.as_ref().map(|value| value.value),
+            ),
+            ("IXX", self.ixx.as_ref().map(|value| value.value)),
+            ("IYY", self.iyy.as_ref().map(|value| value.value)),
+            ("IZZ", self.izz.as_ref().map(|value| value.value)),
+            ("IXY", self.ixy.as_ref().map(|value| value.value)),
+            ("IXZ", self.ixz.as_ref().map(|value| value.value)),
+            ("IYZ", self.iyz.as_ref().map(|value| value.value)),
+        ] {
+            if let Some(value) = value {
+                require_finite(field, value)?;
             }
         }
         Ok(())
@@ -1103,6 +1227,12 @@ impl OcmTrajState {
             "TRAJ",
         )?;
 
+        validate_ocm_line_values(
+            "TRAJ",
+            "trajLine",
+            self.traj_lines.iter().map(|l| &l.values),
+        )?;
+
         let traj_type = self.traj_type.trim().to_uppercase();
 
         if let Some(units) = &self.traj_units {
@@ -1137,12 +1267,6 @@ impl OcmTrajState {
                 }
             }
         }
-        Ok(())
-    }
-
-    // Example of cross-block validation (not strictly required by spec but good practice)
-    fn validate_all(_trajs: &[OcmTrajState]) -> Result<()> {
-        // Could check for overlapping time spans or duplicate IDs
         Ok(())
     }
 }
@@ -1270,8 +1394,36 @@ impl OcmCovarianceMatrix {
             "covLine epoch",
             "COV",
         )?;
+        validate_ocm_line_values("COV", "covLine", self.cov_lines.iter().map(|l| &l.values))?;
         Ok(())
     }
+}
+
+/// Rejects non-finite numbers in an OCM history line, naming the line and column that failed.
+fn validate_ocm_line_values<'a>(
+    block: &'static str,
+    line_name: &'static str,
+    lines: impl Iterator<Item = &'a Vec<f64>>,
+) -> Result<()> {
+    for (line_index, values) in lines.enumerate() {
+        for (column, value) in values.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(ValidationError::InvalidValue {
+                    field: format!(
+                        "{block} {line_name} {} value {}",
+                        line_index + 1,
+                        column + 1
+                    )
+                    .into(),
+                    value: value.to_string(),
+                    expected: Cow::Borrowed("a finite number"),
+                    line: None,
+                }
+                .into());
+            }
+        }
+    }
+    Ok(())
 }
 
 impl OcmManeuverParameters {
@@ -1353,6 +1505,17 @@ impl OcmManeuverParameters {
         validate_man_duty_cycle(self)?;
 
         let expected = tokens.len().saturating_sub(1);
+        // Built once per maneuver block rather than per line, so history parsing keeps its
+        // recorded allocation budget.
+        let numeric_columns: Vec<bool> = tokens
+            .iter()
+            .skip(1)
+            .map(|token| {
+                !NON_NUMERIC_MAN_COLUMNS
+                    .iter()
+                    .any(|known| known.eq_ignore_ascii_case(token.trim()))
+            })
+            .collect();
         let mut previous_key: Option<crate::types::EpochOrderKey<'_>> = None;
         for line in &self.man_lines {
             validate_man_history_epoch(&line.epoch, time_tag)?;
@@ -1395,9 +1558,57 @@ impl OcmManeuverParameters {
                 }
                 .into());
             }
+            validate_man_line_numbers(&numeric_columns, &tokens, line)?;
         }
         Ok(())
     }
+}
+
+/// Composition columns that do not hold a number.
+///
+/// Everything else in ODM tables 6-8 and 6-9 is a numeric quantity. `ACC_INTERP` and `THR_INTERP`
+/// are ON/OFF flags (ODM §6.2.8.20.1) and `DEPLOY_ID` is a free-text child-object identifier.
+/// The two time tags can only appear as the first element, which is validated separately.
+const NON_NUMERIC_MAN_COLUMNS: [&str; 5] = [
+    "ACC_INTERP",
+    "THR_INTERP",
+    "DEPLOY_ID",
+    "TIME_ABSOLUTE",
+    "TIME_RELATIVE",
+];
+
+/// Requires every declared-numeric maneuver column to hold a finite number.
+///
+/// `ManLine::values` is `Vec<String>` because the columns are heterogeneous, so nothing else stops
+/// text reaching a numeric column: the XSD types the line as a string list, so the schema oracle
+/// accepts it. This matches Orekit, whose `ManeuverFieldType` parses each declared-numeric column
+/// as a double and likewise enforces no per-column domain.
+fn validate_man_line_numbers(
+    numeric_columns: &[bool],
+    tokens: &[String],
+    line: &ManLine,
+) -> Result<()> {
+    for (index, value) in line.values.iter().enumerate() {
+        // `values` excludes the time tag, so column `index` is composition token `index + 1`.
+        if numeric_columns.get(index) != Some(&true) {
+            continue;
+        }
+        let parsed = value.trim().parse::<f64>();
+        if parsed.map(|number| number.is_finite()) != Ok(true) {
+            let column = tokens
+                .get(index + 1)
+                .map(|token| token.trim())
+                .unwrap_or("value");
+            return Err(ValidationError::InvalidValue {
+                field: format!("manLine {column}").into(),
+                value: value.clone(),
+                expected: Cow::Borrowed("a finite number"),
+                line: None,
+            }
+            .into());
+        }
+    }
+    Ok(())
 }
 
 #[derive(Clone, Copy)]
@@ -1482,6 +1693,27 @@ fn validate_man_duty_cycle(man: &OcmManeuverParameters) -> Result<()> {
         }
     }
 
+    // `Vec3Double` has three public `f64` components and a constructor that checks nothing, so
+    // these are the only route by which a non-finite number reaches a `vec3Double` element. The
+    // XSD list type rejects the resulting `inf 0 0` lexical form.
+    for (field, vector) in [
+        ("DC_REF_DIR", &man.dc_ref_dir),
+        ("DC_BODY_TRIGGER", &man.dc_body_trigger),
+    ] {
+        let Some(vector) = vector else { continue };
+        for (component, value) in [("x", vector.x), ("y", vector.y), ("z", vector.z)] {
+            if !value.is_finite() {
+                return Err(ValidationError::InvalidValue {
+                    field: format!("{field} {component}").into(),
+                    value: value.to_string(),
+                    expected: Cow::Borrowed("a finite number"),
+                    line: None,
+                }
+                .into());
+            }
+        }
+    }
+
     if let Some(max_cycles) = man.dc_max_cycles {
         if max_cycles == 0 {
             return Err(ValidationError::invalid_value(
@@ -1493,19 +1725,14 @@ fn validate_man_duty_cycle(man: &OcmManeuverParameters) -> Result<()> {
         }
     }
 
+    // ODM permits any finite phase-angle magnitude; `angleType`'s [-360, 360) is a limit of the
+    // XML edition, checked in `validate_xml_representability` instead.
     for (field, angle) in [
         ("DC_PA_START_ANGLE", man.dc_pa_start_angle.as_ref()),
         ("DC_PA_STOP_ANGLE", man.dc_pa_stop_angle.as_ref()),
     ] {
         if let Some(angle) = angle {
-            if !(-360.0..360.0).contains(&angle.value) {
-                return Err(ValidationError::invalid_value(
-                    field,
-                    angle.value.to_string(),
-                    "a finite angle in the XSD range [-360, 360)",
-                )
-                .into());
-            }
+            require_finite(field, angle.value)?;
         }
     }
 
@@ -5498,16 +5725,71 @@ impl ToKvn for OcmOdParameters {
 
 impl OcmPerturbations {
     fn validate(&self) -> Result<()> {
-        if let Some(v) = self.oblate_flattening {
-            if v <= 0.0 {
-                return Err(ValidationError::OutOfRange {
-                    name: "OBLATE_FLATTENING".into(),
-                    value: v.to_string(),
-                    expected: "> 0".into(),
-                    line: None,
-                }
-                .into());
+        // GM is `gmType`, a `positiveDouble`.
+        if let Some(value) = &self.gm {
+            Gm::validate_value(value.value, "GM")?;
+        }
+        // `positionTypeUO`, `angleRateType`, `geomagType`, and `solarFluxType` are plain doubles.
+        for (field, value) in [
+            (
+                "EQUATORIAL_RADIUS",
+                self.equatorial_radius.as_ref().map(|value| value.value),
+            ),
+            (
+                "CENTRAL_BODY_ROTATION",
+                self.central_body_rotation.as_ref().map(|value| value.value),
+            ),
+            (
+                "FIXED_GEOMAG_KP",
+                self.fixed_geomag_kp.as_ref().map(|value| value.value),
+            ),
+            (
+                "FIXED_GEOMAG_AP",
+                self.fixed_geomag_ap.as_ref().map(|value| value.value),
+            ),
+            (
+                "FIXED_GEOMAG_DST",
+                self.fixed_geomag_dst.as_ref().map(|value| value.value),
+            ),
+            (
+                "FIXED_F10P7",
+                self.fixed_f10p7.as_ref().map(|value| value.value),
+            ),
+            (
+                "FIXED_F10P7_MEAN",
+                self.fixed_f10p7_mean.as_ref().map(|value| value.value),
+            ),
+            (
+                "FIXED_M10P7",
+                self.fixed_m10p7.as_ref().map(|value| value.value),
+            ),
+            (
+                "FIXED_M10P7_MEAN",
+                self.fixed_m10p7_mean.as_ref().map(|value| value.value),
+            ),
+            (
+                "FIXED_S10P7",
+                self.fixed_s10p7.as_ref().map(|value| value.value),
+            ),
+            (
+                "FIXED_S10P7_MEAN",
+                self.fixed_s10p7_mean.as_ref().map(|value| value.value),
+            ),
+            (
+                "FIXED_Y10P7",
+                self.fixed_y10p7.as_ref().map(|value| value.value),
+            ),
+            (
+                "FIXED_Y10P7_MEAN",
+                self.fixed_y10p7_mean.as_ref().map(|value| value.value),
+            ),
+        ] {
+            if let Some(value) = value {
+                require_finite(field, value)?;
             }
+        }
+        if let Some(v) = self.oblate_flattening {
+            require_positive(v, "OBLATE_FLATTENING")?;
         }
         if let Some(v) = self.albedo_grid_size {
             if v == 0 {
@@ -5548,21 +5830,71 @@ impl OcmOdParameters {
             }
         }
 
+        // GDOP and WEIGHTED_RMS are `nonNegativeDouble`; NaN and both infinities are excluded
+        // by the shared predicate rather than by the sign comparison alone.
         for (name, val) in [
             ("GDOP", self.gdop),
             ("WEIGHTED_RMS", self.weighted_rms.map(|v| v.value)),
         ] {
             if let Some(v) = val {
-                if v < 0.0 {
-                    return Err(ValidationError::OutOfRange {
-                        name: name.into(),
-                        value: v.to_string(),
-                        expected: ">= 0".into(),
-                        line: None,
-                    }
-                    .into());
-                }
+                NonNegativeDouble::validate_value(v, name)?;
             }
+        }
+        // ODM permits signed DAYS_SINCE_*_OBS while the XSD's `dayIntervalTypeUO` is
+        // `nonNegativeDouble`, so P3 enforces only finiteness for those two and
+        // `validate_xml_representability` refuses a negative value at XML generation.
+        for (field, value) in [
+            ("DAYS_SINCE_FIRST_OBS", &self.days_since_first_obs),
+            ("DAYS_SINCE_LAST_OBS", &self.days_since_last_obs),
+        ] {
+            if let Some(value) = value {
+                require_finite(field, value.value)?;
+            }
+        }
+        // `dayIntervalTypeUO` is `nonNegativeDouble` for the remaining spans, which have no
+        // conflicting book range.
+        for (field, value) in [
+            ("RECOMMENDED_OD_SPAN", &self.recommended_od_span),
+            ("ACTUAL_OD_SPAN", &self.actual_od_span),
+            ("MAXIMUM_OBS_GAP", &self.maximum_obs_gap),
+        ] {
+            if let Some(value) = value {
+                DayInterval::validate_value(value.value, field)?;
+            }
+        }
+        // `lengthTypeUO` is a plain double; `percentageTypeUO` is [0, 100]; `wkgType` is
+        // `nonNegativeDouble`.
+        for (field, value) in [
+            (
+                "OD_EPOCH_EIGMAJ",
+                self.od_epoch_eigmaj.as_ref().map(|value| value.value),
+            ),
+            (
+                "OD_EPOCH_EIGINT",
+                self.od_epoch_eigint.as_ref().map(|value| value.value),
+            ),
+            (
+                "OD_EPOCH_EIGMIN",
+                self.od_epoch_eigmin.as_ref().map(|value| value.value),
+            ),
+            (
+                "OD_MAX_PRED_EIGMAJ",
+                self.od_max_pred_eigmaj.as_ref().map(|value| value.value),
+            ),
+            (
+                "OD_MIN_PRED_EIGMIN",
+                self.od_min_pred_eigmin.as_ref().map(|value| value.value),
+            ),
+        ] {
+            if let Some(value) = value {
+                require_finite(field, value)?;
+            }
+        }
+        if let Some(value) = &self.od_confidence {
+            Percentage::validate_value(value.value, "OD_CONFIDENCE")?;
+        }
+        if let Some(value) = &self.sedr {
+            NonNegativeDouble::validate_value(value.value, "SEDR")?;
         }
         Ok(())
     }
@@ -6090,8 +6422,16 @@ TRAJ_STOP
         assert!(error.contains("DC_WIN_OPEN"));
 
         man.dc_win_open = Some("0".parse().unwrap());
+        // ODM permits any finite phase angle, so 360 is semantically valid; the XSD's
+        // [-360, 360) is a representability limit checked at XML generation instead.
         man.dc_pa_start_angle = Some(Angle {
             value: 360.0,
+            units: Some(AngleUnits::Deg),
+        });
+        man.validate().expect("ODM imposes no phase-angle range");
+
+        man.dc_pa_start_angle = Some(Angle {
+            value: f64::NAN,
             units: Some(AngleUnits::Deg),
         });
         let error = man.validate().unwrap_err().to_string();
