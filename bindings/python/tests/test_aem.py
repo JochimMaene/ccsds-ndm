@@ -197,6 +197,14 @@ class TestAem:
         assert aem2.header.originator == "TEST"
         assert len(aem2.segments) == 1
 
+    def test_live_attitude_state_edits_are_revalidated_before_generation(self):
+        aem = self._create_valid_aem()
+        state = aem.segments[0].data.attitude_states[0]
+        state.values = [float("nan"), 0.0, 0.0, 1.0]
+
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="Quaternion"):
+            aem.to_str(format="xml")
+
     def test_file_io(self, tmp_path):
         aem = self._create_valid_aem()
         kvn_path = tmp_path / "test.aem"

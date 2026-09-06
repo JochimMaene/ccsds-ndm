@@ -11,6 +11,7 @@ import pytest
 
 from ccsds_ndm import (
     AtmosphericReentryParameters,
+    GroundImpactParameters,
     Rdm,
     RdmData,
     RdmHeader,
@@ -107,6 +108,21 @@ class TestRdm:
                 reentry_altitude=120.0,
                 nominal_reentry_epoch="123.5",
             )
+
+    def test_mutated_optional_blocks_are_revalidated(self):
+        rdm = self._create_valid_rdm()
+        ground = GroundImpactParameters(
+            impact_ref_frame="ITRF",
+            nominal_impact_lon=1.0,
+            nominal_impact_lat=1.0,
+        )
+        rdm.segment.data.ground_impact_parameters = ground
+        ground.impact_ref_frame = None
+
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="IMPACT_REF_FRAME"):
+            rdm.validate()
+        with pytest.raises(ccsds_ndm.NdmValidationError):
+            rdm.to_str(format="xml")
 
 
 if __name__ == "__main__":

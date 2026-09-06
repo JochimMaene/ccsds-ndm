@@ -370,6 +370,14 @@ class TestAcm:
         acm2 = Acm.from_str(xml, format="xml")
         assert acm2.header.originator == "TEST"
 
+    def test_live_physical_edits_are_revalidated_before_generation(self):
+        acm = self._create_valid_acm()
+        acm.segment.data.phys = AcmPhysicalDescription()
+        acm.segment.data.phys.drag_coeff = float("nan")
+
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="DRAG_COEFF"):
+            acm.to_str(format="xml")
+
     def test_file_io(self, tmp_path):
         acm = self._create_valid_acm()
         kvn_path = tmp_path / "test.acm"

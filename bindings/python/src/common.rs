@@ -1047,12 +1047,9 @@ impl OdParameters {
         self.inner.recommended_od_span.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_recommended_od_span(&mut self, v: Option<f64>) -> PyResult<()> {
-        use ccsds_ndm::types::DayInterval;
-        self.inner.recommended_od_span = v
-            .map(|x| DayInterval::new(x, None).map_err(|e| PyValueError::new_err(e.to_string())))
-            .transpose()?;
-        Ok(())
+    fn set_recommended_od_span(&mut self, v: Option<f64>) {
+        self.inner.recommended_od_span =
+            v.map(|value| ccsds_ndm::types::DayInterval { value, units: None });
     }
 
     /// Based on the observations available and the RECOMMENDED_OD_SPAN, the actual
@@ -1068,12 +1065,9 @@ impl OdParameters {
         self.inner.actual_od_span.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_actual_od_span(&mut self, v: Option<f64>) -> PyResult<()> {
-        use ccsds_ndm::types::DayInterval;
-        self.inner.actual_od_span = v
-            .map(|x| DayInterval::new(x, None).map_err(|e| PyValueError::new_err(e.to_string())))
-            .transpose()?;
-        Ok(())
+    fn set_actual_od_span(&mut self, v: Option<f64>) {
+        self.inner.actual_od_span =
+            v.map(|value| ccsds_ndm::types::DayInterval { value, units: None });
     }
 
     /// The total number of observations available for orbit determination.
@@ -1134,12 +1128,9 @@ impl OdParameters {
         self.inner.residuals_accepted.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_residuals_accepted(&mut self, v: Option<f64>) -> PyResult<()> {
-        use ccsds_ndm::types::Percentage;
-        self.inner.residuals_accepted = v
-            .map(|x| Percentage::new(x, None).map_err(|e| PyValueError::new_err(e.to_string())))
-            .transpose()?;
-        Ok(())
+    fn set_residuals_accepted(&mut self, v: Option<f64>) {
+        self.inner.residuals_accepted =
+            v.map(|value| ccsds_ndm::types::Percentage { value, units: None });
     }
 
     /// The weighted root mean square (RMS) of the residuals.
@@ -1450,14 +1441,8 @@ impl GroundImpactParameters {
         self.inner.probability_of_impact.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_probability_of_impact(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.probability_of_impact = v
-            .map(|x| {
-                ccsds_ndm::types::Probability::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_probability_of_impact(&mut self, v: Option<f64>) {
+        self.inner.probability_of_impact = v.map(|value| ccsds_ndm::types::Probability { value });
     }
 
     /// Probability that the entire object and any fragments will burn up during atmospheric
@@ -1469,14 +1454,8 @@ impl GroundImpactParameters {
         self.inner.probability_of_burn_up.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_probability_of_burn_up(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.probability_of_burn_up = v
-            .map(|x| {
-                ccsds_ndm::types::Probability::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_probability_of_burn_up(&mut self, v: Option<f64>) {
+        self.inner.probability_of_burn_up = v.map(|value| ccsds_ndm::types::Probability { value });
     }
 
     /// Probability that the object will break up during re-entry (0 to 1).
@@ -1487,14 +1466,8 @@ impl GroundImpactParameters {
         self.inner.probability_of_break_up.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_probability_of_break_up(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.probability_of_break_up = v
-            .map(|x| {
-                ccsds_ndm::types::Probability::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_probability_of_break_up(&mut self, v: Option<f64>) {
+        self.inner.probability_of_break_up = v.map(|value| ccsds_ndm::types::Probability { value });
     }
 
     /// Probability that any fragment will impact solid ground (0 to 1).
@@ -1508,14 +1481,9 @@ impl GroundImpactParameters {
             .map(|v| v.value)
     }
     #[setter]
-    fn set_probability_of_land_impact(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.probability_of_land_impact = v
-            .map(|x| {
-                ccsds_ndm::types::Probability::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_probability_of_land_impact(&mut self, v: Option<f64>) {
+        self.inner.probability_of_land_impact =
+            v.map(|value| ccsds_ndm::types::Probability { value });
     }
 
     /// Probability that the re-entry event will cause any casualties (severe injuries or
@@ -1527,14 +1495,8 @@ impl GroundImpactParameters {
         self.inner.probability_of_casualty.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_probability_of_casualty(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.probability_of_casualty = v
-            .map(|x| {
-                ccsds_ndm::types::Probability::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_probability_of_casualty(&mut self, v: Option<f64>) {
+        self.inner.probability_of_casualty = v.map(|value| ccsds_ndm::types::Probability { value });
     }
 
     /// Epoch of the predicted impact (formatting rules specified in 5.3.3.5).
@@ -1609,14 +1571,11 @@ impl GroundImpactParameters {
         self.inner.nominal_impact_lon.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_nominal_impact_lon(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.nominal_impact_lon = v
-            .map(|x| {
-                ccsds_ndm::types::LongitudeRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_nominal_impact_lon(&mut self, v: Option<f64>) {
+        self.inner.nominal_impact_lon = v.map(|value| ccsds_ndm::types::LongitudeRequired {
+            value,
+            units: ccsds_ndm::types::LatLonUnits::Deg,
+        });
     }
 
     /// Latitude of the predicted impact location with respect to the value of
@@ -1631,14 +1590,11 @@ impl GroundImpactParameters {
         self.inner.nominal_impact_lat.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_nominal_impact_lat(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.nominal_impact_lat = v
-            .map(|x| {
-                ccsds_ndm::types::LatitudeRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_nominal_impact_lat(&mut self, v: Option<f64>) {
+        self.inner.nominal_impact_lat = v.map(|value| ccsds_ndm::types::LatitudeRequired {
+            value,
+            units: ccsds_ndm::types::LatLonUnits::Deg,
+        });
     }
 
     /// Altitude of the impact location with respect to the value of IMPACT_REF_FRAME.
@@ -1651,14 +1607,11 @@ impl GroundImpactParameters {
         self.inner.nominal_impact_alt.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_nominal_impact_alt(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.nominal_impact_alt = v
-            .map(|x| {
-                ccsds_ndm::types::AltitudeRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_nominal_impact_alt(&mut self, v: Option<f64>) {
+        self.inner.nominal_impact_alt = v.map(|value| ccsds_ndm::types::AltitudeRequired {
+            value,
+            units: ccsds_ndm::types::LengthUnits::M,
+        });
     }
 
     /// First (lowest) confidence interval for the impact location.
@@ -1671,14 +1624,11 @@ impl GroundImpactParameters {
         self.inner.impact_1_confidence.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_impact_1_confidence(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.impact_1_confidence = v
-            .map(|x| {
-                ccsds_ndm::types::PercentageRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_impact_1_confidence(&mut self, v: Option<f64>) {
+        self.inner.impact_1_confidence = v.map(|value| ccsds_ndm::types::PercentageRequired {
+            value,
+            units: ccsds_ndm::types::PercentageUnits::Percent,
+        });
     }
 
     /// Longitude of the start of the first confidence interval along the ground track with
@@ -1693,14 +1643,11 @@ impl GroundImpactParameters {
         self.inner.impact_1_start_lon.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_impact_1_start_lon(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.impact_1_start_lon = v
-            .map(|x| {
-                ccsds_ndm::types::LongitudeRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_impact_1_start_lon(&mut self, v: Option<f64>) {
+        self.inner.impact_1_start_lon = v.map(|value| ccsds_ndm::types::LongitudeRequired {
+            value,
+            units: ccsds_ndm::types::LatLonUnits::Deg,
+        });
     }
 
     /// Latitude of the start of the first confidence interval along the ground track with
@@ -1715,14 +1662,11 @@ impl GroundImpactParameters {
         self.inner.impact_1_start_lat.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_impact_1_start_lat(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.impact_1_start_lat = v
-            .map(|x| {
-                ccsds_ndm::types::LatitudeRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_impact_1_start_lat(&mut self, v: Option<f64>) {
+        self.inner.impact_1_start_lat = v.map(|value| ccsds_ndm::types::LatitudeRequired {
+            value,
+            units: ccsds_ndm::types::LatLonUnits::Deg,
+        });
     }
 
     /// Longitude of the end of the first confidence interval along the ground track with
@@ -1737,14 +1681,11 @@ impl GroundImpactParameters {
         self.inner.impact_1_stop_lon.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_impact_1_stop_lon(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.impact_1_stop_lon = v
-            .map(|x| {
-                ccsds_ndm::types::LongitudeRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_impact_1_stop_lon(&mut self, v: Option<f64>) {
+        self.inner.impact_1_stop_lon = v.map(|value| ccsds_ndm::types::LongitudeRequired {
+            value,
+            units: ccsds_ndm::types::LatLonUnits::Deg,
+        });
     }
 
     /// Latitude of the end of the first confidence interval along the ground track with
@@ -1759,14 +1700,11 @@ impl GroundImpactParameters {
         self.inner.impact_1_stop_lat.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_impact_1_stop_lat(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.impact_1_stop_lat = v
-            .map(|x| {
-                ccsds_ndm::types::LatitudeRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_impact_1_stop_lat(&mut self, v: Option<f64>) {
+        self.inner.impact_1_stop_lat = v.map(|value| ccsds_ndm::types::LatitudeRequired {
+            value,
+            units: ccsds_ndm::types::LatLonUnits::Deg,
+        });
     }
 
     /// Cross-track size of the first confidence interval.
@@ -1794,14 +1732,11 @@ impl GroundImpactParameters {
         self.inner.impact_2_confidence.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_impact_2_confidence(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.impact_2_confidence = v
-            .map(|x| {
-                ccsds_ndm::types::PercentageRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_impact_2_confidence(&mut self, v: Option<f64>) {
+        self.inner.impact_2_confidence = v.map(|value| ccsds_ndm::types::PercentageRequired {
+            value,
+            units: ccsds_ndm::types::PercentageUnits::Percent,
+        });
     }
 
     /// Longitude of the start of the second confidence interval along the ground track with
@@ -1816,14 +1751,11 @@ impl GroundImpactParameters {
         self.inner.impact_2_start_lon.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_impact_2_start_lon(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.impact_2_start_lon = v
-            .map(|x| {
-                ccsds_ndm::types::LongitudeRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_impact_2_start_lon(&mut self, v: Option<f64>) {
+        self.inner.impact_2_start_lon = v.map(|value| ccsds_ndm::types::LongitudeRequired {
+            value,
+            units: ccsds_ndm::types::LatLonUnits::Deg,
+        });
     }
 
     /// Latitude of the start of the second confidence interval along the ground track with
@@ -1838,14 +1770,11 @@ impl GroundImpactParameters {
         self.inner.impact_2_start_lat.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_impact_2_start_lat(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.impact_2_start_lat = v
-            .map(|x| {
-                ccsds_ndm::types::LatitudeRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_impact_2_start_lat(&mut self, v: Option<f64>) {
+        self.inner.impact_2_start_lat = v.map(|value| ccsds_ndm::types::LatitudeRequired {
+            value,
+            units: ccsds_ndm::types::LatLonUnits::Deg,
+        });
     }
 
     /// Longitude of the end of the second confidence interval along the ground track with
@@ -1860,14 +1789,11 @@ impl GroundImpactParameters {
         self.inner.impact_2_stop_lon.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_impact_2_stop_lon(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.impact_2_stop_lon = v
-            .map(|x| {
-                ccsds_ndm::types::LongitudeRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_impact_2_stop_lon(&mut self, v: Option<f64>) {
+        self.inner.impact_2_stop_lon = v.map(|value| ccsds_ndm::types::LongitudeRequired {
+            value,
+            units: ccsds_ndm::types::LatLonUnits::Deg,
+        });
     }
 
     /// Latitude of the end of the second confidence interval along the ground track with
@@ -1882,14 +1808,11 @@ impl GroundImpactParameters {
         self.inner.impact_2_stop_lat.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_impact_2_stop_lat(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.impact_2_stop_lat = v
-            .map(|x| {
-                ccsds_ndm::types::LatitudeRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_impact_2_stop_lat(&mut self, v: Option<f64>) {
+        self.inner.impact_2_stop_lat = v.map(|value| ccsds_ndm::types::LatitudeRequired {
+            value,
+            units: ccsds_ndm::types::LatLonUnits::Deg,
+        });
     }
 
     /// Cross-track size of the second confidence interval.
@@ -1917,14 +1840,11 @@ impl GroundImpactParameters {
         self.inner.impact_3_confidence.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_impact_3_confidence(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.impact_3_confidence = v
-            .map(|x| {
-                ccsds_ndm::types::PercentageRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_impact_3_confidence(&mut self, v: Option<f64>) {
+        self.inner.impact_3_confidence = v.map(|value| ccsds_ndm::types::PercentageRequired {
+            value,
+            units: ccsds_ndm::types::PercentageUnits::Percent,
+        });
     }
 
     /// Longitude of the start of the third confidence interval along the ground track with
@@ -1939,14 +1859,11 @@ impl GroundImpactParameters {
         self.inner.impact_3_start_lon.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_impact_3_start_lon(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.impact_3_start_lon = v
-            .map(|x| {
-                ccsds_ndm::types::LongitudeRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_impact_3_start_lon(&mut self, v: Option<f64>) {
+        self.inner.impact_3_start_lon = v.map(|value| ccsds_ndm::types::LongitudeRequired {
+            value,
+            units: ccsds_ndm::types::LatLonUnits::Deg,
+        });
     }
 
     /// Latitude of the start of the third confidence interval along the ground track with
@@ -1961,14 +1878,11 @@ impl GroundImpactParameters {
         self.inner.impact_3_start_lat.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_impact_3_start_lat(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.impact_3_start_lat = v
-            .map(|x| {
-                ccsds_ndm::types::LatitudeRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_impact_3_start_lat(&mut self, v: Option<f64>) {
+        self.inner.impact_3_start_lat = v.map(|value| ccsds_ndm::types::LatitudeRequired {
+            value,
+            units: ccsds_ndm::types::LatLonUnits::Deg,
+        });
     }
 
     /// Longitude of the end of the third confidence interval along the ground track with
@@ -1983,14 +1897,11 @@ impl GroundImpactParameters {
         self.inner.impact_3_stop_lon.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_impact_3_stop_lon(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.impact_3_stop_lon = v
-            .map(|x| {
-                ccsds_ndm::types::LongitudeRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_impact_3_stop_lon(&mut self, v: Option<f64>) {
+        self.inner.impact_3_stop_lon = v.map(|value| ccsds_ndm::types::LongitudeRequired {
+            value,
+            units: ccsds_ndm::types::LatLonUnits::Deg,
+        });
     }
 
     /// Latitude of the end of the third confidence interval along the ground track with
@@ -2005,14 +1916,11 @@ impl GroundImpactParameters {
         self.inner.impact_3_stop_lat.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_impact_3_stop_lat(&mut self, v: Option<f64>) -> PyResult<()> {
-        self.inner.impact_3_stop_lat = v
-            .map(|x| {
-                ccsds_ndm::types::LatitudeRequired::new(x)
-                    .map_err(|e| PyValueError::new_err(e.to_string()))
-            })
-            .transpose()?;
-        Ok(())
+    fn set_impact_3_stop_lat(&mut self, v: Option<f64>) {
+        self.inner.impact_3_stop_lat = v.map(|value| ccsds_ndm::types::LatitudeRequired {
+            value,
+            units: ccsds_ndm::types::LatLonUnits::Deg,
+        });
     }
 
     /// Cross-track size of the third confidence interval.

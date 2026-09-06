@@ -93,6 +93,40 @@ class TestTdm:
         with pytest.raises(ValueError):
             TdmObservation(epoch="123.5", keyword="RANGE", value=1.0)
 
+    def test_mutated_metadata_is_revalidated(self):
+        tdm = self._create_valid_tdm()
+        metadata = tdm.body.segments[0].metadata
+        metadata.integration_interval = -1.0
+
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="INTEGRATION_INTERVAL"):
+            tdm.validate()
+        with pytest.raises(ccsds_ndm.NdmValidationError):
+            tdm.to_str(format="xml")
+
+    def test_mutated_observation_value_is_revalidated(self):
+        """TEMPERATURE is positive in TDM 2.0 prose although the XSD admits zero."""
+        tdm = self._create_valid_tdm()
+        data = tdm.body.segments[0].data
+        data.observations = [
+            TdmObservation(
+                epoch="2023-01-01T00:00:00", keyword="TEMPERATURE", value=-5.0
+            )
+        ]
+
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="TEMPERATURE"):
+            tdm.validate()
+        with pytest.raises(ccsds_ndm.NdmValidationError):
+            tdm.to_str(format="kvn")
+        with pytest.raises(ccsds_ndm.NdmValidationError):
+            tdm.to_str(format="xml")
+
+        data.observations = [
+            TdmObservation(
+                epoch="2023-01-01T00:00:00", keyword="TEMPERATURE", value=290.0
+            )
+        ]
+        tdm.validate()
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
