@@ -39,12 +39,17 @@ Annex A, section A2.2.2 contains 25 AEM implementation-conformance statement row
 Section 4.2.4.8.1's strictly increasing, non-repeated epoch requirement and the metadata/cross-block
 usable-span rules have direct semantic regression tests in `aem_semantic_validation`.
 
-There is one normative-example conflict that the library resolves in favor of accepting the
-published CCSDS fixture: `ccsds-ndm/data/kvn/aem_g4.kvn` declares interpolation degree 7 but contains four
-records. Enforcing “at least degree + 1 records” would reject that official example. The degree
-field and its conditional presence are validated, but record-count capacity is therefore not used
-as a rejection rule. This exception is explicit and must be resolved before any affected semantic
-cell is promoted.
+There is one normative-example conflict that remains **unresolved**: `ccsds-ndm/data/kvn/aem_g4.kvn`
+declares interpolation degree 7 but contains four records. The governing prose (ADM 504.0-B-2
+§4.2.4.8.4, via `docs/ccsds-books/adm.rst`) requires that all data blocks contain a sufficient
+number of attitude ephemeris data records to allow the recommended interpolation method to be
+carried out consistently throughout the AEM. That rule is stated in terms of sufficiency for the
+method, not as an explicit `degree + 1` numeric shall, so the numeric capacity threshold — and
+whether it varies by interpolation method — is not established from the cited text. The degree
+field and its conditional presence with `INTERPOLATION_METHOD` are validated, but record-count
+capacity is not used as a rejection rule, which means the published fixture is accepted while the
+sufficiency requirement has no numeric enforcement. This stays a promotion blocker until the
+method-specific requirement is determined from the standard or a corrigendum.
 
 ## Public-surface and artifact evidence
 

@@ -533,7 +533,7 @@ impl TdmMetadata {
     #[pyo3(signature = (
         *,
         participant_1,
-        time_system=None,
+        time_system,
         track_id=None,
         data_types=None,
         start_time=None,
@@ -597,7 +597,7 @@ impl TdmMetadata {
     #[allow(clippy::too_many_arguments)]
     fn new(
         participant_1: String,
-        time_system: Option<String>,
+        time_system: String,
         track_id: Option<String>,
 
         data_types: Option<String>,
@@ -660,8 +660,6 @@ impl TdmMetadata {
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         use std::str::FromStr;
-
-        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
 
         let mode = match mode {
             Some(ref ob) => Some(parse_tdm_mode(ob)?),

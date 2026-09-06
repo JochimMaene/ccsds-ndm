@@ -4,10 +4,26 @@
 
 use crate::types::{parse_calendar_epoch, parse_epoch};
 use ccsds_ndm::common as core_common;
-use ccsds_ndm::types::{Acc, Position, Velocity};
+use ccsds_ndm::types::{Acc, InterpolationDegree, Position, Velocity};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::str::FromStr;
+
+pub(crate) fn parse_interpolation_degree(
+    value: Option<u32>,
+) -> PyResult<Option<InterpolationDegree>> {
+    value
+        .map(|value| {
+            std::num::NonZeroU32::new(value)
+                .map(InterpolationDegree)
+                .ok_or_else(|| {
+                    PyValueError::new_err(
+                        "interpolation_degree must be a positive integer; got 0 (use None to omit it)",
+                    )
+                })
+        })
+        .transpose()
+}
 
 /// Represents the `odmHeader` complex type.
 ///

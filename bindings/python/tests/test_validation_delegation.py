@@ -11,7 +11,7 @@ XML generation all agree with the Rust core. This deliberately does not duplicat
 mutation matrix for every field; it proves that reconstruction and delegation preserve the
 enforcement boundary for each shape.
 
-See ``docs/design/validation-rollout.md`` category 6.
+See ``docs/design/validation-contract.md`` and the per-family conformance documents.
 """
 
 import pathlib

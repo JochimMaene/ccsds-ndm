@@ -263,6 +263,82 @@ class TestOem:
         data.covariance_matrix_numpy = nearly.reshape(1, 6, 6)
         assert np.allclose(data.covariance_matrix_numpy[0], np.eye(6, dtype=float))
 
+    def test_interpolation_degree_zero_is_rejected_not_dropped(self):
+        with pytest.raises(ValueError, match="positive integer"):
+            OemMetadata(
+                "SAT1",
+                "2023-001A",
+                "2023-01-01T00:00:00",
+                "2023-01-01T01:00:00",
+                center_name="EARTH",
+                ref_frame="EME2000",
+                time_system="UTC",
+                interpolation="LINEAR",
+                interpolation_degree=0,
+            )
+
+        meta = OemMetadata(
+            "SAT1",
+            "2023-001A",
+            "2023-01-01T00:00:00",
+            "2023-01-01T01:00:00",
+            center_name="EARTH",
+            ref_frame="EME2000",
+            time_system="UTC",
+            interpolation="LINEAR",
+            interpolation_degree=5,
+        )
+        assert meta.interpolation_degree == 5
+        with pytest.raises(ValueError, match="positive integer"):
+            meta.interpolation_degree = 0
+        assert meta.interpolation_degree == 5
+
+        meta.interpolation_degree = None
+        assert meta.interpolation_degree is None
+
+        meta.interpolation_degree = 8
+        oem = self._create_valid_oem()
+        oem.segments[0].metadata.interpolation = "LINEAR"
+        oem.segments[0].metadata.interpolation_degree = 8
+        kvn = oem.to_str(format="kvn")
+        assert "INTERPOLATION_DEGREE" in kvn
+
+    def test_strided_state_arrays_survive_construction_and_assignment(self):
+        # Six or nine columns do not imply contiguous storage; strided views
+        # such as array[:, ::2] must not raise PanicException.
+        epochs = ["2023-01-01T00:00:00", "2023-01-01T00:01:00"]
+        strided = np.arange(24, dtype=float).reshape(2, 12)[:, ::2]
+        assert not strided.flags["C_CONTIGUOUS"]
+        assert strided.shape == (2, 6)
+
+        data = OemData.from_numpy(
+            state_vector_epochs=list(epochs),
+            state_vector_numpy=strided,
+            comments=[],
+        )
+        assert np.allclose(data.state_vector_numpy, strided)
+
+        # Slice the replacement from a wider base so the assigned view is
+        # genuinely strided: slicing must come last, since arithmetic on a
+        # view materializes a contiguous array and would leave the setter
+        # path unprotected.
+        replacement = (np.arange(48, dtype=float).reshape(2, 24) + 100.0)[:, ::4]
+        assert not replacement.flags["C_CONTIGUOUS"]
+        assert replacement.shape == (2, 6)
+        data.state_vector_numpy = replacement
+        assert np.allclose(data.state_vector_numpy, replacement)
+
+        # Nine-column histories (with accelerations) take the same path.
+        strided_nine = np.arange(36, dtype=float).reshape(2, 18)[:, ::2]
+        assert not strided_nine.flags["C_CONTIGUOUS"]
+        assert strided_nine.shape == (2, 9)
+        data_nine = OemData.from_numpy(
+            state_vector_epochs=list(epochs),
+            state_vector_numpy=strided_nine,
+            comments=[],
+        )
+        assert np.allclose(data_nine.state_vector_numpy, strided_nine)
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

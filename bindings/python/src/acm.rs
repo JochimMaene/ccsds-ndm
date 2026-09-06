@@ -270,19 +270,17 @@ impl AcmMetadata {
     #[pyo3(signature = (
         object_name,
         epoch_tzero,
-        time_system=None,
+        time_system,
         international_designator=None,
         comment=None
     ))]
     fn new(
         object_name: String,
         epoch_tzero: String,
-        time_system: Option<String>,
+        time_system: String,
         international_designator: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
-
         Ok(Self {
             inner: core_acm::AcmMetadata {
                 comment: comment.unwrap_or_default(),

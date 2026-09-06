@@ -22,7 +22,8 @@ This library contains models, parsers, and serializers for the following message
 
 Inclusion in this list describes implementation coverage, not verified support for every edition,
 notation, operation, or public surface. Exact conformance claims are made only through the project's
-support and conformance matrix.
+`support matrix <https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/support-matrix.md>`_
+(canonical; not duplicated here).
 
 .. toctree::
    :maxdepth: 2

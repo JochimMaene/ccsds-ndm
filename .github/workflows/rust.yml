@@ -1,11 +1,9 @@
-name: Rust
+name: CI
 
 on:
   push:
     branches:
       - main
-    tags:
-      - "v*"
   pull_request:
 
 permissions:
@@ -16,22 +14,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.90.0
-      - uses: taiki-e/install-action@just
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: ccsds-ndm
-      - name: Install XSD validator
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes libxml2-utils
-      - name: Run tests
-        run: just test-rust
+  quality:
+    name: Behavioral quality
+    uses: ./.github/workflows/behavioral-quality.yml
 
   msrv:
     name: Minimum supported Rust
@@ -58,108 +43,3 @@ jobs:
 
       - name: Linting
         run: just lint-rust
-  coverage:
-    name: Code coverage
-    runs-on: ubuntu-latest
-    if: github.actor != 'dependabot[bot]'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-      - uses: taiki-e/install-action@just
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Install XSD validator
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes libxml2-utils
-      - name: Generate code coverage
-        run: just coverage
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
-          files: ccsds-ndm/codecov.json
-          fail_ci_if_error: true
-
-  bindings:
-    name: Python Bindings Quality
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.90.0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-      - uses: astral-sh/setup-uv@v5
-      - uses: taiki-e/install-action@just
-      - name: Set up Python environment
-        run: just setup-dev
-      - name: Build Python extension
-        run: just dev
-      - name: Lint Python
-        run: just lint-python
-      - name: Audit bindings
-        run: just audit
-      - name: Check stubs
-        run: just stubs-check
-      - name: Check synced docstrings
-        run: just sync-docs-check
-      - name: Run Python tests
-        run: just test-python
-
-  package:
-    name: Package Rust crate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.90.0
-      - uses: taiki-e/install-action@just
-      - name: Install XSD validator
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes libxml2-utils
-      - name: Build and verify crate package
-        run: just package-rust
-
-  package-python:
-    name: Package Python wheel
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.90.0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-      - uses: astral-sh/setup-uv@v5
-      - uses: taiki-e/install-action@just
-      - name: Build, install, and verify Python wheel
-        run: just package-python
-
-  release:
-    name: Release
-    runs-on: ubuntu-latest
-    needs: [test, msrv, fmt, coverage, bindings, package, package-python]
-    if: github.ref_type == 'tag'
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.90.0
-        with:
-          components: rustfmt, clippy
-
-      - name: Verify release tag matches crate version
-        working-directory: ./ccsds-ndm
-        run: |
-          crate_version="$(awk -F '"' '/^version = / { print $2; exit }' Cargo.toml)"
-          if [[ "${GITHUB_REF_NAME}" != "v${crate_version}" ]]; then
-            echo "Release tag ${GITHUB_REF_NAME} does not match crate version ${crate_version}" >&2
-            exit 1
-          fi
-
-      - name: Publish to crates.io
-        working-directory: ./ccsds-ndm
-        env:
-          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
-        run: cargo publish --token ${CRATES_TOKEN}

@@ -231,7 +231,6 @@ impl GenerationMetadata for crate::messages::ocm::Ocm {
     }
 
     fn validate_xml_model(&self) -> Result<()> {
-        self.validate()?;
         self.validate_xml_representability()
     }
 }
@@ -249,7 +248,6 @@ impl GenerationMetadata for crate::messages::rdm::Rdm {
     }
 
     fn validate_xml_model(&self) -> Result<()> {
-        self.validate()?;
         self.validate_xml_representability()
     }
 }

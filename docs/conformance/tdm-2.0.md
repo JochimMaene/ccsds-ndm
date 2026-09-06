@@ -85,9 +85,13 @@ claims.
 TDM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its ICS feature inventory and packaged
 surfaces are reconciled, and the recorded timing observations below remain informational.
 
-Both accepted input editions are covered. The observation value domains above are enforced
+Both accepted input editions are covered for value domains. The observation value domains above are enforced
 regardless of edition, and 503.0-B-1 was checked directly to confirm that is correct: it specifies
 the same `-180.0 <= ANGLE_1 < 360.0` bound and the same positive `TEMPERATURE` and `STEC`, and it
 has no `RCS` keyword at all, so that rule is vacuous rather than conflicting for 1.0 input. No
-edition-conditional rule is required; see
-[Edition-aware validation](../design/edition-aware-validation.md).
+edition-conditional rule is required.
+
+That check is not full 1.0 edition support. What remains unverified for 1.0 is wire-syntax and
+metadata parsing specifically: no shipped 1.0 fixture exercises 1.0-only KVN/XML syntax or metadata
+paths through the Rust and Python parsers. Value-domain agreement is verified; 1.0 syntax/metadata
+coverage is the remaining named proof before any 1.0 support claim.

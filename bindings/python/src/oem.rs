@@ -2,20 +2,17 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::common::{OdmHeader, StateVectorAcc};
+use crate::common::{parse_interpolation_degree, OdmHeader, StateVectorAcc};
 use crate::types::{parse_calendar_epoch, parse_epoch};
 use ccsds_ndm::messages::oem as core_oem;
 use ccsds_ndm::types::{
-    Acc, InterpolationDegree, Position, PositionCovariance, PositionVelocityCovariance, Velocity,
-    VelocityCovariance,
+    Acc, Position, PositionCovariance, PositionVelocityCovariance, Velocity, VelocityCovariance,
 };
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use pyo3::PyClass;
-
-use std::num::NonZeroU32;
 
 fn build_covariance_matrix(
     epoch: ccsds_ndm::types::Epoch,
@@ -162,6 +159,59 @@ fn full_covariance_values(
         }
     }
     Ok(lower)
+}
+
+/// Map one six/nine-column caller row into a state record, preserving the
+/// NaN-gap convention for absent accelerations.
+///
+/// The column reader is a closure over the ndarray row view rather than a
+/// contiguous slice: six or nine columns do not imply contiguous storage
+/// (e.g. `array[:, ::2]`), and the previous indexed access supported those views.
+fn state_vector_from_row(
+    epoch: ccsds_ndm::types::Epoch,
+    value_at: impl Fn(usize) -> f64,
+    has_accel: bool,
+) -> ccsds_ndm::common::StateVectorAcc {
+    let accel = |index: usize| {
+        if has_accel && !value_at(index).is_nan() {
+            Some(Acc {
+                value: value_at(index),
+                units: None,
+            })
+        } else {
+            None
+        }
+    };
+    ccsds_ndm::common::StateVectorAcc {
+        epoch,
+        x: Position {
+            value: value_at(0),
+            units: None,
+        },
+        y: Position {
+            value: value_at(1),
+            units: None,
+        },
+        z: Position {
+            value: value_at(2),
+            units: None,
+        },
+        x_dot: Velocity {
+            value: value_at(3),
+            units: None,
+        },
+        y_dot: Velocity {
+            value: value_at(4),
+            units: None,
+        },
+        z_dot: Velocity {
+            value: value_at(5),
+            units: None,
+        },
+        x_ddot: accel(6),
+        y_ddot: accel(7),
+        z_ddot: accel(8),
+    }
 }
 
 /// Orbit Ephemeris Message (OEM).
@@ -652,9 +702,9 @@ impl OemMetadata {
         object_id,
         start_time,
         stop_time,
-        center_name=String::from("EARTH"),
-        ref_frame=None,
-        time_system=None,
+        center_name,
+        ref_frame,
+        time_system,
         ref_frame_epoch=None,
         useable_start_time=None,
         useable_stop_time=None,
@@ -668,8 +718,8 @@ impl OemMetadata {
         start_time: String,
         stop_time: String,
         center_name: String,
-        ref_frame: Option<String>,
-        time_system: Option<String>,
+        ref_frame: String,
+        time_system: String,
         ref_frame_epoch: Option<String>,
         useable_start_time: Option<String>,
         useable_stop_time: Option<String>,
@@ -677,9 +727,6 @@ impl OemMetadata {
         interpolation_degree: Option<u32>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let ref_frame = ref_frame.unwrap_or_else(|| "GCRF".to_string());
-        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
-
         Ok(Self {
             inner: core_oem::OemMetadata {
                 object_name,
@@ -696,9 +743,7 @@ impl OemMetadata {
                 useable_start_time: useable_start_time.map(|s| parse_epoch(&s)).transpose()?,
                 useable_stop_time: useable_stop_time.map(|s| parse_epoch(&s)).transpose()?,
                 interpolation,
-                interpolation_degree: interpolation_degree
-                    .and_then(NonZeroU32::new)
-                    .map(InterpolationDegree),
+                interpolation_degree: parse_interpolation_degree(interpolation_degree)?,
             },
         })
     }
@@ -946,10 +991,9 @@ impl OemMetadata {
     }
 
     #[setter]
-    fn set_interpolation_degree(&mut self, interpolation_degree: Option<u32>) {
-        self.inner.interpolation_degree = interpolation_degree
-            .and_then(NonZeroU32::new)
-            .map(InterpolationDegree);
+    fn set_interpolation_degree(&mut self, interpolation_degree: Option<u32>) -> PyResult<()> {
+        self.inner.interpolation_degree = parse_interpolation_degree(interpolation_degree)?;
+        Ok(())
     }
 
     /// Comments (see 7.8 for formatting rules).
@@ -1042,57 +1086,11 @@ impl OemData {
         let mut state_vectors = Vec::with_capacity(shape[0]);
         for (i, epoch_str) in state_vector_epochs.iter().enumerate() {
             let row = array_view.row(i);
-            state_vectors.push(ccsds_ndm::common::StateVectorAcc {
-                epoch: parse_epoch(epoch_str)?,
-                x: Position {
-                    value: row[0],
-                    units: None,
-                },
-                y: Position {
-                    value: row[1],
-                    units: None,
-                },
-                z: Position {
-                    value: row[2],
-                    units: None,
-                },
-                x_dot: Velocity {
-                    value: row[3],
-                    units: None,
-                },
-                y_dot: Velocity {
-                    value: row[4],
-                    units: None,
-                },
-                z_dot: Velocity {
-                    value: row[5],
-                    units: None,
-                },
-                x_ddot: if has_accel && !row[6].is_nan() {
-                    Some(Acc {
-                        value: row[6],
-                        units: None,
-                    })
-                } else {
-                    None
-                },
-                y_ddot: if has_accel && !row[7].is_nan() {
-                    Some(Acc {
-                        value: row[7],
-                        units: None,
-                    })
-                } else {
-                    None
-                },
-                z_ddot: if has_accel && !row[8].is_nan() {
-                    Some(Acc {
-                        value: row[8],
-                        units: None,
-                    })
-                } else {
-                    None
-                },
-            });
+            state_vectors.push(state_vector_from_row(
+                parse_epoch(epoch_str)?,
+                |index| row[index],
+                has_accel,
+            ));
         }
 
         let mut covariance_matrices = Vec::new();
@@ -1544,57 +1542,11 @@ impl OemData {
 
         for (i, existing) in core.state_vector.iter().enumerate() {
             let row = array_view.row(i);
-            state_vectors.push(ccsds_ndm::common::StateVectorAcc {
-                epoch: existing.epoch,
-                x: Position {
-                    value: row[0],
-                    units: None,
-                },
-                y: Position {
-                    value: row[1],
-                    units: None,
-                },
-                z: Position {
-                    value: row[2],
-                    units: None,
-                },
-                x_dot: Velocity {
-                    value: row[3],
-                    units: None,
-                },
-                y_dot: Velocity {
-                    value: row[4],
-                    units: None,
-                },
-                z_dot: Velocity {
-                    value: row[5],
-                    units: None,
-                },
-                x_ddot: if has_accel && !row[6].is_nan() {
-                    Some(Acc {
-                        value: row[6],
-                        units: None,
-                    })
-                } else {
-                    None
-                },
-                y_ddot: if has_accel && !row[7].is_nan() {
-                    Some(Acc {
-                        value: row[7],
-                        units: None,
-                    })
-                } else {
-                    None
-                },
-                z_ddot: if has_accel && !row[8].is_nan() {
-                    Some(Acc {
-                        value: row[8],
-                        units: None,
-                    })
-                } else {
-                    None
-                },
-            });
+            state_vectors.push(state_vector_from_row(
+                existing.epoch,
+                |index| row[index],
+                has_accel,
+            ));
         }
 
         let values = self.state_vector.bind(py);

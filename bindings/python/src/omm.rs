@@ -365,9 +365,9 @@ impl OmmMetadata {
     #[pyo3(signature = (
         object_name,
         object_id,
-        center_name=String::from("EARTH"),
-        ref_frame=None,
-        time_system=None,
+        center_name,
+        ref_frame,
+        time_system,
         mean_element_theory=String::from("SGP4"),
         ref_frame_epoch=None,
         comment=None
@@ -376,15 +376,12 @@ impl OmmMetadata {
         object_name: String,
         object_id: String,
         center_name: String,
-        ref_frame: Option<String>,
-        time_system: Option<String>,
+        ref_frame: String,
+        time_system: String,
         mean_element_theory: String,
         ref_frame_epoch: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let ref_frame = ref_frame.unwrap_or_else(|| "TEME".to_string());
-        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
-
         Ok(Self {
             inner: core_omm::OmmMetadata {
                 object_name,

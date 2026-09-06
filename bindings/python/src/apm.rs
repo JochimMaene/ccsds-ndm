@@ -250,19 +250,17 @@ impl ApmMetadata {
     #[pyo3(signature = (
         object_name,
         object_id,
-        time_system=None,
+        time_system,
         center_name=None,
         comment=None
     ))]
     fn new(
         object_name: String,
         object_id: String,
-        time_system: Option<String>,
+        time_system: String,
         center_name: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
-
         Ok(Self {
             inner: core_apm::ApmMetadata {
                 comment: comment.unwrap_or_default(),

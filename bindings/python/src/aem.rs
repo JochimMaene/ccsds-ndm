@@ -2,12 +2,11 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::common::AdmHeader;
+use crate::common::{parse_interpolation_degree, AdmHeader};
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::aem as core_aem;
 use ccsds_ndm::types::{
-    Angle, AngleRate, AttitudeTypeType, Duration, InterpolationDegree, QuaternionDotComponent,
-    RotSeq,
+    Angle, AngleRate, AttitudeTypeType, Duration, QuaternionDotComponent, RotSeq,
 };
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
@@ -709,11 +708,11 @@ impl AemMetadata {
     #[pyo3(signature = (
         object_name,
         object_id,
-        ref_frame_a=None,
-        ref_frame_b=None,
-        start_time=None,
-        stop_time=None,
-        time_system=None,
+        ref_frame_a,
+        ref_frame_b,
+        start_time,
+        stop_time,
+        time_system,
         attitude_type=String::from("QUATERNION"),
         center_name=None,
         useable_start_time=None,
@@ -727,11 +726,11 @@ impl AemMetadata {
     fn new(
         object_name: String,
         object_id: String,
-        ref_frame_a: Option<String>,
-        ref_frame_b: Option<String>,
+        ref_frame_a: String,
+        ref_frame_b: String,
         start_time: Option<String>,
         stop_time: Option<String>,
-        time_system: Option<String>,
+        time_system: String,
         attitude_type: String,
         center_name: Option<String>,
         useable_start_time: Option<String>,
@@ -742,11 +741,6 @@ impl AemMetadata {
         interpolation_degree: Option<u32>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        use std::num::NonZeroU32;
-
-        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
-        let ref_frame_a = ref_frame_a.unwrap_or_else(|| "GCRF".to_string());
-        let ref_frame_b = ref_frame_b.unwrap_or_else(|| "GCRF".to_string());
         let start_time =
             start_time.ok_or_else(|| PyValueError::new_err("start_time is required"))?;
         let stop_time = stop_time.ok_or_else(|| PyValueError::new_err("stop_time is required"))?;
@@ -778,9 +772,7 @@ impl AemMetadata {
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
                 angvel_frame,
                 interpolation_method,
-                interpolation_degree: interpolation_degree
-                    .and_then(NonZeroU32::new)
-                    .map(InterpolationDegree),
+                interpolation_degree: parse_interpolation_degree(interpolation_degree)?,
             },
         })
     }
@@ -1083,10 +1075,9 @@ impl AemMetadata {
     }
 
     #[setter]
-    fn set_interpolation_degree(&mut self, value: Option<u32>) {
-        self.inner.interpolation_degree = value
-            .and_then(std::num::NonZeroU32::new)
-            .map(InterpolationDegree);
+    fn set_interpolation_degree(&mut self, value: Option<u32>) -> PyResult<()> {
+        self.inner.interpolation_degree = parse_interpolation_degree(value)?;
+        Ok(())
     }
 }
 

@@ -109,9 +109,9 @@ class TestOcm:
 
     def test_metadata_reference_epochs_require_calendar_form(self):
         with pytest.raises(ValueError):
-            OcmMetadata(epoch_tzero="123.5")
+            OcmMetadata(epoch_tzero="123.5", time_system="UTC")
 
-        metadata = OcmMetadata(epoch_tzero="2023-01-01T00:00:00")
+        metadata = OcmMetadata(epoch_tzero="2023-01-01T00:00:00", time_system="UTC")
         for field in (
             "epoch_tzero",
             "previous_message_epoch",
