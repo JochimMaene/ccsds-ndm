@@ -1802,8 +1802,29 @@ pub struct AcmPhysicalDescription {
     pub iyz: Option<Moment>,
 }
 
+fn validate_finite_acm_value(field: &'static str, value: f64) -> Result<()> {
+    if value.is_finite() {
+        return Ok(());
+    }
+    Err(ValidationError::InvalidValue {
+        field: field.into(),
+        value: value.to_string(),
+        expected: "a finite number".into(),
+        line: None,
+    }
+    .into())
+}
+
 impl AcmPhysicalDescription {
     fn validate(&self) -> Result<()> {
+        if let Some(value) = self.drag_coeff {
+            validate_finite_acm_value("DRAG_COEFF", value)?;
+        }
+        for (field, value) in [("WET_MASS", &self.wet_mass), ("DRY_MASS", &self.dry_mass)] {
+            if let Some(value) = value {
+                Mass::validate_value(value.value, field)?;
+            }
+        }
         if self.cp_ref_frame.is_some() && self.cp.is_none() {
             return Err(ValidationError::MissingRequiredField {
                 block: "ACM Physical Description".into(),
@@ -1829,6 +1850,21 @@ impl AcmPhysicalDescription {
                     line: None,
                 }
                 .into());
+            }
+            for value in &cp.elements {
+                validate_finite_acm_value("CP", *value)?;
+            }
+        }
+        for (field, value) in [
+            ("IXX", &self.ixx),
+            ("IYY", &self.iyy),
+            ("IZZ", &self.izz),
+            ("IXY", &self.ixy),
+            ("IXZ", &self.ixz),
+            ("IYZ", &self.iyz),
+        ] {
+            if let Some(value) = value {
+                validate_finite_acm_value(field, value.value)?;
             }
         }
         Ok(())
@@ -2200,6 +2236,9 @@ impl AcmManeuverParameters {
             }
             .into());
         }
+        if let Some(value) = &self.man_duration {
+            Duration::validate_value(value.value, "MAN_DURATION")?;
+        }
         if self.target_momentum.is_some() && self.target_mom_frame.is_none() {
             return Err(ValidationError::MissingRequiredField {
                 block: "ACM Maneuver".into(),
@@ -2226,6 +2265,9 @@ impl AcmManeuverParameters {
                 }
                 .into());
             }
+            for value in &momentum.elements {
+                validate_finite_acm_value("TARGET_MOMENTUM", *value)?;
+            }
         }
         if let Some(att) = &self.target_attitude {
             if att.values.len() != 4 {
@@ -2237,6 +2279,12 @@ impl AcmManeuverParameters {
                 }
                 .into());
             }
+            for value in &att.values {
+                validate_finite_acm_value("TARGET_ATTITUDE", *value)?;
+            }
+        }
+        if let Some(value) = &self.target_spinrate {
+            validate_finite_acm_value("TARGET_SPINRATE", value.value)?;
         }
         let has_target_momentum = self.target_momentum.is_some();
         let has_target_attitude = self.target_attitude.is_some();
@@ -2584,15 +2632,7 @@ impl AcmAttitudeDetermination {
                 .into());
             }
             if let Some(frequency) = &sensor.sensor_frequency {
-                if !frequency.value.is_finite() || frequency.value <= 0.0 {
-                    return Err(ValidationError::OutOfRange {
-                        name: "SENSOR_FREQUENCY".into(),
-                        value: frequency.value.to_string(),
-                        expected: "finite value > 0".into(),
-                        line: None,
-                    }
-                    .into());
-                }
+                require_positive(frequency.value, "SENSOR_FREQUENCY")?;
             }
         }
 

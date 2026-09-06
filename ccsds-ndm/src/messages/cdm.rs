@@ -957,6 +957,36 @@ pub struct RelativeMetadataData {
 
 impl crate::traits::Validate for RelativeMetadataData {
     fn validate(&self) -> Result<()> {
+        // These are plain doubles in the CDM schema, so only finiteness constrains them. The KVN
+        // writer already refused non-finite numbers; `validate` and the XML writer did not, and
+        // an infinity reached the output as the lexical `inf`, which `xsd:double` rejects.
+        let mut numbers: Vec<(&'static str, f64)> =
+            vec![("MISS_DISTANCE", self.miss_distance.value)];
+        if let Some(value) = &self.relative_speed {
+            numbers.push(("RELATIVE_SPEED", value.value));
+        }
+        if let Some(vector) = &self.relative_state_vector {
+            numbers.extend([
+                ("RELATIVE_POSITION_R", vector.relative_position_r.value),
+                ("RELATIVE_POSITION_T", vector.relative_position_t.value),
+                ("RELATIVE_POSITION_N", vector.relative_position_n.value),
+                ("RELATIVE_VELOCITY_R", vector.relative_velocity_r.value),
+                ("RELATIVE_VELOCITY_T", vector.relative_velocity_t.value),
+                ("RELATIVE_VELOCITY_N", vector.relative_velocity_n.value),
+            ]);
+        }
+        for (field, value) in [
+            ("SCREEN_VOLUME_X", &self.screen_volume_x),
+            ("SCREEN_VOLUME_Y", &self.screen_volume_y),
+            ("SCREEN_VOLUME_Z", &self.screen_volume_z),
+        ] {
+            if let Some(value) = value {
+                numbers.push((field, value.value));
+            }
+        }
+        for (field, value) in numbers {
+            require_finite(field, value)?;
+        }
         if let Some(prob) = &self.collision_probability {
             if !(0.0..=1.0).contains(&prob.value) {
                 return Err(crate::error::ValidationError::OutOfRange {
@@ -1460,6 +1490,9 @@ impl crate::traits::Validate for CdmData {
                 line: None,
             }
             .into());
+        }
+        if let Some(parameters) = &self.od_parameters {
+            parameters.validate()?;
         }
         if let Some(parameters) = &self.additional_parameters {
             parameters.validate()?;

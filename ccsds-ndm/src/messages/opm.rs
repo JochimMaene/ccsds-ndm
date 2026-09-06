@@ -1544,25 +1544,7 @@ impl crate::traits::Validate for KeplerianElements {
                 .into());
             }
         }
-        let gm = self.gm.value;
-        if !gm.is_finite() {
-            return Err(ValidationError::InvalidValue {
-                field: "GM".into(),
-                value: gm.to_string(),
-                expected: "a finite number".into(),
-                line: None,
-            }
-            .into());
-        }
-        if gm <= 0.0 {
-            return Err(ValidationError::OutOfRange {
-                name: "GM".into(),
-                value: gm.to_string(),
-                expected: "> 0".into(),
-                line: None,
-            }
-            .into());
-        }
+        Gm::validate_value(self.gm.value, "GM")?;
         if self.true_anomaly.is_some() == self.mean_anomaly.is_some() {
             let selected = [
                 ("TRUE_ANOMALY", self.true_anomaly.is_some()),

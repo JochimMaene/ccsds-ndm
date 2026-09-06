@@ -1295,6 +1295,114 @@ impl AemAttitudeStateWrapper {
             AttitudeTypeType::SpinNutationMom => self.spin_nutation_mom.is_some(),
         }
     }
+
+    fn validate_values(&self) -> Result<()> {
+        let angles = |values: &[(&'static str, f64)]| -> Result<()> {
+            for (name, value) in values {
+                Angle::validate_value(*value, name)?;
+            }
+            Ok(())
+        };
+        let finite = |values: &[(&'static str, f64)]| -> Result<()> {
+            for (name, value) in values {
+                if !value.is_finite() {
+                    return Err(ValidationError::InvalidValue {
+                        field: (*name).into(),
+                        value: value.to_string(),
+                        expected: "a finite number".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+            Ok(())
+        };
+
+        if let Some(value) = &self.quaternion_ephemeris {
+            return crate::traits::Validate::validate(&value.quaternion);
+        }
+        if let Some(value) = &self.quaternion_derivative {
+            crate::traits::Validate::validate(&value.quaternion)?;
+            return finite(&[
+                ("Q1_DOT", value.quaternion_dot.q1_dot.value),
+                ("Q2_DOT", value.quaternion_dot.q2_dot.value),
+                ("Q3_DOT", value.quaternion_dot.q3_dot.value),
+                ("QC_DOT", value.quaternion_dot.qc_dot.value),
+            ]);
+        }
+        if let Some(value) = &self.quaternion_ang_vel {
+            crate::traits::Validate::validate(&value.quaternion)?;
+            return finite(&[
+                ("ANGVEL_X", value.ang_vel.angvel_x.value),
+                ("ANGVEL_Y", value.ang_vel.angvel_y.value),
+                ("ANGVEL_Z", value.ang_vel.angvel_z.value),
+            ]);
+        }
+        if let Some(value) = &self.euler_angle {
+            return angles(&[
+                ("ANGLE_1", value.angle_1.value),
+                ("ANGLE_2", value.angle_2.value),
+                ("ANGLE_3", value.angle_3.value),
+            ]);
+        }
+        if let Some(value) = &self.euler_angle_derivative {
+            angles(&[
+                ("ANGLE_1", value.angle_1.value),
+                ("ANGLE_2", value.angle_2.value),
+                ("ANGLE_3", value.angle_3.value),
+            ])?;
+            return finite(&[
+                ("ANGLE_1_DOT", value.angle_1_dot.value),
+                ("ANGLE_2_DOT", value.angle_2_dot.value),
+                ("ANGLE_3_DOT", value.angle_3_dot.value),
+            ]);
+        }
+        if let Some(value) = &self.euler_angle_ang_vel {
+            angles(&[
+                ("ANGLE_1", value.angle_1.value),
+                ("ANGLE_2", value.angle_2.value),
+                ("ANGLE_3", value.angle_3.value),
+            ])?;
+            return finite(&[
+                ("ANGVEL_X", value.angvel_x.value),
+                ("ANGVEL_Y", value.angvel_y.value),
+                ("ANGVEL_Z", value.angvel_z.value),
+            ]);
+        }
+        if let Some(value) = &self.spin {
+            angles(&[
+                ("SPIN_ALPHA", value.spin_alpha.value),
+                ("SPIN_DELTA", value.spin_delta.value),
+                ("SPIN_ANGLE", value.spin_angle.value),
+            ])?;
+            return finite(&[("SPIN_ANGLE_VEL", value.spin_angle_vel.value)]);
+        }
+        if let Some(value) = &self.spin_nutation {
+            angles(&[
+                ("SPIN_ALPHA", value.spin_alpha.value),
+                ("SPIN_DELTA", value.spin_delta.value),
+                ("SPIN_ANGLE", value.spin_angle.value),
+                ("NUTATION", value.nutation.value),
+                ("NUTATION_PHASE", value.nutation_phase.value),
+            ])?;
+            finite(&[("SPIN_ANGLE_VEL", value.spin_angle_vel.value)])?;
+            return Duration::validate_value(value.nutation_per.value, "NUTATION_PER");
+        }
+        if let Some(value) = &self.spin_nutation_mom {
+            angles(&[
+                ("SPIN_ALPHA", value.spin_alpha.value),
+                ("SPIN_DELTA", value.spin_delta.value),
+                ("SPIN_ANGLE", value.spin_angle.value),
+                ("MOMENTUM_ALPHA", value.momentum_alpha.value),
+                ("MOMENTUM_DELTA", value.momentum_delta.value),
+            ])?;
+            return finite(&[
+                ("SPIN_ANGLE_VEL", value.spin_angle_vel.value),
+                ("NUTATION_VEL", value.nutation_vel.value),
+            ]);
+        }
+        Ok(())
+    }
 }
 
 impl crate::traits::ToKvn for AemAttitudeStateWrapper {
@@ -1358,6 +1466,7 @@ impl crate::traits::Validate for AemData {
                     return Err(ValidationError::conflict(state.populated_fields()).into());
                 }
             }
+            state.validate_values()?;
         }
         Ok(())
     }

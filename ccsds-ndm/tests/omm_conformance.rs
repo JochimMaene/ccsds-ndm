@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use ccsds_ndm::messages::omm::Omm;
+use ccsds_ndm::types::ElementSetNo;
 use ccsds_ndm::Ndm;
 use tempfile::NamedTempFile;
 
@@ -109,6 +110,47 @@ fn every_shipped_omm_fixture_preserves_the_typed_model_and_generates_valid_xml()
     let xml = message.to_xml().unwrap();
     assert_eq!(Omm::from_xml(&xml).unwrap(), message);
     validate_xml("omm_g10.xml", &xml);
+}
+
+/// `elementSetNoType` restricts to `[0, 9999]` in both bundled OMM schemas, but `ElementSetNo`
+/// only enforces that in its constructor and the value field is public. Before this was routed
+/// through the root, `ELEMENT_SET_NO = 100000` produced XML that `xmllint` rejected with
+/// `[facet 'maxInclusive']`.
+#[test]
+fn omm_validation_enforces_the_element_set_number_range() {
+    let mut omm = Omm::from_kvn(KVN_WITH_COVARIANCE).expect("fixture should parse");
+    omm.body
+        .segment
+        .data
+        .tle_parameters
+        .as_mut()
+        .expect("fixture has TLE parameters")
+        .element_set_no = Some(ElementSetNo { value: 100_000 });
+
+    let error = omm.validate().expect_err("100000 is outside [0, 9999]");
+    assert!(
+        error.to_string().contains("ELEMENT_SET_NO"),
+        "unhelpful diagnostic: {error}"
+    );
+    assert!(omm.to_kvn().is_err(), "KVN accepted an out-of-range value");
+    assert!(omm.to_xml().is_err(), "XML accepted an out-of-range value");
+
+    let mut output = Vec::new();
+    assert!(omm.write_kvn_to(&mut output).is_err());
+    assert!(output.is_empty(), "streaming wrote bytes");
+    assert!(omm.write_xml_to(&mut output).is_err());
+    assert!(output.is_empty(), "streaming wrote bytes");
+
+    // The accepted boundary must still reach the reference schema.
+    omm.body
+        .segment
+        .data
+        .tle_parameters
+        .as_mut()
+        .unwrap()
+        .element_set_no = Some(ElementSetNo { value: 9999 });
+    omm.validate().expect("9999 is the inclusive maximum");
+    validate_xml("OMM ELEMENT_SET_NO boundary", &omm.to_xml().unwrap());
 }
 
 fn validate_xml(label: &str, xml: &str) {

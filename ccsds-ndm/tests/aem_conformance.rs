@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use ccsds_ndm::messages::aem::Aem;
-use ccsds_ndm::Ndm;
+use ccsds_ndm::{Ndm, Validate};
 use tempfile::NamedTempFile;
 
 const KVN: &str = include_str!("../data/kvn/aem_g4.kvn");
@@ -164,6 +164,122 @@ fn every_kvn_generation_gate_rejects_invalid_state_before_output() {
         );
         assert!(output.is_empty(), "streaming wrote bytes for {label}");
     }
+}
+
+fn assert_aem_rejects(message: &Aem, field: &str) {
+    let error = Validate::validate(message).unwrap_err().to_string();
+    assert!(error.contains(field), "{error}");
+    assert!(message.to_kvn().is_err());
+    assert!(message.to_xml().is_err());
+    for write in [Aem::write_kvn_to::<Vec<u8>>, Aem::write_xml_to::<Vec<u8>>] {
+        let mut output = Vec::new();
+        assert!(write(message, &mut output).is_err());
+        assert!(output.is_empty());
+    }
+}
+
+#[test]
+fn every_aem_attitude_choice_revalidates_edited_numeric_values() {
+    let mut cases = Vec::new();
+    let mut repeated = Aem::from_kvn(KVN).unwrap();
+    repeated.body.segment[0].data.attitude_states[1]
+        .quaternion_ephemeris
+        .as_mut()
+        .unwrap()
+        .quaternion
+        .q1 = f64::NAN;
+    cases.push(("Quaternion", repeated));
+
+    let base = Aem::from_xml(XML).unwrap();
+    let mut value = base.clone();
+    value.body.segment[1].data.attitude_states[0]
+        .quaternion_derivative
+        .as_mut()
+        .unwrap()
+        .quaternion_dot
+        .q1_dot
+        .value = f64::NAN;
+    cases.push(("Q1_DOT", value));
+    let mut value = base.clone();
+    value.body.segment[2].data.attitude_states[0]
+        .quaternion_ang_vel
+        .as_mut()
+        .unwrap()
+        .ang_vel
+        .angvel_x
+        .value = f64::INFINITY;
+    cases.push(("ANGVEL_X", value));
+    let mut value = base.clone();
+    value.body.segment[3].data.attitude_states[0]
+        .euler_angle
+        .as_mut()
+        .unwrap()
+        .angle_1
+        .value = 360.0;
+    cases.push(("ANGLE_1", value));
+    let mut value = base.clone();
+    value.body.segment[4].data.attitude_states[0]
+        .euler_angle_derivative
+        .as_mut()
+        .unwrap()
+        .angle_1_dot
+        .value = f64::NAN;
+    cases.push(("ANGLE_1_DOT", value));
+    let mut value = base.clone();
+    value.body.segment[5].data.attitude_states[0]
+        .euler_angle_ang_vel
+        .as_mut()
+        .unwrap()
+        .angvel_x
+        .value = f64::NEG_INFINITY;
+    cases.push(("ANGVEL_X", value));
+    let mut value = base.clone();
+    value.body.segment[6].data.attitude_states[0]
+        .spin
+        .as_mut()
+        .unwrap()
+        .spin_alpha
+        .value = 360.0;
+    cases.push(("SPIN_ALPHA", value));
+    let mut value = base.clone();
+    value.body.segment[7].data.attitude_states[0]
+        .spin_nutation
+        .as_mut()
+        .unwrap()
+        .nutation_per
+        .value = -1.0;
+    cases.push(("NUTATION_PER", value));
+    let mut value = base;
+    value.body.segment[8].data.attitude_states[0]
+        .spin_nutation_mom
+        .as_mut()
+        .unwrap()
+        .nutation_vel
+        .value = f64::NAN;
+    cases.push(("NUTATION_VEL", value));
+
+    for (field, message) in cases {
+        assert_aem_rejects(&message, field);
+    }
+}
+
+#[test]
+fn aem_angle_and_nutation_duration_boundaries_generate_valid_xml() {
+    let mut message = Aem::from_xml(XML).unwrap();
+    message.body.segment[3].data.attitude_states[0]
+        .euler_angle
+        .as_mut()
+        .unwrap()
+        .angle_1
+        .value = -360.0;
+    message.body.segment[7].data.attitude_states[0]
+        .spin_nutation
+        .as_mut()
+        .unwrap()
+        .nutation_per
+        .value = 0.0;
+    let xml = message.to_xml().unwrap();
+    validate_xml("AEM numeric boundaries", &xml);
 }
 
 #[test]

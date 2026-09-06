@@ -218,9 +218,41 @@ impl_generation_metadata!(crate::messages::apm::Apm, Apm);
 impl_generation_metadata!(crate::messages::omm::Omm, Omm, kvn_representability);
 impl_generation_metadata!(crate::messages::cdm::Cdm, Cdm, kvn_representability);
 impl_generation_metadata!(crate::messages::aem::Aem, Aem, kvn_representability);
-impl_generation_metadata!(crate::messages::ocm::Ocm, Ocm, kvn_representability);
+impl GenerationMetadata for crate::messages::ocm::Ocm {
+    const KIND: MessageKind = MessageKind::Ocm;
+
+    fn version(&self) -> &str {
+        &self.version
+    }
+
+    fn validate_kvn_model(&self) -> Result<()> {
+        self.validate()?;
+        self.validate_kvn_representability()
+    }
+
+    fn validate_xml_model(&self) -> Result<()> {
+        self.validate()?;
+        self.validate_xml_representability()
+    }
+}
 impl_generation_metadata!(crate::messages::tdm::Tdm, Tdm, kvn_representability);
-impl_generation_metadata!(crate::messages::rdm::Rdm, Rdm, kvn_representability);
+impl GenerationMetadata for crate::messages::rdm::Rdm {
+    const KIND: MessageKind = MessageKind::Rdm;
+
+    fn version(&self) -> &str {
+        &self.version
+    }
+
+    fn validate_kvn_model(&self) -> Result<()> {
+        self.validate()?;
+        self.validate_kvn_representability()
+    }
+
+    fn validate_xml_model(&self) -> Result<()> {
+        self.validate()?;
+        self.validate_xml_representability()
+    }
+}
 
 impl GenerationMetadata for crate::messages::opm::Opm {
     const KIND: MessageKind = MessageKind::Opm;

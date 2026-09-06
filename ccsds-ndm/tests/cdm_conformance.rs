@@ -14,6 +14,31 @@ fn repository_path(relative: &str) -> PathBuf {
 }
 
 #[test]
+fn edited_shared_od_parameters_are_revalidated_in_cdm() {
+    let mut message = Cdm::from_kvn(KVN).unwrap();
+    message.body.segments[1]
+        .data
+        .od_parameters
+        .as_mut()
+        .unwrap()
+        .weighted_rms
+        .as_mut()
+        .unwrap()
+        .value = f64::NAN;
+
+    let error = message.validate().unwrap_err();
+    assert!(error.to_string().contains("WEIGHTED_RMS"), "{error}");
+    assert!(message.to_kvn().is_err());
+    assert!(message.to_xml().is_err());
+
+    let mut output = Vec::new();
+    assert!(message.write_kvn_to(&mut output).is_err());
+    assert!(output.is_empty());
+    assert!(message.write_xml_to(&mut output).is_err());
+    assert!(output.is_empty());
+}
+
+#[test]
 fn edited_cdm_numeric_values_are_validated_before_any_output() {
     for field in [
         "MASS",
@@ -253,6 +278,78 @@ fn generation_rejects_partial_optional_covariance_rows() {
         .expect_err("a partial optional covariance row violates CCSDS 508.0-B-1 section 5.2.8");
     assert_eq!(error.code(), Some("validation.missing_required_field"));
     assert!(error.to_string().contains("CDRG_T"));
+}
+
+/// The relative metadata numbers are plain doubles, so only finiteness constrains them. Before
+/// this was routed, `validate` and the XML writer accepted a non-finite value while the KVN
+/// writer rejected it, and an infinity reached the document as the lexical `inf`, which `xmllint`
+/// rejects as "not a valid value of the atomic type 'xs:double'".
+#[test]
+fn edited_cdm_relative_metadata_numbers_are_revalidated_before_output() {
+    type Mutation = fn(&mut Cdm, f64);
+    let cases: [(&str, Mutation); 5] = [
+        ("MISS_DISTANCE", |cdm, value| {
+            cdm.body.relative_metadata_data.miss_distance.value = value
+        }),
+        ("RELATIVE_SPEED", |cdm, value| {
+            cdm.body
+                .relative_metadata_data
+                .relative_speed
+                .as_mut()
+                .expect("fixture has RELATIVE_SPEED")
+                .value = value
+        }),
+        ("RELATIVE_POSITION_T", |cdm, value| {
+            cdm.body
+                .relative_metadata_data
+                .relative_state_vector
+                .as_mut()
+                .expect("fixture has a relative state vector")
+                .relative_position_t
+                .value = value
+        }),
+        ("RELATIVE_VELOCITY_N", |cdm, value| {
+            cdm.body
+                .relative_metadata_data
+                .relative_state_vector
+                .as_mut()
+                .expect("fixture has a relative state vector")
+                .relative_velocity_n
+                .value = value
+        }),
+        ("SCREEN_VOLUME_Y", |cdm, value| {
+            cdm.body
+                .relative_metadata_data
+                .screen_volume_y
+                .as_mut()
+                .expect("fixture has SCREEN_VOLUME_Y")
+                .value = value
+        }),
+    ];
+
+    for (field, mutate) in cases {
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut cdm = Cdm::from_kvn(KVN).expect("fixture should parse");
+            mutate(&mut cdm, value);
+
+            let error = cdm.validate().expect_err("non-finite value accepted");
+            assert!(error.to_string().contains(field), "{field}: {error}");
+            assert!(cdm.to_kvn().is_err(), "KVN accepted {field} = {value}");
+            assert!(cdm.to_xml().is_err(), "XML accepted {field} = {value}");
+
+            let mut output = Vec::new();
+            assert!(cdm.write_kvn_to(&mut output).is_err());
+            assert!(output.is_empty(), "streaming wrote bytes for {field}");
+            assert!(cdm.write_xml_to(&mut output).is_err());
+            assert!(output.is_empty(), "streaming wrote bytes for {field}");
+        }
+    }
+
+    // A finite replacement still reaches the reference schema.
+    let mut cdm = Cdm::from_kvn(KVN).expect("fixture should parse");
+    cdm.body.relative_metadata_data.miss_distance.value = 0.0;
+    cdm.validate().expect("zero miss distance is representable");
+    validate_xml("CDM relative metadata boundary", &cdm.to_xml().unwrap());
 }
 
 fn validate_xml(label: &str, xml: &str) {

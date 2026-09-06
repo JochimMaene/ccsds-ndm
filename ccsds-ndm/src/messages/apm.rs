@@ -714,6 +714,17 @@ impl crate::traits::Validate for ApmData {
         for block in &self.spin {
             block.validate()?;
         }
+        // These three repeated blocks previously had no validator reached from any root, so an
+        // out-of-range Euler angle produced XML the reference schema rejects on `maxExclusive`.
+        for block in &self.euler_angle_state {
+            crate::traits::Validate::validate(block)?;
+        }
+        for block in &self.angular_velocity {
+            crate::traits::Validate::validate(block)?;
+        }
+        for block in &self.inertia {
+            crate::traits::Validate::validate(block)?;
+        }
         Ok(())
     }
 }

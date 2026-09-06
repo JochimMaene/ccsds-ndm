@@ -1165,16 +1165,7 @@ impl crate::traits::Validate for MeanElements {
         }
 
         if let Some(gm) = &self.gm {
-            finite("GM", gm.value)?;
-            if gm.value <= 0.0 {
-                return Err(ValidationError::OutOfRange {
-                    name: "GM".into(),
-                    value: gm.value.to_string(),
-                    expected: "> 0".into(),
-                    line: None,
-                }
-                .into());
-            }
+            Gm::validate_value(gm.value, "GM")?;
         }
         Ok(())
     }
@@ -1198,6 +1189,11 @@ impl TleParameters {
         ] {
             let Some(value) = value else { continue };
             finite(field, value)?;
+        }
+        // The typed wrapper only enforces `elementSetNoType` in its constructor; the public field
+        // is reachable directly, so the root has to restate the range.
+        if let Some(value) = self.element_set_no {
+            ElementSetNo::validate_value(value.value, "ELEMENT_SET_NO")?;
         }
         Ok(())
     }
