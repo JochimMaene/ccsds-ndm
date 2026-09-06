@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use ccsds_ndm::common::{GroundImpactParameters, OdParameters, RdmSpacecraftParameters};
 use ccsds_ndm::messages::rdm::Rdm;
@@ -9,7 +8,9 @@ use ccsds_ndm::types::{
     NonNegativeDouble, Percentage, PercentageRequired, PositionUnits, PositiveInteger, Probability,
 };
 use ccsds_ndm::{Ndm, Validate};
-use tempfile::NamedTempFile;
+
+mod common;
+use common::{assert_rejects, validate_xml};
 
 const KVN: &str = include_str!("../data/kvn/rdm_c2.kvn");
 const XML: &str = include_str!("../data/xml/rdm_c4.xml");
@@ -194,21 +195,6 @@ fn orbit_lifetime_rule_is_enforced_at_every_public_boundary() {
     }
 }
 
-fn assert_rdm_rejects(message: &Rdm, field: &str) {
-    let error = message
-        .validate()
-        .expect_err("invalid edited value accepted");
-    assert!(error.to_string().contains(field), "{field}: {error}");
-    assert!(message.to_kvn().is_err(), "KVN accepted invalid {field}");
-    assert!(message.to_xml().is_err(), "XML accepted invalid {field}");
-
-    let mut output = Vec::new();
-    assert!(message.write_kvn_to(&mut output).is_err());
-    assert!(output.is_empty(), "KVN wrote bytes for invalid {field}");
-    assert!(message.write_xml_to(&mut output).is_err());
-    assert!(output.is_empty(), "XML wrote bytes for invalid {field}");
-}
-
 fn complete_ground_impact_parameters() -> GroundImpactParameters {
     let probability = || Some(Probability::new(0.5).unwrap());
     let confidence = |value| Some(PercentageRequired::new(value).unwrap());
@@ -337,7 +323,7 @@ fn edited_ground_impact_values_are_revalidated_before_output() {
         } else {
             2.0
         };
-        assert_rdm_rejects(&message, field);
+        assert_rejects(&message, field);
     }
 }
 
@@ -369,7 +355,7 @@ fn ground_impact_dependencies_and_confidence_order_are_enforced() {
     for (parameters, field) in cases {
         let mut message = Rdm::from_kvn(KVN).unwrap();
         message.body.segment.data.ground_impact_parameters = Some(parameters);
-        assert_rdm_rejects(&message, field);
+        assert_rejects(&message, field);
     }
 }
 
@@ -426,7 +412,7 @@ fn edited_rdm_spacecraft_values_are_revalidated_before_output() {
         } else {
             -1.0
         };
-        assert_rdm_rejects(&message, field);
+        assert_rejects(&message, field);
     }
 }
 
@@ -466,7 +452,7 @@ fn edited_od_values_are_revalidated_before_output() {
         } else {
             -1.0
         };
-        assert_rdm_rejects(&message, field);
+        assert_rejects(&message, field);
     }
 
     for field in [
@@ -484,7 +470,7 @@ fn edited_od_values_are_revalidated_before_output() {
             "TRACKS_AVAILABLE" => parameters.tracks_available.as_mut().unwrap().value = 0,
             _ => parameters.tracks_used.as_mut().unwrap().value = 0,
         }
-        assert_rdm_rejects(&message, field);
+        assert_rejects(&message, field);
     }
 }
 
@@ -567,7 +553,7 @@ fn rdm_routes_the_shared_covariance_validator() {
             .expect("fixture has a covariance matrix")
             .cx_x
             .value = bad;
-        assert_rdm_rejects(&message, "CX_X");
+        assert_rejects(&message, "CX_X");
     }
 
     // A later entry, so the fix is not passing on the first element alone.
@@ -581,7 +567,7 @@ fn rdm_routes_the_shared_covariance_validator() {
         .unwrap()
         .cz_dot_z_dot
         .value = f64::NAN;
-    assert_rdm_rejects(&message, "CZ_DOT_Z_DOT");
+    assert_rejects(&message, "CZ_DOT_Z_DOT");
 }
 
 /// Populates the nominal-impact triple that RDM §3.5.10 requires alongside an altitude.
@@ -638,7 +624,7 @@ fn nominal_impact_altitude_separates_semantics_from_xml_representability() {
 
     // Non-finite is not a number the standard can express in either notation.
     let message = ground_impact_with_altitude(f64::NAN);
-    assert_rdm_rejects(&message, "NOMINAL_IMPACT_ALT");
+    assert_rejects(&message, "NOMINAL_IMPACT_ALT");
 
     // Both XSD boundaries are accepted and reach the reference schema.
     for boundary in [-430.5, 8848.0] {
@@ -646,21 +632,4 @@ fn nominal_impact_altitude_separates_semantics_from_xml_representability() {
         message.validate().unwrap();
         validate_xml("RDM altitude boundary", &message.to_xml().unwrap());
     }
-}
-
-fn validate_xml(label: &str, xml: &str) {
-    let document = NamedTempFile::new().unwrap();
-    fs::write(document.path(), xml).unwrap();
-    let output = Command::new("xmllint")
-        .arg("--noout")
-        .arg("--schema")
-        .arg(repository_path("data/xsd/ndmxml-4.0.0-master-4.0.xsd"))
-        .arg(document.path())
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "{label} generated invalid XML: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
 }

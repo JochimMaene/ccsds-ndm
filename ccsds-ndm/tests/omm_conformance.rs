@@ -1,11 +1,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use ccsds_ndm::messages::omm::Omm;
 use ccsds_ndm::types::ElementSetNo;
 use ccsds_ndm::Ndm;
-use tempfile::NamedTempFile;
+
+mod common;
+use common::validate_xml;
 
 const KVN: &str = include_str!("../data/kvn/omm_g9.kvn");
 const XML: &str = include_str!("../data/xml/omm_g10.xml");
@@ -151,23 +152,6 @@ fn omm_validation_enforces_the_element_set_number_range() {
         .element_set_no = Some(ElementSetNo { value: 9999 });
     omm.validate().expect("9999 is the inclusive maximum");
     validate_xml("OMM ELEMENT_SET_NO boundary", &omm.to_xml().unwrap());
-}
-
-fn validate_xml(label: &str, xml: &str) {
-    let document = NamedTempFile::new().unwrap();
-    fs::write(document.path(), xml).unwrap();
-    let output = Command::new("xmllint")
-        .arg("--noout")
-        .arg("--schema")
-        .arg(repository_path("data/xsd/ndmxml-4.0.0-master-4.0.xsd"))
-        .arg(document.path())
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "{label} generated invalid XML: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
 }
 
 /// Each OMM keyword choice shares one ordering rank so either spelling may fill the slot. That

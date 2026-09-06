@@ -1,11 +1,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use ccsds_ndm::messages::tdm::{Tdm, TdmObservationData};
 use ccsds_ndm::types::{Percentage, TdmRangeUnits};
 use ccsds_ndm::{Ndm, Validate};
-use tempfile::NamedTempFile;
+
+mod common;
+use common::{assert_rejects, validate_xml};
 
 const KVN: &str = include_str!("../data/kvn/tdm_e1.kvn");
 const XML: &str = include_str!("../data/xml/tdm_e21.xml");
@@ -143,21 +144,6 @@ fn tdm_xml_accepts_every_schema_range_units_spelling() {
     }
 }
 
-fn assert_tdm_rejects(message: &Tdm, field: &str) {
-    let error = message
-        .validate()
-        .expect_err("invalid edited value accepted");
-    assert!(error.to_string().contains(field), "{field}: {error}");
-    assert!(message.to_kvn().is_err(), "KVN accepted invalid {field}");
-    assert!(message.to_xml().is_err(), "XML accepted invalid {field}");
-
-    let mut output = Vec::new();
-    assert!(message.write_kvn_to(&mut output).is_err());
-    assert!(output.is_empty());
-    assert!(message.write_xml_to(&mut output).is_err());
-    assert!(output.is_empty());
-}
-
 #[test]
 fn edited_tdm_metadata_numbers_are_revalidated_before_output() {
     for field in [
@@ -223,7 +209,7 @@ fn edited_tdm_metadata_numbers_are_revalidated_before_output() {
                 -1.0
             },
         );
-        assert_tdm_rejects(&message, field);
+        assert_rejects(&message, field);
     }
 
     for field in ["INTERPOLATION_DEGREE", "DOPPLER_COUNT_SCALE"] {
@@ -234,7 +220,7 @@ fn edited_tdm_metadata_numbers_are_revalidated_before_output() {
         } else {
             metadata.doppler_count_scale = Some(0);
         }
-        assert_tdm_rejects(&message, field);
+        assert_rejects(&message, field);
     }
 }
 
@@ -243,7 +229,7 @@ fn tdm_paths_and_single_diff_receive_band_use_segment_context() {
     for path in ["2", "2,4"] {
         let mut message = Tdm::from_kvn(KVN).unwrap();
         message.body.segments[0].metadata.path.as_mut().unwrap().0 = path.into();
-        assert_tdm_rejects(&message, "PATH");
+        assert_rejects(&message, "PATH");
     }
 
     let single_diff = include_str!("../data/kvn/tdm_e10.kvn");
@@ -255,7 +241,7 @@ fn tdm_paths_and_single_diff_receive_band_use_segment_context() {
         message.body.segments[0].metadata.receive_band = None;
         message.body.segments[0].data.observations.truncate(1);
         message.body.segments[0].data.observations[0].data = data;
-        assert_tdm_rejects(&message, "RECEIVE_BAND");
+        assert_rejects(&message, "RECEIVE_BAND");
     }
     for data in [
         TdmObservationData::ReceiveFreq1(1.0),
@@ -287,7 +273,7 @@ fn unambiguous_tdm_observation_domains_are_revalidated() {
         let mut message = Tdm::from_kvn(KVN).unwrap();
         message.body.segments[0].data.observations.truncate(1);
         message.body.segments[0].data.observations[0].data = data;
-        assert_tdm_rejects(&message, field);
+        assert_rejects(&message, field);
     }
 }
 
@@ -309,7 +295,7 @@ fn tdm_observation_domains_follow_the_narrower_book_range() {
         let mut message = Tdm::from_kvn(KVN).unwrap();
         message.body.segments[0].data.observations.truncate(1);
         message.body.segments[0].data.observations[0].data = data;
-        assert_tdm_rejects(&message, field);
+        assert_rejects(&message, field);
     }
 }
 
@@ -344,11 +330,11 @@ fn tdm_revalidates_later_segments_and_observations() {
     let mut message = Tdm::from_kvn(KVN).unwrap();
     message.body.segments.push(message.body.segments[0].clone());
     message.body.segments[1].metadata.integration_interval = Some(0.0);
-    assert_tdm_rejects(&message, "INTEGRATION_INTERVAL");
+    assert_rejects(&message, "INTEGRATION_INTERVAL");
 
     let mut message = Tdm::from_kvn(KVN).unwrap();
     message.body.segments[0].data.observations[1].data = TdmObservationData::TransmitFreq1(0.0);
-    assert_tdm_rejects(&message, "TRANSMIT_FREQ_1");
+    assert_rejects(&message, "TRANSMIT_FREQ_1");
 }
 
 #[test]
@@ -420,21 +406,4 @@ fn every_shipped_tdm_fixture_preserves_the_typed_model_and_generates_valid_xml()
         assert_eq!(Tdm::from_xml(&xml).unwrap(), message, "{name} XML model");
         validate_xml(name, &xml);
     }
-}
-
-fn validate_xml(label: &str, xml: &str) {
-    let document = NamedTempFile::new().unwrap();
-    fs::write(document.path(), xml).unwrap();
-    let output = Command::new("xmllint")
-        .arg("--noout")
-        .arg("--schema")
-        .arg(repository_path("data/xsd/ndmxml-4.0.0-master-4.0.xsd"))
-        .arg(document.path())
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "{label} generated invalid XML: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
 }

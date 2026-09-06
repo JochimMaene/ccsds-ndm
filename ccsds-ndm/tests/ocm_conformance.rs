@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use ccsds_ndm::messages::ocm::Ocm;
 use ccsds_ndm::types::{
@@ -8,7 +7,9 @@ use ccsds_ndm::types::{
     Probability, Vec3Double,
 };
 use ccsds_ndm::{Ndm, Validate};
-use tempfile::NamedTempFile;
+
+mod common;
+use common::{assert_rejects, validate_xml};
 
 const KVN: &str = include_str!("../data/kvn/ocm_g18.kvn");
 const XML: &str = include_str!("../data/xml/ocm_g20.xml");
@@ -185,7 +186,7 @@ fn time_and_angle_vector_components_must_be_finite() {
             ] {
                 let mut message = time_and_angle_message();
                 mutate(&mut message, vector);
-                assert_ocm_rejects(&message, field);
+                assert_rejects(&message, field);
             }
         }
     }
@@ -225,21 +226,6 @@ fn kvn_generation_rounds_trajectory_numbers_to_the_ccsds_digit_limit() {
     let mut message = Ocm::from_kvn(KVN).unwrap();
     message.body.segment.data.traj[0].traj_lines[0].values[0] = 1.234_567_890_123_456_7;
     assert!(message.to_kvn().unwrap().contains("1.234567890123457e0"));
-}
-
-fn assert_ocm_rejects(message: &Ocm, field: &str) {
-    let error = message
-        .validate()
-        .expect_err("invalid edited value accepted");
-    assert!(error.to_string().contains(field), "{field}: {error}");
-    assert!(message.to_kvn().is_err(), "KVN accepted invalid {field}");
-    assert!(message.to_xml().is_err(), "XML accepted invalid {field}");
-
-    let mut output = Vec::new();
-    assert!(message.write_kvn_to(&mut output).is_err());
-    assert!(output.is_empty(), "streaming wrote bytes for {field}");
-    assert!(message.write_xml_to(&mut output).is_err());
-    assert!(output.is_empty(), "streaming wrote bytes for {field}");
 }
 
 #[test]
@@ -296,7 +282,7 @@ fn edited_ocm_block_values_are_revalidated_before_output() {
     for (field, mutate) in physical {
         let mut message = Ocm::from_kvn(KVN).unwrap();
         mutate(message.body.segment.data.phys.as_mut().unwrap());
-        assert_ocm_rejects(&message, field);
+        assert_rejects(&message, field);
     }
 
     type PertMutation = fn(&mut ccsds_ndm::messages::ocm::OcmPerturbations);
@@ -320,7 +306,7 @@ fn edited_ocm_block_values_are_revalidated_before_output() {
     for (field, mutate) in perturbations {
         let mut message = Ocm::from_kvn(KVN).unwrap();
         mutate(message.body.segment.data.pert.as_mut().unwrap());
-        assert_ocm_rejects(&message, field);
+        assert_rejects(&message, field);
     }
 
     type OdMutation = fn(&mut ccsds_ndm::messages::ocm::OcmOdParameters);
@@ -351,13 +337,13 @@ fn edited_ocm_block_values_are_revalidated_before_output() {
     for (field, mutate) in od {
         let mut message = Ocm::from_kvn(KVN).unwrap();
         mutate(message.body.segment.data.od.as_mut().unwrap());
-        assert_ocm_rejects(&message, field);
+        assert_rejects(&message, field);
     }
 
     // History lines carry raw numbers; the repeated container must be revisited beyond index 0.
     let mut message = Ocm::from_kvn(KVN).unwrap();
     message.body.segment.data.traj[0].traj_lines[1].values[2] = f64::NAN;
-    assert_ocm_rejects(&message, "trajLine 2 value 3");
+    assert_rejects(&message, "trajLine 2 value 3");
 }
 
 #[test]
@@ -414,7 +400,7 @@ fn maneuver_line_numeric_columns_must_hold_numbers() {
         let mut message = Ocm::from_kvn(KVN).unwrap();
         // Column 1 of this fixture's composition after the time tag is THR_X.
         message.body.segment.data.man[0].man_lines[0].values[1] = bad.to_owned();
-        assert_ocm_rejects(&message, "THR_X");
+        assert_rejects(&message, "THR_X");
     }
 
     // A non-numeric column keeps accepting its flag value.
@@ -432,7 +418,7 @@ fn maneuver_line_numeric_columns_must_hold_numbers() {
     // A later record is reached too.
     let mut message = Ocm::from_kvn(KVN).unwrap();
     message.body.segment.data.man[0].man_lines[1].values[1] = "abc".to_owned();
-    assert_ocm_rejects(&message, "THR_X");
+    assert_rejects(&message, "THR_X");
 }
 
 /// Three OCM values have a book domain wider than the 3.0 schema's, so they follow the same
@@ -512,7 +498,7 @@ fn ocm_book_wider_than_xsd_values_are_refused_at_xml_only() {
         value: f64::NAN,
         units: None,
     });
-    assert_ocm_rejects(&message, "DAYS_SINCE_LAST_OBS");
+    assert_rejects(&message, "DAYS_SINCE_LAST_OBS");
 
     // The accepted boundary still reaches the reference schema.
     let mut message = Ocm::from_kvn(KVN).unwrap();
@@ -529,21 +515,4 @@ fn ocm_book_wider_than_xsd_values_are_refused_at_xml_only() {
     });
     message.validate().unwrap();
     validate_xml("OCM days-since boundary", &message.to_xml().unwrap());
-}
-
-fn validate_xml(label: &str, xml: &str) {
-    let document = NamedTempFile::new().unwrap();
-    fs::write(document.path(), xml).unwrap();
-    let output = Command::new("xmllint")
-        .arg("--noout")
-        .arg("--schema")
-        .arg(repository_path("data/xsd/ndmxml-4.0.0-master-4.0.xsd"))
-        .arg(document.path())
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "{label} generated invalid XML: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
 }

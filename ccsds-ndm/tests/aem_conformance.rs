@@ -1,10 +1,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use ccsds_ndm::messages::aem::Aem;
-use ccsds_ndm::{Ndm, Validate};
-use tempfile::NamedTempFile;
+use ccsds_ndm::Ndm;
+
+mod common;
+use common::{assert_rejects, validate_xml};
 
 const KVN: &str = include_str!("../data/kvn/aem_g4.kvn");
 const SPIN_KVN: &str = include_str!("../data/kvn/aem_g5.kvn");
@@ -166,18 +167,6 @@ fn every_kvn_generation_gate_rejects_invalid_state_before_output() {
     }
 }
 
-fn assert_aem_rejects(message: &Aem, field: &str) {
-    let error = Validate::validate(message).unwrap_err().to_string();
-    assert!(error.contains(field), "{error}");
-    assert!(message.to_kvn().is_err());
-    assert!(message.to_xml().is_err());
-    for write in [Aem::write_kvn_to::<Vec<u8>>, Aem::write_xml_to::<Vec<u8>>] {
-        let mut output = Vec::new();
-        assert!(write(message, &mut output).is_err());
-        assert!(output.is_empty());
-    }
-}
-
 #[test]
 fn every_aem_attitude_choice_revalidates_edited_numeric_values() {
     let mut cases = Vec::new();
@@ -259,7 +248,7 @@ fn every_aem_attitude_choice_revalidates_edited_numeric_values() {
     cases.push(("NUTATION_VEL", value));
 
     for (field, message) in cases {
-        assert_aem_rejects(&message, field);
+        assert_rejects(&message, field);
     }
 }
 
@@ -292,21 +281,4 @@ fn kvn_generation_rounds_history_numbers_to_the_ccsds_digit_limit() {
         .spin_alpha
         .value = 1.234_567_890_123_456_7;
     assert!(message.to_kvn().unwrap().contains("1.234567890123457e0"));
-}
-
-fn validate_xml(label: &str, xml: &str) {
-    let document = NamedTempFile::new().unwrap();
-    fs::write(document.path(), xml).unwrap();
-    let output = Command::new("xmllint")
-        .arg("--noout")
-        .arg("--schema")
-        .arg(repository_path("data/xsd/ndmxml-4.0.0-master-4.0.xsd"))
-        .arg(document.path())
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "{label} generated invalid XML: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
 }

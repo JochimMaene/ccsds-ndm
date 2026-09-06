@@ -127,5 +127,7 @@ field paths, so it is not the default design.
 Static field-name searches are useful for triage only. Same-name fields, parent-validates-child
 patterns, helper functions, and notation-specific preflights make them unsound as coverage proof.
 
-The current evidence assessment and ordered implementation categories are maintained in
-[Validation evidence and rollout](validation-rollout.md).
+Per-family evidence lives in [the conformance set](../conformance/). What remains unresolved is
+listed in [Validation: outstanding work](validation-rollout.md), and the consolidation experiments
+— including the ones rejected with reasons — are in
+[Consolidation findings](consolidation-findings.md).

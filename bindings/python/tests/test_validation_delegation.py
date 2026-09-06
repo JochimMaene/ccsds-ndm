@@ -167,31 +167,24 @@ class TestAssignmentDefersToRootValidation:
         acm.segment.data.phys.wet_mass = -1.0
         assert_all_surfaces_reject(acm, "WET_MASS")
 
-    @pytest.mark.parametrize("bad", [-5.0, float("nan"), float("inf")])
     @pytest.mark.parametrize("segment", [0, 1])
-    @pytest.mark.parametrize(
-        "field, keyword",
-        [
-            ("area_pc", "AREA_PC"),
-            ("area_drg", "AREA_DRG"),
-            ("area_srp", "AREA_SRP"),
-            ("mass", "MASS"),
-        ],
-    )
-    def test_cdm_additional_parameters_defer_to_root(
-        self, field, keyword, segment, bad
-    ):
-        """These four setters used to raise on assignment. Loosening them is only safe because
-        root validation rejects the same values, in both segments, on every surface."""
+    def test_cdm_additional_parameters_defer_to_root(self, segment):
+        """These setters used to raise on assignment.
+
+        One field is enough: all four `AdditionalParameters` setters are the same struct-literal
+        assignment. Both segments are kept because the second one is a *routing* fact — the
+        repeated container must be revisited — not another domain sample. The domains themselves
+        belong to `types.rs::test_mass_validation` and the Rust CDM conformance mutation test.
+        """
         cdm = load("cdm_363.kvn", ccsds_ndm.Cdm)
         parameters = cdm.body.segments[segment].data.additional_parameters
-        setattr(parameters, field, bad)
-        assert_all_surfaces_reject(cdm, keyword)
+        parameters.mass = -5.0
+        assert parameters.mass == -5.0  # stored, not rejected at assignment
+        assert_all_surfaces_reject(cdm, "MASS")
 
-    @pytest.mark.parametrize("bad", [-5.0, float("nan"), float("inf")])
-    def test_cdm_additional_parameters_constructor_defers_to_root(self, bad):
+    def test_cdm_additional_parameters_constructor_defers_to_root(self):
         parameters = ccsds_ndm.AdditionalParameters(
-            area_pc=bad,
+            area_pc=-5.0,
             area_drg=None,
             area_srp=None,
             mass=None,
@@ -201,17 +194,19 @@ class TestAssignmentDefersToRootValidation:
             sedr=None,
             comment=[],
         )
-        assert parameters.area_pc == pytest.approx(bad, nan_ok=True)
+        assert parameters.area_pc == -5.0
 
         cdm = load("cdm_363.kvn", ccsds_ndm.Cdm)
         cdm.body.segments[0].data.additional_parameters = parameters
         assert_all_surfaces_reject(cdm, "AREA_PC")
 
-    @pytest.mark.parametrize("bad", [-5.0, 0.0, float("nan"), float("inf")])
-    def test_ocm_gm_defers_to_root(self, bad):
-        """`gmType` is a positiveDouble, so zero is invalid too."""
+    def test_ocm_gm_defers_to_root(self):
+        """Zero is the interesting value: `gmType` is a positiveDouble, so it distinguishes this
+        setter from the non-negative ones. The rest of the domain is `types.rs::test_gm_validation`.
+        """
         ocm = load("ocm_g18.kvn", ccsds_ndm.Ocm)
-        ocm.segment.data.pert.gm = bad
+        ocm.segment.data.pert.gm = 0.0
+        assert ocm.segment.data.pert.gm == 0.0
         assert_all_surfaces_reject(ocm, "GM")
 
 

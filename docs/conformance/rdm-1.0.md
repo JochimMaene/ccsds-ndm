@@ -52,6 +52,10 @@ preserved — see "Registry-governed values" in the [validation contract](../des
 Other SANA-sourced vocabulary remains external and caller supplied, while locally decidable
 controlled values and numeric ranges are typed and validated.
 
+RDM §§3.5.8–3.5.9 say the orbit-lifetime and re-entry epochs *should* resolve consistently. That
+is advisory rather than a `shall`, and reconciling them needs time-system context the block does
+not supply, so the two are not compared. Recorded here as a deliberate non-claim.
+
 `NOMINAL_IMPACT_ALT` separates semantics from representability. RDM states no numeric range and
 permits non-Earth body-fixed frames, while the common 4.0 XSD applies an Earth-derived range, so
 the model preserves any finite altitude and validation enforces only finiteness. KVN writes such a

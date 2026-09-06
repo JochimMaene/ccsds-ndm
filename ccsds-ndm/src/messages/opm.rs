@@ -2050,6 +2050,29 @@ mod kvn_layout {
         ));
     }
 
+    /// Only a repeatable block may follow itself. Without this, a document could restate a block
+    /// that the standard allows exactly once.
+    #[test]
+    fn a_non_repeatable_block_may_not_restart() {
+        assert!(!opm_allows_non_increasing_derived(
+            assignment("Z_DOT"),
+            assignment("EPOCH")
+        ));
+        assert!(!opm_allows_non_increasing_derived(
+            assignment("DRAG_COEFF"),
+            assignment("MASS")
+        ));
+        assert!(!opm_allows_non_increasing_derived(
+            assignment("CZ_DOT_Z_DOT"),
+            assignment("COV_REF_FRAME")
+        ));
+        // A backwards step across blocks is never legal either.
+        assert!(!opm_allows_non_increasing_derived(
+            assignment("MAN_DV_3"),
+            assignment("MASS")
+        ));
+    }
+
     /// Optional blocks may be skipped, so a block start may follow the closing keyword of any
     /// earlier block with only optional blocks between them.
     #[test]

@@ -1,10 +1,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use ccsds_ndm::messages::cdm::Cdm;
 use ccsds_ndm::Ndm;
-use tempfile::NamedTempFile;
+
+mod common;
+use common::validate_xml;
 
 const KVN: &str = include_str!("../data/kvn/cdm_363.kvn");
 const XML: &str = include_str!("../data/xml/cdm_44.xml");
@@ -350,21 +351,4 @@ fn edited_cdm_relative_metadata_numbers_are_revalidated_before_output() {
     cdm.body.relative_metadata_data.miss_distance.value = 0.0;
     cdm.validate().expect("zero miss distance is representable");
     validate_xml("CDM relative metadata boundary", &cdm.to_xml().unwrap());
-}
-
-fn validate_xml(label: &str, xml: &str) {
-    let document = NamedTempFile::new().unwrap();
-    fs::write(document.path(), xml).unwrap();
-    let output = Command::new("xmllint")
-        .arg("--noout")
-        .arg("--schema")
-        .arg(repository_path("data/xsd/ndmxml-4.0.0-master-4.0.xsd"))
-        .arg(document.path())
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "{label} generated invalid XML: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
 }

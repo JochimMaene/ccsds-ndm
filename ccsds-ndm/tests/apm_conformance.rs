@@ -1,10 +1,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use ccsds_ndm::messages::apm::Apm;
-use ccsds_ndm::{Ndm, Validate};
-use tempfile::NamedTempFile;
+use ccsds_ndm::Ndm;
+
+mod common;
+use common::{assert_rejects, validate_xml};
 
 const KVN: &str = include_str!("../data/kvn/apm_g1.kvn");
 const XML: &str = include_str!("../data/xml/apm_g10.xml");
@@ -136,28 +137,16 @@ fn every_shipped_apm_fixture_preserves_the_typed_model_and_generates_valid_xml()
     validate_xml("apm_g10.xml", &xml);
 }
 
-fn assert_apm_rejects(message: &Apm, field: &str) {
-    let error = Validate::validate(message).unwrap_err().to_string();
-    assert!(error.contains(field), "{error}");
-    assert!(message.to_kvn().is_err());
-    assert!(message.to_xml().is_err());
-    for write in [Apm::write_kvn_to::<Vec<u8>>, Apm::write_xml_to::<Vec<u8>>] {
-        let mut output = Vec::new();
-        assert!(write(message, &mut output).is_err());
-        assert!(output.is_empty());
-    }
-}
-
 #[test]
 fn apm_spin_revalidates_edited_numeric_values() {
     let base = Apm::from_kvn(SPIN_KVN).unwrap();
     let mut angle = base.clone();
     angle.body.segment.data.spin[0].spin_alpha.value = 360.0;
-    assert_apm_rejects(&angle, "SPIN_ALPHA");
+    assert_rejects(&angle, "SPIN_ALPHA");
 
     let mut rate = base.clone();
     rate.body.segment.data.spin[0].spin_angle_vel.value = f64::NAN;
-    assert_apm_rejects(&rate, "SPIN_ANGLE_VEL");
+    assert_rejects(&rate, "SPIN_ANGLE_VEL");
 
     let mut nutation = base.clone();
     nutation.body.segment.data.spin[0]
@@ -165,7 +154,7 @@ fn apm_spin_revalidates_edited_numeric_values() {
         .as_mut()
         .unwrap()
         .value = -360.1;
-    assert_apm_rejects(&nutation, "NUTATION");
+    assert_rejects(&nutation, "NUTATION");
 
     let mut period = base;
     period.body.segment.data.spin[0]
@@ -173,7 +162,7 @@ fn apm_spin_revalidates_edited_numeric_values() {
         .as_mut()
         .unwrap()
         .value = -1.0;
-    assert_apm_rejects(&period, "NUTATION_PER");
+    assert_rejects(&period, "NUTATION_PER");
 
     let mut momentum = Apm::from_kvn(SPIN_KVN).unwrap();
     let spin = &mut momentum.body.segment.data.spin[0];
@@ -184,7 +173,7 @@ fn apm_spin_revalidates_edited_numeric_values() {
     spin.momentum_delta = Some(spin.spin_delta.clone());
     spin.nutation_vel = Some(spin.spin_angle_vel.clone());
     spin.momentum_delta.as_mut().unwrap().value = 360.0;
-    assert_apm_rejects(&momentum, "MOMENTUM_DELTA");
+    assert_rejects(&momentum, "MOMENTUM_DELTA");
 }
 
 /// `EulerAngleState`, `AngVelState`, and `InertiaState` had no validator reached from any root.
@@ -196,41 +185,18 @@ fn apm_repeated_attitude_blocks_are_reached_from_the_root() {
     const EULER_KVN: &str = include_str!("../data/kvn/apm_g2.kvn");
     const INERTIA_KVN: &str = include_str!("../data/kvn/apm_g3.kvn");
 
-    for (index, bad) in [(0usize, 400.0), (0, -360.5), (0, f64::NAN)] {
-        let mut message = Apm::from_kvn(EULER_KVN).unwrap();
-        message.body.segment.data.euler_angle_state[index]
-            .angle_1
-            .value = bad;
-        assert_apm_rejects(&message, "EULER_ANGLE_1");
-    }
-
+    // One value is enough to prove the route is reached; `angleType`'s domain is exercised once
+    // in `types.rs::test_angle_validation` rather than re-proved at every call site.
     let mut message = Apm::from_kvn(EULER_KVN).unwrap();
-    message.body.segment.data.euler_angle_state[0].angle_3.value = 360.0;
-    assert_apm_rejects(&message, "EULER_ANGLE_3");
+    message.body.segment.data.euler_angle_state[0].angle_1.value = 400.0;
+    assert_rejects(&message, "EULER_ANGLE_1");
 
     let mut message = Apm::from_kvn(INERTIA_KVN).unwrap();
     message.body.segment.data.inertia[0].iyz.value = f64::INFINITY;
-    assert_apm_rejects(&message, "IYZ");
+    assert_rejects(&message, "IYZ");
 
     // The accepted boundary still reaches the reference schema.
     let mut message = Apm::from_kvn(EULER_KVN).unwrap();
     message.body.segment.data.euler_angle_state[0].angle_1.value = -360.0;
     validate_xml("APM Euler boundary", &message.to_xml().unwrap());
-}
-
-fn validate_xml(label: &str, xml: &str) {
-    let document = NamedTempFile::new().unwrap();
-    fs::write(document.path(), xml).unwrap();
-    let output = Command::new("xmllint")
-        .arg("--noout")
-        .arg("--schema")
-        .arg(repository_path("data/xsd/ndmxml-4.0.0-master-4.0.xsd"))
-        .arg(document.path())
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "{label} generated invalid XML: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
 }

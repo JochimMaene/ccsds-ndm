@@ -1,13 +1,14 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::{from_str_with_options, Message, Notation, ParseOptions};
 use ccsds_ndm::{Ndm, Validate};
-use tempfile::NamedTempFile;
+
+mod common;
+use common::validate_xml;
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 const OPM_WITH_MANEUVERS_KVN: &str = include_str!("../data/kvn/opm_g2.kvn");
@@ -156,21 +157,4 @@ fn loss_or_non_schema_model_states_are_rejected() {
     };
     assert!(nested.validate().is_err());
     assert!(nested.to_xml().is_err());
-}
-
-fn validate_xml(label: &str, xml: &str) {
-    let document = NamedTempFile::new().unwrap();
-    fs::write(document.path(), xml).unwrap();
-    let output = Command::new("xmllint")
-        .arg("--noout")
-        .arg("--schema")
-        .arg(repository_path("data/xsd/ndmxml-4.0.0-master-4.0.xsd"))
-        .arg(document.path())
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "{label} generated invalid XML: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
 }

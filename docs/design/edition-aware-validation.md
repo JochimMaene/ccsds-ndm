@@ -151,6 +151,6 @@ current three maintainable.
 ## References
 
 - [Validation contract](validation-contract.md), enforcement boundaries P1–P4
-- [Validation evidence and rollout](validation-rollout.md), category 2 legacy-edition exposure
+- [tdm-2.0.md](../conformance/tdm-2.0.md), which records that both accepted TDM editions are covered
 - `ccsds-ndm/src/versioning.rs`, edition specs and the three existing edition validators
 - Orekit `ObservationType.java`, `TdmMetadata.java`, `ApmData.java` (branch `develop`)
