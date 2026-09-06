@@ -272,6 +272,10 @@ check: lint audit stubs-check sync-docs-check test docs
 bench:
     cargo bench --manifest-path {{rust_manifest}}
 
+# Measure Python object-graph parse, reconstruction, generation, editing, and peak RSS.
+bench-python-object-model:
+    cd {{python_dir}} && uv run python benchmarks/object_model.py
+
 # Benchmark materialized and streaming OPM XML generation
 [private]
 bench-opm-xml:

@@ -43,7 +43,7 @@ The rejected long-term alternatives are immutable rebuilding and an editor/proxy
 rebuilding adds ceremony to routine edits. An editor hides copy/write-back behavior behind a second
 type, weakens static typing, and makes large-history edit cost easy to miss.
 
-## Performance result
+## Performance evidence
 
 OEM was the deciding workload because its state-vector histories can be large. The
 time-sensitive paths were measured before extending the graph to every message family:
@@ -52,10 +52,17 @@ time-sensitive paths were measured before extending the graph to every message f
 - repeated scalar edits through a retained state-vector reference; and
 - the same end-to-end workloads in the competing Python package.
 
-The measured overhead was modest while parse and generation remained substantially faster than the
-existing Python package on the same workload. A specialized native repeated sequence therefore did
-not earn its complexity. Any future optimization must preserve the direct mutation API and the
-Rust-core validation/generation gate.
+Those historical measurements were not retained in a reproducible repository workload, so they do
+not support a current comparative-performance claim. `just bench-python-object-model` now measures
+small and 10,000-record OEM parsing, Rust-graph reconstruction and validation, XML generation,
+retained-child edits, edit-plus-validation, and isolated-process peak RSS. Results are comparison
+evidence, not release thresholds. The initial machine-local measurements and limitations are
+recorded in [Python object-model performance baseline](python-object-model-performance.md).
+
+A comparison with another package is valid only when both libraries process the same generated
+document on the same machine. A specialized native repeated sequence still must preserve direct
+mutation and the Rust-core validation/generation gate, and must demonstrate a material improvement
+on this workload before earning its complexity.
 
 ## Parsing resource controls
 
