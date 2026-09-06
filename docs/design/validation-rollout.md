@@ -23,10 +23,10 @@ descriptive rather than a `shall`; `OEB_Q*` has no norm rule because `-999` is t
 
 **Outstanding.**
 
-- The structural-duplication question is **not** settled. Pilot C examined `OpmCovarianceMatrix`,
-  which was already consolidated, and found a routing defect instead. The original concern —
-  repeated KVN ordering, comment boundaries, XML sequence registration, parser assignments and
-  writers, most visibly in OPM — remains open and needs a genuinely representative block.
+- The structural-duplication question is **partly settled**. Pilot C first examined
+  `OpmCovarianceMatrix`, which was already consolidated, and found a routing defect instead; Pilot
+  E then took OPM's KVN keyword ordering, which is genuinely duplicated. The remaining strands —
+  XML sequence registration, KVN parser assignments, and the writers — are still open.
 - Performance evidence is one reproducible Python baseline. It omits KVN, has no warm-up phase,
   and does not support any broad performance claim.
 - Consolidation pilots A (constrained scalar) and B (enum) are closed, A positively and B as a
@@ -518,6 +518,51 @@ oracle.
 This is the same lesson as Pilot C from the other direction: an eager wrapper setter can mask a
 missing root validator indefinitely, because the surface most users touch appears to enforce the
 rule.
+
+### Pilot E — one OPM structural block: PASSED, with the model corrected twice by evidence
+
+The representative case is OPM's **KVN keyword ordering**, which was stated three times in
+`messages/opm.rs` and coupled through opaque numbers:
+
+- `rank`, a 58-entry keyword-to-number table whose gaps (17 to 20, 26 to 30, 34 to 40, 61 to 70,
+  76 to 80) silently encoded block boundaries;
+- `comment_starts_block`, written in rank literals and ranges — `matches!(previous, 17 | 26 |
+  30..=34 | 61 | 76)` — which are the closing ranks of each block that may precede;
+- `allows_non_increasing`, written in bare ranks `70`, `76`, `80`, `25`.
+
+Adding a keyword to the spacecraft block meant widening `30..=34` in two other functions, with
+nothing but a test to catch a mistake, and nothing in the source saying the range meant "the
+closing ranks of the spacecraft block".
+
+`OPM_KVN_BLOCKS` now declares the layout once — keywords in order, how many leading and trailing
+keywords are optional, whether the block repeats, whether a repeat restarts a comment run, and
+whether the whole block may be absent — and all three predicates derive from it. The ranks became
+an implementation detail rather than a maintained fact.
+
+**Verification.** The refactor was done in three steps: hoist the nested functions unchanged and
+confirm the suite is green; add the declaration and derived predicates alongside; prove
+equivalence exhaustively over every keyword and every reachable rank before switching the parser
+over. The original hand-written functions are retained in `#[cfg(test)]` scope as the golden
+reference, so the equivalence proof is permanent. That is deliberately a second copy, in test
+scope only: any future edit to the declaration must be shown not to change recorded behaviour.
+
+**The model was wrong twice, and the equivalence test caught both**, which is the argument for
+doing this as a checked refactor rather than a rewrite:
+
+1. Treating the header as one block made `CLASSIFICATION` fail to open a comment run. The version
+   keyword anchors the document and is its own group; the header content follows it.
+2. "Repeatable" conflated two facts. Maneuvers repeat *and* a comment may open a fresh run;
+   `USER_DEFINED_*` repeats *within* one logical block, so a comment there does not start a new
+   one. These needed separate flags.
+
+A third fact was missing entirely: a mandatory block between two others blocks the path, which is
+why the header cannot immediately precede the metadata. Without it the derived predicate was more
+permissive than the original.
+
+**What this does not cover.** Only the KVN ordering strand. The XML sequence tables state the same
+element order again, but per parent and nested, so they do not share this flat structure; the KVN
+parser's match arms and the writers state it a third and fourth time. Whether those can share the
+declaration is a separate experiment, and this pilot is not evidence that they can.
 
 ## Completion gate per category
 
