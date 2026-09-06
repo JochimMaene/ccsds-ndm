@@ -46,14 +46,25 @@ Known conflicts include:
 - OCM `DC_PA_START_ANGLE` and `DC_PA_STOP_ANGLE`: ODM permits any finite magnitude; OCM 3.0 XML
   uses `angleType`, whose range is `[-360, 360)`. **Resolved** with the P3/P4 split: finiteness at
   P3, refused by `Ocm::validate_xml_representability` at XML generation.
-- OPM `MAN_DELTA_MASS`: **not a conflict — an edition change.** 502.0-B-3 §3.2.4.7 says the value
-  "must be a negative number", and the 2.0 XSD's `deltamassType` is `negativeDouble`
-  (`maxExclusive 0.0`). The 3.0 XSD deliberately widened it to `deltamassTypeZ`
-  (`nonPositiveDouble`, `maxInclusive 0.0`) and says why in the schema itself: "Type Z for
-  deltamass that allows value of zero (attitude maneuvers)". Zero is therefore legal in edition 3.0
-  and rejected in 2.0, which is what `versioning::validate_opm_edition` implements. Positive values
-  are rejected in both. An earlier draft of this list claimed "the narrower semantic rule applies"
-  and so contradicted the code; the code was right.
+- OPM `MAN_DELTA_MASS`: the authorities do differ, and the resolution is per edition rather than a
+  general rule.
+
+  | Authority | Says | Applies to |
+  | --- | --- | --- |
+  | 502.0-B-3 §3.2.4.7 | "MAN_DELTA_MASS may be used for both finite and impulsive maneuvers; the value must be a negative number" | prose, both editions |
+  | `ndmxml-2.0.0-common-2.0.xsd` `deltamassType` → `negativeDouble` (`maxExclusive 0.0`) | strictly negative | OPM 2.0 XML |
+  | `ndmxml-4.0.0-common-4.0.xsd` `deltamassTypeZ` → `nonPositiveDouble` (`maxInclusive 0.0`) | zero permitted | OPM 3.0 XML |
+
+  The 3.0 schema states its own reason inline: "Type Z for deltamass that allows value of zero
+  (attitude maneuvers)". That annotated widening is the later and more specific statement for the
+  3.0 edition, so zero is accepted there and rejected in 2.0, which is what
+  `versioning::validate_opm_edition` implements. Positive values are rejected in both.
+
+  This resolution is scoped to this field and these two editions. It is **not** a rule that a
+  schema beats prose, any more than the earlier draft's "the narrower semantic rule applies" was a
+  rule that prose beats a schema. Each conflict is resolved on its own evidence and recorded here
+  with citations, so a reader can check the reasoning rather than apply a slogan.
+
 - OCM `DAYS_SINCE_FIRST_OBS` and `DAYS_SINCE_LAST_OBS`: ODM permits signed values; the OCM 3.0 XSD
   uses a non-negative day interval. **Resolved** with the P3/P4 split: finiteness at P3, negative
   values refused at XML generation.

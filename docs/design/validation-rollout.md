@@ -23,18 +23,35 @@ descriptive rather than a `shall`; `OEB_Q*` has no norm rule because `-999` is t
 
 **Outstanding.**
 
-- The structural-duplication question is **partly settled**. Pilot C first examined
-  `OpmCovarianceMatrix`, which was already consolidated, and found a routing defect instead; Pilot
-  E then took OPM's KVN keyword ordering, which is genuinely duplicated. The remaining strands —
-  XML sequence registration, KVN parser assignments, and the writers — are still open.
-- Performance evidence is one reproducible Python baseline. It omits KVN, has no warm-up phase,
-  and does not support any broad performance claim.
-- Consolidation pilots A (constrained scalar) and B (enum) are closed, A positively and B as a
-  reasoned negative. Pilot D (Python wrapper generation) is closed as a negative.
+1. **Assess the XML, parser and writer duplication separately.** Pilot E settled the KVN ordering
+   strand for OPM. The XML sequence tables state the same element order again, per parent and
+   nested; the KVN parser match arms and the writers state it a third and fourth time. Whether any
+   of those can share the declaration is a separate experiment, and Pilot E is not evidence that
+   they can.
+2. **Extend performance evidence where real workloads warrant it.** There is one reproducible
+   Python baseline, on one machine, for one family, with no allocation counts. The Rust suite has
+   allocation budgets for the history-bearing families; wall-clock evidence beyond OEM does not
+   exist. Extend it where a workload actually matters rather than for coverage.
+3. **Retire temporary machinery and state documents once they stop serving active work.** The
+   migration-era duplicate of the OPM ordering implementation has already been removed and
+   replaced with standard-derived cases. This document is itself in that category: once the
+   outstanding items close, the Status section belongs in the conformance set and the pilot
+   narrative belongs in history.
+4. **Validate packaged artifacts before treating the result as release-ready.** `package-rust` and
+   `package-python` both pass on this snapshot: the crate builds and its doctests run from a
+   packaged checkout, and the `manylinux_2_34` abi3 wheel installs into a clean interpreter. That
+   is a gate passed, not a release decision.
+
+Consolidation pilots A (constrained scalar) and E (OPM KVN ordering) closed positively; B (enum
+macro) and D (Python wrapper generation) closed as reasoned negatives; C found a reachability
+defect rather than duplication. The standard Pilot E sets is the one to apply to the remaining
+strands: remove a concrete maintenance burden, demonstrate preserved behaviour, and keep only the
+mechanism that earned its place. Abstraction for its own sake is not the goal.
 
 **Decided, not open.** TDM edition 1.0 (agrees with 2.0); RDM `NOMINAL_IMPACT_ALT`, OCM phase
 angles and OCM `DAYS_SINCE_*_OBS` (P3 finiteness, P4 refusal); OCM `MAN_*` numeric columns (Orekit
-parity); TDM 1.0 keyword leniency (accepted); OPM `MAN_DELTA_MASS` (edition rule, not a conflict);
+parity); TDM 1.0 keyword leniency (accepted); OPM `MAN_DELTA_MASS` (resolved per edition, with
+citations, in the contract);
 assignment-time validation (setters defer to the root).
 
 ## Evidence boundary
@@ -62,7 +79,7 @@ is retained only to identify the reviewed set.
 | Invalid state excluded by the Rust type | 2 | AEM and OEM interpolation degree store `NonZeroU32`; their validators enforce the associated interpolation dependency |
 | Not semantically checked | 21 | APM `SpinState` values (8), AEM spin/nutation values (5), ACM mass/duration values (3), RDM spacecraft values (4), and OCM `TIME_SPAN` (1) |
 | Partially checked | 1 | OCM `WEIGHTED_RMS` rejected negative finite values but admitted NaN and positive infinity; closed in category 4 |
-| Edition change, not an authority conflict | 1 | OPM `MAN_DELTA_MASS` is strictly negative in edition 2.0 and non-positive in 3.0, which the 3.0 schema annotates as deliberate for attitude maneuvers |
+| Resolved per edition | 1 | OPM `MAN_DELTA_MASS`: prose says negative in both editions, the 2.0 schema is `negativeDouble` and the 3.0 schema is `nonPositiveDouble` with an inline rationale for attitude maneuvers. See the contract for the citations |
 
 The RDM lifetime pilot subsequently closed three previously uncovered `DayIntervalRequired` uses:
 `ORBIT_LIFETIME` and its optional start/end window. It demonstrated one reusable predicate, one
@@ -100,10 +117,11 @@ Notation and governance conflicts are separate redesign decisions, not ordinary 
 - OCM phase angles and days-since-observation values are broader in ODM than in the XSD.
   **Resolved** with the same P3/P4 split as RDM's altitude: finiteness at P3,
   `Ocm::validate_xml_representability` refuses the conversion at XML generation.
-- OPM `MAN_DELTA_MASS` turned out **not** to be an authority conflict: the 3.0 schema
-  deliberately widened `negativeDouble` to `nonPositiveDouble` and annotates the change as being
-  for attitude maneuvers, so zero is legal in 3.0 and rejected in 2.0. Handled as an edition rule,
-  not a book/XSD standoff.
+- OPM `MAN_DELTA_MASS`: the authorities genuinely differ — 502.0-B-3 §3.2.4.7 says the value
+  "must be a negative number" while the 3.0 schema's `deltamassTypeZ` permits zero with an inline
+  rationale for attitude maneuvers. Resolved per edition: zero accepted in 3.0, rejected in 2.0.
+  The reasoning and citations are in the contract; it is scoped to this field and these editions
+  rather than being a general precedence rule.
 - RDM nominal impact altitude has no book range while the XSD embeds an Earth-derived range.
   **Resolved**: the model preserves any finite altitude, P3 enforces finiteness only, KVN writes
   it, and `Rdm::validate_xml_representability` refuses XML generation outside `[-430.5, 8848]`.
