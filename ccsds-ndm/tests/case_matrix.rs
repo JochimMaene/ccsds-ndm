@@ -2,400 +2,309 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+//! A catalogue of minimal inputs, one per parser behaviour worth pinning.
+//!
+//! Cases are held in a fixed-order slice so a failure names the same case on
+//! every run. Failure cases built by mutating a valid baseline go through
+//! [`mutated`], which fails loudly if the pattern it edits is absent — without
+//! that guard a stale pattern silently turns a failure case back into its own
+//! (passing) baseline.
+
 use ccsds_ndm::from_str;
-use std::collections::HashMap;
+
+struct Case {
+    name: &'static str,
+    input: fn() -> String,
+    should_parse: bool,
+}
 
 #[test]
-fn test_minimal_success_cases() {
-    for (behavior, minimal) in behavior_catalog() {
-        if !minimal.should_parse {
-            continue;
-        }
-        let res = from_str(&minimal.input);
+fn minimal_success_cases_parse() {
+    for case in CASES.iter().filter(|c| c.should_parse) {
+        let input = (case.input)();
         assert!(
-            res.is_ok(),
-            "Expected success for {behavior}, got error: {res:?}"
+            from_str(&input).is_ok(),
+            "expected {} to parse, got: {:?}",
+            case.name,
+            from_str(&input)
         );
     }
 }
 
 #[test]
-fn test_minimal_failure_cases() {
-    for (behavior, minimal) in behavior_catalog() {
-        if minimal.should_parse {
-            continue;
-        }
-        let res = from_str(&minimal.input);
-        assert!(res.is_err(), "Expected failure for {behavior}, got success");
+fn minimal_failure_cases_are_rejected() {
+    for case in CASES.iter().filter(|c| !c.should_parse) {
+        assert!(
+            from_str(&(case.input)()).is_err(),
+            "expected {} to be rejected, but it parsed",
+            case.name
+        );
     }
 }
 
-struct MinimalCase {
-    input: String,
-    should_parse: bool,
+/// Case names are the failure label; duplicates would make a report ambiguous.
+#[test]
+fn case_names_are_unique() {
+    let mut names: Vec<_> = CASES.iter().map(|c| c.name).collect();
+    names.sort_unstable();
+    let count = names.len();
+    names.dedup();
+    assert_eq!(count, names.len(), "duplicate case name in CASES");
 }
 
-fn behavior_catalog() -> HashMap<&'static str, MinimalCase> {
-    let mut map = HashMap::new();
-
-    // Success behaviors (minimal valid KVN/XML per message type)
-    map.insert(
-        "acm_success_kvn",
-        MinimalCase {
-            input: minimal_acm_kvn(),
-            should_parse: true,
-        },
+/// Apply a mutation to a valid baseline, proving the pattern was really there.
+fn mutated(baseline: String, from: &str, to: &str) -> String {
+    assert!(
+        baseline.contains(from),
+        "mutation pattern {from:?} is absent from its baseline, so the case \
+         would re-test the unmodified document"
     );
-    map.insert(
-        "aem_success_kvn",
-        MinimalCase {
-            input: minimal_aem_kvn(),
-            should_parse: true,
-        },
-    );
-    map.insert(
-        "apm_success_kvn",
-        MinimalCase {
-            input: minimal_apm_kvn(),
-            should_parse: true,
-        },
-    );
-    map.insert(
-        "cdm_success_kvn",
-        MinimalCase {
-            input: minimal_cdm_kvn(),
-            should_parse: true,
-        },
-    );
-    map.insert(
-        "ocm_success_kvn",
-        MinimalCase {
-            input: minimal_ocm_kvn(),
-            should_parse: true,
-        },
-    );
-    map.insert(
-        "oem_success_kvn",
-        MinimalCase {
-            input: minimal_oem_kvn(),
-            should_parse: true,
-        },
-    );
-    map.insert(
-        "oem_success_xml",
-        MinimalCase {
-            input: minimal_oem_xml(),
-            should_parse: true,
-        },
-    );
-    map.insert(
-        "omm_success_kvn",
-        MinimalCase {
-            input: minimal_omm_kvn(),
-            should_parse: true,
-        },
-    );
-    map.insert(
-        "opm_success_kvn",
-        MinimalCase {
-            input: minimal_opm_kvn(),
-            should_parse: true,
-        },
-    );
-    map.insert(
-        "tdm_success_kvn",
-        MinimalCase {
-            input: minimal_tdm_kvn(),
-            should_parse: true,
-        },
-    );
-    map.insert(
-        "tdm_success_xml",
-        MinimalCase {
-            input: minimal_tdm_xml(),
-            should_parse: true,
-        },
-    );
-    map.insert(
-        "rdm_success_kvn",
-        MinimalCase {
-            input: minimal_rdm_kvn(),
-            should_parse: true,
-        },
-    );
-    map.insert(
-        "ndm_success_xml",
-        MinimalCase {
-            input: minimal_ndm_xml(),
-            should_parse: true,
-        },
-    );
-
-    // Generic failure behaviors per message class.
-    map.insert(
-        "acm_missing",
-        MinimalCase {
-            input: acm_missing_cp_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "acm_spurious",
-        MinimalCase {
-            input: acm_spurious_metadata_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "acm_number_format",
-        MinimalCase {
-            input: acm_number_format_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "acm_duplicate",
-        MinimalCase {
-            input: acm_duplicate_sensor_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "acm_inconsistent",
-        MinimalCase {
-            input: acm_conflict_kvn(),
-            should_parse: false,
-        },
-    );
-
-    map.insert(
-        "aem_missing",
-        MinimalCase {
-            input: aem_missing_attitude_type_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "aem_wrong_keyword",
-        MinimalCase {
-            input: aem_wrong_keyword_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "aem_number_format",
-        MinimalCase {
-            input: aem_number_format_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "aem_inconsistent",
-        MinimalCase {
-            input: aem_inconsistent_data_kvn(),
-            should_parse: false,
-        },
-    );
-
-    map.insert(
-        "apm_missing",
-        MinimalCase {
-            input: apm_missing_frame_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "apm_wrong_keyword",
-        MinimalCase {
-            input: apm_wrong_keyword_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "apm_number_format",
-        MinimalCase {
-            input: apm_number_format_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "apm_invalid_value",
-        MinimalCase {
-            input: apm_invalid_euler_seq_kvn(),
-            should_parse: false,
-        },
-    );
-
-    map.insert(
-        "cdm_missing",
-        MinimalCase {
-            input: cdm_missing_tca_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "cdm_wrong_keyword",
-        MinimalCase {
-            input: cdm_wrong_keyword_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "cdm_number_format",
-        MinimalCase {
-            input: cdm_number_format_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "cdm_invalid_value",
-        MinimalCase {
-            input: cdm_invalid_tca_kvn(),
-            should_parse: false,
-        },
-    );
-
-    map.insert(
-        "ocm_missing",
-        MinimalCase {
-            input: ocm_missing_tzero_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "ocm_wrong_keyword",
-        MinimalCase {
-            input: ocm_wrong_keyword_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "ocm_invalid_value",
-        MinimalCase {
-            input: ocm_unknown_frame_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "ocm_invalid_units",
-        MinimalCase {
-            input: ocm_invalid_units_kvn(),
-            should_parse: false,
-        },
-    );
-
-    map.insert(
-        "oem_number_format",
-        MinimalCase {
-            input: oem_number_format_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "oem_wrong_keyword",
-        MinimalCase {
-            input: oem_wrong_keyword_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "oem_inconsistent",
-        MinimalCase {
-            input: oem_inconsistent_time_system_kvn(),
-            should_parse: false,
-        },
-    );
-
-    map.insert(
-        "omm_missing",
-        MinimalCase {
-            input: omm_missing_object_id_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "omm_wrong_keyword",
-        MinimalCase {
-            input: omm_wrong_keyword_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "omm_number_format",
-        MinimalCase {
-            input: omm_number_format_kvn(),
-            should_parse: false,
-        },
-    );
-
-    map.insert(
-        "opm_invalid_units",
-        MinimalCase {
-            input: opm_invalid_units_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "opm_invalid_value",
-        MinimalCase {
-            input: opm_invalid_units_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "opm_wrong_keyword",
-        MinimalCase {
-            input: opm_wrong_keyword_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "opm_number_format",
-        MinimalCase {
-            input: opm_number_format_kvn(),
-            should_parse: false,
-        },
-    );
-
-    map.insert(
-        "tdm_missing",
-        MinimalCase {
-            input: tdm_missing_time_system_xml(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "tdm_wrong_keyword",
-        MinimalCase {
-            input: tdm_wrong_keyword_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "tdm_number_format",
-        MinimalCase {
-            input: tdm_number_format_kvn(),
-            should_parse: false,
-        },
-    );
-    map.insert(
-        "tdm_inconsistent",
-        MinimalCase {
-            input: tdm_inconsistent_time_system_kvn(),
-            should_parse: false,
-        },
-    );
-
-    map.insert(
-        "ndm_wrong_format",
-        MinimalCase {
-            input: "NOT_A_CCSDS_MESSAGE".to_string(),
-            should_parse: false,
-        },
-    );
-
-    map
+    baseline.replace(from, to)
 }
+
+#[rustfmt::skip]
+static CASES: &[Case] = &[
+    Case {
+        name: "acm_success_kvn",
+        input: || minimal_acm_kvn(),
+        should_parse: true,
+    },
+    Case {
+        name: "aem_success_kvn",
+        input: || minimal_aem_kvn(),
+        should_parse: true,
+    },
+    Case {
+        name: "apm_success_kvn",
+        input: || minimal_apm_kvn(),
+        should_parse: true,
+    },
+    Case {
+        name: "cdm_success_kvn",
+        input: || minimal_cdm_kvn(),
+        should_parse: true,
+    },
+    Case {
+        name: "ocm_success_kvn",
+        input: || minimal_ocm_kvn(),
+        should_parse: true,
+    },
+    Case {
+        name: "oem_success_kvn",
+        input: || minimal_oem_kvn(),
+        should_parse: true,
+    },
+    Case {
+        name: "oem_success_xml",
+        input: || minimal_oem_xml(),
+        should_parse: true,
+    },
+    Case {
+        name: "omm_success_kvn",
+        input: || minimal_omm_kvn(),
+        should_parse: true,
+    },
+    Case {
+        name: "opm_success_kvn",
+        input: || minimal_opm_kvn(),
+        should_parse: true,
+    },
+    Case {
+        name: "tdm_success_kvn",
+        input: || minimal_tdm_kvn(),
+        should_parse: true,
+    },
+    Case {
+        name: "tdm_success_xml",
+        input: || minimal_tdm_xml(),
+        should_parse: true,
+    },
+    Case {
+        name: "rdm_success_kvn",
+        input: || minimal_rdm_kvn(),
+        should_parse: true,
+    },
+    Case {
+        name: "ndm_success_xml",
+        input: || minimal_ndm_xml(),
+        should_parse: true,
+    },
+    Case {
+        name: "acm_missing",
+        input: || acm_missing_cp_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "acm_spurious",
+        input: || acm_spurious_metadata_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "acm_number_format",
+        input: || acm_number_format_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "acm_duplicate",
+        input: || acm_duplicate_sensor_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "acm_inconsistent",
+        input: || acm_conflict_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "aem_missing",
+        input: || aem_missing_attitude_type_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "aem_wrong_keyword",
+        input: || aem_wrong_keyword_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "aem_number_format",
+        input: || aem_number_format_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "aem_inconsistent",
+        input: || aem_inconsistent_data_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "apm_missing",
+        input: || apm_missing_frame_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "apm_wrong_keyword",
+        input: || apm_wrong_keyword_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "apm_number_format",
+        input: || apm_number_format_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "apm_invalid_value",
+        input: || apm_invalid_euler_seq_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "cdm_missing",
+        input: || cdm_missing_tca_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "cdm_wrong_keyword",
+        input: || cdm_wrong_keyword_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "cdm_number_format",
+        input: || cdm_number_format_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "cdm_invalid_value",
+        input: || cdm_invalid_tca_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "ocm_missing",
+        input: || ocm_missing_tzero_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "ocm_wrong_keyword",
+        input: || ocm_wrong_keyword_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "ocm_invalid_value",
+        input: || ocm_unknown_frame_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "ocm_invalid_units",
+        input: || ocm_invalid_units_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "oem_number_format",
+        input: || oem_number_format_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "oem_wrong_keyword",
+        input: || oem_wrong_keyword_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "oem_inconsistent",
+        input: || oem_inconsistent_time_system_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "omm_missing",
+        input: || omm_missing_object_id_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "omm_wrong_keyword",
+        input: || omm_wrong_keyword_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "omm_number_format",
+        input: || omm_number_format_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "opm_invalid_units",
+        input: || opm_invalid_units_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "opm_wrong_keyword",
+        input: || opm_wrong_keyword_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "opm_number_format",
+        input: || opm_number_format_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "tdm_missing",
+        input: || tdm_missing_time_system_xml(),
+        should_parse: false,
+    },
+    Case {
+        name: "tdm_wrong_keyword",
+        input: || tdm_wrong_keyword_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "tdm_number_format",
+        input: || tdm_number_format_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "tdm_inconsistent",
+        input: || tdm_inconsistent_time_system_kvn(),
+        should_parse: false,
+    },
+    Case {
+        name: "ndm_wrong_format",
+        input: || "NOT_A_CCSDS_MESSAGE".to_string(),
+        should_parse: false,
+    },
+];
 
 // ---------------- Minimal inputs ----------------
 
@@ -428,13 +337,13 @@ fn acm_missing_cp_kvn() -> String {
 
 fn acm_spurious_metadata_kvn() -> String {
     let mut s = minimal_acm_kvn();
-    s = s.replace("META_STOP", "BAD_KEY = 1\nMETA_STOP");
+    s = mutated(s, "META_STOP", "BAD_KEY = 1\nMETA_STOP");
     s
 }
 
 fn acm_number_format_kvn() -> String {
     let mut s = minimal_acm_kvn();
-    s = s.replace("0.0 0 0 0 1", "NOT_A_DATE 0 0 0 1");
+    s = mutated(s, "0.0 0 0 0 1", "NOT_A_DATE 0 0 0 1");
     s
 }
 
@@ -472,19 +381,19 @@ DATA_STOP
 }
 
 fn aem_missing_attitude_type_kvn() -> String {
-    minimal_aem_kvn().replace("ATTITUDE_TYPE = QUATERNION\n", "")
+    mutated(minimal_aem_kvn(), "ATTITUDE_TYPE = QUATERNION\n", "")
 }
 
 fn aem_wrong_keyword_kvn() -> String {
-    minimal_aem_kvn().replace("META_STOP", "BAD_KEY = 1\nMETA_STOP")
+    mutated(minimal_aem_kvn(), "META_STOP", "BAD_KEY = 1\nMETA_STOP")
 }
 
 fn aem_number_format_kvn() -> String {
-    minimal_aem_kvn().replace("0 0 0 1", "0 0 BAD 1")
+    mutated(minimal_aem_kvn(), "0 0 0 1", "0 0 BAD 1")
 }
 
 fn aem_inconsistent_data_kvn() -> String {
-    minimal_aem_kvn().replace("0 0 0 1", "0 0 0")
+    mutated(minimal_aem_kvn(), "0 0 0 1", "0 0 0")
 }
 
 fn minimal_apm_kvn() -> String {
@@ -511,15 +420,15 @@ QUAT_STOP
 }
 
 fn apm_missing_frame_kvn() -> String {
-    minimal_apm_kvn().replace("REF_FRAME_A = SC_BODY_1\n", "")
+    mutated(minimal_apm_kvn(), "REF_FRAME_A = SC_BODY_1\n", "")
 }
 
 fn apm_wrong_keyword_kvn() -> String {
-    minimal_apm_kvn().replace("META_STOP", "BAD_KEY = 1\nMETA_STOP")
+    mutated(minimal_apm_kvn(), "META_STOP", "BAD_KEY = 1\nMETA_STOP")
 }
 
 fn apm_number_format_kvn() -> String {
-    minimal_apm_kvn().replace("Q1 = 0", "Q1 = BAD")
+    mutated(minimal_apm_kvn(), "Q1 = 0", "Q1 = BAD")
 }
 
 fn apm_invalid_euler_seq_kvn() -> String {
@@ -636,19 +545,27 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
 }
 
 fn cdm_missing_tca_kvn() -> String {
-    minimal_cdm_kvn().replace("TCA = 2025-01-02T12:00:00\n", "")
+    mutated(minimal_cdm_kvn(), "TCA = 2025-01-02T12:00:00\n", "")
 }
 
 fn cdm_wrong_keyword_kvn() -> String {
-    minimal_cdm_kvn().replace("MISS_DISTANCE", "BAD_KEY")
+    mutated(minimal_cdm_kvn(), "MISS_DISTANCE", "BAD_KEY")
 }
 
 fn cdm_number_format_kvn() -> String {
-    minimal_cdm_kvn().replace("MISS_DISTANCE = 100.0", "MISS_DISTANCE = BAD")
+    mutated(
+        minimal_cdm_kvn(),
+        "MISS_DISTANCE = 100.0",
+        "MISS_DISTANCE = BAD",
+    )
 }
 
 fn cdm_invalid_tca_kvn() -> String {
-    minimal_cdm_kvn().replace("TCA = 2025-01-02T12:00:00", "TCA = NOT_A_DATE")
+    mutated(
+        minimal_cdm_kvn(),
+        "TCA = 2025-01-02T12:00:00",
+        "TCA = NOT_A_DATE",
+    )
 }
 
 fn minimal_ocm_kvn() -> String {
@@ -670,22 +587,24 @@ TRAJ_STOP
 }
 
 fn ocm_missing_tzero_kvn() -> String {
-    minimal_ocm_kvn().replace("EPOCH_TZERO = 2023-01-01T00:00:00\n", "")
+    mutated(minimal_ocm_kvn(), "EPOCH_TZERO = 2023-01-01T00:00:00\n", "")
 }
 
 fn ocm_wrong_keyword_kvn() -> String {
-    minimal_ocm_kvn().replace("TIME_SYSTEM", "BAD_KEY")
+    mutated(minimal_ocm_kvn(), "TIME_SYSTEM", "BAD_KEY")
 }
 
 fn ocm_unknown_frame_kvn() -> String {
-    minimal_ocm_kvn().replace(
+    mutated(
+        minimal_ocm_kvn(),
         "TRAJ_REF_FRAME = GCRF",
         "TRAJ_REF_FRAME = GCRF\nTRAJ_BASIS = INVALID",
     )
 }
 
 fn ocm_invalid_units_kvn() -> String {
-    minimal_ocm_kvn().replace(
+    mutated(
+        minimal_ocm_kvn(),
         "TRAJ_TYPE = CARTPV",
         "TRAJ_TYPE = CARTPV\nTRAJ_UNITS = [m, m, m, m/s, m/s, m/s]",
     )
@@ -710,11 +629,11 @@ META_STOP
 }
 
 fn oem_number_format_kvn() -> String {
-    minimal_oem_kvn().replace("1 2 3 4 5 6", "1 2 BAD 4 5 6")
+    mutated(minimal_oem_kvn(), "1 2 3 4 5 6", "1 2 BAD 4 5 6")
 }
 
 fn oem_wrong_keyword_kvn() -> String {
-    minimal_oem_kvn().replace("REF_FRAME", "BAD_KEY")
+    mutated(minimal_oem_kvn(), "REF_FRAME", "BAD_KEY")
 }
 
 fn oem_inconsistent_time_system_kvn() -> String {
@@ -750,15 +669,15 @@ MEAN_MOTION_DDOT = 0.0 [rev/day**3]
 }
 
 fn omm_missing_object_id_kvn() -> String {
-    minimal_omm_kvn().replace("OBJECT_ID = 2020-001A\n", "")
+    mutated(minimal_omm_kvn(), "OBJECT_ID = 2020-001A\n", "")
 }
 
 fn omm_wrong_keyword_kvn() -> String {
-    minimal_omm_kvn().replace("MEAN_ELEMENT_THEORY", "BAD_KEY")
+    mutated(minimal_omm_kvn(), "MEAN_ELEMENT_THEORY", "BAD_KEY")
 }
 
 fn omm_number_format_kvn() -> String {
-    minimal_omm_kvn().replace("MEAN_MOTION = 15.0", "MEAN_MOTION = BAD")
+    mutated(minimal_omm_kvn(), "MEAN_MOTION = 15.0", "MEAN_MOTION = BAD")
 }
 
 fn minimal_opm_kvn() -> String {
@@ -782,15 +701,15 @@ Z_DOT = 6 [km/s]
 }
 
 fn opm_invalid_units_kvn() -> String {
-    minimal_opm_kvn().replace("X = 1 [km]", "X = 1 [m]")
+    mutated(minimal_opm_kvn(), "X = 1 [km]", "X = 1 [m]")
 }
 
 fn opm_wrong_keyword_kvn() -> String {
-    minimal_opm_kvn().replace("REF_FRAME", "BAD_KEY")
+    mutated(minimal_opm_kvn(), "REF_FRAME", "BAD_KEY")
 }
 
 fn opm_number_format_kvn() -> String {
-    minimal_opm_kvn().replace("X = 1 [km]", "X = BAD [km]")
+    mutated(minimal_opm_kvn(), "X = 1 [km]", "X = BAD [km]")
 }
 
 fn minimal_tdm_kvn() -> String {
@@ -841,18 +760,19 @@ fn minimal_tdm_xml() -> String {
 }
 
 fn tdm_wrong_keyword_kvn() -> String {
-    minimal_tdm_kvn().replace("TIME_SYSTEM", "BAD_KEY")
+    mutated(minimal_tdm_kvn(), "TIME_SYSTEM", "BAD_KEY")
 }
 
 fn tdm_number_format_kvn() -> String {
-    minimal_tdm_kvn().replace(
+    mutated(
+        minimal_tdm_kvn(),
         "RANGE = 2023-01-01T00:00:00 100",
         "RANGE = 2023-01-01T00:00:00 BAD",
     )
 }
 
 fn tdm_inconsistent_time_system_kvn() -> String {
-    minimal_tdm_kvn().replace("PATH_2 = 2,1\n", "")
+    mutated(minimal_tdm_kvn(), "PATH_2 = 2,1\n", "")
 }
 
 fn tdm_missing_time_system_xml() -> String {
