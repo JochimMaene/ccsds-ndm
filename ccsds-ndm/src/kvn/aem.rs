@@ -128,16 +128,7 @@ fn attitude_state_line(
     let epoch = crate::types::CalendarEpoch::from_str(epoch_str)
         .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
 
-    let expected_values = match attitude_type {
-        AttitudeTypeType::Quaternion => 4,
-        AttitudeTypeType::QuaternionDerivative => 8,
-        AttitudeTypeType::QuaternionAngVel
-        | AttitudeTypeType::SpinNutation
-        | AttitudeTypeType::SpinNutationMom => 7,
-        AttitudeTypeType::EulerAngle => 3,
-        AttitudeTypeType::EulerAngleDerivative | AttitudeTypeType::EulerAngleAngVel => 6,
-        AttitudeTypeType::Spin => 4,
-    };
+    let expected_values = attitude_type.value_count();
     let mut values = [0.0; 8];
     let mut value_count = 0usize;
     for s in parts {

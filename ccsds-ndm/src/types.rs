@@ -3977,6 +3977,18 @@ pub enum AttitudeTypeType {
     SpinNutationMom,
 }
 
+impl AttitudeTypeType {
+    pub const fn value_count(&self) -> usize {
+        match self {
+            Self::Quaternion | Self::Spin => 4,
+            Self::QuaternionDerivative => 8,
+            Self::QuaternionAngVel | Self::SpinNutation | Self::SpinNutationMom => 7,
+            Self::EulerAngle => 3,
+            Self::EulerAngleDerivative | Self::EulerAngleAngVel => 6,
+        }
+    }
+}
+
 impl std::str::FromStr for AttitudeTypeType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
@@ -5104,6 +5116,19 @@ mod tests {
         assert!(PositiveInteger::new(1).is_ok());
         assert!(PositiveInteger::new(100).is_ok());
         assert!(PositiveInteger::new(0).is_err());
+    }
+
+    #[test]
+    fn attitude_type_value_counts_match_aem_layouts() {
+        assert_eq!(AttitudeTypeType::Quaternion.value_count(), 4);
+        assert_eq!(AttitudeTypeType::QuaternionDerivative.value_count(), 8);
+        assert_eq!(AttitudeTypeType::QuaternionAngVel.value_count(), 7);
+        assert_eq!(AttitudeTypeType::EulerAngle.value_count(), 3);
+        assert_eq!(AttitudeTypeType::EulerAngleDerivative.value_count(), 6);
+        assert_eq!(AttitudeTypeType::EulerAngleAngVel.value_count(), 6);
+        assert_eq!(AttitudeTypeType::Spin.value_count(), 4);
+        assert_eq!(AttitudeTypeType::SpinNutation.value_count(), 7);
+        assert_eq!(AttitudeTypeType::SpinNutationMom.value_count(), 7);
     }
 
     #[test]

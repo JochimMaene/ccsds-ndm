@@ -82,6 +82,24 @@ pub(crate) fn kvn_comment_error(value: &str) -> Option<ValidationError> {
     None
 }
 
+/// Build the common diagnostic for a number that cannot be emitted as a CCSDS KVN number.
+pub(crate) fn unrepresentable_number(
+    field: &str,
+    value: f64,
+    path: impl Into<Cow<'static, str>>,
+) -> CcsdsNdmError {
+    ValidationError::InvalidValue {
+        field: field.to_owned().into(),
+        // Keep diagnostics compact for very large magnitudes; `f64::to_string` can expand them
+        // into hundreds of digits.
+        value: format!("{value:e}"),
+        expected: Cow::Borrowed("a representable CCSDS number"),
+        line: None,
+    }
+    .at_path(path)
+    .into()
+}
+
 pub(crate) fn validate_at_field_path(
     result: Result<()>,
     parent_path: impl Into<std::borrow::Cow<'static, str>>,

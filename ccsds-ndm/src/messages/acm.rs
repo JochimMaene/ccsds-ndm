@@ -13,7 +13,6 @@ use crate::types::SensorNoise;
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::io::Write;
 
 //----------------------------------------------------------------------
 // Root ACM Structure
@@ -333,43 +332,6 @@ impl Acm {
             }
         }
 
-        let mut sink = AcmKvnLexicalSink::default();
-        let mut writer = KvnWriter::from_io(&mut sink);
-        self.write_kvn(&mut writer);
-        writer.finish_io()
-    }
-}
-
-#[derive(Default)]
-struct AcmKvnLexicalSink {
-    line_len: usize,
-}
-
-impl Write for AcmKvnLexicalSink {
-    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
-        for byte in buffer {
-            if *byte == b'\n' {
-                if self.line_len > 254 {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "generated ACM KVN record exceeds 254 characters",
-                    ));
-                }
-                self.line_len = 0;
-            } else {
-                if !(b' '..=b'~').contains(byte) {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "generated ACM KVN contains non-printable or non-ASCII content",
-                    ));
-                }
-                self.line_len += 1;
-            }
-        }
-        Ok(buffer.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
 }

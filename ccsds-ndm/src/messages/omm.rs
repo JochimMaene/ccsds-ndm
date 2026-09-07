@@ -183,14 +183,9 @@ impl Omm {
             if OdmFloat::is_valid(value) {
                 return Ok(());
             }
-            Err(ValidationError::InvalidValue {
-                field: field.into(),
-                value: value.to_string(),
-                expected: "a representable CCSDS number".into(),
-                line: None,
-            }
-            .at_path(path)
-            .into())
+            Err(crate::validation::unrepresentable_number(
+                field, value, path,
+            ))
         }
 
         let data = &self.body.segment.data;

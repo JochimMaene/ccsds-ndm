@@ -28,20 +28,6 @@ fn absolute_epoch_error(epoch: &Epoch, field: &'static str) -> Option<Validation
     )
 }
 
-/// Report a value with no CCSDS spelling that reads back as a finite number.
-fn unrepresentable_number(field: &str, value: f64, path: String) -> CcsdsNdmError {
-    ValidationError::InvalidValue {
-        field: field.to_owned().into(),
-        // Spell the offender in scientific form; `f64::to_string` expands large magnitudes to
-        // hundreds of digits, which buries the diagnostic.
-        value: format!("{value:e}"),
-        expected: "a representable CCSDS number".into(),
-        line: None,
-    }
-    .at_path(path)
-    .into()
-}
-
 /// Reject a record wider than the normative KVN line limit.
 fn line_length_error(
     name: &'static str,
@@ -93,10 +79,6 @@ fn validate_within_path(
 /// within a specified time range. The message recipient must have a means of interpolating
 /// across these state vectors to obtain the state at an arbitrary time contained within the
 /// span of the ephemeris.
-///
-/// The OEM is suited to exchanges that:
-/// 1. Involve automated interaction (e.g., computer-to-computer communication).
-/// 2. Require higher fidelity or higher precision dynamic modeling than is possible with the OPM.
 ///
 /// **CCSDS Reference**: 502.0-B-3, Section 5.1.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
@@ -698,7 +680,7 @@ impl Oem {
                     for (field, value, member) in required_values {
                         line.push(' ');
                         if !OdmFloat::write_if_valid(value, line) {
-                            return Err(unrepresentable_number(
+                            return Err(crate::validation::unrepresentable_number(
                                 field,
                                 value,
                                 format!("{base}.data.state_vector[{state_index}].{member}"),
@@ -714,7 +696,7 @@ impl Oem {
                     {
                         line.push(' ');
                         if !OdmFloat::write_if_valid(value.value, line) {
-                            return Err(unrepresentable_number(
+                            return Err(crate::validation::unrepresentable_number(
                                 field,
                                 value.value,
                                 format!("{base}.data.state_vector[{state_index}].{member}"),
@@ -801,7 +783,11 @@ impl Oem {
                                 return Err(error.at_path(path()).into());
                             }
                             if !OdmFloat::write_if_valid(*value, line) {
-                                return Err(unrepresentable_number(field, *value, path()));
+                                return Err(crate::validation::unrepresentable_number(
+                                    field,
+                                    *value,
+                                    path(),
+                                ));
                             }
                         }
                         line_length_error("covariance row", line.len() - line_start, || {

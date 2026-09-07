@@ -256,6 +256,11 @@ pub struct KvnWriter<'a> {
     output: KvnOutput<'a>,
     io_error: Option<std::io::Error>,
     lexical_error: bool,
+    line_length_error: bool,
+    line_len: usize,
+    allow_long_history_records: bool,
+    history_block: bool,
+    line_has_equals: bool,
     line_buffer: String,
 }
 
@@ -264,6 +269,14 @@ impl FmtWrite for KvnWriter<'_> {
         self.lexical_error |= !s
             .bytes()
             .all(|byte| byte == b'\n' || (b' '..=b'~').contains(&byte));
+        for byte in s.bytes() {
+            if byte == b'\n' {
+                self.finish_line();
+            } else {
+                self.line_len = self.line_len.saturating_add(1);
+                self.line_has_equals |= byte == b'=';
+            }
+        }
         match &mut self.output {
             KvnOutput::String(output) => output.write_str(s),
             KvnOutput::Io(output) => output.write_all(s.as_bytes()).map_err(|error| {
@@ -282,6 +295,11 @@ impl KvnWriter<'static> {
             output: KvnOutput::String(String::new()),
             io_error: None,
             lexical_error: false,
+            line_length_error: false,
+            line_len: 0,
+            allow_long_history_records: false,
+            history_block: false,
+            line_has_equals: false,
             line_buffer: String::new(),
         }
     }
@@ -291,6 +309,11 @@ impl KvnWriter<'static> {
             output: KvnOutput::String(String::with_capacity(capacity)),
             io_error: None,
             lexical_error: false,
+            line_length_error: false,
+            line_len: 0,
+            allow_long_history_records: false,
+            history_block: false,
+            line_has_equals: false,
             line_buffer: String::new(),
         }
     }
@@ -322,8 +345,28 @@ impl<'a> KvnWriter<'a> {
             output: KvnOutput::Io(output),
             io_error: None,
             lexical_error: false,
+            line_length_error: false,
+            line_len: 0,
+            allow_long_history_records: false,
+            history_block: false,
+            line_has_equals: false,
             line_buffer: String::new(),
         }
+    }
+
+    fn finish_line(&mut self) {
+        if self.line_len > 254
+            && (!self.allow_long_history_records || !self.history_block || self.line_has_equals)
+        {
+            self.line_length_error = true;
+        }
+        self.line_len = 0;
+        self.line_has_equals = false;
+    }
+
+    /// Allow long non-assignment records inside OCM history blocks.
+    pub(crate) fn allow_long_history_records(&mut self) {
+        self.allow_long_history_records = true;
     }
 
     /// Builds and writes one raw line using a reusable growable buffer.
@@ -346,6 +389,15 @@ impl<'a> KvnWriter<'a> {
             let line_start = output.len();
             let result = build(output, line_start);
             if result.is_ok() {
+                let (line_len, has_equals) = {
+                    let line = &output[line_start..];
+                    (line.len(), line.bytes().any(|byte| byte == b'='))
+                };
+                if line_len > 254
+                    && (!self.allow_long_history_records || !self.history_block || has_equals)
+                {
+                    self.line_length_error = true;
+                }
                 output.push('\n');
             } else {
                 output.truncate(line_start);
@@ -409,11 +461,6 @@ impl<'a> KvnWriter<'a> {
 
     /// Writes a CCSDS-compatible ODM number without allocating a value string.
     pub(crate) fn write_odm_float_pair(&mut self, key: &str, value: f64) {
-        if let KvnOutput::String(output) = &mut self.output {
-            Self::build_odm_float_pair(output, key, value);
-            output.push('\n');
-            return;
-        }
         self.write_built_line(|line| Self::build_odm_float_pair(line, key, value));
     }
 
@@ -431,21 +478,11 @@ impl<'a> KvnWriter<'a> {
                 line.push(']');
             }
         };
-        if let KvnOutput::String(output) = &mut self.output {
-            build(output);
-            output.push('\n');
-            return;
-        }
         self.write_built_line(build);
     }
 
     /// Writes one TDM observation without allocating intermediate epoch/value strings.
     pub(crate) fn write_tdm_observation<E: Display>(&mut self, key: &str, epoch: &E, value: f64) {
-        if let KvnOutput::String(output) = &mut self.output {
-            Self::build_tdm_observation(output, key, epoch, value);
-            output.push('\n');
-            return;
-        }
         self.write_built_line(|line| Self::build_tdm_observation(line, key, epoch, value));
     }
 
@@ -458,11 +495,6 @@ impl<'a> KvnWriter<'a> {
                 let _ = OdmFloat(*value).write_to(line);
             }
         };
-        if let KvnOutput::String(output) = &mut self.output {
-            build(output);
-            output.push('\n');
-            return;
-        }
         self.write_built_line(build);
     }
 
@@ -475,11 +507,6 @@ impl<'a> KvnWriter<'a> {
                 let _ = OdmFloat(*value).write_to(line);
             }
         };
-        if let KvnOutput::String(output) = &mut self.output {
-            build(output);
-            output.push('\n');
-            return;
-        }
         self.write_built_line(build);
     }
 
@@ -493,11 +520,6 @@ impl<'a> KvnWriter<'a> {
                 let _ = OdmFloat(*value).write_to(line);
             }
         };
-        if let KvnOutput::String(output) = &mut self.output {
-            build(output);
-            output.push('\n');
-            return;
-        }
         self.write_built_line(build);
     }
 
@@ -520,11 +542,6 @@ impl<'a> KvnWriter<'a> {
                 let _ = write!(line, " [{unit}]");
             }
         };
-        if let KvnOutput::String(output) = &mut self.output {
-            build(output);
-            output.push('\n');
-            return;
-        }
         self.write_built_line(build);
     }
 
@@ -571,6 +588,9 @@ impl<'a> KvnWriter<'a> {
     /// Writes a section tag (e.g., "META_START").
     pub fn write_section(&mut self, tag: &str) {
         let _ = writeln!(self, "{}", tag);
+        if self.allow_long_history_records {
+            self.history_block = matches!(tag, "TRAJ_START" | "COV_START" | "MAN_START");
+        }
     }
 
     /// Inserts a blank line.
@@ -597,7 +617,17 @@ impl<'a> KvnWriter<'a> {
     }
 
     /// Return string-backed output only when every source text value was valid KVN text.
-    pub(crate) fn finish_checked(self) -> crate::error::Result<String> {
+    pub(crate) fn finish_checked(mut self) -> crate::error::Result<String> {
+        if self.line_len > 0 {
+            self.finish_line();
+        }
+        if self.line_length_error {
+            return Err(crate::error::ValidationError::Generic {
+                message: "KVN output records must be no longer than 254 characters".into(),
+                line: None,
+            }
+            .into());
+        }
         if self.lexical_error {
             return Err(crate::error::ValidationError::Generic {
                 message: "KVN output must contain only printable ASCII records".into(),
@@ -609,9 +639,17 @@ impl<'a> KvnWriter<'a> {
     }
 
     /// Finish writing to an I/O sink and return any deferred write error.
-    pub(crate) fn finish_io(self) -> crate::error::Result<()> {
+    pub(crate) fn finish_io(mut self) -> crate::error::Result<()> {
+        if self.line_len > 0 {
+            self.finish_line();
+        }
         match self.io_error {
             Some(error) => Err(error.into()),
+            None if self.line_length_error => Err(crate::error::ValidationError::Generic {
+                message: "KVN output records must be no longer than 254 characters".into(),
+                line: None,
+            }
+            .into()),
             None if self.lexical_error => Err(crate::error::ValidationError::Generic {
                 message: "KVN output must contain only printable ASCII records".into(),
                 line: None,
@@ -753,6 +791,37 @@ mod tests {
             Err(())
         );
         assert_eq!(writer.finish(), "accepted\n");
+    }
+
+    #[test]
+    fn writer_enforces_the_kvn_record_limit() {
+        let mut writer = KvnWriter::new();
+        writer.write_line("x".repeat(254));
+        assert!(writer.finish_checked().is_ok());
+
+        let mut writer = KvnWriter::new();
+        writer.write_line("x".repeat(255));
+        assert!(writer.finish_checked().is_err());
+
+        let mut writer = KvnWriter::new();
+        std::fmt::Write::write_str(&mut writer, &"x".repeat(255)).unwrap();
+        assert!(writer.finish_checked().is_err());
+    }
+
+    #[test]
+    fn writer_preserves_ocm_long_history_records() {
+        let mut writer = KvnWriter::new();
+        writer.allow_long_history_records();
+        writer.write_section("COV_START");
+        writer.write_line("x".repeat(255));
+        writer.write_section("COV_STOP");
+        assert!(writer.finish_checked().is_ok());
+
+        let mut writer = KvnWriter::new();
+        writer.allow_long_history_records();
+        writer.write_section("COV_START");
+        writer.write_pair("KEY", "x".repeat(240));
+        assert!(writer.finish_checked().is_err());
     }
 
     #[test]

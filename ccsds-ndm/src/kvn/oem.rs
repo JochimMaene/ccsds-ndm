@@ -320,60 +320,6 @@ fn parse_covariance_block(input: &mut &str) -> KvnResult<Vec<OemCovarianceMatrix
 // OEM Data Parser
 //----------------------------------------------------------------------
 
-enum OemDataItem {
-    Comment(Vec<String>),
-    StateVec(StateVectorAcc),
-    StateVecWithComments(StateVectorAcc, Vec<String>),
-    Cov(Vec<OemCovarianceMatrix>),
-    CovWithComments(Vec<OemCovarianceMatrix>, Vec<String>),
-}
-
-fn oem_data_item(input: &mut &str) -> KvnResult<OemDataItem> {
-    // Fast-path: if it looks like a state vector line (starts with digit or sign after possible whitespace),
-    // skip comment collection to avoid Vec allocation.
-    let _ = ws.parse_next(input);
-    let remaining = *input;
-    let first_char = remaining.chars().next();
-    if matches!(first_char, Some('0'..='9' | '-' | '+')) {
-        let sv = parse_state_vector_line.parse_next(input)?;
-        return Ok(OemDataItem::StateVec(sv));
-    }
-
-    let comments = collect_comments.parse_next(input)?;
-
-    let remaining = *input;
-    if remaining.is_empty() || at_block_start("META", input) {
-        if !comments.is_empty() {
-            // Trailing comments before META/EOF
-            return Ok(OemDataItem::Comment(comments));
-        }
-        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
-    }
-
-    if at_block_start("COVARIANCE", input) {
-        expect_block_start("COVARIANCE").parse_next(input)?;
-        let mut matrices = parse_covariance_block.parse_next(input)?;
-        expect_block_end("COVARIANCE").parse_next(input)?;
-
-        // Attach comments to first matrix if possible
-        if let Some(first) = matrices.get_mut(0) {
-            first.comment.splice(0..0, comments);
-            return Ok(OemDataItem::Cov(matrices));
-        } else {
-            // Empty covariance block? Unusual but valid structurally.
-            // Comments go to global if they can't be attached.
-            return Ok(OemDataItem::CovWithComments(matrices, comments));
-        }
-    }
-
-    // Try state vector
-    let sv = parse_state_vector_line.parse_next(input)?;
-    if !comments.is_empty() {
-        return Ok(OemDataItem::StateVecWithComments(sv, comments));
-    }
-    Ok(OemDataItem::StateVec(sv))
-}
-
 /// Parses the OEM data section (state vectors and optional covariance matrices).
 pub fn oem_data(input: &mut &str) -> KvnResult<OemData> {
     let mut data = OemData {
@@ -391,47 +337,63 @@ pub fn oem_data(input: &mut &str) -> KvnResult<OemData> {
         }
 
         let checkpoint = input.checkpoint();
-        match oem_data_item.parse_next(input) {
-            Ok(item) => match item {
-                OemDataItem::Comment(c) => data.comment.extend(c),
-                OemDataItem::StateVec(sv) => {
+        // Fast-path: state vectors do not need comment collection and its Vec allocation.
+        let first_char = input.chars().next();
+        let result: KvnResult<()> = (|| {
+            if matches!(first_char, Some('0'..='9' | '-' | '+')) {
+                let sv = parse_state_vector_line.parse_next(input)?;
+                if covariance_started {
+                    return Err(cut_err(
+                        input,
+                        "State vectors cannot appear after covariance matrix block",
+                    ));
+                }
+                data.state_vector.push(sv);
+                Ok(())
+            } else {
+                let comments = collect_comments.parse_next(input)?;
+                if input.is_empty() || at_block_start("META", input) {
+                    if comments.is_empty() {
+                        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
+                    }
+                    data.comment.extend(comments);
+                    Ok(())
+                } else if at_block_start("COVARIANCE", input) {
+                    expect_block_start("COVARIANCE").parse_next(input)?;
+                    let mut matrices = parse_covariance_block.parse_next(input)?;
+                    expect_block_end("COVARIANCE").parse_next(input)?;
+                    covariance_started = true;
+
+                    if let Some(first) = matrices.get_mut(0) {
+                        first.comment.splice(0..0, comments);
+                    } else {
+                        data.comment.extend(comments);
+                    }
+                    data.covariance_matrix.append(&mut matrices);
+                    Ok(())
+                } else {
+                    let sv = parse_state_vector_line.parse_next(input)?;
                     if covariance_started {
-                        input.reset(&checkpoint);
                         return Err(cut_err(
                             input,
                             "State vectors cannot appear after covariance matrix block",
                         ));
                     }
+                    data.comment.extend(comments);
                     data.state_vector.push(sv);
+                    Ok(())
                 }
-                OemDataItem::StateVecWithComments(sv, c) => {
-                    if covariance_started {
-                        input.reset(&checkpoint);
-                        return Err(cut_err(
-                            input,
-                            "State vectors cannot appear after covariance matrix block",
-                        ));
-                    }
-                    data.comment.extend(c);
-                    data.state_vector.push(sv);
-                }
-                OemDataItem::Cov(covs) => {
-                    covariance_started = true;
-                    data.covariance_matrix.extend(covs);
-                }
-                OemDataItem::CovWithComments(covs, c) => {
-                    covariance_started = true;
-                    data.comment.extend(c);
-                    data.covariance_matrix.extend(covs);
-                }
-            },
+            }
+        })();
+
+        match result {
+            Ok(()) => continue,
             Err(e) => {
                 if e.is_backtrack() || input.offset_from(&checkpoint) == 0 {
                     input.reset(&checkpoint);
                     break;
-                } else {
-                    return Err(e);
                 }
+                return Err(e);
             }
         }
     }

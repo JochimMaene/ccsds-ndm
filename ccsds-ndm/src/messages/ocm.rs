@@ -14,7 +14,6 @@ use fast_float;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::io::Write;
 
 //----------------------------------------------------------------------
 // Root OCM Structure
@@ -925,107 +924,44 @@ impl Ocm {
     }
 
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
-        for trajectory in &self.body.segment.data.traj {
-            for line in &trajectory.traj_lines {
-                for value in &line.values {
+        for (trajectory_index, trajectory) in self.body.segment.data.traj.iter().enumerate() {
+            for (line_index, line) in trajectory.traj_lines.iter().enumerate() {
+                for (value_index, value) in line.values.iter().enumerate() {
                     if !crate::kvn::ser::OdmFloat::is_valid(*value) {
-                        return Err(ValidationError::InvalidValue {
-                            field: Cow::Borrowed("trajLine"),
-                            value: value.to_string(),
-                            expected: Cow::Borrowed("a representable CCSDS number"),
-                            line: None,
-                        }
-                        .into());
+                        return Err(crate::validation::unrepresentable_number(
+                            "trajLine",
+                            *value,
+                            format!(
+                                "body.segment.data.traj[{trajectory_index}].traj_lines[{line_index}].values[{value_index}]"
+                            ),
+                        ));
                     }
                 }
             }
         }
-        for covariance in &self.body.segment.data.cov {
-            for line in &covariance.cov_lines {
-                for value in &line.values {
+        for (covariance_index, covariance) in self.body.segment.data.cov.iter().enumerate() {
+            for (line_index, line) in covariance.cov_lines.iter().enumerate() {
+                for (value_index, value) in line.values.iter().enumerate() {
                     if !crate::kvn::ser::OdmFloat::is_valid(*value) {
-                        return Err(ValidationError::InvalidValue {
-                            field: Cow::Borrowed("covLine"),
-                            value: value.to_string(),
-                            expected: Cow::Borrowed("a representable CCSDS number"),
-                            line: None,
-                        }
-                        .into());
+                        return Err(crate::validation::unrepresentable_number(
+                            "covLine",
+                            *value,
+                            format!(
+                                "body.segment.data.cov[{covariance_index}].cov_lines[{line_index}].values[{value_index}]"
+                            ),
+                        ));
                     }
                 }
             }
         }
 
-        let mut sink = OcmKvnLexicalSink::default();
-        let mut writer = KvnWriter::from_io(&mut sink);
-        self.write_kvn(&mut writer);
-        writer.finish_io()
-    }
-}
-
-#[derive(Default)]
-struct OcmKvnLexicalSink {
-    line_len: usize,
-    has_equals: bool,
-    history_block: bool,
-    prefix: [u8; 16],
-    prefix_len: usize,
-}
-
-impl OcmKvnLexicalSink {
-    fn finish_line(&mut self) -> std::io::Result<()> {
-        if self.line_len > 254 && (self.has_equals || !self.history_block) {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "generated OCM KVN keyword record exceeds 254 characters",
-            ));
-        }
-        let prefix = &self.prefix[..self.prefix_len];
-        if matches!(prefix, b"TRAJ_START" | b"COV_START" | b"MAN_START") {
-            self.history_block = true;
-        } else if matches!(prefix, b"TRAJ_STOP" | b"COV_STOP" | b"MAN_STOP") {
-            self.history_block = false;
-        }
-        self.line_len = 0;
-        self.has_equals = false;
-        self.prefix_len = 0;
-        Ok(())
-    }
-}
-
-impl Write for OcmKvnLexicalSink {
-    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
-        for byte in buffer {
-            if *byte == b'\n' {
-                self.finish_line()?;
-                continue;
-            }
-            if !(b' '..=b'~').contains(byte) {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "generated OCM KVN contains non-printable or non-ASCII content",
-                ));
-            }
-            self.line_len = self.line_len.saturating_add(1);
-            self.has_equals |= *byte == b'=';
-            if self.prefix_len < self.prefix.len() {
-                self.prefix[self.prefix_len] = *byte;
-                self.prefix_len += 1;
-            }
-        }
-        Ok(buffer.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        if self.line_len > 0 {
-            self.finish_line()?;
-        }
         Ok(())
     }
 }
 
 impl ToKvn for Ocm {
     fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.allow_long_history_records();
         writer.write_pair("CCSDS_OCM_VERS", &self.version);
         self.header.write_kvn(writer);
         self.body.write_kvn(writer);

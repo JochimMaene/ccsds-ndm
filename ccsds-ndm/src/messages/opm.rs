@@ -668,14 +668,11 @@ impl Opm {
             if OdmFloat::is_valid(value) {
                 return Ok(());
             }
-            Err(ValidationError::InvalidValue {
-                field: field.into(),
-                value: value.to_string(),
-                expected: "a representable CCSDS number".into(),
-                line: None,
-            }
-            .at_path(path.into().resolve())
-            .into())
+            Err(crate::validation::unrepresentable_number(
+                field,
+                value,
+                path.into().resolve(),
+            ))
         }
 
         macro_rules! check {

@@ -236,6 +236,28 @@ fn kvn_lexical_errors_have_the_same_category_for_string_and_streaming_output() {
 }
 
 #[test]
+fn kvn_overlong_records_are_rejected_before_streaming_for_aem_acm_and_ocm() {
+    fn assert_rejected_without_output<T: Ndm>(message: &T) {
+        assert!(message.to_kvn().is_err());
+        let mut output = Vec::new();
+        assert!(message.write_kvn_to(&mut output).is_err());
+        assert!(output.is_empty());
+    }
+
+    let mut aem = Aem::from_kvn(include_str!("../data/kvn/aem_g4.kvn")).unwrap();
+    aem.header.comment = vec!["x".repeat(247)];
+    assert_rejected_without_output(&aem);
+
+    let mut acm = Acm::from_kvn(include_str!("../data/kvn/acm_g7.kvn")).unwrap();
+    acm.header.comment = vec!["x".repeat(247)];
+    assert_rejected_without_output(&acm);
+
+    let mut ocm = Ocm::from_kvn(include_str!("../data/kvn/ocm_g15.kvn")).unwrap();
+    ocm.body.segment.metadata.object_name = Some("x".repeat(240));
+    assert_rejected_without_output(&ocm);
+}
+
+#[test]
 fn combined_xml_string_generation_identifies_invalid_envelope_fields() {
     let mut message =
         ccsds_ndm::messages::ndm::CombinedNdm::from_xml(include_str!("../data/xml/ndm_g12.xml"))
@@ -257,6 +279,21 @@ fn omm_rejects_kvn_numbers_it_could_not_spell_back() {
         error.contains("representable CCSDS number"),
         "unexpected error: {error}"
     );
+}
+
+#[test]
+fn ocm_reports_the_unrepresentable_value_path_compactly() {
+    let mut message = Ocm::from_kvn(include_str!("../data/kvn/ocm_g15.kvn")).unwrap();
+    message.body.segment.data.traj[0].traj_lines[0].values[0] = f64::MAX;
+
+    let error = message.to_kvn().unwrap_err();
+    assert_eq!(
+        error
+            .as_validation_error()
+            .and_then(|error| error.field_path()),
+        Some("body.segment.data.traj[0].traj_lines[0].values[0]".into())
+    );
+    assert!(error.to_string().contains("1.7976931348623157e308"));
 }
 
 #[test]

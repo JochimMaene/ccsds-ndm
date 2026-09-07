@@ -15,20 +15,6 @@ use pyo3::types::PyList;
 
 use std::str::FromStr;
 
-fn expected_values_len(attitude_type: &AttitudeTypeType) -> usize {
-    match attitude_type {
-        AttitudeTypeType::Quaternion => 4,
-        AttitudeTypeType::QuaternionDerivative => 8,
-        AttitudeTypeType::QuaternionAngVel => 7,
-        AttitudeTypeType::EulerAngle => 3,
-        AttitudeTypeType::EulerAngleDerivative => 6,
-        AttitudeTypeType::EulerAngleAngVel => 6,
-        AttitudeTypeType::Spin => 4,
-        AttitudeTypeType::SpinNutation => 7,
-        AttitudeTypeType::SpinNutationMom => 7,
-    }
-}
-
 fn infer_attitude_type_from_values_len(values_len: usize) -> PyResult<AttitudeTypeType> {
     match values_len {
         3 => Ok(AttitudeTypeType::EulerAngle),
@@ -66,7 +52,7 @@ fn build_state_from_values(
     values: &[f64],
     attitude_type: &AttitudeTypeType,
 ) -> PyResult<core_aem::AemAttitudeStateWrapper> {
-    let expected = expected_values_len(attitude_type);
+    let expected = attitude_type.value_count();
     if values.len() != expected {
         return Err(PyValueError::new_err(format!(
             "ATTITUDE_TYPE {} requires {} values per row, got {}",
@@ -1152,7 +1138,7 @@ impl AemData {
         }
         match self.attitude_type.as_ref() {
             Some(attitude_type) => {
-                let expected = expected_values_len(attitude_type);
+                let expected = attitude_type.value_count();
                 if first.len() != expected {
                     return Err(PyValueError::new_err(format!(
                         "ATTITUDE_TYPE {attitude_type} requires {expected} values per state, got {}",
@@ -1255,7 +1241,7 @@ impl AemData {
         }
 
         let resolved_type = parse_attitude_type_or_infer(attitude_type.as_deref(), shape[1])?;
-        let expected_cols = expected_values_len(&resolved_type);
+        let expected_cols = resolved_type.value_count();
         if shape[1] != expected_cols {
             return Err(PyValueError::new_err(format!(
                 "ATTITUDE_TYPE {} requires {} columns, got {}",
@@ -1330,7 +1316,7 @@ impl AemData {
 
         let width = *widths.iter().next().unwrap();
         let resolved_type = if let Some(existing_type) = self.attitude_type.as_ref() {
-            let existing_width = expected_values_len(existing_type);
+            let existing_width = existing_type.value_count();
             if existing_width != width {
                 return Err(PyValueError::new_err(format!(
                     "Expected {} values per state based on existing data, got {}",
@@ -1420,7 +1406,7 @@ impl AemData {
             }
             data.extend(values);
         }
-        debug_assert_eq!(expected_values_len(&resolved_type), expected_cols);
+        debug_assert_eq!(resolved_type.value_count(), expected_cols);
 
         let array = PyArray::from_vec(py, data)
             .reshape([self.attitude_states.bind(py).len(), expected_cols])
@@ -1454,7 +1440,7 @@ impl AemData {
         let resolved_type = self.resolved_type(&current)?.ok_or_else(|| {
             PyValueError::new_err("Attitude type is unavailable for non-empty data")
         })?;
-        let expected_cols = expected_values_len(&resolved_type);
+        let expected_cols = resolved_type.value_count();
         if shape[1] != expected_cols {
             return Err(PyValueError::new_err(format!(
                 "NumPy array must have {} columns for this attitude state type",

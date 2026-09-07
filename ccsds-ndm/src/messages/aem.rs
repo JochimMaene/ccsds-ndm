@@ -12,7 +12,6 @@ use crate::traits::{Ndm, ToKvn};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::io::Write;
 
 //----------------------------------------------------------------------
 // Root AEM Structure
@@ -452,10 +451,7 @@ impl Aem {
                 validate_aem_state_numbers(state)?;
             }
         }
-        let mut sink = AemKvnLexicalSink::default();
-        let mut writer = KvnWriter::from_io(&mut sink);
-        self.write_kvn(&mut writer);
-        writer.finish_io()
+        Ok(())
     }
 }
 
@@ -563,40 +559,6 @@ fn validate_aem_state_numbers(state: &AemAttitudeStateWrapper) -> Result<()> {
     Ok(())
 }
 
-#[derive(Default)]
-struct AemKvnLexicalSink {
-    line_len: usize,
-}
-
-impl Write for AemKvnLexicalSink {
-    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
-        for byte in buffer {
-            if *byte == b'\n' {
-                if self.line_len > 254 {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "generated AEM KVN record exceeds 254 characters",
-                    ));
-                }
-                self.line_len = 0;
-            } else {
-                if !(b' '..=b'~').contains(byte) {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "generated AEM KVN contains non-printable or non-ASCII content",
-                    ));
-                }
-                self.line_len += 1;
-            }
-        }
-        Ok(buffer.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
 impl crate::traits::Validate for AemBody {
     fn validate(&self) -> Result<()> {
         if self.segment.is_empty() {
@@ -651,19 +613,24 @@ impl AemBody {
 
 impl crate::traits::Validate for AemSegment {
     fn validate(&self) -> Result<()> {
-        self.metadata.validate()?;
-        crate::traits::Validate::validate(&self.data)?;
-        self.data.validate_with_type(&self.metadata.attitude_type)?;
-        match self.first_timeline_error() {
-            Some(error) => Err(error.into()),
-            None => Ok(()),
-        }
+        self.validate_inner()
     }
 }
 
 impl AemSegment {
     pub fn validate(&self) -> Result<()> {
-        crate::traits::Validate::validate(self)
+        self.validate_inner()
+    }
+
+    fn validate_inner(&self) -> Result<()> {
+        self.metadata.validate_inner()?;
+        self.data.validate_structure()?;
+        self.data
+            .validate_attitude_type(&self.metadata.attitude_type)?;
+        match self.first_timeline_error() {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
+        }
     }
 
     fn first_timeline_error(&self) -> Option<ValidationError> {
@@ -950,6 +917,10 @@ pub struct AemMetadata {
 
 impl AemMetadata {
     pub fn validate(&self) -> Result<()> {
+        self.validate_inner()
+    }
+
+    fn validate_inner(&self) -> Result<()> {
         if self.object_name.trim().is_empty() {
             return Err(ValidationError::missing_required("AEM Metadata", "OBJECT_NAME").into());
         }
@@ -1062,7 +1033,7 @@ impl AemMetadata {
 
 impl crate::traits::Validate for AemMetadata {
     fn validate(&self) -> Result<()> {
-        self.validate()
+        self.validate_inner()
     }
 }
 
@@ -1308,7 +1279,7 @@ impl AemAttitudeStateWrapper {
         }
     }
 
-    fn validate_values(&self) -> Result<()> {
+    fn validate_state(&self) -> Result<()> {
         let angles = |values: &[(&'static str, f64)]| -> Result<()> {
             for (name, value) in values {
                 Angle::validate_value(*value, name)?;
@@ -1443,6 +1414,12 @@ impl crate::traits::ToKvn for AemAttitudeStateWrapper {
 
 impl crate::traits::Validate for AemData {
     fn validate(&self) -> Result<()> {
+        self.validate_structure()
+    }
+}
+
+impl AemData {
+    fn validate_structure(&self) -> Result<()> {
         if self.attitude_states.is_empty() {
             return Err(ValidationError::missing_required(
                 "AEM Data",
@@ -1478,14 +1455,12 @@ impl crate::traits::Validate for AemData {
                     return Err(ValidationError::conflict(state.populated_fields()).into());
                 }
             }
-            state.validate_values()?;
+            state.validate_state()?;
         }
         Ok(())
     }
-}
 
-impl AemData {
-    pub fn validate_with_type(&self, attitude_type: &AttitudeTypeType) -> Result<()> {
+    fn validate_attitude_type(&self, attitude_type: &AttitudeTypeType) -> Result<()> {
         for (idx, state) in self.attitude_states.iter().enumerate() {
             if !state.matches_type(attitude_type) {
                 return Err(ValidationError::generic(format!(
@@ -1499,9 +1474,13 @@ impl AemData {
         Ok(())
     }
 
+    pub fn validate_with_type(&self, attitude_type: &AttitudeTypeType) -> Result<()> {
+        self.validate_attitude_type(attitude_type)
+    }
+
     pub fn validate(&self, attitude_type: &AttitudeTypeType) -> Result<()> {
-        crate::traits::Validate::validate(self)?;
-        self.validate_with_type(attitude_type)
+        self.validate_structure()?;
+        self.validate_attitude_type(attitude_type)
     }
 }
 
