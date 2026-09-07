@@ -149,11 +149,7 @@ conformance-opm-python:
 # Run the focused OEM 3.0 Rust parsing, validation, generation, conversion, and resource evidence
 [private]
 conformance-oem:
-    cargo test --manifest-path {{rust_manifest}} --test oem_strict_parsing
-    cargo test --manifest-path {{rust_manifest}} --test oem_parse_diagnostics
-    cargo test --manifest-path {{rust_manifest}} --test oem_validation
-    cargo test --manifest-path {{rust_manifest}} --test oem_generation_conformance
-    cargo test --manifest-path {{rust_manifest}} --test oem_conversion
+    cargo test --manifest-path {{rust_manifest}} --test oem
     cargo test --manifest-path {{rust_manifest}} --test oem_kvn_allocations
 
 # Run the focused OMM 3.0 strictness, preservation, and generation evidence

@@ -1,49 +1,24 @@
+use crate::common::validate_xml;
+use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::Validate;
 use ccsds_ndm::{Message, Ndm};
-use std::path::{Path, PathBuf};
-use std::process::Command;
-
-const KVN_FIXTURES: [(&str, &str); 3] = [
-    ("oem_g11.kvn", include_str!("../data/kvn/oem_g11.kvn")),
-    ("oem_g12.kvn", include_str!("../data/kvn/oem_g12.kvn")),
-    ("oem_g13.kvn", include_str!("../data/kvn/oem_g13.kvn")),
-];
-const XML: (&str, &str) = ("oem_g14.xml", include_str!("../data/xml/oem_g14.xml"));
-
-fn schema_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("data/xsd/ndmxml-4.0.0-master-4.0.xsd")
-}
-
-fn validate_xsd(label: &str, xml: &str) {
-    let file = tempfile::NamedTempFile::new().unwrap();
-    std::fs::write(file.path(), xml).unwrap();
-    let output = Command::new("xmllint")
-        .arg("--noout")
-        .arg("--schema")
-        .arg(schema_path())
-        .arg(file.path())
-        .output()
-        .unwrap_or_else(|error| panic!("xmllint is required for conformance tests: {error}"));
-    assert!(
-        output.status.success(),
-        "generated XML for {label} failed the official OEM 3.0 XSD:\n{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-}
 
 #[test]
 fn every_shipped_fixture_generates_deterministic_xsd_valid_xml_and_reparseable_kvn() {
     let mut messages = Vec::new();
-    for (name, source) in KVN_FIXTURES {
-        messages.push((name, Oem::from_kvn(source).unwrap()));
+    for (index, source) in KVN_FIXTURES.into_iter().enumerate() {
+        messages.push((
+            format!("oem_g{}.kvn", index + 11),
+            Oem::from_kvn(source).unwrap(),
+        ));
     }
-    messages.push((XML.0, Oem::from_xml(XML.1).unwrap()));
+    messages.push(("oem_g14.xml".into(), Oem::from_xml(XML).unwrap()));
 
     for (name, message) in messages {
         let xml = message.to_xml().unwrap();
         assert_eq!(message.to_xml().unwrap(), xml);
-        validate_xsd(name, &xml);
+        validate_xml(&name, &xml);
         assert_eq!(Oem::from_xml(&xml).unwrap(), message);
 
         let kvn = message.to_kvn().unwrap();
@@ -56,7 +31,7 @@ fn every_shipped_fixture_generates_deterministic_xsd_valid_xml_and_reparseable_k
 
 #[test]
 fn public_generation_surfaces_are_identical_and_preflight_invalid_models() {
-    let message = Oem::from_kvn(KVN_FIXTURES[2].1).unwrap();
+    let message = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
     let expected_kvn = message.to_kvn().unwrap();
     let expected_xml = message.to_xml().unwrap();
     assert_eq!(message.to_kvn().unwrap(), expected_kvn);
@@ -97,12 +72,12 @@ fn public_generation_surfaces_are_identical_and_preflight_invalid_models() {
 
 #[test]
 fn kvn_generation_rejects_semantically_invalid_mutations() {
-    let mut negative_variance = Oem::from_kvn(KVN_FIXTURES[2].1).unwrap();
+    let mut negative_variance = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
     negative_variance.body.segment[0].data.covariance_matrix[0]
         .cx_x
         .value = -1.0;
 
-    let mut overlapping_useable_spans = Oem::from_kvn(KVN_FIXTURES[0].1).unwrap();
+    let mut overlapping_useable_spans = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
     overlapping_useable_spans.body.segment[1]
         .metadata
         .start_time = "2019-12-28T21:00:00.000".parse().unwrap();
@@ -130,12 +105,12 @@ fn kvn_generation_rejects_semantically_invalid_mutations() {
 
 #[test]
 fn kvn_rounds_to_the_ccsds_digit_limit_and_rejects_partial_acceleration() {
-    let mut message = Oem::from_kvn(KVN_FIXTURES[2].1).unwrap();
+    let mut message = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
     message.body.segment[0].data.state_vector[0].x.value = 1.234_567_890_123_456_7;
     assert!(message.to_kvn().unwrap().contains("1.234567890123457e0"));
     message.to_xml().expect("XML retains the exact f64 value");
 
-    let mut message = Oem::from_xml(XML.1).unwrap();
+    let mut message = Oem::from_xml(XML).unwrap();
     let state = &mut message.body.segment[0].data.state_vector[0];
     state.y_ddot = None;
     let mut output = Vec::new();
@@ -150,7 +125,7 @@ fn kvn_rounds_to_the_ccsds_digit_limit_and_rejects_partial_acceleration() {
 
 #[test]
 fn kvn_rejects_an_overlong_raw_record_before_writing() {
-    let mut message = Oem::from_xml(XML.1).unwrap();
+    let mut message = Oem::from_xml(XML).unwrap();
     let state = &mut message.body.segment[0].data.state_vector[0];
     state.epoch = "2019-12-18T12:00:00.1111111111111111111111111111111111111111"
         .parse()
@@ -178,16 +153,21 @@ fn kvn_rejects_an_overlong_raw_record_before_writing() {
 }
 
 #[test]
-fn unaudited_source_editions_are_rejected() {
-    let mut historical = Oem::from_kvn(KVN_FIXTURES[0].1).unwrap();
+fn unsupported_editions_and_edition_specific_fields_are_rejected() {
+    let mut historical = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
     historical.version = "1.0".into();
     assert!(historical.to_kvn().is_err());
     assert!(historical.to_xml().is_err());
+
+    let mut version_two = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    version_two.version = "2.0".into();
+    version_two.header.message_id = Some("OEM-3-ONLY".into());
+    assert!(version_two.to_kvn().is_err());
 }
 
 #[test]
 fn notation_specific_text_rules_fail_before_output() {
-    let mut message = Oem::from_kvn(KVN_FIXTURES[2].1).unwrap();
+    let mut message = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
     message.body.segment[0].metadata.object_name = "MARS €".into();
     message
         .to_xml()
@@ -208,4 +188,35 @@ fn notation_specific_text_rules_fail_before_output() {
         message.to_kvn().unwrap_err().code(),
         Some("validation.out_of_range")
     );
+}
+
+#[test]
+fn reference_frame_epoch_is_calendar_form_in_xml() {
+    let kvn = KVN_FIXTURES[0].replacen(
+        "REF_FRAME = EME2000\n",
+        "REF_FRAME = EME2000\nREF_FRAME_EPOCH = 2000-01-01T12:00:00\n",
+        1,
+    );
+    let oem = Oem::from_kvn(&kvn).expect("calendar frame epoch should parse");
+    let xml = oem.to_xml().expect("valid OEM should generate");
+    assert!(xml.contains("<REF_FRAME_EPOCH>2000-01-01T12:00:00</REF_FRAME_EPOCH>"));
+
+    let numeric = xml.replace(
+        "<REF_FRAME_EPOCH>2000-01-01T12:00:00</REF_FRAME_EPOCH>",
+        "<REF_FRAME_EPOCH>123.5</REF_FRAME_EPOCH>",
+    );
+    assert!(Oem::from_xml(&numeric).is_err());
+}
+
+#[test]
+fn generation_rejects_mutated_contextual_epochs() {
+    let mut oem = Oem::from_xml(XML).expect("fixture should parse");
+    oem.body.segment[0].metadata.start_time = ccsds_ndm::types::Epoch::new("+").unwrap();
+    assert!(oem.to_xml().is_err());
+    assert!(oem.to_kvn().is_err());
+
+    let mut oem = Oem::from_xml(XML).expect("fixture should parse");
+    oem.body.segment[0].data.state_vector[0].epoch =
+        ccsds_ndm::types::Epoch::new("2023-02-29T00:00:00").unwrap();
+    assert!(oem.to_xml().is_err());
 }

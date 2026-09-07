@@ -70,6 +70,10 @@ fn aem_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
                 "ATTITUDE_TYPE = SPIN\nINTERPOLATION_DEGREE = 0",
             ),
         ),
+        (
+            "missing interpolation degree",
+            KVN.replace("INTERPOLATION_DEGREE = 7\n", ""),
+        ),
         ("trailing assignment", format!("{KVN}UNKNOWN = value\n")),
     ] {
         assert!(Aem::from_kvn(&source).is_err(), "accepted {label}");
@@ -118,6 +122,14 @@ fn aem_xml_rejects_unknown_choice_content_attributes_and_ordering_errors() {
         (
             "illegal quaternion units",
             XML.replace("<Q1>-0.005068</Q1>", "<Q1 units=\"1\">-0.005068</Q1>"),
+        ),
+        (
+            "missing Euler rotation sequence",
+            XML.replace("<EULER_ROT_SEQ>XYZ</EULER_ROT_SEQ>", ""),
+        ),
+        (
+            "missing angular velocity frame",
+            XML.replace("<ANGVEL_FRAME>REF_FRAME_B</ANGVEL_FRAME>", ""),
         ),
         (
             "duplicate epoch",

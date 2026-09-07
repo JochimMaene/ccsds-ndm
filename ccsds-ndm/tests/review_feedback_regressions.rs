@@ -41,32 +41,6 @@ fn opm_rejects_maneuver_fields_without_ignition_epoch() {
 }
 
 #[test]
-fn oem_preserves_the_first_covariance_comment() {
-    let source = include_str!("../data/kvn/oem_g13.kvn").replace(
-        "COVARIANCE_START\n",
-        "COVARIANCE_START\nCOMMENT belongs to first covariance\n",
-    );
-    let message = Oem::from_kvn(&source).unwrap();
-    assert_eq!(
-        message.body.segment[0].data.covariance_matrix[0].comment,
-        ["belongs to first covariance"]
-    );
-}
-
-#[test]
-fn oem_enforces_integer_range_but_accepts_large_fixed_point_numbers() {
-    let source = include_str!("../data/kvn/oem_g13.kvn");
-    let integer = source.replacen("-2432.166", "3000000000", 1);
-    let decimal = source.replacen("-2432.166", "3000000000.0", 1);
-    Oem::from_kvn(&integer).expect_err("ODM integer-form values are limited to signed 32-bit");
-    let decimal_message = Oem::from_kvn(&decimal).unwrap();
-    assert_eq!(
-        decimal_message.body.segment[0].data.state_vector[0].x.value,
-        3_000_000_000.0
-    );
-}
-
-#[test]
 fn user_defined_values_may_contain_assignment_delimiters() {
     let omm_source = include_str!("../data/kvn/omm_g9.kvn").replace(
         "USER_DEFINED_EARTH_MODEL = WGS-84",
@@ -101,14 +75,6 @@ fn user_defined_values_may_contain_assignment_delimiters() {
             .value,
         "a=b"
     );
-}
-
-#[test]
-fn oem_2_kvn_rejects_oem_3_header_fields() {
-    let mut oem = Oem::from_kvn(include_str!("../data/kvn/oem_g11.kvn")).unwrap();
-    oem.version = "2.0".into();
-    oem.header.message_id = Some("OEM-3-ONLY".into());
-    assert!(oem.to_kvn().is_err());
 }
 
 #[test]
@@ -215,14 +181,6 @@ fn opm_maneuvers_are_not_history_records_in_either_notation() {
 
     let xml = Opm::from_kvn(kvn).unwrap().to_xml().unwrap();
     from_str_with_options(&xml, Some(Notation::Xml), &options).unwrap();
-}
-
-#[test]
-fn oem_comment_limit_matches_the_emitted_record() {
-    let mut message = Oem::from_kvn(include_str!("../data/kvn/oem_g11.kvn")).unwrap();
-    message.header.comment = vec!["x".repeat(235)];
-    let kvn = message.to_kvn().unwrap();
-    assert!(kvn.lines().any(|line| line.len() == 243));
 }
 
 #[test]

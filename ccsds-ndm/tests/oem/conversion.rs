@@ -1,13 +1,7 @@
+use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::Ndm;
 use ccsds_ndm::{convert, convert_file, convert_file_with_options, Notation, ParseOptions};
-
-const KVN_FIXTURES: [&str; 3] = [
-    include_str!("../data/kvn/oem_g11.kvn"),
-    include_str!("../data/kvn/oem_g12.kvn"),
-    include_str!("../data/kvn/oem_g13.kvn"),
-];
-const XML: &str = include_str!("../data/xml/oem_g14.xml");
 
 #[test]
 fn both_directions_preserve_the_complete_typed_model() {

@@ -1,23 +1,7 @@
+use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::Ndm;
 use ccsds_ndm::ParseOptions;
-
-const KVN_FIXTURES: [&str; 3] = [
-    include_str!("../data/kvn/oem_g11.kvn"),
-    include_str!("../data/kvn/oem_g12.kvn"),
-    include_str!("../data/kvn/oem_g13.kvn"),
-];
-const XML: &str = include_str!("../data/xml/oem_g14.xml");
-
-#[test]
-fn shipped_oem_3_fixtures_parse_strictly() {
-    for source in KVN_FIXTURES {
-        let message = Oem::from_kvn(source).expect("shipped OEM KVN fixture should parse");
-        assert_eq!(message.version, "3.0");
-    }
-    let message = Oem::from_xml(XML).expect("shipped OEM XML fixture should parse");
-    assert_eq!(message.version, "3.0");
-}
 
 #[test]
 fn kvn_rejects_unknown_duplicate_reordered_malformed_and_misplaced_content() {
@@ -176,6 +160,28 @@ fn xml_declaration_is_optional_but_must_lead_the_document() {
 }
 
 #[test]
+fn xml_contextual_epoch_fields_reject_invalid_values() {
+    for (needle, replacement) in [
+        (
+            "<START_TIME>2019-12-18T12:00:00.331</START_TIME>",
+            "<START_TIME>2023-02-29T12:00:00</START_TIME>",
+        ),
+        (
+            "<USEABLE_START_TIME>2019-12-18T12:10:00.331</USEABLE_START_TIME>",
+            "<USEABLE_START_TIME>+</USEABLE_START_TIME>",
+        ),
+        ("<EPOCH>2019-12-18T12:00:00.331</EPOCH>", "<EPOCH>+</EPOCH>"),
+        ("<EPOCH>2019-12-28T22:28:00.331</EPOCH>", "<EPOCH>.</EPOCH>"),
+    ] {
+        let invalid = XML.replacen(needle, replacement, 1);
+        assert!(
+            Oem::from_xml(&invalid).is_err(),
+            "accepted invalid contextual epoch replacement {replacement:?}"
+        );
+    }
+}
+
+#[test]
 fn input_depth_and_history_limits_are_exact() {
     let message = Oem::from_xml(XML).unwrap();
     let record_count: usize = message
@@ -286,6 +292,9 @@ fn kvn_ephemeris_records_tolerate_padding_and_name_malformed_components() {
         Oem::from_kvn(&padded_final_record).expect("padded final record should parse"),
         expected,
     );
+
+    let large_decimal = source.replacen("-280.045", "3000000000.0", 1);
+    Oem::from_kvn(&large_decimal).expect("large decimal-form values should parse");
 
     for malformed in ["1.2345678901234567", "2147483648", "1e3", "1.", "nan"] {
         let invalid = source.replacen("-280.045", malformed, 1);

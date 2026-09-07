@@ -1,9 +1,7 @@
+use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::types::Epoch;
 use ccsds_ndm::{Ndm, Validate};
-
-const MULTI_SEGMENT: &str = include_str!("../data/kvn/oem_g11.kvn");
-const XML: &str = include_str!("../data/xml/oem_g14.xml");
 
 fn epoch(value: &str) -> Epoch {
     value.parse().unwrap()
@@ -11,7 +9,7 @@ fn epoch(value: &str) -> Epoch {
 
 #[test]
 fn all_segments_must_describe_one_object_and_one_time_system() {
-    let mut message = Oem::from_kvn(MULTI_SEGMENT).unwrap();
+    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
     assert!(message.body.segment.len() > 1);
     message.body.segment[1].metadata.time_system = "TAI".into();
     assert_eq!(
@@ -19,14 +17,14 @@ fn all_segments_must_describe_one_object_and_one_time_system() {
         Some("body.segment[1].metadata.time_system")
     );
 
-    let mut message = Oem::from_kvn(MULTI_SEGMENT).unwrap();
+    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
     message.body.segment[1].metadata.object_id = "DIFFERENT".into();
     assert!(message.validate().is_err());
 }
 
 #[test]
 fn consecutive_useable_spans_may_touch_but_not_overlap() {
-    let mut message = Oem::from_kvn(MULTI_SEGMENT).unwrap();
+    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
     let second = &mut message.body.segment[1].metadata;
     second.start_time = epoch("2019-12-28T21:00:00.000");
     message

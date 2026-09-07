@@ -1,18 +1,16 @@
+use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::error::{DiagnosticNotation, DiagnosticOperation};
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::validation::MessageKind;
 use ccsds_ndm::Ndm;
 
-const KVN: &str = include_str!("../data/kvn/oem_g11.kvn");
-const XML: &str = include_str!("../data/xml/oem_g14.xml");
-
 #[test]
 fn kvn_syntax_diagnostics_are_located_and_machine_readable() {
-    let object_name = KVN
+    let object_name = KVN_FIXTURES[0]
         .lines()
         .find(|line| line.trim_start().starts_with("OBJECT_NAME"))
         .unwrap();
-    let input = KVN.replace(object_name, &format!("{object_name}\nUNKNOWN = value"));
+    let input = KVN_FIXTURES[0].replace(object_name, &format!("{object_name}\nUNKNOWN = value"));
     let error = Oem::from_kvn(&input).expect_err("unknown keyword should fail");
     let diagnostic = error.diagnostic().expect("parse context should be present");
 
@@ -28,11 +26,11 @@ fn kvn_syntax_diagnostics_are_located_and_machine_readable() {
 
 #[test]
 fn carriage_return_diagnostics_keep_the_edition_and_excerpt_to_one_record() {
-    let object_name = KVN
+    let object_name = KVN_FIXTURES[0]
         .lines()
         .find(|line| line.trim_start().starts_with("OBJECT_NAME"))
         .unwrap();
-    let input = KVN
+    let input = KVN_FIXTURES[0]
         .replace(object_name, &format!("{object_name}\nUNKNOWN = value"))
         .replace('\n', "\r");
     let error = Oem::from_kvn(&input).expect_err("unknown keyword should fail");
@@ -44,11 +42,11 @@ fn carriage_return_diagnostics_keep_the_edition_and_excerpt_to_one_record() {
 
 #[test]
 fn semantic_paths_survive_parse_context() {
-    let object_name = KVN
+    let object_name = KVN_FIXTURES[0]
         .lines()
         .find(|line| line.trim_start().starts_with("OBJECT_NAME"))
         .unwrap();
-    let input = KVN.replace(object_name, "OBJECT_NAME =");
+    let input = KVN_FIXTURES[0].replace(object_name, "OBJECT_NAME =");
     let error = Oem::from_kvn(&input).expect_err("empty object name should fail");
     let diagnostic = error.diagnostic().expect("parse context should be present");
     assert_eq!(diagnostic.code, Some("validation.missing_required_field"));

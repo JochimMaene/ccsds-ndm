@@ -1874,382 +1874,36 @@ impl OemCovarianceMatrix {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::traits::Ndm;
+    use crate::traits::{Ndm, Validate};
 
     #[test]
-    fn oem_covariance_rejects_a_negative_variance() {
-        // The first covariance row of the shipped fixture is CX_X, a variance.
-        let kvn =
+    fn covariance_validation_distinguishes_variances_from_off_diagonal_terms() {
+        let negative_variance =
             include_str!("../../data/kvn/oem_g13.kvn").replace("3.3313494e-04", "-3.3313494e-04");
-        let error = Oem::from_kvn(&kvn).expect_err("a negative variance is not representable");
+        let error = Oem::from_kvn(&negative_variance).expect_err("negative variance must fail");
         let message = error.to_string();
-        assert!(
-            message.contains("CX_X")
-                && message.contains("a non-negative variance on the covariance diagonal"),
-            "unexpected error: {message}"
-        );
+        assert!(message.contains("CX_X"));
+        assert!(message.contains("a non-negative variance on the covariance diagonal"));
+
+        let valid_off_diagonal = include_str!("../../data/kvn/oem_g13.kvn");
+        assert!(valid_off_diagonal.contains("-3.0700078e-04"));
+        Oem::from_kvn(valid_off_diagonal).expect("negative off-diagonal values are valid");
     }
 
     #[test]
-    fn oem_covariance_accepts_a_negative_off_diagonal_term() {
-        // CZ_X is an off-diagonal covariance, and the fixture already carries it negative.
-        let kvn = include_str!("../../data/kvn/oem_g13.kvn");
-        assert!(kvn.contains("-3.0700078e-04"));
-        Oem::from_kvn(kvn).expect("shipped OEM fixture should parse");
-    }
-
-    #[test]
-    fn test_header_optional_fields_roundtrip() {
-        // A2.5.3 Items 3,4,7: COMMENT, CLASSIFICATION, MESSAGE_ID optional
-        let kvn = r#"CCSDS_OEM_VERS = 3.0
-COMMENT This is a header comment
-CLASSIFICATION = SBU
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
-META_START
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-START_TIME = 2023-01-01T00:00:00
-STOP_TIME = 2023-01-02T00:00:00
-META_STOP
-2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
-"#;
-        let oem = Oem::from_kvn(kvn).unwrap();
-        let out = oem.to_kvn().unwrap();
-        assert!(out.contains("CLASSIFICATION"));
-        assert!(out.contains("MESSAGE_ID"));
-        let oem2 = Oem::from_kvn(&out).unwrap();
-        assert_eq!(oem.header.classification, oem2.header.classification);
-        assert_eq!(oem.header.message_id, oem2.header.message_id);
-    }
-
-    #[test]
-    fn test_metadata_optional_fields() {
-        // A2.5.3 Items 10, 15, 18, 19: Optional metadata fields
-        let kvn = r#"CCSDS_OEM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-COMMENT This is a metadata comment
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-REF_FRAME_EPOCH = 2000-01-01T00:00:00
-TIME_SYSTEM = UTC
-START_TIME = 2023-01-01T00:00:00
-USEABLE_START_TIME = 2023-01-01T01:00:00
-USEABLE_STOP_TIME = 2023-01-01T23:00:00
-STOP_TIME = 2023-01-02T00:00:00
-META_STOP
-2023-01-01T01:00:00 1000 2000 3000 1.0 2.0 3.0
-"#;
-        let oem = Oem::from_kvn(kvn).unwrap();
-        let meta = &oem.body.segment[0].metadata;
-        assert_eq!(meta.comment, vec!["This is a metadata comment"]);
-        assert!(meta.ref_frame_epoch.is_some());
-        assert!(meta.useable_start_time.is_some());
-        assert!(meta.useable_stop_time.is_some());
-
-        let out = oem.to_kvn().unwrap();
-        assert!(out.contains("COMMENT This is a metadata comment"));
-        assert!(out.contains("REF_FRAME_EPOCH"));
-        assert!(out.contains("USEABLE_START_TIME"));
-        assert!(out.contains("USEABLE_STOP_TIME"));
-    }
-
-    #[test]
-    fn test_data_comments() {
-        // Test for comments within the data section
-        let kvn = r#"CCSDS_OEM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-START_TIME = 2023-01-01T00:00:00
-STOP_TIME = 2023-01-02T00:00:00
-META_STOP
-COMMENT This is a data section comment
-COMMENT Another data comment
-2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0
-2023-01-01T00:01:00 1060 2120 3180 1.0 2.0 3.0
-"#;
-        let oem = Oem::from_kvn(kvn).unwrap();
-        let data = &oem.body.segment[0].data;
-        assert_eq!(
-            data.comment,
-            vec!["This is a data section comment", "Another data comment"]
-        );
-        assert_eq!(data.state_vector.len(), 2);
-
-        let out = oem.to_kvn().unwrap();
-        assert!(out.contains("COMMENT This is a data section comment"));
-    }
-
-    #[test]
-    fn test_write_kvn() {
-        // Parse then Write then Parse check
-        let kvn_in = r#"CCSDS_OEM_VERS = 3.0
-CREATION_DATE = 2023-11-26T12:00:00
-ORIGINATOR = RUST_TEST
-META_START
-OBJECT_NAME = TEST_SAT
-OBJECT_ID = 12345
-CENTER_NAME = EARTH
-REF_FRAME = EME2000
-TIME_SYSTEM = UTC
-START_TIME = 2023-11-26T12:00:00
-STOP_TIME = 2023-11-26T13:00:00
-META_STOP
-2023-11-26T12:00:00 6000.0 0.0 0.0 0.0 7.5 0.0
-"#;
-        let oem = Oem::from_kvn(kvn_in).unwrap();
-        let kvn_out = oem.to_kvn().unwrap();
-
-        let oem2 = Oem::from_kvn(&kvn_out).unwrap();
-        assert_eq!(oem.header.originator, oem2.header.originator);
-        assert_eq!(
-            oem.body.segment[0].data.state_vector[0].epoch,
-            oem2.body.segment[0].data.state_vector[0].epoch
-        );
-    }
-
-    #[test]
-    fn test_xsd_xml_roundtrip() {
-        // Parse XML -> Write XML -> Parse XML should produce same result
-        let xml = include_str!("../../data/xml/oem_g14.xml");
-        let oem1 = Oem::from_xml(xml).unwrap();
-        let xml_out = oem1.to_xml().unwrap();
-        let oem2 = Oem::from_xml(&xml_out).unwrap();
-
-        assert_eq!(oem1.version, oem2.version);
-        assert_eq!(oem1.header.originator, oem2.header.originator);
-        assert_eq!(oem1.body.segment.len(), oem2.body.segment.len());
-
-        let seg1 = &oem1.body.segment[0];
-        let seg2 = &oem2.body.segment[0];
-        assert_eq!(seg1.metadata.object_name, seg2.metadata.object_name);
-        assert_eq!(seg1.data.state_vector.len(), seg2.data.state_vector.len());
-        assert_eq!(
-            seg1.data.covariance_matrix.len(),
-            seg2.data.covariance_matrix.len()
-        );
-    }
-
-    #[test]
-    fn test_xsd_kvn_roundtrip() {
-        // Parse KVN -> Write KVN -> Parse KVN should produce same result
-        let kvn = r#"CCSDS_OEM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-START_TIME = 2023-01-01T00:00:00
-STOP_TIME = 2023-01-02T00:00:00
-INTERPOLATION = HERMITE
-INTERPOLATION_DEGREE = 5
-META_STOP
-2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0 0.001 0.002 0.003
-COVARIANCE_START
-EPOCH = 2023-01-01T00:00:00
-COV_REF_FRAME = RTN
-1.0
-0.1 1.0
-0.1 0.1 1.0
-0.01 0.01 0.01 1.0
-0.01 0.01 0.01 0.1 1.0
-0.01 0.01 0.01 0.1 0.1 1.0
-COVARIANCE_STOP
-"#;
-        let oem1 = Oem::from_kvn(kvn).unwrap();
-        let kvn_out = oem1.to_kvn().unwrap();
-        let oem2 = Oem::from_kvn(&kvn_out).unwrap();
-
-        assert_eq!(oem1.version, oem2.version);
-        assert_eq!(oem1.header.originator, oem2.header.originator);
-        assert_eq!(oem1.body.segment.len(), oem2.body.segment.len());
-
-        let meta1 = &oem1.body.segment[0].metadata;
-        let meta2 = &oem2.body.segment[0].metadata;
-        assert_eq!(meta1.object_name, meta2.object_name);
-        assert_eq!(meta1.interpolation, meta2.interpolation);
-        assert_eq!(meta1.interpolation_degree, meta2.interpolation_degree);
-
-        let data1 = &oem1.body.segment[0].data;
-        let data2 = &oem2.body.segment[0].data;
-        assert_eq!(data1.state_vector.len(), data2.state_vector.len());
-        assert_eq!(data1.covariance_matrix.len(), data2.covariance_matrix.len());
-    }
-
-    #[test]
-    fn test_xsd_kvn_sample_file_roundtrip() {
-        // Parse sample KVN file and verify roundtrip
-        let kvn = include_str!("../../data/kvn/oem_g11.kvn");
-        let oem1 = Oem::from_kvn(kvn).unwrap();
-        let kvn_out = oem1.to_kvn().unwrap();
-        let oem2 = Oem::from_kvn(&kvn_out).unwrap();
-
-        assert_eq!(oem1.body.segment.len(), oem2.body.segment.len());
-        for (seg1, seg2) in oem1.body.segment.iter().zip(oem2.body.segment.iter()) {
-            assert_eq!(seg1.metadata.object_name, seg2.metadata.object_name);
-            assert_eq!(seg1.data.state_vector.len(), seg2.data.state_vector.len());
-        }
-    }
-
-    #[test]
-    fn test_multiple_covariance_matrices_emit_single_covariance_block() {
-        let kvn = include_str!("../../data/kvn/oem_g13.kvn");
-        let oem = Oem::from_kvn(kvn).expect("parse oem_g13");
+    fn serializes_multiple_covariance_matrices_in_one_block() {
+        let oem = Oem::from_kvn(include_str!("../../data/kvn/oem_g13.kvn")).unwrap();
         assert_eq!(oem.body.segment[0].data.covariance_matrix.len(), 2);
 
-        let out = oem.to_kvn().expect("serialize oem_g13");
-        assert_eq!(out.matches("COVARIANCE_START").count(), 1);
-        assert_eq!(out.matches("COVARIANCE_STOP").count(), 1);
-        assert_eq!(out.matches("EPOCH").count(), 2);
+        let output = oem.to_kvn().unwrap();
+        assert_eq!(output.matches("COVARIANCE_START").count(), 1);
+        assert_eq!(output.matches("COVARIANCE_STOP").count(), 1);
+        assert_eq!(output.matches("EPOCH").count(), 2);
     }
 
     #[test]
-    fn test_xsd_parse_xml_oem_g14() {
-        // Parse official CCSDS sample file oem_g14.xml
-        let xml = include_str!("../../data/xml/oem_g14.xml");
-        let oem = Oem::from_xml(xml).expect("Failed to parse oem_g14.xml");
-        assert_eq!(oem.version, "3.0");
-        assert_eq!(oem.header.originator, "NASA/JPL");
-        assert!(oem.header.message_id.is_some());
-        assert_eq!(oem.body.segment.len(), 1);
-        // Verify state vectors with optional accelerations
-        let seg = &oem.body.segment[0];
-        assert_eq!(seg.metadata.object_name, "MARS GLOBAL SURVEYOR");
-        assert_eq!(seg.data.state_vector.len(), 4);
-        // XML sample has accelerations
-        assert!(seg.data.state_vector[0].x_ddot.is_some());
-        // XML sample has covariance
-        assert_eq!(seg.data.covariance_matrix.len(), 1);
-        assert!(seg.data.covariance_matrix[0].cov_ref_frame.is_some());
-    }
-
-    #[test]
-    fn full_optional_fields_roundtrip() {
-        let kvn = r#"
-CCSDS_OEM_VERS = 3.0
-COMMENT Header comment
-CLASSIFICATION = UNCLASSIFIED
-CREATION_DATE = 2025-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
-
-META_START
-COMMENT Metadata comment
-OBJECT_NAME = TEST_OBJ
-OBJECT_ID = 12345
-CENTER_NAME = EARTH
-REF_FRAME = EME2000
-REF_FRAME_EPOCH = 2000-01-01T00:00:00
-TIME_SYSTEM = UTC
-START_TIME = 2025-01-01T00:00:00
-USEABLE_START_TIME = 2025-01-01T00:10:00
-USEABLE_STOP_TIME = 2025-01-01T23:50:00
-STOP_TIME = 2025-01-02T00:00:00
-INTERPOLATION = HERMITE
-INTERPOLATION_DEGREE = 7
-META_STOP
-
-COMMENT Data comment
-2025-01-01T00:00:00 1000.0 2000.0 3000.0 1.0 2.0 3.0 0.01 0.02 0.03
-
-COVARIANCE_START
-EPOCH = 2025-01-01T00:00:00
-COV_REF_FRAME = EME2000
-1.0
-0.1 1.0
-0.1 0.1 1.0
-0.01 0.01 0.01 1.0
-0.01 0.01 0.01 0.1 1.0
-0.01 0.01 0.01 0.1 0.1 1.0
-COVARIANCE_STOP
-"#;
-        let oem = Oem::from_kvn(kvn).expect("parse full oem");
-        let regenerated = oem.to_kvn().expect("generate full kvn");
-        let oem2 = Oem::from_kvn(&regenerated).expect("parse regenerated full oem");
-
-        assert_eq!(oem.header.message_id, oem2.header.message_id);
-        assert_eq!(
-            oem.body.segment[0].metadata.ref_frame_epoch,
-            oem2.body.segment[0].metadata.ref_frame_epoch
-        );
-        assert_eq!(
-            oem.body.segment[0].data.state_vector[0]
-                .x_ddot
-                .as_ref()
-                .map(|v| v.value),
-            Some(0.01)
-        );
-        assert_eq!(
-            oem.body.segment[0].data.covariance_matrix[0]
-                .cov_ref_frame
-                .as_deref(),
-            Some("EME2000")
-        );
-    }
-
-    #[test]
-    fn test_oem_validation_interpolation_reqs() {
-        let kvn = r#"CCSDS_OEM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-OBJECT_NAME = TEST
-OBJECT_ID = 1
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-START_TIME = 2023-01-01T00:00:00
-STOP_TIME = 2023-01-02T00:00:00
-INTERPOLATION = HERMITE
-# Missing INTERPOLATION_DEGREE
-META_STOP
-2023-01-01T00:00:00 1 2 3 4 5 6
-"#;
-        assert!(Oem::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_oem_validation_empty_state_vector() {
-        // Construct KVN without data lines?
-        // Parser logic for OEM data: it expects lines or comments until next block.
-        // If no lines, `state_vector` will be empty.
-        let kvn = r#"CCSDS_OEM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-OBJECT_NAME = TEST
-OBJECT_ID = 1
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-START_TIME = 2023-01-01T00:00:00
-STOP_TIME = 2023-01-02T00:00:00
-META_STOP
-COMMENT No data
-"#;
-        assert!(Oem::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_oem_metadata_interpolation_validation() {
-        let mut meta = OemMetadata::builder()
+    fn validates_required_model_invariants() {
+        let mut metadata = OemMetadata::builder()
             .object_name("SAT")
             .object_id("1")
             .center_name("EARTH")
@@ -2259,23 +1913,13 @@ COMMENT No data
             .stop_time(Epoch::new("2023-01-01T13:00:00").unwrap())
             .build();
 
-        meta.interpolation = Some("LAGRANGE".to_string());
-        // Missing degree
-        assert!(meta.validate().is_err());
+        metadata.interpolation = Some("LAGRANGE".into());
+        assert!(metadata.validate().is_err());
 
-        meta.interpolation_degree = Some(InterpolationDegree::from(NonZeroU32::new(5).unwrap()));
-        assert!(meta.validate().is_ok());
-    }
-
-    #[test]
-    fn test_oem_data_empty_validation_internal() {
-        let data = OemData::builder().build();
-        assert!(data.validate().is_err());
-    }
-
-    #[test]
-    fn test_oem_body_requires_segment() {
-        let body = OemBody { segment: vec![] };
-        assert!(body.validate().is_err());
+        metadata.interpolation_degree =
+            Some(InterpolationDegree::from(NonZeroU32::new(5).unwrap()));
+        assert!(metadata.validate().is_ok());
+        assert!(OemData::builder().build().validate().is_err());
+        assert!(OemBody { segment: vec![] }.validate().is_err());
     }
 }
