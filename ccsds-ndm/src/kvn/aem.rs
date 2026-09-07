@@ -95,8 +95,12 @@ pub fn aem_metadata(input: &mut &str) -> KvnResult<AemMetadata> {
         angvel_frame: rate_frame,
         interpolation_method,
         interpolation_degree: interpolation_degree
-            .and_then(std::num::NonZeroU32::new)
-            .map(InterpolationDegree),
+            .map(|degree| {
+                std::num::NonZeroU32::new(degree)
+                    .map(InterpolationDegree)
+                    .ok_or_else(|| cut_err(input, "positive integer"))
+            })
+            .transpose()?,
     })
 }
 
@@ -137,7 +141,16 @@ fn attitude_state_line(
     let mut values = [0.0; 8];
     let mut value_count = 0usize;
     for s in parts {
-        let val = s.parse::<f64>().map_err(|_| {
+        if !valid_ccsds_number(s) {
+            return Err(ErrMode::Cut(
+                InternalParserError::from_input(input).add_context(
+                    input,
+                    &input.checkpoint(),
+                    winnow::error::StrContext::Label("CCSDS number in data line"),
+                ),
+            ));
+        }
+        let val = fast_float::parse(s).map_err(|_| {
             ErrMode::Cut(InternalParserError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),

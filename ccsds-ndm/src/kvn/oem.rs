@@ -5,40 +5,6 @@
 //! Winnow parsers for OEM (Orbit Ephemeris Message).
 //!
 //! This module implements KVN parsing for OEM using winnow parser combinators.
-//! The parsing follows the CCSDS 502.0-B-3 specification structure:
-//!
-//! ```text
-//! OEM
-//! ├── Version (CCSDS_OEM_VERS)
-//! ├── Header (OdmHeader)
-//! │   ├── COMMENT* (optional, multiple)
-//! │   ├── CLASSIFICATION (optional)
-//! │   ├── CREATION_DATE (required)
-//! │   ├── ORIGINATOR (required)
-//! │   └── MESSAGE_ID (optional)
-//! └── Body (OemBody)
-//!     └── Segment* (OemSegment, one or more)
-//!         ├── META_START
-//!         ├── Metadata (OemMetadata)
-//!         │   ├── COMMENT* (optional)
-//!         │   ├── OBJECT_NAME (required)
-//!         │   ├── OBJECT_ID (required)
-//!         │   ├── CENTER_NAME (required)
-//!         │   ├── REF_FRAME (required)
-//!         │   ├── REF_FRAME_EPOCH (optional)
-//!         │   ├── TIME_SYSTEM (required)
-//!         │   ├── START_TIME (required)
-//!         │   ├── USEABLE_START_TIME (optional)
-//!         │   ├── USEABLE_STOP_TIME (optional)
-//!         │   ├── STOP_TIME (required)
-//!         │   ├── INTERPOLATION (optional)
-//!         │   └── INTERPOLATION_DEGREE (conditional)
-//!         ├── META_STOP
-//!         └── Data (OemData)
-//!             ├── COMMENT* (optional)
-//!             ├── StateVectorAcc* (raw data lines)
-//!             └── CovarianceMatrix* (optional, within COVARIANCE_START/STOP)
-//! ```
 
 use crate::common::StateVectorAcc;
 use crate::error::InternalParserError;
@@ -52,7 +18,6 @@ use winnow::combinator::preceded;
 use winnow::error::{AddContext, ErrMode};
 use winnow::prelude::*;
 use winnow::stream::Offset;
-use winnow::token::take_while;
 
 //----------------------------------------------------------------------
 // OEM Version Parser
@@ -144,10 +109,8 @@ fn at_record_end(input: &str) -> bool {
 }
 
 fn parse_odm_f64(input: &mut &str) -> KvnResult<f64> {
-    let token = take_while::<_, _, ()>(1.., ('0'..='9', '.', '-', '+', 'e', 'E'))
-        .parse_next(input)
-        .map_err(|_| cut_err(input, "Invalid ODM number"))?;
-    if !crate::messages::oem::valid_odm_number(token) {
+    let token = till_space_or_eol.parse_next(input)?;
+    if !valid_ccsds_number(token) {
         return Err(cut_err(input, "Invalid ODM number"));
     }
     fast_float::parse(token).map_err(|_| cut_err(input, "Invalid ODM number"))

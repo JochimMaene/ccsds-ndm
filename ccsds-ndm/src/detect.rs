@@ -282,7 +282,9 @@ impl NdmKind {
             Self::Cdm => crate::traits::Ndm::from_xml(input).map(Message::Cdm),
             Self::Tdm => crate::traits::Ndm::from_xml(input).map(Message::Tdm),
             Self::Rdm => crate::traits::Ndm::from_xml(input).map(Message::Rdm),
-            Self::Aem => crate::traits::Ndm::from_xml(input).map(Message::Aem),
+            Self::Aem => {
+                crate::messages::aem::Aem::from_xml_with_options(input, options).map(Message::Aem)
+            }
             Self::Apm => crate::traits::Ndm::from_xml(input).map(Message::Apm),
             Self::Ndm => crate::messages::ndm::CombinedNdm::from_xml_with_options(input, options)
                 .map(Message::Ndm),
@@ -403,8 +405,8 @@ fn detect_xml_type(s: &str, options: &ParseOptions) -> Result<Message> {
                     message_kind,
                     crate::error::DiagnosticNotation::Xml,
                 )?;
-                // OPM and OEM apply their specialised strict preflight, including these limits.
-                if !matches!(kind, NdmKind::Opm | NdmKind::Oem) {
+                // These families apply their specialised strict preflight, including these limits.
+                if !matches!(kind, NdmKind::Opm | NdmKind::Oem | NdmKind::Aem) {
                     validate_xml_limits(s, options, message_kind)?;
                 }
                 return with_xml_parse_context(kind.parse_xml(s, options), message_kind, s);

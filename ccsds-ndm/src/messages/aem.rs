@@ -72,11 +72,7 @@ impl Ndm for Aem {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::validate_document_root(xml, b"aem", "AEM")?;
-        validate_xml_sequences(xml)?;
-        let aem: Self = crate::xml::from_str_with_context(xml, "AEM")?;
-        crate::traits::Validate::validate(&aem)?;
-        Ok(aem)
+        Self::from_xml_with_options(xml, &crate::options::ParseOptions::default())
     }
 
     fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
@@ -88,46 +84,55 @@ impl Ndm for Aem {
     }
 }
 
-fn validate_xml_sequences(xml: &str) -> Result<()> {
+fn validate_aem_xml_envelope(
+    xml: &str,
+    options: &crate::options::ParseOptions,
+    source_edition: &mut Option<String>,
+) -> Result<()> {
     use crate::xml::XmlSequenceRule;
-    crate::xml::validate_element_sequences(
+    crate::xml::validate_standalone_document(
         xml,
+        b"aem",
         "AEM",
-        |parent, child| {
-            let children = aem_xml_children(parent)?;
-            let rank = children.iter().position(|candidate| *candidate == child)? as u16;
-            let repeatable =
-                child == b"COMMENT" || child == b"segment" || child == b"attitudeState";
-            Some(XmlSequenceRule::new(rank, repeatable))
-        },
-        |element, attribute| {
-            attribute == b"units"
-                && matches!(
-                    element,
-                    b"Q1_DOT"
-                        | b"Q2_DOT"
-                        | b"Q3_DOT"
-                        | b"QC_DOT"
-                        | b"ANGLE_1"
-                        | b"ANGLE_2"
-                        | b"ANGLE_3"
-                        | b"ANGLE_1_DOT"
-                        | b"ANGLE_2_DOT"
-                        | b"ANGLE_3_DOT"
-                        | b"ANGVEL_X"
-                        | b"ANGVEL_Y"
-                        | b"ANGVEL_Z"
-                        | b"SPIN_ALPHA"
-                        | b"SPIN_DELTA"
-                        | b"SPIN_ANGLE"
-                        | b"SPIN_ANGLE_VEL"
-                        | b"NUTATION"
-                        | b"NUTATION_PER"
-                        | b"NUTATION_PHASE"
-                        | b"MOMENTUM_ALPHA"
-                        | b"MOMENTUM_DELTA"
-                        | b"NUTATION_VEL"
-                )
+        options,
+        source_edition,
+        crate::xml::MessageSchema {
+            child_rule: |parent: &[u8], child: &[u8]| {
+                let children = aem_xml_children(parent)?;
+                let rank = children.iter().position(|candidate| *candidate == child)? as u16;
+                let repeatable = matches!(child, b"COMMENT" | b"segment" | b"attitudeState");
+                Some(XmlSequenceRule::new(rank, repeatable))
+            },
+            attribute_allowed: |element: &[u8], attribute: &[u8]| {
+                attribute == b"units"
+                    && matches!(
+                        element,
+                        b"Q1_DOT"
+                            | b"Q2_DOT"
+                            | b"Q3_DOT"
+                            | b"QC_DOT"
+                            | b"ANGLE_1"
+                            | b"ANGLE_2"
+                            | b"ANGLE_3"
+                            | b"ANGLE_1_DOT"
+                            | b"ANGLE_2_DOT"
+                            | b"ANGLE_3_DOT"
+                            | b"ANGVEL_X"
+                            | b"ANGVEL_Y"
+                            | b"ANGVEL_Z"
+                            | b"SPIN_ALPHA"
+                            | b"SPIN_DELTA"
+                            | b"SPIN_ANGLE"
+                            | b"SPIN_ANGLE_VEL"
+                            | b"NUTATION"
+                            | b"NUTATION_PER"
+                            | b"NUTATION_PHASE"
+                            | b"MOMENTUM_ALPHA"
+                            | b"MOMENTUM_DELTA"
+                            | b"NUTATION_VEL"
+                    )
+            },
+            is_record: |element: &[u8]| element == b"attitudeState",
         },
     )
 }
@@ -390,6 +395,17 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
 }
 
 impl Aem {
+    pub(crate) fn from_xml_with_options(
+        xml: &str,
+        options: &crate::options::ParseOptions,
+    ) -> Result<Self> {
+        let mut source_edition = None;
+        validate_aem_xml_envelope(xml, options, &mut source_edition)?;
+        let aem: Self = crate::xml::from_str_with_context(xml, "AEM")?;
+        crate::traits::Validate::validate(&aem)?;
+        Ok(aem)
+    }
+
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
         let check_text = |value: &str| -> Result<()> {
             if !value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
@@ -593,7 +609,7 @@ impl crate::traits::Validate for AemBody {
         for segment in &self.segment {
             segment.validate()?;
         }
-        if let Some(error) = self.cross_segment_errors().into_iter().next() {
+        if let Some(error) = self.first_cross_segment_error() {
             return Err(error.into());
         }
         Ok(())
@@ -601,25 +617,23 @@ impl crate::traits::Validate for AemBody {
 }
 
 impl AemBody {
-    fn cross_segment_errors(&self) -> Vec<ValidationError> {
+    fn first_cross_segment_error(&self) -> Option<ValidationError> {
         use std::cmp::Ordering;
 
-        let mut errors = Vec::new();
         for (index, pair) in self.segment.windows(2).enumerate() {
-            let previous_stop = pair[0].metadata.useable_stop_time;
-            let current_start = pair[1].metadata.useable_start_time;
-            if matches!(
-                (previous_stop, current_start),
-                (Some(previous), Some(current))
-                    if previous
-                        .into_epoch()
-                        .cmp_same_branch(&current.into_epoch())
-                        == Some(Ordering::Greater)
-            ) {
-                errors.push(
+            let (Some(previous), Some(current)) = (
+                pair[0].metadata.useable_stop_time,
+                pair[1].metadata.useable_start_time,
+            ) else {
+                continue;
+            };
+            if previous.into_epoch().cmp_same_branch(&current.into_epoch())
+                == Some(Ordering::Greater)
+            {
+                return Some(
                     ValidationError::InvalidValue {
                         field: "USEABLE_START_TIME".into(),
-                        value: current_start.unwrap().to_string(),
+                        value: current.to_string(),
                         expected: "no earlier than the preceding segment's USEABLE_STOP_TIME"
                             .into(),
                         line: None,
@@ -631,7 +645,7 @@ impl AemBody {
                 );
             }
         }
-        errors
+        None
     }
 }
 
@@ -640,7 +654,7 @@ impl crate::traits::Validate for AemSegment {
         self.metadata.validate()?;
         crate::traits::Validate::validate(&self.data)?;
         self.data.validate_with_type(&self.metadata.attitude_type)?;
-        match self.timeline_errors().into_iter().next() {
+        match self.first_timeline_error() {
             Some(error) => Err(error.into()),
             None => Ok(()),
         }
@@ -652,10 +666,9 @@ impl AemSegment {
         crate::traits::Validate::validate(self)
     }
 
-    fn timeline_errors(&self) -> Vec<ValidationError> {
+    fn first_timeline_error(&self) -> Option<ValidationError> {
         use std::cmp::Ordering;
 
-        let mut errors = Vec::new();
         let start = self.metadata.start_time.into_epoch();
         let stop = self.metadata.stop_time.into_epoch();
         let mut previous: Option<crate::types::Epoch> = None;
@@ -667,7 +680,7 @@ impl AemSegment {
             if start.cmp_same_branch(&current) == Some(Ordering::Greater)
                 || current.cmp_same_branch(&stop) == Some(Ordering::Greater)
             {
-                errors.push(
+                return Some(
                     ValidationError::OutOfRange {
                         name: "attitudeState EPOCH".into(),
                         value: epoch.to_string(),
@@ -685,7 +698,7 @@ impl AemSegment {
                 previous,
                 Some(prior) if prior.cmp_same_branch(&current) != Some(Ordering::Less)
             ) {
-                errors.push(
+                return Some(
                     ValidationError::InvalidValue {
                         field: "attitudeState EPOCH".into(),
                         value: epoch.to_string(),
@@ -697,7 +710,7 @@ impl AemSegment {
             }
             previous = Some(current);
         }
-        errors
+        None
     }
 }
 
@@ -990,20 +1003,19 @@ impl AemMetadata {
             .into());
         }
 
-        match self.time_span_errors().into_iter().next() {
+        match self.first_time_span_error() {
             Some(error) => Err(error.into()),
             None => Ok(()),
         }
     }
 
-    fn time_span_errors(&self) -> Vec<ValidationError> {
+    fn first_time_span_error(&self) -> Option<ValidationError> {
         use std::cmp::Ordering;
 
-        let mut errors = Vec::new();
         let start = self.start_time.into_epoch();
         let stop = self.stop_time.into_epoch();
         if start.cmp_same_branch(&stop) == Some(Ordering::Greater) {
-            errors.push(ValidationError::InvalidValue {
+            return Some(ValidationError::InvalidValue {
                 field: "START_TIME/STOP_TIME".into(),
                 value: format!("{} > {}", self.start_time, self.stop_time),
                 expected: "START_TIME no later than STOP_TIME".into(),
@@ -1019,7 +1031,7 @@ impl AemMetadata {
                 if start.cmp_same_branch(&value_epoch) == Some(Ordering::Greater)
                     || value_epoch.cmp_same_branch(&stop) == Some(Ordering::Greater)
                 {
-                    errors.push(ValidationError::OutOfRange {
+                    return Some(ValidationError::OutOfRange {
                         name: field.into(),
                         value: value.to_string(),
                         expected: "within the total START_TIME/STOP_TIME span".into(),
@@ -1036,7 +1048,7 @@ impl AemMetadata {
                 .cmp_same_branch(&useable_stop.into_epoch())
                 == Some(Ordering::Greater)
             {
-                errors.push(ValidationError::InvalidValue {
+                return Some(ValidationError::InvalidValue {
                     field: "USEABLE_START_TIME/USEABLE_STOP_TIME".into(),
                     value: format!("{useable_start} > {useable_stop}"),
                     expected: "USEABLE_START_TIME no later than USEABLE_STOP_TIME".into(),
@@ -1044,7 +1056,7 @@ impl AemMetadata {
                 });
             }
         }
-        errors
+        None
     }
 }
 

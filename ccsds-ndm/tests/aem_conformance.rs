@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use ccsds_ndm::messages::aem::Aem;
-use ccsds_ndm::Ndm;
+use ccsds_ndm::{from_str_with_options, Ndm, Notation, ParseOptions};
 
 mod common;
 use common::{assert_rejects, validate_xml};
@@ -63,10 +63,35 @@ fn aem_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
                 "ATTITUDE_TYPE = QUATERNION\nANGVEL_FRAME = A",
             ),
         ),
+        (
+            "zero interpolation degree",
+            SPIN_KVN.replace(
+                "ATTITUDE_TYPE = SPIN",
+                "ATTITUDE_TYPE = SPIN\nINTERPOLATION_DEGREE = 0",
+            ),
+        ),
         ("trailing assignment", format!("{KVN}UNKNOWN = value\n")),
     ] {
         assert!(Aem::from_kvn(&source).is_err(), "accepted {label}");
     }
+}
+
+#[test]
+fn aem_kvn_rejects_non_ccsds_history_number_spellings() {
+    for value in [".5", "1e0", "1.2345678901234567"] {
+        let source = SPIN_KVN.replacen("2.6862511e+002", value, 1);
+        assert!(Aem::from_kvn(&source).is_err(), "accepted {value}");
+    }
+}
+
+#[test]
+fn aem_xml_preflight_enforces_the_history_limit() {
+    let records = XML.matches("<attitudeState>").count();
+    let exact = ParseOptions::default().with_max_records(records);
+    assert!(from_str_with_options(XML, Some(Notation::Xml), &exact).is_ok());
+
+    let too_small = ParseOptions::default().with_max_records(records - 1);
+    assert!(from_str_with_options(XML, Some(Notation::Xml), &too_small).is_err());
 }
 
 #[test]

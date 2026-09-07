@@ -1001,58 +1001,6 @@ fn validate_input_size(input: &str, options: &crate::options::ParseOptions) -> R
     Ok(())
 }
 
-pub(crate) fn valid_odm_number(token: &str) -> bool {
-    let bytes = token.as_bytes();
-    let mut index = usize::from(matches!(bytes.first(), Some(b'+' | b'-')));
-    if index == bytes.len() {
-        return false;
-    }
-
-    let integer_start = index;
-    while bytes.get(index).is_some_and(u8::is_ascii_digit) {
-        index += 1;
-    }
-    let integer_digits = index - integer_start;
-    if integer_digits == 0 {
-        return false;
-    }
-
-    let mut fraction_digits = 0;
-    let has_decimal = bytes.get(index) == Some(&b'.');
-    if has_decimal {
-        index += 1;
-        let fraction_start = index;
-        while bytes.get(index).is_some_and(u8::is_ascii_digit) {
-            index += 1;
-        }
-        fraction_digits = index - fraction_start;
-        if fraction_digits == 0 {
-            return false;
-        }
-    }
-
-    let significant_digits = integer_digits + fraction_digits;
-    if significant_digits > 16 {
-        return false;
-    }
-    if index == bytes.len() {
-        return has_decimal || token.parse::<i32>().is_ok();
-    }
-    if !has_decimal || integer_digits != 1 || !matches!(bytes.get(index), Some(b'e' | b'E')) {
-        return false;
-    }
-
-    index += 1;
-    if matches!(bytes.get(index), Some(b'+' | b'-')) {
-        index += 1;
-    }
-    let exponent_start = index;
-    while bytes.get(index).is_some_and(u8::is_ascii_digit) {
-        index += 1;
-    }
-    index == bytes.len() && index > exponent_start
-}
-
 /// Validate the OEM KVN record structure.
 ///
 /// Expects `kvn` to have gone through [`crate::kvn::normalize_line_endings`], so every remaining
@@ -1962,37 +1910,6 @@ mod tests {
         let kvn = include_str!("../../data/kvn/oem_g13.kvn");
         assert!(kvn.contains("-3.0700078e-04"));
         Oem::from_kvn(kvn).expect("shipped OEM fixture should parse");
-    }
-
-    #[test]
-    fn odm_number_lexical_validation_matches_book_forms() {
-        for value in [
-            "0",
-            "-2147483648",
-            "2147483647",
-            "0.0",
-            "-12.5",
-            "1.234567890123456",
-            "1.0e0",
-            "-1.234567890123456E+308",
-        ] {
-            assert!(valid_odm_number(value), "{value}");
-        }
-        for value in [
-            "",
-            "+",
-            "2147483648",
-            "-2147483649",
-            ".5",
-            "1.",
-            "12e3",
-            "1e3",
-            "1.0e",
-            "1.0e+",
-            "1.2345678901234567",
-        ] {
-            assert!(!valid_odm_number(value), "{value}");
-        }
     }
 
     #[test]
