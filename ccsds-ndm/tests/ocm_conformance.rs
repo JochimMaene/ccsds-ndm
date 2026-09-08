@@ -199,26 +199,27 @@ fn time_and_angle_vector_components_must_be_finite() {
 
 #[test]
 fn every_kvn_generation_gate_rejects_invalid_state_before_output() {
-    type OcmMutation = fn(&mut Ocm);
-    let cases: [(&str, OcmMutation); 2] = [
-        ("non-ASCII free text", |message: &mut Ocm| {
-            message.body.segment.metadata.object_name = Some("OSPREY €".to_owned());
-        }),
-        ("overlong keyword record", |message: &mut Ocm| {
-            message.body.segment.metadata.object_name = Some("X".repeat(240));
-        }),
-    ];
-    for (label, mutate) in cases {
-        let mut message = Ocm::from_kvn(KVN).unwrap();
-        mutate(&mut message);
-        assert!(message.to_kvn().is_err(), "materialized accepted {label}");
-        let mut output = Vec::new();
-        assert!(
-            message.write_kvn_to(&mut output).is_err(),
-            "streaming accepted {label}"
-        );
-        assert!(output.is_empty(), "streaming wrote bytes for {label}");
-    }
+    let mut message = Ocm::from_kvn(KVN).unwrap();
+    message.body.segment.metadata.object_name = Some("OSPREY €".to_owned());
+    assert!(message.to_kvn().is_err());
+    let mut output = Vec::new();
+    assert!(message.write_kvn_to(&mut output).is_err());
+    assert!(output.is_empty());
+}
+
+#[test]
+fn ocm_accepts_arbitrary_line_lengths() {
+    let long_name = "X".repeat(300);
+    let source = KVN.replace(
+        "OBJECT_NAME = OSPREY 5",
+        &format!("OBJECT_NAME = {long_name}"),
+    );
+    let message = Ocm::from_kvn(&source).unwrap();
+    let generated = message.to_kvn().unwrap();
+    assert!(generated.lines().any(|line| line.len() > 254));
+    let mut streamed = Vec::new();
+    message.write_kvn_to(&mut streamed).unwrap();
+    assert_eq!(streamed, generated.as_bytes());
 }
 
 #[test]

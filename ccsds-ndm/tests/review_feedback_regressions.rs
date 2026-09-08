@@ -194,25 +194,19 @@ fn kvn_lexical_errors_have_the_same_category_for_string_and_streaming_output() {
 }
 
 #[test]
-fn kvn_overlong_records_are_rejected_before_streaming_for_aem_acm_and_ocm() {
-    fn assert_rejected_without_output<T: Ndm>(message: &T) {
-        assert!(message.to_kvn().is_err());
-        let mut output = Vec::new();
-        assert!(message.write_kvn_to(&mut output).is_err());
-        assert!(output.is_empty());
-    }
-
+fn aem_overlong_records_are_rejected_before_streaming() {
     let mut aem = Aem::from_kvn(include_str!("../data/kvn/aem_g4.kvn")).unwrap();
     aem.header.comment = vec!["x".repeat(247)];
-    assert_rejected_without_output(&aem);
-
-    let mut acm = Acm::from_kvn(include_str!("../data/kvn/acm_g7.kvn")).unwrap();
-    acm.header.comment = vec!["x".repeat(247)];
-    assert_rejected_without_output(&acm);
-
-    let mut ocm = Ocm::from_kvn(include_str!("../data/kvn/ocm_g15.kvn")).unwrap();
-    ocm.body.segment.metadata.object_name = Some("x".repeat(240));
-    assert_rejected_without_output(&ocm);
+    assert_eq!(
+        aem.to_kvn().unwrap_err().code(),
+        Some("validation.out_of_range")
+    );
+    let mut output = Vec::new();
+    assert_eq!(
+        aem.write_kvn_to(&mut output).unwrap_err().code(),
+        Some("validation.out_of_range")
+    );
+    assert!(output.is_empty());
 }
 
 #[test]

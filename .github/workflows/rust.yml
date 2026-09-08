@@ -18,28 +18,16 @@ jobs:
     name: Behavioral quality
     uses: ./.github/workflows/behavioral-quality.yml
 
-  msrv:
-    name: Minimum supported Rust
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@1.88.0
-      - name: Check the published library
-        # No --locked: Cargo.lock is not tracked, so a clean checkout has no lock file to honor.
-        run: cargo check --manifest-path ccsds-ndm/Cargo.toml --lib
-
-  fmt:
-    name: Linting - Format check
+  package-python:
+    name: Verify Python wheel
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@1.90.0
+      - uses: actions/setup-python@v5
         with:
-          components: rustfmt, clippy
+          python-version: "3.10"
+      - uses: astral-sh/setup-uv@v5
       - uses: taiki-e/install-action@just
-
-      - name: Enforce formatting
-        run: just fmt-rust-check
-
-      - name: Linting
-        run: just lint-rust
+      - name: Build, install, and verify wheel
+        run: just package-python

@@ -714,8 +714,8 @@ impl AemMetadata {
         object_id: String,
         ref_frame_a: String,
         ref_frame_b: String,
-        start_time: Option<String>,
-        stop_time: Option<String>,
+        start_time: String,
+        stop_time: String,
         time_system: String,
         attitude_type: String,
         center_name: Option<String>,
@@ -727,10 +727,6 @@ impl AemMetadata {
         interpolation_degree: Option<u32>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let start_time =
-            start_time.ok_or_else(|| PyValueError::new_err("start_time is required"))?;
-        let stop_time = stop_time.ok_or_else(|| PyValueError::new_err("stop_time is required"))?;
-
         let attitude_type = AttitudeTypeType::from_str(&attitude_type)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
 

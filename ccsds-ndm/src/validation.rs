@@ -109,3 +109,16 @@ pub(crate) fn validate_at_field_path(
         result => result,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::kvn_comment_error;
+
+    #[test]
+    fn kvn_comment_limit_includes_the_emitted_prefix() {
+        assert!(kvn_comment_error(&"x".repeat(246)).is_none());
+        let error = kvn_comment_error(&"x".repeat(247)).unwrap();
+        assert_eq!(error.code(), Some("validation.out_of_range"));
+        assert!(error.to_string().contains("255"));
+    }
+}

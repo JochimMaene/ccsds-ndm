@@ -39,7 +39,6 @@ jobs:
 
   linux-extended:
     runs-on: ${{ matrix.platform.runner }}
-    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     strategy:
       matrix:
         platform:
@@ -73,7 +72,6 @@ jobs:
 
   musllinux:
     runs-on: ${{ matrix.platform.runner }}
-    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     strategy:
       matrix:
         platform:
@@ -125,7 +123,6 @@ jobs:
 
   windows-extended:
     runs-on: windows-latest
-    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
@@ -165,7 +162,6 @@ jobs:
 
   macos-extended:
     runs-on: macos-15
-    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v5

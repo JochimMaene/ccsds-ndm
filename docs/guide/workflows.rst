@@ -73,28 +73,31 @@ The parser checks supplied units against each field's CCSDS unit enum. Required 
 attributes must be present, incompatible KVN units are rejected, and dimensionless fields reject
 spurious units. Values are never silently reinterpreted under a different unit.
 
-Parsing limits, generation guarantees, and editions
----------------------------------------------------
+Parsing limits and generation guarantees
+-----------------------------------------
 
-Parsing accepts ``max_input_bytes`` on every message and additionally ``max_records`` on
-record-bearing messages; use ``from_str_with_options`` in Rust for an aggregate input bound or
-an XML-depth policy. Input bytes are unlimited by default; XML depth defaults to 16 because
+Python's ``from_str`` and ``from_file`` accept ``max_input_bytes`` on every message and
+``max_records`` on record-bearing messages. Rust additionally exposes ``from_str_with_options``
+for an XML-depth policy. Input bytes are unlimited by default; XML depth defaults to 16 because
 valid messages have a small fixed schema depth. Parsing remains bounded materialization;
 streaming parsing is intentionally absent.
 
 Generation always validates the complete message before writing any caller-visible bytes and
-preserves the edition stored on the message. Use ``to_kvn`` / ``to_xml`` for strings. The
-``to_file`` / ``convert_file`` file forms replace the destination atomically only after
-conversion succeeds; the ``write_*_to`` streaming forms write directly to the caller's sink
-and can leave partial output if the sink fails mid-write. Finite XML values are rounded when
-necessary to the 16-digit KVN representation required by CCSDS ODM.
+preserves the edition stored on the message. In Python, use ``to_str(format)`` for a string and
+``to_file(path, format)`` for atomic file replacement. Rust exposes ``to_kvn``, ``to_xml``, and
+the ``write_*_to`` streaming methods; streaming can leave partial output if the caller's sink
+fails mid-write. ``convert_file`` also replaces its destination atomically. Finite XML values
+are rounded when necessary to the 16-digit KVN representation required by CCSDS.
 
 Errors expose stable ``code()``, ``field_path()``, and ``diagnostic()`` accessors; diagnostic
 wording may improve before 1.0 while codes, enum meanings, and canonical paths are the machine
 interface. Python NDM exceptions additionally expose ``operation``, ``notation``,
 ``message_kind``, source edition, and available source location/token fields.
 
-OPM, OEM, and OMM can target ODM 2.0 or 3.0; select an edition with ``version="2.0"`` or
-``version="3.0"``. The 2.0 checks use the official `SANA NDM/XML schema archive
-<https://sanaregistry.org/r/ndmxml_unqualified/>`_. OPM and OEM ODM 1.0 remain parse-only
-because they do not have an audited schema-backed serializer; attempted relabeling is rejected.
+Migrating metadata construction
+-------------------------------
+
+Metadata constructors now require CCSDS-significant interpretation fields such as
+``time_system``, reference frames, centers, and required interval epochs instead of silently
+supplying defaults. Pass those values explicitly. ``interpolation_degree=0`` is now rejected;
+omit it with ``None`` when no interpolation degree is present.

@@ -658,9 +658,6 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
         if line.as_bytes().contains(&b'\r') {
             return fail("lone carriage return");
         }
-        if line.len() > 254 {
-            return fail("line exceeds the normative 254-character limit");
-        }
         if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
             return fail("non-printable or non-ASCII character");
         }
@@ -829,6 +826,7 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
 
 impl ToKvn for Acm {
     fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.allow_long_records();
         writer.write_pair("CCSDS_ACM_VERS", &self.version);
         self.header.write_kvn(writer);
         self.body.write_kvn(writer);

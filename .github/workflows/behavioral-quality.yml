@@ -8,6 +8,30 @@ permissions:
   contents: read
 
 jobs:
+  msrv:
+    name: Minimum supported Rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - name: Check the published library
+        # No --locked: Cargo.lock is not tracked, so a clean checkout has no lock file to honor.
+        run: cargo check --manifest-path ccsds-ndm/Cargo.toml --lib
+
+  rust-lint:
+    name: Rust formatting and linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@1.90.0
+        with:
+          components: rustfmt, clippy
+      - uses: taiki-e/install-action@just
+      - name: Check formatting
+        run: just fmt-rust-check
+      - name: Run Clippy
+        run: just lint-rust
+
   rust-tests:
     name: Rust tests
     runs-on: ubuntu-latest

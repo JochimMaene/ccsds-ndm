@@ -256,25 +256,20 @@ pub struct KvnWriter<'a> {
     output: KvnOutput<'a>,
     io_error: Option<std::io::Error>,
     lexical_error: bool,
-    line_length_error: bool,
+    line_length_error: Option<usize>,
     line_len: usize,
-    allow_long_history_records: bool,
-    history_block: bool,
-    line_has_equals: bool,
+    allow_long_records: bool,
     line_buffer: String,
 }
 
 impl FmtWrite for KvnWriter<'_> {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        self.lexical_error |= !s
-            .bytes()
-            .all(|byte| byte == b'\n' || (b' '..=b'~').contains(&byte));
         for byte in s.bytes() {
             if byte == b'\n' {
                 self.finish_line();
             } else {
+                self.lexical_error |= !(b' '..=b'~').contains(&byte);
                 self.line_len = self.line_len.saturating_add(1);
-                self.line_has_equals |= byte == b'=';
             }
         }
         match &mut self.output {
@@ -295,11 +290,9 @@ impl KvnWriter<'static> {
             output: KvnOutput::String(String::new()),
             io_error: None,
             lexical_error: false,
-            line_length_error: false,
+            line_length_error: None,
             line_len: 0,
-            allow_long_history_records: false,
-            history_block: false,
-            line_has_equals: false,
+            allow_long_records: false,
             line_buffer: String::new(),
         }
     }
@@ -309,11 +302,9 @@ impl KvnWriter<'static> {
             output: KvnOutput::String(String::with_capacity(capacity)),
             io_error: None,
             lexical_error: false,
-            line_length_error: false,
+            line_length_error: None,
             line_len: 0,
-            allow_long_history_records: false,
-            history_block: false,
-            line_has_equals: false,
+            allow_long_records: false,
             line_buffer: String::new(),
         }
     }
@@ -345,28 +336,23 @@ impl<'a> KvnWriter<'a> {
             output: KvnOutput::Io(output),
             io_error: None,
             lexical_error: false,
-            line_length_error: false,
+            line_length_error: None,
             line_len: 0,
-            allow_long_history_records: false,
-            history_block: false,
-            line_has_equals: false,
+            allow_long_records: false,
             line_buffer: String::new(),
         }
     }
 
     fn finish_line(&mut self) {
-        if self.line_len > 254
-            && (!self.allow_long_history_records || !self.history_block || self.line_has_equals)
-        {
-            self.line_length_error = true;
+        if self.line_len > 254 && !self.allow_long_records {
+            self.line_length_error.get_or_insert(self.line_len);
         }
         self.line_len = 0;
-        self.line_has_equals = false;
     }
 
-    /// Allow long non-assignment records inside OCM history blocks.
-    pub(crate) fn allow_long_history_records(&mut self) {
-        self.allow_long_history_records = true;
+    /// Allow arbitrary line lengths for ACM and OCM, as required by their CCSDS books.
+    pub(crate) fn allow_long_records(&mut self) {
+        self.allow_long_records = true;
     }
 
     /// Builds and writes one raw line using a reusable growable buffer.
@@ -389,14 +375,9 @@ impl<'a> KvnWriter<'a> {
             let line_start = output.len();
             let result = build(output, line_start);
             if result.is_ok() {
-                let (line_len, has_equals) = {
-                    let line = &output[line_start..];
-                    (line.len(), line.bytes().any(|byte| byte == b'='))
-                };
-                if line_len > 254
-                    && (!self.allow_long_history_records || !self.history_block || has_equals)
-                {
-                    self.line_length_error = true;
+                let line_len = output.len() - line_start;
+                if line_len > 254 && !self.allow_long_records {
+                    self.line_length_error.get_or_insert(line_len);
                 }
                 output.push('\n');
             } else {
@@ -557,11 +538,6 @@ impl<'a> KvnWriter<'a> {
                 line.push_str(value);
             }
         };
-        if let KvnOutput::String(output) = &mut self.output {
-            build(output);
-            output.push('\n');
-            return;
-        }
         self.write_built_line(build);
     }
 
@@ -588,9 +564,6 @@ impl<'a> KvnWriter<'a> {
     /// Writes a section tag (e.g., "META_START").
     pub fn write_section(&mut self, tag: &str) {
         let _ = writeln!(self, "{}", tag);
-        if self.allow_long_history_records {
-            self.history_block = matches!(tag, "TRAJ_START" | "COV_START" | "MAN_START");
-        }
     }
 
     /// Inserts a blank line.
@@ -621,9 +594,11 @@ impl<'a> KvnWriter<'a> {
         if self.line_len > 0 {
             self.finish_line();
         }
-        if self.line_length_error {
-            return Err(crate::error::ValidationError::Generic {
-                message: "KVN output records must be no longer than 254 characters".into(),
+        if let Some(line_len) = self.line_length_error {
+            return Err(crate::error::ValidationError::OutOfRange {
+                name: "KVN record".into(),
+                value: line_len.to_string(),
+                expected: "a KVN line no longer than 254 characters".into(),
                 line: None,
             }
             .into());
@@ -643,20 +618,26 @@ impl<'a> KvnWriter<'a> {
         if self.line_len > 0 {
             self.finish_line();
         }
-        match self.io_error {
-            Some(error) => Err(error.into()),
-            None if self.line_length_error => Err(crate::error::ValidationError::Generic {
-                message: "KVN output records must be no longer than 254 characters".into(),
+        if let Some(error) = self.io_error {
+            return Err(error.into());
+        }
+        if let Some(line_len) = self.line_length_error {
+            return Err(crate::error::ValidationError::OutOfRange {
+                name: "KVN record".into(),
+                value: line_len.to_string(),
+                expected: "a KVN line no longer than 254 characters".into(),
                 line: None,
             }
-            .into()),
-            None if self.lexical_error => Err(crate::error::ValidationError::Generic {
+            .into());
+        }
+        if self.lexical_error {
+            return Err(crate::error::ValidationError::Generic {
                 message: "KVN output must contain only printable ASCII records".into(),
                 line: None,
             }
-            .into()),
-            None => Ok(()),
+            .into());
         }
+        Ok(())
     }
 }
 
@@ -801,27 +782,29 @@ mod tests {
 
         let mut writer = KvnWriter::new();
         writer.write_line("x".repeat(255));
-        assert!(writer.finish_checked().is_err());
+        let error = writer.finish_checked().unwrap_err();
+        assert_eq!(error.code(), Some("validation.out_of_range"));
+        assert!(error.to_string().contains("255"));
 
         let mut writer = KvnWriter::new();
         std::fmt::Write::write_str(&mut writer, &"x".repeat(255)).unwrap();
         assert!(writer.finish_checked().is_err());
+
+        let mut output = Vec::new();
+        let mut writer = KvnWriter::from_io(&mut output);
+        writer.write_line("x".repeat(255));
+        assert_eq!(
+            writer.finish_io().unwrap_err().code(),
+            Some("validation.out_of_range")
+        );
     }
 
     #[test]
-    fn writer_preserves_ocm_long_history_records() {
+    fn writer_allows_arbitrary_line_lengths_when_the_message_standard_does() {
         let mut writer = KvnWriter::new();
-        writer.allow_long_history_records();
-        writer.write_section("COV_START");
-        writer.write_line("x".repeat(255));
-        writer.write_section("COV_STOP");
-        assert!(writer.finish_checked().is_ok());
-
-        let mut writer = KvnWriter::new();
-        writer.allow_long_history_records();
-        writer.write_section("COV_START");
+        writer.allow_long_records();
         writer.write_pair("KEY", "x".repeat(240));
-        assert!(writer.finish_checked().is_err());
+        assert!(writer.finish_checked().is_ok());
     }
 
     #[test]

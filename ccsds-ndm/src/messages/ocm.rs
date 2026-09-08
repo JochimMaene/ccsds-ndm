@@ -729,14 +729,6 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
         if line.as_bytes().contains(&b'\r') {
             return fail("lone carriage return");
         }
-        // ODM's 254-character KVN limit applies to keyword records. OCM covariance history
-        // records are fixed logical records and the official Annex G example contains complete
-        // lower-triangular records longer than 254 characters; splitting one would change it.
-        if line.len() > 254
-            && (line.contains('=') || !matches!(current_block, Some("TRAJ" | "COV" | "MAN")))
-        {
-            return fail("line exceeds the normative 254-character limit");
-        }
         if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
             return fail("non-printable or non-ASCII character");
         }
@@ -961,7 +953,7 @@ impl Ocm {
 
 impl ToKvn for Ocm {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.allow_long_history_records();
+        writer.allow_long_records();
         writer.write_pair("CCSDS_OCM_VERS", &self.version);
         self.header.write_kvn(writer);
         self.body.write_kvn(writer);

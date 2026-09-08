@@ -131,22 +131,24 @@ fn acm_vectors_and_units_survive_both_notations() {
 
 #[test]
 fn every_kvn_generation_gate_rejects_invalid_state_before_output() {
-    let mut cases: Vec<(&str, Acm)> = Vec::new();
     let mut non_ascii = Acm::from_kvn(ATT_KVN).unwrap();
     non_ascii.body.segment.metadata.object_name = "ST5 €".to_owned();
-    cases.push(("non-ASCII text", non_ascii));
-    let mut overlong = Acm::from_kvn(ATT_KVN).unwrap();
-    overlong.body.segment.metadata.object_name = "X".repeat(240);
-    cases.push(("overlong record", overlong));
-    for (label, message) in cases {
-        assert!(message.to_kvn().is_err(), "materialized accepted {label}");
-        let mut output = Vec::new();
-        assert!(
-            message.write_kvn_to(&mut output).is_err(),
-            "streaming accepted {label}"
-        );
-        assert!(output.is_empty(), "streaming wrote bytes for {label}");
-    }
+    assert!(non_ascii.to_kvn().is_err());
+    let mut output = Vec::new();
+    assert!(non_ascii.write_kvn_to(&mut output).is_err());
+    assert!(output.is_empty());
+}
+
+#[test]
+fn acm_accepts_arbitrary_line_lengths() {
+    let long_name = "X".repeat(300);
+    let source = ATT_KVN.replace("OBJECT_NAME = SDO", &format!("OBJECT_NAME = {long_name}"));
+    let message = Acm::from_kvn(&source).unwrap();
+    let generated = message.to_kvn().unwrap();
+    assert!(generated.lines().any(|line| line.len() > 254));
+    let mut streamed = Vec::new();
+    message.write_kvn_to(&mut streamed).unwrap();
+    assert_eq!(streamed, generated.as_bytes());
 }
 
 #[test]
