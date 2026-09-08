@@ -6,12 +6,16 @@
 //!
 //! This module implements KVN parsing for TDM using winnow parser combinators.
 
-use crate::error::{CcsdsNdmError, InternalParserError};
-use crate::kvn::parser::*;
-use crate::messages::tdm::{
+use super::{
     Tdm, TdmBody, TdmData, TdmHeader, TdmMetadata, TdmObservation, TdmObservationData, TdmSegment,
 };
+use crate::error::{
+    CcsdsNdmError, FormatError, InternalParserError, KvnParseError, Result, ValidationError,
+};
+use crate::kvn::parser::*;
+use crate::kvn::ser::KvnWriter;
 use crate::parse_block;
+use crate::traits::ToKvn;
 use crate::types::{CalendarEpoch, Percentage};
 use winnow::combinator::preceded;
 use winnow::error::{AddContext, ErrMode, StrContext};
@@ -473,6 +477,462 @@ impl ParseKvn for Tdm {
 //----------------------------------------------------------------------
 // Tests
 //----------------------------------------------------------------------
+
+fn is_tdm_observation_key(key: &str) -> bool {
+    super::is_tdm_observation_key_bytes(key.as_bytes())
+}
+
+pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
+    #[derive(Clone, Copy, PartialEq)]
+    enum Section {
+        Header,
+        Metadata,
+        Data,
+    }
+
+    let invalid = |line: usize, offset: usize, message: String| {
+        CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(KvnParseError {
+            line,
+            column: 1,
+            message,
+            contexts: vec!["while validating TDM KVN structure"],
+            offset,
+        }))))
+    };
+    let header_rank = |key: &str| match key {
+        "CCSDS_TDM_VERS" => Some(0),
+        "CREATION_DATE" => Some(1),
+        "ORIGINATOR" => Some(2),
+        "MESSAGE_ID" => Some(3),
+        _ => None,
+    };
+
+    let mut section = Section::Header;
+    let mut header_previous = None;
+    let mut metadata_seen = 0u128;
+    let mut metadata_has_content = false;
+    let mut data_has_observation = false;
+    let mut metadata_closed = false;
+    let mut completed_segments = 0usize;
+    let mut offset = 0usize;
+
+    for (index, raw_line) in kvn.split('\n').enumerate() {
+        let line_number = index + 1;
+        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        let fail = |message: &str| Err(invalid(line_number, offset, message.into()));
+        if line.as_bytes().contains(&b'\r') {
+            return fail("lone carriage return");
+        }
+        if line.len() > 254 {
+            return fail("line exceeds the normative 254-character limit");
+        }
+        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            return fail("non-printable or non-ASCII character");
+        }
+        let line = line.trim();
+        if line.is_empty() {
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if line == "COMMENT" || line.starts_with("COMMENT ") {
+            let allowed = match section {
+                Section::Header => header_previous == Some(0),
+                Section::Metadata => !metadata_has_content,
+                Section::Data => !data_has_observation,
+            };
+            if !allowed {
+                return fail("COMMENT is not at the beginning of its TDM logical section");
+            }
+            offset += raw_line.len() + 1;
+            continue;
+        }
+
+        match line {
+            "META_START" => {
+                let after_header =
+                    completed_segments == 0 && matches!(header_previous, Some(2 | 3));
+                let after_segment = completed_segments > 0 && header_previous.is_none();
+                if section != Section::Header || !(after_header || after_segment) {
+                    return fail("META_START is out of order");
+                }
+                section = Section::Metadata;
+                metadata_seen = 0;
+                metadata_has_content = false;
+                metadata_closed = false;
+                offset += raw_line.len() + 1;
+                continue;
+            }
+            "META_STOP" => {
+                if section != Section::Metadata {
+                    return fail("META_STOP without matching META_START");
+                }
+                section = Section::Header;
+                // A sentinel distinguishes the between-segment state from the message header.
+                header_previous = None;
+                metadata_closed = true;
+                offset += raw_line.len() + 1;
+                continue;
+            }
+            "DATA_START" => {
+                if section != Section::Header || header_previous.is_some() || !metadata_closed {
+                    return fail("DATA_START must immediately follow a metadata section");
+                }
+                section = Section::Data;
+                data_has_observation = false;
+                metadata_closed = false;
+                offset += raw_line.len() + 1;
+                continue;
+            }
+            "DATA_STOP" => {
+                if section != Section::Data {
+                    return fail("DATA_STOP without matching DATA_START");
+                }
+                section = Section::Header;
+                header_previous = None;
+                completed_segments += 1;
+                offset += raw_line.len() + 1;
+                continue;
+            }
+            _ => {}
+        }
+
+        if !line.contains('=') {
+            return fail("expected an assignment or TDM section delimiter");
+        }
+        let key = line
+            .split_once('=')
+            .expect("assignment count checked")
+            .0
+            .trim();
+        match section {
+            Section::Header => {
+                if completed_segments > 0 || header_previous.is_none() && key != "CCSDS_TDM_VERS" {
+                    return fail("assignment outside a TDM section");
+                }
+                let rank = header_rank(key).ok_or_else(|| {
+                    invalid(line_number, offset, "unknown TDM header keyword".into())
+                })?;
+                if header_previous.is_some_and(|previous| rank <= previous) {
+                    return fail("duplicate or out-of-order TDM header keyword");
+                }
+                header_previous = Some(rank);
+            }
+            Section::Metadata => {
+                let rank = super::tdm_metadata_rank(key).ok_or_else(|| {
+                    invalid(line_number, offset, "unknown TDM metadata keyword".into())
+                })?;
+                if rank == 0 {
+                    return fail("COMMENT must use COMMENT line syntax");
+                }
+                let bit = 1u128 << rank;
+                if metadata_seen & bit != 0 {
+                    return fail("duplicate or mutually exclusive TDM metadata keyword");
+                }
+                metadata_seen |= bit;
+                metadata_has_content = true;
+            }
+            Section::Data => {
+                if !is_tdm_observation_key(key) {
+                    return fail("unknown TDM observation keyword");
+                }
+                data_has_observation = true;
+            }
+        }
+        offset += raw_line.len() + 1;
+    }
+
+    if section != Section::Header || completed_segments == 0 || header_previous.is_some() {
+        return Err(invalid(
+            kvn.lines().count().max(1),
+            kvn.len(),
+            "unterminated or incomplete TDM section sequence".into(),
+        ));
+    }
+    Ok(())
+}
+
+impl ToKvn for Tdm {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_pair("CCSDS_TDM_VERS", &self.version);
+        self.header.write_kvn(writer);
+        self.body.write_kvn(writer);
+    }
+}
+
+impl ToKvn for TdmHeader {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        writer.write_pair("CREATION_DATE", self.creation_date);
+        writer.write_pair("ORIGINATOR", &self.originator);
+        if let Some(v) = &self.message_id {
+            writer.write_pair("MESSAGE_ID", v);
+        }
+    }
+}
+
+impl ToKvn for TdmBody {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        for segment in &self.segments {
+            segment.write_kvn(writer);
+        }
+    }
+}
+
+impl ToKvn for TdmSegment {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        self.metadata.write_kvn(writer);
+        self.data.write_kvn(writer);
+    }
+}
+
+impl ToKvn for TdmMetadata {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_section("META_START");
+        writer.write_comments(&self.comment);
+        if let Some(v) = &self.track_id {
+            writer.write_pair("TRACK_ID", v);
+        }
+        if let Some(v) = &self.data_types {
+            writer.write_pair("DATA_TYPES", v);
+        }
+        writer.write_pair("TIME_SYSTEM", &self.time_system);
+        if let Some(v) = &self.start_time {
+            writer.write_pair("START_TIME", v);
+        }
+        if let Some(v) = &self.stop_time {
+            writer.write_pair("STOP_TIME", v);
+        }
+        writer.write_pair("PARTICIPANT_1", &self.participant_1);
+        if let Some(v) = &self.participant_2 {
+            writer.write_pair("PARTICIPANT_2", v);
+        }
+        if let Some(v) = &self.participant_3 {
+            writer.write_pair("PARTICIPANT_3", v);
+        }
+        if let Some(v) = &self.participant_4 {
+            writer.write_pair("PARTICIPANT_4", v);
+        }
+        if let Some(v) = &self.participant_5 {
+            writer.write_pair("PARTICIPANT_5", v);
+        }
+        if let Some(v) = &self.mode {
+            writer.write_pair("MODE", v.to_string());
+        }
+        if let Some(v) = &self.path {
+            writer.write_pair("PATH", v.0.as_str());
+        }
+        if let Some(v) = &self.path_1 {
+            writer.write_pair("PATH_1", v.0.as_str());
+        }
+        if let Some(v) = &self.path_2 {
+            writer.write_pair("PATH_2", v.0.as_str());
+        }
+        if let Some(v) = &self.ephemeris_name_1 {
+            writer.write_pair("EPHEMERIS_NAME_1", v);
+        }
+        if let Some(v) = &self.ephemeris_name_2 {
+            writer.write_pair("EPHEMERIS_NAME_2", v);
+        }
+        if let Some(v) = &self.ephemeris_name_3 {
+            writer.write_pair("EPHEMERIS_NAME_3", v);
+        }
+        if let Some(v) = &self.ephemeris_name_4 {
+            writer.write_pair("EPHEMERIS_NAME_4", v);
+        }
+        if let Some(v) = &self.ephemeris_name_5 {
+            writer.write_pair("EPHEMERIS_NAME_5", v);
+        }
+        if let Some(v) = &self.transmit_band {
+            writer.write_pair("TRANSMIT_BAND", v);
+        }
+        if let Some(v) = &self.receive_band {
+            writer.write_pair("RECEIVE_BAND", v);
+        }
+        if let Some(v) = self.turnaround_numerator {
+            writer.write_pair("TURNAROUND_NUMERATOR", v);
+        }
+        if let Some(v) = self.turnaround_denominator {
+            writer.write_pair("TURNAROUND_DENOMINATOR", v);
+        }
+        if let Some(v) = &self.timetag_ref {
+            writer.write_pair("TIMETAG_REF", v.to_string());
+        }
+        if let Some(v) = self.integration_interval {
+            writer.write_pair("INTEGRATION_INTERVAL", v);
+        }
+        if let Some(v) = &self.integration_ref {
+            writer.write_pair("INTEGRATION_REF", v.to_string());
+        }
+        if let Some(v) = self.freq_offset {
+            writer.write_pair("FREQ_OFFSET", v);
+        }
+        if let Some(v) = &self.range_mode {
+            writer.write_pair("RANGE_MODE", v.to_string());
+        }
+        if let Some(v) = self.range_modulus {
+            writer.write_pair("RANGE_MODULUS", v);
+        }
+        if let Some(v) = &self.range_units {
+            writer.write_pair("RANGE_UNITS", v.to_string());
+        }
+        if let Some(v) = &self.angle_type {
+            writer.write_pair("ANGLE_TYPE", v.to_string());
+        }
+        if let Some(v) = &self.reference_frame {
+            writer.write_pair("REFERENCE_FRAME", v.to_string());
+        }
+        if let Some(v) = &self.interpolation {
+            writer.write_pair("INTERPOLATION", v);
+        }
+        if let Some(v) = self.interpolation_degree {
+            writer.write_pair("INTERPOLATION_DEGREE", v);
+        }
+        if let Some(v) = self.doppler_count_bias {
+            writer.write_pair("DOPPLER_COUNT_BIAS", v);
+        }
+        if let Some(v) = self.doppler_count_scale {
+            writer.write_pair("DOPPLER_COUNT_SCALE", v);
+        }
+        if let Some(v) = &self.doppler_count_rollover {
+            writer.write_pair("DOPPLER_COUNT_ROLLOVER", format!("{}", v));
+        }
+        if let Some(v) = self.transmit_delay_1 {
+            writer.write_pair("TRANSMIT_DELAY_1", v);
+        }
+        if let Some(v) = self.transmit_delay_2 {
+            writer.write_pair("TRANSMIT_DELAY_2", v);
+        }
+        if let Some(v) = self.transmit_delay_3 {
+            writer.write_pair("TRANSMIT_DELAY_3", v);
+        }
+        if let Some(v) = self.transmit_delay_4 {
+            writer.write_pair("TRANSMIT_DELAY_4", v);
+        }
+        if let Some(v) = self.transmit_delay_5 {
+            writer.write_pair("TRANSMIT_DELAY_5", v);
+        }
+        if let Some(v) = self.receive_delay_1 {
+            writer.write_pair("RECEIVE_DELAY_1", v);
+        }
+        if let Some(v) = self.receive_delay_2 {
+            writer.write_pair("RECEIVE_DELAY_2", v);
+        }
+        if let Some(v) = self.receive_delay_3 {
+            writer.write_pair("RECEIVE_DELAY_3", v);
+        }
+        if let Some(v) = self.receive_delay_4 {
+            writer.write_pair("RECEIVE_DELAY_4", v);
+        }
+        if let Some(v) = self.receive_delay_5 {
+            writer.write_pair("RECEIVE_DELAY_5", v);
+        }
+        if let Some(v) = &self.data_quality {
+            writer.write_pair("DATA_QUALITY", v.to_string());
+        }
+        if let Some(v) = self.correction_angle_1 {
+            writer.write_pair("CORRECTION_ANGLE_1", v);
+        }
+        if let Some(v) = self.correction_angle_2 {
+            writer.write_pair("CORRECTION_ANGLE_2", v);
+        }
+        if let Some(v) = self.correction_doppler {
+            writer.write_pair("CORRECTION_DOPPLER", v);
+        }
+        if let Some(v) = self.correction_mag {
+            writer.write_pair("CORRECTION_MAG", v);
+        }
+        if let Some(v) = self.correction_range {
+            writer.write_pair("CORRECTION_RANGE", v);
+        }
+        if let Some(v) = self.correction_rcs {
+            writer.write_pair("CORRECTION_RCS", v);
+        }
+        if let Some(v) = self.correction_receive {
+            writer.write_pair("CORRECTION_RECEIVE", v);
+        }
+        if let Some(v) = self.correction_transmit {
+            writer.write_pair("CORRECTION_TRANSMIT", v);
+        }
+        if let Some(v) = self.correction_aberration_yearly {
+            writer.write_pair("CORRECTION_ABERRATION_YEARLY", v);
+        }
+        if let Some(v) = self.correction_aberration_diurnal {
+            writer.write_pair("CORRECTION_ABERRATION_DIURNAL", v);
+        }
+        if let Some(v) = &self.corrections_applied {
+            writer.write_pair("CORRECTIONS_APPLIED", format!("{}", v));
+        }
+        writer.write_section("META_STOP");
+    }
+}
+
+impl ToKvn for TdmData {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_section("DATA_START");
+        writer.write_comments(&self.comment);
+        for obs in &self.observations {
+            writer.write_tdm_observation(obs.data.key(), &obs.epoch, obs.data.value());
+        }
+        writer.write_section("DATA_STOP");
+    }
+}
+
+impl Tdm {
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        let check = |field: &'static str, value: &str| -> Result<()> {
+            if value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+                Ok(())
+            } else {
+                Err(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "printable ASCII for TDM KVN".into(),
+                    line: None,
+                }
+                .into())
+            }
+        };
+        for comment in &self.header.comment {
+            check("COMMENT", comment)?;
+        }
+        check("ORIGINATOR", &self.header.originator)?;
+        if let Some(value) = &self.header.message_id {
+            check("MESSAGE_ID", value)?;
+        }
+        for segment in &self.body.segments {
+            let metadata = &segment.metadata;
+            for comment in &metadata.comment {
+                check("COMMENT", comment)?;
+            }
+            for (field, value) in [
+                ("TRACK_ID", metadata.track_id.as_deref()),
+                ("DATA_TYPES", metadata.data_types.as_deref()),
+                ("TIME_SYSTEM", Some(metadata.time_system.as_str())),
+                ("PARTICIPANT_1", Some(metadata.participant_1.as_str())),
+                ("PARTICIPANT_2", metadata.participant_2.as_deref()),
+                ("PARTICIPANT_3", metadata.participant_3.as_deref()),
+                ("PARTICIPANT_4", metadata.participant_4.as_deref()),
+                ("PARTICIPANT_5", metadata.participant_5.as_deref()),
+                ("EPHEMERIS_NAME_1", metadata.ephemeris_name_1.as_deref()),
+                ("EPHEMERIS_NAME_2", metadata.ephemeris_name_2.as_deref()),
+                ("EPHEMERIS_NAME_3", metadata.ephemeris_name_3.as_deref()),
+                ("EPHEMERIS_NAME_4", metadata.ephemeris_name_4.as_deref()),
+                ("EPHEMERIS_NAME_5", metadata.ephemeris_name_5.as_deref()),
+                ("TRANSMIT_BAND", metadata.transmit_band.as_deref()),
+                ("RECEIVE_BAND", metadata.receive_band.as_deref()),
+                ("INTERPOLATION", metadata.interpolation.as_deref()),
+            ] {
+                if let Some(value) = value {
+                    check(field, value)?;
+                }
+            }
+            for comment in &segment.data.comment {
+                check("COMMENT", comment)?;
+            }
+        }
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -1288,7 +1748,7 @@ DATA_STOP
 
     #[test]
     fn test_xsd_sample_tdm_e1_kvn() {
-        let kvn = include_str!("../../data/kvn/tdm_e1.kvn");
+        let kvn = include_str!("../../../data/kvn/tdm_e1.kvn");
         let tdm = Tdm::from_kvn(kvn).unwrap();
         assert!(!tdm.body.segments.is_empty());
         assert!(!tdm.body.segments[0].metadata.time_system.is_empty());
@@ -1296,21 +1756,21 @@ DATA_STOP
 
     #[test]
     fn test_xsd_sample_tdm_e2_kvn() {
-        let kvn = include_str!("../../data/kvn/tdm_e2.kvn");
+        let kvn = include_str!("../../../data/kvn/tdm_e2.kvn");
         let tdm = Tdm::from_kvn(kvn).unwrap();
         assert!(!tdm.body.segments.is_empty());
     }
 
     #[test]
     fn test_xsd_sample_tdm_e3_kvn() {
-        let kvn = include_str!("../../data/kvn/tdm_e3.kvn");
+        let kvn = include_str!("../../../data/kvn/tdm_e3.kvn");
         let tdm = Tdm::from_kvn(kvn).unwrap();
         assert!(!tdm.body.segments.is_empty());
     }
 
     #[test]
     fn test_xsd_sample_tdm_e16_kvn() {
-        let kvn = include_str!("../../data/kvn/tdm_e16.kvn");
+        let kvn = include_str!("../../../data/kvn/tdm_e16.kvn");
         let tdm = Tdm::from_kvn(kvn).unwrap();
         assert!(!tdm.body.segments.is_empty());
         let seg = &tdm.body.segments[0];
@@ -1319,7 +1779,7 @@ DATA_STOP
 
     #[test]
     fn test_xsd_sample_tdm_e18_kvn() {
-        let kvn = include_str!("../../data/kvn/tdm_e18.kvn");
+        let kvn = include_str!("../../../data/kvn/tdm_e18.kvn");
         let tdm = Tdm::from_kvn(kvn).unwrap();
         assert!(!tdm.body.segments.is_empty());
     }

@@ -21,19 +21,9 @@
 //!   [`Ndm::from_kvn`](crate::traits::Ndm::from_kvn) or the crate-level auto-detection helpers.
 //! - **Serialization**: Uses a custom `KvnWriter` to ensure correct formatting and indentation.
 
-pub(crate) mod acm;
-pub(crate) mod aem;
-pub(crate) mod apm;
-pub(crate) mod cdm;
-pub(crate) mod ocm;
-pub(crate) mod oem;
-pub(crate) mod omm;
-pub(crate) mod opm;
 pub(crate) mod parser;
-pub(crate) mod rdm;
 pub mod ser;
 pub(crate) mod strict;
-pub(crate) mod tdm;
 
 /// Normalize CR, LFCR, and CRLF terminators so line-oriented passes only have to handle LF.
 ///

@@ -2,185 +2,22 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::error::{CcsdsNdmError, FormatError, KvnParseError, Result, ValidationError};
+mod kvn;
+mod xml;
+
+use crate::error::{CcsdsNdmError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
-use crate::kvn::ser::KvnWriter;
+use crate::traits::Ndm;
 #[cfg(test)]
 use crate::traits::Validate;
-use crate::traits::{Ndm, ToKvn};
 use crate::types::{
     require_non_negative, require_positive, CalendarEpoch, Percentage, TdmAngleType,
     TdmDataQuality, TdmIntegrationRef, TdmMode, TdmPath, TdmRangeMode, TdmRangeUnits,
     TdmReferenceFrame, TdmTimetagRef, YesNo,
 };
 use fast_float;
-use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::fmt;
-
-/// Tracking Data Message (TDM).
-///
-/// The TDM specifies a standard message format for use in exchanging spacecraft tracking data
-/// between space agencies. Such exchanges are used for distributing tracking data output from
-/// routine interagency cross-supports.
-///
-/// Tracking data includes data types such as:
-/// - Doppler
-/// - Transmit/Received frequencies
-/// - Range
-/// - Angles
-/// - Delta-DOR
-/// - Media correction (ionosphere, troposphere)
-/// - Meteorological data
-///
-/// **CCSDS Reference**: 503.0-B-2.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename = "tdm")]
-pub struct Tdm {
-    pub header: TdmHeader,
-    pub body: TdmBody,
-    #[serde(rename = "@id")]
-    #[builder(required, default = Some("CCSDS_TDM_VERS".to_string()))]
-    pub id: Option<String>,
-    #[serde(rename = "@version")]
-    #[builder(default = "2.0".to_string(), into)]
-    pub version: String,
-}
-
-impl crate::traits::Validate for Tdm {
-    fn validate(&self) -> Result<()> {
-        crate::versioning::validate_root(
-            crate::validation::MessageKind::Tdm,
-            &self.id,
-            &self.version,
-        )?;
-        self.header.validate()?;
-        self.body.validate()
-    }
-}
-
-impl Ndm for Tdm {
-    fn to_kvn(&self) -> Result<String> {
-        crate::generation::to_kvn_string(self)
-    }
-
-    fn from_kvn(kvn: &str) -> Result<Self> {
-        validate_kvn_syntax(kvn)?;
-        let tdm = Self::from_kvn_str(kvn)?;
-        crate::traits::Validate::validate(&tdm)?;
-        Ok(tdm)
-    }
-
-    fn to_xml(&self) -> Result<String> {
-        crate::generation::to_xml_string(self)
-    }
-
-    fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::validate_document_root(xml, b"tdm", "TDM")?;
-        validate_xml_sequences(xml)?;
-        let tdm: Self = crate::xml::from_str_with_context(xml, "TDM")?;
-        crate::traits::Validate::validate(&tdm)?;
-        Ok(tdm)
-    }
-
-    fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
-        crate::generation::write_kvn_to(self, output)
-    }
-
-    fn write_xml_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
-        crate::generation::write_xml_to(self, output)
-    }
-}
-
-impl Tdm {
-    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
-        let check = |field: &'static str, value: &str| -> Result<()> {
-            if value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
-                Ok(())
-            } else {
-                Err(ValidationError::InvalidValue {
-                    field: field.into(),
-                    value: value.to_string(),
-                    expected: "printable ASCII for TDM KVN".into(),
-                    line: None,
-                }
-                .into())
-            }
-        };
-        for comment in &self.header.comment {
-            check("COMMENT", comment)?;
-        }
-        check("ORIGINATOR", &self.header.originator)?;
-        if let Some(value) = &self.header.message_id {
-            check("MESSAGE_ID", value)?;
-        }
-        for segment in &self.body.segments {
-            let metadata = &segment.metadata;
-            for comment in &metadata.comment {
-                check("COMMENT", comment)?;
-            }
-            for (field, value) in [
-                ("TRACK_ID", metadata.track_id.as_deref()),
-                ("DATA_TYPES", metadata.data_types.as_deref()),
-                ("TIME_SYSTEM", Some(metadata.time_system.as_str())),
-                ("PARTICIPANT_1", Some(metadata.participant_1.as_str())),
-                ("PARTICIPANT_2", metadata.participant_2.as_deref()),
-                ("PARTICIPANT_3", metadata.participant_3.as_deref()),
-                ("PARTICIPANT_4", metadata.participant_4.as_deref()),
-                ("PARTICIPANT_5", metadata.participant_5.as_deref()),
-                ("EPHEMERIS_NAME_1", metadata.ephemeris_name_1.as_deref()),
-                ("EPHEMERIS_NAME_2", metadata.ephemeris_name_2.as_deref()),
-                ("EPHEMERIS_NAME_3", metadata.ephemeris_name_3.as_deref()),
-                ("EPHEMERIS_NAME_4", metadata.ephemeris_name_4.as_deref()),
-                ("EPHEMERIS_NAME_5", metadata.ephemeris_name_5.as_deref()),
-                ("TRANSMIT_BAND", metadata.transmit_band.as_deref()),
-                ("RECEIVE_BAND", metadata.receive_band.as_deref()),
-                ("INTERPOLATION", metadata.interpolation.as_deref()),
-            ] {
-                if let Some(value) = value {
-                    check(field, value)?;
-                }
-            }
-            for comment in &segment.data.comment {
-                check("COMMENT", comment)?;
-            }
-        }
-        Ok(())
-    }
-}
-
-fn validate_xml_sequences(xml: &str) -> Result<()> {
-    use crate::xml::XmlSequenceRule;
-
-    let rule = |rank, repeatable| XmlSequenceRule::new(rank, repeatable);
-    crate::xml::validate_element_sequences(
-        xml,
-        "TDM",
-        |parent, child| {
-            Some(match (parent, child) {
-                (b"tdm", b"header") => rule(0, false),
-                (b"tdm", b"body") => rule(1, false),
-                (b"header", b"COMMENT") => rule(0, true),
-                (b"header", b"CREATION_DATE") => rule(1, false),
-                (b"header", b"ORIGINATOR") => rule(2, false),
-                (b"header", b"MESSAGE_ID") => rule(3, false),
-                (b"body", b"segment") => rule(0, true),
-                (b"segment", b"metadata") => rule(0, false),
-                (b"segment", b"data") => rule(1, false),
-                (b"metadata", child) => rule(tdm_metadata_rank_bytes(child)?, child == b"COMMENT"),
-                (b"data", b"COMMENT") => rule(0, true),
-                (b"data", b"observation") => rule(1, true),
-                (b"observation", b"EPOCH") => rule(0, false),
-                (b"observation", child) if is_tdm_observation_key_bytes(child) => rule(1, false),
-                _ => return None,
-            })
-        },
-        |element, attribute| {
-            attribute == b"units" && matches!(element, b"ANGLE_1" | b"ANGLE_2" | b"RHUMIDITY")
-        },
-    )
-}
 
 fn tdm_metadata_rank(key: &str) -> Option<u16> {
     const KEYS: &[&str] = &[
@@ -259,15 +96,11 @@ fn tdm_metadata_rank(key: &str) -> Option<u16> {
         })
 }
 
-fn tdm_metadata_rank_bytes(key: &[u8]) -> Option<u16> {
+pub(super) fn tdm_metadata_rank_bytes(key: &[u8]) -> Option<u16> {
     std::str::from_utf8(key).ok().and_then(tdm_metadata_rank)
 }
 
-fn is_tdm_observation_key(key: &str) -> bool {
-    is_tdm_observation_key_bytes(key.as_bytes())
-}
-
-fn is_tdm_observation_key_bytes(key: &[u8]) -> bool {
+pub(super) fn is_tdm_observation_key_bytes(key: &[u8]) -> bool {
     matches!(
         key,
         b"ANGLE_1"
@@ -320,180 +153,77 @@ fn is_tdm_observation_key_bytes(key: &[u8]) -> bool {
     )
 }
 
-fn validate_kvn_syntax(kvn: &str) -> Result<()> {
-    #[derive(Clone, Copy, PartialEq)]
-    enum Section {
-        Header,
-        Metadata,
-        Data,
-    }
-
-    let invalid = |line: usize, offset: usize, message: String| {
-        CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(KvnParseError {
-            line,
-            column: 1,
-            message,
-            contexts: vec!["while validating TDM KVN structure"],
-            offset,
-        }))))
-    };
-    let header_rank = |key: &str| match key {
-        "CCSDS_TDM_VERS" => Some(0),
-        "CREATION_DATE" => Some(1),
-        "ORIGINATOR" => Some(2),
-        "MESSAGE_ID" => Some(3),
-        _ => None,
-    };
-
-    let mut section = Section::Header;
-    let mut header_previous = None;
-    let mut metadata_seen = 0u128;
-    let mut metadata_has_content = false;
-    let mut data_has_observation = false;
-    let mut metadata_closed = false;
-    let mut completed_segments = 0usize;
-    let mut offset = 0usize;
-
-    for (index, raw_line) in kvn.split('\n').enumerate() {
-        let line_number = index + 1;
-        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
-        let fail = |message: &str| Err(invalid(line_number, offset, message.into()));
-        if line.as_bytes().contains(&b'\r') {
-            return fail("lone carriage return");
-        }
-        if line.len() > 254 {
-            return fail("line exceeds the normative 254-character limit");
-        }
-        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
-            return fail("non-printable or non-ASCII character");
-        }
-        let line = line.trim();
-        if line.is_empty() {
-            offset += raw_line.len() + 1;
-            continue;
-        }
-        if line == "COMMENT" || line.starts_with("COMMENT ") {
-            let allowed = match section {
-                Section::Header => header_previous == Some(0),
-                Section::Metadata => !metadata_has_content,
-                Section::Data => !data_has_observation,
-            };
-            if !allowed {
-                return fail("COMMENT is not at the beginning of its TDM logical section");
-            }
-            offset += raw_line.len() + 1;
-            continue;
-        }
-
-        match line {
-            "META_START" => {
-                let after_header =
-                    completed_segments == 0 && matches!(header_previous, Some(2 | 3));
-                let after_segment = completed_segments > 0 && header_previous.is_none();
-                if section != Section::Header || !(after_header || after_segment) {
-                    return fail("META_START is out of order");
-                }
-                section = Section::Metadata;
-                metadata_seen = 0;
-                metadata_has_content = false;
-                metadata_closed = false;
-                offset += raw_line.len() + 1;
-                continue;
-            }
-            "META_STOP" => {
-                if section != Section::Metadata {
-                    return fail("META_STOP without matching META_START");
-                }
-                section = Section::Header;
-                // A sentinel distinguishes the between-segment state from the message header.
-                header_previous = None;
-                metadata_closed = true;
-                offset += raw_line.len() + 1;
-                continue;
-            }
-            "DATA_START" => {
-                if section != Section::Header || header_previous.is_some() || !metadata_closed {
-                    return fail("DATA_START must immediately follow a metadata section");
-                }
-                section = Section::Data;
-                data_has_observation = false;
-                metadata_closed = false;
-                offset += raw_line.len() + 1;
-                continue;
-            }
-            "DATA_STOP" => {
-                if section != Section::Data {
-                    return fail("DATA_STOP without matching DATA_START");
-                }
-                section = Section::Header;
-                header_previous = None;
-                completed_segments += 1;
-                offset += raw_line.len() + 1;
-                continue;
-            }
-            _ => {}
-        }
-
-        if !line.contains('=') {
-            return fail("expected an assignment or TDM section delimiter");
-        }
-        let key = line
-            .split_once('=')
-            .expect("assignment count checked")
-            .0
-            .trim();
-        match section {
-            Section::Header => {
-                if completed_segments > 0 || header_previous.is_none() && key != "CCSDS_TDM_VERS" {
-                    return fail("assignment outside a TDM section");
-                }
-                let rank = header_rank(key).ok_or_else(|| {
-                    invalid(line_number, offset, "unknown TDM header keyword".into())
-                })?;
-                if header_previous.is_some_and(|previous| rank <= previous) {
-                    return fail("duplicate or out-of-order TDM header keyword");
-                }
-                header_previous = Some(rank);
-            }
-            Section::Metadata => {
-                let rank = tdm_metadata_rank(key).ok_or_else(|| {
-                    invalid(line_number, offset, "unknown TDM metadata keyword".into())
-                })?;
-                if rank == 0 {
-                    return fail("COMMENT must use COMMENT line syntax");
-                }
-                let bit = 1u128 << rank;
-                if metadata_seen & bit != 0 {
-                    return fail("duplicate or mutually exclusive TDM metadata keyword");
-                }
-                metadata_seen |= bit;
-                metadata_has_content = true;
-            }
-            Section::Data => {
-                if !is_tdm_observation_key(key) {
-                    return fail("unknown TDM observation keyword");
-                }
-                data_has_observation = true;
-            }
-        }
-        offset += raw_line.len() + 1;
-    }
-
-    if section != Section::Header || completed_segments == 0 || header_previous.is_some() {
-        return Err(invalid(
-            kvn.lines().count().max(1),
-            kvn.len(),
-            "unterminated or incomplete TDM section sequence".into(),
-        ));
-    }
-    Ok(())
+/// Tracking Data Message (TDM).
+///
+/// The TDM specifies a standard message format for use in exchanging spacecraft tracking data
+/// between space agencies. Such exchanges are used for distributing tracking data output from
+/// routine interagency cross-supports.
+///
+/// Tracking data includes data types such as:
+/// - Doppler
+/// - Transmit/Received frequencies
+/// - Range
+/// - Angles
+/// - Delta-DOR
+/// - Media correction (ionosphere, troposphere)
+/// - Meteorological data
+///
+/// **CCSDS Reference**: 503.0-B-2.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
+#[serde(rename = "tdm")]
+pub struct Tdm {
+    pub header: TdmHeader,
+    pub body: TdmBody,
+    #[serde(rename = "@id")]
+    #[builder(required, default = Some("CCSDS_TDM_VERS".to_string()))]
+    pub id: Option<String>,
+    #[serde(rename = "@version")]
+    #[builder(default = "2.0".to_string(), into)]
+    pub version: String,
 }
 
-impl ToKvn for Tdm {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_pair("CCSDS_TDM_VERS", &self.version);
-        self.header.write_kvn(writer);
-        self.body.write_kvn(writer);
+impl crate::traits::Validate for Tdm {
+    fn validate(&self) -> Result<()> {
+        crate::versioning::validate_root(
+            crate::validation::MessageKind::Tdm,
+            &self.id,
+            &self.version,
+        )?;
+        self.header.validate()?;
+        self.body.validate()
+    }
+}
+
+impl Ndm for Tdm {
+    fn to_kvn(&self) -> Result<String> {
+        crate::generation::to_kvn_string(self)
+    }
+
+    fn from_kvn(kvn: &str) -> Result<Self> {
+        kvn::validate_kvn_syntax(kvn)?;
+        let tdm = Self::from_kvn_str(kvn)?;
+        crate::traits::Validate::validate(&tdm)?;
+        Ok(tdm)
+    }
+
+    fn to_xml(&self) -> Result<String> {
+        crate::generation::to_xml_string(self)
+    }
+
+    fn from_xml(xml: &str) -> Result<Self> {
+        crate::xml::validate_document_root(xml, b"tdm", "TDM")?;
+        xml::validate_xml_sequences(xml)?;
+        let tdm: Self = crate::xml::from_str_with_context(xml, "TDM")?;
+        crate::traits::Validate::validate(&tdm)?;
+        Ok(tdm)
+    }
+
+    fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
+        crate::generation::write_kvn_to(self, output)
+    }
+
+    fn write_xml_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
+        crate::generation::write_xml_to(self, output)
     }
 }
 
@@ -566,17 +296,6 @@ impl crate::traits::Validate for TdmHeader {
     }
 }
 
-impl ToKvn for TdmHeader {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_comments(&self.comment);
-        writer.write_pair("CREATION_DATE", self.creation_date);
-        writer.write_pair("ORIGINATOR", &self.originator);
-        if let Some(v) = &self.message_id {
-            writer.write_pair("MESSAGE_ID", v);
-        }
-    }
-}
-
 //----------------------------------------------------------------------
 // Body & Segment
 //----------------------------------------------------------------------
@@ -607,14 +326,6 @@ impl crate::traits::Validate for TdmBody {
     }
 }
 
-impl ToKvn for TdmBody {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        for segment in &self.segments {
-            segment.write_kvn(writer);
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct TdmSegment {
@@ -635,13 +346,6 @@ impl crate::traits::Validate for TdmSegment {
 impl TdmSegment {
     pub fn validate(&self) -> Result<()> {
         crate::traits::Validate::validate(self)
-    }
-}
-
-impl ToKvn for TdmSegment {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        self.metadata.write_kvn(writer);
-        self.data.write_kvn(writer);
     }
 }
 
@@ -1549,187 +1253,6 @@ impl TdmMetadata {
     }
 }
 
-impl ToKvn for TdmMetadata {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_section("META_START");
-        writer.write_comments(&self.comment);
-        if let Some(v) = &self.track_id {
-            writer.write_pair("TRACK_ID", v);
-        }
-        if let Some(v) = &self.data_types {
-            writer.write_pair("DATA_TYPES", v);
-        }
-        writer.write_pair("TIME_SYSTEM", &self.time_system);
-        if let Some(v) = &self.start_time {
-            writer.write_pair("START_TIME", v);
-        }
-        if let Some(v) = &self.stop_time {
-            writer.write_pair("STOP_TIME", v);
-        }
-        writer.write_pair("PARTICIPANT_1", &self.participant_1);
-        if let Some(v) = &self.participant_2 {
-            writer.write_pair("PARTICIPANT_2", v);
-        }
-        if let Some(v) = &self.participant_3 {
-            writer.write_pair("PARTICIPANT_3", v);
-        }
-        if let Some(v) = &self.participant_4 {
-            writer.write_pair("PARTICIPANT_4", v);
-        }
-        if let Some(v) = &self.participant_5 {
-            writer.write_pair("PARTICIPANT_5", v);
-        }
-        if let Some(v) = &self.mode {
-            writer.write_pair("MODE", v.to_string());
-        }
-        if let Some(v) = &self.path {
-            writer.write_pair("PATH", v.0.as_str());
-        }
-        if let Some(v) = &self.path_1 {
-            writer.write_pair("PATH_1", v.0.as_str());
-        }
-        if let Some(v) = &self.path_2 {
-            writer.write_pair("PATH_2", v.0.as_str());
-        }
-        if let Some(v) = &self.ephemeris_name_1 {
-            writer.write_pair("EPHEMERIS_NAME_1", v);
-        }
-        if let Some(v) = &self.ephemeris_name_2 {
-            writer.write_pair("EPHEMERIS_NAME_2", v);
-        }
-        if let Some(v) = &self.ephemeris_name_3 {
-            writer.write_pair("EPHEMERIS_NAME_3", v);
-        }
-        if let Some(v) = &self.ephemeris_name_4 {
-            writer.write_pair("EPHEMERIS_NAME_4", v);
-        }
-        if let Some(v) = &self.ephemeris_name_5 {
-            writer.write_pair("EPHEMERIS_NAME_5", v);
-        }
-        if let Some(v) = &self.transmit_band {
-            writer.write_pair("TRANSMIT_BAND", v);
-        }
-        if let Some(v) = &self.receive_band {
-            writer.write_pair("RECEIVE_BAND", v);
-        }
-        if let Some(v) = self.turnaround_numerator {
-            writer.write_pair("TURNAROUND_NUMERATOR", v);
-        }
-        if let Some(v) = self.turnaround_denominator {
-            writer.write_pair("TURNAROUND_DENOMINATOR", v);
-        }
-        if let Some(v) = &self.timetag_ref {
-            writer.write_pair("TIMETAG_REF", v.to_string());
-        }
-        if let Some(v) = self.integration_interval {
-            writer.write_pair("INTEGRATION_INTERVAL", v);
-        }
-        if let Some(v) = &self.integration_ref {
-            writer.write_pair("INTEGRATION_REF", v.to_string());
-        }
-        if let Some(v) = self.freq_offset {
-            writer.write_pair("FREQ_OFFSET", v);
-        }
-        if let Some(v) = &self.range_mode {
-            writer.write_pair("RANGE_MODE", v.to_string());
-        }
-        if let Some(v) = self.range_modulus {
-            writer.write_pair("RANGE_MODULUS", v);
-        }
-        if let Some(v) = &self.range_units {
-            writer.write_pair("RANGE_UNITS", v.to_string());
-        }
-        if let Some(v) = &self.angle_type {
-            writer.write_pair("ANGLE_TYPE", v.to_string());
-        }
-        if let Some(v) = &self.reference_frame {
-            writer.write_pair("REFERENCE_FRAME", v.to_string());
-        }
-        if let Some(v) = &self.interpolation {
-            writer.write_pair("INTERPOLATION", v);
-        }
-        if let Some(v) = self.interpolation_degree {
-            writer.write_pair("INTERPOLATION_DEGREE", v);
-        }
-        if let Some(v) = self.doppler_count_bias {
-            writer.write_pair("DOPPLER_COUNT_BIAS", v);
-        }
-        if let Some(v) = self.doppler_count_scale {
-            writer.write_pair("DOPPLER_COUNT_SCALE", v);
-        }
-        if let Some(v) = &self.doppler_count_rollover {
-            writer.write_pair("DOPPLER_COUNT_ROLLOVER", format!("{}", v));
-        }
-        if let Some(v) = self.transmit_delay_1 {
-            writer.write_pair("TRANSMIT_DELAY_1", v);
-        }
-        if let Some(v) = self.transmit_delay_2 {
-            writer.write_pair("TRANSMIT_DELAY_2", v);
-        }
-        if let Some(v) = self.transmit_delay_3 {
-            writer.write_pair("TRANSMIT_DELAY_3", v);
-        }
-        if let Some(v) = self.transmit_delay_4 {
-            writer.write_pair("TRANSMIT_DELAY_4", v);
-        }
-        if let Some(v) = self.transmit_delay_5 {
-            writer.write_pair("TRANSMIT_DELAY_5", v);
-        }
-        if let Some(v) = self.receive_delay_1 {
-            writer.write_pair("RECEIVE_DELAY_1", v);
-        }
-        if let Some(v) = self.receive_delay_2 {
-            writer.write_pair("RECEIVE_DELAY_2", v);
-        }
-        if let Some(v) = self.receive_delay_3 {
-            writer.write_pair("RECEIVE_DELAY_3", v);
-        }
-        if let Some(v) = self.receive_delay_4 {
-            writer.write_pair("RECEIVE_DELAY_4", v);
-        }
-        if let Some(v) = self.receive_delay_5 {
-            writer.write_pair("RECEIVE_DELAY_5", v);
-        }
-        if let Some(v) = &self.data_quality {
-            writer.write_pair("DATA_QUALITY", v.to_string());
-        }
-        if let Some(v) = self.correction_angle_1 {
-            writer.write_pair("CORRECTION_ANGLE_1", v);
-        }
-        if let Some(v) = self.correction_angle_2 {
-            writer.write_pair("CORRECTION_ANGLE_2", v);
-        }
-        if let Some(v) = self.correction_doppler {
-            writer.write_pair("CORRECTION_DOPPLER", v);
-        }
-        if let Some(v) = self.correction_mag {
-            writer.write_pair("CORRECTION_MAG", v);
-        }
-        if let Some(v) = self.correction_range {
-            writer.write_pair("CORRECTION_RANGE", v);
-        }
-        if let Some(v) = self.correction_rcs {
-            writer.write_pair("CORRECTION_RCS", v);
-        }
-        if let Some(v) = self.correction_receive {
-            writer.write_pair("CORRECTION_RECEIVE", v);
-        }
-        if let Some(v) = self.correction_transmit {
-            writer.write_pair("CORRECTION_TRANSMIT", v);
-        }
-        if let Some(v) = self.correction_aberration_yearly {
-            writer.write_pair("CORRECTION_ABERRATION_YEARLY", v);
-        }
-        if let Some(v) = self.correction_aberration_diurnal {
-            writer.write_pair("CORRECTION_ABERRATION_DIURNAL", v);
-        }
-        if let Some(v) = &self.corrections_applied {
-            writer.write_pair("CORRECTIONS_APPLIED", format!("{}", v));
-        }
-        writer.write_section("META_STOP");
-    }
-}
-
 //----------------------------------------------------------------------
 // Data
 //----------------------------------------------------------------------
@@ -1771,17 +1294,6 @@ impl TdmData {
     }
 }
 
-impl ToKvn for TdmData {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_section("DATA_START");
-        writer.write_comments(&self.comment);
-        for obs in &self.observations {
-            writer.write_tdm_observation(obs.data.key(), &obs.epoch, obs.data.value());
-        }
-        writer.write_section("DATA_STOP");
-    }
-}
-
 //----------------------------------------------------------------------
 // Observation
 //----------------------------------------------------------------------
@@ -1795,202 +1307,6 @@ pub struct TdmObservation {
     /// The tracking observable (measurement or calculation).
     #[serde(rename = "$value")]
     pub data: TdmObservationData,
-}
-
-// Custom Deserialize to handle XML's flat structure correctly
-impl<'de> Deserialize<'de> for TdmObservation {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct TdmObservationVisitor;
-
-        impl<'de> Visitor<'de> for TdmObservationVisitor {
-            type Value = TdmObservation;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a TDM observation element")
-            }
-
-            fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
-            where
-                A: MapAccess<'de>,
-            {
-                let mut epoch: Option<CalendarEpoch> = None;
-                let mut data: Option<TdmObservationData> = None;
-
-                while let Some(key) = map.next_key::<String>()? {
-                    match key.as_str() {
-                        "EPOCH" => {
-                            if epoch.is_some() {
-                                return Err(serde::de::Error::duplicate_field("EPOCH"));
-                            }
-                            epoch = Some(map.next_value()?);
-                        }
-                        // Explicit matching of all data types
-                        "ANGLE_1" => {
-                            data = Some(TdmObservationData::Angle1(map.next_value()?));
-                        }
-                        "ANGLE_2" => {
-                            data = Some(TdmObservationData::Angle2(map.next_value()?));
-                        }
-                        "CARRIER_POWER" => {
-                            data = Some(TdmObservationData::CarrierPower(map.next_value()?));
-                        }
-                        "CLOCK_BIAS" => {
-                            data = Some(TdmObservationData::ClockBias(map.next_value()?));
-                        }
-                        "CLOCK_DRIFT" => {
-                            data = Some(TdmObservationData::ClockDrift(map.next_value()?));
-                        }
-                        "DOPPLER_COUNT" => {
-                            data = Some(TdmObservationData::DopplerCount(map.next_value()?));
-                        }
-                        "DOPPLER_INSTANTANEOUS" => {
-                            data =
-                                Some(TdmObservationData::DopplerInstantaneous(map.next_value()?));
-                        }
-                        "DOPPLER_INTEGRATED" => {
-                            data = Some(TdmObservationData::DopplerIntegrated(map.next_value()?));
-                        }
-                        "DOR" => {
-                            data = Some(TdmObservationData::Dor(map.next_value()?));
-                        }
-                        "MAG" => {
-                            data = Some(TdmObservationData::Mag(map.next_value()?));
-                        }
-                        "PC_N0" => {
-                            data = Some(TdmObservationData::PcN0(map.next_value()?));
-                        }
-                        "PR_N0" => {
-                            data = Some(TdmObservationData::PrN0(map.next_value()?));
-                        }
-                        "PRESSURE" => {
-                            data = Some(TdmObservationData::Pressure(map.next_value()?));
-                        }
-                        "RANGE" => {
-                            data = Some(TdmObservationData::Range(map.next_value()?));
-                        }
-                        "RCS" => {
-                            data = Some(TdmObservationData::Rcs(map.next_value()?));
-                        }
-                        "RECEIVE_FREQ" => {
-                            data = Some(TdmObservationData::ReceiveFreq(map.next_value()?));
-                        }
-                        "RECEIVE_FREQ_1" => {
-                            data = Some(TdmObservationData::ReceiveFreq1(map.next_value()?));
-                        }
-                        "RECEIVE_FREQ_2" => {
-                            data = Some(TdmObservationData::ReceiveFreq2(map.next_value()?));
-                        }
-                        "RECEIVE_FREQ_3" => {
-                            data = Some(TdmObservationData::ReceiveFreq3(map.next_value()?));
-                        }
-                        "RECEIVE_FREQ_4" => {
-                            data = Some(TdmObservationData::ReceiveFreq4(map.next_value()?));
-                        }
-                        "RECEIVE_FREQ_5" => {
-                            data = Some(TdmObservationData::ReceiveFreq5(map.next_value()?));
-                        }
-                        "RECEIVE_PHASE_CT_1" => {
-                            data = Some(TdmObservationData::ReceivePhaseCt1(map.next_value()?));
-                        }
-                        "RECEIVE_PHASE_CT_2" => {
-                            data = Some(TdmObservationData::ReceivePhaseCt2(map.next_value()?));
-                        }
-                        "RECEIVE_PHASE_CT_3" => {
-                            data = Some(TdmObservationData::ReceivePhaseCt3(map.next_value()?));
-                        }
-                        "RECEIVE_PHASE_CT_4" => {
-                            data = Some(TdmObservationData::ReceivePhaseCt4(map.next_value()?));
-                        }
-                        "RECEIVE_PHASE_CT_5" => {
-                            data = Some(TdmObservationData::ReceivePhaseCt5(map.next_value()?));
-                        }
-                        "RHUMIDITY" => {
-                            data = Some(TdmObservationData::Rhumidity(map.next_value()?));
-                        }
-                        "STEC" => {
-                            data = Some(TdmObservationData::Stec(map.next_value()?));
-                        }
-                        "TEMPERATURE" => {
-                            data = Some(TdmObservationData::Temperature(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_1" => {
-                            data = Some(TdmObservationData::TransmitFreq1(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_2" => {
-                            data = Some(TdmObservationData::TransmitFreq2(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_3" => {
-                            data = Some(TdmObservationData::TransmitFreq3(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_4" => {
-                            data = Some(TdmObservationData::TransmitFreq4(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_5" => {
-                            data = Some(TdmObservationData::TransmitFreq5(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_RATE_1" => {
-                            data = Some(TdmObservationData::TransmitFreqRate1(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_RATE_2" => {
-                            data = Some(TdmObservationData::TransmitFreqRate2(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_RATE_3" => {
-                            data = Some(TdmObservationData::TransmitFreqRate3(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_RATE_4" => {
-                            data = Some(TdmObservationData::TransmitFreqRate4(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_RATE_5" => {
-                            data = Some(TdmObservationData::TransmitFreqRate5(map.next_value()?));
-                        }
-                        "TRANSMIT_PHASE_CT_1" => {
-                            data = Some(TdmObservationData::TransmitPhaseCt1(map.next_value()?));
-                        }
-                        "TRANSMIT_PHASE_CT_2" => {
-                            data = Some(TdmObservationData::TransmitPhaseCt2(map.next_value()?));
-                        }
-                        "TRANSMIT_PHASE_CT_3" => {
-                            data = Some(TdmObservationData::TransmitPhaseCt3(map.next_value()?));
-                        }
-                        "TRANSMIT_PHASE_CT_4" => {
-                            data = Some(TdmObservationData::TransmitPhaseCt4(map.next_value()?));
-                        }
-                        "TRANSMIT_PHASE_CT_5" => {
-                            data = Some(TdmObservationData::TransmitPhaseCt5(map.next_value()?));
-                        }
-                        "TROPO_DRY" => {
-                            data = Some(TdmObservationData::TropoDry(map.next_value()?));
-                        }
-                        "TROPO_WET" => {
-                            data = Some(TdmObservationData::TropoWet(map.next_value()?));
-                        }
-                        "VLBI_DELAY" => {
-                            data = Some(TdmObservationData::VlbiDelay(map.next_value()?));
-                        }
-                        _ => {
-                            return Err(serde::de::Error::custom(format!(
-                                "unknown TDM observation field '{key}'"
-                            )));
-                        }
-                    }
-                }
-
-                let epoch = epoch.ok_or_else(|| serde::de::Error::missing_field("EPOCH"))?;
-                let data = data.ok_or_else(|| {
-                    serde::de::Error::custom(
-                        "Missing TDM observation data (must have one of: ANGLE_1, RANGE, etc.)",
-                    )
-                })?;
-
-                Ok(TdmObservation { epoch, data })
-            }
-        }
-
-        deserializer.deserialize_map(TdmObservationVisitor)
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -2471,6 +1787,8 @@ impl TdmObservationData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::kvn::ser::KvnWriter;
+    use crate::traits::ToKvn;
 
     #[test]
     fn test_kitchen_sink_roundtrip() {

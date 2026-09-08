@@ -6,12 +6,17 @@
 //!
 //! This module implements KVN parsing for CDM using winnow parser combinators.
 
-use crate::common::OdParameters;
-use crate::kvn::parser::*;
-use crate::messages::cdm::{
+use super::{
     AdditionalParameters, Cdm, CdmBody, CdmCovarianceMatrix, CdmData, CdmHeader, CdmMetadata,
     CdmSegment, CdmStateVector, RelativeMetadataData, RelativeStateVector,
 };
+use crate::common::OdParameters;
+use crate::error::{CcsdsNdmError, FormatError, KvnParseError, Result, ValidationError};
+use crate::kvn::parser::*;
+use crate::kvn::ser::KvnWriter;
+use crate::traits::ToKvn;
+use crate::types::*;
+use std::borrow::Cow;
 use winnow::combinator::peek;
 use winnow::prelude::*;
 use winnow::stream::Offset;
@@ -721,12 +726,653 @@ impl ParseKvn for Cdm {
 // Tests
 //----------------------------------------------------------------------
 
+fn cdm_kvn_key(key: &str) -> Option<(u8, u16)> {
+    const HEADER: &[&str] = &["CREATION_DATE", "ORIGINATOR", "MESSAGE_FOR", "MESSAGE_ID"];
+    const RELATIVE: &[&str] = &[
+        "TCA",
+        "MISS_DISTANCE",
+        "RELATIVE_SPEED",
+        "RELATIVE_POSITION_R",
+        "RELATIVE_POSITION_T",
+        "RELATIVE_POSITION_N",
+        "RELATIVE_VELOCITY_R",
+        "RELATIVE_VELOCITY_T",
+        "RELATIVE_VELOCITY_N",
+        "START_SCREEN_PERIOD",
+        "STOP_SCREEN_PERIOD",
+        "SCREEN_VOLUME_FRAME",
+        "SCREEN_VOLUME_SHAPE",
+        "SCREEN_VOLUME_X",
+        "SCREEN_VOLUME_Y",
+        "SCREEN_VOLUME_Z",
+        "SCREEN_ENTRY_TIME",
+        "SCREEN_EXIT_TIME",
+        "COLLISION_PROBABILITY",
+        "COLLISION_PROBABILITY_METHOD",
+    ];
+    const METADATA: &[&str] = &[
+        "OBJECT",
+        "OBJECT_DESIGNATOR",
+        "CATALOG_NAME",
+        "OBJECT_NAME",
+        "INTERNATIONAL_DESIGNATOR",
+        "OBJECT_TYPE",
+        "OPERATOR_CONTACT_POSITION",
+        "OPERATOR_ORGANIZATION",
+        "OPERATOR_PHONE",
+        "OPERATOR_EMAIL",
+        "EPHEMERIS_NAME",
+        "COVARIANCE_METHOD",
+        "MANEUVERABLE",
+        "ORBIT_CENTER",
+        "REF_FRAME",
+        "GRAVITY_MODEL",
+        "ATMOSPHERIC_MODEL",
+        "N_BODY_PERTURBATIONS",
+        "SOLAR_RAD_PRESSURE",
+        "EARTH_TIDES",
+        "INTRACK_THRUST",
+    ];
+    const OD: &[&str] = &[
+        "TIME_LASTOB_START",
+        "TIME_LASTOB_END",
+        "RECOMMENDED_OD_SPAN",
+        "ACTUAL_OD_SPAN",
+        "OBS_AVAILABLE",
+        "OBS_USED",
+        "TRACKS_AVAILABLE",
+        "TRACKS_USED",
+        "RESIDUALS_ACCEPTED",
+        "WEIGHTED_RMS",
+    ];
+    const ADDITIONAL: &[&str] = &[
+        "AREA_PC",
+        "AREA_DRG",
+        "AREA_SRP",
+        "MASS",
+        "CD_AREA_OVER_MASS",
+        "CR_AREA_OVER_MASS",
+        "THRUST_ACCELERATION",
+        "SEDR",
+    ];
+    const STATE: &[&str] = &["X", "Y", "Z", "X_DOT", "Y_DOT", "Z_DOT"];
+    const COVARIANCE: &[&str] = &[
+        "CR_R",
+        "CT_R",
+        "CT_T",
+        "CN_R",
+        "CN_T",
+        "CN_N",
+        "CRDOT_R",
+        "CRDOT_T",
+        "CRDOT_N",
+        "CRDOT_RDOT",
+        "CTDOT_R",
+        "CTDOT_T",
+        "CTDOT_N",
+        "CTDOT_RDOT",
+        "CTDOT_TDOT",
+        "CNDOT_R",
+        "CNDOT_T",
+        "CNDOT_N",
+        "CNDOT_RDOT",
+        "CNDOT_TDOT",
+        "CNDOT_NDOT",
+        "CDRG_R",
+        "CDRG_T",
+        "CDRG_N",
+        "CDRG_RDOT",
+        "CDRG_TDOT",
+        "CDRG_NDOT",
+        "CDRG_DRG",
+        "CSRP_R",
+        "CSRP_T",
+        "CSRP_N",
+        "CSRP_RDOT",
+        "CSRP_TDOT",
+        "CSRP_NDOT",
+        "CSRP_DRG",
+        "CSRP_SRP",
+        "CTHR_R",
+        "CTHR_T",
+        "CTHR_N",
+        "CTHR_RDOT",
+        "CTHR_TDOT",
+        "CTHR_NDOT",
+        "CTHR_DRG",
+        "CTHR_SRP",
+        "CTHR_THR",
+    ];
+
+    for (block, keys) in [
+        (0, HEADER),
+        (1, RELATIVE),
+        (2, METADATA),
+        (3, OD),
+        (4, ADDITIONAL),
+        (5, STATE),
+        (6, COVARIANCE),
+    ] {
+        if let Some(rank) = keys.iter().position(|candidate| *candidate == key) {
+            return Some((block, rank as u16));
+        }
+    }
+    None
+}
+
+pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
+    let invalid = |line: usize, offset: usize, message: String| {
+        CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(KvnParseError {
+            line,
+            column: 1,
+            message,
+            contexts: vec!["while validating CDM KVN structure"],
+            offset,
+        }))))
+    };
+    let mut saw_version = false;
+    let mut current_block = None;
+    let mut previous_key = None;
+    let mut pending_comments = false;
+    let mut segment_count = 0u8;
+    let mut offset = 0usize;
+
+    for (index, raw_line) in kvn.split('\n').enumerate() {
+        let number = index + 1;
+        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        let fail = |message: &str| Err(invalid(number, offset, message.into()));
+        if line.as_bytes().contains(&b'\r') {
+            return fail("lone carriage return");
+        }
+        if line.len() > 254 {
+            return fail("line exceeds the normative 254-character limit");
+        }
+        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            return fail("non-printable or non-ASCII character");
+        }
+        let line = line.trim();
+        if line.is_empty() {
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if line == "COMMENT" || line.starts_with("COMMENT ") {
+            pending_comments = true;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if !line.contains('=') {
+            return fail("expected exactly one CDM assignment");
+        }
+        let key = line.split_once('=').unwrap().0.trim();
+        if key == "CCSDS_CDM_VERS" {
+            if saw_version || current_block.is_some() || pending_comments {
+                return fail("CCSDS_CDM_VERS must be the first record");
+            }
+            saw_version = true;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if !saw_version {
+            return fail("expected CCSDS_CDM_VERS as the first record");
+        }
+        let (block, rank) = cdm_kvn_key(key)
+            .ok_or_else(|| invalid(number, offset, "unknown CDM keyword".into()))?;
+
+        match current_block {
+            None => {
+                if block != 0 {
+                    return fail("expected CDM header");
+                }
+            }
+            Some(current) if block == current => {
+                if pending_comments && previous_key.is_some() {
+                    return fail("COMMENT is not at the beginning of a CDM logical block");
+                }
+                if previous_key.is_some_and(|previous| rank <= previous) {
+                    return fail("duplicate or out-of-order CDM keyword");
+                }
+            }
+            Some(5 | 6) if block == 2 => {
+                segment_count += 1;
+                if segment_count > 2 {
+                    return fail("CDM contains more than two segments");
+                }
+            }
+            Some(current) => {
+                let allowed = matches!(
+                    (current, block),
+                    (0, 1) | (1, 2) | (2, 3..=5) | (3, 4..=5) | (4, 5) | (5, 6)
+                );
+                if !allowed {
+                    return fail("out-of-order CDM logical block");
+                }
+            }
+        }
+        if block == 2 && key == "OBJECT" && current_block != Some(2) && segment_count == 0 {
+            segment_count = 1;
+        }
+        current_block = Some(block);
+        previous_key = Some(rank);
+        pending_comments = false;
+        offset += raw_line.len() + 1;
+    }
+
+    if pending_comments {
+        return Err(invalid(
+            kvn.lines().count().max(1),
+            kvn.len(),
+            "trailing CDM COMMENT has no logical block".into(),
+        ));
+    }
+    if !saw_version {
+        return Err(invalid(1, 0, "missing CCSDS_CDM_VERS".into()));
+    }
+    Ok(())
+}
+
+impl ToKvn for Cdm {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        // 1. Header
+        writer.write_pair("CCSDS_CDM_VERS", &self.version);
+        self.header.write_kvn(writer);
+
+        // 2. Body
+        self.body.write_kvn(writer);
+    }
+}
+
+impl ToKvn for CdmHeader {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+
+        writer.write_pair("CREATION_DATE", self.creation_date);
+        writer.write_pair("ORIGINATOR", &self.originator);
+        if let Some(v) = &self.message_for {
+            writer.write_pair("MESSAGE_FOR", v);
+        }
+        writer.write_pair("MESSAGE_ID", &self.message_id);
+    }
+}
+
+impl ToKvn for CdmBody {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        self.relative_metadata_data.write_kvn(writer);
+        for segment in &self.segments {
+            segment.write_kvn(writer);
+        }
+    }
+}
+
+impl ToKvn for RelativeMetadataData {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        writer.write_pair("TCA", self.tca);
+        writer.write_measure("MISS_DISTANCE", &self.miss_distance);
+        if let Some(v) = &self.relative_speed {
+            writer.write_measure("RELATIVE_SPEED", &v.to_unit_value());
+        }
+        if let Some(v) = &self.relative_state_vector {
+            v.write_kvn(writer);
+        }
+        if let Some(v) = &self.start_screen_period {
+            writer.write_pair("START_SCREEN_PERIOD", v);
+        }
+        if let Some(v) = &self.stop_screen_period {
+            writer.write_pair("STOP_SCREEN_PERIOD", v);
+        }
+        if let Some(v) = &self.screen_volume_frame {
+            writer.write_pair("SCREEN_VOLUME_FRAME", v.to_string());
+        }
+        if let Some(v) = &self.screen_volume_shape {
+            writer.write_pair("SCREEN_VOLUME_SHAPE", v.to_string());
+        }
+
+        if let Some(v) = &self.screen_volume_x {
+            writer.write_measure("SCREEN_VOLUME_X", v);
+        }
+        if let Some(v) = &self.screen_volume_y {
+            writer.write_measure("SCREEN_VOLUME_Y", v);
+        }
+        if let Some(v) = &self.screen_volume_z {
+            writer.write_measure("SCREEN_VOLUME_Z", v);
+        }
+        if let Some(v) = &self.screen_entry_time {
+            writer.write_pair("SCREEN_ENTRY_TIME", v);
+        }
+        if let Some(v) = &self.screen_exit_time {
+            writer.write_pair("SCREEN_EXIT_TIME", v);
+        }
+        if let Some(v) = &self.collision_probability {
+            writer.write_pair("COLLISION_PROBABILITY", v.value);
+        }
+        if let Some(v) = &self.collision_probability_method {
+            writer.write_pair("COLLISION_PROBABILITY_METHOD", v);
+        }
+    }
+}
+
+impl ToKvn for RelativeStateVector {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_measure("RELATIVE_POSITION_R", &self.relative_position_r);
+        writer.write_measure("RELATIVE_POSITION_T", &self.relative_position_t);
+        writer.write_measure("RELATIVE_POSITION_N", &self.relative_position_n);
+        writer.write_measure(
+            "RELATIVE_VELOCITY_R",
+            &self.relative_velocity_r.to_unit_value(),
+        );
+        writer.write_measure(
+            "RELATIVE_VELOCITY_T",
+            &self.relative_velocity_t.to_unit_value(),
+        );
+        writer.write_measure(
+            "RELATIVE_VELOCITY_N",
+            &self.relative_velocity_n.to_unit_value(),
+        );
+    }
+}
+
+impl ToKvn for CdmSegment {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        self.metadata.write_kvn(writer);
+        self.data.write_kvn(writer);
+    }
+}
+
+impl ToKvn for CdmMetadata {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        writer.write_pair(
+            "OBJECT",
+            match self.object {
+                CdmObjectType::Object1 => "OBJECT1",
+                CdmObjectType::Object2 => "OBJECT2",
+            },
+        );
+        writer.write_pair("OBJECT_DESIGNATOR", &self.object_designator);
+        writer.write_pair("CATALOG_NAME", &self.catalog_name);
+        writer.write_pair("OBJECT_NAME", &self.object_name);
+        writer.write_pair("INTERNATIONAL_DESIGNATOR", &self.international_designator);
+        if let Some(v) = &self.object_type {
+            writer.write_pair("OBJECT_TYPE", v.to_string());
+        }
+        if let Some(v) = &self.operator_contact_position {
+            writer.write_pair("OPERATOR_CONTACT_POSITION", v);
+        }
+        if let Some(v) = &self.operator_organization {
+            writer.write_pair("OPERATOR_ORGANIZATION", v);
+        }
+        if let Some(v) = &self.operator_phone {
+            writer.write_pair("OPERATOR_PHONE", v);
+        }
+        if let Some(v) = &self.operator_email {
+            writer.write_pair("OPERATOR_EMAIL", v);
+        }
+        writer.write_pair("EPHEMERIS_NAME", &self.ephemeris_name);
+        writer.write_pair("COVARIANCE_METHOD", self.covariance_method.to_string());
+        writer.write_pair("MANEUVERABLE", self.maneuverable.to_string());
+        if let Some(v) = &self.orbit_center {
+            writer.write_pair("ORBIT_CENTER", v);
+        }
+        writer.write_pair("REF_FRAME", self.ref_frame.to_string());
+        if let Some(v) = &self.gravity_model {
+            writer.write_pair("GRAVITY_MODEL", v);
+        }
+        if let Some(v) = &self.atmospheric_model {
+            writer.write_pair("ATMOSPHERIC_MODEL", v);
+        }
+        if let Some(v) = &self.n_body_perturbations {
+            writer.write_pair("N_BODY_PERTURBATIONS", v);
+        }
+        if let Some(v) = &self.solar_rad_pressure {
+            writer.write_pair("SOLAR_RAD_PRESSURE", v.to_string());
+        }
+        if let Some(v) = &self.earth_tides {
+            writer.write_pair("EARTH_TIDES", v.to_string());
+        }
+        if let Some(v) = &self.intrack_thrust {
+            writer.write_pair("INTRACK_THRUST", v.to_string());
+        }
+    }
+}
+
+impl ToKvn for CdmData {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        // OD Parameters
+        if let Some(od) = &self.od_parameters {
+            writer.write_comments(&od.comment);
+            if let Some(v) = &od.time_lastob_start {
+                writer.write_pair("TIME_LASTOB_START", v);
+            }
+            if let Some(v) = &od.time_lastob_end {
+                writer.write_pair("TIME_LASTOB_END", v);
+            }
+            if let Some(v) = &od.recommended_od_span {
+                writer.write_measure("RECOMMENDED_OD_SPAN", &v.to_unit_value());
+            }
+            if let Some(v) = &od.actual_od_span {
+                writer.write_measure("ACTUAL_OD_SPAN", &v.to_unit_value());
+            }
+            if let Some(v) = &od.obs_available {
+                writer.write_pair("OBS_AVAILABLE", v);
+            }
+            if let Some(v) = &od.obs_used {
+                writer.write_pair("OBS_USED", v);
+            }
+            if let Some(v) = &od.tracks_available {
+                writer.write_pair("TRACKS_AVAILABLE", v);
+            }
+            if let Some(v) = &od.tracks_used {
+                writer.write_pair("TRACKS_USED", v);
+            }
+            if let Some(v) = &od.residuals_accepted {
+                writer.write_measure("RESIDUALS_ACCEPTED", &v.to_unit_value());
+            }
+            if let Some(v) = &od.weighted_rms {
+                writer.write_pair("WEIGHTED_RMS", v);
+            }
+        }
+        // Additional Parameters
+        if let Some(ap) = &self.additional_parameters {
+            writer.write_comments(&ap.comment);
+            if let Some(v) = &ap.area_pc {
+                writer.write_measure("AREA_PC", &v.to_unit_value());
+            }
+            if let Some(v) = &ap.area_drg {
+                writer.write_measure("AREA_DRG", &v.to_unit_value());
+            }
+            if let Some(v) = &ap.area_srp {
+                writer.write_measure("AREA_SRP", &v.to_unit_value());
+            }
+            if let Some(v) = &ap.mass {
+                writer.write_measure("MASS", &v.to_unit_value());
+            }
+            if let Some(v) = &ap.cd_area_over_mass {
+                writer.write_measure("CD_AREA_OVER_MASS", &v.to_unit_value());
+            }
+            if let Some(v) = &ap.cr_area_over_mass {
+                writer.write_measure("CR_AREA_OVER_MASS", &v.to_unit_value());
+            }
+            if let Some(v) = &ap.thrust_acceleration {
+                writer.write_measure("THRUST_ACCELERATION", &v.to_unit_value());
+            }
+            if let Some(v) = &ap.sedr {
+                writer.write_measure("SEDR", &v.to_unit_value());
+            }
+        }
+        // State Vector
+        self.state_vector.write_kvn(writer);
+        // Covariance
+        if let Some(cov) = &self.covariance_matrix {
+            cov.write_kvn(writer);
+        }
+    }
+}
+
+impl ToKvn for CdmStateVector {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        writer.write_measure("X", &self.x.to_unit_value());
+        writer.write_measure("Y", &self.y.to_unit_value());
+        writer.write_measure("Z", &self.z.to_unit_value());
+        writer.write_measure("X_DOT", &self.x_dot.to_unit_value());
+        writer.write_measure("Y_DOT", &self.y_dot.to_unit_value());
+        writer.write_measure("Z_DOT", &self.z_dot.to_unit_value());
+    }
+}
+
+impl ToKvn for CdmCovarianceMatrix {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        // Required
+        writer.write_measure("CR_R", &self.cr_r.to_unit_value());
+        writer.write_measure("CT_R", &self.ct_r.to_unit_value());
+        writer.write_measure("CT_T", &self.ct_t.to_unit_value());
+        writer.write_measure("CN_R", &self.cn_r.to_unit_value());
+        writer.write_measure("CN_T", &self.cn_t.to_unit_value());
+        writer.write_measure("CN_N", &self.cn_n.to_unit_value());
+        writer.write_measure("CRDOT_R", &self.crdot_r.to_unit_value());
+        writer.write_measure("CRDOT_T", &self.crdot_t.to_unit_value());
+        writer.write_measure("CRDOT_N", &self.crdot_n.to_unit_value());
+        writer.write_measure("CRDOT_RDOT", &self.crdot_rdot.to_unit_value());
+        writer.write_measure("CTDOT_R", &self.ctdot_r.to_unit_value());
+        writer.write_measure("CTDOT_T", &self.ctdot_t.to_unit_value());
+        writer.write_measure("CTDOT_N", &self.ctdot_n.to_unit_value());
+        writer.write_measure("CTDOT_RDOT", &self.ctdot_rdot.to_unit_value());
+        writer.write_measure("CTDOT_TDOT", &self.ctdot_tdot.to_unit_value());
+        writer.write_measure("CNDOT_R", &self.cndot_r.to_unit_value());
+        writer.write_measure("CNDOT_T", &self.cndot_t.to_unit_value());
+        writer.write_measure("CNDOT_N", &self.cndot_n.to_unit_value());
+        writer.write_measure("CNDOT_RDOT", &self.cndot_rdot.to_unit_value());
+        writer.write_measure("CNDOT_TDOT", &self.cndot_tdot.to_unit_value());
+        writer.write_measure("CNDOT_NDOT", &self.cndot_ndot.to_unit_value());
+
+        // Optionals
+        if let Some(v) = &self.cdrg_r {
+            writer.write_measure("CDRG_R", &v.to_unit_value());
+        }
+        if let Some(v) = &self.cdrg_t {
+            writer.write_measure("CDRG_T", &v.to_unit_value());
+        }
+        if let Some(v) = &self.cdrg_n {
+            writer.write_measure("CDRG_N", &v.to_unit_value());
+        }
+        if let Some(v) = &self.cdrg_rdot {
+            writer.write_measure("CDRG_RDOT", &v.to_unit_value());
+        }
+        if let Some(v) = &self.cdrg_tdot {
+            writer.write_measure("CDRG_TDOT", &v.to_unit_value());
+        }
+        if let Some(v) = &self.cdrg_ndot {
+            writer.write_measure("CDRG_NDOT", &v.to_unit_value());
+        }
+        if let Some(v) = &self.cdrg_drg {
+            writer.write_measure("CDRG_DRG", &v.to_unit_value());
+        }
+
+        if let Some(v) = &self.csrp_r {
+            writer.write_measure("CSRP_R", &v.to_unit_value());
+        }
+        if let Some(v) = &self.csrp_t {
+            writer.write_measure("CSRP_T", &v.to_unit_value());
+        }
+        if let Some(v) = &self.csrp_n {
+            writer.write_measure("CSRP_N", &v.to_unit_value());
+        }
+        if let Some(v) = &self.csrp_rdot {
+            writer.write_measure("CSRP_RDOT", &v.to_unit_value());
+        }
+        if let Some(v) = &self.csrp_tdot {
+            writer.write_measure("CSRP_TDOT", &v.to_unit_value());
+        }
+        if let Some(v) = &self.csrp_ndot {
+            writer.write_measure("CSRP_NDOT", &v.to_unit_value());
+        }
+        if let Some(v) = &self.csrp_drg {
+            writer.write_measure("CSRP_DRG", &v.to_unit_value());
+        }
+        if let Some(v) = &self.csrp_srp {
+            writer.write_measure("CSRP_SRP", &v.to_unit_value());
+        }
+
+        if let Some(v) = &self.cthr_r {
+            writer.write_measure("CTHR_R", &v.to_unit_value());
+        }
+        if let Some(v) = &self.cthr_t {
+            writer.write_measure("CTHR_T", &v.to_unit_value());
+        }
+        if let Some(v) = &self.cthr_n {
+            writer.write_measure("CTHR_N", &v.to_unit_value());
+        }
+        if let Some(v) = &self.cthr_rdot {
+            writer.write_measure("CTHR_RDOT", &v.to_unit_value());
+        }
+        if let Some(v) = &self.cthr_tdot {
+            writer.write_measure("CTHR_TDOT", &v.to_unit_value());
+        }
+        if let Some(v) = &self.cthr_ndot {
+            writer.write_measure("CTHR_NDOT", &v.to_unit_value());
+        }
+        if let Some(v) = &self.cthr_drg {
+            writer.write_measure("CTHR_DRG", &v.to_unit_value());
+        }
+        if let Some(v) = &self.cthr_srp {
+            writer.write_measure("CTHR_SRP", &v.to_unit_value());
+        }
+        if let Some(v) = &self.cthr_thr {
+            writer.write_measure("CTHR_THR", &v.to_unit_value());
+        }
+    }
+}
+
+impl Cdm {
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        for segment in &self.body.segments {
+            let first_nested_comments = if let Some(od) = &segment.data.od_parameters {
+                &od.comment
+            } else if let Some(additional) = &segment.data.additional_parameters {
+                &additional.comment
+            } else {
+                &segment.data.state_vector.comment
+            };
+            if !first_nested_comments.is_empty() {
+                return Err(ValidationError::Generic {
+                    message: Cow::Borrowed(
+                        "CDM KVN cannot distinguish the outer data COMMENT run from the first nested logical-block COMMENT run",
+                    ),
+                    line: None,
+                }
+                .into());
+            }
+        }
+
+        // CDM has a fixed, bounded scalar shape. A private model fixed-point preflight therefore
+        // catches every lossy KVN scalar spelling and lexical record without introducing an
+        // unbounded history-sized allocation or emitting caller-visible bytes.
+        let mut writer = KvnWriter::new();
+        self.write_kvn(&mut writer);
+        let output = writer.finish();
+        validate_kvn_syntax(&output)?;
+        let reparsed = Self::from_kvn_str(&output)?;
+        crate::traits::Validate::validate(&reparsed)?;
+        if reparsed != *self {
+            return Err(ValidationError::Generic {
+                message: Cow::Borrowed(
+                    "CDM model cannot be represented in KVN without changing typed content",
+                ),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::error::{CcsdsNdmError, FormatError, ValidationError};
     use crate::traits::Ndm;
-    use crate::types::*;
 
     // From CCSDS Blue Book 508.0-B-1 Annex D (modified for KVN)
     const CDM_BLUE_BOOK_SAMPLE: &str = r###"CCSDS_CDM_VERS = 1.0

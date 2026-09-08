@@ -9,11 +9,13 @@ use crate::common::{
     SpinState,
 };
 // But QuaternionState etc are in common.
+use super::{Apm, ApmBody, ApmData, ApmMetadata, ApmSegment};
 use crate::common::AttManeuverState;
-use crate::error::InternalParserError;
+use crate::error::{CcsdsNdmError, FormatError, InternalParserError, KvnParseError, Result};
 use crate::kvn::parser::*;
-use crate::messages::apm::{Apm, ApmBody, ApmData, ApmMetadata, ApmSegment};
+use crate::kvn::ser::KvnWriter;
 use crate::parse_block;
+use crate::traits::ToKvn;
 use std::str::FromStr;
 use winnow::error::{ErrMode, FromExternalError};
 use winnow::prelude::*;
@@ -410,6 +412,315 @@ pub fn parse_apm(input: &mut &str) -> KvnResult<Apm> {
 impl ParseKvn for Apm {
     fn parse_kvn(input: &mut &str) -> KvnResult<Self> {
         parse_apm.parse_next(input)
+    }
+}
+
+pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
+    fn top_rank(key: &str) -> Option<u16> {
+        Some(match key {
+            "CCSDS_APM_VERS" => 0,
+            "CLASSIFICATION" => 1,
+            "CREATION_DATE" => 2,
+            "ORIGINATOR" => 3,
+            "MESSAGE_ID" => 4,
+            "OBJECT_NAME" => 10,
+            "OBJECT_ID" => 11,
+            "CENTER_NAME" => 12,
+            "TIME_SYSTEM" => 13,
+            "EPOCH" => 20,
+            _ => return None,
+        })
+    }
+
+    fn block_rank(block: &str, key: &str) -> Option<u16> {
+        let keys: &[&str] = match block {
+            "META" => &["OBJECT_NAME", "OBJECT_ID", "CENTER_NAME", "TIME_SYSTEM"],
+            "QUAT" => &[
+                "REF_FRAME_A",
+                "REF_FRAME_B",
+                "Q1",
+                "Q2",
+                "Q3",
+                "QC",
+                "Q1_DOT",
+                "Q2_DOT",
+                "Q3_DOT",
+                "QC_DOT",
+            ],
+            "EULER" => &[
+                "REF_FRAME_A",
+                "REF_FRAME_B",
+                "EULER_ROT_SEQ",
+                "ANGLE_1",
+                "ANGLE_2",
+                "ANGLE_3",
+                "ANGLE_1_DOT",
+                "ANGLE_2_DOT",
+                "ANGLE_3_DOT",
+            ],
+            "ANGVEL" => &[
+                "REF_FRAME_A",
+                "REF_FRAME_B",
+                "ANGVEL_FRAME",
+                "ANGVEL_X",
+                "ANGVEL_Y",
+                "ANGVEL_Z",
+            ],
+            "SPIN" => &[
+                "REF_FRAME_A",
+                "REF_FRAME_B",
+                "SPIN_ALPHA",
+                "SPIN_DELTA",
+                "SPIN_ANGLE",
+                "SPIN_ANGLE_VEL",
+                "NUTATION",
+                "NUTATION_PER",
+                "NUTATION_PHASE",
+                "MOMENTUM_ALPHA",
+                "MOMENTUM_DELTA",
+                "NUTATION_VEL",
+            ],
+            "INERTIA" => &[
+                "INERTIA_REF_FRAME",
+                "IXX",
+                "IYY",
+                "IZZ",
+                "IXY",
+                "IXZ",
+                "IYZ",
+            ],
+            "MAN" => &[
+                "MAN_EPOCH_START",
+                "MAN_DURATION",
+                "MAN_REF_FRAME",
+                "MAN_TOR_X",
+                "MAN_TOR_Y",
+                "MAN_TOR_Z",
+                "MAN_DELTA_MASS",
+            ],
+            _ => return None,
+        };
+        keys.iter()
+            .position(|candidate| *candidate == key)
+            .map(|rank| rank as u16)
+    }
+
+    let invalid = |line: usize, offset: usize, message: String| {
+        CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(KvnParseError {
+            line,
+            column: 1,
+            message,
+            contexts: vec!["while validating APM KVN structure"],
+            offset,
+        }))))
+    };
+    let mut current_block: Option<&str> = None;
+    let mut top_previous = None;
+    let mut block_previous = None;
+    let mut pending_comment = false;
+    let mut offset = 0usize;
+
+    for (index, raw_line) in kvn.split('\n').enumerate() {
+        let line_number = index + 1;
+        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        let fail = |message: &str| Err(invalid(line_number, offset, message.into()));
+        if line.as_bytes().contains(&b'\r') {
+            return fail("lone carriage return");
+        }
+        if line.len() > 254 {
+            return fail("line exceeds the normative 254-character limit");
+        }
+        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            return fail("non-printable or non-ASCII character");
+        }
+        let line = line.trim();
+        if line.is_empty() {
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if line == "COMMENT" || line.starts_with("COMMENT ") {
+            if current_block.is_some() && block_previous.is_some() {
+                return fail("COMMENT is not at the beginning of a logical block");
+            }
+            if current_block.is_none() && !matches!(top_previous, Some(0 | 3 | 4 | 13)) {
+                return fail("COMMENT is not at the beginning of a logical block");
+            }
+            pending_comment = true;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+
+        if let Some(marker) = line.strip_suffix("_START").filter(|_| !line.contains('=')) {
+            if current_block.is_some()
+                || !matches!(
+                    marker,
+                    "META" | "QUAT" | "EULER" | "ANGVEL" | "SPIN" | "INERTIA" | "MAN"
+                )
+            {
+                return fail("unknown or nested APM logical-block start");
+            }
+            if pending_comment {
+                return fail("COMMENT must follow, not precede, a logical-block start");
+            }
+            if marker == "META" {
+                if !matches!(top_previous, Some(3 | 4)) {
+                    return fail("META_START is out of order");
+                }
+            } else if top_previous != Some(20) {
+                return fail("attitude logical block must follow EPOCH");
+            }
+            current_block = Some(marker);
+            block_previous = None;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if let Some(marker) = line.strip_suffix("_STOP").filter(|_| !line.contains('=')) {
+            if current_block != Some(marker) {
+                return fail("mismatched APM logical-block end");
+            }
+            if pending_comment {
+                return fail("trailing COMMENT has no logical block content");
+            }
+            if marker == "META" {
+                top_previous = Some(13);
+            }
+            current_block = None;
+            block_previous = None;
+            offset += raw_line.len() + 1;
+            continue;
+        }
+
+        if !line.contains('=') {
+            return fail("expected an assignment or logical-block delimiter");
+        }
+        let key = line
+            .split_once('=')
+            .expect("assignment count checked")
+            .0
+            .trim();
+        if let Some(block) = current_block {
+            let rank = block_rank(block, key)
+                .ok_or_else(|| invalid(line_number, offset, "unknown APM block keyword".into()))?;
+            if block_previous.is_some_and(|previous| rank <= previous) {
+                return fail("duplicate or out-of-order APM block keyword");
+            }
+            block_previous = Some(rank);
+        } else {
+            let rank = top_rank(key)
+                .ok_or_else(|| invalid(line_number, offset, "unknown APM keyword".into()))?;
+            if pending_comment {
+                let starts_block = match key {
+                    "CLASSIFICATION" | "CREATION_DATE" => top_previous == Some(0),
+                    "OBJECT_NAME" => matches!(top_previous, Some(3 | 4)),
+                    "EPOCH" => top_previous == Some(13),
+                    _ => false,
+                };
+                if !starts_block {
+                    return fail("COMMENT is not at the beginning of a logical block");
+                }
+            }
+            if top_previous.is_some_and(|previous| rank <= previous) {
+                return fail("duplicate or out-of-order APM keyword");
+            }
+            top_previous = Some(rank);
+        }
+        pending_comment = false;
+        offset += raw_line.len() + 1;
+    }
+
+    if current_block.is_some() {
+        return Err(invalid(
+            kvn.lines().count().max(1),
+            kvn.len(),
+            "unterminated APM logical block".into(),
+        ));
+    }
+    if pending_comment {
+        return Err(invalid(
+            kvn.lines().count().max(1),
+            kvn.len(),
+            "trailing COMMENT has no logical block".into(),
+        ));
+    }
+    Ok(())
+}
+
+impl ToKvn for Apm {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_pair("CCSDS_APM_VERS", &self.version);
+        self.header.write_kvn(writer);
+        self.body.write_kvn(writer);
+    }
+}
+
+impl ToKvn for ApmBody {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        self.segment.write_kvn(writer);
+    }
+}
+
+impl ToKvn for ApmSegment {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_line("META_START");
+        self.metadata.write_kvn(writer);
+        writer.write_line("META_STOP");
+        writer.write_line("");
+        self.data.write_kvn(writer);
+    }
+}
+
+impl ToKvn for ApmMetadata {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        writer.write_pair("OBJECT_NAME", &self.object_name);
+        writer.write_pair("OBJECT_ID", &self.object_id);
+        if let Some(v) = &self.center_name {
+            writer.write_pair("CENTER_NAME", v);
+        }
+        writer.write_pair("TIME_SYSTEM", &self.time_system);
+    }
+}
+
+impl ToKvn for ApmData {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        writer.write_pair("EPOCH", self.epoch);
+        for block in &self.quaternion_state {
+            writer.write_line("QUAT_START");
+            block.write_kvn(writer);
+            writer.write_line("QUAT_STOP");
+            writer.write_line("");
+        }
+        for block in &self.euler_angle_state {
+            writer.write_line("EULER_START");
+            block.write_kvn(writer);
+            writer.write_line("EULER_STOP");
+            writer.write_line("");
+        }
+        for block in &self.angular_velocity {
+            writer.write_line("ANGVEL_START");
+            block.write_kvn(writer);
+            writer.write_line("ANGVEL_STOP");
+            writer.write_line("");
+        }
+        for block in &self.spin {
+            writer.write_line("SPIN_START");
+            block.write_kvn(writer);
+            writer.write_line("SPIN_STOP");
+            writer.write_line("");
+        }
+        for block in &self.inertia {
+            writer.write_line("INERTIA_START");
+            block.write_kvn(writer);
+            writer.write_line("INERTIA_STOP");
+            writer.write_line("");
+        }
+        for man in &self.maneuver_parameters {
+            writer.write_line("MAN_START");
+            man.write_kvn(writer);
+            writer.write_line("MAN_STOP");
+            writer.write_line("");
+        }
     }
 }
 

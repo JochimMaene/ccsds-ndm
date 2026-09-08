@@ -6,11 +6,13 @@
 //!
 //! This module implements KVN parsing for OMM using winnow parser combinators.
 
+use super::{MeanElements, Omm, OmmBody, OmmData, OmmMetadata, OmmSegment, TleParameters};
+use crate::error::Result;
 use crate::kvn::parser::*;
-use crate::messages::omm::{
-    MeanElements, Omm, OmmBody, OmmData, OmmMetadata, OmmSegment, TleParameters,
-};
+use crate::kvn::ser::{KvnWriter, OdmFloat};
 use crate::parse_block;
+use crate::traits::ToKvn;
+use crate::types::*;
 use winnow::prelude::*;
 
 //----------------------------------------------------------------------
@@ -237,6 +239,398 @@ impl ParseKvn for Omm {
 //----------------------------------------------------------------------
 // Tests
 //----------------------------------------------------------------------
+
+pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
+    fn rank(key: &str) -> Option<u16> {
+        Some(match key {
+            "CCSDS_OMM_VERS" => 0,
+            "CLASSIFICATION" => 1,
+            "CREATION_DATE" => 2,
+            "ORIGINATOR" => 3,
+            "MESSAGE_ID" => 4,
+            "OBJECT_NAME" => 5,
+            "OBJECT_ID" => 6,
+            "CENTER_NAME" => 7,
+            "REF_FRAME" => 8,
+            "REF_FRAME_EPOCH" => 9,
+            "TIME_SYSTEM" => 10,
+            "MEAN_ELEMENT_THEORY" => 11,
+            "EPOCH" => 12,
+            "SEMI_MAJOR_AXIS" | "MEAN_MOTION" => 13,
+            "ECCENTRICITY" => 14,
+            "INCLINATION" => 15,
+            "RA_OF_ASC_NODE" => 16,
+            "ARG_OF_PERICENTER" => 17,
+            "MEAN_ANOMALY" => 18,
+            "GM" => 19,
+            "MASS" => 30,
+            "SOLAR_RAD_AREA" => 31,
+            "SOLAR_RAD_COEFF" => 32,
+            "DRAG_AREA" => 33,
+            "DRAG_COEFF" => 34,
+            "EPHEMERIS_TYPE" => 40,
+            "CLASSIFICATION_TYPE" => 41,
+            "NORAD_CAT_ID" => 42,
+            "ELEMENT_SET_NO" => 43,
+            "REV_AT_EPOCH" => 44,
+            "BSTAR" | "BTERM" => 45,
+            "MEAN_MOTION_DOT" => 46,
+            "MEAN_MOTION_DDOT" | "AGOM" => 47,
+            "COV_REF_FRAME" => 60,
+            "CX_X" => 61,
+            "CY_X" => 62,
+            "CY_Y" => 63,
+            "CZ_X" => 64,
+            "CZ_Y" => 65,
+            "CZ_Z" => 66,
+            "CX_DOT_X" => 67,
+            "CX_DOT_Y" => 68,
+            "CX_DOT_Z" => 69,
+            "CX_DOT_X_DOT" => 70,
+            "CY_DOT_X" => 71,
+            "CY_DOT_Y" => 72,
+            "CY_DOT_Z" => 73,
+            "CY_DOT_X_DOT" => 74,
+            "CY_DOT_Y_DOT" => 75,
+            "CZ_DOT_X" => 76,
+            "CZ_DOT_Y" => 77,
+            "CZ_DOT_Z" => 78,
+            "CZ_DOT_X_DOT" => 79,
+            "CZ_DOT_Y_DOT" => 80,
+            "CZ_DOT_Z_DOT" => 81,
+            key if key.starts_with("USER_DEFINED_") => 90,
+            _ => return None,
+        })
+    }
+
+    fn comments_start_block(previous: u16, key: &str) -> bool {
+        match key {
+            "CLASSIFICATION" | "CREATION_DATE" => previous == 0,
+            "OBJECT_NAME" => matches!(previous, 3 | 4),
+            "EPOCH" => previous == 11,
+            "MASS" | "SOLAR_RAD_AREA" | "SOLAR_RAD_COEFF" | "DRAG_AREA" | "DRAG_COEFF" => {
+                matches!(previous, 18 | 19)
+            }
+            "EPHEMERIS_TYPE"
+            | "CLASSIFICATION_TYPE"
+            | "NORAD_CAT_ID"
+            | "ELEMENT_SET_NO"
+            | "REV_AT_EPOCH"
+            | "BSTAR"
+            | "BTERM"
+            | "MEAN_MOTION_DOT"
+            | "MEAN_MOTION_DDOT"
+            | "AGOM" => matches!(previous, 18 | 19 | 30..=34),
+            "COV_REF_FRAME" | "CX_X" => {
+                matches!(previous, 18 | 19 | 30..=34 | 40..=47)
+            }
+            key if key.starts_with("USER_DEFINED_") => {
+                matches!(previous, 18 | 19 | 30..=34 | 40..=47 | 61..=81)
+            }
+            _ => false,
+        }
+    }
+
+    crate::kvn::strict::validate_odm_assignments(
+        kvn,
+        &crate::kvn::strict::OdmAssignmentRules {
+            context: "strict OMM KVN",
+            message_name: "OMM",
+            rank,
+            comment_starts_block: comments_start_block,
+            allows_non_increasing: |previous, current| {
+                // SEMI_MAJOR_AXIS/MEAN_MOTION, BSTAR/BTERM, and MEAN_MOTION_DDOT/AGOM each share
+                // a rank so either spelling may fill the slot; only the *other* alternative may
+                // follow, never a repeat of the same keyword. USER_DEFINED_* genuinely repeats.
+                (matches!(previous.rank, 13 | 45 | 47)
+                    && current.rank == previous.rank
+                    && current.key != previous.key)
+                    || (current.rank == 90 && previous.rank == 90)
+            },
+        },
+    )
+}
+
+impl ToKvn for Omm {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        // 1. Header
+        writer.write_pair("CCSDS_OMM_VERS", &self.version);
+        self.header.write_kvn(writer);
+
+        // 2. Body
+        self.body.write_kvn(writer);
+    }
+}
+
+impl ToKvn for OmmBody {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        self.segment.write_kvn(writer);
+    }
+}
+
+impl ToKvn for OmmSegment {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        self.metadata.write_kvn(writer);
+        self.data.write_kvn(writer);
+    }
+}
+
+impl ToKvn for OmmMetadata {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        writer.write_pair("OBJECT_NAME", &self.object_name);
+        writer.write_pair("OBJECT_ID", &self.object_id);
+        writer.write_pair("CENTER_NAME", &self.center_name);
+        writer.write_pair("REF_FRAME", &self.ref_frame);
+        if let Some(v) = &self.ref_frame_epoch {
+            writer.write_pair("REF_FRAME_EPOCH", v);
+        }
+        writer.write_pair("TIME_SYSTEM", &self.time_system);
+        writer.write_pair("MEAN_ELEMENT_THEORY", &self.mean_element_theory);
+    }
+}
+
+impl ToKvn for OmmData {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        // Mean Elements
+        self.mean_elements.write_kvn(writer);
+
+        // Spacecraft Params
+        if let Some(sp) = &self.spacecraft_parameters {
+            writer.write_comments(&sp.comment);
+            if let Some(v) = &sp.mass {
+                writer.write_odm_float_measure("MASS", &v.to_unit_value());
+            }
+            if let Some(v) = &sp.solar_rad_area {
+                writer.write_odm_float_measure("SOLAR_RAD_AREA", &v.to_unit_value());
+            }
+            if let Some(v) = &sp.solar_rad_coeff {
+                writer.write_odm_float_pair("SOLAR_RAD_COEFF", v.value);
+            }
+            if let Some(v) = &sp.drag_area {
+                writer.write_odm_float_measure("DRAG_AREA", &v.to_unit_value());
+            }
+            if let Some(v) = &sp.drag_coeff {
+                writer.write_odm_float_pair("DRAG_COEFF", v.value);
+            }
+        }
+
+        // TLE Params
+        if let Some(tle) = &self.tle_parameters {
+            tle.write_kvn(writer);
+        }
+
+        // Covariance
+        if let Some(cov) = &self.covariance_matrix {
+            cov.write_kvn(writer);
+        }
+
+        // User Defined
+        if let Some(ud) = &self.user_defined_parameters {
+            writer.write_comments(&ud.comment);
+            for p in &ud.user_defined {
+                writer.write_user_defined(&p.parameter, &p.value);
+            }
+        }
+    }
+}
+
+impl ToKvn for MeanElements {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        writer.write_pair("EPOCH", self.epoch);
+        if let Some(v) = &self.semi_major_axis {
+            writer.write_odm_float_measure("SEMI_MAJOR_AXIS", v);
+        }
+        if let Some(v) = &self.mean_motion {
+            writer.write_odm_float_measure("MEAN_MOTION", v);
+        }
+        writer.write_odm_float_pair("ECCENTRICITY", self.eccentricity.value);
+        writer.write_odm_float_measure("INCLINATION", &self.inclination.to_unit_value());
+        writer.write_odm_float_measure("RA_OF_ASC_NODE", &self.ra_of_asc_node.to_unit_value());
+        writer
+            .write_odm_float_measure("ARG_OF_PERICENTER", &self.arg_of_pericenter.to_unit_value());
+        writer.write_odm_float_measure("MEAN_ANOMALY", &self.mean_anomaly.to_unit_value());
+        if let Some(v) = &self.gm {
+            writer.write_odm_float_measure("GM", &UnitValue::new(v.value, v.units.clone()));
+        }
+    }
+}
+
+impl ToKvn for TleParameters {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        if let Some(v) = self.ephemeris_type {
+            writer.write_pair("EPHEMERIS_TYPE", v);
+        }
+        if let Some(v) = &self.classification_type {
+            writer.write_pair("CLASSIFICATION_TYPE", v);
+        }
+        if let Some(v) = self.norad_cat_id {
+            writer.write_pair("NORAD_CAT_ID", v);
+        }
+        if let Some(v) = self.element_set_no {
+            writer.write_pair("ELEMENT_SET_NO", v);
+        }
+        if let Some(v) = self.rev_at_epoch {
+            writer.write_pair("REV_AT_EPOCH", v);
+        }
+        if let Some(v) = &self.bstar {
+            writer.write_odm_float_measure("BSTAR", v);
+        }
+        if let Some(v) = &self.bterm {
+            writer.write_odm_float_measure("BTERM", v);
+        }
+        writer.write_odm_float_measure("MEAN_MOTION_DOT", &self.mean_motion_dot);
+        if let Some(v) = &self.mean_motion_ddot {
+            writer.write_odm_float_measure("MEAN_MOTION_DDOT", v);
+        }
+        if let Some(v) = &self.agom {
+            writer.write_odm_float_measure("AGOM", v);
+        }
+    }
+}
+
+impl Omm {
+    /// Reject values that KVN generation could not spell back to the same number.
+    ///
+    /// The schema types these fields as plain doubles, so range and finiteness checks let through
+    /// magnitudes whose shortest round-tripping spelling exceeds the 16 significant digits and
+    /// 255-character line that ODM 7.7.1 allows. Catching them here keeps generation from
+    /// emitting a document this library would refuse to read back.
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        fn check(field: &'static str, value: f64, path: &'static str) -> Result<()> {
+            if OdmFloat::is_valid(value) {
+                return Ok(());
+            }
+            Err(crate::validation::unrepresentable_number(
+                field, value, path,
+            ))
+        }
+
+        let data = &self.body.segment.data;
+        let elements = &data.mean_elements;
+        check(
+            "ECCENTRICITY",
+            elements.eccentricity.value,
+            "body.segment.data.mean_elements.eccentricity",
+        )?;
+        check(
+            "INCLINATION",
+            elements.inclination.angle.value,
+            "body.segment.data.mean_elements.inclination",
+        )?;
+        check(
+            "RA_OF_ASC_NODE",
+            elements.ra_of_asc_node.value,
+            "body.segment.data.mean_elements.ra_of_asc_node",
+        )?;
+        check(
+            "ARG_OF_PERICENTER",
+            elements.arg_of_pericenter.value,
+            "body.segment.data.mean_elements.arg_of_pericenter",
+        )?;
+        check(
+            "MEAN_ANOMALY",
+            elements.mean_anomaly.value,
+            "body.segment.data.mean_elements.mean_anomaly",
+        )?;
+        for (field, value, path) in [
+            (
+                "SEMI_MAJOR_AXIS",
+                elements.semi_major_axis.as_ref().map(|v| v.value),
+                "body.segment.data.mean_elements.semi_major_axis",
+            ),
+            (
+                "MEAN_MOTION",
+                elements.mean_motion.as_ref().map(|v| v.value),
+                "body.segment.data.mean_elements.mean_motion",
+            ),
+            (
+                "GM",
+                elements.gm.as_ref().map(|v| v.value),
+                "body.segment.data.mean_elements.gm",
+            ),
+        ] {
+            let Some(value) = value else { continue };
+            check(field, value, path)?;
+        }
+        if let Some(parameters) = &data.spacecraft_parameters {
+            for (field, value, path) in [
+                (
+                    "MASS",
+                    parameters.mass.as_ref().map(|v| v.value),
+                    "body.segment.data.spacecraft_parameters.mass",
+                ),
+                (
+                    "SOLAR_RAD_AREA",
+                    parameters.solar_rad_area.as_ref().map(|v| v.value),
+                    "body.segment.data.spacecraft_parameters.solar_rad_area",
+                ),
+                (
+                    "SOLAR_RAD_COEFF",
+                    parameters.solar_rad_coeff.as_ref().map(|v| v.value),
+                    "body.segment.data.spacecraft_parameters.solar_rad_coeff",
+                ),
+                (
+                    "DRAG_AREA",
+                    parameters.drag_area.as_ref().map(|v| v.value),
+                    "body.segment.data.spacecraft_parameters.drag_area",
+                ),
+                (
+                    "DRAG_COEFF",
+                    parameters.drag_coeff.as_ref().map(|v| v.value),
+                    "body.segment.data.spacecraft_parameters.drag_coeff",
+                ),
+            ] {
+                let Some(value) = value else { continue };
+                check(field, value, path)?;
+            }
+        }
+
+        if let Some(tle) = &data.tle_parameters {
+            for (field, value, path) in [
+                (
+                    "BSTAR",
+                    tle.bstar.as_ref().map(|v| v.value),
+                    "body.segment.data.tle_parameters.bstar",
+                ),
+                (
+                    "BTERM",
+                    tle.bterm.as_ref().map(|v| v.value),
+                    "body.segment.data.tle_parameters.bterm",
+                ),
+                (
+                    "MEAN_MOTION_DOT",
+                    Some(tle.mean_motion_dot.value),
+                    "body.segment.data.tle_parameters.mean_motion_dot",
+                ),
+                (
+                    "MEAN_MOTION_DDOT",
+                    tle.mean_motion_ddot.as_ref().map(|v| v.value),
+                    "body.segment.data.tle_parameters.mean_motion_ddot",
+                ),
+                (
+                    "AGOM",
+                    tle.agom.as_ref().map(|v| v.value),
+                    "body.segment.data.tle_parameters.agom",
+                ),
+            ] {
+                let Some(value) = value else { continue };
+                check(field, value, path)?;
+            }
+        }
+
+        if let Some(covariance) = &data.covariance_matrix {
+            for (field, value, path) in covariance.kvn_numbers() {
+                check(field, value, path)?;
+            }
+        }
+
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {

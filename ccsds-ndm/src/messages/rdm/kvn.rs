@@ -6,13 +6,16 @@
 //!
 //! This module implements KVN parsing for RDM using winnow parser combinators.
 
+use super::{Rdm, RdmBody, RdmData, RdmHeader, RdmMetadata, RdmSegment};
 use crate::common::{
     AtmosphericReentryParameters, GroundImpactParameters, OdParameters, OpmCovarianceMatrix,
     RdmSpacecraftParameters, StateVector,
 };
+use crate::error::Result;
 use crate::kvn::parser::*;
-use crate::messages::rdm::{Rdm, RdmBody, RdmData, RdmHeader, RdmMetadata, RdmSegment};
+use crate::kvn::ser::KvnWriter;
 use crate::parse_block;
+use crate::traits::ToKvn;
 use crate::types::*;
 use winnow::prelude::*;
 use winnow::stream::Offset;
@@ -616,6 +619,401 @@ impl ParseKvn for Rdm {
 //----------------------------------------------------------------------
 // Tests
 //----------------------------------------------------------------------
+
+pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
+    const KEYS: &[&str] = &[
+        "CCSDS_RDM_VERS",
+        "CREATION_DATE",
+        "ORIGINATOR",
+        "MESSAGE_ID",
+        "OBJECT_NAME",
+        "INTERNATIONAL_DESIGNATOR",
+        "CATALOG_NAME",
+        "OBJECT_DESIGNATOR",
+        "OBJECT_TYPE",
+        "OBJECT_OWNER",
+        "OBJECT_OPERATOR",
+        "CONTROLLED_REENTRY",
+        "CENTER_NAME",
+        "TIME_SYSTEM",
+        "EPOCH_TZERO",
+        "REF_FRAME",
+        "REF_FRAME_EPOCH",
+        "EPHEMERIS_NAME",
+        "GRAVITY_MODEL",
+        "ATMOSPHERIC_MODEL",
+        "SOLAR_FLUX_PREDICTION",
+        "N_BODY_PERTURBATIONS",
+        "SOLAR_RAD_PRESSURE",
+        "EARTH_TIDES",
+        "INTRACK_THRUST",
+        "DRAG_PARAMETERS_SOURCE",
+        "DRAG_PARAMETERS_ALTITUDE",
+        "REENTRY_UNCERTAINTY_METHOD",
+        "REENTRY_DISINTEGRATION",
+        "IMPACT_UNCERTAINTY_METHOD",
+        "PREVIOUS_MESSAGE_ID",
+        "PREVIOUS_MESSAGE_EPOCH",
+        "NEXT_MESSAGE_EPOCH",
+        "ORBIT_LIFETIME",
+        "REENTRY_ALTITUDE",
+        "ORBIT_LIFETIME_WINDOW_START",
+        "ORBIT_LIFETIME_WINDOW_END",
+        "NOMINAL_REENTRY_EPOCH",
+        "REENTRY_WINDOW_START",
+        "REENTRY_WINDOW_END",
+        "ORBIT_LIFETIME_CONFIDENCE_LEVEL",
+        "PROBABILITY_OF_IMPACT",
+        "PROBABILITY_OF_BURN_UP",
+        "PROBABILITY_OF_BREAK_UP",
+        "PROBABILITY_OF_LAND_IMPACT",
+        "PROBABILITY_OF_CASUALTY",
+        "NOMINAL_IMPACT_EPOCH",
+        "IMPACT_WINDOW_START",
+        "IMPACT_WINDOW_END",
+        "IMPACT_REF_FRAME",
+        "NOMINAL_IMPACT_LON",
+        "NOMINAL_IMPACT_LAT",
+        "NOMINAL_IMPACT_ALT",
+        "IMPACT_1_CONFIDENCE",
+        "IMPACT_1_START_LON",
+        "IMPACT_1_START_LAT",
+        "IMPACT_1_STOP_LON",
+        "IMPACT_1_STOP_LAT",
+        "IMPACT_1_CROSS_TRACK",
+        "IMPACT_2_CONFIDENCE",
+        "IMPACT_2_START_LON",
+        "IMPACT_2_START_LAT",
+        "IMPACT_2_STOP_LON",
+        "IMPACT_2_STOP_LAT",
+        "IMPACT_2_CROSS_TRACK",
+        "IMPACT_3_CONFIDENCE",
+        "IMPACT_3_START_LON",
+        "IMPACT_3_START_LAT",
+        "IMPACT_3_STOP_LON",
+        "IMPACT_3_STOP_LAT",
+        "IMPACT_3_CROSS_TRACK",
+        "EPOCH",
+        "X",
+        "Y",
+        "Z",
+        "X_DOT",
+        "Y_DOT",
+        "Z_DOT",
+        "COV_REF_FRAME",
+        "CX_X",
+        "CY_X",
+        "CY_Y",
+        "CZ_X",
+        "CZ_Y",
+        "CZ_Z",
+        "CX_DOT_X",
+        "CX_DOT_Y",
+        "CX_DOT_Z",
+        "CX_DOT_X_DOT",
+        "CY_DOT_X",
+        "CY_DOT_Y",
+        "CY_DOT_Z",
+        "CY_DOT_X_DOT",
+        "CY_DOT_Y_DOT",
+        "CZ_DOT_X",
+        "CZ_DOT_Y",
+        "CZ_DOT_Z",
+        "CZ_DOT_X_DOT",
+        "CZ_DOT_Y_DOT",
+        "CZ_DOT_Z_DOT",
+        "WET_MASS",
+        "DRY_MASS",
+        "HAZARDOUS_SUBSTANCES",
+        "SOLAR_RAD_AREA",
+        "SOLAR_RAD_COEFF",
+        "DRAG_AREA",
+        "DRAG_COEFF",
+        "RCS",
+        "BALLISTIC_COEFF",
+        "THRUST_ACCELERATION",
+        "TIME_LASTOB_START",
+        "TIME_LASTOB_END",
+        "RECOMMENDED_OD_SPAN",
+        "ACTUAL_OD_SPAN",
+        "OBS_AVAILABLE",
+        "OBS_USED",
+        "TRACKS_AVAILABLE",
+        "TRACKS_USED",
+        "RESIDUALS_ACCEPTED",
+        "WEIGHTED_RMS",
+    ];
+
+    fn rank(key: &str) -> Option<u16> {
+        if key.starts_with("USER_DEFINED_") {
+            return Some(KEYS.len() as u16);
+        }
+        KEYS.iter()
+            .position(|candidate| *candidate == key)
+            .map(|rank| rank as u16)
+    }
+
+    fn group(rank: u16) -> u8 {
+        match rank {
+            0 => 0,
+            1..=3 => 1,
+            4..=32 => 2,
+            33..=40 => 3,
+            41..=70 => 4,
+            71..=77 => 5,
+            78..=99 => 6,
+            100..=109 => 7,
+            110..=119 => 8,
+            _ => 9,
+        }
+    }
+
+    fn comments_start_block(previous: u16, key: &str) -> bool {
+        let Some(current) = rank(key) else {
+            return false;
+        };
+        match current {
+            1 => previous == 0,
+            4 => previous == 3,
+            33 => group(previous) == 2,
+            _ => group(current) >= 4 && group(previous) < group(current),
+        }
+    }
+
+    crate::kvn::strict::validate_odm_assignments(
+        kvn,
+        &crate::kvn::strict::OdmAssignmentRules {
+            context: "while validating RDM KVN structure",
+            message_name: "RDM",
+            rank,
+            comment_starts_block: comments_start_block,
+            allows_non_increasing: |previous, current| {
+                current.rank == KEYS.len() as u16
+                    && previous.rank == current.rank
+                    && current.key.starts_with("USER_DEFINED_")
+            },
+        },
+    )
+}
+
+impl ToKvn for Rdm {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_pair("CCSDS_RDM_VERS", &self.version);
+        self.header.write_kvn(writer);
+        self.body.write_kvn(writer);
+    }
+}
+
+impl ToKvn for RdmHeader {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        writer.write_pair("CREATION_DATE", self.creation_date);
+        writer.write_pair("ORIGINATOR", &self.originator);
+        writer.write_pair("MESSAGE_ID", &self.message_id);
+    }
+}
+
+impl ToKvn for RdmBody {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        self.segment.write_kvn(writer);
+    }
+}
+
+impl ToKvn for RdmSegment {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        self.metadata.write_kvn(writer);
+        self.data.write_kvn(writer);
+    }
+}
+
+impl ToKvn for RdmMetadata {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.write_comments(&self.comment);
+        writer.write_pair("OBJECT_NAME", &self.object_name);
+        writer.write_pair("INTERNATIONAL_DESIGNATOR", &self.international_designator);
+        if let Some(v) = &self.catalog_name {
+            writer.write_pair("CATALOG_NAME", v);
+        }
+        if let Some(v) = &self.object_designator {
+            writer.write_pair("OBJECT_DESIGNATOR", v);
+        }
+        if let Some(ref v) = self.object_type {
+            writer.write_pair("OBJECT_TYPE", v.to_string());
+        }
+        if let Some(v) = &self.object_owner {
+            writer.write_pair("OBJECT_OWNER", v);
+        }
+        if let Some(v) = &self.object_operator {
+            writer.write_pair("OBJECT_OPERATOR", v);
+        }
+        writer.write_pair("CONTROLLED_REENTRY", format!("{}", self.controlled_reentry));
+        writer.write_pair("CENTER_NAME", &self.center_name);
+        writer.write_pair("TIME_SYSTEM", &self.time_system);
+        writer.write_pair("EPOCH_TZERO", self.epoch_tzero);
+        if let Some(v) = &self.ref_frame {
+            writer.write_pair("REF_FRAME", v);
+        }
+        if let Some(v) = &self.ref_frame_epoch {
+            writer.write_pair("REF_FRAME_EPOCH", v);
+        }
+        if let Some(v) = &self.ephemeris_name {
+            writer.write_pair("EPHEMERIS_NAME", v);
+        }
+        if let Some(v) = &self.gravity_model {
+            writer.write_pair("GRAVITY_MODEL", v);
+        }
+        if let Some(v) = &self.atmospheric_model {
+            writer.write_pair("ATMOSPHERIC_MODEL", v);
+        }
+        if let Some(v) = &self.solar_flux_prediction {
+            writer.write_pair("SOLAR_FLUX_PREDICTION", v);
+        }
+        if let Some(v) = &self.n_body_perturbations {
+            writer.write_pair("N_BODY_PERTURBATIONS", v);
+        }
+        if let Some(v) = &self.solar_rad_pressure {
+            writer.write_pair("SOLAR_RAD_PRESSURE", v);
+        }
+        if let Some(v) = &self.earth_tides {
+            writer.write_pair("EARTH_TIDES", v);
+        }
+        if let Some(v) = &self.intrack_thrust {
+            writer.write_pair("INTRACK_THRUST", format!("{}", v));
+        }
+        if let Some(v) = &self.drag_parameters_source {
+            writer.write_pair("DRAG_PARAMETERS_SOURCE", v);
+        }
+        if let Some(v) = &self.drag_parameters_altitude {
+            writer.write_pair("DRAG_PARAMETERS_ALTITUDE", v);
+        }
+        if let Some(v) = &self.reentry_uncertainty_method {
+            writer.write_pair("REENTRY_UNCERTAINTY_METHOD", v.to_string());
+        }
+        if let Some(v) = &self.reentry_disintegration {
+            writer.write_pair("REENTRY_DISINTEGRATION", format!("{}", v));
+        }
+        if let Some(v) = &self.impact_uncertainty_method {
+            writer.write_pair("IMPACT_UNCERTAINTY_METHOD", v.to_string());
+        }
+        if let Some(v) = &self.previous_message_id {
+            writer.write_pair("PREVIOUS_MESSAGE_ID", v);
+        }
+        if let Some(v) = &self.previous_message_epoch {
+            writer.write_pair("PREVIOUS_MESSAGE_EPOCH", v);
+        }
+        if let Some(v) = &self.next_message_epoch {
+            writer.write_pair("NEXT_MESSAGE_EPOCH", v);
+        }
+    }
+}
+
+impl Rdm {
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        if !self.body.segment.data.comment.is_empty() {
+            return Err(crate::error::ValidationError::Generic {
+                message: "RDM XML data-level COMMENT cannot be represented distinctly from the first KVN logical-block COMMENT".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
+impl RdmData {
+    fn write_kvn(&self, writer: &mut KvnWriter) {
+        // No DATA_START
+        writer.write_comments(&self.comment);
+        // Atmospheric (mandatory)
+        self.atmospheric_reentry_parameters.write_kvn(writer);
+
+        // Ground impact (optional)
+        if let Some(g) = &self.ground_impact_parameters {
+            g.write_kvn(writer);
+        }
+
+        // Optional blocks: write when present
+        if let Some(sv) = &self.state_vector {
+            sv.write_kvn(writer);
+        }
+        if let Some(cov) = &self.covariance_matrix {
+            cov.write_kvn(writer);
+        }
+        if let Some(sp) = &self.spacecraft_parameters {
+            writer.write_comments(&sp.comment);
+            if let Some(v) = &sp.wet_mass {
+                writer.write_measure("WET_MASS", &v.to_unit_value());
+            }
+            if let Some(v) = &sp.dry_mass {
+                writer.write_measure("DRY_MASS", &v.to_unit_value());
+            }
+            if let Some(v) = &sp.hazardous_substances {
+                writer.write_pair("HAZARDOUS_SUBSTANCES", v);
+            }
+            if let Some(v) = &sp.solar_rad_area {
+                writer.write_measure("SOLAR_RAD_AREA", &v.to_unit_value());
+            }
+            if let Some(v) = &sp.solar_rad_coeff {
+                writer.write_pair("SOLAR_RAD_COEFF", v);
+            }
+            if let Some(v) = &sp.drag_area {
+                writer.write_measure("DRAG_AREA", &v.to_unit_value());
+            }
+            if let Some(v) = &sp.drag_coeff {
+                writer.write_pair("DRAG_COEFF", v);
+            }
+            if let Some(v) = &sp.rcs {
+                writer.write_measure("RCS", &v.to_unit_value());
+            }
+            if let Some(v) = &sp.ballistic_coeff {
+                writer.write_measure("BALLISTIC_COEFF", v);
+            }
+            if let Some(v) = &sp.thrust_acceleration {
+                writer.write_measure("THRUST_ACCELERATION", &v.to_unit_value());
+            }
+        }
+        if let Some(od) = &self.od_parameters {
+            writer.write_comments(&od.comment);
+            if let Some(v) = &od.time_lastob_start {
+                writer.write_pair("TIME_LASTOB_START", v);
+            }
+            if let Some(v) = &od.time_lastob_end {
+                writer.write_pair("TIME_LASTOB_END", v);
+            }
+            if let Some(v) = &od.recommended_od_span {
+                writer.write_measure("RECOMMENDED_OD_SPAN", &v.to_unit_value());
+            }
+            if let Some(v) = &od.actual_od_span {
+                writer.write_measure("ACTUAL_OD_SPAN", &v.to_unit_value());
+            }
+            if let Some(v) = &od.obs_available {
+                writer.write_pair("OBS_AVAILABLE", v);
+            }
+            if let Some(v) = &od.obs_used {
+                writer.write_pair("OBS_USED", v);
+            }
+            if let Some(v) = &od.tracks_available {
+                writer.write_pair("TRACKS_AVAILABLE", v);
+            }
+            if let Some(v) = &od.tracks_used {
+                writer.write_pair("TRACKS_USED", v);
+            }
+            if let Some(v) = &od.residuals_accepted {
+                writer.write_measure("RESIDUALS_ACCEPTED", &v.to_unit_value());
+            }
+            if let Some(v) = &od.weighted_rms {
+                writer.write_pair("WEIGHTED_RMS", v);
+            }
+        }
+
+        if let Some(ud) = &self.user_defined_parameters {
+            writer.write_comments(&ud.comment);
+            for p in &ud.user_defined {
+                writer.write_user_defined(&p.parameter, &p.value);
+            }
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
