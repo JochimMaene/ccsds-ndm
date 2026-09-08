@@ -1534,7 +1534,7 @@ class AemData:
     """
     AEM Data Section.
     """
-    def __init__(self, attitude_states, attitude_type=None, comment=None) -> None: ...
+    def __init__(self, attitude_states, attitude_type, comment=None) -> None: ...
     @property
     def attitude_states(self) -> list[AttitudeState]:
         """
@@ -1580,7 +1580,7 @@ class AemData:
     def from_numpy(
         epochs: list[str],
         array: numpy.ndarray,
-        attitude_type: str | None = None,
+        attitude_type: str | None,
         comment: list[str] | None = None,
     ) -> AemData: ...
     def validate(self, attitude_type) -> None:
