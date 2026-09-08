@@ -2103,6 +2103,61 @@ mod kvn_layout {
 mod tests {
     use super::*;
 
+    const MINIMAL: &str = r#"CCSDS_OPM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+EPOCH = 2023-01-01T00:00:00
+X = 1000 [km]
+Y = 2000 [km]
+Z = 3000 [km]
+X_DOT = 1.0 [km/s]
+Y_DOT = 2.0 [km/s]
+Z_DOT = 3.0 [km/s]
+"#;
+
+    #[test]
+    fn required_metadata_and_state_fields_cannot_be_omitted() {
+        Opm::from_kvn(MINIMAL).unwrap();
+        for key in [
+            "OBJECT_NAME",
+            "OBJECT_ID",
+            "CENTER_NAME",
+            "REF_FRAME",
+            "TIME_SYSTEM",
+            "EPOCH",
+            "X",
+            "Y",
+            "Z",
+            "X_DOT",
+            "Y_DOT",
+            "Z_DOT",
+        ] {
+            let line = MINIMAL
+                .lines()
+                .find(|line| line.starts_with(&format!("{key} =")))
+                .unwrap();
+            let invalid = MINIMAL.replace(&format!("{line}\n"), "");
+            assert!(Opm::from_kvn(&invalid).is_err(), "accepted missing {key}");
+        }
+    }
+
+    #[test]
+    fn minimal_message_omits_optional_blocks_and_roundtrips() {
+        let message = Opm::from_kvn(MINIMAL).unwrap();
+        let data = &message.body.segment.data;
+        assert!(data.keplerian_elements.is_none());
+        assert!(data.spacecraft_parameters.is_none());
+        assert!(data.covariance_matrix.is_none());
+        assert!(data.maneuver_parameters.is_empty());
+        assert_eq!(Opm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+        assert_eq!(Opm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    }
+
     fn sample_opm_kvn() -> String {
         r#"CCSDS_OPM_VERS = 3.0
 CREATION_DATE = 2022-11-06T09:23:57
@@ -2235,140 +2290,10 @@ MAN_DV_3 = 0.0
         assert!(ok, "expected MASS missing validation error, got {err}");
     }
 
-    // =========================================================================
-    // XSD COMPLIANCE TESTS - Group 1: Mandatory Metadata Fields
-    // XSD: opmMetadata defines mandatory fields without minOccurs="0"
-    // =========================================================================
-
-    #[test]
-    fn test_xsd_missing_object_name() {
-        // XSD: OBJECT_NAME is mandatory (no minOccurs="0")
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-"#;
-        // Should fail - OBJECT_NAME is required
-        assert!(Opm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_xsd_missing_object_id() {
-        // XSD: OBJECT_ID is mandatory (no minOccurs="0")
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-"#;
-        // Should fail - OBJECT_ID is required
-        assert!(Opm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_xsd_missing_center_name() {
-        // XSD: CENTER_NAME is mandatory (no minOccurs="0")
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-"#;
-        // Should fail - CENTER_NAME is required
-        assert!(Opm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_xsd_missing_ref_frame() {
-        // XSD: REF_FRAME is mandatory (no minOccurs="0")
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-"#;
-        // Should fail - REF_FRAME is required
-        assert!(Opm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_xsd_missing_time_system() {
-        // XSD: TIME_SYSTEM is mandatory (no minOccurs="0")
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-"#;
-        // Should fail - TIME_SYSTEM is required
-        assert!(Opm::from_kvn(kvn).is_err());
-    }
-
     #[test]
     fn test_xsd_metadata_optional_ref_frame_epoch() {
         // XSD: REF_FRAME_EPOCH has minOccurs="0" - it's optional
-        let kvn_without = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-"#;
+        let kvn_without = MINIMAL;
         let opm = Opm::from_kvn(kvn_without).unwrap();
         assert!(opm.body.segment.metadata.ref_frame_epoch.is_none());
 
@@ -2392,11 +2317,6 @@ Z_DOT = 3.0 [km/s]
         let opm = Opm::from_kvn(kvn_with).unwrap();
         assert!(opm.body.segment.metadata.ref_frame_epoch.is_some());
     }
-
-    // =========================================================================
-    // XSD COMPLIANCE TESTS - Group 2: State Vector Tests
-    // XSD: stateVectorType has mandatory EPOCH, X, Y, Z, X_DOT, Y_DOT, Z_DOT
-    // =========================================================================
 
     #[test]
     fn test_xsd_state_vector_all_mandatory() {
@@ -2428,105 +2348,19 @@ Z_DOT = -4.191076 [km/s]
     }
 
     #[test]
-    fn test_xsd_state_vector_missing_epoch() {
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-"#;
-        // Should fail - EPOCH is required
-        assert!(Opm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_xsd_state_vector_missing_position() {
-        // XSD: X, Y, Z are mandatory in stateVectorType
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-"#;
-        // Should fail - Z is required
-        assert!(Opm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_xsd_state_vector_missing_velocity() {
-        // XSD: X_DOT, Y_DOT, Z_DOT are mandatory in stateVectorType
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-"#;
-        // Should fail - Z_DOT is required
-        assert!(Opm::from_kvn(kvn).is_err());
-    }
-
-    // =========================================================================
-    // XSD COMPLIANCE TESTS - Group 3: Keplerian Elements Tests
-    // XSD: keplerianElementsType has xsd:choice between TRUE_ANOMALY XOR MEAN_ANOMALY
-    // XSD: nonNegativeDouble for ECCENTRICITY (minInclusive=0.0)
-    // XSD: inclinationType for INCLINATION (0-180 degrees)
-    // XSD: angleRange for RA_OF_ASC_NODE, ARG_OF_PERICENTER, *_ANOMALY (-360 to <360)
-    // XSD: positiveDouble for GM (minExclusive=0.0)
-    // =========================================================================
-
-    #[test]
     fn test_xsd_keplerian_with_true_anomaly() {
         // XSD: keplerianElementsType choice: TRUE_ANOMALY path
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-SEMI_MAJOR_AXIS = 7000 [km]
+        let kvn = &format!(
+            "{MINIMAL}{}",
+            r#"SEMI_MAJOR_AXIS = 7000 [km]
 ECCENTRICITY = 0.001
 INCLINATION = 45 [deg]
 RA_OF_ASC_NODE = 90 [deg]
 ARG_OF_PERICENTER = 180 [deg]
 TRUE_ANOMALY = 270 [deg]
 GM = 398600.4 [km**3/s**2]
-"#;
+"#
+        );
         let opm = Opm::from_kvn(kvn).unwrap();
         let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
         assert!(kep.true_anomaly.is_some());
@@ -2537,29 +2371,17 @@ GM = 398600.4 [km**3/s**2]
     #[test]
     fn test_xsd_keplerian_with_mean_anomaly() {
         // XSD: keplerianElementsType choice: MEAN_ANOMALY path
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-SEMI_MAJOR_AXIS = 7000 [km]
+        let kvn = &format!(
+            "{MINIMAL}{}",
+            r#"SEMI_MAJOR_AXIS = 7000 [km]
 ECCENTRICITY = 0.001
 INCLINATION = 45 [deg]
 RA_OF_ASC_NODE = 90 [deg]
 ARG_OF_PERICENTER = 180 [deg]
 MEAN_ANOMALY = 120 [deg]
 GM = 398600.4 [km**3/s**2]
-"#;
+"#
+        );
         let opm = Opm::from_kvn(kvn).unwrap();
         let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
         assert!(kep.mean_anomaly.is_some());
@@ -2570,29 +2392,17 @@ GM = 398600.4 [km**3/s**2]
     #[test]
     fn test_xsd_keplerian_eccentricity_zero_valid() {
         // XSD: nonNegativeDouble - minInclusive=0.0 (circular orbit)
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-SEMI_MAJOR_AXIS = 7000 [km]
+        let kvn = &format!(
+            "{MINIMAL}{}",
+            r#"SEMI_MAJOR_AXIS = 7000 [km]
 ECCENTRICITY = 0.0
 INCLINATION = 45 [deg]
 RA_OF_ASC_NODE = 90 [deg]
 ARG_OF_PERICENTER = 0 [deg]
 TRUE_ANOMALY = 0 [deg]
 GM = 398600.4 [km**3/s**2]
-"#;
+"#
+        );
         let opm = Opm::from_kvn(kvn).unwrap();
         let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
         assert_eq!(kep.eccentricity, NonNegativeDouble::new(0.0).unwrap());
@@ -2601,56 +2411,32 @@ GM = 398600.4 [km**3/s**2]
     #[test]
     fn test_xsd_keplerian_inclination_boundaries() {
         // XSD: inclinationType - 0 to 180 degrees inclusive
-        let kvn_zero = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-SEMI_MAJOR_AXIS = 7000 [km]
+        let kvn_zero = &format!(
+            "{MINIMAL}{}",
+            r#"SEMI_MAJOR_AXIS = 7000 [km]
 ECCENTRICITY = 0.001
 INCLINATION = 0 [deg]
 RA_OF_ASC_NODE = 0 [deg]
 ARG_OF_PERICENTER = 0 [deg]
 TRUE_ANOMALY = 0 [deg]
 GM = 398600.4 [km**3/s**2]
-"#;
+"#
+        );
         let opm = Opm::from_kvn(kvn_zero).unwrap();
         let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
         assert_eq!(kep.inclination.angle.value, 0.0);
 
-        let kvn_180 = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-SEMI_MAJOR_AXIS = 7000 [km]
+        let kvn_180 = &format!(
+            "{MINIMAL}{}",
+            r#"SEMI_MAJOR_AXIS = 7000 [km]
 ECCENTRICITY = 0.001
 INCLINATION = 180 [deg]
 RA_OF_ASC_NODE = 0 [deg]
 ARG_OF_PERICENTER = 0 [deg]
 TRUE_ANOMALY = 0 [deg]
 GM = 398600.4 [km**3/s**2]
-"#;
+"#
+        );
         let opm = Opm::from_kvn(kvn_180).unwrap();
         let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
         assert_eq!(kep.inclination.angle.value, 180.0);
@@ -2659,29 +2445,17 @@ GM = 398600.4 [km**3/s**2]
     #[test]
     fn test_xsd_keplerian_angle_range_negative() {
         // XSD: angleRange - can be negative (minInclusive=-360.0)
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-SEMI_MAJOR_AXIS = 7000 [km]
+        let kvn = &format!(
+            "{MINIMAL}{}",
+            r#"SEMI_MAJOR_AXIS = 7000 [km]
 ECCENTRICITY = 0.001
 INCLINATION = 45 [deg]
 RA_OF_ASC_NODE = -180 [deg]
 ARG_OF_PERICENTER = -90 [deg]
 TRUE_ANOMALY = -45 [deg]
 GM = 398600.4 [km**3/s**2]
-"#;
+"#
+        );
         let opm = Opm::from_kvn(kvn).unwrap();
         let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
         assert_eq!(kep.ra_of_asc_node.value, -180.0);
@@ -2692,111 +2466,34 @@ GM = 398600.4 [km**3/s**2]
     #[test]
     fn test_xsd_keplerian_gm_positive() {
         // XSD: positiveDouble for GM - minExclusive=0.0
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-SEMI_MAJOR_AXIS = 7000 [km]
+        let kvn = &format!(
+            "{MINIMAL}{}",
+            r#"SEMI_MAJOR_AXIS = 7000 [km]
 ECCENTRICITY = 0.001
 INCLINATION = 45 [deg]
 RA_OF_ASC_NODE = 90 [deg]
 ARG_OF_PERICENTER = 180 [deg]
 TRUE_ANOMALY = 0 [deg]
 GM = 0.001 [km**3/s**2]
-"#;
+"#
+        );
         let opm = Opm::from_kvn(kvn).unwrap();
         let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
         assert_eq!(kep.gm.value, 0.001);
     }
 
     #[test]
-    fn test_xsd_keplerian_is_optional() {
-        // XSD: keplerianElements is minOccurs="0" - optional
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-"#;
-        let opm = Opm::from_kvn(kvn).unwrap();
-        assert!(opm.body.segment.data.keplerian_elements.is_none());
-    }
-
-    // =========================================================================
-    // XSD COMPLIANCE TESTS - Group 4: Spacecraft Parameters & Covariance
-    // XSD: spacecraftParametersType is optional (minOccurs="0")
-    // XSD: nonNegativeDouble for SOLAR_RAD_COEFF, DRAG_COEFF (minInclusive=0.0)
-    // XSD: covarianceMatrixType is optional (minOccurs="0")
-    // =========================================================================
-
-    #[test]
-    fn test_xsd_spacecraft_parameters_optional() {
-        // XSD: spacecraftParameters minOccurs="0"
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-"#;
-        let opm = Opm::from_kvn(kvn).unwrap();
-        assert!(opm.body.segment.data.spacecraft_parameters.is_none());
-    }
-
-    #[test]
     fn test_xsd_spacecraft_parameters_with_all_fields() {
         // XSD: spacecraftParametersType has MASS, SOLAR_RAD_AREA, SOLAR_RAD_COEFF, DRAG_AREA, DRAG_COEFF
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-MASS = 500 [kg]
+        let kvn = &format!(
+            "{MINIMAL}{}",
+            r#"MASS = 500 [kg]
 SOLAR_RAD_AREA = 10.0 [m**2]
 SOLAR_RAD_COEFF = 1.2
 DRAG_AREA = 8.0 [m**2]
 DRAG_COEFF = 2.2
-"#;
+"#
+        );
         let opm = Opm::from_kvn(kvn).unwrap();
         let sp = opm
             .body
@@ -2821,25 +2518,13 @@ DRAG_COEFF = 2.2
     #[test]
     fn test_xsd_spacecraft_zero_coefficients() {
         // XSD: nonNegativeDouble allows 0 for coefficients
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-MASS = 100 [kg]
+        let kvn = &format!(
+            "{MINIMAL}{}",
+            r#"MASS = 100 [kg]
 SOLAR_RAD_COEFF = 0.0
 DRAG_COEFF = 0.0
-"#;
+"#
+        );
         let opm = Opm::from_kvn(kvn).unwrap();
         let sp = opm
             .body
@@ -2859,47 +2544,11 @@ DRAG_COEFF = 0.0
     }
 
     #[test]
-    fn test_xsd_covariance_matrix_optional() {
-        // XSD: covarianceMatrix minOccurs="0"
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-"#;
-        let opm = Opm::from_kvn(kvn).unwrap();
-        assert!(opm.body.segment.data.covariance_matrix.is_none());
-    }
-
-    #[test]
     fn test_xsd_covariance_matrix_present() {
         // XSD: covarianceMatrixType when present
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-COV_REF_FRAME = RSW
+        let kvn = &format!(
+            "{MINIMAL}{}",
+            r#"COV_REF_FRAME = RSW
 CX_X = 1.0e-6 [km**2]
 CY_X = 0.0 [km**2]
 CY_Y = 1.0e-6 [km**2]
@@ -2921,60 +2570,19 @@ CZ_DOT_Z = 0.0 [km**2/s]
 CZ_DOT_X_DOT = 0.0 [km**2/s**2]
 CZ_DOT_Y_DOT = 0.0 [km**2/s**2]
 CZ_DOT_Z_DOT = 1.0e-9 [km**2/s**2]
-"#;
+"#
+        );
         let opm = Opm::from_kvn(kvn).unwrap();
         let cov = opm.body.segment.data.covariance_matrix.as_ref().unwrap();
         assert!(cov.cov_ref_frame.is_some());
     }
 
-    // =========================================================================
-    // XSD COMPLIANCE TESTS - Group 5: Maneuver Tests
-    // XSD: maneuverParametersType minOccurs="0" maxOccurs="unbounded"
-    // XSD: deltamassTypeZ for MAN_DELTA_MASS (nonPositiveDouble, ≤ 0)
-    // =========================================================================
-
-    #[test]
-    fn test_xsd_maneuvers_optional() {
-        // XSD: maneuverParameters minOccurs="0"
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-"#;
-        let opm = Opm::from_kvn(kvn).unwrap();
-        assert!(opm.body.segment.data.maneuver_parameters.is_empty());
-    }
-
     #[test]
     fn test_xsd_single_maneuver() {
         // XSD: maneuverParametersType with mandatory fields
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-MASS = 3000.000000 [kg]
+        let kvn = &format!(
+            "{MINIMAL}{}",
+            r#"MASS = 3000.000000 [kg]
 MAN_EPOCH_IGNITION = 2023-01-02T00:00:00
 MAN_DURATION = 100 [s]
 MAN_DELTA_MASS = -5.0 [kg]
@@ -2982,7 +2590,8 @@ MAN_REF_FRAME = RSW
 MAN_DV_1 = 0.1 [km/s]
 MAN_DV_2 = 0.0 [km/s]
 MAN_DV_3 = 0.0 [km/s]
-"#;
+"#
+        );
         let opm = Opm::from_kvn(kvn).unwrap();
         assert_eq!(opm.body.segment.data.maneuver_parameters.len(), 1);
         let man = &opm.body.segment.data.maneuver_parameters[0];
@@ -2993,22 +2602,9 @@ MAN_DV_3 = 0.0 [km/s]
     #[test]
     fn test_xsd_multiple_maneuvers_unbounded() {
         // XSD: maxOccurs="unbounded" allows multiple maneuvers
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-MASS = 3000.000000 [kg]
+        let kvn = &format!(
+            "{MINIMAL}{}",
+            r#"MASS = 3000.000000 [kg]
 MAN_EPOCH_IGNITION = 2023-01-02T00:00:00
 MAN_DURATION = 100 [s]
 MAN_DELTA_MASS = -5.0 [kg]
@@ -3030,7 +2626,8 @@ MAN_REF_FRAME = RSW
 MAN_DV_1 = 0.0 [km/s]
 MAN_DV_2 = 0.1 [km/s]
 MAN_DV_3 = 0.0 [km/s]
-"#;
+"#
+        );
         let opm = Opm::from_kvn(kvn).unwrap();
         assert_eq!(opm.body.segment.data.maneuver_parameters.len(), 3);
     }
@@ -3039,22 +2636,9 @@ MAN_DV_3 = 0.0 [km/s]
     fn test_xsd_maneuver_delta_mass_zero_allowed() {
         // XSD: deltamassTypeZ is nonPositiveDouble (≤0), so zero is allowed
         // This represents attitude maneuvers that don't use propellant
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-MASS = 3000.000000 [kg]
+        let kvn = &format!(
+            "{MINIMAL}{}",
+            r#"MASS = 3000.000000 [kg]
 MAN_EPOCH_IGNITION = 2023-01-02T00:00:00
 MAN_DURATION = 100 [s]
 MAN_DELTA_MASS = 0.0 [kg]
@@ -3062,7 +2646,8 @@ MAN_REF_FRAME = RSW
 MAN_DV_1 = 0.1 [km/s]
 MAN_DV_2 = 0.0 [km/s]
 MAN_DV_3 = 0.0 [km/s]
-"#;
+"#
+        );
         // XSD allows zero for attitude maneuvers
         let opm = Opm::from_kvn(kvn).unwrap();
         let man = &opm.body.segment.data.maneuver_parameters[0];
@@ -3071,29 +2656,17 @@ MAN_DV_3 = 0.0 [km/s]
 
     #[test]
     fn test_xsd_maneuver_delta_mass_positive_rejected() {
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-MAN_EPOCH_IGNITION = 2023-01-02T00:00:00
+        let kvn = &format!(
+            "{MINIMAL}{}",
+            r#"MAN_EPOCH_IGNITION = 2023-01-02T00:00:00
 MAN_DURATION = 100 [s]
 MAN_DELTA_MASS = 5.0 [kg]
 MAN_REF_FRAME = RSW
 MAN_DV_1 = 0.1 [km/s]
 MAN_DV_2 = 0.0 [km/s]
 MAN_DV_3 = 0.0 [km/s]
-"#;
+"#
+        );
         // Should fail - positive MAN_DELTA_MASS is not allowed (must be <= 0)
         assert!(Opm::from_kvn(kvn).is_err());
     }
@@ -3101,22 +2674,9 @@ MAN_DV_3 = 0.0 [km/s]
     #[test]
     fn test_xsd_maneuver_delta_mass_negative() {
         // XSD: deltamassTypeZ - negative values are valid (mass loss)
-        let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-MASS = 3000.000000 [kg]
+        let kvn = &format!(
+            "{MINIMAL}{}",
+            r#"MASS = 3000.000000 [kg]
 MAN_EPOCH_IGNITION = 2023-01-02T00:00:00
 MAN_DURATION = 100 [s]
 MAN_DELTA_MASS = -100.0 [kg]
@@ -3124,81 +2684,11 @@ MAN_REF_FRAME = RSW
 MAN_DV_1 = 0.1 [km/s]
 MAN_DV_2 = 0.0 [km/s]
 MAN_DV_3 = 0.0 [km/s]
-"#;
+"#
+        );
         let opm = Opm::from_kvn(kvn).unwrap();
         let man = &opm.body.segment.data.maneuver_parameters[0];
         assert_eq!(man.man_delta_mass.value, -100.0);
-    }
-
-    // =========================================================================
-    // XSD COMPLIANCE TESTS - Group 6: Sample Files & Roundtrips
-    // =========================================================================
-
-    #[test]
-    fn test_xsd_sample_opm_g1_kvn() {
-        // Parse official CCSDS OPM example G-1
-        let kvn = include_str!("../../data/kvn/opm_g1.kvn");
-        let opm = Opm::from_kvn(kvn).unwrap();
-
-        // Verify metadata
-        assert!(!opm.body.segment.metadata.object_name.is_empty());
-        assert!(!opm.body.segment.metadata.object_id.is_empty());
-        assert!(!opm.body.segment.metadata.center_name.is_empty());
-
-        // Verify state vector present
-        assert!(!opm
-            .body
-            .segment
-            .data
-            .state_vector
-            .epoch
-            .to_string()
-            .is_empty());
-    }
-
-    #[test]
-    fn test_xsd_sample_opm_g2_kvn() {
-        // Parse official CCSDS OPM example G-2
-        let kvn = include_str!("../../data/kvn/opm_g2.kvn");
-        let opm = Opm::from_kvn(kvn).unwrap();
-
-        // Verify mandatory metadata
-        assert!(!opm.body.segment.metadata.object_name.is_empty());
-        assert!(!opm.body.segment.metadata.object_id.is_empty());
-    }
-
-    #[test]
-    fn test_xsd_sample_opm_g3_kvn() {
-        // Parse official CCSDS OPM example G-3
-        let kvn = include_str!("../../data/kvn/opm_g3.kvn");
-        let opm = Opm::from_kvn(kvn).unwrap();
-
-        // Verify mandatory metadata
-        assert!(!opm.body.segment.metadata.object_name.is_empty());
-        assert!(!opm.body.segment.metadata.object_id.is_empty());
-    }
-
-    #[test]
-    fn test_xsd_sample_opm_g4_kvn() {
-        // Parse official CCSDS OPM example G-4
-        let kvn = include_str!("../../data/kvn/opm_g4.kvn");
-        let opm = Opm::from_kvn(kvn).unwrap();
-
-        // Verify mandatory metadata
-        assert!(!opm.body.segment.metadata.object_name.is_empty());
-        assert!(!opm.body.segment.metadata.object_id.is_empty());
-    }
-
-    #[test]
-    fn test_xsd_sample_opm_g5_xml() {
-        // Parse official CCSDS OPM XML example G-5
-        let xml = include_str!("../../data/xml/opm_g5.xml");
-        let opm = Opm::from_xml(xml).unwrap();
-
-        // Verify metadata
-        assert!(!opm.body.segment.metadata.object_name.is_empty());
-        assert!(!opm.body.segment.metadata.object_id.is_empty());
-        assert!(!opm.body.segment.metadata.center_name.is_empty());
     }
 
     #[test]
@@ -3236,33 +2726,6 @@ Z_DOT = -4.191076 [km/s]
             opm.body.segment.data.state_vector.x.value,
             opm2.body.segment.data.state_vector.x.value
         );
-    }
-
-    #[test]
-    fn test_xsd_xml_roundtrip() {
-        // Full roundtrip: XML -> Opm -> XML
-        // Note: Roundtrip may not be exact due to formatting differences
-        let xml = include_str!("../../data/xml/opm_g5.xml");
-        let opm = Opm::from_xml(xml).unwrap();
-
-        // Verify we can convert to XML
-        let output = opm.to_xml();
-        assert!(output.is_ok() || output.is_err()); // Test parses successfully, serialization may have issues
-    }
-
-    #[test]
-    fn test_xsd_kvn_to_xml_conversion() {
-        // Cross-format: KVN -> Opm -> verify structure preserved
-        let kvn = include_str!("../../data/kvn/opm_g1.kvn");
-        let opm = Opm::from_kvn(kvn).unwrap();
-
-        // Verify the internal structure is valid
-        assert!(!opm.body.segment.metadata.object_name.is_empty());
-        assert!(!opm.body.segment.metadata.object_id.is_empty());
-
-        // Conversion to XML may have serialization issues
-        // but the structure should be valid
-        let _ = opm.to_xml(); // Don't unwrap - may have unit serialization issues
     }
 
     #[test]
@@ -3389,34 +2852,6 @@ Z_DOT = -4.191076 [km/s]
         assert!(kvn.contains("REF_FRAME_EPOCH"));
         assert!(kvn.contains("2000-01-01T12:00:00"));
         assert!(kvn.contains("MEAN_ANOMALY"));
-    }
-
-    #[test]
-    fn test_keplerian_elements_validation_detailed() {
-        // Invalid Anomaly Choice (Neither)
-        let mut ke = KeplerianElements::builder()
-            .semi_major_axis(Distance::new(7000.0, None))
-            .eccentricity(NonNegativeDouble::new(0.0).unwrap())
-            .inclination(Inclination::new(0.0, None).unwrap())
-            .ra_of_asc_node(Angle::new(0.0, None).unwrap())
-            .arg_of_pericenter(Angle::new(0.0, None).unwrap())
-            .gm(Gm::new(398600.0, None).unwrap())
-            .build();
-        assert!(ke.validate().is_err());
-
-        // Invalid Anomaly Choice (Both)
-        ke.true_anomaly = Some(Angle::new(0.0, None).unwrap());
-        ke.mean_anomaly = Some(Angle::new(0.0, None).unwrap());
-        assert!(ke.validate().is_err());
-
-        // Valid (True Anomaly)
-        ke.mean_anomaly = None;
-        assert!(ke.validate().is_ok());
-
-        // Valid (Mean Anomaly)
-        ke.true_anomaly = None;
-        ke.mean_anomaly = Some(Angle::new(0.0, None).unwrap());
-        assert!(ke.validate().is_ok());
     }
 
     #[test]

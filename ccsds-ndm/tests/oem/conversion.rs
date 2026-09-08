@@ -1,7 +1,7 @@
 use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::Ndm;
-use ccsds_ndm::{convert, convert_file, convert_file_with_options, Notation, ParseOptions};
+use ccsds_ndm::{convert, Notation};
 
 #[test]
 fn both_directions_preserve_the_complete_typed_model() {
@@ -76,35 +76,4 @@ fn kvn_round_trip_preserves_significant_comment_whitespace() {
     let kvn = convert(&message.to_xml().unwrap(), Notation::Kvn).unwrap();
     let reparsed = Oem::from_kvn(&kvn).unwrap();
     assert_eq!(reparsed.header.comment, message.header.comment);
-}
-
-#[test]
-fn file_conversion_is_atomic_and_bounds_input_before_materialization() {
-    let directory = tempfile::tempdir().unwrap();
-    let source = directory.path().join("source.oem");
-    let destination = directory.path().join("destination.xml");
-    std::fs::write(&source, KVN_FIXTURES[0]).unwrap();
-    std::fs::write(&destination, b"sentinel").unwrap();
-
-    convert_file(&source, &destination, Notation::Xml).unwrap();
-    Oem::from_xml(&std::fs::read_to_string(&destination).unwrap()).unwrap();
-
-    std::fs::write(&destination, b"sentinel").unwrap();
-    let error = convert_file_with_options(
-        &source,
-        &destination,
-        Notation::Xml,
-        &ParseOptions::default().with_max_input_bytes(16),
-    )
-    .expect_err("input limit should fail before replacement");
-    assert_eq!(error.code(), Some("resource.input_limit_exceeded"));
-    assert_eq!(std::fs::read(&destination).unwrap(), b"sentinel");
-    assert_eq!(
-        std::fs::read_dir(directory.path())
-            .unwrap()
-            .filter_map(Result::ok)
-            .filter(|entry| entry.file_name().to_string_lossy().ends_with(".tmp"))
-            .count(),
-        0
-    );
 }

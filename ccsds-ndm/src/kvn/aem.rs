@@ -521,36 +521,106 @@ DATA_STOP
             .unwrap()
     }
 
-    fn parsed_type_and_last_value(state: &AemAttitudeState) -> (AttitudeTypeType, f64) {
+    // ADM table 4-4: compare every named component in its KVN column order.
+    fn parsed_type_and_values(state: &AemAttitudeState) -> (AttitudeTypeType, Vec<f64>) {
         match state {
-            AemAttitudeState::QuaternionEphemeris(value) => {
-                (AttitudeTypeType::Quaternion, value.quaternion.qc)
-            }
+            AemAttitudeState::QuaternionEphemeris(value) => (
+                AttitudeTypeType::Quaternion,
+                vec![
+                    value.quaternion.q1,
+                    value.quaternion.q2,
+                    value.quaternion.q3,
+                    value.quaternion.qc,
+                ],
+            ),
             AemAttitudeState::QuaternionDerivative(value) => (
                 AttitudeTypeType::QuaternionDerivative,
-                value.quaternion_dot.qc_dot.value,
+                vec![
+                    value.quaternion.q1,
+                    value.quaternion.q2,
+                    value.quaternion.q3,
+                    value.quaternion.qc,
+                    value.quaternion_dot.q1_dot.value,
+                    value.quaternion_dot.q2_dot.value,
+                    value.quaternion_dot.q3_dot.value,
+                    value.quaternion_dot.qc_dot.value,
+                ],
             ),
             AemAttitudeState::QuaternionAngVel(value) => (
                 AttitudeTypeType::QuaternionAngVel,
-                value.ang_vel.angvel_z.value,
+                vec![
+                    value.quaternion.q1,
+                    value.quaternion.q2,
+                    value.quaternion.q3,
+                    value.quaternion.qc,
+                    value.ang_vel.angvel_x.value,
+                    value.ang_vel.angvel_y.value,
+                    value.ang_vel.angvel_z.value,
+                ],
             ),
-            AemAttitudeState::EulerAngle(value) => {
-                (AttitudeTypeType::EulerAngle, value.angle_3.value)
-            }
+            AemAttitudeState::EulerAngle(value) => (
+                AttitudeTypeType::EulerAngle,
+                vec![
+                    value.angle_1.value,
+                    value.angle_2.value,
+                    value.angle_3.value,
+                ],
+            ),
             AemAttitudeState::EulerAngleDerivative(value) => (
                 AttitudeTypeType::EulerAngleDerivative,
-                value.angle_3_dot.value,
+                vec![
+                    value.angle_1.value,
+                    value.angle_2.value,
+                    value.angle_3.value,
+                    value.angle_1_dot.value,
+                    value.angle_2_dot.value,
+                    value.angle_3_dot.value,
+                ],
             ),
-            AemAttitudeState::EulerAngleAngVel(value) => {
-                (AttitudeTypeType::EulerAngleAngVel, value.angvel_z.value)
-            }
-            AemAttitudeState::Spin(value) => (AttitudeTypeType::Spin, value.spin_angle_vel.value),
-            AemAttitudeState::SpinNutation(value) => {
-                (AttitudeTypeType::SpinNutation, value.nutation_phase.value)
-            }
-            AemAttitudeState::SpinNutationMom(value) => {
-                (AttitudeTypeType::SpinNutationMom, value.nutation_vel.value)
-            }
+            AemAttitudeState::EulerAngleAngVel(value) => (
+                AttitudeTypeType::EulerAngleAngVel,
+                vec![
+                    value.angle_1.value,
+                    value.angle_2.value,
+                    value.angle_3.value,
+                    value.angvel_x.value,
+                    value.angvel_y.value,
+                    value.angvel_z.value,
+                ],
+            ),
+            AemAttitudeState::Spin(value) => (
+                AttitudeTypeType::Spin,
+                vec![
+                    value.spin_alpha.value,
+                    value.spin_delta.value,
+                    value.spin_angle.value,
+                    value.spin_angle_vel.value,
+                ],
+            ),
+            AemAttitudeState::SpinNutation(value) => (
+                AttitudeTypeType::SpinNutation,
+                vec![
+                    value.spin_alpha.value,
+                    value.spin_delta.value,
+                    value.spin_angle.value,
+                    value.spin_angle_vel.value,
+                    value.nutation.value,
+                    value.nutation_per.value,
+                    value.nutation_phase.value,
+                ],
+            ),
+            AemAttitudeState::SpinNutationMom(value) => (
+                AttitudeTypeType::SpinNutationMom,
+                vec![
+                    value.spin_alpha.value,
+                    value.spin_delta.value,
+                    value.spin_angle.value,
+                    value.spin_angle_vel.value,
+                    value.momentum_alpha.value,
+                    value.momentum_delta.value,
+                    value.nutation_vel.value,
+                ],
+            ),
         }
     }
 
@@ -559,60 +629,59 @@ DATA_STOP
         let cases = [
             (
                 "QUATERNION",
-                "0.5 0.5 0.5 0.5",
+                "0.0 0.36 0.48 0.8",
                 AttitudeTypeType::Quaternion,
-                0.5,
             ),
             (
                 "QUATERNION/DERIVATIVE",
-                "0.5 0.5 0.5 0.5 0.5 0.6 0.7 0.8",
+                "0.0 0.36 0.48 0.8 0.5 0.6 0.7 0.9",
                 AttitudeTypeType::QuaternionDerivative,
-                0.8,
             ),
             (
                 "QUATERNION/ANGVEL",
-                "0.5 0.5 0.5 0.5 0.01 0.02 0.03",
+                "0.0 0.36 0.48 0.8 0.01 0.02 0.03",
                 AttitudeTypeType::QuaternionAngVel,
-                0.03,
             ),
             (
                 "EULER_ANGLE",
                 "10.0 20.0 30.0",
                 AttitudeTypeType::EulerAngle,
-                30.0,
             ),
             (
                 "EULER_ANGLE/DERIVATIVE",
                 "10.0 20.0 30.0 0.1 0.2 0.3",
                 AttitudeTypeType::EulerAngleDerivative,
-                0.3,
             ),
             (
                 "EULER_ANGLE/ANGVEL",
                 "10.0 20.0 30.0 0.1 0.2 0.3",
                 AttitudeTypeType::EulerAngleAngVel,
-                0.3,
             ),
-            ("SPIN", "10.0 20.0 30.0 0.1", AttitudeTypeType::Spin, 0.1),
+            ("SPIN", "10.0 20.0 30.0 0.1", AttitudeTypeType::Spin),
             (
                 "SPIN/NUTATION",
                 "10.0 20.0 30.0 0.1 5.0 100.0 45.0",
                 AttitudeTypeType::SpinNutation,
-                45.0,
             ),
             (
                 "SPIN/NUTATION_MOM",
                 "10.0 20.0 30.0 0.1 5.0 6.0 0.05",
                 AttitudeTypeType::SpinNutationMom,
-                0.05,
             ),
         ];
 
-        for (attitude_type, values, expected_type, expected_value) in cases {
+        for (attitude_type, values, expected_type) in cases {
             let state = parse_attitude_state(attitude_type, values);
-            let (actual_type, actual_value) = parsed_type_and_last_value(&state);
+            let (actual_type, actual_values) = parsed_type_and_values(&state);
+            let expected_values: Vec<f64> = values
+                .split_whitespace()
+                .map(|value| value.parse().unwrap())
+                .collect();
             assert_eq!(actual_type, expected_type);
-            assert_eq!(actual_value, expected_value);
+            assert_eq!(
+                actual_values, expected_values,
+                "{attitude_type} column order"
+            );
         }
     }
 

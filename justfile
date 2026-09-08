@@ -108,39 +108,27 @@ test-python:
 # Run both Rust and Python tests
 test: test-rust test-python
 
-# Run the OPM 3.0 Rust XML-generation conformance slice
+# Run all OPM behavior, allocation, and shared output-contract checks
 [private]
-conformance-opm-xml:
-    cargo test --manifest-path {{rust_manifest}} --test opm_3_xml_generation_conformance
-    cargo test --manifest-path {{rust_manifest}} --test opm_epoch_xml_generation
-    cargo test --manifest-path {{rust_manifest}} --test opm_keplerian_xml_generation
-    cargo test --manifest-path {{rust_manifest}} --test opm_maneuver_duration_units
-    cargo test --manifest-path {{rust_manifest}} --test opm_xml_root_envelope
-    cargo test --manifest-path {{rust_manifest}} --test opm_xml_writer_failure
-    cargo test --manifest-path {{rust_manifest}} --test opm_xml_allocations
+conformance-opm:
+    cargo test --manifest-path {{rust_manifest}} --test opm --test opm_kvn_allocations --test opm_xml_allocations --test message_output_contract
 
-# Run the OPM 3.0 Rust KVN-generation conformance slice
+# Compatibility aliases. Name-filtered slices were removed: `cargo test <filter>` exits 0 when
+# the filter matches nothing, so a module rename would silently empty the gate.
 [private]
-conformance-opm-kvn:
-    cargo test --manifest-path {{rust_manifest}} --test opm_3_kvn_generation_conformance
-    cargo test --manifest-path {{rust_manifest}} --test opm_kvn_writer_failure
-    cargo test --manifest-path {{rust_manifest}} --test opm_kvn_allocations
-
-# Run strict OPM parsing, validation, and conversion evidence
-[private]
-conformance-opm-parse:
-    cargo test --manifest-path {{rust_manifest}} --test opm_strict_kvn_parsing
-    cargo test --manifest-path {{rust_manifest}} --test opm_strict_xml_parsing
-    cargo test --manifest-path {{rust_manifest}} --test opm_parse_diagnostics
-    cargo test --manifest-path {{rust_manifest}} --test opm_parse_limits
+conformance-opm-xml: conformance-opm
 
 [private]
-conformance-opm-validation:
-    cargo test --manifest-path {{rust_manifest}} --test opm_validation
+conformance-opm-kvn: conformance-opm
 
 [private]
-conformance-opm-conversion:
-    cargo test --manifest-path {{rust_manifest}} --test opm_conversion
+conformance-opm-parse: conformance-opm
+
+[private]
+conformance-opm-validation: conformance-opm
+
+[private]
+conformance-opm-conversion: conformance-opm
 
 [private]
 conformance-opm-python:
@@ -151,6 +139,7 @@ conformance-opm-python:
 conformance-oem:
     cargo test --manifest-path {{rust_manifest}} --test oem
     cargo test --manifest-path {{rust_manifest}} --test oem_kvn_allocations
+    cargo test --manifest-path {{rust_manifest}} --test message_output_contract
 
 # Run the focused OMM 3.0 strictness, preservation, and generation evidence
 [private]
@@ -177,9 +166,9 @@ conformance-cdm:
 # Run the focused standalone AEM 2.0 conformance and history-allocation evidence.
 [private]
 conformance-aem:
-    cargo test --manifest-path {{rust_manifest}} --test aem_conformance
-    cargo test --manifest-path {{rust_manifest}} --test aem_semantic_validation
+    cargo test --manifest-path {{rust_manifest}} --test aem
     cargo test --manifest-path {{rust_manifest}} --test aem_kvn_allocations
+    cargo test --manifest-path {{rust_manifest}} --test message_output_contract
 
 # Run the focused standalone ACM 2.0 conformance and history-allocation evidence.
 [private]

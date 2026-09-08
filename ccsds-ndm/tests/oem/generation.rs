@@ -1,7 +1,6 @@
-use crate::common::validate_xml;
+use crate::common::{assert_rejects, validate_xml};
 use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::messages::oem::Oem;
-use ccsds_ndm::Validate;
 use ccsds_ndm::{Message, Ndm};
 
 #[test]
@@ -30,22 +29,8 @@ fn every_shipped_fixture_generates_deterministic_xsd_valid_xml_and_reparseable_k
 }
 
 #[test]
-fn public_generation_surfaces_are_identical_and_preflight_invalid_models() {
+fn generation_diagnostics_identify_the_message_and_field() {
     let message = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
-    let expected_kvn = message.to_kvn().unwrap();
-    let expected_xml = message.to_xml().unwrap();
-    assert_eq!(message.to_kvn().unwrap(), expected_kvn);
-    assert_eq!(message.to_xml().unwrap(), expected_xml);
-    let mut streamed = Vec::new();
-    message.write_kvn_to(&mut streamed).unwrap();
-    assert_eq!(streamed, expected_kvn.as_bytes());
-    streamed.clear();
-    message.write_xml_to(&mut streamed).unwrap();
-    assert_eq!(streamed, expected_xml.as_bytes());
-    let erased = Message::Oem(message.clone());
-    assert_eq!(erased.to_kvn().unwrap(), expected_kvn);
-    assert_eq!(erased.to_xml().unwrap(), expected_xml);
-
     let mut invalid = message;
     invalid.body.segment[0].metadata.object_name.clear();
     for error in [
@@ -85,21 +70,11 @@ fn kvn_generation_rejects_semantically_invalid_mutations() {
         .metadata
         .useable_start_time = Some("2019-12-28T21:22:00.331".parse().unwrap());
 
-    for (label, message) in [
-        ("negative covariance variance", negative_variance),
-        ("overlapping useable spans", overlapping_useable_spans),
+    for (field, message) in [
+        ("CX_X", negative_variance),
+        ("USEABLE_START_TIME", overlapping_useable_spans),
     ] {
-        message
-            .validate()
-            .expect_err(&format!("{label} must be semantically invalid"));
-        message
-            .to_kvn()
-            .expect_err(&format!("materialized KVN accepted {label}"));
-        let mut output = Vec::new();
-        message
-            .write_kvn_to(&mut output)
-            .expect_err(&format!("streaming KVN accepted {label}"));
-        assert!(output.is_empty(), "streaming KVN wrote bytes for {label}");
+        assert_rejects(&message, field);
     }
 }
 

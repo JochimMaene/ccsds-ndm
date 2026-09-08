@@ -34,7 +34,8 @@ The underlying `Epoch` union remains able to represent both XSD branches for fie
 branch is contextual. A broad schema type therefore does not weaken a stricter OPM field rule.
 
 Focused Rust parsing, public-mutation, and generation tests are in
-[`opm_epoch_xml_generation.rs`](../../ccsds-ndm/tests/opm_epoch_xml_generation.rs).
+[`opm/parsing.rs`](../../ccsds-ndm/tests/opm/parsing.rs) and
+[`opm/generation.rs`](../../ccsds-ndm/tests/opm/generation.rs).
 
 ## Caller-context boundary
 

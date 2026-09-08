@@ -13,7 +13,8 @@ This inventory records maintainer evidence for standalone AEM 2.0. The
 
 ## Executable evidence
 
-`just conformance-aem` runs `aem_conformance` and `aem_kvn_allocations`, which establish:
+`just conformance-aem` runs `aem`, `aem_kvn_allocations`, and
+`message_output_contract`, which establish:
 
 | Concern | Evidence |
 | --- | --- |
@@ -37,7 +38,7 @@ Annex A, section A2.2.2 contains 25 AEM implementation-conformance statement row
 | 25 | Attitude ephemeris data | All nine table 4-4 attitude-state alternatives are typed and exclusive, have fixed record widths/order/units, preserve their epochs and values, and are exercised by the all-types XML fixture. Root validation additionally revisits every branch and every record, not only index zero: quaternion normalisation on the three quaternion branches, angle bounds on all Euler and spin angles, a non-negative `NUTATION_PER`, and finiteness of every rate, derivative, and momentum component. This is distinct from the KVN significant-digit representability preflight, which is a different rule at a different boundary. |
 
 Section 4.2.4.8.1's strictly increasing, non-repeated epoch requirement and the metadata/cross-block
-usable-span rules have direct semantic regression tests in `aem_semantic_validation`.
+usable-span rules have direct semantic regression tests in `aem::validation`.
 
 There is one normative-example conflict that remains **unresolved**: `ccsds-ndm/data/kvn/aem_g4.kvn`
 declares interpolation degree 7 but contains four records. The governing prose (ADM 504.0-B-2

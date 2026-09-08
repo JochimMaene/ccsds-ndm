@@ -1,13 +1,12 @@
+mod common;
+use common::validate_xml;
+
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use ccsds_ndm::{from_str, Message};
-use tempfile::NamedTempFile;
 
-const REMAINING_PREFIXES: [&str; 8] = [
-    "omm_", "ocm_", "cdm_", "tdm_", "rdm_", "aem_", "apm_", "acm_",
-];
+const REMAINING_PREFIXES: [&str; 7] = ["omm_", "ocm_", "cdm_", "tdm_", "rdm_", "apm_", "acm_"];
 
 fn repository_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
@@ -32,23 +31,6 @@ fn fixture_paths(directory: &str, extension: &str) -> Vec<PathBuf> {
     paths
 }
 
-fn validate_official_xsd(label: &str, xml: &str) {
-    let document = NamedTempFile::new().unwrap();
-    fs::write(document.path(), xml).unwrap();
-    let output = Command::new("xmllint")
-        .arg("--noout")
-        .arg("--schema")
-        .arg(repository_path("data/xsd/ndmxml-4.0.0-master-4.0.xsd"))
-        .arg(document.path())
-        .output()
-        .unwrap_or_else(|error| panic!("xmllint is required for conformance evidence: {error}"));
-    assert!(
-        output.status.success(),
-        "{label} generated invalid XML: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-}
-
 fn assert_standalone_generation(label: &str, message: &Message) {
     let kvn = message
         .to_kvn()
@@ -61,7 +43,7 @@ fn assert_standalone_generation(label: &str, message: &Message) {
         .to_xml()
         .unwrap_or_else(|error| panic!("{label} XML generation failed: {error}"));
     assert_eq!(message.to_xml().unwrap(), xml, "{label} XML changed");
-    validate_official_xsd(label, &xml);
+    validate_xml(label, &xml);
     let reparsed_xml = from_str(&xml).unwrap();
     assert_eq!(reparsed_xml.kind(), message.kind());
 }
@@ -100,7 +82,7 @@ fn every_remaining_xml_fixture_generates_deterministically_and_reparsably() {
             );
             let xml = message.to_xml().unwrap();
             assert_eq!(message.to_xml().unwrap(), xml);
-            validate_official_xsd(&label, &xml);
+            validate_xml(&label, &xml);
             assert_eq!(from_str(&xml).unwrap().kind(), message.kind());
             continue;
         }
@@ -142,7 +124,7 @@ fn aem_optional_xml_unit_annotations_are_normatively_normalized_through_kvn() {
     // Section 7.6.10 makes these fixed XML unit annotations optional.
     assert!(normalized_xml.contains("<NUTATION>2</NUTATION>"));
     assert!(!normalized_xml.contains("<NUTATION units="));
-    validate_official_xsd("AEM optional unit normalization", &normalized_xml);
+    validate_xml("AEM optional unit normalization", &normalized_xml);
 }
 
 #[test]

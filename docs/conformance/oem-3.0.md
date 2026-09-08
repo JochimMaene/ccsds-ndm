@@ -53,3 +53,6 @@ schema 3.0. Python delegation is reviewed separately in `odm-3.0-surfaces.md`.
 
 Run `just verify` for the full quality checks plus packaged-artifact gates. Run `cargo bench -p ccsds-ndm --bench kvn_benches -- kvn_scaling` and `cargo bench -p ccsds-ndm --bench xml_benches -- xml_scaling` separately to collect informational scaling
 measurements on the current host.
+
+`just conformance-oem` runs the focused OEM suite and KVN allocation check, plus
+`message_output_contract` for the shared AEM/OEM/OPM output and atomic-file guarantees.
