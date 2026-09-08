@@ -1533,8 +1533,22 @@ class Aem:
 class AemData:
     """
     AEM Data Section.
+
+    Parameters
+    ----------
+        attitude_states : list[AttitudeState]
+        Attitude states.
+        attitude_type : str
+        CCSDS attitude type shared by every state.
+        comment : list[str], optional
+        Comments.
     """
-    def __init__(self, attitude_states, attitude_type, comment=None) -> None: ...
+    def __init__(
+        self,
+        attitude_states: list[AttitudeState],
+        attitude_type: str,
+        comment: list[str] | None = None,
+    ) -> None: ...
     @property
     def attitude_states(self) -> list[AttitudeState]:
         """
@@ -1580,7 +1594,7 @@ class AemData:
     def from_numpy(
         epochs: list[str],
         array: numpy.ndarray,
-        attitude_type: str | None,
+        attitude_type: str,
         comment: list[str] | None = None,
     ) -> AemData: ...
     def validate(self, attitude_type) -> None:
@@ -9411,13 +9425,15 @@ class OemData:
     ----------
         state_vectors : list[StateVectorAcc]
         List of state vectors.
+        covariance_matrices : list[OemCovarianceMatrix], optional
+        Covariance matrices.
         comments : list[str], optional
         Comments.
     """
     def __init__(
         self,
         state_vectors: list[StateVectorAcc],
-        covariance_matrix=None,
+        covariance_matrices: list[OemCovarianceMatrix] | None = None,
         comments: list[str] | None = None,
     ) -> None: ...
     @property

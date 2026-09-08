@@ -1036,6 +1036,15 @@ impl AemMetadata {
 }
 
 /// AEM Data Section.
+///
+/// Parameters
+/// ----------
+///     attitude_states : list[AttitudeState]
+///     Attitude states.
+///     attitude_type : str
+///     CCSDS attitude type shared by every state.
+///     comment : list[str], optional
+///     Comments.
 #[pyclass]
 pub struct AemData {
     comment: Vec<String>,

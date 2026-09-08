@@ -363,6 +363,8 @@ pub struct OemMetadata {
 /// ----------
 ///     state_vectors : list[StateVectorAcc]
 ///     List of state vectors.
+///     covariance_matrices : list[OemCovarianceMatrix], optional
+///     Covariance matrices.
 ///     comments : list[str], optional
 ///     Comments.
 #[pyclass]
@@ -1013,17 +1015,17 @@ impl OemMetadata {
 #[pymethods]
 impl OemData {
     #[new]
-    #[pyo3(signature = (state_vectors, covariance_matrix=None, comments=None))]
+    #[pyo3(signature = (state_vectors, covariance_matrices=None, comments=None))]
     fn new(
         py: Python<'_>,
         state_vectors: Vec<Py<StateVectorAcc>>,
-        covariance_matrix: Option<Vec<Py<OemCovarianceMatrix>>>,
+        covariance_matrices: Option<Vec<Py<OemCovarianceMatrix>>>,
         comments: Option<Vec<String>>,
     ) -> PyResult<Self> {
         Ok(Self {
             state_vector: PyList::new(py, state_vectors)?.unbind(),
             comment: comments.unwrap_or_default(),
-            covariance_matrix: PyList::new(py, covariance_matrix.unwrap_or_default())?.unbind(),
+            covariance_matrix: PyList::new(py, covariance_matrices.unwrap_or_default())?.unbind(),
         })
     }
 

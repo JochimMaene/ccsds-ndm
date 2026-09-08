@@ -69,7 +69,7 @@ PUBLIC_API_PARAMETER_TYPES = {
     "from_numpy": {
         "epochs": "list[str]",
         "array": "numpy.ndarray",
-        "attitude_type": "str | None",
+        "attitude_type": "str",
         "comment": "list[str] | None",
         "comments": "list[str] | None",
         "state_vector": "numpy.ndarray",
