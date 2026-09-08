@@ -31,6 +31,7 @@ notation, operation, or public surface. Exact conformance claims are made only t
 
    guide/quicktour
    guide/workflows
+   release-notes
 
 
 .. toctree::

@@ -15,43 +15,15 @@ use pyo3::types::PyList;
 
 use std::str::FromStr;
 
-fn infer_attitude_type_from_values_len(values_len: usize) -> PyResult<AttitudeTypeType> {
-    match values_len {
-        3 => Ok(AttitudeTypeType::EulerAngle),
-        4 => Err(PyValueError::new_err(
-            "Ambiguous 4-column AEM data; specify attitude_type explicitly (QUATERNION or SPIN)",
-        )),
-        6 => Err(PyValueError::new_err(
-            "Ambiguous 6-column AEM data; specify attitude_type explicitly (EULER_ANGLE/DERIVATIVE or EULER_ANGLE/ANGVEL)",
-        )),
-        7 => Err(PyValueError::new_err(
-            "Ambiguous 7-column AEM data; specify attitude_type explicitly (QUATERNION/ANGVEL, SPIN/NUTATION, or SPIN/NUTATION_MOM)",
-        )),
-        8 => Ok(AttitudeTypeType::QuaternionDerivative),
-        _ => Err(PyValueError::new_err(format!(
-            "Unsupported AEM data width {}. Allowed widths are 3, 4, 6, 7, 8",
-            values_len
-        ))),
-    }
-}
-
-fn parse_attitude_type_or_infer(
-    attitude_type: Option<&str>,
-    values_len: usize,
-) -> PyResult<AttitudeTypeType> {
-    match attitude_type {
-        Some(raw) => {
-            AttitudeTypeType::from_str(raw).map_err(|e| PyValueError::new_err(e.to_string()))
-        }
-        None => infer_attitude_type_from_values_len(values_len),
-    }
+fn parse_attitude_type(value: &str) -> PyResult<AttitudeTypeType> {
+    AttitudeTypeType::from_str(value).map_err(|error| PyValueError::new_err(error.to_string()))
 }
 
 fn build_state_from_values(
     epoch: ccsds_ndm::types::CalendarEpoch,
     values: &[f64],
     attitude_type: &AttitudeTypeType,
-) -> PyResult<core_aem::AemAttitudeStateWrapper> {
+) -> PyResult<ccsds_ndm::common::AemAttitudeState> {
     let expected = attitude_type.value_count();
     if values.len() != expected {
         return Err(PyValueError::new_err(format!(
@@ -290,7 +262,7 @@ fn build_state_from_values(
         }),
     };
 
-    Ok(state.into())
+    Ok(state)
 }
 
 fn values_from_content(
@@ -1068,7 +1040,7 @@ impl AemMetadata {
 pub struct AemData {
     comment: Vec<String>,
     attitude_states: Py<PyList>,
-    attitude_type: Option<AttitudeTypeType>,
+    attitude_type: AttitudeTypeType,
 }
 
 impl AemData {
@@ -1076,10 +1048,7 @@ impl AemData {
         let mut attitude_type = None;
         let mut states = Vec::with_capacity(value.attitude_states.len());
         for state in value.attitude_states {
-            let content = state
-                .content()
-                .ok_or_else(|| PyValueError::new_err("Attitude state is missing content"))?;
-            let this_type = attitude_type_from_content(&content);
+            let this_type = attitude_type_from_content(&state);
             if attitude_type
                 .as_ref()
                 .is_some_and(|existing| existing != &this_type)
@@ -1089,13 +1058,14 @@ impl AemData {
                 ));
             }
             attitude_type = Some(this_type);
-            let (epoch, values) = values_from_content(content);
+            let (epoch, values) = values_from_content(state);
             states.push(Py::new(py, AttitudeState { epoch, values })?);
         }
         Ok(Self {
             comment: value.comment,
             attitude_states: PyList::new(py, states)?.unbind(),
-            attitude_type,
+            attitude_type: attitude_type
+                .ok_or_else(|| PyValueError::new_err("AEM data requires an attitude state"))?,
         })
     }
 
@@ -1120,43 +1090,28 @@ impl AemData {
             .collect()
     }
 
-    fn resolved_type(
+    fn validate_widths(
         &self,
         values: &[(ccsds_ndm::types::CalendarEpoch, Vec<f64>)],
-    ) -> PyResult<Option<AttitudeTypeType>> {
-        let Some((_, first)) = values.first() else {
-            return Ok(self.attitude_type.clone());
-        };
-        if values.iter().any(|(_, values)| values.len() != first.len()) {
-            return Err(PyValueError::new_err(
-                "All attitude states must have the same number of values",
-            ));
+    ) -> PyResult<()> {
+        let expected = self.attitude_type.value_count();
+        if let Some((_, values)) = values.iter().find(|(_, values)| values.len() != expected) {
+            return Err(PyValueError::new_err(format!(
+                "ATTITUDE_TYPE {} requires {expected} values per state, got {}",
+                self.attitude_type,
+                values.len()
+            )));
         }
-        match self.attitude_type.as_ref() {
-            Some(attitude_type) => {
-                let expected = attitude_type.value_count();
-                if first.len() != expected {
-                    return Err(PyValueError::new_err(format!(
-                        "ATTITUDE_TYPE {attitude_type} requires {expected} values per state, got {}",
-                        first.len()
-                    )));
-                }
-                Ok(Some(attitude_type.clone()))
-            }
-            None => parse_attitude_type_or_infer(None, first.len()).map(Some),
-        }
+        Ok(())
     }
 
     fn to_core(&self, py: Python<'_>) -> PyResult<core_aem::AemData> {
         let values = self.state_values(py)?;
-        let attitude_type = self.resolved_type(&values)?;
-        let attitude_states = match attitude_type {
-            Some(attitude_type) => values
-                .into_iter()
-                .map(|(epoch, values)| build_state_from_values(epoch, &values, &attitude_type))
-                .collect::<PyResult<Vec<_>>>()?,
-            None => Vec::new(),
-        };
+        self.validate_widths(&values)?;
+        let attitude_states = values
+            .into_iter()
+            .map(|(epoch, values)| build_state_from_values(epoch, &values, &self.attitude_type))
+            .collect::<PyResult<Vec<_>>>()?;
         Ok(core_aem::AemData {
             comment: self.comment.clone(),
             attitude_states,
@@ -1167,35 +1122,24 @@ impl AemData {
 #[pymethods]
 impl AemData {
     #[new]
-    #[pyo3(signature = (attitude_states, attitude_type=None, comment=None))]
+    #[pyo3(signature = (attitude_states, attitude_type, comment=None))]
     fn new(
         py: Python<'_>,
         attitude_states: Vec<Py<AttitudeState>>,
-        attitude_type: Option<String>,
+        attitude_type: String,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let attitude_type = if attitude_states.is_empty() {
-            attitude_type
-                .as_deref()
-                .map(AttitudeTypeType::from_str)
-                .transpose()
-                .map_err(|error| PyValueError::new_err(error.to_string()))?
-        } else {
-            let widths: std::collections::BTreeSet<usize> = attitude_states
-                .iter()
-                .map(|state| state.borrow(py).values.len())
-                .collect();
-            if widths.len() != 1 {
-                return Err(PyValueError::new_err(
-                    "All attitude states must have the same number of values",
-                ));
-            }
-            let width = *widths.iter().next().unwrap();
-            Some(parse_attitude_type_or_infer(
-                attitude_type.as_deref(),
-                width,
-            )?)
-        };
+        let attitude_type = parse_attitude_type(&attitude_type)?;
+        let expected = attitude_type.value_count();
+        if let Some(state) = attitude_states
+            .iter()
+            .find(|state| state.borrow(py).values.len() != expected)
+        {
+            return Err(PyValueError::new_err(format!(
+                "ATTITUDE_TYPE {attitude_type} requires {expected} values per state, got {}",
+                state.borrow(py).values.len()
+            )));
+        }
 
         Ok(Self {
             comment: comment.unwrap_or_default(),
@@ -1218,12 +1162,12 @@ impl AemData {
     }
 
     #[staticmethod]
-    #[pyo3(signature = (epochs, array, attitude_type=None, comment=None))]
+    #[pyo3(signature = (epochs, array, attitude_type, comment=None))]
     fn from_numpy(
         py: Python<'_>,
         epochs: Vec<String>,
         array: PyReadonlyArray2<f64>,
-        attitude_type: Option<String>,
+        attitude_type: String,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         let shape = array.shape();
@@ -1236,7 +1180,7 @@ impl AemData {
             ));
         }
 
-        let resolved_type = parse_attitude_type_or_infer(attitude_type.as_deref(), shape[1])?;
+        let resolved_type = parse_attitude_type(&attitude_type)?;
         let expected_cols = resolved_type.value_count();
         if shape[1] != expected_cols {
             return Err(PyValueError::new_err(format!(
@@ -1263,7 +1207,7 @@ impl AemData {
         Ok(Self {
             comment: comment.unwrap_or_default(),
             attitude_states: PyList::new(py, attitude_states)?.unbind(),
-            attitude_type: Some(resolved_type),
+            attitude_type: resolved_type,
         })
     }
 
@@ -1300,31 +1244,16 @@ impl AemData {
             return Ok(());
         }
 
-        let widths: std::collections::BTreeSet<usize> = attitude_states
+        let expected = self.attitude_type.value_count();
+        if attitude_states
             .iter()
-            .map(|state| state.borrow(py).values.len())
-            .collect();
-        if widths.len() != 1 {
-            return Err(PyValueError::new_err(
-                "All attitude states must have the same number of values",
-            ));
+            .any(|state| state.borrow(py).values.len() != expected)
+        {
+            return Err(PyValueError::new_err(format!(
+                "ATTITUDE_TYPE {} requires {expected} values per state",
+                self.attitude_type
+            )));
         }
-
-        let width = *widths.iter().next().unwrap();
-        let resolved_type = if let Some(existing_type) = self.attitude_type.as_ref() {
-            let existing_width = existing_type.value_count();
-            if existing_width != width {
-                return Err(PyValueError::new_err(format!(
-                    "Expected {} values per state based on existing data, got {}",
-                    existing_width, width
-                )));
-            }
-            existing_type.clone()
-        } else {
-            parse_attitude_type_or_infer(None, width)?
-        };
-
-        self.attitude_type = Some(resolved_type);
         self.attitude_states = PyList::new(py, attitude_states)?.unbind();
         Ok(())
     }
@@ -1334,11 +1263,21 @@ impl AemData {
     /// :type: list[str]
     #[getter]
     fn get_attitude_states_epochs(&self, py: Python<'_>) -> PyResult<Vec<String>> {
-        Ok(self
-            .state_values(py)?
-            .into_iter()
-            .map(|(epoch, _)| epoch.as_str().to_string())
-            .collect())
+        self.attitude_states
+            .bind(py)
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .extract::<PyRef<'_, AttitudeState>>()
+                    .map(|state| state.epoch.as_str().to_string())
+                    .map_err(|_| {
+                        PyValueError::new_err(format!(
+                            "attitude_states[{index}] must be AttitudeState"
+                        ))
+                    })
+            })
+            .collect()
     }
 
     #[setter]
@@ -1356,14 +1295,27 @@ impl AemData {
             ));
         }
 
-        for (index, epoch) in epochs.into_iter().enumerate() {
+        // Validate every epoch and every element type before mutating anything, so a failure
+        // partway through the list cannot leave the earlier records already rewritten.
+        let mut parsed = Vec::with_capacity(epochs.len());
+        for (index, epoch) in epochs.iter().enumerate() {
+            let value = states.get_item(index)?;
+            value
+                .extract::<PyRefMut<'_, AttitudeState>>()
+                .map_err(|_| {
+                    PyValueError::new_err(format!("attitude_states[{index}] must be AttitudeState"))
+                })?;
+            parsed.push(parse_calendar_epoch(epoch)?);
+        }
+
+        for (index, epoch) in parsed.into_iter().enumerate() {
             let value = states.get_item(index)?;
             let mut state = value
                 .extract::<PyRefMut<'_, AttitudeState>>()
                 .map_err(|_| {
                     PyValueError::new_err(format!("attitude_states[{index}] must be AttitudeState"))
                 })?;
-            state.epoch = parse_calendar_epoch(&epoch)?;
+            state.epoch = epoch;
         }
         Ok(())
     }
@@ -1385,24 +1337,12 @@ impl AemData {
             return Ok(array.into());
         }
 
-        let resolved_type = self.resolved_type(&states)?.ok_or_else(|| {
-            PyValueError::new_err("Attitude type is unavailable for non-empty data")
-        })?;
-        let first_values = states[0].1.clone();
-        let expected_cols = first_values.len();
-
-        let mut data = Vec::with_capacity(states.len() * expected_cols);
-        data.extend(first_values);
-
-        for (_, values) in states.into_iter().skip(1) {
-            if values.len() != expected_cols {
-                return Err(PyValueError::new_err(
-                    "NumPy access requires all attitude states to have the same data width",
-                ));
-            }
-            data.extend(values);
-        }
-        debug_assert_eq!(resolved_type.value_count(), expected_cols);
+        self.validate_widths(&states)?;
+        let expected_cols = self.attitude_type.value_count();
+        let data = states
+            .into_iter()
+            .flat_map(|(_, values)| values)
+            .collect::<Vec<_>>();
 
         let array = PyArray::from_vec(py, data)
             .reshape([self.attitude_states.bind(py).len(), expected_cols])
@@ -1432,11 +1372,7 @@ impl AemData {
             ));
         }
 
-        let current = self.state_values(py)?;
-        let resolved_type = self.resolved_type(&current)?.ok_or_else(|| {
-            PyValueError::new_err("Attitude type is unavailable for non-empty data")
-        })?;
-        let expected_cols = resolved_type.value_count();
+        let expected_cols = self.attitude_type.value_count();
         if shape[1] != expected_cols {
             return Err(PyValueError::new_err(format!(
                 "NumPy array must have {} columns for this attitude state type",

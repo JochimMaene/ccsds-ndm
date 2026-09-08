@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::common::AdmHeader;
+use crate::common::{AdmHeader, AemAttitudeState};
 use crate::error::{CcsdsNdmError, FormatError, KvnParseError, Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::kvn::ser::KvnWriter;
@@ -60,8 +60,9 @@ impl Ndm for Aem {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        validate_kvn_syntax(kvn)?;
-        let aem = Self::from_kvn_str(kvn)?;
+        let normalized = crate::kvn::normalize_line_endings(kvn);
+        validate_kvn_syntax(&normalized)?;
+        let aem = Self::from_kvn_str(&normalized)?;
         crate::traits::Validate::validate(&aem)?;
         Ok(aem)
     }
@@ -277,9 +278,6 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
         let number = index + 1;
         let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
         let fail = |message: &str| Err(invalid(number, offset, message.into()));
-        if line.as_bytes().contains(&b'\r') {
-            return fail("lone carriage return");
-        }
         if line.len() > 254 {
             return fail("line exceeds the normative 254-character limit");
         }
@@ -455,7 +453,7 @@ impl Aem {
     }
 }
 
-fn validate_aem_state_numbers(state: &AemAttitudeStateWrapper) -> Result<()> {
+fn validate_aem_state_numbers(state: &AemAttitudeState) -> Result<()> {
     let check = |values: &[f64]| -> Result<()> {
         if values
             .iter()
@@ -472,16 +470,14 @@ fn validate_aem_state_numbers(state: &AemAttitudeStateWrapper) -> Result<()> {
             .into())
         }
     };
-    if let Some(v) = &state.quaternion_ephemeris {
-        check(&[
+    match state {
+        AemAttitudeState::QuaternionEphemeris(v) => check(&[
             v.quaternion.q1,
             v.quaternion.q2,
             v.quaternion.q3,
             v.quaternion.qc,
-        ])?;
-    }
-    if let Some(v) = &state.quaternion_derivative {
-        check(&[
+        ]),
+        AemAttitudeState::QuaternionDerivative(v) => check(&[
             v.quaternion.q1,
             v.quaternion.q2,
             v.quaternion.q3,
@@ -490,10 +486,8 @@ fn validate_aem_state_numbers(state: &AemAttitudeStateWrapper) -> Result<()> {
             v.quaternion_dot.q2_dot.value,
             v.quaternion_dot.q3_dot.value,
             v.quaternion_dot.qc_dot.value,
-        ])?;
-    }
-    if let Some(v) = &state.quaternion_ang_vel {
-        check(&[
+        ]),
+        AemAttitudeState::QuaternionAngVel(v) => check(&[
             v.quaternion.q1,
             v.quaternion.q2,
             v.quaternion.q3,
@@ -501,41 +495,33 @@ fn validate_aem_state_numbers(state: &AemAttitudeStateWrapper) -> Result<()> {
             v.ang_vel.angvel_x.value,
             v.ang_vel.angvel_y.value,
             v.ang_vel.angvel_z.value,
-        ])?;
-    }
-    if let Some(v) = &state.euler_angle {
-        check(&[v.angle_1.value, v.angle_2.value, v.angle_3.value])?;
-    }
-    if let Some(v) = &state.euler_angle_derivative {
-        check(&[
+        ]),
+        AemAttitudeState::EulerAngle(v) => {
+            check(&[v.angle_1.value, v.angle_2.value, v.angle_3.value])
+        }
+        AemAttitudeState::EulerAngleDerivative(v) => check(&[
             v.angle_1.value,
             v.angle_2.value,
             v.angle_3.value,
             v.angle_1_dot.value,
             v.angle_2_dot.value,
             v.angle_3_dot.value,
-        ])?;
-    }
-    if let Some(v) = &state.euler_angle_ang_vel {
-        check(&[
+        ]),
+        AemAttitudeState::EulerAngleAngVel(v) => check(&[
             v.angle_1.value,
             v.angle_2.value,
             v.angle_3.value,
             v.angvel_x.value,
             v.angvel_y.value,
             v.angvel_z.value,
-        ])?;
-    }
-    if let Some(v) = &state.spin {
-        check(&[
+        ]),
+        AemAttitudeState::Spin(v) => check(&[
             v.spin_alpha.value,
             v.spin_delta.value,
             v.spin_angle.value,
             v.spin_angle_vel.value,
-        ])?;
-    }
-    if let Some(v) = &state.spin_nutation {
-        check(&[
+        ]),
+        AemAttitudeState::SpinNutation(v) => check(&[
             v.spin_alpha.value,
             v.spin_delta.value,
             v.spin_angle.value,
@@ -543,10 +529,8 @@ fn validate_aem_state_numbers(state: &AemAttitudeStateWrapper) -> Result<()> {
             v.nutation.value,
             v.nutation_per.value,
             v.nutation_phase.value,
-        ])?;
-    }
-    if let Some(v) = &state.spin_nutation_mom {
-        check(&[
+        ]),
+        AemAttitudeState::SpinNutationMom(v) => check(&[
             v.spin_alpha.value,
             v.spin_delta.value,
             v.spin_angle.value,
@@ -554,9 +538,8 @@ fn validate_aem_state_numbers(state: &AemAttitudeStateWrapper) -> Result<()> {
             v.momentum_alpha.value,
             v.momentum_delta.value,
             v.nutation_vel.value,
-        ])?;
+        ]),
     }
-    Ok(())
 }
 
 impl crate::traits::Validate for AemBody {
@@ -582,6 +565,10 @@ impl AemBody {
     fn first_cross_segment_error(&self) -> Option<ValidationError> {
         use std::cmp::Ordering;
 
+        if let Some(error) = self.first_identity_error() {
+            return Some(error);
+        }
+
         for (index, pair) in self.segment.windows(2).enumerate() {
             let (Some(previous), Some(current)) = (
                 pair[0].metadata.useable_stop_time,
@@ -604,6 +591,40 @@ impl AemBody {
                         "segment[{}].metadata.useable_start_time",
                         index + 1
                     )),
+                );
+            }
+        }
+        None
+    }
+
+    /// Enforce the single-object rule from 504.0-B-2 section 2.3.1. Figure G-4 uses different
+    /// casing for one object's name, while OBJECT_ID remains exact. TIME_SYSTEM is only fixed
+    /// within each segment by section 4.2.4.8.2.
+    fn first_identity_error(&self) -> Option<ValidationError> {
+        let first = self.segment.first()?;
+        let object_name = &first.metadata.object_name;
+        let object_id = &first.metadata.object_id;
+        for (index, segment) in self.segment.iter().enumerate().skip(1) {
+            if !segment
+                .metadata
+                .object_name
+                .eq_ignore_ascii_case(object_name)
+                || segment.metadata.object_id != *object_id
+            {
+                return Some(
+                    ValidationError::InvalidValue {
+                        field: "OBJECT_NAME/OBJECT_ID".into(),
+                        value: format!(
+                            "{}/{}",
+                            segment.metadata.object_name, segment.metadata.object_id
+                        ),
+                        expected: format!(
+                            "one object throughout the AEM (expected {object_name}/{object_id})"
+                        )
+                        .into(),
+                        line: None,
+                    }
+                    .at_path(format!("segment[{index}].metadata.object_id")),
                 );
             }
         }
@@ -640,9 +661,7 @@ impl AemSegment {
         let stop = self.metadata.stop_time.into_epoch();
         let mut previous: Option<crate::types::Epoch> = None;
         for (index, state) in self.data.attitude_states.iter().enumerate() {
-            let Some(epoch) = state.epoch() else {
-                continue;
-            };
+            let epoch = state.epoch();
             let current = epoch.into_epoch();
             if start.cmp_same_branch(&current) == Some(Ordering::Greater)
                 || current.cmp_same_branch(&stop) == Some(Ordering::Greater)
@@ -1073,210 +1092,218 @@ impl ToKvn for AemMetadata {
 }
 
 /// AEM Data Section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
+#[derive(Debug, PartialEq, Clone, bon::Builder)]
 pub struct AemData {
     /// Comments allowed only at the beginning of the Data section. Each comment line shall begin
     /// with this keyword.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.4.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default)]
     pub comment: Vec<String>,
     /// Attitude ephemeris data lines.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.4.
-    #[serde(rename = "attitudeState")]
     #[builder(default)]
-    pub attitude_states: Vec<AemAttitudeStateWrapper>,
+    pub attitude_states: Vec<AemAttitudeState>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-pub struct AemAttitudeStateWrapper {
-    #[serde(
-        rename = "quaternionEphemeris",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub quaternion_ephemeris: Option<crate::common::QuaternionEphemeris>,
-    #[serde(
-        rename = "quaternionDerivative",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub quaternion_derivative: Option<crate::common::QuaternionDerivative>,
-    #[serde(
-        rename = "quaternionAngVel",
-        skip_serializing_if = "Option::is_none",
-        default
-    )]
-    pub quaternion_ang_vel: Option<crate::common::QuaternionAngVel>,
-    #[serde(
-        rename = "eulerAngle",
-        skip_serializing_if = "Option::is_none",
-        default
-    )]
-    pub euler_angle: Option<crate::common::EulerAngle>,
-    #[serde(
-        rename = "eulerAngleDerivative",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub euler_angle_derivative: Option<crate::common::EulerAngleDerivative>,
-    #[serde(
-        rename = "eulerAngleAngVel",
-        skip_serializing_if = "Option::is_none",
-        default
-    )]
-    pub euler_angle_ang_vel: Option<crate::common::EulerAngleAngVel>,
-    #[serde(rename = "spin", skip_serializing_if = "Option::is_none", default)]
-    pub spin: Option<crate::common::Spin>,
-    #[serde(
-        rename = "spinNutation",
-        skip_serializing_if = "Option::is_none",
-        default
-    )]
-    pub spin_nutation: Option<crate::common::SpinNutation>,
-    #[serde(
-        rename = "spinNutationMom",
-        skip_serializing_if = "Option::is_none",
-        default
-    )]
-    pub spin_nutation_mom: Option<crate::common::SpinNutationMom>,
+#[derive(Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
+struct AemDataXml {
+    #[serde(default)]
+    comment: Vec<String>,
+    #[serde(rename = "attitudeState")]
+    attitude_states: Vec<AemAttitudeStateXml>,
 }
 
-impl From<crate::common::AemAttitudeState> for AemAttitudeStateWrapper {
-    fn from(state: crate::common::AemAttitudeState) -> Self {
-        let mut wrapper = AemAttitudeStateWrapper {
-            quaternion_ephemeris: None,
-            quaternion_derivative: None,
-            quaternion_ang_vel: None,
-            euler_angle: None,
-            euler_angle_derivative: None,
-            euler_angle_ang_vel: None,
-            spin: None,
-            spin_nutation: None,
-            spin_nutation_mom: None,
-        };
-        match state {
-            crate::common::AemAttitudeState::QuaternionEphemeris(v) => {
-                wrapper.quaternion_ephemeris = Some(v)
-            }
-            crate::common::AemAttitudeState::QuaternionDerivative(v) => {
-                wrapper.quaternion_derivative = Some(v)
-            }
-            crate::common::AemAttitudeState::QuaternionAngVel(v) => {
-                wrapper.quaternion_ang_vel = Some(v)
-            }
-            crate::common::AemAttitudeState::EulerAngle(v) => wrapper.euler_angle = Some(v),
-            crate::common::AemAttitudeState::EulerAngleDerivative(v) => {
-                wrapper.euler_angle_derivative = Some(v)
-            }
-            crate::common::AemAttitudeState::EulerAngleAngVel(v) => {
-                wrapper.euler_angle_ang_vel = Some(v)
-            }
-            crate::common::AemAttitudeState::Spin(v) => wrapper.spin = Some(v),
-            crate::common::AemAttitudeState::SpinNutation(v) => wrapper.spin_nutation = Some(v),
-            crate::common::AemAttitudeState::SpinNutationMom(v) => {
-                wrapper.spin_nutation_mom = Some(v)
-            }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AemAttitudeStateXml {
+    #[serde(rename = "quaternionEphemeris", default)]
+    quaternion_ephemeris: Option<crate::common::QuaternionEphemeris>,
+    #[serde(rename = "quaternionDerivative", default)]
+    quaternion_derivative: Option<crate::common::QuaternionDerivative>,
+    #[serde(rename = "quaternionAngVel", default)]
+    quaternion_ang_vel: Option<crate::common::QuaternionAngVel>,
+    #[serde(rename = "eulerAngle", default)]
+    euler_angle: Option<crate::common::EulerAngle>,
+    #[serde(rename = "eulerAngleDerivative", default)]
+    euler_angle_derivative: Option<crate::common::EulerAngleDerivative>,
+    #[serde(rename = "eulerAngleAngVel", default)]
+    euler_angle_ang_vel: Option<crate::common::EulerAngleAngVel>,
+    #[serde(rename = "spin", default)]
+    spin: Option<crate::common::Spin>,
+    #[serde(rename = "spinNutation", default)]
+    spin_nutation: Option<crate::common::SpinNutation>,
+    #[serde(rename = "spinNutationMom", default)]
+    spin_nutation_mom: Option<crate::common::SpinNutationMom>,
+}
+
+impl AemAttitudeStateXml {
+    fn into_state(self) -> std::result::Result<AemAttitudeState, &'static str> {
+        let count = [
+            self.quaternion_ephemeris.is_some(),
+            self.quaternion_derivative.is_some(),
+            self.quaternion_ang_vel.is_some(),
+            self.euler_angle.is_some(),
+            self.euler_angle_derivative.is_some(),
+            self.euler_angle_ang_vel.is_some(),
+            self.spin.is_some(),
+            self.spin_nutation.is_some(),
+            self.spin_nutation_mom.is_some(),
+        ]
+        .into_iter()
+        .filter(|present| *present)
+        .count();
+        if count != 1 {
+            return Err("attitudeState requires exactly one attitude choice");
         }
-        wrapper
+        Ok(if let Some(value) = self.quaternion_ephemeris {
+            AemAttitudeState::QuaternionEphemeris(value)
+        } else if let Some(value) = self.quaternion_derivative {
+            AemAttitudeState::QuaternionDerivative(value)
+        } else if let Some(value) = self.quaternion_ang_vel {
+            AemAttitudeState::QuaternionAngVel(value)
+        } else if let Some(value) = self.euler_angle {
+            AemAttitudeState::EulerAngle(value)
+        } else if let Some(value) = self.euler_angle_derivative {
+            AemAttitudeState::EulerAngleDerivative(value)
+        } else if let Some(value) = self.euler_angle_ang_vel {
+            AemAttitudeState::EulerAngleAngVel(value)
+        } else if let Some(value) = self.spin {
+            AemAttitudeState::Spin(value)
+        } else if let Some(value) = self.spin_nutation {
+            AemAttitudeState::SpinNutation(value)
+        } else {
+            AemAttitudeState::SpinNutationMom(self.spin_nutation_mom.unwrap())
+        })
     }
 }
 
-impl AemAttitudeStateWrapper {
-    pub fn content(&self) -> Option<crate::common::AemAttitudeState> {
-        if let Some(v) = &self.quaternion_ephemeris {
-            return Some(crate::common::AemAttitudeState::QuaternionEphemeris(
-                v.clone(),
-            ));
-        }
-        if let Some(v) = &self.quaternion_derivative {
-            return Some(crate::common::AemAttitudeState::QuaternionDerivative(
-                v.clone(),
-            ));
-        }
-        if let Some(v) = &self.quaternion_ang_vel {
-            return Some(crate::common::AemAttitudeState::QuaternionAngVel(v.clone()));
-        }
-        if let Some(v) = &self.euler_angle {
-            return Some(crate::common::AemAttitudeState::EulerAngle(v.clone()));
-        }
-        if let Some(v) = &self.euler_angle_derivative {
-            return Some(crate::common::AemAttitudeState::EulerAngleDerivative(
-                v.clone(),
-            ));
-        }
-        if let Some(v) = &self.euler_angle_ang_vel {
-            return Some(crate::common::AemAttitudeState::EulerAngleAngVel(v.clone()));
-        }
-        if let Some(v) = &self.spin {
-            return Some(crate::common::AemAttitudeState::Spin(v.clone()));
-        }
-        if let Some(v) = &self.spin_nutation {
-            return Some(crate::common::AemAttitudeState::SpinNutation(v.clone()));
-        }
-        if let Some(v) = &self.spin_nutation_mom {
-            return Some(crate::common::AemAttitudeState::SpinNutationMom(v.clone()));
-        }
-        None
+impl<'de> Deserialize<'de> for AemData {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        use serde::de::Error;
+        let value = AemDataXml::deserialize(deserializer)?;
+        Ok(Self {
+            comment: value.comment,
+            attitude_states: value
+                .attitude_states
+                .into_iter()
+                .map(|state| state.into_state().map_err(D::Error::custom))
+                .collect::<std::result::Result<_, _>>()?,
+        })
     }
+}
 
-    fn epoch(&self) -> Option<&CalendarEpoch> {
-        self.quaternion_ephemeris
-            .as_ref()
-            .map(|state| &state.epoch)
-            .or_else(|| {
-                self.quaternion_derivative
-                    .as_ref()
-                    .map(|state| &state.epoch)
-            })
-            .or_else(|| self.quaternion_ang_vel.as_ref().map(|state| &state.epoch))
-            .or_else(|| self.euler_angle.as_ref().map(|state| &state.epoch))
-            .or_else(|| {
-                self.euler_angle_derivative
-                    .as_ref()
-                    .map(|state| &state.epoch)
-            })
-            .or_else(|| self.euler_angle_ang_vel.as_ref().map(|state| &state.epoch))
-            .or_else(|| self.spin.as_ref().map(|state| &state.epoch))
-            .or_else(|| self.spin_nutation.as_ref().map(|state| &state.epoch))
-            .or_else(|| self.spin_nutation_mom.as_ref().map(|state| &state.epoch))
+impl Serialize for AemData {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("AemData", 2)?;
+        if !self.comment.is_empty() {
+            state.serialize_field("COMMENT", &self.comment)?;
+        }
+        state.serialize_field(
+            "attitudeState",
+            &AemAttitudeStatesXml(&self.attitude_states),
+        )?;
+        state.end()
     }
+}
 
-    fn populated_fields(&self) -> Vec<Cow<'static, str>> {
-        let mut fields = Vec::new();
-        for (field, populated) in [
-            ("quaternionEphemeris", self.quaternion_ephemeris.is_some()),
-            ("quaternionDerivative", self.quaternion_derivative.is_some()),
-            ("quaternionAngVel", self.quaternion_ang_vel.is_some()),
-            ("eulerAngle", self.euler_angle.is_some()),
-            (
-                "eulerAngleDerivative",
-                self.euler_angle_derivative.is_some(),
-            ),
-            ("eulerAngleAngVel", self.euler_angle_ang_vel.is_some()),
-            ("spin", self.spin.is_some()),
-            ("spinNutation", self.spin_nutation.is_some()),
-            ("spinNutationMom", self.spin_nutation_mom.is_some()),
-        ] {
-            if populated {
-                fields.push(Cow::Borrowed(field));
+struct AemAttitudeStatesXml<'a>(&'a [AemAttitudeState]);
+
+impl Serialize for AemAttitudeStatesXml<'_> {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        serializer.collect_seq(self.0.iter().map(AemAttitudeStateXmlRef))
+    }
+}
+
+struct AemAttitudeStateXmlRef<'a>(&'a AemAttitudeState);
+
+impl Serialize for AemAttitudeStateXmlRef<'_> {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("attitudeState", 1)?;
+        match self.0 {
+            AemAttitudeState::QuaternionEphemeris(value) => {
+                state.serialize_field("quaternionEphemeris", value)?
+            }
+            AemAttitudeState::QuaternionDerivative(value) => {
+                state.serialize_field("quaternionDerivative", value)?
+            }
+            AemAttitudeState::QuaternionAngVel(value) => {
+                state.serialize_field("quaternionAngVel", value)?
+            }
+            AemAttitudeState::EulerAngle(value) => state.serialize_field("eulerAngle", value)?,
+            AemAttitudeState::EulerAngleDerivative(value) => {
+                state.serialize_field("eulerAngleDerivative", value)?
+            }
+            AemAttitudeState::EulerAngleAngVel(value) => {
+                state.serialize_field("eulerAngleAngVel", value)?
+            }
+            AemAttitudeState::Spin(value) => state.serialize_field("spin", value)?,
+            AemAttitudeState::SpinNutation(value) => {
+                state.serialize_field("spinNutation", value)?
+            }
+            AemAttitudeState::SpinNutationMom(value) => {
+                state.serialize_field("spinNutationMom", value)?
             }
         }
-        fields
+        state.end()
+    }
+}
+
+impl AemAttitudeState {
+    fn epoch(&self) -> &CalendarEpoch {
+        match self {
+            Self::QuaternionEphemeris(v) => &v.epoch,
+            Self::QuaternionDerivative(v) => &v.epoch,
+            Self::QuaternionAngVel(v) => &v.epoch,
+            Self::EulerAngle(v) => &v.epoch,
+            Self::EulerAngleDerivative(v) => &v.epoch,
+            Self::EulerAngleAngVel(v) => &v.epoch,
+            Self::Spin(v) => &v.epoch,
+            Self::SpinNutation(v) => &v.epoch,
+            Self::SpinNutationMom(v) => &v.epoch,
+        }
     }
 
     fn matches_type(&self, attitude_type: &AttitudeTypeType) -> bool {
-        match attitude_type {
-            AttitudeTypeType::Quaternion => self.quaternion_ephemeris.is_some(),
-            AttitudeTypeType::QuaternionDerivative => self.quaternion_derivative.is_some(),
-            AttitudeTypeType::QuaternionAngVel => self.quaternion_ang_vel.is_some(),
-            AttitudeTypeType::EulerAngle => self.euler_angle.is_some(),
-            AttitudeTypeType::EulerAngleDerivative => self.euler_angle_derivative.is_some(),
-            AttitudeTypeType::EulerAngleAngVel => self.euler_angle_ang_vel.is_some(),
-            AttitudeTypeType::Spin => self.spin.is_some(),
-            AttitudeTypeType::SpinNutation => self.spin_nutation.is_some(),
-            AttitudeTypeType::SpinNutationMom => self.spin_nutation_mom.is_some(),
-        }
+        matches!(
+            (self, attitude_type),
+            (Self::QuaternionEphemeris(_), AttitudeTypeType::Quaternion)
+                | (
+                    Self::QuaternionDerivative(_),
+                    AttitudeTypeType::QuaternionDerivative
+                )
+                | (
+                    Self::QuaternionAngVel(_),
+                    AttitudeTypeType::QuaternionAngVel
+                )
+                | (Self::EulerAngle(_), AttitudeTypeType::EulerAngle)
+                | (
+                    Self::EulerAngleDerivative(_),
+                    AttitudeTypeType::EulerAngleDerivative
+                )
+                | (
+                    Self::EulerAngleAngVel(_),
+                    AttitudeTypeType::EulerAngleAngVel
+                )
+                | (Self::Spin(_), AttitudeTypeType::Spin)
+                | (Self::SpinNutation(_), AttitudeTypeType::SpinNutation)
+                | (Self::SpinNutationMom(_), AttitudeTypeType::SpinNutationMom)
+        )
     }
 
     fn validate_state(&self) -> Result<()> {
@@ -1301,113 +1328,88 @@ impl AemAttitudeStateWrapper {
             Ok(())
         };
 
-        if let Some(value) = &self.quaternion_ephemeris {
-            return crate::traits::Validate::validate(&value.quaternion);
-        }
-        if let Some(value) = &self.quaternion_derivative {
-            crate::traits::Validate::validate(&value.quaternion)?;
-            return finite(&[
-                ("Q1_DOT", value.quaternion_dot.q1_dot.value),
-                ("Q2_DOT", value.quaternion_dot.q2_dot.value),
-                ("Q3_DOT", value.quaternion_dot.q3_dot.value),
-                ("QC_DOT", value.quaternion_dot.qc_dot.value),
-            ]);
-        }
-        if let Some(value) = &self.quaternion_ang_vel {
-            crate::traits::Validate::validate(&value.quaternion)?;
-            return finite(&[
-                ("ANGVEL_X", value.ang_vel.angvel_x.value),
-                ("ANGVEL_Y", value.ang_vel.angvel_y.value),
-                ("ANGVEL_Z", value.ang_vel.angvel_z.value),
-            ]);
-        }
-        if let Some(value) = &self.euler_angle {
-            return angles(&[
+        match self {
+            Self::QuaternionEphemeris(value) => {
+                crate::traits::Validate::validate(&value.quaternion)
+            }
+            Self::QuaternionDerivative(value) => {
+                crate::traits::Validate::validate(&value.quaternion)?;
+                finite(&[
+                    ("Q1_DOT", value.quaternion_dot.q1_dot.value),
+                    ("Q2_DOT", value.quaternion_dot.q2_dot.value),
+                    ("Q3_DOT", value.quaternion_dot.q3_dot.value),
+                    ("QC_DOT", value.quaternion_dot.qc_dot.value),
+                ])
+            }
+            Self::QuaternionAngVel(value) => {
+                crate::traits::Validate::validate(&value.quaternion)?;
+                finite(&[
+                    ("ANGVEL_X", value.ang_vel.angvel_x.value),
+                    ("ANGVEL_Y", value.ang_vel.angvel_y.value),
+                    ("ANGVEL_Z", value.ang_vel.angvel_z.value),
+                ])
+            }
+            Self::EulerAngle(value) => angles(&[
                 ("ANGLE_1", value.angle_1.value),
                 ("ANGLE_2", value.angle_2.value),
                 ("ANGLE_3", value.angle_3.value),
-            ]);
-        }
-        if let Some(value) = &self.euler_angle_derivative {
-            angles(&[
-                ("ANGLE_1", value.angle_1.value),
-                ("ANGLE_2", value.angle_2.value),
-                ("ANGLE_3", value.angle_3.value),
-            ])?;
-            return finite(&[
-                ("ANGLE_1_DOT", value.angle_1_dot.value),
-                ("ANGLE_2_DOT", value.angle_2_dot.value),
-                ("ANGLE_3_DOT", value.angle_3_dot.value),
-            ]);
-        }
-        if let Some(value) = &self.euler_angle_ang_vel {
-            angles(&[
-                ("ANGLE_1", value.angle_1.value),
-                ("ANGLE_2", value.angle_2.value),
-                ("ANGLE_3", value.angle_3.value),
-            ])?;
-            return finite(&[
-                ("ANGVEL_X", value.angvel_x.value),
-                ("ANGVEL_Y", value.angvel_y.value),
-                ("ANGVEL_Z", value.angvel_z.value),
-            ]);
-        }
-        if let Some(value) = &self.spin {
-            angles(&[
-                ("SPIN_ALPHA", value.spin_alpha.value),
-                ("SPIN_DELTA", value.spin_delta.value),
-                ("SPIN_ANGLE", value.spin_angle.value),
-            ])?;
-            return finite(&[("SPIN_ANGLE_VEL", value.spin_angle_vel.value)]);
-        }
-        if let Some(value) = &self.spin_nutation {
-            angles(&[
-                ("SPIN_ALPHA", value.spin_alpha.value),
-                ("SPIN_DELTA", value.spin_delta.value),
-                ("SPIN_ANGLE", value.spin_angle.value),
-                ("NUTATION", value.nutation.value),
-                ("NUTATION_PHASE", value.nutation_phase.value),
-            ])?;
-            finite(&[("SPIN_ANGLE_VEL", value.spin_angle_vel.value)])?;
-            return Duration::validate_value(value.nutation_per.value, "NUTATION_PER");
-        }
-        if let Some(value) = &self.spin_nutation_mom {
-            angles(&[
-                ("SPIN_ALPHA", value.spin_alpha.value),
-                ("SPIN_DELTA", value.spin_delta.value),
-                ("SPIN_ANGLE", value.spin_angle.value),
-                ("MOMENTUM_ALPHA", value.momentum_alpha.value),
-                ("MOMENTUM_DELTA", value.momentum_delta.value),
-            ])?;
-            return finite(&[
-                ("SPIN_ANGLE_VEL", value.spin_angle_vel.value),
-                ("NUTATION_VEL", value.nutation_vel.value),
-            ]);
-        }
-        Ok(())
-    }
-}
-
-impl crate::traits::ToKvn for AemAttitudeStateWrapper {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        if let Some(value) = &self.quaternion_ephemeris {
-            value.write_kvn(writer);
-        } else if let Some(value) = &self.quaternion_derivative {
-            value.write_kvn(writer);
-        } else if let Some(value) = &self.quaternion_ang_vel {
-            value.write_kvn(writer);
-        } else if let Some(value) = &self.euler_angle {
-            value.write_kvn(writer);
-        } else if let Some(value) = &self.euler_angle_derivative {
-            value.write_kvn(writer);
-        } else if let Some(value) = &self.euler_angle_ang_vel {
-            value.write_kvn(writer);
-        } else if let Some(value) = &self.spin {
-            value.write_kvn(writer);
-        } else if let Some(value) = &self.spin_nutation {
-            value.write_kvn(writer);
-        } else if let Some(value) = &self.spin_nutation_mom {
-            value.write_kvn(writer);
+            ]),
+            Self::EulerAngleDerivative(value) => {
+                angles(&[
+                    ("ANGLE_1", value.angle_1.value),
+                    ("ANGLE_2", value.angle_2.value),
+                    ("ANGLE_3", value.angle_3.value),
+                ])?;
+                finite(&[
+                    ("ANGLE_1_DOT", value.angle_1_dot.value),
+                    ("ANGLE_2_DOT", value.angle_2_dot.value),
+                    ("ANGLE_3_DOT", value.angle_3_dot.value),
+                ])
+            }
+            Self::EulerAngleAngVel(value) => {
+                angles(&[
+                    ("ANGLE_1", value.angle_1.value),
+                    ("ANGLE_2", value.angle_2.value),
+                    ("ANGLE_3", value.angle_3.value),
+                ])?;
+                finite(&[
+                    ("ANGVEL_X", value.angvel_x.value),
+                    ("ANGVEL_Y", value.angvel_y.value),
+                    ("ANGVEL_Z", value.angvel_z.value),
+                ])
+            }
+            Self::Spin(value) => {
+                angles(&[
+                    ("SPIN_ALPHA", value.spin_alpha.value),
+                    ("SPIN_DELTA", value.spin_delta.value),
+                    ("SPIN_ANGLE", value.spin_angle.value),
+                ])?;
+                finite(&[("SPIN_ANGLE_VEL", value.spin_angle_vel.value)])
+            }
+            Self::SpinNutation(value) => {
+                angles(&[
+                    ("SPIN_ALPHA", value.spin_alpha.value),
+                    ("SPIN_DELTA", value.spin_delta.value),
+                    ("SPIN_ANGLE", value.spin_angle.value),
+                    ("NUTATION", value.nutation.value),
+                    ("NUTATION_PHASE", value.nutation_phase.value),
+                ])?;
+                finite(&[("SPIN_ANGLE_VEL", value.spin_angle_vel.value)])?;
+                Duration::validate_value(value.nutation_per.value, "NUTATION_PER")
+            }
+            Self::SpinNutationMom(value) => {
+                angles(&[
+                    ("SPIN_ALPHA", value.spin_alpha.value),
+                    ("SPIN_DELTA", value.spin_delta.value),
+                    ("SPIN_ANGLE", value.spin_angle.value),
+                    ("MOMENTUM_ALPHA", value.momentum_alpha.value),
+                    ("MOMENTUM_DELTA", value.momentum_delta.value),
+                ])?;
+                finite(&[
+                    ("SPIN_ANGLE_VEL", value.spin_angle_vel.value),
+                    ("NUTATION_VEL", value.nutation_vel.value),
+                ])
+            }
         }
     }
 }
@@ -1427,34 +1429,7 @@ impl AemData {
             )
             .into());
         }
-        for (idx, state) in self.attitude_states.iter().enumerate() {
-            let count = [
-                state.quaternion_ephemeris.is_some(),
-                state.quaternion_derivative.is_some(),
-                state.quaternion_ang_vel.is_some(),
-                state.euler_angle.is_some(),
-                state.euler_angle_derivative.is_some(),
-                state.euler_angle_ang_vel.is_some(),
-                state.spin.is_some(),
-                state.spin_nutation.is_some(),
-                state.spin_nutation_mom.is_some(),
-            ]
-            .into_iter()
-            .filter(|populated| *populated)
-            .count();
-            match count {
-                0 => {
-                    return Err(ValidationError::missing_required(
-                        "AEM Data",
-                        format!("attitudeState[{}] (exactly one choice required)", idx + 1),
-                    )
-                    .into());
-                }
-                1 => {}
-                _ => {
-                    return Err(ValidationError::conflict(state.populated_fields()).into());
-                }
-            }
+        for state in &self.attitude_states {
             state.validate_state()?;
         }
         Ok(())
@@ -1472,10 +1447,6 @@ impl AemData {
             }
         }
         Ok(())
-    }
-
-    pub fn validate_with_type(&self, attitude_type: &AttitudeTypeType) -> Result<()> {
-        self.validate_attitude_type(attitude_type)
     }
 
     pub fn validate(&self, attitude_type: &AttitudeTypeType) -> Result<()> {
@@ -1505,19 +1476,17 @@ mod tests {
     fn test_aem_data_validation_mismatches() {
         use crate::common::*;
 
-        let valid_q = AemAttitudeStateWrapper::from(AemAttitudeState::QuaternionEphemeris(
-            QuaternionEphemeris {
-                epoch: "2023-01-01T00:00:00".parse().unwrap(),
-                quaternion: Quaternion::new(0.0, 0.0, 0.0, 1.0).unwrap(),
-            },
-        ));
+        let valid_q = AemAttitudeState::QuaternionEphemeris(QuaternionEphemeris {
+            epoch: "2023-01-01T00:00:00".parse().unwrap(),
+            quaternion: Quaternion::new(0.0, 0.0, 0.0, 1.0).unwrap(),
+        });
 
-        let valid_euler = AemAttitudeStateWrapper::from(AemAttitudeState::EulerAngle(EulerAngle {
+        let valid_euler = AemAttitudeState::EulerAngle(EulerAngle {
             epoch: "2023-01-01T00:00:00".parse().unwrap(),
             angle_1: Angle::new(10.0, None).unwrap(),
             angle_2: Angle::new(20.0, None).unwrap(),
             angle_3: Angle::new(30.0, None).unwrap(),
-        }));
+        });
 
         // Type mismatch: Expects QUATERNION, gets EULER_ANGLE
         let data = AemData {
@@ -1562,31 +1531,6 @@ mod tests {
         let data = AemData {
             comment: vec![],
             attitude_states: vec![],
-        };
-        assert!(crate::traits::Validate::validate(&data).is_err());
-    }
-
-    #[test]
-    fn test_aem_data_state_choice_conflict() {
-        use crate::common::*;
-
-        let mut wrapper = AemAttitudeStateWrapper::from(AemAttitudeState::QuaternionEphemeris(
-            QuaternionEphemeris {
-                epoch: "2023-01-01T00:00:00".parse().unwrap(),
-                quaternion: Quaternion::new(0.0, 0.0, 0.0, 1.0).unwrap(),
-            },
-        ));
-
-        wrapper.euler_angle = Some(EulerAngle {
-            epoch: "2023-01-01T00:00:00".parse().unwrap(),
-            angle_1: Angle::new(10.0, None).unwrap(),
-            angle_2: Angle::new(20.0, None).unwrap(),
-            angle_3: Angle::new(30.0, None).unwrap(),
-        });
-
-        let data = AemData {
-            comment: vec![],
-            attitude_states: vec![wrapper],
         };
         assert!(crate::traits::Validate::validate(&data).is_err());
     }

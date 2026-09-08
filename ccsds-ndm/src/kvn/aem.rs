@@ -517,8 +517,7 @@ DATA_STOP
         Aem::from_kvn(&input).unwrap().body.segment[0]
             .data
             .attitude_states[0]
-            .content()
-            .unwrap()
+            .clone()
     }
 
     // ADM table 4-4: compare every named component in its KVN column order.

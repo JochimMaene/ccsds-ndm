@@ -119,3 +119,13 @@ fn aem_xml_rejects_unknown_choice_content_attributes_and_ordering_errors() {
         assert!(Aem::from_xml(&source).is_err(), "accepted {label}");
     }
 }
+
+#[test]
+fn aem_kvn_accepts_carriage_return_only_line_endings() {
+    let cr_only = KVN.replace("\r\n", "\n").replace('\n', "\r");
+    assert!(!cr_only.contains('\n'), "fixture still holds line feeds");
+
+    let from_cr = Aem::from_kvn(&cr_only).unwrap();
+    let from_lf = Aem::from_kvn(KVN).unwrap();
+    assert_eq!(from_cr, from_lf);
+}

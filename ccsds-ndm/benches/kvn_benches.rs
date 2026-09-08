@@ -285,7 +285,10 @@ fn bench_aem_history_scaling(c: &mut Criterion) {
                 let hours = 5 + index / 3_600;
                 let minutes = (index % 3_600) / 60;
                 let seconds = index % 60;
-                state.spin.as_mut().unwrap().epoch = CalendarEpoch::from_str(&format!(
+                let ccsds_ndm::common::AemAttitudeState::Spin(spin) = &mut state else {
+                    unreachable!()
+                };
+                spin.epoch = CalendarEpoch::from_str(&format!(
                     "2006-090T{hours:02}:{minutes:02}:{seconds:02}.071"
                 ))
                 .unwrap();

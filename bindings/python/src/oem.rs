@@ -1281,44 +1281,9 @@ impl OemData {
     fn set_state_vector_epochs(&mut self, py: Python<'_>, epochs: Vec<String>) -> PyResult<()> {
         let state_vectors = self.state_vector.bind(py);
         if state_vectors.is_empty() {
-            for epoch_str in epochs {
-                state_vectors.append(Py::new(
-                    py,
-                    StateVectorAcc {
-                        inner: ccsds_ndm::common::StateVectorAcc {
-                            epoch: parse_epoch(&epoch_str)?,
-                            x: Position {
-                                value: 0.0,
-                                units: None,
-                            },
-                            y: Position {
-                                value: 0.0,
-                                units: None,
-                            },
-                            z: Position {
-                                value: 0.0,
-                                units: None,
-                            },
-                            x_dot: Velocity {
-                                value: 0.0,
-                                units: None,
-                            },
-                            y_dot: Velocity {
-                                value: 0.0,
-                                units: None,
-                            },
-                            z_dot: Velocity {
-                                value: 0.0,
-                                units: None,
-                            },
-                            x_ddot: None,
-                            y_ddot: None,
-                            z_ddot: None,
-                        },
-                    },
-                )?)?;
-            }
-            return Ok(());
+            return Err(PyValueError::new_err(
+                "Cannot set epochs when no state vectors exist; create states first",
+            ));
         }
 
         if epochs.len() != state_vectors.len() {
@@ -1327,14 +1292,26 @@ impl OemData {
             ));
         }
 
-        for (index, epoch_str) in epochs.iter().enumerate() {
+        let parsed = epochs
+            .iter()
+            .map(|epoch| parse_epoch(epoch))
+            .collect::<PyResult<Vec<_>>>()?;
+        visit_records(
+            &self.state_vector,
+            py,
+            "state_vector",
+            "StateVectorAcc",
+            |_: &StateVectorAcc| {},
+        )?;
+
+        for (index, epoch) in parsed.into_iter().enumerate() {
             let value = state_vectors.get_item(index)?;
             let mut state = value
                 .extract::<PyRefMut<'_, StateVectorAcc>>()
                 .map_err(|_| {
                     PyValueError::new_err(format!("state_vector[{index}] must be StateVectorAcc"))
                 })?;
-            state.inner.epoch = parse_epoch(epoch_str)?;
+            state.inner.epoch = epoch;
         }
         Ok(())
     }
@@ -1388,20 +1365,9 @@ impl OemData {
     ) -> PyResult<()> {
         let covariance_matrices = self.covariance_matrix.bind(py);
         if covariance_matrices.is_empty() {
-            for epoch_str in epochs {
-                covariance_matrices.append(Py::new(
-                    py,
-                    OemCovarianceMatrix {
-                        inner: build_covariance_matrix(
-                            parse_epoch(&epoch_str)?,
-                            None,
-                            Vec::new(),
-                            [0.0; 21],
-                        ),
-                    },
-                )?)?;
-            }
-            return Ok(());
+            return Err(PyValueError::new_err(
+                "Cannot set epochs when no covariance matrices exist; create matrices first",
+            ));
         }
 
         if epochs.len() != covariance_matrices.len() {
@@ -1410,7 +1376,19 @@ impl OemData {
             ));
         }
 
-        for (index, epoch_str) in epochs.iter().enumerate() {
+        let parsed = epochs
+            .iter()
+            .map(|epoch| parse_epoch(epoch))
+            .collect::<PyResult<Vec<_>>>()?;
+        visit_records(
+            &self.covariance_matrix,
+            py,
+            "covariance_matrix",
+            "OemCovarianceMatrix",
+            |_: &OemCovarianceMatrix| {},
+        )?;
+
+        for (index, epoch) in parsed.into_iter().enumerate() {
             let value = covariance_matrices.get_item(index)?;
             let mut covariance = value
                 .extract::<PyRefMut<'_, OemCovarianceMatrix>>()
@@ -1419,7 +1397,7 @@ impl OemData {
                         "covariance_matrix[{index}] must be OemCovarianceMatrix"
                     ))
                 })?;
-            covariance.inner.epoch = parse_epoch(epoch_str)?;
+            covariance.inner.epoch = epoch;
         }
         Ok(())
     }

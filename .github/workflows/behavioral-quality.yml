@@ -16,7 +16,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.88.0
       - name: Check the published library
         # No --locked: Cargo.lock is not tracked, so a clean checkout has no lock file to honor.
-        run: cargo check --manifest-path ccsds-ndm/Cargo.toml --lib
+        run: cargo +1.88.0 check --manifest-path ccsds-ndm/Cargo.toml --lib
 
   rust-lint:
     name: Rust formatting and linting

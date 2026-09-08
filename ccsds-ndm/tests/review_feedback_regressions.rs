@@ -83,11 +83,16 @@ fn assignment_values_may_end_with_marked_block_suffixes() {
         .replace("OBJECT_NAME = TRMM", "OBJECT_NAME = TRMM_START");
     Apm::from_kvn(&apm).unwrap();
 
-    let aem = include_str!("../data/kvn/aem_g4.kvn").replacen(
-        "OBJECT_NAME = MARS GLOBAL SURVEYOR",
-        "OBJECT_NAME = MARS GLOBAL SURVEYOR_STOP",
-        1,
-    );
+    // Both segments are renamed: the AEM now requires one object across the whole message.
+    let aem = include_str!("../data/kvn/aem_g4.kvn")
+        .replace(
+            "OBJECT_NAME = MARS GLOBAL SURVEYOR",
+            "OBJECT_NAME = MARS GLOBAL SURVEYOR_STOP",
+        )
+        .replace(
+            "OBJECT_NAME = mars global surveyor",
+            "OBJECT_NAME = mars global surveyor_STOP",
+        );
     Aem::from_kvn(&aem).unwrap();
 
     let acm = include_str!("../data/kvn/acm_g6.kvn").replace(

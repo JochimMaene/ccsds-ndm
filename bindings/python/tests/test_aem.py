@@ -148,16 +148,12 @@ class TestAem:
         segment = AemSegment(meta, data)
         return Aem(header, [segment])
 
-    def test_aem_from_numpy_requires_explicit_type_for_ambiguous_width(self):
+    def test_aem_from_numpy_requires_explicit_type(self):
         epochs = ["2023-01-01T00:00:00"]
         values = np.array([[0.0, 0.0, 0.0, 1.0]])
 
-        with pytest.raises(ValueError, match="Ambiguous 4-column AEM data"):
+        with pytest.raises(TypeError):
             AemData.from_numpy(epochs, values, comment=[])
-
-        values_6 = np.array([[1.0, 2.0, 3.0, 0.1, 0.2, 0.3]])
-        with pytest.raises(ValueError, match="Ambiguous 6-column AEM data"):
-            AemData.from_numpy(epochs, values_6, comment=[])
 
     def test_aem_from_numpy_rejects_wrong_width_without_defaults(self):
         epochs = ["2023-01-01T00:00:00"]
@@ -177,8 +173,33 @@ class TestAem:
         assert states[0].epoch == "2023-01-01T00:00:00"
         assert states[0].values == [10.0, 20.0, 30.0, 0.5]
 
+    def test_attitude_states_epochs_reject_bad_input_without_partial_writes(self):
+        state1 = AttitudeState("2023-01-01T00:00:00", [0.0, 0.0, 0.0, 1.0])
+        state2 = AttitudeState("2023-01-01T00:01:00", [0.0, 0.0, 0.0, 1.0])
+        data = AemData(
+            attitude_states=[state1, state2],
+            attitude_type="QUATERNION",
+            comment=[],
+        )
+        original = data.attitude_states[0].epoch
+
+        with pytest.raises(ValueError):
+            data.attitude_states_epochs = [
+                "2024-01-01T00:00:00",
+                "not-a-timestamp",
+            ]
+        assert data.attitude_states[0].epoch == original
+
+        data.attitude_states[1] = "not an attitude state"
+        with pytest.raises(ValueError, match=r"attitude_states\[1\]"):
+            data.attitude_states_epochs = [
+                "2024-01-01T00:00:00",
+                "2024-01-01T00:01:00",
+            ]
+        assert data.attitude_states[0].epoch == original
+
     def test_aem_set_epochs_without_states_raises(self):
-        data = AemData(attitude_states=[], comment=[])
+        data = AemData(attitude_states=[], attitude_type="QUATERNION", comment=[])
         with pytest.raises(ValueError, match="Cannot set epochs"):
             data.attitude_states_epochs = ["2023-01-01T00:00:00"]
 

@@ -31,7 +31,9 @@ LIVE_NESTED_CASES = [
     (Acm, ROOT / "ccsds-ndm/data/kvn/acm_g6.kvn", lambda value: value.segment.metadata),
     (
         Aem,
-        ROOT / "ccsds-ndm/data/kvn/aem_g4.kvn",
+        # Single-segment fixture: renaming one segment's object in a multi-segment AEM now
+        # trips the message-level OBJECT_NAME/OBJECT_ID consistency check.
+        ROOT / "ccsds-ndm/data/kvn/aem_g5.kvn",
         lambda value: value.segments[0].metadata,
     ),
     (Apm, ROOT / "ccsds-ndm/data/kvn/apm_g1.kvn", lambda value: value.segment.metadata),

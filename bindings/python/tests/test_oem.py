@@ -196,6 +196,61 @@ class TestOem:
             with pytest.raises(ValueError, match=r"covariance_matrix\[1\]"):
                 getattr(data, accessor)
 
+    def test_state_vector_epochs_reject_bad_input_without_partial_writes(self):
+        data = self._numpy_data()
+        original = data.state_vector[0].epoch
+
+        with pytest.raises(ValueError):
+            data.state_vector_epochs = ["2024-01-01T00:00:00", "not-a-timestamp"]
+        assert data.state_vector[0].epoch == original
+
+        data.state_vector[1] = "not a state vector"
+        with pytest.raises(ValueError, match=r"state_vector\[1\]"):
+            data.state_vector_epochs = [
+                "2024-01-01T00:00:00",
+                "2024-01-01T00:01:00",
+            ]
+        assert data.state_vector[0].epoch == original
+
+    def test_epoch_setters_do_not_create_records(self):
+        data = OemData(state_vectors=[], covariance_matrices=[], comments=[])
+        with pytest.raises(ValueError, match="no state vectors"):
+            data.state_vector_epochs = ["2023-01-01T00:00:00"]
+        with pytest.raises(ValueError, match="no covariance matrices"):
+            data.covariance_matrix_epochs = ["2023-01-01T00:00:00"]
+
+    def test_covariance_matrix_epochs_reject_bad_input_without_partial_writes(self):
+        data = OemData.from_numpy(
+            state_vector_epochs=["2023-01-01T00:00:00", "2023-01-01T00:01:00"],
+            state_vector_numpy=np.array(
+                [
+                    [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0],
+                    [7001.0, 0.1, 0.2, 0.0, 7.5, 0.0],
+                ],
+                dtype=float,
+            ),
+            covariance_matrix_epochs=["2023-01-01T00:00:00", "2023-01-01T00:01:00"],
+            covariance_matrix_numpy=np.eye(6, dtype=float)
+            .reshape(1, 6, 6)
+            .repeat(2, axis=0),
+        )
+        original = data.covariance_matrix[0].epoch
+
+        with pytest.raises(ValueError):
+            data.covariance_matrix_epochs = [
+                "2024-01-01T00:00:00",
+                "not-a-timestamp",
+            ]
+        assert data.covariance_matrix[0].epoch == original
+
+        data.covariance_matrix[1] = "not a covariance matrix"
+        with pytest.raises(ValueError, match=r"covariance_matrix\[1\]"):
+            data.covariance_matrix_epochs = [
+                "2024-01-01T00:00:00",
+                "2024-01-01T00:01:00",
+            ]
+        assert data.covariance_matrix[0].epoch == original
+
     def _numpy_data(self):
         return OemData.from_numpy(
             state_vector_epochs=["2023-01-01T00:00:00", "2023-01-01T00:01:00"],
