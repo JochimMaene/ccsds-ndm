@@ -256,6 +256,7 @@ pub struct KvnWriter<'a> {
     output: KvnOutput<'a>,
     io_error: Option<std::io::Error>,
     lexical_error: bool,
+    unrepresentable_number: bool,
     line_length_error: Option<usize>,
     line_len: usize,
     allow_long_records: bool,
@@ -290,6 +291,7 @@ impl KvnWriter<'static> {
             output: KvnOutput::String(String::new()),
             io_error: None,
             lexical_error: false,
+            unrepresentable_number: false,
             line_length_error: None,
             line_len: 0,
             allow_long_records: false,
@@ -302,6 +304,7 @@ impl KvnWriter<'static> {
             output: KvnOutput::String(String::with_capacity(capacity)),
             io_error: None,
             lexical_error: false,
+            unrepresentable_number: false,
             line_length_error: None,
             line_len: 0,
             allow_long_records: false,
@@ -336,6 +339,7 @@ impl<'a> KvnWriter<'a> {
             output: KvnOutput::Io(output),
             io_error: None,
             lexical_error: false,
+            unrepresentable_number: false,
             line_length_error: None,
             line_len: 0,
             allow_long_records: false,
@@ -481,6 +485,7 @@ impl<'a> KvnWriter<'a> {
 
     /// Write one AEM attitude-state record without allocating intermediate strings.
     pub(crate) fn write_aem_attitude_state<E: Display>(&mut self, epoch: &E, values: &[f64]) {
+        self.unrepresentable_number |= values.iter().any(|value| !OdmFloat::is_valid(*value));
         let build = |line: &mut String| {
             let _ = write!(line, "{epoch}");
             for value in values {
@@ -589,11 +594,7 @@ impl<'a> KvnWriter<'a> {
         }
     }
 
-    /// Return string-backed output only when every source text value was valid KVN text.
-    pub(crate) fn finish_checked(mut self) -> crate::error::Result<String> {
-        if self.line_len > 0 {
-            self.finish_line();
-        }
+    fn validate_output(&self) -> crate::error::Result<()> {
         if let Some(line_len) = self.line_length_error {
             return Err(crate::error::ValidationError::OutOfRange {
                 name: "KVN record".into(),
@@ -610,6 +611,23 @@ impl<'a> KvnWriter<'a> {
             }
             .into());
         }
+        if self.unrepresentable_number {
+            return Err(crate::error::ValidationError::Generic {
+                message: "KVN output contains a number without a representable CCSDS spelling"
+                    .into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+
+    /// Return string-backed output only when every source text value was valid KVN text.
+    pub(crate) fn finish_checked(mut self) -> crate::error::Result<String> {
+        if self.line_len > 0 {
+            self.finish_line();
+        }
+        self.validate_output()?;
         Ok(self.finish())
     }
 
@@ -618,26 +636,10 @@ impl<'a> KvnWriter<'a> {
         if self.line_len > 0 {
             self.finish_line();
         }
-        if let Some(error) = self.io_error {
+        if let Some(error) = self.io_error.take() {
             return Err(error.into());
         }
-        if let Some(line_len) = self.line_length_error {
-            return Err(crate::error::ValidationError::OutOfRange {
-                name: "KVN record".into(),
-                value: line_len.to_string(),
-                expected: "a KVN line no longer than 254 characters".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.lexical_error {
-            return Err(crate::error::ValidationError::Generic {
-                message: "KVN output must contain only printable ASCII records".into(),
-                line: None,
-            }
-            .into());
-        }
-        Ok(())
+        self.validate_output()
     }
 }
 

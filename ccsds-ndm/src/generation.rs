@@ -217,7 +217,7 @@ impl_generation_metadata!(crate::messages::apm::Apm, Apm);
 
 impl_generation_metadata!(crate::messages::omm::Omm, Omm, kvn_representability);
 impl_generation_metadata!(crate::messages::cdm::Cdm, Cdm, kvn_representability);
-impl_generation_metadata!(crate::messages::aem::Aem, Aem, kvn_representability);
+impl_generation_metadata!(crate::messages::aem::Aem, Aem);
 impl GenerationMetadata for crate::messages::ocm::Ocm {
     const KIND: MessageKind = MessageKind::Ocm;
 

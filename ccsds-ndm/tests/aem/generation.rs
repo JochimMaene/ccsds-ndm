@@ -27,6 +27,14 @@ fn every_kvn_generation_gate_rejects_invalid_state_before_output() {
     let mut overlong = Aem::from_kvn(SPIN_KVN).unwrap();
     overlong.body.segment[0].metadata.object_name = "X".repeat(240);
     cases.push(("overlong record", overlong));
+    let mut unrepresentable = Aem::from_kvn(SPIN_KVN).unwrap();
+    let AemAttitudeState::Spin(state) =
+        &mut unrepresentable.body.segment[0].data.attitude_states[0]
+    else {
+        unreachable!()
+    };
+    state.spin_angle_vel.value = f64::MAX;
+    cases.push(("unrepresentable number", unrepresentable));
     for (label, message) in cases {
         assert!(message.to_kvn().is_err(), "materialized accepted {label}");
         let mut output = Vec::new();
