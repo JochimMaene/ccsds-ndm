@@ -37,9 +37,7 @@ This is simpler and more familiar than introducing a custom ownership rule solel
 - The complete edited graph is what validation and generation observe, so there is no stale
   shadow copy or forgotten commit.
 - Ordinary lists are preferable to a custom repeated-field framework unless a benchmark proves
-  that a specialized representation is needed. The reproducible benchmark shows extra per-record
-  cost at large sizes, but no equivalent Rust-owned alternative has been measured. The existing
-  model therefore remains provisional.
+  that a specialized representation is needed.
 
 The rejected long-term alternatives are immutable rebuilding and an editor/proxy API. Immutable
 rebuilding adds ceremony to routine edits. An editor hides copy/write-back behavior behind a second
@@ -54,10 +52,16 @@ time-sensitive paths were measured before extending the graph to every message f
 - repeated scalar edits through a retained state-vector reference; and
 - the same end-to-end workloads in the competing Python package.
 
-Those historical measurements were not retained and do not support a comparative claim.
 `just bench-python-object-model` measures OEM parsing, construction from records and NumPy arrays,
 validation, generation, numeric access, editing, and isolated-process peak RSS. Results are local
 comparison evidence, not release thresholds.
+
+A 2026-09-09 release-build experiment compared the live model with Rust-owned copy-on-write OEM
+histories at 100,000 records. The prototype made prepared-NumPy construction 73%, bulk replacement
+75%, and validation 40% faster; XML generation improved 9% and its peak RSS fell from 224 to 160
+MiB. NumPy export became 82% slower, while record construction used 138 rather than 118 MiB. It
+removed only nine production lines and added snapshot semantics and explicit update methods, so it
+was rejected for increasing ownership complexity despite useful performance gains.
 
 A comparison with another package is valid only when both libraries process the same generated
 document on the same machine. A specialized native repeated sequence still must preserve direct
