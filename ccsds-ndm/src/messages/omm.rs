@@ -1086,279 +1086,120 @@ MEAN_ANOMALY = 30.0 [deg]
         );
     }
 
-    #[test]
-    fn test_omm_validation_missing_mandatory_metadata() {
-        // Missing OBJECT_NAME
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = EME2000
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.0 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 10.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 10.0 [deg]
-MEAN_ANOMALY = 10.0 [deg]
-TLE_PARAMETERS =
-  EPHEMERIS_TYPE = 0
-  CLASSIFICATION_TYPE = U
-  NORAD_CAT_ID = 99999
-  ELEMENT_SET_NO = 123
-  REV_AT_EPOCH = 500
-  BSTAR = 0.0001 [1/ER]
-  MEAN_MOTION_DOT = 0.0 [rev/day**2]
-  MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-"#;
-        // OBJECT_NAME is mandatory in the struct builder
-        // The parser usually fails if a required field is missing for the builder
-        assert!(Omm::from_kvn(kvn).is_err());
+    /// Drops every TLE keyword, leaving a message whose theory still demands the block.
+    fn strip_tle_parameters(kvn: &str) -> String {
+        let dropped = [
+            "EPHEMERIS_TYPE",
+            "CLASSIFICATION_TYPE",
+            "NORAD_CAT_ID",
+            "ELEMENT_SET_NO",
+            "REV_AT_EPOCH",
+            "BSTAR",
+            "MEAN_MOTION_DOT",
+            "MEAN_MOTION_DDOT",
+        ];
+        let kept: Vec<&str> = kvn
+            .lines()
+            .filter(|line| !dropped.iter().any(|key| line.starts_with(key)))
+            .collect();
+        format!("{}\n", kept.join("\n"))
     }
 
+    /// Every message-level rule, exercised as a single mutation of a shipped fixture.
+    ///
+    /// Hand-written messages had drifted out of the KVN grammar — they carried an XML-only
+    /// `TLE_PARAMETERS =` block header, so the parser rejected them as an unknown keyword and the
+    /// rule under test was never reached. Mutating a fixture that parses keeps each case honest,
+    /// and asserting on the diagnostic keeps it from passing on an unrelated failure.
     #[test]
-    fn test_omm_validation_theory_sgp4_reqs() {
-        // Case 1: SGP4 theory but missing TLE Parameters block
-        let kvn_no_tle = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.0 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 10.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 10.0 [deg]
-MEAN_ANOMALY = 10.0 [deg]
-"#;
-        let res = Omm::from_kvn(kvn_no_tle);
-        assert!(res.is_err());
-        // Check for specific error if possible, but strict error checking might be brittle
-        // Expecting ValidationError::MissingRequiredField for TLE_PARAMETERS
+    fn omm_kvn_validation_rules_name_the_offending_field() {
+        const FIXTURE: &str = include_str!("../../data/kvn/omm_g7.kvn");
+        // The shipped theory is SGP/SGP4, which imposes no TLE requirements of its own.
+        let sgp4 = |kvn: &str| kvn.replace("THEORY = SGP/SGP4", "THEORY = SGP4");
+        let sgp = |kvn: &str| kvn.replace("THEORY = SGP/SGP4", "THEORY = SGP");
 
-        // Case 2: SGP4 theory but using SEMI_MAJOR_AXIS instead of MEAN_MOTION
-        let kvn_sma = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-SEMI_MAJOR_AXIS = 7000.0 [km]
-ECCENTRICITY = 0.001
-INCLINATION = 10.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 10.0 [deg]
-MEAN_ANOMALY = 10.0 [deg]
-TLE_PARAMETERS =
-  BSTAR = 0.0001 [1/ER]
-  MEAN_MOTION_DOT = 0.0 [rev/day**2]
-"#;
-        // Validation logic should flag missing MEAN_MOTION for SGP4
-        assert!(Omm::from_kvn(kvn_sma).is_err());
+        Omm::from_kvn(&sgp4(FIXTURE)).expect("baseline fixture must satisfy every rule");
 
-        // Case 3: SGP4 theory but missing BSTAR in TLE parameters
-        let kvn_no_bstar = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.0 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 10.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 10.0 [deg]
-MEAN_ANOMALY = 10.0 [deg]
-TLE_PARAMETERS =
-  MEAN_MOTION_DOT = 0.0 [rev/day**2]
-"#;
-        assert!(Omm::from_kvn(kvn_no_bstar).is_err());
-    }
-
-    #[test]
-    fn test_omm_validation_theory_sgp4_xp_reqs() {
-        // SGP4-XP requires AGOM and BTERM
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4-XP
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.0 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 10.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 10.0 [deg]
-MEAN_ANOMALY = 10.0 [deg]
-TLE_PARAMETERS =
-  BTERM = 0.01 [m**2/kg]
-  MEAN_MOTION_DOT = 0.0 [rev/day**2]
-  # Missing AGOM
-"#;
-        assert!(Omm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_omm_validation_mean_elements_choice() {
-        // Missing both SMA and Mean Motion
-        let kvn_none = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = EME2000
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = DSST
-EPOCH = 2023-01-01T00:00:00
-ECCENTRICITY = 0.001
-INCLINATION = 10.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 10.0 [deg]
-MEAN_ANOMALY = 10.0 [deg]
-"#;
-        assert!(Omm::from_kvn(kvn_none).is_err());
-
-        // Both SMA and Mean Motion present
-        let kvn_both = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = EME2000
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = DSST
-EPOCH = 2023-01-01T00:00:00
-SEMI_MAJOR_AXIS = 7000.0 [km]
-MEAN_MOTION = 15.0 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 10.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 10.0 [deg]
-MEAN_ANOMALY = 10.0 [deg]
-"#;
-        assert!(Omm::from_kvn(kvn_both).is_err());
-    }
-
-    #[test]
-    fn test_omm_tle_conflicting_bstar_bterm_strict() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.0 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 10.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 10.0 [deg]
-MEAN_ANOMALY = 10.0 [deg]
-BSTAR = 0.0001 [1/ER]
-BTERM = 0.01 [m**2/kg]
-MEAN_MOTION_DOT = 0.0 [rev/day**2]
-"#;
-
-        assert!(Omm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_omm_tle_conflicting_ddot_agom_strict() {
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.0 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 10.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 10.0 [deg]
-MEAN_ANOMALY = 10.0 [deg]
-BSTAR = 0.0001 [1/ER]
-MEAN_MOTION_DOT = 0.0 [rev/day**2]
-MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-AGOM = 0.0001 [m**2/kg]
-"#;
-        assert!(Omm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_tle_parameters_validate_conflicts() {
-        let mut tle = TleParameters::builder()
-            .mean_motion_dot(MeanMotionDot::new(0.0, None))
-            .build();
-        tle.bstar = Some(BStar::new(0.0001, None));
-        tle.bterm = Some(M2kg::new(0.01, None));
-
-        let err = tle.validate("SGP4").unwrap_err();
-        assert!(err.as_validation_error().is_some_and(|e| {
-            matches!(e, ValidationError::Conflict { fields, .. } if fields.iter().any(|f| f.as_ref() == "BSTAR") && fields.iter().any(|f| f.as_ref() == "BTERM"))
-        }));
-
-        let mut tle = TleParameters::builder()
-            .mean_motion_dot(MeanMotionDot::new(0.0, None))
-            .build();
-        tle.mean_motion_ddot = Some(MeanMotionDDot::new(0.0, None));
-        tle.agom = Some(M2kg::new(0.001, None));
-
-        let err = tle.validate("SGP").unwrap_err();
-        assert!(err.as_validation_error().is_some_and(|e| {
-            matches!(e, ValidationError::Conflict { fields, .. } if fields.iter().any(|f| f.as_ref() == "MEAN_MOTION_DDOT") && fields.iter().any(|f| f.as_ref() == "AGOM"))
-        }));
-    }
-
-    #[test]
-    fn test_omm_validation_negative_values() {
-        // Negative Eccentricity
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = EME2000
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = DSST
-EPOCH = 2023-01-01T00:00:00
-SEMI_MAJOR_AXIS = 7000.0 [km]
-ECCENTRICITY = -0.001
-INCLINATION = 10.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 10.0 [deg]
-MEAN_ANOMALY = 10.0 [deg]
-"#;
-        assert!(Omm::from_kvn(kvn).is_err());
+        for (mutated, expected) in [
+            // Mandatory metadata.
+            (
+                FIXTURE.replace("OBJECT_NAME = GOES 9\n", ""),
+                "Missing required field: OBJECT_NAME",
+            ),
+            // Mean element choice: exactly one of SEMI_MAJOR_AXIS or MEAN_MOTION.
+            (
+                FIXTURE
+                    .replace("THEORY = SGP/SGP4", "THEORY = DSST")
+                    .replace("MEAN_MOTION = 1.00273272\n", ""),
+                "exactly one of SEMI_MAJOR_AXIS or MEAN_MOTION",
+            ),
+            (
+                FIXTURE
+                    .replace("THEORY = SGP/SGP4", "THEORY = DSST")
+                    .replace("MEAN_MOTION =", "SEMI_MAJOR_AXIS = 7000.0\nMEAN_MOTION ="),
+                "exactly one of SEMI_MAJOR_AXIS or MEAN_MOTION",
+            ),
+            // Range-checked element values.
+            (
+                FIXTURE.replace("ECCENTRICITY = 0.0005013", "ECCENTRICITY = -0.0005013"),
+                "out of range",
+            ),
+            // SGP4 needs MEAN_MOTION, a TLE block, and BSTAR within it.
+            (
+                sgp4(FIXTURE).replace("MEAN_MOTION = 1.00273272", "SEMI_MAJOR_AXIS = 7000.0"),
+                "Missing required field: MEAN_MOTION in block Mean Elements",
+            ),
+            (
+                strip_tle_parameters(&sgp4(FIXTURE)),
+                "Missing required field: TLE_PARAMETERS",
+            ),
+            (
+                sgp4(FIXTURE).replace("BSTAR = 0.0001\n", ""),
+                "Missing required field: BSTAR",
+            ),
+            // SGP4-XP swaps BSTAR for BTERM and additionally needs AGOM.
+            (
+                sgp4(FIXTURE)
+                    .replace("THEORY = SGP4", "THEORY = SGP4-XP")
+                    .replace("BSTAR = 0.0001\n", ""),
+                "Missing required field: BTERM",
+            ),
+            (
+                sgp4(FIXTURE)
+                    .replace("THEORY = SGP4", "THEORY = SGP4-XP")
+                    .replace("BSTAR = 0.0001", "BTERM = 0.01"),
+                "Missing required field: AGOM",
+            ),
+            // SGP and PPT3 need MEAN_MOTION_DDOT.
+            (
+                sgp(FIXTURE).replace("MEAN_MOTION_DDOT = 0.0\n", ""),
+                "Missing required field: MEAN_MOTION_DDOT",
+            ),
+            (
+                sgp(FIXTURE)
+                    .replace("THEORY = SGP", "THEORY = PPT3")
+                    .replace("MEAN_MOTION_DDOT = 0.0\n", ""),
+                "Missing required field: MEAN_MOTION_DDOT",
+            ),
+            // Mutually exclusive TLE parameters.
+            (
+                sgp4(FIXTURE).replace("BSTAR = 0.0001", "BSTAR = 0.0001\nBTERM = 0.01"),
+                r#"Conflicting fields: ["BSTAR", "BTERM"]"#,
+            ),
+            (
+                sgp(FIXTURE).replace(
+                    "MEAN_MOTION_DDOT = 0.0",
+                    "MEAN_MOTION_DDOT = 0.0\nAGOM = 0.0001",
+                ),
+                r#"Conflicting fields: ["MEAN_MOTION_DDOT", "AGOM"]"#,
+            ),
+        ] {
+            let error = Omm::from_kvn(&mutated).expect_err("mutation accepted");
+            assert!(
+                error.to_string().contains(expected),
+                "diagnostic did not name {expected}: {error}"
+            );
+        }
     }
 
     #[test]
@@ -1380,77 +1221,46 @@ MEAN_ANOMALY = 10.0 [deg]
         assert!(RevPerDay3Units::from_str("INVALID").is_err());
     }
 
+    /// `TleParameters::validate` is public, so its theory dispatch is checked directly: the
+    /// error variants the KVN table only sees as text, the theories that impose no requirement,
+    /// and the satisfied SGP4-XP case.
     #[test]
-    fn test_omm_validation_theory_sgp_ppt3_reqs() {
-        // SGP/PPT3 requires MEAN_MOTION_DDOT
-        let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.0 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 10.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 10.0 [deg]
-MEAN_ANOMALY = 10.0 [deg]
-TLE_PARAMETERS =
-  MEAN_MOTION_DOT = 0.0 [rev/day**2]
-  # Missing MEAN_MOTION_DDOT
-"#;
-        assert!(Omm::from_kvn(kvn).is_err());
-    }
+    fn tle_parameters_validate_dispatches_on_theory() {
+        let base = || {
+            TleParameters::builder()
+                .mean_motion_dot(MeanMotionDot::new(0.0, None))
+                .build()
+        };
 
-    #[test]
-    fn test_omm_validation_theory_sgp4_xp_additional_reqs() {
-        // SGP4-XP requires BTERM and AGOM
-        let data = OmmData::builder()
-            .mean_elements(
-                MeanElements::builder()
-                    .epoch("2023-01-01T00:00:00".parse().unwrap())
-                    .mean_motion(MeanMotion::new(15.0, None))
-                    .eccentricity(NonNegativeDouble::new(0.001).unwrap())
-                    .inclination(Inclination::new(10.0, None).unwrap())
-                    .ra_of_asc_node(Angle::new(10.0, None).unwrap())
-                    .arg_of_pericenter(Angle::new(10.0, None).unwrap())
-                    .mean_anomaly(Angle::new(10.0, None).unwrap())
-                    .build(),
-            )
-            .tle_parameters(
-                TleParameters::builder()
-                    .mean_motion_dot(MeanMotionDot::new(0.0, None))
-                    .build(),
-            )
-            .build();
+        let mut conflicting = base();
+        conflicting.bstar = Some(BStar::new(0.0001, None));
+        conflicting.bterm = Some(M2kg::new(0.01, None));
+        let error = conflicting.validate("SGP4").unwrap_err();
+        assert!(error.as_validation_error().is_some_and(|error| {
+            matches!(error, ValidationError::Conflict { fields, .. }
+                if fields.iter().any(|field| field.as_ref() == "BSTAR")
+                    && fields.iter().any(|field| field.as_ref() == "BTERM"))
+        }));
 
-        let mut segment = OmmSegment::builder()
-            .metadata(
-                OmmMetadata::builder()
-                    .object_name("SAT")
-                    .object_id("1")
-                    .center_name("EARTH")
-                    .ref_frame("TEME")
-                    .time_system("UTC")
-                    .mean_element_theory("SGP4-XP")
-                    .build(),
-            )
-            .data(data.clone())
-            .build();
+        let mut conflicting = base();
+        conflicting.mean_motion_ddot = Some(MeanMotionDDot::new(0.0, None));
+        conflicting.agom = Some(M2kg::new(0.001, None));
+        let error = conflicting.validate("SGP").unwrap_err();
+        assert!(error.as_validation_error().is_some_and(|error| {
+            matches!(error, ValidationError::Conflict { fields, .. }
+                if fields.iter().any(|field| field.as_ref() == "MEAN_MOTION_DDOT")
+                    && fields.iter().any(|field| field.as_ref() == "AGOM"))
+        }));
 
-        // Missing BTERM
-        assert!(segment.validate().is_err());
+        // An unrecognised theory imposes nothing beyond the conflict rules.
+        assert!(base().validate("UNKNOWN").is_ok());
 
-        segment.data.tle_parameters.as_mut().unwrap().bterm = Some(M2kg::new(0.01, None));
-        // Missing AGOM
-        assert!(segment.validate().is_err());
-
-        segment.data.tle_parameters.as_mut().unwrap().agom = Some(M2kg::new(1.0, None));
-        assert!(segment.validate().is_ok());
+        let mut satisfied = base();
+        satisfied.bterm = Some(M2kg::new(0.01, None));
+        satisfied.agom = Some(M2kg::new(1.0, None));
+        satisfied
+            .validate("SGP4-XP")
+            .expect("BTERM and AGOM satisfy SGP4-XP");
     }
 
     #[test]
@@ -1510,91 +1320,6 @@ TLE_PARAMETERS =
         assert!(kvn.contains("0.01"));
         assert!(kvn.contains("AGOM"));
         assert!(kvn.contains("1"));
-    }
-
-    #[test]
-    fn test_omm_validation_theory_gaps() {
-        // SGP missing MEAN_MOTION
-        let meta = OmmMetadata::builder()
-            .object_name("SAT")
-            .object_id("1")
-            .center_name("EARTH")
-            .ref_frame("TEME")
-            .time_system("UTC")
-            .mean_element_theory("SGP")
-            .build();
-        let mut data = OmmData::builder()
-            .mean_elements(
-                MeanElements::builder()
-                    .epoch("2023-01-01T00:00:00".parse().unwrap())
-                    .semi_major_axis(Distance::new(7000.0, None))
-                    .eccentricity(NonNegativeDouble::new(0.001).unwrap())
-                    .inclination(Inclination::new(10.0, None).unwrap())
-                    .ra_of_asc_node(Angle::new(10.0, None).unwrap())
-                    .arg_of_pericenter(Angle::new(10.0, None).unwrap())
-                    .mean_anomaly(Angle::new(10.0, None).unwrap())
-                    .build(),
-            )
-            .tle_parameters(
-                TleParameters::builder()
-                    .mean_motion_dot(MeanMotionDot::new(0.0, None))
-                    .build(),
-            )
-            .build();
-
-        let segment = OmmSegment::builder()
-            .metadata(meta)
-            .data(data.clone())
-            .build();
-        assert!(segment.validate().is_err()); // Missing MEAN_MOTION for SGP
-
-        // TleParameters SGP/PPT3 missing mean_motion_ddot
-        assert!(data
-            .tle_parameters
-            .as_ref()
-            .unwrap()
-            .validate("SGP")
-            .is_err());
-        assert!(data
-            .tle_parameters
-            .as_ref()
-            .unwrap()
-            .validate("PPT3")
-            .is_err());
-
-        // TleParameters SGP4 missing bstar
-        assert!(data
-            .tle_parameters
-            .as_ref()
-            .unwrap()
-            .validate("SGP4")
-            .is_err());
-
-        // TleParameters SGP4-XP missing bterm/agom
-        assert!(data
-            .tle_parameters
-            .as_ref()
-            .unwrap()
-            .validate("SGP4-XP")
-            .is_err());
-        let mut tle_xp = data.tle_parameters.clone().unwrap();
-        tle_xp.bterm = Some(M2kg::new(0.01, None));
-        assert!(tle_xp.validate("SGP4-XP").is_err()); // Missing AGOM
-
-        // MeanElements both SMA and MeanMotion
-        data.mean_elements.mean_motion = Some(MeanMotion::new(15.0, None));
-        assert!(data.mean_elements.validate().is_err());
-
-        // MeanElements neither SMA nor MeanMotion
-        data.mean_elements.semi_major_axis = None;
-        data.mean_elements.mean_motion = None;
-        assert!(data.mean_elements.validate().is_err());
-
-        // Unknown theory in TleParameters
-        let tle = TleParameters::builder()
-            .mean_motion_dot(MeanMotionDot::new(0.0, None))
-            .build();
-        assert!(tle.validate("UNKNOWN").is_ok());
     }
 
     #[test]
