@@ -7,10 +7,9 @@
 
 use super::types::*;
 use crate::error::{Result, ValidationError};
-use crate::kvn::ser::{KvnWriter, OdmFloat};
+use crate::kvn::ser::KvnWriter;
 use crate::traits::ToKvn;
 use serde::{Deserialize, Serialize};
-use std::fmt::Write;
 
 /// Represents the `ndmHeader` complex type from the XSD.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
@@ -618,32 +617,6 @@ pub struct StateVectorAcc {
     pub z_ddot: Option<Acc>,
 }
 
-impl ToKvn for StateVectorAcc {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_built_line(|line| {
-            line.push_str(self.epoch.as_str());
-            for value in [
-                self.x.value,
-                self.y.value,
-                self.z.value,
-                self.x_dot.value,
-                self.y_dot.value,
-                self.z_dot.value,
-            ] {
-                line.push(' ');
-                let _ = write!(line, "{}", OdmFloat::new(value));
-            }
-            for acceleration in [&self.x_ddot, &self.y_ddot, &self.z_ddot]
-                .into_iter()
-                .flatten()
-            {
-                line.push(' ');
-                let _ = write!(line, "{}", OdmFloat::new(acceleration.value));
-            }
-        });
-    }
-}
-
 impl crate::traits::Validate for StateVectorAcc {
     fn validate(&self) -> Result<()> {
         if !self.epoch.is_contextually_valid() {
@@ -707,7 +680,18 @@ pub struct Quaternion {
 
 impl Quaternion {
     pub fn new(q1: f64, q2: f64, q3: f64, qc: f64) -> crate::error::Result<Self> {
-        for (name, v) in [("Q1", q1), ("Q2", q2), ("Q3", q3), ("QC", qc)] {
+        let quaternion = Self { q1, q2, q3, qc };
+        quaternion.validate_components()?;
+        Ok(quaternion)
+    }
+
+    pub(crate) fn validate_components(&self) -> Result<()> {
+        for (name, v) in [
+            ("Q1", self.q1),
+            ("Q2", self.q2),
+            ("Q3", self.q3),
+            ("QC", self.qc),
+        ] {
             if !(-1.0..=1.0).contains(&v) {
                 return Err(crate::error::ValidationError::OutOfRange {
                     name: name.into(),
@@ -718,12 +702,13 @@ impl Quaternion {
                 .into());
             }
         }
-        Ok(Self { q1, q2, q3, qc })
+        Ok(())
     }
 }
 
 impl crate::traits::Validate for Quaternion {
     fn validate(&self) -> Result<()> {
+        self.validate_components()?;
         let sum_sq = self.q1 * self.q1 + self.q2 * self.q2 + self.q3 * self.q3 + self.qc * self.qc;
         if !(0.999..=1.001).contains(&sum_sq) {
             return Err(crate::error::ValidationError::Generic {
@@ -3410,28 +3395,6 @@ mod tests {
         assert!(s.contains("1"));
         assert!(s.contains("Z_DOT"));
         assert!(s.contains("6"));
-    }
-
-    #[test]
-    fn test_state_vector_acc_kvn() {
-        let sv = StateVectorAcc::builder()
-            .epoch("2000-01-01T00:00:00".parse().unwrap())
-            .x(Position::new(1.0, None))
-            .y(Position::new(2.0, None))
-            .z(Position::new(3.0, None))
-            .x_dot(Velocity::new(4.0, None))
-            .y_dot(Velocity::new(5.0, None))
-            .z_dot(Velocity::new(6.0, None))
-            .build();
-        let mut w = KvnWriter::new();
-        // StateVectorAcc uses a custom write format in write_kvn?
-        // Looking at the code: it writes a raw line "epoch x y z ..."
-        sv.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("2000-01-01T00:00:00"));
-        assert!(s.contains("1"));
-        assert!(s.contains("2"));
-        assert!(s.contains("3"));
     }
 
     #[test]

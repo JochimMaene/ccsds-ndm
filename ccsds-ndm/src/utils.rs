@@ -9,8 +9,7 @@ use serde::{Deserializer, Serializer};
 /// Deserialize a value from the deserializer's own view of the token, without an owned `String`.
 ///
 /// Every caller parses a short lexical token into a fixed-size or numeric value, so routing
-/// through `String` puts one heap allocation on each record of a large history. Measured on
-/// `xml_parse_oem_10k`, removing it from the epoch path alone cut parse time by about a quarter.
+/// through `String` puts one heap allocation on each record of a large history.
 pub(crate) fn deserialize_parsed<'de, D, T, E>(
     deserializer: D,
     expecting: &'static str,

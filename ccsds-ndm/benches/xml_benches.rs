@@ -246,23 +246,6 @@ fn create_test_ocm_maneuver(num_states: usize) -> Ocm {
         .build()
 }
 
-fn bench_xml_parse_oem(c: &mut Criterion) {
-    let oem = create_test_oem(10000);
-    let xml_data = oem.to_xml().unwrap();
-
-    c.bench_function("xml_parse_oem_10k", |b| {
-        b.iter(|| Oem::from_xml(black_box(&xml_data)).unwrap())
-    });
-}
-
-fn bench_xml_generate_oem(c: &mut Criterion) {
-    let oem = create_test_oem(10000);
-
-    c.bench_function("xml_generate_oem_10k", |b| {
-        b.iter(|| black_box(&oem).to_xml().unwrap())
-    });
-}
-
 /// Baseline the format-independent validation walk used before OEM generation.
 ///
 /// Epoch construction is intentionally outside this benchmark. A validated epoch
@@ -498,8 +481,6 @@ fn bench_xml_scaling(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    bench_xml_parse_oem,
-    bench_xml_generate_oem,
     bench_validate_oem,
     bench_ocm_trajectory_10k,
     bench_ocm_covariance_10k,

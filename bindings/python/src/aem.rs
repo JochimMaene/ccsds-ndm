@@ -5,9 +5,7 @@
 use crate::common::{parse_interpolation_degree, AdmHeader};
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::aem as core_aem;
-use ccsds_ndm::types::{
-    Angle, AngleRate, AttitudeTypeType, Duration, QuaternionDotComponent, RotSeq,
-};
+use ccsds_ndm::types::{AttitudeTypeType, RotSeq};
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -17,376 +15,6 @@ use std::str::FromStr;
 
 fn parse_attitude_type(value: &str) -> PyResult<AttitudeTypeType> {
     AttitudeTypeType::from_str(value).map_err(|error| PyValueError::new_err(error.to_string()))
-}
-
-fn build_state_from_values(
-    epoch: ccsds_ndm::types::CalendarEpoch,
-    values: &[f64],
-    attitude_type: &AttitudeTypeType,
-) -> PyResult<ccsds_ndm::common::AemAttitudeState> {
-    let expected = attitude_type.value_count();
-    if values.len() != expected {
-        return Err(PyValueError::new_err(format!(
-            "ATTITUDE_TYPE {} requires {} values per row, got {}",
-            attitude_type,
-            expected,
-            values.len()
-        )));
-    }
-
-    use ccsds_ndm::common::{
-        AemAttitudeState, AngVel, EulerAngle, EulerAngleAngVel, EulerAngleDerivative, Quaternion,
-        QuaternionAngVel, QuaternionDerivative, QuaternionDot, QuaternionEphemeris, Spin,
-        SpinNutation, SpinNutationMom,
-    };
-
-    let state = match attitude_type {
-        AttitudeTypeType::Quaternion => {
-            AemAttitudeState::QuaternionEphemeris(QuaternionEphemeris {
-                epoch,
-                quaternion: Quaternion {
-                    q1: values[0],
-                    q2: values[1],
-                    q3: values[2],
-                    qc: values[3],
-                },
-            })
-        }
-        AttitudeTypeType::QuaternionDerivative => {
-            AemAttitudeState::QuaternionDerivative(QuaternionDerivative {
-                epoch,
-                quaternion: Quaternion {
-                    q1: values[0],
-                    q2: values[1],
-                    q3: values[2],
-                    qc: values[3],
-                },
-                quaternion_dot: QuaternionDot {
-                    q1_dot: QuaternionDotComponent {
-                        value: values[4],
-                        units: None,
-                    },
-                    q2_dot: QuaternionDotComponent {
-                        value: values[5],
-                        units: None,
-                    },
-                    q3_dot: QuaternionDotComponent {
-                        value: values[6],
-                        units: None,
-                    },
-                    qc_dot: QuaternionDotComponent {
-                        value: values[7],
-                        units: None,
-                    },
-                },
-            })
-        }
-        AttitudeTypeType::QuaternionAngVel => {
-            AemAttitudeState::QuaternionAngVel(QuaternionAngVel {
-                epoch,
-                quaternion: Quaternion {
-                    q1: values[0],
-                    q2: values[1],
-                    q3: values[2],
-                    qc: values[3],
-                },
-                ang_vel: AngVel {
-                    angvel_x: AngleRate {
-                        value: values[4],
-                        units: None,
-                    },
-                    angvel_y: AngleRate {
-                        value: values[5],
-                        units: None,
-                    },
-                    angvel_z: AngleRate {
-                        value: values[6],
-                        units: None,
-                    },
-                },
-            })
-        }
-        AttitudeTypeType::EulerAngle => AemAttitudeState::EulerAngle(EulerAngle {
-            epoch,
-            angle_1: Angle {
-                value: values[0],
-                units: None,
-            },
-            angle_2: Angle {
-                value: values[1],
-                units: None,
-            },
-            angle_3: Angle {
-                value: values[2],
-                units: None,
-            },
-        }),
-        AttitudeTypeType::EulerAngleDerivative => {
-            AemAttitudeState::EulerAngleDerivative(EulerAngleDerivative {
-                epoch,
-                angle_1: Angle {
-                    value: values[0],
-                    units: None,
-                },
-                angle_2: Angle {
-                    value: values[1],
-                    units: None,
-                },
-                angle_3: Angle {
-                    value: values[2],
-                    units: None,
-                },
-                angle_1_dot: AngleRate {
-                    value: values[3],
-                    units: None,
-                },
-                angle_2_dot: AngleRate {
-                    value: values[4],
-                    units: None,
-                },
-                angle_3_dot: AngleRate {
-                    value: values[5],
-                    units: None,
-                },
-            })
-        }
-        AttitudeTypeType::EulerAngleAngVel => {
-            AemAttitudeState::EulerAngleAngVel(EulerAngleAngVel {
-                epoch,
-                angle_1: Angle {
-                    value: values[0],
-                    units: None,
-                },
-                angle_2: Angle {
-                    value: values[1],
-                    units: None,
-                },
-                angle_3: Angle {
-                    value: values[2],
-                    units: None,
-                },
-                angvel_x: AngleRate {
-                    value: values[3],
-                    units: None,
-                },
-                angvel_y: AngleRate {
-                    value: values[4],
-                    units: None,
-                },
-                angvel_z: AngleRate {
-                    value: values[5],
-                    units: None,
-                },
-            })
-        }
-        AttitudeTypeType::Spin => AemAttitudeState::Spin(Spin {
-            epoch,
-            spin_alpha: Angle {
-                value: values[0],
-                units: None,
-            },
-            spin_delta: Angle {
-                value: values[1],
-                units: None,
-            },
-            spin_angle: Angle {
-                value: values[2],
-                units: None,
-            },
-            spin_angle_vel: AngleRate {
-                value: values[3],
-                units: None,
-            },
-        }),
-        AttitudeTypeType::SpinNutation => AemAttitudeState::SpinNutation(SpinNutation {
-            epoch,
-            spin_alpha: Angle {
-                value: values[0],
-                units: None,
-            },
-            spin_delta: Angle {
-                value: values[1],
-                units: None,
-            },
-            spin_angle: Angle {
-                value: values[2],
-                units: None,
-            },
-            spin_angle_vel: AngleRate {
-                value: values[3],
-                units: None,
-            },
-            nutation: Angle {
-                value: values[4],
-                units: None,
-            },
-            nutation_per: Duration {
-                value: values[5],
-                units: None,
-            },
-            nutation_phase: Angle {
-                value: values[6],
-                units: None,
-            },
-        }),
-        AttitudeTypeType::SpinNutationMom => AemAttitudeState::SpinNutationMom(SpinNutationMom {
-            epoch,
-            spin_alpha: Angle {
-                value: values[0],
-                units: None,
-            },
-            spin_delta: Angle {
-                value: values[1],
-                units: None,
-            },
-            spin_angle: Angle {
-                value: values[2],
-                units: None,
-            },
-            spin_angle_vel: AngleRate {
-                value: values[3],
-                units: None,
-            },
-            momentum_alpha: Angle {
-                value: values[4],
-                units: None,
-            },
-            momentum_delta: Angle {
-                value: values[5],
-                units: None,
-            },
-            nutation_vel: AngleRate {
-                value: values[6],
-                units: None,
-            },
-        }),
-    };
-
-    Ok(state)
-}
-
-fn values_from_content(
-    content: ccsds_ndm::common::AemAttitudeState,
-) -> (ccsds_ndm::types::CalendarEpoch, Vec<f64>) {
-    match content {
-        ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v) => (
-            v.epoch,
-            vec![
-                v.quaternion.q1,
-                v.quaternion.q2,
-                v.quaternion.q3,
-                v.quaternion.qc,
-            ],
-        ),
-        ccsds_ndm::common::AemAttitudeState::QuaternionDerivative(v) => (
-            v.epoch,
-            vec![
-                v.quaternion.q1,
-                v.quaternion.q2,
-                v.quaternion.q3,
-                v.quaternion.qc,
-                v.quaternion_dot.q1_dot.value,
-                v.quaternion_dot.q2_dot.value,
-                v.quaternion_dot.q3_dot.value,
-                v.quaternion_dot.qc_dot.value,
-            ],
-        ),
-        ccsds_ndm::common::AemAttitudeState::QuaternionAngVel(v) => (
-            v.epoch,
-            vec![
-                v.quaternion.q1,
-                v.quaternion.q2,
-                v.quaternion.q3,
-                v.quaternion.qc,
-                v.ang_vel.angvel_x.value,
-                v.ang_vel.angvel_y.value,
-                v.ang_vel.angvel_z.value,
-            ],
-        ),
-        ccsds_ndm::common::AemAttitudeState::EulerAngle(v) => (
-            v.epoch,
-            vec![v.angle_1.value, v.angle_2.value, v.angle_3.value],
-        ),
-        ccsds_ndm::common::AemAttitudeState::EulerAngleDerivative(v) => (
-            v.epoch,
-            vec![
-                v.angle_1.value,
-                v.angle_2.value,
-                v.angle_3.value,
-                v.angle_1_dot.value,
-                v.angle_2_dot.value,
-                v.angle_3_dot.value,
-            ],
-        ),
-        ccsds_ndm::common::AemAttitudeState::EulerAngleAngVel(v) => (
-            v.epoch,
-            vec![
-                v.angle_1.value,
-                v.angle_2.value,
-                v.angle_3.value,
-                v.angvel_x.value,
-                v.angvel_y.value,
-                v.angvel_z.value,
-            ],
-        ),
-        ccsds_ndm::common::AemAttitudeState::Spin(v) => (
-            v.epoch,
-            vec![
-                v.spin_alpha.value,
-                v.spin_delta.value,
-                v.spin_angle.value,
-                v.spin_angle_vel.value,
-            ],
-        ),
-        ccsds_ndm::common::AemAttitudeState::SpinNutation(v) => (
-            v.epoch,
-            vec![
-                v.spin_alpha.value,
-                v.spin_delta.value,
-                v.spin_angle.value,
-                v.spin_angle_vel.value,
-                v.nutation.value,
-                v.nutation_per.value,
-                v.nutation_phase.value,
-            ],
-        ),
-        ccsds_ndm::common::AemAttitudeState::SpinNutationMom(v) => (
-            v.epoch,
-            vec![
-                v.spin_alpha.value,
-                v.spin_delta.value,
-                v.spin_angle.value,
-                v.spin_angle_vel.value,
-                v.momentum_alpha.value,
-                v.momentum_delta.value,
-                v.nutation_vel.value,
-            ],
-        ),
-    }
-}
-
-fn attitude_type_from_content(content: &ccsds_ndm::common::AemAttitudeState) -> AttitudeTypeType {
-    match content {
-        ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(_) => AttitudeTypeType::Quaternion,
-        ccsds_ndm::common::AemAttitudeState::QuaternionDerivative(_) => {
-            AttitudeTypeType::QuaternionDerivative
-        }
-        ccsds_ndm::common::AemAttitudeState::QuaternionAngVel(_) => {
-            AttitudeTypeType::QuaternionAngVel
-        }
-        ccsds_ndm::common::AemAttitudeState::EulerAngle(_) => AttitudeTypeType::EulerAngle,
-        ccsds_ndm::common::AemAttitudeState::EulerAngleDerivative(_) => {
-            AttitudeTypeType::EulerAngleDerivative
-        }
-        ccsds_ndm::common::AemAttitudeState::EulerAngleAngVel(_) => {
-            AttitudeTypeType::EulerAngleAngVel
-        }
-        ccsds_ndm::common::AemAttitudeState::Spin(_) => AttitudeTypeType::Spin,
-        ccsds_ndm::common::AemAttitudeState::SpinNutation(_) => AttitudeTypeType::SpinNutation,
-        ccsds_ndm::common::AemAttitudeState::SpinNutationMom(_) => {
-            AttitudeTypeType::SpinNutationMom
-        }
-    }
 }
 
 /// Attitude Ephemeris Message (AEM).
@@ -1057,7 +685,7 @@ impl AemData {
         let mut attitude_type = None;
         let mut states = Vec::with_capacity(value.attitude_states.len());
         for state in value.attitude_states {
-            let this_type = attitude_type_from_content(&state);
+            let this_type = state.attitude_type();
             if attitude_type
                 .as_ref()
                 .is_some_and(|existing| existing != &this_type)
@@ -1067,7 +695,7 @@ impl AemData {
                 ));
             }
             attitude_type = Some(this_type);
-            let (epoch, values) = values_from_content(state);
+            let (epoch, values) = state.into_epoch_values();
             states.push(Py::new(py, AttitudeState { epoch, values })?);
         }
         Ok(Self {
@@ -1119,7 +747,14 @@ impl AemData {
         self.validate_widths(&values)?;
         let attitude_states = values
             .into_iter()
-            .map(|(epoch, values)| build_state_from_values(epoch, &values, &self.attitude_type))
+            .map(|(epoch, values)| {
+                ccsds_ndm::common::AemAttitudeState::from_values(
+                    epoch,
+                    &values,
+                    &self.attitude_type,
+                )
+                .ok_or_else(|| PyValueError::new_err("attitude state width changed"))
+            })
             .collect::<PyResult<Vec<_>>>()?;
         Ok(core_aem::AemData {
             comment: self.comment.clone(),

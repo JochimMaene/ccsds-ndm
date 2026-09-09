@@ -23,22 +23,8 @@ alone. It needs `TIME_SYSTEM`, `EPOCH_TZERO`, a MET/MRT reference event, SCLK pa
 
 ## OEM inventory
 
-| Location / XML name | XSD occurrence | Book meaning | Current representation | Python exposure | Proposed category |
-| --- | --- | --- | --- | --- | --- |
-| `header.creation_date` / `CREATION_DATE` | required `epochType` through the common ODM header | Absolute UTC creation time | `CalendarEpoch` | `str` | `CalendarEpoch` |
-| `metadata.ref_frame_epoch` / `REF_FRAME_EPOCH` | optional `epochType` | Absolute epoch when the frame definition needs one; selected time system | `Option<CalendarEpoch>` | `str | None` | `CalendarEpoch` plus segment context |
-| `metadata.start_time` / `START_TIME` | required `epochType` | Start of the total ephemeris/covariance span; interpretation follows `TIME_SYSTEM`, including MET/MRT rules | `Epoch` | `str` | contextual `Epoch` |
-| `metadata.useable_start_time` / `USEABLE_START_TIME` | optional `epochType` | Start of the usable ephemeris span under the segment time system | `Option<Epoch>` | `str | None` | contextual `Epoch` |
-| `metadata.useable_stop_time` / `USEABLE_STOP_TIME` | optional `epochType` | End of the usable ephemeris span under the segment time system | `Option<Epoch>` | `str | None` | contextual `Epoch` |
-| `metadata.stop_time` / `STOP_TIME` | required `epochType` | End of the total ephemeris/covariance span; interpretation follows `TIME_SYSTEM` | `Epoch` | `str` | contextual `Epoch` |
-| `data.state_vector[*].epoch` / `stateVector/EPOCH` | one required `epochType` per required `stateVector` | State time tag under the segment time system | `StateVectorAcc.epoch: Epoch` | `str` | contextual `Epoch` |
-| `data.covariance_matrix[*].epoch` / `covarianceMatrix/EPOCH` | required `epochType` in each optional matrix | Covariance time tag under the segment time system | `OemCovarianceMatrix.epoch: Epoch` | `str` | contextual `Epoch` |
-
-The OEM validator checks required structure, numeric state/covariance values, and the lexical
-branch validity of these contextual epochs: calendar fields must describe a real date/time, and
-numeric tags must be non-degenerate. It intentionally does not resolve `TIME_SYSTEM`, compare
-calendar and numeric values, or infer MET/MRT/SCLK/ICD reference events; those remain context that
-callers may supply for a future arithmetic or ordering API.
+The maintained OEM requirements and current absolute-time behavior are recorded in
+[`oem-3.0.md`](oem-3.0.md). This document retains only the more detailed OCM architecture audit.
 
 ## OCM metadata reference-epoch audit
 

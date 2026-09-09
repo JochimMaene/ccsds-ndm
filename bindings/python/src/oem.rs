@@ -24,90 +24,27 @@ fn build_covariance_matrix(
         epoch,
         cov_ref_frame,
         comment,
-        cx_x: PositionCovariance {
-            value: v[0],
-            units: None,
-        },
-        cy_x: PositionCovariance {
-            value: v[1],
-            units: None,
-        },
-        cy_y: PositionCovariance {
-            value: v[2],
-            units: None,
-        },
-        cz_x: PositionCovariance {
-            value: v[3],
-            units: None,
-        },
-        cz_y: PositionCovariance {
-            value: v[4],
-            units: None,
-        },
-        cz_z: PositionCovariance {
-            value: v[5],
-            units: None,
-        },
-        cx_dot_x: PositionVelocityCovariance {
-            value: v[6],
-            units: None,
-        },
-        cx_dot_y: PositionVelocityCovariance {
-            value: v[7],
-            units: None,
-        },
-        cx_dot_z: PositionVelocityCovariance {
-            value: v[8],
-            units: None,
-        },
-        cx_dot_x_dot: VelocityCovariance {
-            value: v[9],
-            units: None,
-        },
-        cy_dot_x: PositionVelocityCovariance {
-            value: v[10],
-            units: None,
-        },
-        cy_dot_y: PositionVelocityCovariance {
-            value: v[11],
-            units: None,
-        },
-        cy_dot_z: PositionVelocityCovariance {
-            value: v[12],
-            units: None,
-        },
-        cy_dot_x_dot: VelocityCovariance {
-            value: v[13],
-            units: None,
-        },
-        cy_dot_y_dot: VelocityCovariance {
-            value: v[14],
-            units: None,
-        },
-        cz_dot_x: PositionVelocityCovariance {
-            value: v[15],
-            units: None,
-        },
-        cz_dot_y: PositionVelocityCovariance {
-            value: v[16],
-            units: None,
-        },
-        cz_dot_z: PositionVelocityCovariance {
-            value: v[17],
-            units: None,
-        },
-        cz_dot_x_dot: VelocityCovariance {
-            value: v[18],
-            units: None,
-        },
-        cz_dot_y_dot: VelocityCovariance {
-            value: v[19],
-            units: None,
-        },
-        cz_dot_z_dot: VelocityCovariance {
-            value: v[20],
-            units: None,
-        },
+        cx_x: PositionCovariance::new(v[0], None),
+        cy_x: PositionCovariance::new(v[1], None),
+        cy_y: PositionCovariance::new(v[2], None),
+        cz_x: PositionCovariance::new(v[3], None),
+        cz_y: PositionCovariance::new(v[4], None),
+        cz_z: PositionCovariance::new(v[5], None),
+        cx_dot_x: PositionVelocityCovariance::new(v[6], None),
+        cx_dot_y: PositionVelocityCovariance::new(v[7], None),
+        cx_dot_z: PositionVelocityCovariance::new(v[8], None),
+        cx_dot_x_dot: VelocityCovariance::new(v[9], None),
+        cy_dot_x: PositionVelocityCovariance::new(v[10], None),
+        cy_dot_y: PositionVelocityCovariance::new(v[11], None),
+        cy_dot_z: PositionVelocityCovariance::new(v[12], None),
+        cy_dot_x_dot: VelocityCovariance::new(v[13], None),
+        cy_dot_y_dot: VelocityCovariance::new(v[14], None),
+        cz_dot_x: PositionVelocityCovariance::new(v[15], None),
+        cz_dot_y: PositionVelocityCovariance::new(v[16], None),
+        cz_dot_z: PositionVelocityCovariance::new(v[17], None),
+        cz_dot_x_dot: VelocityCovariance::new(v[18], None),
+        cz_dot_y_dot: VelocityCovariance::new(v[19], None),
+        cz_dot_z_dot: VelocityCovariance::new(v[20], None),
     }
 }
 
@@ -1170,53 +1107,9 @@ impl OemData {
                 let v: [f64; 21] = if shape.len() == 3 {
                     full_covariance_values(&cov_array, Some(i))?
                 } else if shape.len() == 2 && shape[1] == 21 {
-                    [
-                        array_view[[i, 0]],
-                        array_view[[i, 1]],
-                        array_view[[i, 2]],
-                        array_view[[i, 3]],
-                        array_view[[i, 4]],
-                        array_view[[i, 5]],
-                        array_view[[i, 6]],
-                        array_view[[i, 7]],
-                        array_view[[i, 8]],
-                        array_view[[i, 9]],
-                        array_view[[i, 10]],
-                        array_view[[i, 11]],
-                        array_view[[i, 12]],
-                        array_view[[i, 13]],
-                        array_view[[i, 14]],
-                        array_view[[i, 15]],
-                        array_view[[i, 16]],
-                        array_view[[i, 17]],
-                        array_view[[i, 18]],
-                        array_view[[i, 19]],
-                        array_view[[i, 20]],
-                    ]
+                    std::array::from_fn(|column| array_view[[i, column]])
                 } else if shape.len() == 1 {
-                    [
-                        array_view[[0]],
-                        array_view[[1]],
-                        array_view[[2]],
-                        array_view[[3]],
-                        array_view[[4]],
-                        array_view[[5]],
-                        array_view[[6]],
-                        array_view[[7]],
-                        array_view[[8]],
-                        array_view[[9]],
-                        array_view[[10]],
-                        array_view[[11]],
-                        array_view[[12]],
-                        array_view[[13]],
-                        array_view[[14]],
-                        array_view[[15]],
-                        array_view[[16]],
-                        array_view[[17]],
-                        array_view[[18]],
-                        array_view[[19]],
-                        array_view[[20]],
-                    ]
+                    std::array::from_fn(|column| array_view[[column]])
                 } else {
                     full_covariance_values(&cov_array, None)?
                 };

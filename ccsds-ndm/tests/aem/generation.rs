@@ -56,7 +56,7 @@ fn every_aem_attitude_choice_revalidates_edited_numeric_values() {
         unreachable!()
     };
     state.quaternion.q1 = f64::NAN;
-    cases.push(("Quaternion", repeated));
+    cases.push(("Q1", repeated));
 
     let base = Aem::from_xml(XML).unwrap();
     let mut value = base.clone();

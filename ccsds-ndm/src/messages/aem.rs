@@ -5,7 +5,11 @@
 mod kvn;
 mod xml;
 
-use crate::common::{AdmHeader, AemAttitudeState};
+use crate::common::{
+    AdmHeader, AemAttitudeState, AngVel, EulerAngle, EulerAngleAngVel, EulerAngleDerivative,
+    Quaternion, QuaternionAngVel, QuaternionDerivative, QuaternionDot, QuaternionEphemeris, Spin,
+    SpinNutation, SpinNutationMom,
+};
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::traits::Ndm;
@@ -587,7 +591,212 @@ pub struct AemData {
 }
 
 impl AemAttitudeState {
-    fn epoch(&self) -> &CalendarEpoch {
+    /// Builds a state when `values` has the width required by `attitude_type`.
+    /// Numeric validation remains the caller's responsibility.
+    pub fn from_values(
+        epoch: CalendarEpoch,
+        values: &[f64],
+        attitude_type: &AttitudeTypeType,
+    ) -> Option<Self> {
+        if values.len() != attitude_type.value_count() {
+            return None;
+        }
+        let angle = |index| Angle {
+            value: values[index],
+            units: None,
+        };
+        let rate = |index| AngleRate::new(values[index], None);
+        let quaternion = || Quaternion {
+            q1: values[0],
+            q2: values[1],
+            q3: values[2],
+            qc: values[3],
+        };
+        Some(match attitude_type {
+            AttitudeTypeType::Quaternion => Self::QuaternionEphemeris(QuaternionEphemeris {
+                epoch,
+                quaternion: quaternion(),
+            }),
+            AttitudeTypeType::QuaternionDerivative => {
+                Self::QuaternionDerivative(QuaternionDerivative {
+                    epoch,
+                    quaternion: quaternion(),
+                    quaternion_dot: QuaternionDot {
+                        q1_dot: QuaternionDotComponent::new(values[4], None),
+                        q2_dot: QuaternionDotComponent::new(values[5], None),
+                        q3_dot: QuaternionDotComponent::new(values[6], None),
+                        qc_dot: QuaternionDotComponent::new(values[7], None),
+                    },
+                })
+            }
+            AttitudeTypeType::QuaternionAngVel => Self::QuaternionAngVel(QuaternionAngVel {
+                epoch,
+                quaternion: quaternion(),
+                ang_vel: AngVel {
+                    angvel_x: rate(4),
+                    angvel_y: rate(5),
+                    angvel_z: rate(6),
+                },
+            }),
+            AttitudeTypeType::EulerAngle => Self::EulerAngle(EulerAngle {
+                epoch,
+                angle_1: angle(0),
+                angle_2: angle(1),
+                angle_3: angle(2),
+            }),
+            AttitudeTypeType::EulerAngleDerivative => {
+                Self::EulerAngleDerivative(EulerAngleDerivative {
+                    epoch,
+                    angle_1: angle(0),
+                    angle_2: angle(1),
+                    angle_3: angle(2),
+                    angle_1_dot: rate(3),
+                    angle_2_dot: rate(4),
+                    angle_3_dot: rate(5),
+                })
+            }
+            AttitudeTypeType::EulerAngleAngVel => Self::EulerAngleAngVel(EulerAngleAngVel {
+                epoch,
+                angle_1: angle(0),
+                angle_2: angle(1),
+                angle_3: angle(2),
+                angvel_x: rate(3),
+                angvel_y: rate(4),
+                angvel_z: rate(5),
+            }),
+            AttitudeTypeType::Spin => Self::Spin(Spin {
+                epoch,
+                spin_alpha: angle(0),
+                spin_delta: angle(1),
+                spin_angle: angle(2),
+                spin_angle_vel: rate(3),
+            }),
+            AttitudeTypeType::SpinNutation => Self::SpinNutation(SpinNutation {
+                epoch,
+                spin_alpha: angle(0),
+                spin_delta: angle(1),
+                spin_angle: angle(2),
+                spin_angle_vel: rate(3),
+                nutation: angle(4),
+                nutation_per: Duration {
+                    value: values[5],
+                    units: None,
+                },
+                nutation_phase: angle(6),
+            }),
+            AttitudeTypeType::SpinNutationMom => Self::SpinNutationMom(SpinNutationMom {
+                epoch,
+                spin_alpha: angle(0),
+                spin_delta: angle(1),
+                spin_angle: angle(2),
+                spin_angle_vel: rate(3),
+                momentum_alpha: angle(4),
+                momentum_delta: angle(5),
+                nutation_vel: rate(6),
+            }),
+        })
+    }
+
+    /// Returns the epoch and numeric columns, discarding unit attributes.
+    pub fn into_epoch_values(self) -> (CalendarEpoch, Vec<f64>) {
+        match self {
+            Self::QuaternionEphemeris(v) => (
+                v.epoch,
+                vec![
+                    v.quaternion.q1,
+                    v.quaternion.q2,
+                    v.quaternion.q3,
+                    v.quaternion.qc,
+                ],
+            ),
+            Self::QuaternionDerivative(v) => (
+                v.epoch,
+                vec![
+                    v.quaternion.q1,
+                    v.quaternion.q2,
+                    v.quaternion.q3,
+                    v.quaternion.qc,
+                    v.quaternion_dot.q1_dot.value,
+                    v.quaternion_dot.q2_dot.value,
+                    v.quaternion_dot.q3_dot.value,
+                    v.quaternion_dot.qc_dot.value,
+                ],
+            ),
+            Self::QuaternionAngVel(v) => (
+                v.epoch,
+                vec![
+                    v.quaternion.q1,
+                    v.quaternion.q2,
+                    v.quaternion.q3,
+                    v.quaternion.qc,
+                    v.ang_vel.angvel_x.value,
+                    v.ang_vel.angvel_y.value,
+                    v.ang_vel.angvel_z.value,
+                ],
+            ),
+            Self::EulerAngle(v) => (
+                v.epoch,
+                vec![v.angle_1.value, v.angle_2.value, v.angle_3.value],
+            ),
+            Self::EulerAngleDerivative(v) => (
+                v.epoch,
+                vec![
+                    v.angle_1.value,
+                    v.angle_2.value,
+                    v.angle_3.value,
+                    v.angle_1_dot.value,
+                    v.angle_2_dot.value,
+                    v.angle_3_dot.value,
+                ],
+            ),
+            Self::EulerAngleAngVel(v) => (
+                v.epoch,
+                vec![
+                    v.angle_1.value,
+                    v.angle_2.value,
+                    v.angle_3.value,
+                    v.angvel_x.value,
+                    v.angvel_y.value,
+                    v.angvel_z.value,
+                ],
+            ),
+            Self::Spin(v) => (
+                v.epoch,
+                vec![
+                    v.spin_alpha.value,
+                    v.spin_delta.value,
+                    v.spin_angle.value,
+                    v.spin_angle_vel.value,
+                ],
+            ),
+            Self::SpinNutation(v) => (
+                v.epoch,
+                vec![
+                    v.spin_alpha.value,
+                    v.spin_delta.value,
+                    v.spin_angle.value,
+                    v.spin_angle_vel.value,
+                    v.nutation.value,
+                    v.nutation_per.value,
+                    v.nutation_phase.value,
+                ],
+            ),
+            Self::SpinNutationMom(v) => (
+                v.epoch,
+                vec![
+                    v.spin_alpha.value,
+                    v.spin_delta.value,
+                    v.spin_angle.value,
+                    v.spin_angle_vel.value,
+                    v.momentum_alpha.value,
+                    v.momentum_delta.value,
+                    v.nutation_vel.value,
+                ],
+            ),
+        }
+    }
+
+    pub fn epoch(&self) -> &CalendarEpoch {
         match self {
             Self::QuaternionEphemeris(v) => &v.epoch,
             Self::QuaternionDerivative(v) => &v.epoch,
@@ -601,34 +810,25 @@ impl AemAttitudeState {
         }
     }
 
-    fn matches_type(&self, attitude_type: &AttitudeTypeType) -> bool {
-        matches!(
-            (self, attitude_type),
-            (Self::QuaternionEphemeris(_), AttitudeTypeType::Quaternion)
-                | (
-                    Self::QuaternionDerivative(_),
-                    AttitudeTypeType::QuaternionDerivative
-                )
-                | (
-                    Self::QuaternionAngVel(_),
-                    AttitudeTypeType::QuaternionAngVel
-                )
-                | (Self::EulerAngle(_), AttitudeTypeType::EulerAngle)
-                | (
-                    Self::EulerAngleDerivative(_),
-                    AttitudeTypeType::EulerAngleDerivative
-                )
-                | (
-                    Self::EulerAngleAngVel(_),
-                    AttitudeTypeType::EulerAngleAngVel
-                )
-                | (Self::Spin(_), AttitudeTypeType::Spin)
-                | (Self::SpinNutation(_), AttitudeTypeType::SpinNutation)
-                | (Self::SpinNutationMom(_), AttitudeTypeType::SpinNutationMom)
-        )
+    pub fn attitude_type(&self) -> AttitudeTypeType {
+        match self {
+            Self::QuaternionEphemeris(_) => AttitudeTypeType::Quaternion,
+            Self::QuaternionDerivative(_) => AttitudeTypeType::QuaternionDerivative,
+            Self::QuaternionAngVel(_) => AttitudeTypeType::QuaternionAngVel,
+            Self::EulerAngle(_) => AttitudeTypeType::EulerAngle,
+            Self::EulerAngleDerivative(_) => AttitudeTypeType::EulerAngleDerivative,
+            Self::EulerAngleAngVel(_) => AttitudeTypeType::EulerAngleAngVel,
+            Self::Spin(_) => AttitudeTypeType::Spin,
+            Self::SpinNutation(_) => AttitudeTypeType::SpinNutation,
+            Self::SpinNutationMom(_) => AttitudeTypeType::SpinNutationMom,
+        }
     }
 
-    fn validate_state(&self) -> Result<()> {
+    fn matches_type(&self, attitude_type: &AttitudeTypeType) -> bool {
+        self.attitude_type() == *attitude_type
+    }
+
+    fn validate_values(&self) -> Result<()> {
         let angles = |values: &[(&'static str, f64)]| -> Result<()> {
             for (name, value) in values {
                 Angle::validate_value(*value, name)?;
@@ -651,11 +851,9 @@ impl AemAttitudeState {
         };
 
         match self {
-            Self::QuaternionEphemeris(value) => {
-                crate::traits::Validate::validate(&value.quaternion)
-            }
+            Self::QuaternionEphemeris(value) => value.quaternion.validate_components(),
             Self::QuaternionDerivative(value) => {
-                crate::traits::Validate::validate(&value.quaternion)?;
+                value.quaternion.validate_components()?;
                 finite(&[
                     ("Q1_DOT", value.quaternion_dot.q1_dot.value),
                     ("Q2_DOT", value.quaternion_dot.q2_dot.value),
@@ -664,7 +862,7 @@ impl AemAttitudeState {
                 ])
             }
             Self::QuaternionAngVel(value) => {
-                crate::traits::Validate::validate(&value.quaternion)?;
+                value.quaternion.validate_components()?;
                 finite(&[
                     ("ANGVEL_X", value.ang_vel.angvel_x.value),
                     ("ANGVEL_Y", value.ang_vel.angvel_y.value),
@@ -732,6 +930,20 @@ impl AemAttitudeState {
                     ("NUTATION_VEL", value.nutation_vel.value),
                 ])
             }
+        }
+    }
+
+    fn validate_state(&self) -> Result<()> {
+        self.validate_values()?;
+        match self {
+            Self::QuaternionEphemeris(value) => {
+                crate::traits::Validate::validate(&value.quaternion)
+            }
+            Self::QuaternionDerivative(value) => {
+                crate::traits::Validate::validate(&value.quaternion)
+            }
+            Self::QuaternionAngVel(value) => crate::traits::Validate::validate(&value.quaternion),
+            _ => Ok(()),
         }
     }
 }

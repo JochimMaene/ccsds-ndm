@@ -96,25 +96,6 @@ fn create_test_oem(num_states: usize) -> Oem {
     }
 }
 
-// --- Core OEM benchmarks (original) ---
-
-fn bench_parse_kvn(c: &mut Criterion) {
-    let oem = create_test_oem(50000);
-    let kvn_data = oem.to_kvn().unwrap();
-
-    c.bench_function("kvn_parse", |b| {
-        b.iter(|| Oem::from_kvn(black_box(&kvn_data)).unwrap())
-    });
-}
-
-fn bench_generate_kvn(c: &mut Criterion) {
-    let oem = create_test_oem(50000);
-
-    c.bench_function("kvn_generate", |b| {
-        b.iter(|| black_box(&oem).to_kvn().unwrap())
-    });
-}
-
 fn bench_generate_kvn_rounding(c: &mut Criterion) {
     let mut oem = create_test_oem(50000);
     for state in &mut oem.body.segment[0].data.state_vector {
@@ -426,8 +407,6 @@ fn bench_micro(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    bench_parse_kvn,
-    bench_generate_kvn,
     bench_generate_kvn_rounding,
     bench_parse_opm,
     bench_parse_opm_failures,

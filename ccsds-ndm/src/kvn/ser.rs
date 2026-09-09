@@ -20,10 +20,6 @@ pub(crate) struct OdmFloat(f64);
 const MAX_MAGNITUDE: f64 = f64::from_bits(f64::MAX.to_bits() - 2);
 
 impl OdmFloat {
-    pub(crate) const fn new(value: f64) -> Self {
-        Self(value)
-    }
-
     /// Report whether `value` has a CCSDS spelling that reads back as a finite number.
     pub(crate) const fn is_valid(value: f64) -> bool {
         value.is_finite() && value.abs() <= MAX_MAGNITUDE
