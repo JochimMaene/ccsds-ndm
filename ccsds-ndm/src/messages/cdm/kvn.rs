@@ -1666,62 +1666,28 @@ MESSAGE_ID = MSG-001
         }
     }
 
+    /// A CDM describes exactly two objects, so a message truncated before the second one must be
+    /// refused. Truncating a shipped fixture keeps the first segment byte-for-byte valid, leaving
+    /// the missing second segment as the only reason the parse can fail.
     #[test]
     fn validate_exactly_two_segments() {
-        // Build KVN with only one segment explicitly
-        let kvn = r###"CCSDS_CDM_VERS = 1.0
-CREATION_DATE = 2025-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_FOR = TEST_SAT
-MESSAGE_ID = MSG-ONE
+        const FIXTURE: &str = include_str!("../../../data/kvn/cdm_362.kvn");
+        let first_segment_only: Vec<&str> = FIXTURE
+            .lines()
+            .take_while(|line| !line.starts_with("OBJECT = OBJECT2"))
+            .collect();
 
-TCA = 2025-01-02T12:00:00
-MISS_DISTANCE = 100.0 [m]
-SCREEN_VOLUME_SHAPE = BOX
-OBJECT = OBJECT1
-OBJECT_DESIGNATOR = 00001
-CATALOG_NAME = CAT
-OBJECT_NAME = OBJ1
-INTERNATIONAL_DESIGNATOR = 1998-067A
-OBJECT_TYPE = PAYLOAD
-EPHEMERIS_NAME = EPH1
-COVARIANCE_METHOD = CALCULATED
-MANEUVERABLE = YES
-REF_FRAME = EME2000
-
-X = 1.0 [km]
-Y = 2.0 [km]
-Z = 3.0 [km]
-X_DOT = 0.1 [km/s]
-Y_DOT = 0.2 [km/s]
-Z_DOT = 0.3 [km/s]
-
-CR_R = 1.0 [m**2]
-CT_R = 0.0 [m**2]
-CT_T = 1.0 [m**2]
-CN_R = 0.0 [m**2]
-CN_T = 0.0 [m**2]
-CN_N = 1.0 [m**2]
-CRDOT_R = 0.0 [m**2/s]
-CRDOT_T = 0.0 [m**2/s]
-CRDOT_N = 0.0 [m**2/s]
-CRDOT_RDOT = 1.0 [m**2/s**2]
-CTDOT_R = 0.0 [m**2/s]
-CTDOT_T = 0.0 [m**2/s]
-CTDOT_N = 0.0 [m**2/s]
-CTDOT_RDOT = 0.0 [m**2/s**2]
-CTDOT_TDOT = 1.0 [m**2/s**2]
-CNDOT_R = 0.0 [m**2/s]
-CNDOT_T = 0.0 [m**2/s]
-CNDOT_N = 0.0 [m**2/s]
-CNDOT_RDOT = 0.0 [m**2/s**2]
-CNDOT_TDOT = 0.0 [m**2/s**2]
-CNDOT_NDOT = 1.0 [m**2/s**2]
-"###;
-        let err = Cdm::from_kvn(kvn).unwrap_err();
-        if let CcsdsNdmError::Validation(_) = err {
-            // expected
-        }
+        Cdm::from_kvn(FIXTURE).expect("fixture with both segments must parse");
+        let error = Cdm::from_kvn(&format!("{}\n", first_segment_only.join("\n")))
+            .expect_err("single-segment CDM accepted");
+        assert!(
+            matches!(
+                &error,
+                CcsdsNdmError::Validation(validation)
+                    if matches!(&**validation, ValidationError::MissingRequiredField { field, .. } if field == "OBJECT")
+            ),
+            "single-segment CDM was refused for an unrelated reason: {error}"
+        );
     }
 
     #[test]

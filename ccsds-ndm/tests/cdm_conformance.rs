@@ -5,7 +5,7 @@ use ccsds_ndm::messages::cdm::Cdm;
 use ccsds_ndm::Ndm;
 
 mod common;
-use common::validate_xml;
+use common::{assert_rejects, validate_xml};
 
 const KVN: &str = include_str!("../data/kvn/cdm_363.kvn");
 const XML: &str = include_str!("../data/xml/cdm_44.xml");
@@ -27,16 +27,7 @@ fn edited_shared_od_parameters_are_revalidated_in_cdm() {
         .unwrap()
         .value = f64::NAN;
 
-    let error = message.validate().unwrap_err();
-    assert!(error.to_string().contains("WEIGHTED_RMS"), "{error}");
-    assert!(message.to_kvn().is_err());
-    assert!(message.to_xml().is_err());
-
-    let mut output = Vec::new();
-    assert!(message.write_kvn_to(&mut output).is_err());
-    assert!(output.is_empty());
-    assert!(message.write_xml_to(&mut output).is_err());
-    assert!(output.is_empty());
+    assert_rejects(&message, "WEIGHTED_RMS");
 }
 
 #[test]
@@ -86,17 +77,7 @@ fn edited_cdm_numeric_values_are_validated_before_any_output() {
                 }
             };
             *target = value;
-            let error = message
-                .validate()
-                .expect_err("invalid edited value accepted");
-            assert!(error.to_string().contains(field), "{field}: {error}");
-            assert!(message.to_xml().is_err(), "{field}={value}");
-            assert!(message.to_kvn().is_err(), "{field}={value}");
-            let mut output = Vec::new();
-            assert!(message.write_xml_to(&mut output).is_err());
-            assert!(output.is_empty());
-            assert!(message.write_kvn_to(&mut output).is_err());
-            assert!(output.is_empty());
+            assert_rejects(&message, field);
         }
     }
     for probability in [0.0, 1.0] {
