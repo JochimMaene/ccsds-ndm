@@ -233,10 +233,7 @@ fn kvn_rejects_ephemeris_records_packed_onto_one_line() {
         ),
         (
             "record followed by a bare epoch",
-            format!("{record} {record}").replace(
-                " 2789.619 -280.045 -1746.755 4.73372 -2.49586 -1.04195\n",
-                "\n",
-            ),
+            format!("{record} 2019-12-18T12:00:30.331"),
         ),
     ] {
         assert!(
@@ -245,19 +242,29 @@ fn kvn_rejects_ephemeris_records_packed_onto_one_line() {
         );
     }
 
-    let mut line = String::new();
-    for minute in 0..8 {
-        line.push_str(&format!("2019-001T00:0{minute}:00 1 2 3 4 5 6 "));
-    }
-    let packed = source.replace(record, line.trim_end());
+    // `max_records` counts ephemeris lines, so the fixture must pass at exactly its own record
+    // count and fail one below it; a packed line can no longer inflate that count unnoticed.
+    let record_count = Oem::from_kvn(source)
+        .expect("fixture should parse")
+        .body
+        .segment
+        .iter()
+        .map(|segment| segment.data.state_vector.len())
+        .sum::<usize>();
+    ccsds_ndm::from_str_with_options(
+        source,
+        None,
+        &ParseOptions::default().with_max_records(record_count),
+    )
+    .expect("fixture should pass a limit equal to its record count");
     assert!(
         ccsds_ndm::from_str_with_options(
-            &packed,
+            source,
             None,
-            &ParseOptions::default().with_max_records(2)
+            &ParseOptions::default().with_max_records(record_count - 1),
         )
         .is_err(),
-        "packed records bypassed the max_records limit"
+        "KVN ephemeris lines were not counted against max_records"
     );
 }
 
