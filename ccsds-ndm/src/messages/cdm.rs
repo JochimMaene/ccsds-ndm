@@ -147,9 +147,7 @@ pub struct CdmHeader {
 
 impl Cdm {
     pub fn validate(&self) -> Result<()> {
-        self.header.validate()?;
-        self.body.validate()?;
-        Ok(())
+        crate::traits::Validate::validate(self)
     }
 }
 
