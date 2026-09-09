@@ -6,6 +6,7 @@ use crate::common::parse_yes_no;
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::tdm as core_tdm;
 use ccsds_ndm::types::{self as core_types};
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -38,6 +39,7 @@ use std::str::FromStr;
 /// body : TdmBody
 ///     The message body containing segments.
 ///     (Mandatory)
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct Tdm {
     id: Option<String>,
@@ -71,6 +73,7 @@ impl Tdm {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Tdm {
     #[new]
@@ -163,6 +166,7 @@ impl Tdm {
     /// Shortcut to access segments directly from the body.
     ///
     /// :type: list[TdmSegment]
+    #[gen_stub(override_return_type(type_repr="list[TdmSegment]"))]
     #[getter]
     fn get_segments(&self, py: Python<'_>) -> Py<PyList> {
         self.body.borrow(py).segments.clone_ref(py)
@@ -212,12 +216,12 @@ impl Tdm {
     }
 
     /// Atomically write this TDM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Tdm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to validated KVN or XML.
-    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
@@ -242,12 +246,14 @@ impl Tdm {
 /// comment : list[str], optional
 ///     Comments.
 ///     (Optional)
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct TdmHeader {
     pub inner: core_tdm::TdmHeader,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TdmHeader {
     #[new]
@@ -354,6 +360,7 @@ impl TdmHeader {
 /// ----------
 /// segments : list[TdmSegment]
 ///     List of data segments.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct TdmBody {
     segments: Py<PyList>,
@@ -390,6 +397,7 @@ impl TdmBody {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TdmBody {
     #[new]
@@ -409,15 +417,18 @@ impl TdmBody {
     /// Each segment consists of a Metadata Section and a Data Section.
     ///
     /// :type: list[TdmSegment]
+    #[gen_stub(override_return_type(type_repr="list[TdmSegment]"))]
     #[getter]
     fn get_segments(&self, py: Python<'_>) -> Py<PyList> {
         self.segments.clone_ref(py)
     }
 
     #[setter]
-    fn set_segments(&mut self, py: Python<'_>, value: Vec<Py<TdmSegment>>) -> PyResult<()> {
-        self.segments = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_segments(&mut self, value: Vec<Py<TdmSegment>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.segments = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 }
 
@@ -438,6 +449,7 @@ impl TdmBody {
 /// data : TdmData
 ///     Segment data.
 ///     (Mandatory)
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct TdmSegment {
     metadata: Py<TdmMetadata>,
@@ -465,6 +477,7 @@ impl TdmSegment {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TdmSegment {
     #[new]
@@ -527,12 +540,14 @@ impl TdmSegment {
 /// -------------------
 /// Many optional parameters are available to describe the tracking configuration,
 /// signal path, frequencies, and corrections. See CCSDS TDM Blue Book for full details.
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct TdmMetadata {
     pub inner: core_tdm::TdmMetadata,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TdmMetadata {
     #[new]
@@ -1818,6 +1833,7 @@ impl TdmMetadata {
 /// comment : list[str], optional
 ///     Comments in the data section.
 ///     (Optional)
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct TdmData {
     comment: Vec<String>,
@@ -1861,6 +1877,7 @@ impl TdmData {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TdmData {
     #[new]
@@ -1896,15 +1913,18 @@ impl TdmData {
     /// Tracking data records.
     ///
     /// :type: list[TdmObservation]
+    #[gen_stub(override_return_type(type_repr="list[TdmObservation]"))]
     #[getter]
     fn get_observations(&self, py: Python<'_>) -> Py<PyList> {
         self.observations.clone_ref(py)
     }
 
     #[setter]
-    fn set_observations(&mut self, py: Python<'_>, value: Vec<Py<TdmObservation>>) -> PyResult<()> {
-        self.observations = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_observations(&mut self, value: Vec<Py<TdmObservation>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.observations = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 }
 
@@ -1924,12 +1944,14 @@ impl TdmData {
 ///     Tracking observable value. Note: For phase counts that require full precision strings,
 ///     use internal representation handling (this constructor takes float for simplicity,
 ///     but the object can hold string representations internally).
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct TdmObservation {
     pub inner: core_tdm::TdmObservation,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TdmObservation {
     #[new]
@@ -1998,6 +2020,7 @@ impl TdmObservation {
     }
 }
 
+#[gen_stub_pyclass_enum]
 #[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq, Copy)]
 pub enum TdmMode {
@@ -2005,6 +2028,7 @@ pub enum TdmMode {
     SingleDiff,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TdmMode {
     fn __str__(&self) -> &'static str {
@@ -2031,6 +2055,7 @@ pub fn parse_tdm_mode(ob: &Bound<'_, PyAny>) -> PyResult<core_types::TdmMode> {
     }
 }
 
+#[gen_stub_pyclass_enum]
 #[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq, Copy)]
 pub enum TdmPath {
@@ -2039,6 +2064,7 @@ pub enum TdmPath {
     Path3,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TdmPath {
     fn __str__(&self) -> &'static str {

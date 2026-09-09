@@ -6,6 +6,7 @@ use crate::common::{OdmHeader, StateVector};
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::opm as core_opm;
 use ccsds_ndm::types::{Angle, Distance, Gm, Inclination};
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -24,6 +25,7 @@ use pyo3::types::PyList;
 ///     The message header.
 /// segment : OpmSegment
 ///     The data segment.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct Opm {
     id: Option<String>,
@@ -59,6 +61,7 @@ impl Opm {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Opm {
     #[new]
@@ -174,12 +177,12 @@ impl Opm {
     }
 
     /// Atomically write this OPM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Opm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to KVN or XML after mandatory CCSDS validation.
-    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
@@ -194,6 +197,7 @@ impl Opm {
 ///     Segment metadata.
 /// data : OpmData
 ///     Segment data.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct OpmSegment {
     metadata: Py<OpmMetadata>,
@@ -221,6 +225,7 @@ impl OpmSegment {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OpmSegment {
     /// Create a new OPM Segment.
@@ -290,12 +295,14 @@ impl OpmSegment {
 ///     Epoch of the reference frame, if not intrinsic to the definition (ISO 8601).
 /// comment : list[str], optional
 ///     Comments.
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OpmMetadata {
     pub inner: core_opm::OpmMetadata,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OpmMetadata {
     #[new]
@@ -521,12 +528,14 @@ impl OpmMetadata {
 ///     True anomaly. Units: deg.
 /// mean_anomaly : float or None
 ///     Mean anomaly. Units: deg.
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct KeplerianElements {
     pub inner: core_opm::KeplerianElements,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl KeplerianElements {
     #[new]
@@ -795,12 +804,14 @@ impl KeplerianElements {
 /// cx_x : float
 ///     Position X covariance [1,1]. Units: km².
 ///     ... (see Parameters for full list of attributes with units)
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OpmCovarianceMatrix {
     pub inner: ccsds_ndm::common::OpmCovarianceMatrix,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OpmCovarianceMatrix {
     #[new]
@@ -1284,6 +1295,7 @@ impl OpmCovarianceMatrix {
 /// ----------
 /// state_vector : StateVector
 ///     State vector.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct OpmData {
     comment: Vec<String>,
@@ -1372,6 +1384,7 @@ impl OpmData {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OpmData {
     #[new]
@@ -1479,6 +1492,7 @@ impl OpmData {
     /// Maneuver parameters.
     ///
     /// :type: list[OpmManeuverParameters]
+    #[gen_stub(override_return_type(type_repr="list[OpmManeuverParameters]"))]
     #[getter]
     fn get_maneuver_parameters(&self, py: Python<'_>) -> Py<PyList> {
         self.maneuver_parameters.clone_ref(py)
@@ -1487,11 +1501,12 @@ impl OpmData {
     #[setter]
     fn set_maneuver_parameters(
         &mut self,
-        py: Python<'_>,
         value: Vec<Py<OpmManeuverParameters>>,
     ) -> PyResult<()> {
-        self.maneuver_parameters = PyList::new(py, value)?.unbind();
-        Ok(())
+        Python::attach(|py| {
+            self.maneuver_parameters = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// User defined parameters.
@@ -1531,12 +1546,14 @@ impl OpmData {
 ///     Velocity change in 2nd axis (km/s).
 /// man_dv_3 : float
 ///     Velocity change in 3rd axis (km/s).
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OpmManeuverParameters {
     pub inner: core_opm::ManeuverParameters,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OpmManeuverParameters {
     #[new]

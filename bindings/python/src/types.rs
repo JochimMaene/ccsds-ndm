@@ -11,6 +11,7 @@
 // Default units are documented in the .pyi stub files.
 
 use ccsds_ndm::types as core_types;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
@@ -49,12 +50,14 @@ pub fn parse_relative_time(s: &str) -> PyResult<core_types::RelativeTime> {
 ///     A dictionary of user-defined parameters and their values.
 /// comment : list[str], optional
 ///     Comments.
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone, Default)]
 pub struct UserDefined {
     pub inner: core_types::UserDefined,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl UserDefined {
     /// Create a new UserDefined object.

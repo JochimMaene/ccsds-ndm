@@ -6,6 +6,7 @@ use crate::attitude::{AngVelState, EulerAngleState, InertiaState, QuaternionStat
 use crate::common::AdmHeader;
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::apm as core_apm;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
@@ -17,6 +18,7 @@ use pyo3::types::PyList;
 ///
 /// The APM requires the use of a propagation technique to determine the attitude state at
 /// times different from the specified epoch.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct Apm {
     id: Option<String>,
@@ -52,6 +54,7 @@ impl Apm {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Apm {
     #[new]
@@ -139,7 +142,7 @@ impl Apm {
     }
 
     /// Serialize to validated KVN or XML.
-    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 
@@ -171,11 +174,12 @@ impl Apm {
     }
 
     /// Atomically write this APM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Apm(self.to_core(py)?), &path, format)
     }
 }
 
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct ApmSegment {
     metadata: Py<ApmMetadata>,
@@ -203,6 +207,7 @@ impl ApmSegment {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl ApmSegment {
     #[new]
@@ -238,12 +243,14 @@ impl ApmSegment {
 }
 
 /// APM Metadata Section.
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct ApmMetadata {
     pub inner: core_apm::ApmMetadata,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl ApmMetadata {
     #[new]
@@ -373,6 +380,7 @@ impl ApmMetadata {
 }
 
 /// APM Data Section.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct ApmData {
     comment: Vec<String>,
@@ -454,6 +462,7 @@ impl ApmData {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl ApmData {
     #[new]
@@ -495,6 +504,7 @@ impl ApmData {
     /// (See annex F for conventions and further detail.)
     ///
     /// :type: list[QuaternionState]
+    #[gen_stub(override_return_type(type_repr="list[QuaternionState]"))]
     #[getter]
     fn get_quaternion_state(&self, py: Python<'_>) -> Py<PyList> {
         self.quaternion_state.clone_ref(py)
@@ -503,17 +513,19 @@ impl ApmData {
     #[setter]
     fn set_quaternion_state(
         &mut self,
-        py: Python<'_>,
         value: Vec<Py<QuaternionState>>,
     ) -> PyResult<()> {
-        self.quaternion_state = PyList::new(py, value)?.unbind();
-        Ok(())
+        Python::attach(|py| {
+            self.quaternion_state = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Euler angle elements. All mandatory elements of the logical block are to be provided if the
     /// block is present. (See annex F for conventions and further detail.)
     ///
     /// :type: list[EulerAngleState]
+    #[gen_stub(override_return_type(type_repr="list[EulerAngleState]"))]
     #[getter]
     fn get_euler_angle_state(&self, py: Python<'_>) -> Py<PyList> {
         self.euler_angle_state.clone_ref(py)
@@ -522,16 +534,18 @@ impl ApmData {
     #[setter]
     fn set_euler_angle_state(
         &mut self,
-        py: Python<'_>,
         value: Vec<Py<EulerAngleState>>,
     ) -> PyResult<()> {
-        self.euler_angle_state = PyList::new(py, value)?.unbind();
-        Ok(())
+        Python::attach(|py| {
+            self.euler_angle_state = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Angular velocity vector.
     ///
     /// :type: list[AngVelState]
+    #[gen_stub(override_return_type(type_repr="list[AngVelState]"))]
     #[getter]
     fn get_angular_velocity(&self, py: Python<'_>) -> Py<PyList> {
         self.angular_velocity.clone_ref(py)
@@ -540,11 +554,12 @@ impl ApmData {
     #[setter]
     fn set_angular_velocity(
         &mut self,
-        py: Python<'_>,
         value: Vec<Py<AngVelState>>,
     ) -> PyResult<()> {
-        self.angular_velocity = PyList::new(py, value)?.unbind();
-        Ok(())
+        Python::attach(|py| {
+            self.angular_velocity = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Spin. All mandatory elements are to be provided if the block is present. (See annex F for
@@ -553,15 +568,18 @@ impl ApmData {
     /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: list[SpinState]
+    #[gen_stub(override_return_type(type_repr="list[SpinState]"))]
     #[getter]
     fn get_spin(&self, py: Python<'_>) -> Py<PyList> {
         self.spin.clone_ref(py)
     }
 
     #[setter]
-    fn set_spin(&mut self, py: Python<'_>, value: Vec<Py<SpinState>>) -> PyResult<()> {
-        self.spin = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_spin(&mut self, value: Vec<Py<SpinState>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.spin = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Inertia. All mandatory elements are to be provided if the block is present. (See annex F
@@ -570,20 +588,24 @@ impl ApmData {
     /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: list[InertiaState]
+    #[gen_stub(override_return_type(type_repr="list[InertiaState]"))]
     #[getter]
     fn get_inertia(&self, py: Python<'_>) -> Py<PyList> {
         self.inertia.clone_ref(py)
     }
 
     #[setter]
-    fn set_inertia(&mut self, py: Python<'_>, value: Vec<Py<InertiaState>>) -> PyResult<()> {
-        self.inertia = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_inertia(&mut self, value: Vec<Py<InertiaState>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.inertia = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Maneuver Parameters.
     ///
     /// :type: list[ApmManeuverParameters]
+    #[gen_stub(override_return_type(type_repr="list[ApmManeuverParameters]"))]
     #[getter]
     fn get_maneuver_parameters(&self, py: Python<'_>) -> Py<PyList> {
         self.maneuver_parameters.clone_ref(py)
@@ -592,11 +614,12 @@ impl ApmData {
     #[setter]
     fn set_maneuver_parameters(
         &mut self,
-        py: Python<'_>,
         value: Vec<Py<ApmManeuverParameters>>,
     ) -> PyResult<()> {
-        self.maneuver_parameters = PyList::new(py, value)?.unbind();
-        Ok(())
+        Python::attach(|py| {
+            self.maneuver_parameters = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Epoch of the attitude elements and optional logical blocks.
@@ -635,12 +658,14 @@ impl ApmData {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct ApmManeuverParameters {
     pub inner: ccsds_ndm::common::AttManeuverState,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl ApmManeuverParameters {
     #[new]

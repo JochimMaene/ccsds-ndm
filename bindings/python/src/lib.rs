@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::Message;
+use pyo3_stub_gen::derive::gen_stub_pyfunction;
 use pyo3::exceptions::PyNotImplementedError;
 use pyo3::prelude::*;
 use pyo3::Py;
@@ -105,6 +106,7 @@ pub(crate) fn message_to_py(py: Python<'_>, message: Message) -> PyResult<Py<PyA
 /// ------
 /// ValueError
 ///     If the input is invalid or unsupported.
+#[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (data, format=None, *, max_input_bytes=None, max_records=None))]
 fn from_str(
@@ -131,6 +133,7 @@ fn from_str(
 /// -------
 /// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, CombinedNdm, Aem, Apm, Acm]
 ///     The parsed NDM object.
+#[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
 fn from_file(
@@ -148,11 +151,12 @@ fn from_file(
 }
 
 /// Convert any recognized NDM message between KVN and XML through the shared generation gate.
+#[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (data, to_format, *, max_input_bytes=None, max_records=None))]
 fn convert(
     data: &str,
-    to_format: &str,
+    #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] to_format: &str,
     max_input_bytes: Option<usize>,
     max_records: Option<usize>,
 ) -> PyResult<String> {
@@ -162,12 +166,13 @@ fn convert(
 }
 
 /// Convert any recognized NDM file and atomically replace the destination on success.
+#[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (source_path, destination_path, to_format, *, max_input_bytes=None, max_records=None))]
 fn convert_file(
     source_path: PathBuf,
     destination_path: PathBuf,
-    to_format: &str,
+    #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] to_format: &str,
     max_input_bytes: Option<usize>,
     max_records: Option<usize>,
 ) -> PyResult<()> {
@@ -326,3 +331,5 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     Ok(())
 }
+
+pyo3_stub_gen::define_stub_info_gatherer!(stub_info);

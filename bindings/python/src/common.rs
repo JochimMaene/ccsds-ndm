@@ -5,6 +5,7 @@
 use crate::types::{parse_calendar_epoch, parse_epoch};
 use ccsds_ndm::common as core_common;
 use ccsds_ndm::types::{Acc, InterpolationDegree, Position, Velocity};
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::str::FromStr;
@@ -39,12 +40,14 @@ pub(crate) fn parse_interpolation_degree(
 ///     ID that uniquely identifies a message from a given originator.
 /// comment : list of str, optional
 ///     Comments.
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OdmHeader {
     pub inner: core_common::OdmHeader,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OdmHeader {
     #[new]
@@ -165,12 +168,14 @@ impl OdmHeader {
 }
 
 /// Represents the `admHeader` complex type from the XSD.
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AdmHeader {
     pub inner: core_common::AdmHeader,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AdmHeader {
     #[new]
@@ -313,12 +318,14 @@ impl AdmHeader {
 ///     Acceleration vector Y-component (km/s²).
 /// z_ddot : float, optional
 ///     Acceleration vector Z-component (km/s²).
+#[gen_stub_pyclass]
 #[pyclass(from_py_object, name = "StateVectorAcc")]
 #[derive(Clone)]
 pub struct StateVectorAcc {
     pub inner: core_common::StateVectorAcc,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl StateVectorAcc {
     #[new]
@@ -583,12 +590,14 @@ impl StateVectorAcc {
 ///     Velocity vector Y-component (km/s).
 /// z_dot : float
 ///     Velocity vector Z-component (km/s).
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct StateVector {
     pub inner: core_common::StateVector,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl StateVector {
     #[new]
@@ -800,12 +809,14 @@ impl StateVector {
 ///     Drag area (m²).
 /// drag_coeff : float, optional
 ///     Drag coefficient.
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct SpacecraftParameters {
     pub inner: core_common::SpacecraftParameters,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl SpacecraftParameters {
     #[new]
@@ -983,12 +994,14 @@ impl SpacecraftParameters {
 ///     Weighted RMS.
 /// comment : list of str, optional
 ///     Comments.
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OdParameters {
     pub inner: core_common::OdParameters,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OdParameters {
     #[new]
@@ -1274,12 +1287,14 @@ impl OdParameters {
 ///     Impact 3 cross track. Units: km
 /// comment : list of str, optional
 ///     Comments.
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct GroundImpactParameters {
     pub inner: core_common::GroundImpactParameters,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl GroundImpactParameters {
     #[new]
@@ -2002,6 +2017,7 @@ impl GroundImpactParameters {
     }
 }
 
+#[gen_stub_pyclass_enum]
 #[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq)]
 pub enum YesNo {
@@ -2009,6 +2025,7 @@ pub enum YesNo {
     No,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl YesNo {
     fn __str__(&self) -> &'static str {
@@ -2047,6 +2064,7 @@ pub fn parse_yes_no(ob: &Bound<'_, PyAny>) -> PyResult<ccsds_ndm::types::YesNo> 
     }
 }
 
+#[gen_stub_pyclass_enum]
 #[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq, Copy)]
 pub enum ObjectDescription {
@@ -2057,6 +2075,7 @@ pub enum ObjectDescription {
     Other,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl ObjectDescription {
     fn __str__(&self) -> &'static str {
@@ -2108,6 +2127,7 @@ pub fn parse_object_description(
     }
 }
 
+#[gen_stub_pyclass_enum]
 #[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq, Copy)]
 pub enum ControlledType {
@@ -2116,6 +2136,7 @@ pub enum ControlledType {
     Unknown,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl ControlledType {
     fn __str__(&self) -> &'static str {

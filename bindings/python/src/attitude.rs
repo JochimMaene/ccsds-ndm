@@ -4,18 +4,21 @@
 
 use ccsds_ndm::common as core_common;
 use ccsds_ndm::types::{Angle, AngleRate, Duration, Moment};
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::prelude::*;
 
 /// Attitude quaternion.
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct QuaternionState {
     pub inner: core_common::QuaternionState,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl QuaternionState {
     #[new]
@@ -232,12 +235,14 @@ impl QuaternionState {
 ///
 /// All mandatory elements of the logical block are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct EulerAngleState {
     pub inner: core_common::EulerAngleState,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl EulerAngleState {
     #[new]
@@ -453,12 +458,14 @@ impl EulerAngleState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AngVelState {
     pub inner: core_common::AngVelState,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AngVelState {
     #[new]
@@ -605,12 +612,14 @@ impl AngVelState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct SpinState {
     pub inner: core_common::SpinState,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl SpinState {
     #[new]
@@ -879,12 +888,14 @@ impl SpinState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct InertiaState {
     pub inner: core_common::InertiaState,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl InertiaState {
     #[new]

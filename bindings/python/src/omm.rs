@@ -6,6 +6,7 @@ use crate::common::OdmHeader;
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::omm as core_omm;
 use ccsds_ndm::types::{Angle, Distance, Gm, Inclination};
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
@@ -29,6 +30,7 @@ use crate::opm::OpmCovarianceMatrix;
 ///     The message header.
 /// segment : OmmSegment
 ///     The data segment.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct Omm {
     id: Option<String>,
@@ -64,6 +66,7 @@ impl Omm {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Omm {
     #[new]
@@ -180,12 +183,12 @@ impl Omm {
     }
 
     /// Atomically write this OMM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Omm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to validated KVN or XML.
-    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 
@@ -264,6 +267,7 @@ impl Omm {
 ///     Segment metadata.
 /// data : OmmData
 ///     Segment data.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct OmmSegment {
     metadata: Py<OmmMetadata>,
@@ -291,6 +295,7 @@ impl OmmSegment {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OmmSegment {
     #[new]
@@ -352,12 +357,14 @@ impl OmmSegment {
 ///     Epoch of reference frame, if not intrinsic to the definition of the reference frame.
 /// comment : list of str, optional
 ///     Comments (allowed at the beginning of the OMM Metadata).
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OmmMetadata {
     pub inner: core_omm::OmmMetadata,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OmmMetadata {
     #[new]
@@ -589,12 +596,14 @@ impl OmmMetadata {
 ///     Keplerian Mean motion in revolutions per day. Required if MEAN_ELEMENT_THEORY = SGP/SGP4.
 /// gm : float, optional
 ///     Gravitational Coefficient (Gravitational Constant × Central Mass) in km³/s².
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct MeanElements {
     pub inner: core_omm::MeanElements,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl MeanElements {
     #[new]
@@ -842,6 +851,7 @@ impl MeanElements {
 }
 
 /// OMM Data section.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct OmmData {
     comment: Vec<String>,
@@ -905,6 +915,7 @@ impl OmmData {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OmmData {
     /// Create a new OMM Data object.
@@ -1050,12 +1061,14 @@ impl OmmData {
 ///     Second derivative of mean motion (rev/day³). Required when MEAN_ELEMENT_THEORY = SGP or PPT3.
 /// agom : float, optional
 ///     Solar radiation pressure coefficient (m²/kg). Required for SGP4-XP.
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct TleParameters {
     pub inner: core_omm::TleParameters,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TleParameters {
     #[new]

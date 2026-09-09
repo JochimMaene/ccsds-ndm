@@ -9,6 +9,7 @@ use ccsds_ndm::types::{
     Acc, Position, PositionCovariance, PositionVelocityCovariance, Velocity, VelocityCovariance,
 };
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -168,6 +169,7 @@ fn state_vector_from_row(
 ///     The message header.
 /// segments : list[OemSegment]
 ///     The list of data segments.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct Oem {
     id: Option<String>,
@@ -231,6 +233,7 @@ impl Oem {
 ///     Segment metadata.
 /// data : OemData
 ///     Segment data.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct OemSegment {
     metadata: Py<OemMetadata>,
@@ -288,6 +291,7 @@ impl OemSegment {
 ///     Degree of the interpolation polynomial.
 /// comment : list[str], optional
 ///     Comments.
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OemMetadata {
@@ -304,6 +308,7 @@ pub struct OemMetadata {
 ///     Covariance matrices.
 ///     comments : list[str], optional
 ///     Comments.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct OemData {
     comment: Vec<String>,
@@ -435,12 +440,14 @@ impl OemData {
 ///     Velocity Z / Velocity Y covariance [6,5]. Units: km²/s².
 /// cz_dot_z_dot : float
 ///     Velocity Z covariance [6,6]. Units: km²/s².
+#[gen_stub_pyclass]
 #[pyclass(from_py_object, name = "OemCovarianceMatrix")]
 #[derive(Clone)]
 pub struct OemCovarianceMatrix {
     pub inner: core_oem::OemCovarianceMatrix,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Oem {
     #[new]
@@ -507,15 +514,18 @@ impl Oem {
     /// The list of data segments.
     ///
     /// :type: list[OemSegment]
+    #[gen_stub(override_return_type(type_repr="list[OemSegment]"))]
     #[getter]
     fn get_segments(&self, py: Python<'_>) -> Py<PyList> {
         self.segments.clone_ref(py)
     }
 
     #[setter]
-    fn set_segments(&mut self, py: Python<'_>, segments: Vec<Py<OemSegment>>) -> PyResult<()> {
-        self.segments = PyList::new(py, segments)?.unbind();
-        Ok(())
+    fn set_segments(&mut self, segments: Vec<Py<OemSegment>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.segments = PyList::new(py, segments)?.unbind();
+            Ok(())
+        })
     }
 
     /// Validate the message against CCSDS rules.
@@ -568,16 +578,17 @@ impl Oem {
     }
 
     /// Atomically write this OEM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Oem(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to validated KVN or XML.
-    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OemSegment {
     #[new]
@@ -632,6 +643,7 @@ impl OemSegment {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OemMetadata {
     #[new]
@@ -965,6 +977,7 @@ impl OemMetadata {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OemData {
     #[new]
@@ -1159,6 +1172,7 @@ impl OemData {
     /// CCSDS Reference: 502.0-B-3, Section 5.2.4.
     ///
     /// :type: list[StateVectorAcc]
+    #[gen_stub(override_return_type(type_repr="list[StateVectorAcc]"))]
     #[getter]
     fn get_state_vector(&self, py: Python<'_>) -> Py<PyList> {
         self.state_vector.clone_ref(py)
@@ -1167,11 +1181,12 @@ impl OemData {
     #[setter]
     fn set_state_vector(
         &mut self,
-        py: Python<'_>,
         state_vectors: Vec<Py<StateVectorAcc>>,
     ) -> PyResult<()> {
-        self.state_vector = PyList::new(py, state_vectors)?.unbind();
-        Ok(())
+        Python::attach(|py| {
+            self.state_vector = PyList::new(py, state_vectors)?.unbind();
+            Ok(())
+        })
     }
 
     /// Epochs for state vectors (ISO 8601).
@@ -1191,42 +1206,44 @@ impl OemData {
     }
 
     #[setter]
-    fn set_state_vector_epochs(&mut self, py: Python<'_>, epochs: Vec<String>) -> PyResult<()> {
-        let state_vectors = self.state_vector.bind(py);
-        if state_vectors.is_empty() {
-            return Err(PyValueError::new_err(
-                "Cannot set epochs when no state vectors exist; create states first",
-            ));
-        }
+    fn set_state_vector_epochs(&mut self, epochs: Vec<String>) -> PyResult<()> {
+        Python::attach(|py| {
+            let state_vectors = self.state_vector.bind(py);
+            if state_vectors.is_empty() {
+                return Err(PyValueError::new_err(
+                    "Cannot set epochs when no state vectors exist; create states first",
+                ));
+            }
 
-        if epochs.len() != state_vectors.len() {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Number of epochs must match number of state vectors",
-            ));
-        }
+            if epochs.len() != state_vectors.len() {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "Number of epochs must match number of state vectors",
+                ));
+            }
 
-        let parsed = epochs
-            .iter()
-            .map(|epoch| parse_epoch(epoch))
-            .collect::<PyResult<Vec<_>>>()?;
-        visit_records(
-            &self.state_vector,
-            py,
-            "state_vector",
-            "StateVectorAcc",
-            |_: &StateVectorAcc| {},
-        )?;
+            let parsed = epochs
+                .iter()
+                .map(|epoch| parse_epoch(epoch))
+                .collect::<PyResult<Vec<_>>>()?;
+            visit_records(
+                &self.state_vector,
+                py,
+                "state_vector",
+                "StateVectorAcc",
+                |_: &StateVectorAcc| {},
+            )?;
 
-        for (index, epoch) in parsed.into_iter().enumerate() {
-            let value = state_vectors.get_item(index)?;
-            let mut state = value
-                .extract::<PyRefMut<'_, StateVectorAcc>>()
-                .map_err(|_| {
-                    PyValueError::new_err(format!("state_vector[{index}] must be StateVectorAcc"))
-                })?;
-            state.inner.epoch = epoch;
-        }
-        Ok(())
+            for (index, epoch) in parsed.into_iter().enumerate() {
+                let value = state_vectors.get_item(index)?;
+                let mut state = value
+                    .extract::<PyRefMut<'_, StateVectorAcc>>()
+                    .map_err(|_| {
+                        PyValueError::new_err(format!("state_vector[{index}] must be StateVectorAcc"))
+                    })?;
+                state.inner.epoch = epoch;
+            }
+            Ok(())
+        })
     }
 
     /// List of covariance matrices associated with the state vectors.
@@ -1239,6 +1256,7 @@ impl OemData {
     /// Matrices are given in lower triangular form in the covariance reference frame.
     ///
     /// :type: list[OemCovarianceMatrix]
+    #[gen_stub(override_return_type(type_repr="list[OemCovarianceMatrix]"))]
     #[getter]
     fn get_covariance_matrix(&self, py: Python<'_>) -> Py<PyList> {
         self.covariance_matrix.clone_ref(py)
@@ -1247,11 +1265,12 @@ impl OemData {
     #[setter]
     fn set_covariance_matrix(
         &mut self,
-        py: Python<'_>,
         covariance_matrices: Vec<Py<OemCovarianceMatrix>>,
     ) -> PyResult<()> {
-        self.covariance_matrix = PyList::new(py, covariance_matrices)?.unbind();
-        Ok(())
+        Python::attach(|py| {
+            self.covariance_matrix = PyList::new(py, covariance_matrices)?.unbind();
+            Ok(())
+        })
     }
 
     /// Epochs for covariance matrices (ISO 8601).
@@ -1273,46 +1292,47 @@ impl OemData {
     #[setter]
     fn set_covariance_matrix_epochs(
         &mut self,
-        py: Python<'_>,
         epochs: Vec<String>,
     ) -> PyResult<()> {
-        let covariance_matrices = self.covariance_matrix.bind(py);
-        if covariance_matrices.is_empty() {
-            return Err(PyValueError::new_err(
-                "Cannot set epochs when no covariance matrices exist; create matrices first",
-            ));
-        }
+        Python::attach(|py| {
+            let covariance_matrices = self.covariance_matrix.bind(py);
+            if covariance_matrices.is_empty() {
+                return Err(PyValueError::new_err(
+                    "Cannot set epochs when no covariance matrices exist; create matrices first",
+                ));
+            }
 
-        if epochs.len() != covariance_matrices.len() {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Number of epochs must match number of covariance matrices",
-            ));
-        }
+            if epochs.len() != covariance_matrices.len() {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "Number of epochs must match number of covariance matrices",
+                ));
+            }
 
-        let parsed = epochs
-            .iter()
-            .map(|epoch| parse_epoch(epoch))
-            .collect::<PyResult<Vec<_>>>()?;
-        visit_records(
-            &self.covariance_matrix,
-            py,
-            "covariance_matrix",
-            "OemCovarianceMatrix",
-            |_: &OemCovarianceMatrix| {},
-        )?;
+            let parsed = epochs
+                .iter()
+                .map(|epoch| parse_epoch(epoch))
+                .collect::<PyResult<Vec<_>>>()?;
+            visit_records(
+                &self.covariance_matrix,
+                py,
+                "covariance_matrix",
+                "OemCovarianceMatrix",
+                |_: &OemCovarianceMatrix| {},
+            )?;
 
-        for (index, epoch) in parsed.into_iter().enumerate() {
-            let value = covariance_matrices.get_item(index)?;
-            let mut covariance = value
-                .extract::<PyRefMut<'_, OemCovarianceMatrix>>()
-                .map_err(|_| {
-                    PyValueError::new_err(format!(
-                        "covariance_matrix[{index}] must be OemCovarianceMatrix"
-                    ))
-                })?;
-            covariance.inner.epoch = epoch;
-        }
-        Ok(())
+            for (index, epoch) in parsed.into_iter().enumerate() {
+                let value = covariance_matrices.get_item(index)?;
+                let mut covariance = value
+                    .extract::<PyRefMut<'_, OemCovarianceMatrix>>()
+                    .map_err(|_| {
+                        PyValueError::new_err(format!(
+                            "covariance_matrix[{index}] must be OemCovarianceMatrix"
+                        ))
+                    })?;
+                covariance.inner.epoch = epoch;
+            }
+            Ok(())
+        })
     }
 
     /// Comments (see 7.8 for formatting rules).
@@ -1403,56 +1423,57 @@ impl OemData {
     #[setter]
     fn set_state_vector_numpy(
         &mut self,
-        py: Python<'_>,
         array: PyReadonlyArray2<f64>,
     ) -> PyResult<()> {
-        let shape = array.shape();
-        if shape.len() != 2 {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "NumPy array must be 2-dimensional",
-            ));
-        }
-        if shape[1] != 6 && shape[1] != 9 {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "NumPy array must have 6 or 9 columns",
-            ));
-        }
-        let core = self.to_core(py)?;
-        if core.state_vector.is_empty() {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "State vector epochs are missing; set state_vector_epochs or use from_numpy",
-            ));
-        }
-        if core.state_vector.len() != shape[0] {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Number of rows must match number of state vectors",
-            ));
-        }
+        Python::attach(|py| {
+            let shape = array.shape();
+            if shape.len() != 2 {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "NumPy array must be 2-dimensional",
+                ));
+            }
+            if shape[1] != 6 && shape[1] != 9 {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "NumPy array must have 6 or 9 columns",
+                ));
+            }
+            let core = self.to_core(py)?;
+            if core.state_vector.is_empty() {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "State vector epochs are missing; set state_vector_epochs or use from_numpy",
+                ));
+            }
+            if core.state_vector.len() != shape[0] {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "Number of rows must match number of state vectors",
+                ));
+            }
 
-        let has_accel = shape[1] == 9;
-        let array_view = array.as_array();
-        let mut state_vectors = Vec::with_capacity(shape[0]);
+            let has_accel = shape[1] == 9;
+            let array_view = array.as_array();
+            let mut state_vectors = Vec::with_capacity(shape[0]);
 
-        for (i, existing) in core.state_vector.iter().enumerate() {
-            let row = array_view.row(i);
-            state_vectors.push(state_vector_from_row(
-                existing.epoch,
-                |index| row[index],
-                has_accel,
-            ));
-        }
+            for (i, existing) in core.state_vector.iter().enumerate() {
+                let row = array_view.row(i);
+                state_vectors.push(state_vector_from_row(
+                    existing.epoch,
+                    |index| row[index],
+                    has_accel,
+                ));
+            }
 
-        let values = self.state_vector.bind(py);
-        for (index, inner) in state_vectors.into_iter().enumerate() {
-            let value = values.get_item(index)?;
-            let mut state = value
-                .extract::<PyRefMut<'_, StateVectorAcc>>()
-                .map_err(|_| {
-                    PyValueError::new_err(format!("state_vector[{index}] must be StateVectorAcc"))
-                })?;
-            state.inner = inner;
-        }
-        Ok(())
+            let values = self.state_vector.bind(py);
+            for (index, inner) in state_vectors.into_iter().enumerate() {
+                let value = values.get_item(index)?;
+                let mut state = value
+                    .extract::<PyRefMut<'_, StateVectorAcc>>()
+                    .map_err(|_| {
+                        PyValueError::new_err(format!("state_vector[{index}] must be StateVectorAcc"))
+                    })?;
+                state.inner = inner;
+            }
+            Ok(())
+        })
     }
 
     /// Get covariance matrices as a NumPy array.
@@ -1535,142 +1556,144 @@ impl OemData {
     #[setter]
     fn set_covariance_matrix_numpy(
         &mut self,
-        py: Python<'_>,
         array: PyReadonlyArrayDyn<f64>,
     ) -> PyResult<()> {
-        let shape = array.shape();
-        let num_matrices = match shape.len() {
-            3 => {
-                if shape[1] != 6 || shape[2] != 6 {
-                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "Covariance matrices must be 6x6",
-                    ));
-                }
-                shape[0]
-            }
-            2 => {
-                if shape[1] == 21 {
+        Python::attach(|py| {
+            let shape = array.shape();
+            let num_matrices = match shape.len() {
+                3 => {
+                    if shape[1] != 6 || shape[2] != 6 {
+                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                            "Covariance matrices must be 6x6",
+                        ));
+                    }
                     shape[0]
-                } else if shape[0] == 6 && shape[1] == 6 {
-                    1
-                } else {
+                }
+                2 => {
+                    if shape[1] == 21 {
+                        shape[0]
+                    } else if shape[0] == 6 && shape[1] == 6 {
+                        1
+                    } else {
+                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                            "NumPy array must be shaped (N,6,6), (N,21), (6,6), or (21,)",
+                        ));
+                    }
+                }
+                1 => {
+                    if shape[0] == 21 {
+                        1
+                    } else {
+                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                            "NumPy array must be shaped (N,6,6), (N,21), (6,6), or (21,)",
+                        ));
+                    }
+                }
+                _ => {
                     return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "NumPy array must be shaped (N,6,6), (N,21), (6,6), or (21,)",
+                        "NumPy array must be 1-, 2-, or 3-dimensional",
                     ));
                 }
-            }
-            1 => {
-                if shape[0] == 21 {
-                    1
-                } else {
-                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "NumPy array must be shaped (N,6,6), (N,21), (6,6), or (21,)",
-                    ));
-                }
-            }
-            _ => {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "NumPy array must be 1-, 2-, or 3-dimensional",
-                ));
-            }
-        };
-
-        let core = self.to_core(py)?;
-        if core.covariance_matrix.is_empty() {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Covariance epochs are missing; set covariance_matrix_epochs or use from_numpy",
-            ));
-        }
-        if core.covariance_matrix.len() != num_matrices {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Number of matrices must match number of covariance epochs",
-            ));
-        }
-
-        let existing = core.covariance_matrix;
-        let array_view = array.as_array();
-        let mut covariance_matrices = Vec::with_capacity(num_matrices);
-
-        for i in 0..num_matrices {
-            let v: [f64; 21] = if shape.len() == 3 {
-                full_covariance_values(&array, Some(i))?
-            } else if shape.len() == 2 && shape[1] == 21 {
-                [
-                    array_view[[i, 0]],
-                    array_view[[i, 1]],
-                    array_view[[i, 2]],
-                    array_view[[i, 3]],
-                    array_view[[i, 4]],
-                    array_view[[i, 5]],
-                    array_view[[i, 6]],
-                    array_view[[i, 7]],
-                    array_view[[i, 8]],
-                    array_view[[i, 9]],
-                    array_view[[i, 10]],
-                    array_view[[i, 11]],
-                    array_view[[i, 12]],
-                    array_view[[i, 13]],
-                    array_view[[i, 14]],
-                    array_view[[i, 15]],
-                    array_view[[i, 16]],
-                    array_view[[i, 17]],
-                    array_view[[i, 18]],
-                    array_view[[i, 19]],
-                    array_view[[i, 20]],
-                ]
-            } else if shape.len() == 1 {
-                [
-                    array_view[[0]],
-                    array_view[[1]],
-                    array_view[[2]],
-                    array_view[[3]],
-                    array_view[[4]],
-                    array_view[[5]],
-                    array_view[[6]],
-                    array_view[[7]],
-                    array_view[[8]],
-                    array_view[[9]],
-                    array_view[[10]],
-                    array_view[[11]],
-                    array_view[[12]],
-                    array_view[[13]],
-                    array_view[[14]],
-                    array_view[[15]],
-                    array_view[[16]],
-                    array_view[[17]],
-                    array_view[[18]],
-                    array_view[[19]],
-                    array_view[[20]],
-                ]
-            } else {
-                full_covariance_values(&array, None)?
             };
 
-            let current = &existing[i];
-            covariance_matrices.push(build_covariance_matrix(
-                current.epoch,
-                current.cov_ref_frame.clone(),
-                current.comment.clone(),
-                v,
-            ));
-        }
+            let core = self.to_core(py)?;
+            if core.covariance_matrix.is_empty() {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "Covariance epochs are missing; set covariance_matrix_epochs or use from_numpy",
+                ));
+            }
+            if core.covariance_matrix.len() != num_matrices {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "Number of matrices must match number of covariance epochs",
+                ));
+            }
 
-        let values = self.covariance_matrix.bind(py);
-        for (index, inner) in covariance_matrices.into_iter().enumerate() {
-            let value = values.get_item(index)?;
-            let mut covariance = value
-                .extract::<PyRefMut<'_, OemCovarianceMatrix>>()
-                .map_err(|_| {
-                    PyValueError::new_err(format!(
-                        "covariance_matrix[{index}] must be OemCovarianceMatrix"
-                    ))
-                })?;
-            covariance.inner = inner;
-        }
-        Ok(())
+            let existing = core.covariance_matrix;
+            let array_view = array.as_array();
+            let mut covariance_matrices = Vec::with_capacity(num_matrices);
+
+            for i in 0..num_matrices {
+                let v: [f64; 21] = if shape.len() == 3 {
+                    full_covariance_values(&array, Some(i))?
+                } else if shape.len() == 2 && shape[1] == 21 {
+                    [
+                        array_view[[i, 0]],
+                        array_view[[i, 1]],
+                        array_view[[i, 2]],
+                        array_view[[i, 3]],
+                        array_view[[i, 4]],
+                        array_view[[i, 5]],
+                        array_view[[i, 6]],
+                        array_view[[i, 7]],
+                        array_view[[i, 8]],
+                        array_view[[i, 9]],
+                        array_view[[i, 10]],
+                        array_view[[i, 11]],
+                        array_view[[i, 12]],
+                        array_view[[i, 13]],
+                        array_view[[i, 14]],
+                        array_view[[i, 15]],
+                        array_view[[i, 16]],
+                        array_view[[i, 17]],
+                        array_view[[i, 18]],
+                        array_view[[i, 19]],
+                        array_view[[i, 20]],
+                    ]
+                } else if shape.len() == 1 {
+                    [
+                        array_view[[0]],
+                        array_view[[1]],
+                        array_view[[2]],
+                        array_view[[3]],
+                        array_view[[4]],
+                        array_view[[5]],
+                        array_view[[6]],
+                        array_view[[7]],
+                        array_view[[8]],
+                        array_view[[9]],
+                        array_view[[10]],
+                        array_view[[11]],
+                        array_view[[12]],
+                        array_view[[13]],
+                        array_view[[14]],
+                        array_view[[15]],
+                        array_view[[16]],
+                        array_view[[17]],
+                        array_view[[18]],
+                        array_view[[19]],
+                        array_view[[20]],
+                    ]
+                } else {
+                    full_covariance_values(&array, None)?
+                };
+
+                let current = &existing[i];
+                covariance_matrices.push(build_covariance_matrix(
+                    current.epoch,
+                    current.cov_ref_frame.clone(),
+                    current.comment.clone(),
+                    v,
+                ));
+            }
+
+            let values = self.covariance_matrix.bind(py);
+            for (index, inner) in covariance_matrices.into_iter().enumerate() {
+                let value = values.get_item(index)?;
+                let mut covariance = value
+                    .extract::<PyRefMut<'_, OemCovarianceMatrix>>()
+                    .map_err(|_| {
+                        PyValueError::new_err(format!(
+                            "covariance_matrix[{index}] must be OemCovarianceMatrix"
+                        ))
+                    })?;
+                covariance.inner = inner;
+            }
+            Ok(())
+        })
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OemCovarianceMatrix {
     #[new]

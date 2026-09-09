@@ -7,6 +7,7 @@ use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::aem as core_aem;
 use ccsds_ndm::types::{AttitudeTypeType, RotSeq};
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -27,6 +28,7 @@ fn parse_attitude_type(value: &str) -> PyResult<AttitudeTypeType> {
 /// The AEM allows for dynamic modeling of any number of torques (solar pressure, atmospheric
 /// torques, magnetics, etc.). It requires the use of an interpolation technique to interpret
 /// the attitude state at times different from the tabular epochs.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct Aem {
     id: Option<String>,
@@ -80,6 +82,7 @@ impl Aem {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Aem {
     #[new]
@@ -155,15 +158,18 @@ impl Aem {
     /// AEM Segments.
     ///
     /// :type: list[AemSegment]
+    #[gen_stub(override_return_type(type_repr="list[AemSegment]"))]
     #[getter]
     fn get_segments(&self, py: Python<'_>) -> Py<PyList> {
         self.segments.clone_ref(py)
     }
 
     #[setter]
-    fn set_segments(&mut self, py: Python<'_>, segments: Vec<Py<AemSegment>>) -> PyResult<()> {
-        self.segments = PyList::new(py, segments)?.unbind();
-        Ok(())
+    fn set_segments(&mut self, segments: Vec<Py<AemSegment>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.segments = PyList::new(py, segments)?.unbind();
+            Ok(())
+        })
     }
 
     /// Validate the message against CCSDS rules.
@@ -173,7 +179,7 @@ impl Aem {
     }
 
     /// Serialize to validated KVN or XML.
-    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 
@@ -207,11 +213,12 @@ impl Aem {
     }
 
     /// Atomically write this AEM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Aem(self.to_core(py)?), &path, format)
     }
 }
 
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct AemSegment {
     metadata: Py<AemMetadata>,
@@ -239,6 +246,7 @@ impl AemSegment {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AemSegment {
     #[new]
@@ -281,12 +289,14 @@ impl AemSegment {
 }
 
 /// AEM Metadata Section.
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AemMetadata {
     pub inner: core_aem::AemMetadata,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AemMetadata {
     #[new]
@@ -691,6 +701,7 @@ impl AemMetadata {
 ///     CCSDS attitude type shared by every state.
 ///     comment : list[str], optional
 ///     Comments.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct AemData {
     comment: Vec<String>,
@@ -781,6 +792,7 @@ impl AemData {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AemData {
     #[new]
@@ -894,6 +906,7 @@ impl AemData {
     /// CCSDS Reference: 504.0-B-2, Section 4.2.4.
     ///
     /// :type: list[AttitudeState]
+    #[gen_stub(override_return_type(type_repr="list[AttitudeState]"))]
     #[getter]
     fn get_attitude_states(&self, py: Python<'_>) -> Py<PyList> {
         self.attitude_states.clone_ref(py)
@@ -902,26 +915,27 @@ impl AemData {
     #[setter]
     fn set_attitude_states(
         &mut self,
-        py: Python<'_>,
         attitude_states: Vec<Py<AttitudeState>>,
     ) -> PyResult<()> {
-        if attitude_states.is_empty() {
-            self.attitude_states = PyList::empty(py).unbind();
-            return Ok(());
-        }
+        Python::attach(|py| {
+            if attitude_states.is_empty() {
+                self.attitude_states = PyList::empty(py).unbind();
+                return Ok(());
+            }
 
-        let expected = self.attitude_type.value_count();
-        if attitude_states
-            .iter()
-            .any(|state| state.borrow(py).values.len() != expected)
-        {
-            return Err(PyValueError::new_err(format!(
-                "ATTITUDE_TYPE {} requires {expected} values per state",
-                self.attitude_type
-            )));
-        }
-        self.attitude_states = PyList::new(py, attitude_states)?.unbind();
-        Ok(())
+            let expected = self.attitude_type.value_count();
+            if attitude_states
+                .iter()
+                .any(|state| state.borrow(py).values.len() != expected)
+            {
+                return Err(PyValueError::new_err(format!(
+                    "ATTITUDE_TYPE {} requires {expected} values per state",
+                    self.attitude_type
+                )));
+            }
+            self.attitude_states = PyList::new(py, attitude_states)?.unbind();
+            Ok(())
+        })
     }
 
     /// Epochs for attitude states (ISO 8601).
@@ -947,43 +961,45 @@ impl AemData {
     }
 
     #[setter]
-    fn set_attitude_states_epochs(&mut self, py: Python<'_>, epochs: Vec<String>) -> PyResult<()> {
-        let states = self.attitude_states.bind(py);
-        if states.is_empty() {
-            return Err(PyValueError::new_err(
-                "Cannot set epochs when no attitude states exist; create states first",
-            ));
-        }
+    fn set_attitude_states_epochs(&mut self, epochs: Vec<String>) -> PyResult<()> {
+        Python::attach(|py| {
+            let states = self.attitude_states.bind(py);
+            if states.is_empty() {
+                return Err(PyValueError::new_err(
+                    "Cannot set epochs when no attitude states exist; create states first",
+                ));
+            }
 
-        if epochs.len() != states.len() {
-            return Err(PyValueError::new_err(
-                "Number of epochs must match number of attitude states",
-            ));
-        }
+            if epochs.len() != states.len() {
+                return Err(PyValueError::new_err(
+                    "Number of epochs must match number of attitude states",
+                ));
+            }
 
-        // Validate every epoch and every element type before mutating anything, so a failure
-        // partway through the list cannot leave the earlier records already rewritten.
-        let mut parsed = Vec::with_capacity(epochs.len());
-        for (index, epoch) in epochs.iter().enumerate() {
-            let value = states.get_item(index)?;
-            value
-                .extract::<PyRefMut<'_, AttitudeState>>()
-                .map_err(|_| {
-                    PyValueError::new_err(format!("attitude_states[{index}] must be AttitudeState"))
-                })?;
-            parsed.push(parse_calendar_epoch(epoch)?);
-        }
+            // Validate every epoch and every element type before mutating anything, so a failure
+            // partway through the list cannot leave the earlier records already rewritten.
+            let mut parsed = Vec::with_capacity(epochs.len());
+            for (index, epoch) in epochs.iter().enumerate() {
+                let value = states.get_item(index)?;
+                value
+                    .extract::<PyRefMut<'_, AttitudeState>>()
+                    .map_err(|_| {
+                        PyValueError::new_err(format!("attitude_states[{index}] must be AttitudeState"))
+                    })?;
+                parsed.push(parse_calendar_epoch(epoch)?);
+            }
 
-        for (index, epoch) in parsed.into_iter().enumerate() {
-            let value = states.get_item(index)?;
-            let mut state = value
-                .extract::<PyRefMut<'_, AttitudeState>>()
-                .map_err(|_| {
-                    PyValueError::new_err(format!("attitude_states[{index}] must be AttitudeState"))
-                })?;
-            state.epoch = epoch;
-        }
-        Ok(())
+            for (index, epoch) in parsed.into_iter().enumerate() {
+                let value = states.get_item(index)?;
+                let mut state = value
+                    .extract::<PyRefMut<'_, AttitudeState>>()
+                    .map_err(|_| {
+                        PyValueError::new_err(format!("attitude_states[{index}] must be AttitudeState"))
+                    })?;
+                state.epoch = epoch;
+            }
+            Ok(())
+        })
     }
 
     /// Get attitude states as a 2D NumPy array.
@@ -1019,48 +1035,50 @@ impl AemData {
     #[setter]
     fn set_attitude_states_numpy(
         &mut self,
-        py: Python<'_>,
         array: PyReadonlyArray2<f64>,
     ) -> PyResult<()> {
-        let shape = array.shape();
-        if shape.len() != 2 {
-            return Err(PyValueError::new_err("NumPy array must be 2-dimensional"));
-        }
-        let states = self.attitude_states.bind(py);
-        if states.is_empty() {
-            return Err(PyValueError::new_err(
-                "Attitude epochs are missing; set attitude_states_epochs or use from_numpy",
-            ));
-        }
-        if states.len() != shape[0] {
-            return Err(PyValueError::new_err(
-                "Number of rows must match number of attitude states",
-            ));
-        }
+        Python::attach(|py| {
+            let shape = array.shape();
+            if shape.len() != 2 {
+                return Err(PyValueError::new_err("NumPy array must be 2-dimensional"));
+            }
+            let states = self.attitude_states.bind(py);
+            if states.is_empty() {
+                return Err(PyValueError::new_err(
+                    "Attitude epochs are missing; set attitude_states_epochs or use from_numpy",
+                ));
+            }
+            if states.len() != shape[0] {
+                return Err(PyValueError::new_err(
+                    "Number of rows must match number of attitude states",
+                ));
+            }
 
-        let expected_cols = self.attitude_type.value_count();
-        if shape[1] != expected_cols {
-            return Err(PyValueError::new_err(format!(
-                "NumPy array must have {} columns for this attitude state type",
-                expected_cols
-            )));
-        }
-        let array_view = array.as_array();
-        for i in 0..shape[0] {
-            let row = array_view.row(i);
-            let row_values: Vec<f64> = row.iter().copied().collect();
-            let value = states.get_item(i)?;
-            let mut state = value
-                .extract::<PyRefMut<'_, AttitudeState>>()
-                .map_err(|_| {
-                    PyValueError::new_err(format!("attitude_states[{i}] must be AttitudeState"))
-                })?;
-            state.values = row_values;
-        }
-        Ok(())
+            let expected_cols = self.attitude_type.value_count();
+            if shape[1] != expected_cols {
+                return Err(PyValueError::new_err(format!(
+                    "NumPy array must have {} columns for this attitude state type",
+                    expected_cols
+                )));
+            }
+            let array_view = array.as_array();
+            for i in 0..shape[0] {
+                let row = array_view.row(i);
+                let row_values: Vec<f64> = row.iter().copied().collect();
+                let value = states.get_item(i)?;
+                let mut state = value
+                    .extract::<PyRefMut<'_, AttitudeState>>()
+                    .map_err(|_| {
+                        PyValueError::new_err(format!("attitude_states[{i}] must be AttitudeState"))
+                    })?;
+                state.values = row_values;
+            }
+            Ok(())
+        })
     }
 }
 
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AttitudeState {
@@ -1068,6 +1086,7 @@ pub struct AttitudeState {
     pub values: Vec<f64>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AttitudeState {
     #[new]

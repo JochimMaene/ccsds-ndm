@@ -4,6 +4,7 @@
 
 use ccsds_ndm::messages::ndm as core_ndm;
 use ccsds_ndm::Message;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -25,6 +26,7 @@ use crate::tdm::Tdm;
 /// spacecraft attitude that depends upon a particular orbital state (an APM and its
 /// associated OPM could be conveniently conveyed in a single NDM); (3) an ephemeris message
 /// with the set of tracking data messages used in the orbit determination.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct CombinedNdm {
     id: Option<String>,
@@ -98,6 +100,7 @@ fn py_messages_to_core(py: Python<'_>, messages: &[Py<PyAny>]) -> PyResult<Vec<M
         .collect()
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl CombinedNdm {
     #[new]
@@ -155,14 +158,14 @@ impl CombinedNdm {
     ///
     /// Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError` and leaves the
     /// destination untouched.
-    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
         crate::api::generate_file(&Message::Ndm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to an XML string.
     ///
     /// Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError`.
-    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
         let message = Message::Ndm(self.to_core(py)?);
         match crate::api::notation(format)? {
             ccsds_ndm::Notation::Kvn => message.to_kvn(),
@@ -174,16 +177,19 @@ impl CombinedNdm {
     /// List of contained navigation messages.
     ///
     /// :type: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]]
+    #[gen_stub(override_return_type(type_repr="list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]]"))]
     #[getter]
     fn messages(&self, py: Python<'_>) -> Py<PyList> {
         self.messages.clone_ref(py)
     }
 
     #[setter]
-    fn set_messages(&mut self, py: Python, messages: Vec<Py<PyAny>>) -> PyResult<()> {
-        py_messages_to_core(py, &messages)?;
-        self.messages = PyList::new(py, messages)?.unbind();
-        Ok(())
+    fn set_messages(&mut self, messages: Vec<Py<PyAny>>) -> PyResult<()> {
+        Python::attach(|py| {
+            py_messages_to_core(py, &messages)?;
+            self.messages = PyList::new(py, messages)?.unbind();
+            Ok(())
+        })
     }
 
     /// Message Identifier (optional).

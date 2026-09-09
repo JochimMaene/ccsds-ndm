@@ -11,6 +11,7 @@ use crate::types::parse_calendar_epoch;
 use ccsds_ndm::common as core_common;
 use ccsds_ndm::messages::rdm as core_rdm;
 use ccsds_ndm::types::{self as core_types, *};
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
@@ -38,6 +39,7 @@ use pyo3::prelude::*;
 /// segment : RdmSegment
 ///     The message segment containing metadata and data.
 ///     (Mandatory)
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct Rdm {
     id: Option<String>,
@@ -73,6 +75,7 @@ impl Rdm {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Rdm {
     #[new]
@@ -205,7 +208,7 @@ impl Rdm {
     }
 
     /// Atomically write this RDM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Rdm(self.to_core(py)?), &path, format)
     }
 
@@ -219,7 +222,7 @@ impl Rdm {
     /// -------
     /// str
     ///     The serialized string.
-    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
@@ -244,12 +247,14 @@ impl Rdm {
 /// comment : list[str], optional
 ///     Comments.
 ///     (Optional)
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RdmHeader {
     pub inner: core_rdm::RdmHeader,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl RdmHeader {
     #[new]
@@ -346,6 +351,7 @@ impl RdmHeader {
 /// data : RdmData
 ///     Segment data.
 ///     (Mandatory)
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct RdmSegment {
     metadata: Py<RdmMetadata>,
@@ -373,6 +379,7 @@ impl RdmSegment {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl RdmSegment {
     #[new]
@@ -435,12 +442,14 @@ impl RdmSegment {
 ///     Epoch from which the ORBIT_LIFETIME is calculated.
 ///
 ///     Optional
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RdmMetadata {
     pub inner: core_rdm::RdmMetadata,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl RdmMetadata {
     #[new]
@@ -1165,6 +1174,7 @@ impl RdmMetadata {
 ///     User defined parameters.
 /// comment : list[str], optional
 ///     Comments.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct RdmData {
     comment: Vec<String>,
@@ -1250,6 +1260,7 @@ impl RdmData {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl RdmData {
     #[new]
@@ -1418,12 +1429,14 @@ impl RdmData {
 ///     Remaining time in orbit (days).
 /// reentry_altitude : float
 ///     Defined re-entry altitude (km).
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AtmosphericReentryParameters {
     pub inner: core_common::AtmosphericReentryParameters,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AtmosphericReentryParameters {
     #[new]
@@ -1666,12 +1679,14 @@ impl AtmosphericReentryParameters {
 // ============================================================================
 
 /// RDM spacecraft parameters (rdmSpacecraftParametersType).
+#[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RdmSpacecraftParameters {
     pub inner: core_common::RdmSpacecraftParameters,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl RdmSpacecraftParameters {
     #[new]
