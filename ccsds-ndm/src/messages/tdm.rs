@@ -1729,9 +1729,9 @@ impl TdmObservationData {
 
     pub fn from_key_val(key: &str, val: &str) -> Result<Self> {
         let value = fast_float::parse(val).map_err(|_| {
-            CcsdsNdmError::Format(Box::new(crate::error::FormatError::InvalidFormat(
-                format!("Invalid float: {val}"),
-            )))
+            CcsdsNdmError::Format(Box::new(crate::error::FormatError::InvalidFormat(format!(
+                "Invalid float: {val}"
+            ))))
         })?;
         Self::from_key_value(key, value)
     }

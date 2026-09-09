@@ -238,7 +238,7 @@ impl ApmSegment {
 }
 
 /// APM Metadata Section.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct ApmMetadata {
     pub inner: core_apm::ApmMetadata,
@@ -619,7 +619,7 @@ impl ApmData {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct ApmManeuverParameters {
     pub inner: ccsds_ndm::common::AttManeuverState,

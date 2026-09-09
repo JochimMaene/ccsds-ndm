@@ -242,7 +242,7 @@ impl Tdm {
 /// comment : list[str], optional
 ///     Comments.
 ///     (Optional)
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct TdmHeader {
     pub inner: core_tdm::TdmHeader,
@@ -521,7 +521,7 @@ impl TdmSegment {
 /// -------------------
 /// Many optional parameters are available to describe the tracking configuration,
 /// signal path, frequencies, and corrections. See CCSDS TDM Blue Book for full details.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct TdmMetadata {
     pub inner: core_tdm::TdmMetadata,
@@ -1914,7 +1914,7 @@ impl TdmData {
 ///     Tracking observable value. Note: For phase counts that require full precision strings,
 ///     use internal representation handling (this constructor takes float for simplicity,
 ///     but the object can hold string representations internally).
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct TdmObservation {
     pub inner: core_tdm::TdmObservation,
@@ -1988,7 +1988,7 @@ impl TdmObservation {
     }
 }
 
-#[pyclass(eq, eq_int)]
+#[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq, Copy)]
 pub enum TdmMode {
     Sequential,
@@ -2021,7 +2021,7 @@ pub fn parse_tdm_mode(ob: &Bound<'_, PyAny>) -> PyResult<core_types::TdmMode> {
     }
 }
 
-#[pyclass(eq, eq_int)]
+#[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq, Copy)]
 pub enum TdmPath {
     Path1,

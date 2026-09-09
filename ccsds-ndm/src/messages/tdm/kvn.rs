@@ -307,8 +307,12 @@ pub fn tdm_observation(input: &mut &str) -> KvnResult<TdmObservation> {
         }
     })?;
 
-    let (_, epoch, value) =
-        (kv_sep, kv_calendar_epoch_token, preceded(ws, parse_f64_winnow)).parse_next(input)?;
+    let (_, epoch, value) = (
+        kv_sep,
+        kv_calendar_epoch_token,
+        preceded(ws, parse_f64_winnow),
+    )
+        .parse_next(input)?;
 
     let data = TdmObservationData::from_key_value(key, value).map_err(|error| {
         input.reset(&checkpoint);

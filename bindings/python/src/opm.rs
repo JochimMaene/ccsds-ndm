@@ -290,7 +290,7 @@ impl OpmSegment {
 ///     Epoch of the reference frame, if not intrinsic to the definition (ISO 8601).
 /// comment : list[str], optional
 ///     Comments.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OpmMetadata {
     pub inner: core_opm::OpmMetadata,
@@ -509,7 +509,7 @@ impl OpmMetadata {
 ///     True anomaly. Units: deg.
 /// mean_anomaly : float or None
 ///     Mean anomaly. Units: deg.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct KeplerianElements {
     pub inner: core_opm::KeplerianElements,
@@ -769,7 +769,7 @@ impl KeplerianElements {
 /// cx_x : float
 ///     Position X covariance [1,1]. Units: km².
 ///     ... (see Parameters for full list of attributes with units)
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OpmCovarianceMatrix {
     pub inner: ccsds_ndm::common::OpmCovarianceMatrix,
@@ -1461,7 +1461,7 @@ impl OpmData {
 ///     Velocity change in 2nd axis (km/s).
 /// man_dv_3 : float
 ///     Velocity change in 3rd axis (km/s).
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OpmManeuverParameters {
     pub inner: core_opm::ManeuverParameters,

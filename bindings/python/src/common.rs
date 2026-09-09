@@ -39,7 +39,7 @@ pub(crate) fn parse_interpolation_degree(
 ///     ID that uniquely identifies a message from a given originator.
 /// comment : list of str, optional
 ///     Comments.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OdmHeader {
     pub inner: core_common::OdmHeader,
@@ -159,7 +159,7 @@ impl OdmHeader {
 }
 
 /// Represents the `admHeader` complex type from the XSD.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AdmHeader {
     pub inner: core_common::AdmHeader,
@@ -301,7 +301,7 @@ impl AdmHeader {
 ///     Acceleration vector Y-component (km/s²).
 /// z_ddot : float, optional
 ///     Acceleration vector Z-component (km/s²).
-#[pyclass(name = "StateVectorAcc")]
+#[pyclass(from_py_object, name = "StateVectorAcc")]
 #[derive(Clone)]
 pub struct StateVectorAcc {
     pub inner: core_common::StateVectorAcc,
@@ -557,7 +557,7 @@ impl StateVectorAcc {
 ///     Velocity vector Y-component (km/s).
 /// z_dot : float
 ///     Velocity vector Z-component (km/s).
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct StateVector {
     pub inner: core_common::StateVector,
@@ -758,7 +758,7 @@ impl StateVector {
 ///     Drag area (m²).
 /// drag_coeff : float, optional
 ///     Drag coefficient.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct SpacecraftParameters {
     pub inner: core_common::SpacecraftParameters,
@@ -939,7 +939,7 @@ impl SpacecraftParameters {
 ///     Weighted RMS.
 /// comment : list of str, optional
 ///     Comments.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OdParameters {
     pub inner: core_common::OdParameters,
@@ -1228,7 +1228,7 @@ impl OdParameters {
 ///     Impact 3 cross track. Units: km
 /// comment : list of str, optional
 ///     Comments.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct GroundImpactParameters {
     pub inner: core_common::GroundImpactParameters,
@@ -1954,7 +1954,7 @@ impl GroundImpactParameters {
     }
 }
 
-#[pyclass(eq, eq_int)]
+#[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq)]
 pub enum YesNo {
     Yes,
@@ -1999,7 +1999,7 @@ pub fn parse_yes_no(ob: &Bound<'_, PyAny>) -> PyResult<ccsds_ndm::types::YesNo> 
     }
 }
 
-#[pyclass(eq, eq_int)]
+#[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq, Copy)]
 pub enum ObjectDescription {
     Payload,
@@ -2060,7 +2060,7 @@ pub fn parse_object_description(
     }
 }
 
-#[pyclass(eq, eq_int)]
+#[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq, Copy)]
 pub enum ControlledType {
     Yes,

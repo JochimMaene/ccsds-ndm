@@ -288,7 +288,7 @@ impl OemSegment {
 ///     Degree of the interpolation polynomial.
 /// comment : list[str], optional
 ///     Comments.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OemMetadata {
     pub inner: core_oem::OemMetadata,
@@ -435,7 +435,7 @@ impl OemData {
 ///     Velocity Z / Velocity Y covariance [6,5]. Units: km²/s².
 /// cz_dot_z_dot : float
 ///     Velocity Z covariance [6,6]. Units: km²/s².
-#[pyclass(name = "OemCovarianceMatrix")]
+#[pyclass(from_py_object, name = "OemCovarianceMatrix")]
 #[derive(Clone)]
 pub struct OemCovarianceMatrix {
     pub inner: core_oem::OemCovarianceMatrix,

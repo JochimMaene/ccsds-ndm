@@ -257,7 +257,7 @@ impl AcmSegment {
 }
 
 /// ACM Metadata Section.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AcmMetadata {
     pub inner: core_acm::AcmMetadata,
@@ -822,7 +822,7 @@ impl AcmData {
 }
 
 /// ACM Data: Attitude State Time History Section.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AcmAttitudeState {
     pub inner: core_acm::AcmAttitudeState,
@@ -1071,7 +1071,7 @@ impl AcmAttitudeState {
 }
 
 /// ACM Data: Space Object Physical Characteristics Section.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AcmPhysicalDescription {
     pub inner: core_acm::AcmPhysicalDescription,
@@ -1314,7 +1314,7 @@ impl AcmPhysicalDescription {
 }
 
 /// ACM Data: Covariance Time History Section.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AcmCovarianceMatrix {
     pub inner: core_acm::AcmCovarianceMatrix,
@@ -1496,7 +1496,7 @@ impl AcmCovarianceMatrix {
 }
 
 /// ACM Data: Maneuver Specification Section.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AcmManeuverParameters {
     pub inner: core_acm::AcmManeuverParameters,
@@ -1730,7 +1730,7 @@ impl AcmManeuverParameters {
 }
 
 /// ACM Data: Sensor Data Section.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AcmSensor {
     pub inner: core_acm::AcmSensor,

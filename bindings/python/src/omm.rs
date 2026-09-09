@@ -352,7 +352,7 @@ impl OmmSegment {
 ///     Epoch of reference frame, if not intrinsic to the definition of the reference frame.
 /// comment : list of str, optional
 ///     Comments (allowed at the beginning of the OMM Metadata).
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OmmMetadata {
     pub inner: core_omm::OmmMetadata,
@@ -575,7 +575,7 @@ impl OmmMetadata {
 ///     Keplerian Mean motion in revolutions per day. Required if MEAN_ELEMENT_THEORY = SGP/SGP4.
 /// gm : float, optional
 ///     Gravitational Coefficient (Gravitational Constant × Central Mass) in km³/s².
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct MeanElements {
     pub inner: core_omm::MeanElements,
@@ -1018,7 +1018,7 @@ impl OmmData {
 ///     Second derivative of mean motion (rev/day³). Required when MEAN_ELEMENT_THEORY = SGP or PPT3.
 /// agom : float, optional
 ///     Solar radiation pressure coefficient (m²/kg). Required for SGP4-XP.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct TleParameters {
     pub inner: core_omm::TleParameters,

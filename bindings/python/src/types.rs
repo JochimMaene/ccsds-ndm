@@ -49,7 +49,7 @@ pub fn parse_relative_time(s: &str) -> PyResult<core_types::RelativeTime> {
 ///     A dictionary of user-defined parameters and their values.
 /// comment : list[str], optional
 ///     Comments.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Default)]
 pub struct UserDefined {
     pub inner: core_types::UserDefined,

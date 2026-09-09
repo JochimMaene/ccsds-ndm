@@ -10,7 +10,7 @@ use pyo3::prelude::*;
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct QuaternionState {
     pub inner: core_common::QuaternionState,
@@ -218,7 +218,7 @@ impl QuaternionState {
 ///
 /// All mandatory elements of the logical block are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct EulerAngleState {
     pub inner: core_common::EulerAngleState,
@@ -425,7 +425,7 @@ impl EulerAngleState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AngVelState {
     pub inner: core_common::AngVelState,
@@ -563,7 +563,7 @@ impl AngVelState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct SpinState {
     pub inner: core_common::SpinState,
@@ -823,7 +823,7 @@ impl SpinState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct InertiaState {
     pub inner: core_common::InertiaState,

@@ -244,7 +244,7 @@ impl Rdm {
 /// comment : list[str], optional
 ///     Comments.
 ///     (Optional)
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RdmHeader {
     pub inner: core_rdm::RdmHeader,
@@ -435,7 +435,7 @@ impl RdmSegment {
 ///     Epoch from which the ORBIT_LIFETIME is calculated.
 ///
 ///     Optional
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RdmMetadata {
     pub inner: core_rdm::RdmMetadata,
@@ -1404,7 +1404,7 @@ impl RdmData {
 ///     Remaining time in orbit (days).
 /// reentry_altitude : float
 ///     Defined re-entry altitude (km).
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AtmosphericReentryParameters {
     pub inner: core_common::AtmosphericReentryParameters,
@@ -1646,7 +1646,7 @@ impl AtmosphericReentryParameters {
 // ============================================================================
 
 /// RDM spacecraft parameters (rdmSpacecraftParametersType).
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RdmSpacecraftParameters {
     pub inner: core_common::RdmSpacecraftParameters,

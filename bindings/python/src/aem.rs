@@ -281,7 +281,7 @@ impl AemSegment {
 }
 
 /// AEM Metadata Section.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AemMetadata {
     pub inner: core_aem::AemMetadata,
@@ -1039,7 +1039,7 @@ impl AemData {
     }
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AttitudeState {
     pub epoch: ccsds_ndm::types::CalendarEpoch,

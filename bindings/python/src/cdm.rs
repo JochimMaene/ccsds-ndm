@@ -387,7 +387,7 @@ impl Cdm {
 ///     Spacecraft name(s) for which the CDM is provided.
 /// comment : list of str, optional
 ///     Explanatory comments.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct CdmHeader {
     pub inner: core_cdm::CdmHeader,
@@ -643,7 +643,7 @@ impl CdmBody {
 ///     Comments.
 /// miss_distance_unit : str, optional
 ///     Optional unit string for validation (must be 'm').
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RelativeMetadataData {
     pub inner: core_cdm::RelativeMetadataData,
@@ -1029,7 +1029,7 @@ impl RelativeMetadataData {
 ///     Relative velocity T component. Units: m/s.
 /// relative_velocity_n : float
 ///     Relative velocity N component. Units: m/s.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RelativeStateVector {
     pub inner: core_cdm::RelativeStateVector,
@@ -1294,7 +1294,7 @@ impl CdmSegment {
 ///     Whether in-track thrust modeling was used.
 /// comment : list of str, optional
 ///     Comments.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct CdmMetadata {
     pub inner: core_cdm::CdmMetadata,
@@ -2110,7 +2110,7 @@ impl CdmData {
 ///     Velocity Y component. Units: km/s.
 /// z_dot : float
 ///     Velocity Z component. Units: km/s.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct CdmStateVector {
     pub inner: core_cdm::CdmStateVector,
@@ -2310,7 +2310,7 @@ impl CdmStateVector {
 // Enums
 // -----------------------------------------------------------------------------------------
 
-#[pyclass(eq, eq_int)]
+#[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq)]
 pub enum CdmObjectType {
     Object1,
@@ -2346,7 +2346,7 @@ fn parse_cdm_object_type(ob: &Bound<'_, PyAny>) -> PyResult<CdmObjectType> {
     }
 }
 
-#[pyclass(eq, eq_int)]
+#[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq)]
 pub enum ScreenVolumeFrameType {
     Rtn,
@@ -2382,7 +2382,7 @@ fn parse_screen_volume_frame_type(ob: &Bound<'_, PyAny>) -> PyResult<ScreenVolum
     }
 }
 
-#[pyclass(eq, eq_int)]
+#[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq)]
 pub enum ScreenVolumeShapeType {
     Ellipsoid,
@@ -2418,7 +2418,7 @@ fn parse_screen_volume_shape_type(ob: &Bound<'_, PyAny>) -> PyResult<ScreenVolum
     }
 }
 
-#[pyclass(eq, eq_int)]
+#[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq)]
 pub enum ReferenceFrameType {
     Eme2000,
@@ -2457,7 +2457,7 @@ fn parse_reference_frame_type(ob: &Bound<'_, PyAny>) -> PyResult<ReferenceFrameT
     }
 }
 
-#[pyclass(eq, eq_int)]
+#[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq)]
 pub enum CovarianceMethodType {
     Calculated,
@@ -2493,7 +2493,7 @@ fn parse_covariance_method_type(ob: &Bound<'_, PyAny>) -> PyResult<CovarianceMet
     }
 }
 
-#[pyclass(eq, eq_int)]
+#[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq)]
 pub enum ManeuverableType {
     Yes,
@@ -2554,7 +2554,7 @@ fn parse_maneuverable_type(ob: &Bound<'_, PyAny>) -> PyResult<ManeuverableType> 
 ///     Solar energy dissipation rate. Units: W/kg
 /// comment : list of str, optional
 ///     Comments.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AdditionalParameters {
     pub inner: core_cdm::AdditionalParameters,
@@ -2817,7 +2817,7 @@ impl AdditionalParameters {
 ///     Thrust variance.
 /// comment : list of str, optional
 ///     Comments.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct CdmCovarianceMatrix {
     pub inner: core_cdm::CdmCovarianceMatrix,

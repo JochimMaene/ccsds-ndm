@@ -404,7 +404,7 @@ impl OcmSegment {
 /// epoch_tzero : str
 ///     Epoch T-Zero.
 ///     ... (see Parameters for full list)
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OcmMetadata {
     pub inner: core_ocm::OcmMetadata,
@@ -2187,7 +2187,7 @@ impl OcmTrajState {
 /// values : list of float
 ///     Trajectory state elements for this epoch.
 ///     (Mandatory)
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct TrajLine {
     pub inner: core_ocm::TrajLine,
@@ -2251,7 +2251,7 @@ impl TrajLine {
 /// comment : list[str], optional
 ///     Comments.
 ///     (Optional)
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OcmPhysicalDescription {
     pub inner: core_ocm::OcmPhysicalDescription,
@@ -3893,7 +3893,7 @@ impl OcmCovarianceMatrix {
 ///     Absolute or relative time tag.
 /// values : list of float
 ///     Covariance matrix elements for this epoch.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct CovLine {
     pub inner: core_ocm::CovLine,
@@ -4791,7 +4791,7 @@ impl OcmManeuverParameters {
 ///     Ignition epoch.
 /// values : list of str
 ///     Maneuver elements for this epoch.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct ManLine {
     pub inner: core_ocm::ManLine,
@@ -4856,7 +4856,7 @@ impl ManLine {
 /// comment : list[str], optional
 ///     Comments.
 ///     (Optional)
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OcmPerturbations {
     pub inner: core_ocm::OcmPerturbations,
@@ -5361,7 +5361,7 @@ impl OcmPerturbations {
 /// comment : list[str], optional
 ///     Comments.
 ///     (Optional)
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OcmOdParameters {
     pub inner: core_ocm::OcmOdParameters,
