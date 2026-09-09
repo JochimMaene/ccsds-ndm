@@ -47,6 +47,8 @@ def test_ccsds_reference_ignores_harmless_formatting_but_not_the_citation():
     python = "CCSDS Reference: 508.0-B-1, Section 3.2"
     assert ccsds_reference(core) == ccsds_reference(python) == "508.0-B-1, Section 3.2"
 
-    assert ccsds_reference("CCSDS Reference: 999.9-Z-9, Section 42.") != ccsds_reference(core)
+    assert ccsds_reference(
+        "CCSDS Reference: 999.9-Z-9, Section 42."
+    ) != ccsds_reference(core)
     assert ccsds_reference("no citation here") is None
     assert ccsds_reference(None) is None

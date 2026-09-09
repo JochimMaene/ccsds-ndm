@@ -82,7 +82,9 @@ def collect_python_classes(binding_dir: Path) -> dict[str, PythonClass]:
 # ---------------------------------------------------------------------------
 
 
-_CCSDS_REFERENCE = re.compile(r"\*{0,2}CCSDS Reference\*{0,2}:\s*(.+?)\s*$", re.MULTILINE)
+_CCSDS_REFERENCE = re.compile(
+    r"\*{0,2}CCSDS Reference\*{0,2}:\s*(.+?)\s*$", re.MULTILINE
+)
 
 
 def ccsds_reference(docstring: str | None) -> str | None:
