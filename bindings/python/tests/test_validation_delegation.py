@@ -55,7 +55,8 @@ class TestRoutingShapes:
         states = aem.segments[1].data.attitude_states
         assert len(states) > 1
         broken = list(states[1].values)
-        broken[0] = 5.0  # destroys quaternion normalisation
+        # In range per component, so the norm check is what rejects this.
+        broken[0] = 0.5  # destroys quaternion normalisation
         states[1].values = broken
         assert_all_surfaces_reject(aem, "Quaternion not normalized")
 

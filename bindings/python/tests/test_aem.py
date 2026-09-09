@@ -227,7 +227,7 @@ class TestAem:
         state = aem.segments[0].data.attitude_states[0]
         state.values = [float("nan"), 0.0, 0.0, 1.0]
 
-        with pytest.raises(ccsds_ndm.NdmValidationError, match="Quaternion"):
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="Q1"):
             aem.to_str(format="xml")
 
     def test_file_io(self, tmp_path):
