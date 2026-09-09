@@ -142,27 +142,14 @@ test-python:
 # Run both Rust and Python tests
 test: test-rust test-python
 
-# Run all OPM behavior, allocation, and shared output-contract checks
+# Run all OPM behavior, allocation, and shared output-contract checks.
+#
+# This is one whole-target gate rather than per-concern slices: `cargo test <filter>` exits 0 when
+# the filter matches nothing, so a name-filtered slice would silently empty the gate on a module
+# rename.
 [private]
 conformance-opm:
     cargo test --manifest-path {{rust_manifest}} --test opm --test opm_kvn_allocations --test opm_xml_allocations --test message_output_contract
-
-# Compatibility aliases. Name-filtered slices were removed: `cargo test <filter>` exits 0 when
-# the filter matches nothing, so a module rename would silently empty the gate.
-[private]
-conformance-opm-xml: conformance-opm
-
-[private]
-conformance-opm-kvn: conformance-opm
-
-[private]
-conformance-opm-parse: conformance-opm
-
-[private]
-conformance-opm-validation: conformance-opm
-
-[private]
-conformance-opm-conversion: conformance-opm
 
 [private]
 conformance-opm-python:
