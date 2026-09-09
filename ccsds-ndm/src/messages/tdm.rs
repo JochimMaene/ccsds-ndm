@@ -1508,7 +1508,7 @@ pub enum TdmObservationData {
 }
 
 impl TdmObservationData {
-    fn value(&self) -> f64 {
+    pub fn value(&self) -> f64 {
         match self {
             Self::Rhumidity(value) => value.value,
             Self::Angle1(value)
@@ -1661,122 +1661,79 @@ impl TdmObservationData {
     }
 
     pub fn value_to_string(&self) -> String {
-        match self {
-            Self::Rhumidity(v) => v.value.to_string(),
-            Self::Angle1(v)
-            | Self::Angle2(v)
-            | Self::CarrierPower(v)
-            | Self::ClockBias(v)
-            | Self::ClockDrift(v)
-            | Self::DopplerCount(v)
-            | Self::DopplerInstantaneous(v)
-            | Self::DopplerIntegrated(v)
-            | Self::Dor(v)
-            | Self::Mag(v)
-            | Self::PcN0(v)
-            | Self::PrN0(v)
-            | Self::Pressure(v)
-            | Self::Range(v)
-            | Self::Rcs(v)
-            | Self::ReceiveFreq(v)
-            | Self::ReceiveFreq1(v)
-            | Self::ReceiveFreq2(v)
-            | Self::ReceiveFreq3(v)
-            | Self::ReceiveFreq4(v)
-            | Self::ReceiveFreq5(v)
-            | Self::ReceivePhaseCt1(v)
-            | Self::ReceivePhaseCt2(v)
-            | Self::ReceivePhaseCt3(v)
-            | Self::ReceivePhaseCt4(v)
-            | Self::ReceivePhaseCt5(v)
-            | Self::Stec(v)
-            | Self::Temperature(v)
-            | Self::TransmitFreq1(v)
-            | Self::TransmitFreq2(v)
-            | Self::TransmitFreq3(v)
-            | Self::TransmitFreq4(v)
-            | Self::TransmitFreq5(v)
-            | Self::TransmitFreqRate1(v)
-            | Self::TransmitFreqRate2(v)
-            | Self::TransmitFreqRate3(v)
-            | Self::TransmitFreqRate4(v)
-            | Self::TransmitFreqRate5(v)
-            | Self::TransmitPhaseCt1(v)
-            | Self::TransmitPhaseCt2(v)
-            | Self::TransmitPhaseCt3(v)
-            | Self::TransmitPhaseCt4(v)
-            | Self::TransmitPhaseCt5(v)
-            | Self::TropoDry(v)
-            | Self::TropoWet(v)
-            | Self::VlbiDelay(v) => v.to_string(),
-        }
+        self.value().to_string()
     }
 
-    pub fn from_key_val(key: &str, val: &str) -> Result<Self> {
-        let pf = |s: &str| {
-            fast_float::parse(s).map_err(|_| {
-                CcsdsNdmError::Format(Box::new(crate::error::FormatError::InvalidFormat(format!(
-                    "Invalid float: {}",
-                    s
-                ))))
-            })
-        };
+    /// Builds an observation from its CCSDS keyword and numeric value.
+    ///
+    /// This is the single keyword-to-variant mapping; the KVN, XML and Python paths all
+    /// route through it.
+    pub fn from_key_value(key: &str, value: f64) -> Result<Self> {
         match key {
-            "ANGLE_1" => Ok(Self::Angle1(pf(val)?)),
-            "ANGLE_2" => Ok(Self::Angle2(pf(val)?)),
-            "CARRIER_POWER" => Ok(Self::CarrierPower(pf(val)?)),
-            "CLOCK_BIAS" => Ok(Self::ClockBias(pf(val)?)),
-            "CLOCK_DRIFT" => Ok(Self::ClockDrift(pf(val)?)),
-            "DOPPLER_COUNT" => Ok(Self::DopplerCount(pf(val)?)),
-            "DOPPLER_INSTANTANEOUS" => Ok(Self::DopplerInstantaneous(pf(val)?)),
-            "DOPPLER_INTEGRATED" => Ok(Self::DopplerIntegrated(pf(val)?)),
-            "DOR" => Ok(Self::Dor(pf(val)?)),
-            "MAG" => Ok(Self::Mag(pf(val)?)),
-            "PC_N0" => Ok(Self::PcN0(pf(val)?)),
-            "PR_N0" => Ok(Self::PrN0(pf(val)?)),
-            "PRESSURE" => Ok(Self::Pressure(pf(val)?)),
-            "RANGE" => Ok(Self::Range(pf(val)?)),
-            "RCS" => Ok(Self::Rcs(pf(val)?)),
-            "RECEIVE_FREQ" => Ok(Self::ReceiveFreq(pf(val)?)),
-            "RECEIVE_FREQ_1" => Ok(Self::ReceiveFreq1(pf(val)?)),
-            "RECEIVE_FREQ_2" => Ok(Self::ReceiveFreq2(pf(val)?)),
-            "RECEIVE_FREQ_3" => Ok(Self::ReceiveFreq3(pf(val)?)),
-            "RECEIVE_FREQ_4" => Ok(Self::ReceiveFreq4(pf(val)?)),
-            "RECEIVE_FREQ_5" => Ok(Self::ReceiveFreq5(pf(val)?)),
-            "RECEIVE_PHASE_CT_1" => Ok(Self::ReceivePhaseCt1(pf(val)?)),
-            "RECEIVE_PHASE_CT_2" => Ok(Self::ReceivePhaseCt2(pf(val)?)),
-            "RECEIVE_PHASE_CT_3" => Ok(Self::ReceivePhaseCt3(pf(val)?)),
-            "RECEIVE_PHASE_CT_4" => Ok(Self::ReceivePhaseCt4(pf(val)?)),
-            "RECEIVE_PHASE_CT_5" => Ok(Self::ReceivePhaseCt5(pf(val)?)),
-            "RHUMIDITY" => Ok(Self::Rhumidity(Percentage::new(pf(val)?, None)?)),
-            "STEC" => Ok(Self::Stec(pf(val)?)),
-            "TEMPERATURE" => Ok(Self::Temperature(pf(val)?)),
-            "TRANSMIT_FREQ_1" => Ok(Self::TransmitFreq1(pf(val)?)),
-            "TRANSMIT_FREQ_2" => Ok(Self::TransmitFreq2(pf(val)?)),
-            "TRANSMIT_FREQ_3" => Ok(Self::TransmitFreq3(pf(val)?)),
-            "TRANSMIT_FREQ_4" => Ok(Self::TransmitFreq4(pf(val)?)),
-            "TRANSMIT_FREQ_5" => Ok(Self::TransmitFreq5(pf(val)?)),
-            "TRANSMIT_FREQ_RATE_1" => Ok(Self::TransmitFreqRate1(pf(val)?)),
-            "TRANSMIT_FREQ_RATE_2" => Ok(Self::TransmitFreqRate2(pf(val)?)),
-            "TRANSMIT_FREQ_RATE_3" => Ok(Self::TransmitFreqRate3(pf(val)?)),
-            "TRANSMIT_FREQ_RATE_4" => Ok(Self::TransmitFreqRate4(pf(val)?)),
-            "TRANSMIT_FREQ_RATE_5" => Ok(Self::TransmitFreqRate5(pf(val)?)),
-            "TRANSMIT_PHASE_CT_1" => Ok(Self::TransmitPhaseCt1(pf(val)?)),
-            "TRANSMIT_PHASE_CT_2" => Ok(Self::TransmitPhaseCt2(pf(val)?)),
-            "TRANSMIT_PHASE_CT_3" => Ok(Self::TransmitPhaseCt3(pf(val)?)),
-            "TRANSMIT_PHASE_CT_4" => Ok(Self::TransmitPhaseCt4(pf(val)?)),
-            "TRANSMIT_PHASE_CT_5" => Ok(Self::TransmitPhaseCt5(pf(val)?)),
-            "TROPO_DRY" => Ok(Self::TropoDry(pf(val)?)),
-            "TROPO_WET" => Ok(Self::TropoWet(pf(val)?)),
-            "VLBI_DELAY" => Ok(Self::VlbiDelay(pf(val)?)),
+            "ANGLE_1" => Ok(Self::Angle1(value)),
+            "ANGLE_2" => Ok(Self::Angle2(value)),
+            "CARRIER_POWER" => Ok(Self::CarrierPower(value)),
+            "CLOCK_BIAS" => Ok(Self::ClockBias(value)),
+            "CLOCK_DRIFT" => Ok(Self::ClockDrift(value)),
+            "DOPPLER_COUNT" => Ok(Self::DopplerCount(value)),
+            "DOPPLER_INSTANTANEOUS" => Ok(Self::DopplerInstantaneous(value)),
+            "DOPPLER_INTEGRATED" => Ok(Self::DopplerIntegrated(value)),
+            "DOR" => Ok(Self::Dor(value)),
+            "MAG" => Ok(Self::Mag(value)),
+            "PC_N0" => Ok(Self::PcN0(value)),
+            "PR_N0" => Ok(Self::PrN0(value)),
+            "PRESSURE" => Ok(Self::Pressure(value)),
+            "RANGE" => Ok(Self::Range(value)),
+            "RCS" => Ok(Self::Rcs(value)),
+            "RECEIVE_FREQ" => Ok(Self::ReceiveFreq(value)),
+            "RECEIVE_FREQ_1" => Ok(Self::ReceiveFreq1(value)),
+            "RECEIVE_FREQ_2" => Ok(Self::ReceiveFreq2(value)),
+            "RECEIVE_FREQ_3" => Ok(Self::ReceiveFreq3(value)),
+            "RECEIVE_FREQ_4" => Ok(Self::ReceiveFreq4(value)),
+            "RECEIVE_FREQ_5" => Ok(Self::ReceiveFreq5(value)),
+            "RECEIVE_PHASE_CT_1" => Ok(Self::ReceivePhaseCt1(value)),
+            "RECEIVE_PHASE_CT_2" => Ok(Self::ReceivePhaseCt2(value)),
+            "RECEIVE_PHASE_CT_3" => Ok(Self::ReceivePhaseCt3(value)),
+            "RECEIVE_PHASE_CT_4" => Ok(Self::ReceivePhaseCt4(value)),
+            "RECEIVE_PHASE_CT_5" => Ok(Self::ReceivePhaseCt5(value)),
+            "RHUMIDITY" => Ok(Self::Rhumidity(Percentage::new(value, None)?)),
+            "STEC" => Ok(Self::Stec(value)),
+            "TEMPERATURE" => Ok(Self::Temperature(value)),
+            "TRANSMIT_FREQ_1" => Ok(Self::TransmitFreq1(value)),
+            "TRANSMIT_FREQ_2" => Ok(Self::TransmitFreq2(value)),
+            "TRANSMIT_FREQ_3" => Ok(Self::TransmitFreq3(value)),
+            "TRANSMIT_FREQ_4" => Ok(Self::TransmitFreq4(value)),
+            "TRANSMIT_FREQ_5" => Ok(Self::TransmitFreq5(value)),
+            "TRANSMIT_FREQ_RATE_1" => Ok(Self::TransmitFreqRate1(value)),
+            "TRANSMIT_FREQ_RATE_2" => Ok(Self::TransmitFreqRate2(value)),
+            "TRANSMIT_FREQ_RATE_3" => Ok(Self::TransmitFreqRate3(value)),
+            "TRANSMIT_FREQ_RATE_4" => Ok(Self::TransmitFreqRate4(value)),
+            "TRANSMIT_FREQ_RATE_5" => Ok(Self::TransmitFreqRate5(value)),
+            "TRANSMIT_PHASE_CT_1" => Ok(Self::TransmitPhaseCt1(value)),
+            "TRANSMIT_PHASE_CT_2" => Ok(Self::TransmitPhaseCt2(value)),
+            "TRANSMIT_PHASE_CT_3" => Ok(Self::TransmitPhaseCt3(value)),
+            "TRANSMIT_PHASE_CT_4" => Ok(Self::TransmitPhaseCt4(value)),
+            "TRANSMIT_PHASE_CT_5" => Ok(Self::TransmitPhaseCt5(value)),
+            "TROPO_DRY" => Ok(Self::TropoDry(value)),
+            "TROPO_WET" => Ok(Self::TropoWet(value)),
+            "VLBI_DELAY" => Ok(Self::VlbiDelay(value)),
             _ => Err(crate::error::ValidationError::InvalidValue {
                 field: key.to_string().into(),
-                value: val.to_string(),
+                value: value.to_string(),
                 expected: "valid TDM observation keyword".into(),
                 line: None,
             }
             .into()),
         }
+    }
+
+    pub fn from_key_val(key: &str, val: &str) -> Result<Self> {
+        let value = fast_float::parse(val).map_err(|_| {
+            CcsdsNdmError::Format(Box::new(crate::error::FormatError::InvalidFormat(
+                format!("Invalid float: {val}"),
+            )))
+        })?;
+        Self::from_key_value(key, value)
     }
 }
 

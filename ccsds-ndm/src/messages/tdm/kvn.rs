@@ -16,9 +16,8 @@ use crate::kvn::parser::*;
 use crate::kvn::ser::KvnWriter;
 use crate::parse_block;
 use crate::traits::ToKvn;
-use crate::types::{CalendarEpoch, Percentage};
 use winnow::combinator::preceded;
-use winnow::error::{AddContext, ErrMode, StrContext};
+use winnow::error::{AddContext, ErrMode, FromExternalError, StrContext};
 use winnow::prelude::*;
 use winnow::stream::Offset;
 
@@ -295,63 +294,8 @@ pub fn tdm_metadata(input: &mut &str) -> KvnResult<TdmMetadata> {
 //----------------------------------------------------------------------
 
 pub fn tdm_observation(input: &mut &str) -> KvnResult<TdmObservation> {
-    use winnow::combinator::dispatch;
-
-    let kv_epoch_token = kv_calendar_epoch_token;
     let checkpoint = input.checkpoint();
-    let (epoch, data) = dispatch! {
-        preceded(ws, keyword);
-        "ANGLE_1" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::Angle1(v)))),
-        "ANGLE_2" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::Angle2(v)))),
-        "CARRIER_POWER" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::CarrierPower(v)))),
-        "CLOCK_BIAS" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ClockBias(v)))),
-        "CLOCK_DRIFT" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ClockDrift(v)))),
-        "DOPPLER_COUNT" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::DopplerCount(v)))),
-        "DOPPLER_INSTANTANEOUS" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::DopplerInstantaneous(v)))),
-        "DOPPLER_INTEGRATED" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::DopplerIntegrated(v)))),
-        "DOR" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::Dor(v)))),
-        "MAG" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::Mag(v)))),
-        "PC_N0" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::PcN0(v)))),
-        "PR_N0" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::PrN0(v)))),
-        "PRESSURE" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::Pressure(v)))),
-        "RANGE" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::Range(v)))),
-        "RCS" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::Rcs(v)))),
-        "RECEIVE_FREQ" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceiveFreq(v)))),
-        "RECEIVE_FREQ_1" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceiveFreq1(v)))),
-        "RECEIVE_FREQ_2" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceiveFreq2(v)))),
-        "RECEIVE_FREQ_3" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceiveFreq3(v)))),
-        "RECEIVE_FREQ_4" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceiveFreq4(v)))),
-        "RECEIVE_FREQ_5" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceiveFreq5(v)))),
-        "RECEIVE_PHASE_CT_1" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt1(v)))),
-        "RECEIVE_PHASE_CT_2" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt2(v)))),
-        "RECEIVE_PHASE_CT_3" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt3(v)))),
-        "RECEIVE_PHASE_CT_4" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt4(v)))),
-        "RECEIVE_PHASE_CT_5" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::ReceivePhaseCt5(v)))),
-        "RHUMIDITY" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| {
-            Percentage::new(v, None).map(|p| (e, TdmObservationData::Rhumidity(p)))
-        }),
-        "STEC" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::Stec(v)))),
-        "TEMPERATURE" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::Temperature(v)))),
-        "TRANSMIT_FREQ_1" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreq1(v)))),
-        "TRANSMIT_FREQ_2" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreq2(v)))),
-        "TRANSMIT_FREQ_3" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreq3(v)))),
-        "TRANSMIT_FREQ_4" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreq4(v)))),
-        "TRANSMIT_FREQ_5" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreq5(v)))),
-        "TRANSMIT_FREQ_RATE_1" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreqRate1(v)))),
-        "TRANSMIT_FREQ_RATE_2" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreqRate2(v)))),
-        "TRANSMIT_FREQ_RATE_3" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreqRate3(v)))),
-        "TRANSMIT_FREQ_RATE_4" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreqRate4(v)))),
-        "TRANSMIT_FREQ_RATE_5" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitFreqRate5(v)))),
-        "TRANSMIT_PHASE_CT_1" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt1(v)))),
-        "TRANSMIT_PHASE_CT_2" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt2(v)))),
-        "TRANSMIT_PHASE_CT_3" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt3(v)))),
-        "TRANSMIT_PHASE_CT_4" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt4(v)))),
-        "TRANSMIT_PHASE_CT_5" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TransmitPhaseCt5(v)))),
-        "TROPO_DRY" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TropoDry(v)))),
-        "TROPO_WET" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::TropoWet(v)))),
-        "VLBI_DELAY" => (kv_sep, kv_epoch_token, preceded(ws, parse_f64_winnow)).map(|(_, e, v)| Ok((e, TdmObservationData::VlbiDelay(v)))),
-        _ => |i: &mut &str| Err(ErrMode::Cut(InternalParserError::from_input(i).add_context(i, &i.checkpoint(), StrContext::Label("Unknown TDM data keyword")))),
-    }.try_map(|res: std::result::Result<(CalendarEpoch, TdmObservationData), CcsdsNdmError>| res).parse_next(input).map_err(|e| {
+    let key = preceded(ws, keyword).parse_next(input).map_err(|e| {
         if e.is_backtrack() {
             ErrMode::Backtrack(InternalParserError::from_input(input).add_context(
                 input,
@@ -361,6 +305,14 @@ pub fn tdm_observation(input: &mut &str) -> KvnResult<TdmObservation> {
         } else {
             e
         }
+    })?;
+
+    let (_, epoch, value) =
+        (kv_sep, kv_calendar_epoch_token, preceded(ws, parse_f64_winnow)).parse_next(input)?;
+
+    let data = TdmObservationData::from_key_value(key, value).map_err(|error| {
+        input.reset(&checkpoint);
+        ErrMode::Cut(InternalParserError::from_external_error(input, error))
     })?;
 
     opt_line_ending.parse_next(input)?;
@@ -2033,5 +1985,25 @@ BAD_KEY = 2023-01-01T00:00:00 1000.0
 DATA_STOP
 "#;
         assert!(Tdm::from_kvn(kvn_malformed).is_err());
+    }
+
+    #[test]
+    fn test_observation_value_error_reports_record_line() {
+        let good = include_str!("../../../data/kvn/tdm_e1.kvn");
+        let record = "RECEIVE_FREQ_1 = 2005-159T17:41:00 32021034790.7265";
+        let bad = good.replacen(record, "RHUMIDITY = 2005-159T17:41:00 150.0", 1);
+        let expected_line = good[..good.find(record).unwrap()]
+            .bytes()
+            .filter(|byte| *byte == b'\n')
+            .count()
+            + 1;
+
+        let CcsdsNdmError::Validation(error) = Tdm::from_kvn(&bad).unwrap_err() else {
+            panic!("expected a validation error");
+        };
+        let crate::error::ValidationError::OutOfRange { line, .. } = *error else {
+            panic!("expected an out-of-range error");
+        };
+        assert_eq!(line, Some(expected_line));
     }
 }

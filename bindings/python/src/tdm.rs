@@ -1925,66 +1925,8 @@ impl TdmObservation {
     #[new]
     #[pyo3(signature = (*, epoch, keyword, value))]
     fn new(epoch: String, keyword: String, value: f64) -> PyResult<Self> {
-        use core_tdm::TdmObservationData;
-
-        // Parse the keyword to get the correct observation type
-        let data = match keyword.as_str() {
-            "RANGE" => TdmObservationData::Range(value),
-            "DOPPLER_COUNT" => TdmObservationData::DopplerCount(value),
-            "DOPPLER_INSTANTANEOUS" => TdmObservationData::DopplerInstantaneous(value),
-            "DOPPLER_INTEGRATED" => TdmObservationData::DopplerIntegrated(value),
-            "CARRIER_POWER" => TdmObservationData::CarrierPower(value),
-            "PC_N0" => TdmObservationData::PcN0(value),
-            "PR_N0" => TdmObservationData::PrN0(value),
-            "RECEIVE_FREQ" => TdmObservationData::ReceiveFreq(value),
-            "RECEIVE_FREQ_1" => TdmObservationData::ReceiveFreq1(value),
-            "RECEIVE_FREQ_2" => TdmObservationData::ReceiveFreq2(value),
-            "RECEIVE_FREQ_3" => TdmObservationData::ReceiveFreq3(value),
-            "RECEIVE_FREQ_4" => TdmObservationData::ReceiveFreq4(value),
-            "RECEIVE_FREQ_5" => TdmObservationData::ReceiveFreq5(value),
-            "TRANSMIT_FREQ_1" => TdmObservationData::TransmitFreq1(value),
-            "TRANSMIT_FREQ_2" => TdmObservationData::TransmitFreq2(value),
-            "TRANSMIT_FREQ_3" => TdmObservationData::TransmitFreq3(value),
-            "TRANSMIT_FREQ_4" => TdmObservationData::TransmitFreq4(value),
-            "TRANSMIT_FREQ_5" => TdmObservationData::TransmitFreq5(value),
-            "TRANSMIT_FREQ_RATE_1" => TdmObservationData::TransmitFreqRate1(value),
-            "TRANSMIT_FREQ_RATE_2" => TdmObservationData::TransmitFreqRate2(value),
-            "TRANSMIT_FREQ_RATE_3" => TdmObservationData::TransmitFreqRate3(value),
-            "TRANSMIT_FREQ_RATE_4" => TdmObservationData::TransmitFreqRate4(value),
-            "TRANSMIT_FREQ_RATE_5" => TdmObservationData::TransmitFreqRate5(value),
-            "ANGLE_1" => TdmObservationData::Angle1(value),
-            "ANGLE_2" => TdmObservationData::Angle2(value),
-            "VLBI_DELAY" => TdmObservationData::VlbiDelay(value),
-            "CLOCK_BIAS" => TdmObservationData::ClockBias(value),
-            "CLOCK_DRIFT" => TdmObservationData::ClockDrift(value),
-            "PRESSURE" => TdmObservationData::Pressure(value),
-            "RHUMIDITY" => {
-                TdmObservationData::Rhumidity(ccsds_ndm::types::Percentage { value, units: None })
-            }
-            "TEMPERATURE" => TdmObservationData::Temperature(value),
-            "TROPO_DRY" => TdmObservationData::TropoDry(value),
-            "TROPO_WET" => TdmObservationData::TropoWet(value),
-            "STEC" => TdmObservationData::Stec(value),
-            "MAG" => TdmObservationData::Mag(value),
-            "RCS" => TdmObservationData::Rcs(value),
-            "DOR" => TdmObservationData::Dor(value),
-            "RECEIVE_PHASE_CT_1" => TdmObservationData::ReceivePhaseCt1(value),
-            "RECEIVE_PHASE_CT_2" => TdmObservationData::ReceivePhaseCt2(value),
-            "RECEIVE_PHASE_CT_3" => TdmObservationData::ReceivePhaseCt3(value),
-            "RECEIVE_PHASE_CT_4" => TdmObservationData::ReceivePhaseCt4(value),
-            "RECEIVE_PHASE_CT_5" => TdmObservationData::ReceivePhaseCt5(value),
-            "TRANSMIT_PHASE_CT_1" => TdmObservationData::TransmitPhaseCt1(value),
-            "TRANSMIT_PHASE_CT_2" => TdmObservationData::TransmitPhaseCt2(value),
-            "TRANSMIT_PHASE_CT_3" => TdmObservationData::TransmitPhaseCt3(value),
-            "TRANSMIT_PHASE_CT_4" => TdmObservationData::TransmitPhaseCt4(value),
-            "TRANSMIT_PHASE_CT_5" => TdmObservationData::TransmitPhaseCt5(value),
-            _ => {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Unknown observation keyword: {}",
-                    keyword
-                )))
-            }
-        };
+        let data = core_tdm::TdmObservationData::from_key_value(&keyword, value)
+            .map_err(crate::errors::ccsds_error_to_pyerr)?;
 
         Ok(Self {
             inner: core_tdm::TdmObservation {
@@ -2032,7 +1974,7 @@ impl TdmObservation {
     /// :type: Optional[float]
     #[getter]
     fn get_value(&self) -> Option<f64> {
-        self.inner.data.value_to_string().parse::<f64>().ok()
+        Some(self.inner.data.value())
     }
 
     /// Measurement value as string.

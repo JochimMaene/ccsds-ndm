@@ -76,153 +76,16 @@ impl<'de> Deserialize<'de> for TdmObservation {
                             }
                             epoch = Some(map.next_value()?);
                         }
-                        // Explicit matching of all data types
-                        "ANGLE_1" => {
-                            data = Some(TdmObservationData::Angle1(map.next_value()?));
-                        }
-                        "ANGLE_2" => {
-                            data = Some(TdmObservationData::Angle2(map.next_value()?));
-                        }
-                        "CARRIER_POWER" => {
-                            data = Some(TdmObservationData::CarrierPower(map.next_value()?));
-                        }
-                        "CLOCK_BIAS" => {
-                            data = Some(TdmObservationData::ClockBias(map.next_value()?));
-                        }
-                        "CLOCK_DRIFT" => {
-                            data = Some(TdmObservationData::ClockDrift(map.next_value()?));
-                        }
-                        "DOPPLER_COUNT" => {
-                            data = Some(TdmObservationData::DopplerCount(map.next_value()?));
-                        }
-                        "DOPPLER_INSTANTANEOUS" => {
-                            data =
-                                Some(TdmObservationData::DopplerInstantaneous(map.next_value()?));
-                        }
-                        "DOPPLER_INTEGRATED" => {
-                            data = Some(TdmObservationData::DopplerIntegrated(map.next_value()?));
-                        }
-                        "DOR" => {
-                            data = Some(TdmObservationData::Dor(map.next_value()?));
-                        }
-                        "MAG" => {
-                            data = Some(TdmObservationData::Mag(map.next_value()?));
-                        }
-                        "PC_N0" => {
-                            data = Some(TdmObservationData::PcN0(map.next_value()?));
-                        }
-                        "PR_N0" => {
-                            data = Some(TdmObservationData::PrN0(map.next_value()?));
-                        }
-                        "PRESSURE" => {
-                            data = Some(TdmObservationData::Pressure(map.next_value()?));
-                        }
-                        "RANGE" => {
-                            data = Some(TdmObservationData::Range(map.next_value()?));
-                        }
-                        "RCS" => {
-                            data = Some(TdmObservationData::Rcs(map.next_value()?));
-                        }
-                        "RECEIVE_FREQ" => {
-                            data = Some(TdmObservationData::ReceiveFreq(map.next_value()?));
-                        }
-                        "RECEIVE_FREQ_1" => {
-                            data = Some(TdmObservationData::ReceiveFreq1(map.next_value()?));
-                        }
-                        "RECEIVE_FREQ_2" => {
-                            data = Some(TdmObservationData::ReceiveFreq2(map.next_value()?));
-                        }
-                        "RECEIVE_FREQ_3" => {
-                            data = Some(TdmObservationData::ReceiveFreq3(map.next_value()?));
-                        }
-                        "RECEIVE_FREQ_4" => {
-                            data = Some(TdmObservationData::ReceiveFreq4(map.next_value()?));
-                        }
-                        "RECEIVE_FREQ_5" => {
-                            data = Some(TdmObservationData::ReceiveFreq5(map.next_value()?));
-                        }
-                        "RECEIVE_PHASE_CT_1" => {
-                            data = Some(TdmObservationData::ReceivePhaseCt1(map.next_value()?));
-                        }
-                        "RECEIVE_PHASE_CT_2" => {
-                            data = Some(TdmObservationData::ReceivePhaseCt2(map.next_value()?));
-                        }
-                        "RECEIVE_PHASE_CT_3" => {
-                            data = Some(TdmObservationData::ReceivePhaseCt3(map.next_value()?));
-                        }
-                        "RECEIVE_PHASE_CT_4" => {
-                            data = Some(TdmObservationData::ReceivePhaseCt4(map.next_value()?));
-                        }
-                        "RECEIVE_PHASE_CT_5" => {
-                            data = Some(TdmObservationData::ReceivePhaseCt5(map.next_value()?));
-                        }
+                        // RHUMIDITY uses Percentage so its optional units attribute is preserved.
                         "RHUMIDITY" => {
                             data = Some(TdmObservationData::Rhumidity(map.next_value()?));
                         }
-                        "STEC" => {
-                            data = Some(TdmObservationData::Stec(map.next_value()?));
-                        }
-                        "TEMPERATURE" => {
-                            data = Some(TdmObservationData::Temperature(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_1" => {
-                            data = Some(TdmObservationData::TransmitFreq1(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_2" => {
-                            data = Some(TdmObservationData::TransmitFreq2(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_3" => {
-                            data = Some(TdmObservationData::TransmitFreq3(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_4" => {
-                            data = Some(TdmObservationData::TransmitFreq4(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_5" => {
-                            data = Some(TdmObservationData::TransmitFreq5(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_RATE_1" => {
-                            data = Some(TdmObservationData::TransmitFreqRate1(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_RATE_2" => {
-                            data = Some(TdmObservationData::TransmitFreqRate2(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_RATE_3" => {
-                            data = Some(TdmObservationData::TransmitFreqRate3(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_RATE_4" => {
-                            data = Some(TdmObservationData::TransmitFreqRate4(map.next_value()?));
-                        }
-                        "TRANSMIT_FREQ_RATE_5" => {
-                            data = Some(TdmObservationData::TransmitFreqRate5(map.next_value()?));
-                        }
-                        "TRANSMIT_PHASE_CT_1" => {
-                            data = Some(TdmObservationData::TransmitPhaseCt1(map.next_value()?));
-                        }
-                        "TRANSMIT_PHASE_CT_2" => {
-                            data = Some(TdmObservationData::TransmitPhaseCt2(map.next_value()?));
-                        }
-                        "TRANSMIT_PHASE_CT_3" => {
-                            data = Some(TdmObservationData::TransmitPhaseCt3(map.next_value()?));
-                        }
-                        "TRANSMIT_PHASE_CT_4" => {
-                            data = Some(TdmObservationData::TransmitPhaseCt4(map.next_value()?));
-                        }
-                        "TRANSMIT_PHASE_CT_5" => {
-                            data = Some(TdmObservationData::TransmitPhaseCt5(map.next_value()?));
-                        }
-                        "TROPO_DRY" => {
-                            data = Some(TdmObservationData::TropoDry(map.next_value()?));
-                        }
-                        "TROPO_WET" => {
-                            data = Some(TdmObservationData::TropoWet(map.next_value()?));
-                        }
-                        "VLBI_DELAY" => {
-                            data = Some(TdmObservationData::VlbiDelay(map.next_value()?));
-                        }
-                        _ => {
-                            return Err(serde::de::Error::custom(format!(
-                                "unknown TDM observation field '{key}'"
-                            )));
+                        key => {
+                            let value: f64 = map.next_value()?;
+                            data = Some(
+                                TdmObservationData::from_key_value(key, value)
+                                    .map_err(serde::de::Error::custom)?,
+                            );
                         }
                     }
                 }
