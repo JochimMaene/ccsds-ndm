@@ -280,6 +280,8 @@ impl ApmMetadata {
     ///
     /// Examples: EUTELSAT W1, MARS PATHFINDER, UNKNOWN
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_object_name(&self) -> String {
@@ -303,6 +305,8 @@ impl ApmMetadata {
     ///
     /// Examples: 2000-052A
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_object_id(&self) -> String {
@@ -318,6 +322,8 @@ impl ApmMetadata {
     /// comment line shall begin with this keyword.
     ///
     /// Examples: This is a comment.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.3.
     ///
     /// :type: list[str]
     #[getter]
@@ -351,6 +357,8 @@ impl ApmMetadata {
     /// annex B, subsection B2.
     ///
     /// Examples: UTC, TAI
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.3.
     ///
     /// :type: str
     #[getter]
@@ -542,6 +550,8 @@ impl ApmData {
     /// Spin. All mandatory elements are to be provided if the block is present. (See annex F for
     /// conventions and further detail.)
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: list[SpinState]
     #[getter]
     fn get_spin(&self, py: Python<'_>) -> Py<PyList> {
@@ -556,6 +566,8 @@ impl ApmData {
 
     /// Inertia. All mandatory elements are to be provided if the block is present. (See annex F
     /// for conventions and further detail.)
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: list[InertiaState]
     #[getter]
@@ -589,6 +601,8 @@ impl ApmData {
 
     /// Epoch of the attitude elements and optional logical blocks.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: str
     #[getter]
     fn get_epoch(&self) -> String {
@@ -602,6 +616,8 @@ impl ApmData {
     }
 
     /// One or more comment line(s). Each comment line shall begin with this keyword.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: list[str]
     #[getter]
@@ -672,6 +688,8 @@ impl ApmManeuverParameters {
 
     /// Epoch of start of maneuver. (For format specification, see 6.8.9.)
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: str
     #[getter]
     fn get_man_epoch_start(&self) -> String {
@@ -688,6 +706,8 @@ impl ApmManeuverParameters {
     ///
     /// Units: s
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_man_duration(&self) -> f64 {
@@ -701,6 +721,8 @@ impl ApmManeuverParameters {
 
     /// Coordinate system for the torque vector. The set of allowed values is described in annex B,
     /// subsection B3.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: str
     #[getter]
@@ -717,6 +739,8 @@ impl ApmManeuverParameters {
     ///
     /// Units: N*m
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_man_tor_x(&self) -> f64 {
@@ -732,6 +756,8 @@ impl ApmManeuverParameters {
     ///
     /// Units: N*m
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_man_tor_y(&self) -> f64 {
@@ -746,6 +772,8 @@ impl ApmManeuverParameters {
     /// 3rd component of the torque vector.
     ///
     /// Units: N*m
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -781,6 +809,8 @@ impl ApmManeuverParameters {
     }
 
     /// One or more comment line(s). Each comment line shall begin with this keyword.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: list[str]
     #[getter]

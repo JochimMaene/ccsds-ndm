@@ -317,6 +317,8 @@ impl AcmMetadata {
     ///
     /// Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
+    ///
     /// :type: str
     #[getter]
     fn get_object_name(&self) -> String {
@@ -354,6 +356,8 @@ impl AcmMetadata {
     /// with this keyword.
     ///
     /// Examples: This is a comment.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
     ///
     /// :type: list[str]
     #[getter]
@@ -488,6 +492,8 @@ impl AcmMetadata {
     ///
     /// Examples: UTC, TAI
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
+    ///
     /// :type: str
     #[getter]
     fn get_time_system(&self) -> String {
@@ -504,6 +510,8 @@ impl AcmMetadata {
     /// Metadata section.
     ///
     /// Examples: 2016-11-10T00:00:00
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
     ///
     /// :type: str
     #[getter]
@@ -732,6 +740,8 @@ impl AcmData {
 
     /// A single user-defined Data section.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.10.
+    ///
     /// :type: UserDefined | None
     #[getter]
     fn get_user(&self, py: Python<'_>) -> Option<Py<crate::types::UserDefined>> {
@@ -745,6 +755,8 @@ impl AcmData {
 
     /// One or more optional attitude state time histories (each consisting of one or more attitude
     /// states).
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
     ///
     /// :type: list[AcmAttitudeState]
     #[getter]
@@ -760,6 +772,8 @@ impl AcmData {
 
     /// A single space object physical characteristics section.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.6.
+    ///
     /// :type: AcmPhysicalDescription | None
     #[getter]
     fn get_phys(&self, py: Python<'_>) -> Option<Py<AcmPhysicalDescription>> {
@@ -773,6 +787,8 @@ impl AcmData {
 
     /// One or more optional covariance time histories (each consisting of one or more covariance
     /// matrix diagonals).
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
     ///
     /// :type: list[AcmCovarianceMatrix]
     #[getter]
@@ -788,6 +804,8 @@ impl AcmData {
 
     /// One or more optional maneuver specification section(s).
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.8.
+    ///
     /// :type: list[AcmManeuverParameters]
     #[getter]
     fn get_man(&self, py: Python<'_>) -> Py<PyList> {
@@ -801,6 +819,8 @@ impl AcmData {
     }
 
     /// A single attitude determination Data section.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: AcmAttitudeDetermination | None
     #[getter]
@@ -881,6 +901,8 @@ impl AcmAttitudeState {
     ///
     /// Examples: This is a comment.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -953,6 +975,8 @@ impl AcmAttitudeState {
     ///
     /// Examples: J2000
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
+    ///
     /// :type: str
     #[getter]
     fn get_ref_frame_a(&self) -> String {
@@ -968,6 +992,8 @@ impl AcmAttitudeState {
     /// allowed values is described in annex B, subsection B3.
     ///
     /// Examples: SC_BODY_1
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
     ///
     /// :type: str
     #[getter]
@@ -985,6 +1011,8 @@ impl AcmAttitudeState {
     ///
     /// Examples: 3, 4, 7
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
+    ///
     /// :type: int
     #[getter]
     fn get_number_states(&self) -> u32 {
@@ -1000,6 +1028,8 @@ impl AcmAttitudeState {
     /// listed before rate data. The units that shall be used are given in annex B, subsection B4.
     ///
     /// Examples: QUATERNION, EULER_ANGLES, DCM
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
     ///
     /// :type: str
     #[getter]
@@ -1050,6 +1080,8 @@ impl AcmAttitudeState {
 
     /// Data lines that consist of attitude data followed by rate data. (For the data units, see
     /// above [ATT_TYPE and RATE_TYPE keywords]).
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
     ///
     /// :type: list[list[float]]
     #[getter]
@@ -1104,6 +1136,8 @@ impl AcmPhysicalDescription {
     /// Comments allowed only immediately after the PHYS_START keyword.
     ///
     /// Examples: This is a comment.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.6.
     ///
     /// :type: list[str]
     #[getter]
@@ -1358,6 +1392,8 @@ impl AcmCovarianceMatrix {
     ///
     /// Examples: THIS is a comment.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -1447,6 +1483,8 @@ impl AcmCovarianceMatrix {
     ///
     /// Examples: ANGLE, ANGLE_GYROBIAS
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
+    ///
     /// :type: str
     #[getter]
     fn get_cov_type(&self) -> String {
@@ -1462,6 +1500,8 @@ impl AcmCovarianceMatrix {
 
     /// Optional confidence level of the covariance matrix.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
+    ///
     /// :type: float | None
     #[getter]
     fn get_cov_confidence(&self) -> Option<f64> {
@@ -1475,6 +1515,8 @@ impl AcmCovarianceMatrix {
 
     /// Covariance data lines (diagonal terms only). (For the data units, see annex B, subsection
     /// B6.)
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
     ///
     /// :type: list[list[float]]
     #[getter]
@@ -1528,6 +1570,8 @@ impl AcmManeuverParameters {
     /// Comments allowed only immediately after the MAN_START keyword.
     ///
     /// Examples: This is a comment.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.8.
     ///
     /// :type: list[str]
     #[getter]
@@ -1769,6 +1813,8 @@ impl AcmSensor {
     ///
     /// Examples: This is a comment.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -1933,6 +1979,8 @@ impl AcmAttitudeDetermination {
     ///
     /// Examples: This is a comment.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -2062,6 +2110,8 @@ impl AcmAttitudeDetermination {
 
     /// Epoch of the attitude determination.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
+    ///
     /// :type: str | None
     #[getter]
     fn get_ad_epoch(&self) -> Option<String> {
@@ -2104,6 +2154,8 @@ impl AcmAttitudeDetermination {
     /// listed before rate states.
     ///
     /// Examples: QUATERNION
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: str | None
     #[getter]
@@ -2185,6 +2237,8 @@ impl AcmAttitudeDetermination {
     }
 
     /// Sensor data blocks.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: list[AcmSensor]
     #[getter]

@@ -278,6 +278,8 @@ impl TdmHeader {
     ///
     /// Examples: CNES, ESA, GSFC, DLR, JPL, JAXA
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.2.
+    ///
     /// :type: str
     #[getter]
     fn get_originator(&self) -> String {
@@ -292,6 +294,8 @@ impl TdmHeader {
     /// Data creation date/time in UTC. (For format specification, see 4.3.9.)
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23.4, 2006-001T00:00:00Z
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.2.
     ///
     /// :type: str
     #[getter]
@@ -325,6 +329,8 @@ impl TdmHeader {
     /// (See 4.5 for formatting rules.)
     ///
     /// Examples: This is a comment
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.2.
     ///
     /// :type: list[str]
     #[getter]
@@ -850,6 +856,8 @@ impl TdmMetadata {
     ///
     /// Examples: UTC, TAI, GPS, SCLK
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: str
     #[getter]
     fn get_time_system(&self) -> String {
@@ -906,6 +914,8 @@ impl TdmMetadata {
     /// some special TDMs such as tropospheric media, only one participant need be listed.
     ///
     /// Examples: DSS-63-S400K, ROSETTA, `<Quasar catalog name>`, 1997-061A, UNKNOWN
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
     ///
     /// :type: str
     #[getter]

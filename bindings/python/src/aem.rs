@@ -374,6 +374,8 @@ impl AemMetadata {
     ///
     /// Examples: EUTELSAT W1
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_object_name(&self) -> String {
@@ -397,6 +399,8 @@ impl AemMetadata {
     ///
     /// Examples: 2000-052A
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_object_id(&self) -> String {
@@ -412,6 +416,8 @@ impl AemMetadata {
     /// begin with this keyword.
     ///
     /// Examples: This is a comment.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
     /// :type: list[str]
     #[getter]
@@ -446,6 +452,8 @@ impl AemMetadata {
     ///
     /// Examples: ICRF, SC_BODY_1, INSTRUMENT_A
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_ref_frame_a(&self) -> String {
@@ -461,6 +469,8 @@ impl AemMetadata {
     /// allowed values is described in annex B, subsection B3.
     ///
     /// Examples: SC_BODY_1, INSTRUMENT_A
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
     /// :type: str
     #[getter]
@@ -478,6 +488,8 @@ impl AemMetadata {
     ///
     /// Examples: UTC, TAI
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_time_system(&self) -> String {
@@ -493,6 +505,8 @@ impl AemMetadata {
     /// metadata block.
     ///
     /// Examples: 1996-12-18T14:28:15.11
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
     /// :type: str
     #[getter]
@@ -510,6 +524,8 @@ impl AemMetadata {
     /// metadata block.
     ///
     /// Examples: 1996-12-18T14:28:15.11
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
     /// :type: str
     #[getter]
@@ -572,6 +588,8 @@ impl AemMetadata {
     ///
     /// Examples: QUATERNION, QUATERNION/DERIVATIVE, QUATERNION/ANGVEL, EULER_ANGLE,
     /// EULER_ANGLE/DERIVATIVE, EULER_ANGLE/ANGVEL, SPIN, SPIN/NUTATION, SPIN/NUTATION_MOM
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
     /// :type: str
     #[getter]
@@ -858,6 +876,8 @@ impl AemData {
     /// Comments allowed only at the beginning of the Data section. Each comment line shall begin
     /// with this keyword.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.4.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -870,6 +890,8 @@ impl AemData {
     }
 
     /// Attitude ephemeris data lines.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.4.
     ///
     /// :type: list[AttitudeState]
     #[getter]

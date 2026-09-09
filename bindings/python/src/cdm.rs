@@ -420,6 +420,8 @@ impl CdmHeader {
     ///
     /// Examples: 2010-03-12T22:31:12.000, 2010-071T22:31:12.000
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.2.
+    ///
     /// :type: str
     #[getter]
     fn creation_date(&self) -> String {
@@ -438,6 +440,8 @@ impl CdmHeader {
     ///
     /// Examples: JSPOC, ESA SST, CAESAR, JPL, SDC
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.2.
+    ///
     /// :type: str
     #[getter]
     fn originator(&self) -> String {
@@ -453,6 +457,8 @@ impl CdmHeader {
     /// for formatting rules.)
     ///
     /// Examples: 201113719185, ABC-12_34
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.2.
     ///
     /// :type: str
     #[getter]
@@ -482,6 +488,8 @@ impl CdmHeader {
     /// (See 6.3.4 for formatting rules.)
     ///
     /// Examples: This is a comment
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.2.
     ///
     /// :type: list[str]
     #[getter]
@@ -760,6 +768,8 @@ impl RelativeMetadataData {
 
     /// The date and time in UTC of the closest approach. (See 6.3.2.6 for formatting rules.)
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
+    ///
     /// :type: str
     #[getter]
     fn tca(&self) -> String {
@@ -775,6 +785,8 @@ impl RelativeMetadataData {
     /// TCA. Data type = double.
     ///
     /// Units: m
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
     ///
     /// :type: float
     #[getter]
@@ -938,6 +950,8 @@ impl RelativeMetadataData {
     }
 
     /// Comments (see 6.3.4 for formatting rules).
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
     ///
     /// :type: list[str]
     #[getter]
@@ -1428,6 +1442,8 @@ impl CdmMetadata {
     ///
     /// Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
+    ///
     /// :type: str
     #[getter]
     fn object_name(&self) -> String {
@@ -1441,6 +1457,8 @@ impl CdmMetadata {
     /// The satellite catalog designator for the object. (See 5.2.9 for formatting rules.)
     ///
     /// Examples: 12345
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: str
     #[getter]
@@ -1457,6 +1475,8 @@ impl CdmMetadata {
     /// (<https://sanaregistry.org/r/cdm_catalog>). (See 5.2.9 for formatting rules.)
     ///
     /// Examples: SATCAT
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: str
     #[getter]
@@ -1476,6 +1496,8 @@ impl CdmMetadata {
     ///
     /// Examples: 2002-021A, UNKNOWN
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
+    ///
     /// :type: str
     #[getter]
     fn international_designator(&self) -> String {
@@ -1492,6 +1514,8 @@ impl CdmMetadata {
     /// Orbit Determination (OD) of the CDM originator was used in the CA.
     ///
     /// Examples: EPHEMERIS SATELLITE A, NONE
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: str
     #[getter]
@@ -1621,6 +1645,8 @@ impl CdmMetadata {
 
     /// Comments (see 6.3.4 for formatting rules).
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
+    ///
     /// :type: list[str]
     #[getter]
     fn comment(&self) -> Vec<String> {
@@ -1634,6 +1660,8 @@ impl CdmMetadata {
     /// The object to which the metadata and data apply (Object1 or Object2).
     ///
     /// Examples: OBJECT1, OBJECT2
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: CdmObjectType
     #[getter]
@@ -1683,6 +1711,8 @@ impl CdmMetadata {
     ///
     /// Examples: CALCULATED, DEFAULT
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
+    ///
     /// :type: CovarianceMethodType
     #[getter]
     fn get_covariance_method(&self) -> CovarianceMethodType {
@@ -1702,6 +1732,8 @@ impl CdmMetadata {
     /// The maneuver capacity of the object. (See 1.4.3.1 for definition of 'N/A'.)
     ///
     /// Examples: YES, NO, N/A
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: ManeuverableType
     #[getter]
@@ -1726,6 +1758,8 @@ impl CdmMetadata {
     /// both Object1 and Object2.
     ///
     /// Examples: GCRF, EME2000, ITRF
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: ReferenceFrameType
     #[getter]
@@ -2179,6 +2213,8 @@ impl CdmStateVector {
 
     /// Comments (see 6.3.4 for formatting rules).
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
+    ///
     /// :type: list[str]
     #[getter]
     fn comment(&self) -> Vec<String> {
@@ -2591,6 +2627,8 @@ impl AdditionalParameters {
     }
 
     /// Comments (see 6.3.4 for formatting rules).
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
     ///
     /// :type: list[str]
     #[getter]

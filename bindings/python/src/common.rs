@@ -79,6 +79,8 @@ impl OdmHeader {
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.2.
+    ///
     /// :type: str
     #[getter]
     fn get_creation_date(&self) -> String {
@@ -97,6 +99,8 @@ impl OdmHeader {
     /// procedures to request that originator be added to SANA registry.
     ///
     /// Examples: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.2.
     ///
     /// :type: str
     #[getter]
@@ -145,6 +149,8 @@ impl OdmHeader {
     /// (See 7.8 for formatting rules.)
     ///
     /// Examples: This is a comment
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.2.
     ///
     /// :type: list[str]
     #[getter]
@@ -199,6 +205,8 @@ impl AdmHeader {
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.2.
+    ///
     /// :type: str
     #[getter]
     fn get_creation_date(&self) -> String {
@@ -217,6 +225,8 @@ impl AdmHeader {
     /// procedures to request that originator be added to SANA registry.
     ///
     /// Examples: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.2.
     ///
     /// :type: str
     #[getter]
@@ -264,6 +274,8 @@ impl AdmHeader {
     /// User-defined comments. (See 7.8 for formatting rules.)
     ///
     /// Examples: This is a comment
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.2.
     ///
     /// :type: list[str]
     #[getter]
@@ -382,6 +394,8 @@ impl StateVectorAcc {
 
     /// Epoch of state vector & optional Keplerian elements (see 7.5.10 for formatting rules).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: str
     #[getter]
     fn get_epoch(&self) -> String {
@@ -398,6 +412,8 @@ impl StateVectorAcc {
     ///
     /// Units: km
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.3.3.
+    ///
     /// :type: float
     #[getter]
     fn get_x(&self) -> f64 {
@@ -412,6 +428,8 @@ impl StateVectorAcc {
     /// Position vector Y-component.
     ///
     /// Units: km
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.3.3.
     ///
     /// :type: float
     #[getter]
@@ -428,6 +446,8 @@ impl StateVectorAcc {
     ///
     /// Units: km
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.3.3.
+    ///
     /// :type: float
     #[getter]
     fn get_z(&self) -> f64 {
@@ -442,6 +462,8 @@ impl StateVectorAcc {
     /// Velocity vector X-component.
     ///
     /// Units: km/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.3.3.
     ///
     /// :type: float
     #[getter]
@@ -458,6 +480,8 @@ impl StateVectorAcc {
     ///
     /// Units: km/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.3.3.
+    ///
     /// :type: float
     #[getter]
     fn get_y_dot(&self) -> f64 {
@@ -472,6 +496,8 @@ impl StateVectorAcc {
     /// Velocity vector Z-component.
     ///
     /// Units: km/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.3.3.
     ///
     /// :type: float
     #[getter]
@@ -625,6 +651,8 @@ impl StateVector {
 
     /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -637,6 +665,8 @@ impl StateVector {
     }
 
     /// Epoch of state vector & optional Keplerian elements (see 7.5.10 for formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: str
     #[getter]
@@ -654,6 +684,8 @@ impl StateVector {
     ///
     /// Units: km
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_x(&self) -> f64 {
@@ -668,6 +700,8 @@ impl StateVector {
     /// Position vector Y-component.
     ///
     /// Units: km
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -684,6 +718,8 @@ impl StateVector {
     ///
     /// Units: km
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_z(&self) -> f64 {
@@ -698,6 +734,8 @@ impl StateVector {
     /// Velocity vector X-component.
     ///
     /// Units: km/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -714,6 +752,8 @@ impl StateVector {
     ///
     /// Units: km/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_y_dot(&self) -> f64 {
@@ -728,6 +768,8 @@ impl StateVector {
     /// Velocity vector Z-component.
     ///
     /// Units: km/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -802,6 +844,8 @@ impl SpacecraftParameters {
     }
 
     /// Comments (see 7.8 for formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: list[str]
     #[getter]
@@ -1010,6 +1054,8 @@ impl OdParameters {
     }
 
     /// Comments (see 6.3.4 for formatting rules).
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
     ///
     /// :type: list[str]
     #[getter]
@@ -1438,6 +1484,8 @@ impl GroundImpactParameters {
     // Actually I must include them or audit will fail.
     // I will include them.
     /// Comments (allowed only at the beginning of each RDM data logical block).
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: list[str]
     #[getter]

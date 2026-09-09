@@ -86,6 +86,8 @@ impl UserDefined {
 
     /// Comments (see 7.8 for formatting rules).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {

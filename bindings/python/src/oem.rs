@@ -708,6 +708,8 @@ impl OemMetadata {
     ///
     /// Examples: EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_object_name(&self) -> String {
@@ -730,6 +732,8 @@ impl OemMetadata {
     /// disclosed, the value should be set to UNKNOWN.
     ///
     /// Examples: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.3.
     ///
     /// :type: str
     #[getter]
@@ -754,6 +758,8 @@ impl OemMetadata {
     /// Examples: EARTH, EARTH BARYCENTER, MOON, SOLAR SYSTEM BARYCENTER, SUN,
     /// JUPITER BARYCENTER, STS 106, EROS
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_center_name(&self) -> String {
@@ -769,6 +775,8 @@ impl OemMetadata {
     /// 3.2.3.3 should be documented in an ICD.
     ///
     /// Examples: ICRF, ITRF2000, EME2000, TEME
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.3.
     ///
     /// :type: str
     #[getter]
@@ -786,6 +794,8 @@ impl OemMetadata {
     ///
     /// Examples: UTC, TAI, TT, GPS, TDB, TCB
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_time_system(&self) -> String {
@@ -801,6 +811,8 @@ impl OemMetadata {
     /// following this metadata block. (For format specification, see 7.5.10.)
     ///
     /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.3.
     ///
     /// :type: str
     #[getter]
@@ -818,6 +830,8 @@ impl OemMetadata {
     /// following this metadata block. (For format specification, see 7.5.10.)
     ///
     /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.3.
     ///
     /// :type: str
     #[getter]
@@ -936,6 +950,8 @@ impl OemMetadata {
     }
 
     /// Comments (see 7.8 for formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.3.
     ///
     /// :type: list[str]
     #[getter]
@@ -1140,6 +1156,8 @@ impl OemData {
     ///
     /// Units: km, km/s, km/s²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.4.
+    ///
     /// :type: list[StateVectorAcc]
     #[getter]
     fn get_state_vector(&self, py: Python<'_>) -> Py<PyList> {
@@ -1298,6 +1316,8 @@ impl OemData {
     }
 
     /// Comments (see 7.8 for formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.4.
     ///
     /// :type: list[str]
     #[getter]
@@ -1688,6 +1708,8 @@ impl OemCovarianceMatrix {
     ///
     /// Examples: 2000-01-01T12:00:00Z
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
+    ///
     /// :type: str
     #[getter]
     fn get_epoch(&self) -> String {
@@ -1718,6 +1740,8 @@ impl OemCovarianceMatrix {
 
     /// Comments (see 7.8 for formatting rules).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -1732,6 +1756,8 @@ impl OemCovarianceMatrix {
     /// Covariance matrix `[1,1]`
     ///
     /// Units: km²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
     ///
     /// :type: float
     #[getter]
@@ -1748,6 +1774,8 @@ impl OemCovarianceMatrix {
     ///
     /// Units: km²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
+    ///
     /// :type: float
     #[getter]
     fn get_cy_x(&self) -> f64 {
@@ -1762,6 +1790,8 @@ impl OemCovarianceMatrix {
     /// Covariance matrix `[2,2]`
     ///
     /// Units: km²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
     ///
     /// :type: float
     #[getter]
@@ -1778,6 +1808,8 @@ impl OemCovarianceMatrix {
     ///
     /// Units: km²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
+    ///
     /// :type: float
     #[getter]
     fn get_cz_x(&self) -> f64 {
@@ -1792,6 +1824,8 @@ impl OemCovarianceMatrix {
     /// Covariance matrix `[3,2]`
     ///
     /// Units: km²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
     ///
     /// :type: float
     #[getter]
@@ -1808,6 +1842,8 @@ impl OemCovarianceMatrix {
     ///
     /// Units: km²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
+    ///
     /// :type: float
     #[getter]
     fn get_cz_z(&self) -> f64 {
@@ -1822,6 +1858,8 @@ impl OemCovarianceMatrix {
     /// Covariance matrix `[4,1]`
     ///
     /// Units: km²/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
     ///
     /// :type: float
     #[getter]
@@ -1838,6 +1876,8 @@ impl OemCovarianceMatrix {
     ///
     /// Units: km²/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
+    ///
     /// :type: float
     #[getter]
     fn get_cx_dot_y(&self) -> f64 {
@@ -1852,6 +1892,8 @@ impl OemCovarianceMatrix {
     /// Covariance matrix `[4,3]`
     ///
     /// Units: km²/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
     ///
     /// :type: float
     #[getter]
@@ -1868,6 +1910,8 @@ impl OemCovarianceMatrix {
     ///
     /// Units: km²/s²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
+    ///
     /// :type: float
     #[getter]
     fn get_cx_dot_x_dot(&self) -> f64 {
@@ -1882,6 +1926,8 @@ impl OemCovarianceMatrix {
     /// Covariance matrix `[5,1]`
     ///
     /// Units: km²/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
     ///
     /// :type: float
     #[getter]
@@ -1898,6 +1944,8 @@ impl OemCovarianceMatrix {
     ///
     /// Units: km²/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
+    ///
     /// :type: float
     #[getter]
     fn get_cy_dot_y(&self) -> f64 {
@@ -1912,6 +1960,8 @@ impl OemCovarianceMatrix {
     /// Covariance matrix `[5,3]`
     ///
     /// Units: km²/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
     ///
     /// :type: float
     #[getter]
@@ -1928,6 +1978,8 @@ impl OemCovarianceMatrix {
     ///
     /// Units: km²/s²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
+    ///
     /// :type: float
     #[getter]
     fn get_cy_dot_x_dot(&self) -> f64 {
@@ -1942,6 +1994,8 @@ impl OemCovarianceMatrix {
     /// Covariance matrix `[5,5]`
     ///
     /// Units: km²/s²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
     ///
     /// :type: float
     #[getter]
@@ -1958,6 +2012,8 @@ impl OemCovarianceMatrix {
     ///
     /// Units: km²/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
+    ///
     /// :type: float
     #[getter]
     fn get_cz_dot_x(&self) -> f64 {
@@ -1972,6 +2028,8 @@ impl OemCovarianceMatrix {
     /// Covariance matrix `[6,2]`
     ///
     /// Units: km²/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
     ///
     /// :type: float
     #[getter]
@@ -1988,6 +2046,8 @@ impl OemCovarianceMatrix {
     ///
     /// Units: km²/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
+    ///
     /// :type: float
     #[getter]
     fn get_cz_dot_z(&self) -> f64 {
@@ -2002,6 +2062,8 @@ impl OemCovarianceMatrix {
     /// Covariance matrix `[6,4]`
     ///
     /// Units: km²/s²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
     ///
     /// :type: float
     #[getter]
@@ -2018,6 +2080,8 @@ impl OemCovarianceMatrix {
     ///
     /// Units: km²/s²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
+    ///
     /// :type: float
     #[getter]
     fn get_cz_dot_y_dot(&self) -> f64 {
@@ -2032,6 +2096,8 @@ impl OemCovarianceMatrix {
     /// Covariance matrix `[6,6]`
     ///
     /// Units: km²/s²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.5.
     ///
     /// :type: float
     #[getter]

@@ -608,6 +608,8 @@ impl RdmMetadata {
     ///
     /// Examples: SENTINEL-1A, GOCE, ENVISAT, BRIZ R/B, DEBRIS, UNKNOWN
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: str
     #[getter]
     fn get_object_name(&self) -> String {
@@ -626,6 +628,8 @@ impl RdmMetadata {
     /// in 5.2.3.3).
     ///
     /// Examples: 2010-012C, 2016-001A, 1985-067CD, UNKNOWN
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: str
     #[getter]
@@ -726,6 +730,8 @@ impl RdmMetadata {
     ///
     /// Examples: YES, NO, UNKNOWN
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: str
     #[getter]
     fn get_controlled_reentry(&self) -> String {
@@ -746,6 +752,8 @@ impl RdmMetadata {
     ///
     /// Examples: EARTH, MOON, JUPITER
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: str
     #[getter]
     fn get_center_name(&self) -> String {
@@ -761,6 +769,8 @@ impl RdmMetadata {
     ///
     /// Examples: UTC, TAI
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: str
     #[getter]
     fn get_time_system(&self) -> String {
@@ -775,6 +785,8 @@ impl RdmMetadata {
     /// 5.3.3.5).
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: str
     #[getter]
@@ -1115,6 +1127,8 @@ impl RdmMetadata {
     }
 
     /// Comments (allowed only at the beginning of RDM metadata).
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: list[str]
     #[getter]
@@ -1476,6 +1490,8 @@ impl AtmosphericReentryParameters {
     ///
     /// Units: d
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: float
     #[getter]
     fn get_orbit_lifetime(&self) -> f64 {
@@ -1491,6 +1507,8 @@ impl AtmosphericReentryParameters {
     /// body’s atmosphere.
     ///
     /// Units: km
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: float
     #[getter]
@@ -1625,6 +1643,8 @@ impl AtmosphericReentryParameters {
     }
 
     /// Comments (allowed only at the beginning of each RDM data logical block).
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: list[str]
     #[getter]
@@ -1833,6 +1853,8 @@ impl RdmSpacecraftParameters {
     }
 
     /// Comments (allowed only at the beginning of each RDM data logical block).
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: list[str]
     #[getter]

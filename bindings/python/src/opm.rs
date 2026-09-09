@@ -345,6 +345,8 @@ impl OpmMetadata {
     ///
     /// Examples: EUTELSAT W1 MARS PATHFINDER STS 106 NEAR UNKNOWN
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_object_name(&self) -> String {
@@ -368,6 +370,8 @@ impl OpmMetadata {
     ///
     /// Examples: 2000-052A 1996-068A 2000-053A 1996-008A UNKNOWN
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_object_id(&self) -> String {
@@ -387,6 +391,8 @@ impl OpmMetadata {
     /// Examples: EARTH EARTH BARYCENTER MOON SOLAR SYSTEM BARYCENTER SUN JUPITER BARYCENTER
     /// STS 106 EROS
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_center_name(&self) -> String {
@@ -403,6 +409,8 @@ impl OpmMetadata {
     ///
     /// Examples: ICRF EME2000 ITRF2000 TEME
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_ref_frame(&self) -> String {
@@ -418,6 +426,8 @@ impl OpmMetadata {
     /// those in 3.2.3.2 should be documented in an ICD.
     ///
     /// Examples: UTC, TAI, TT, GPS, TDB, TCB
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.3.
     ///
     /// :type: str
     #[getter]
@@ -453,6 +463,8 @@ impl OpmMetadata {
     /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
     ///
     /// Examples: This is a comment
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.3.
     ///
     /// :type: list[str]
     #[getter]
@@ -578,6 +590,8 @@ impl KeplerianElements {
 
     /// Comments (see 7.8 for formatting rules).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -592,6 +606,8 @@ impl KeplerianElements {
     /// Semi-major axis
     ///
     /// Units: km
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -608,6 +624,8 @@ impl KeplerianElements {
     ///
     /// Units: n/a
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_eccentricity(&self) -> f64 {
@@ -622,6 +640,8 @@ impl KeplerianElements {
     /// Inclination
     ///
     /// Units: deg
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -640,6 +660,8 @@ impl KeplerianElements {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_ra_of_asc_node(&self) -> f64 {
@@ -655,6 +677,8 @@ impl KeplerianElements {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_arg_of_pericenter(&self) -> f64 {
@@ -669,6 +693,8 @@ impl KeplerianElements {
     /// Gravitational Coefficient (Gravitational Constant × Central Mass)
     ///
     /// Units: km³/s²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -881,6 +907,8 @@ impl OpmCovarianceMatrix {
 
     /// Comments (see 7.8 for formatting rules).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -895,6 +923,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[1,1]`
     ///
     /// Units: km²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -911,6 +941,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cy_x(&self) -> f64 {
@@ -925,6 +957,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[2,2]`
     ///
     /// Units: km²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -941,6 +975,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cz_x(&self) -> f64 {
@@ -955,6 +991,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[3,2]`
     ///
     /// Units: km²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -971,6 +1009,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cz_z(&self) -> f64 {
@@ -985,6 +1025,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[4,1]`
     ///
     /// Units: km²/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1001,6 +1043,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cx_dot_y(&self) -> f64 {
@@ -1015,6 +1059,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[4,3]`
     ///
     /// Units: km²/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1031,6 +1077,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cy_dot_x(&self) -> f64 {
@@ -1045,6 +1093,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[5,2]`
     ///
     /// Units: km²/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1061,6 +1111,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cy_dot_z(&self) -> f64 {
@@ -1075,6 +1127,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[6,1]`
     ///
     /// Units: km²/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1091,6 +1145,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cz_dot_y(&self) -> f64 {
@@ -1105,6 +1161,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[6,3]`
     ///
     /// Units: km²/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1121,6 +1179,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²/s²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cx_dot_x_dot(&self) -> f64 {
@@ -1135,6 +1195,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[5,4]`
     ///
     /// Units: km²/s²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1151,6 +1213,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²/s²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cy_dot_y_dot(&self) -> f64 {
@@ -1165,6 +1229,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[6,4]`
     ///
     /// Units: km²/s²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1181,6 +1247,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²/s²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cz_dot_y_dot(&self) -> f64 {
@@ -1195,6 +1263,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[6,6]`
     ///
     /// Units: km²/s²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1506,6 +1576,8 @@ impl OpmManeuverParameters {
 
     /// Comments (see 7.8 for formatting rules).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -1518,6 +1590,8 @@ impl OpmManeuverParameters {
     }
 
     /// Epoch of ignition (see 7.5.10 for formatting rules)
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: str
     #[getter]
@@ -1534,6 +1608,8 @@ impl OpmManeuverParameters {
     /// Maneuver duration (If = 0, impulsive maneuver)
     ///
     /// Units: s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1553,6 +1629,8 @@ impl OpmManeuverParameters {
     ///
     /// The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_man_delta_mass(&self) -> f64 {
@@ -1566,6 +1644,8 @@ impl OpmManeuverParameters {
 
     /// Reference frame in which the velocity increment vector data are given. The user must
     /// select from the accepted set of values indicated in 3.2.4.11.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: str
     #[getter]
@@ -1582,6 +1662,8 @@ impl OpmManeuverParameters {
     ///
     /// Units: km/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_man_dv_1(&self) -> f64 {
@@ -1597,6 +1679,8 @@ impl OpmManeuverParameters {
     ///
     /// Units: km/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_man_dv_2(&self) -> f64 {
@@ -1611,6 +1695,8 @@ impl OpmManeuverParameters {
     /// 3rd component of the velocity increment
     ///
     /// Units: km/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]

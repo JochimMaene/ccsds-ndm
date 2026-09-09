@@ -621,6 +621,8 @@ impl OcmMetadata {
     ///
     /// Examples: UTC
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: str
     #[getter]
     fn get_time_system(&self) -> String {
@@ -638,6 +640,8 @@ impl OcmMetadata {
     /// blocks.
     ///
     /// Examples: 2001-11-06T11:17:33
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: str
     #[getter]
@@ -905,6 +909,8 @@ impl OcmMetadata {
 
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
     /// Metadata section; see 7.8 for comment formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: list[str]
     #[getter]
@@ -1813,6 +1819,8 @@ impl OcmTrajState {
     ///
     /// Examples: EARTH, MOON, ISS, EROS
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
+    ///
     /// :type: str
     #[getter]
     fn get_center_name(&self) -> String {
@@ -1828,6 +1836,8 @@ impl OcmTrajState {
     ///
     /// Examples: ICRF3, J2000
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
+    ///
     /// :type: str
     #[getter]
     fn get_traj_ref_frame(&self) -> String {
@@ -1841,6 +1851,8 @@ impl OcmTrajState {
     /// Specifies the trajectory state type; selected per annex B, subsection B7.
     ///
     /// Examples: CARTP, CARTPV
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
     ///
     /// :type: str
     #[getter]
@@ -1868,6 +1880,8 @@ impl OcmTrajState {
     /// Comments (a contiguous set of one or more comment lines may be provided in the
     /// Trajectory State Time History section only immediately after the TRAJ_START keyword;
     /// see 7.8 for comment formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
     ///
     /// :type: list[str]
     #[getter]
@@ -2553,6 +2567,8 @@ impl OcmPhysicalDescription {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM Space
     /// Object Physical Characteristics only immediately after the PHYS_START keyword; see 7.8
     /// for comment formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: list[str]
     #[getter]
@@ -3723,6 +3739,8 @@ impl OcmCovarianceMatrix {
     ///
     /// Examples: TNW_INERTIA, J2000
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
+    ///
     /// :type: str
     #[getter]
     fn get_cov_ref_frame(&self) -> String {
@@ -3804,6 +3822,8 @@ impl OcmCovarianceMatrix {
     ///
     /// Examples: CARTP, CARTPV, ADBARV
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
+    ///
     /// :type: str
     #[getter]
     fn get_cov_type(&self) -> String {
@@ -3820,6 +3840,8 @@ impl OcmCovarianceMatrix {
     /// triangle off-diagonal terms (UTMWCC).
     ///
     /// Examples: LTM, UTM, FULL, LTMWCC, UTMWCC
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
     ///
     /// :type: str
     #[getter]
@@ -3873,6 +3895,8 @@ impl OcmCovarianceMatrix {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
     /// covariance time history section only immediately after the COV_START keyword; see 7.8
     /// for comment formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
     ///
     /// :type: list[str]
     #[getter]
@@ -4210,6 +4234,8 @@ impl OcmManeuverParameters {
     /// categories shall be added together to represent the total composite maneuver
     /// description.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: str
     #[getter]
     fn get_man_id(&self) -> String {
@@ -4298,6 +4324,8 @@ impl OcmManeuverParameters {
     /// indicates that this maneuver represents the summed acceleration, velocity increment,
     /// or thrust imparted by any/all thrusters utilized in the maneuver.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: str
     #[getter]
     fn get_man_device_id(&self) -> String {
@@ -4371,6 +4399,8 @@ impl OcmManeuverParameters {
     /// subsections B4 and B5. The reference frame must be the same for all data elements
     /// within a given maneuver time history block.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: str
     #[getter]
     fn get_man_ref_frame(&self) -> String {
@@ -4418,6 +4448,8 @@ impl OcmManeuverParameters {
     /// past a reference time and the duty cycle ON and OFF durations; TIME_AND_ANGLE denotes a
     /// duty cycle driven by the phasing/clocking of a space object body frame 'trigger'
     /// direction past a reference direction.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: str
     #[getter]
@@ -4728,6 +4760,8 @@ impl OcmManeuverParameters {
     /// data section, the maneuver composition shall include only one TIME specification
     /// (TIME_ABSOLUTE or TIME_RELATIVE).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: str
     #[getter]
     fn get_man_composition(&self) -> String {
@@ -4771,6 +4805,8 @@ impl OcmManeuverParameters {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
     /// Maneuver Specification only immediately after the MAN_START keyword; see 7.8 for
     /// comment formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: list[str]
     #[getter]
@@ -4882,6 +4918,8 @@ impl OcmPerturbations {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
     /// Perturbations Specification only immediately after the PERT_START keyword; see 7.8 for
     /// comment formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
     ///
     /// :type: list[str]
     #[getter]
@@ -5423,6 +5461,8 @@ impl OcmOdParameters {
 
     /// Comments (see 7.8 for formatting rules).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -5435,6 +5475,8 @@ impl OcmOdParameters {
     /// Identification number for this orbit determination.
     ///
     /// Examples: 1
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: str
     #[getter]
@@ -5464,6 +5506,8 @@ impl OcmOdParameters {
     ///
     /// Examples: LEAST_SQUARES, KALMAN_FILTER
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: str
     #[getter]
     fn get_od_method(&self) -> String {
@@ -5478,6 +5522,8 @@ impl OcmOdParameters {
     /// time system recorded by the TIME_SYSTEM keyword.
     ///
     /// Examples: 2000-01-01T12:00:00Z
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: str
     #[getter]

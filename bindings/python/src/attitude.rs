@@ -69,6 +69,8 @@ impl QuaternionState {
     ///
     /// Units: dimensionless
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_q1(&self) -> f64 {
@@ -83,6 +85,8 @@ impl QuaternionState {
     /// Quaternion components Q1, Q2, Q3, QC.
     ///
     /// Units: dimensionless
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -99,6 +103,8 @@ impl QuaternionState {
     ///
     /// Units: dimensionless
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_q3(&self) -> f64 {
@@ -113,6 +119,8 @@ impl QuaternionState {
     /// Quaternion components Q1, Q2, Q3, QC.
     ///
     /// Units: dimensionless
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -177,6 +185,8 @@ impl QuaternionState {
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: str
     #[getter]
     fn get_ref_frame_a(&self) -> String {
@@ -190,6 +200,8 @@ impl QuaternionState {
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: str
     #[getter]
     fn get_ref_frame_b(&self) -> String {
@@ -201,6 +213,8 @@ impl QuaternionState {
     }
 
     /// One or more comment line(s). Each comment line shall begin with this keyword.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: list[str]
     #[getter]
@@ -273,6 +287,8 @@ impl EulerAngleState {
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: str
     #[getter]
     fn get_ref_frame_a(&self) -> String {
@@ -285,6 +301,8 @@ impl EulerAngleState {
 
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: str
     #[getter]
@@ -301,6 +319,8 @@ impl EulerAngleState {
     /// the rotation axis of the first rotation, the second letter (X, Y, or Z) represents the
     /// rotation axis of the second rotation, and the third letter (X, Y, or Z) represents the
     /// rotation axis of the third rotation.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: str
     #[getter]
@@ -319,6 +339,8 @@ impl EulerAngleState {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_angle_1(&self) -> f64 {
@@ -333,6 +355,8 @@ impl EulerAngleState {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_angle_2(&self) -> f64 {
@@ -346,6 +370,8 @@ impl EulerAngleState {
     /// Angle of the third rotation.
     ///
     /// Units: deg
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -410,6 +436,8 @@ impl EulerAngleState {
 
     /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -468,6 +496,8 @@ impl AngVelState {
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: str
     #[getter]
     fn get_ref_frame_a(&self) -> String {
@@ -481,6 +511,8 @@ impl AngVelState {
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: str
     #[getter]
     fn get_ref_frame_b(&self) -> String {
@@ -493,6 +525,8 @@ impl AngVelState {
 
     /// Reference frame in which the components of the angular velocity vector are given. The set
     /// of allowed values is described in annex B, subsection B3.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: str
     #[getter]
@@ -508,6 +542,8 @@ impl AngVelState {
     ///
     /// Units: deg/s
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_angvel_x(&self) -> f64 {
@@ -521,6 +557,8 @@ impl AngVelState {
     /// Component of the angular velocity vector on the Y axis.
     ///
     /// Units: deg/s
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -536,6 +574,8 @@ impl AngVelState {
     ///
     /// Units: deg/s
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_angvel_z(&self) -> f64 {
@@ -547,6 +587,8 @@ impl AngVelState {
     }
 
     /// One or more comment line(s). Each comment line shall begin with this keyword.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: list[str]
     #[getter]
@@ -634,6 +676,8 @@ impl SpinState {
     /// Name of the reference frame that defines the starting point of the transformation. The set
     /// of allowed values is described in annex B, subsection B3.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: str
     #[getter]
     fn get_ref_frame_a(&self) -> String {
@@ -646,6 +690,8 @@ impl SpinState {
 
     /// Name of the reference frame that defines the end point of the transformation. The set of
     /// allowed values is described in annex B, subsection B3.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: str
     #[getter]
@@ -661,6 +707,8 @@ impl SpinState {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_spin_alpha(&self) -> f64 {
@@ -674,6 +722,8 @@ impl SpinState {
     /// Declination of the spin axis vector in frame A.
     ///
     /// Units: deg
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -689,6 +739,8 @@ impl SpinState {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_spin_angle(&self) -> f64 {
@@ -702,6 +754,8 @@ impl SpinState {
     /// Angular velocity of satellite around spin axis.
     ///
     /// Units: deg/s
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -808,6 +862,8 @@ impl SpinState {
 
     /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -878,6 +934,8 @@ impl InertiaState {
     /// Coordinate system for the inertia tensor. The set of allowed values is described in annex B,
     /// subsection B3.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: str
     #[getter]
     fn get_inertia_ref_frame(&self) -> String {
@@ -891,6 +949,8 @@ impl InertiaState {
     /// Moment of Inertia about the X-axis.
     ///
     /// Units: kg*m²
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -906,6 +966,8 @@ impl InertiaState {
     ///
     /// Units: kg*m²
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_iyy(&self) -> f64 {
@@ -919,6 +981,8 @@ impl InertiaState {
     /// Moment of Inertia about the Z-axis.
     ///
     /// Units: kg*m²
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -934,6 +998,8 @@ impl InertiaState {
     ///
     /// Units: kg*m²
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_ixy(&self) -> f64 {
@@ -947,6 +1013,8 @@ impl InertiaState {
     /// Inertia Cross Product of the X and Z axes.
     ///
     /// Units: kg*m²
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -962,6 +1030,8 @@ impl InertiaState {
     ///
     /// Units: kg*m²
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_iyz(&self) -> f64 {
@@ -973,6 +1043,8 @@ impl InertiaState {
     }
 
     /// One or more comment line(s). Each comment line shall begin with this keyword.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: list[str]
     #[getter]

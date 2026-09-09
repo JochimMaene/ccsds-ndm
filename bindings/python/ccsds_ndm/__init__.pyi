@@ -190,6 +190,8 @@ class AcmAttitudeDetermination:
     def ad_epoch(self) -> str | None:
         """
         Epoch of the attitude determination.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
         """
         ...
 
@@ -247,6 +249,8 @@ class AcmAttitudeDetermination:
         listed before rate states.
 
         Examples: QUATERNION
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
         """
         ...
 
@@ -258,6 +262,8 @@ class AcmAttitudeDetermination:
         Comments allowed only immediately after the AD_START keyword.
 
         Examples: This is a comment.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
         """
         ...
 
@@ -330,6 +336,8 @@ class AcmAttitudeDetermination:
     def sensors(self) -> list[AcmSensor]:
         """
         Sensor data blocks.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
         """
         ...
 
@@ -393,6 +401,8 @@ class AcmAttitudeState:
         """
         Data lines that consist of attitude data followed by rate data. (For the data units, see
         above [ATT_TYPE and RATE_TYPE keywords]).
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.5.
         """
         ...
 
@@ -414,6 +424,8 @@ class AcmAttitudeState:
         listed before rate data. The units that shall be used are given in annex B, subsection B4.
 
         Examples: QUATERNION, EULER_ANGLES, DCM
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.5.
         """
         ...
 
@@ -425,6 +437,8 @@ class AcmAttitudeState:
         Comments allowed only immediately after the ATT_START keyword.
 
         Examples: This is a comment.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.5.
         """
         ...
 
@@ -446,6 +460,8 @@ class AcmAttitudeState:
         states.
 
         Examples: 3, 4, 7
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.5.
         """
         ...
 
@@ -467,6 +483,8 @@ class AcmAttitudeState:
         of allowed values is described in annex B, subsection B3.
 
         Examples: J2000
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.5.
         """
         ...
 
@@ -479,6 +497,8 @@ class AcmAttitudeState:
         allowed values is described in annex B, subsection B3.
 
         Examples: SC_BODY_1
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.5.
         """
         ...
 
@@ -498,6 +518,8 @@ class AcmCovarianceMatrix:
         Comments allowed only immediately after the COV_START keyword.
 
         Examples: THIS is a comment.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.7.
         """
         ...
 
@@ -527,6 +549,8 @@ class AcmCovarianceMatrix:
     def cov_confidence(self) -> float | None:
         """
         Optional confidence level of the covariance matrix.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.7.
         """
         ...
 
@@ -546,6 +570,8 @@ class AcmCovarianceMatrix:
         """
         Covariance data lines (diagonal terms only). (For the data units, see annex B, subsection
         B6.)
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.7.
         """
         ...
 
@@ -578,6 +604,8 @@ class AcmCovarianceMatrix:
         Indicates covariance composition. Select from annex B, subsection B6.
 
         Examples: ANGLE, ANGLE_GYROBIAS
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.7.
         """
         ...
 
@@ -595,6 +623,8 @@ class AcmData:
     def ad(self) -> AcmAttitudeDetermination | None:
         """
         A single attitude determination Data section.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
         """
         ...
 
@@ -605,6 +635,8 @@ class AcmData:
         """
         One or more optional attitude state time histories (each consisting of one or more attitude
         states).
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.5.
         """
         ...
 
@@ -615,6 +647,8 @@ class AcmData:
         """
         One or more optional covariance time histories (each consisting of one or more covariance
         matrix diagonals).
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.7.
         """
         ...
 
@@ -624,6 +658,8 @@ class AcmData:
     def man(self) -> list[AcmManeuverParameters]:
         """
         One or more optional maneuver specification section(s).
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.8.
         """
         ...
 
@@ -633,6 +669,8 @@ class AcmData:
     def phys(self) -> AcmPhysicalDescription | None:
         """
         A single space object physical characteristics section.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.6.
         """
         ...
 
@@ -642,6 +680,8 @@ class AcmData:
     def user(self) -> UserDefined | None:
         """
         A single user-defined Data section.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.10.
         """
         ...
 
@@ -673,6 +713,8 @@ class AcmManeuverParameters:
         Comments allowed only immediately after the MAN_START keyword.
 
         Examples: This is a comment.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.8.
         """
         ...
 
@@ -815,6 +857,8 @@ class AcmMetadata:
         with this keyword.
 
         Examples: This is a comment.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
         """
         ...
 
@@ -828,6 +872,8 @@ class AcmMetadata:
         Metadata section.
 
         Examples: 2016-11-10T00:00:00
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
         """
         ...
 
@@ -890,6 +936,8 @@ class AcmMetadata:
         omitted).
 
         Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
         """
         ...
 
@@ -983,6 +1031,8 @@ class AcmMetadata:
         described in annex B, subsection B2.
 
         Examples: UTC, TAI
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
         """
         ...
 
@@ -1005,6 +1055,8 @@ class AcmPhysicalDescription:
         Comments allowed only immediately after the PHYS_START keyword.
 
         Examples: This is a comment.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.6.
         """
         ...
 
@@ -1163,6 +1215,8 @@ class AcmSensor:
         Comments allowed only immediately after the SENSOR_START keyword.
 
         Examples: This is a comment.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
         """
         ...
 
@@ -1305,6 +1359,8 @@ class AdditionalParameters:
     def comment(self) -> list[str]:
         """
         Comments (see 6.3.4 for formatting rules).
+
+        CCSDS Reference: 508.0-B-1, Section 3.5.2.
         """
         ...
 
@@ -1388,6 +1444,8 @@ class AdmHeader:
         User-defined comments. (See 7.8 for formatting rules.)
 
         Examples: This is a comment
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.2.
         """
         ...
 
@@ -1399,6 +1457,8 @@ class AdmHeader:
         File creation date/time in UTC. (For format specification, see 6.8.9.)
 
         Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.2.
         """
         ...
 
@@ -1425,6 +1485,8 @@ class AdmHeader:
         procedures to request that originator be added to SANA registry.
 
         Examples: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.2.
         """
         ...
 
@@ -1553,6 +1615,8 @@ class AemData:
     def attitude_states(self) -> list[AttitudeState]:
         """
         Attitude ephemeris data lines.
+
+        CCSDS Reference: 504.0-B-2, Section 4.2.4.
         """
         ...
 
@@ -1585,6 +1649,8 @@ class AemData:
         """
         Comments allowed only at the beginning of the Data section. Each comment line shall begin
         with this keyword.
+
+        CCSDS Reference: 504.0-B-2, Section 4.2.4.
         """
         ...
 
@@ -1648,6 +1714,8 @@ class AemMetadata:
 
         Examples: QUATERNION, QUATERNION/DERIVATIVE, QUATERNION/ANGVEL, EULER_ANGLE,
         EULER_ANGLE/DERIVATIVE, EULER_ANGLE/ANGVEL, SPIN, SPIN/NUTATION, SPIN/NUTATION_MOM
+
+        CCSDS Reference: 504.0-B-2, Section 4.2.3.
         """
         ...
 
@@ -1673,6 +1741,8 @@ class AemMetadata:
         begin with this keyword.
 
         Examples: This is a comment.
+
+        CCSDS Reference: 504.0-B-2, Section 4.2.3.
         """
         ...
 
@@ -1733,6 +1803,8 @@ class AemMetadata:
         should be set to UNKNOWN.
 
         Examples: 2000-052A
+
+        CCSDS Reference: 504.0-B-2, Section 4.2.3.
         """
         ...
 
@@ -1748,6 +1820,8 @@ class AemMetadata:
         the value should be set to UNKNOWN.
 
         Examples: EUTELSAT W1
+
+        CCSDS Reference: 504.0-B-2, Section 4.2.3.
         """
         ...
 
@@ -1760,6 +1834,8 @@ class AemMetadata:
         of allowed values is described in annex B, subsection B3.
 
         Examples: ICRF, SC_BODY_1, INSTRUMENT_A
+
+        CCSDS Reference: 504.0-B-2, Section 4.2.3.
         """
         ...
 
@@ -1772,6 +1848,8 @@ class AemMetadata:
         allowed values is described in annex B, subsection B3.
 
         Examples: SC_BODY_1, INSTRUMENT_A
+
+        CCSDS Reference: 504.0-B-2, Section 4.2.3.
         """
         ...
 
@@ -1784,6 +1862,8 @@ class AemMetadata:
         metadata block.
 
         Examples: 1996-12-18T14:28:15.11
+
+        CCSDS Reference: 504.0-B-2, Section 4.2.3.
         """
         ...
 
@@ -1796,6 +1876,8 @@ class AemMetadata:
         metadata block.
 
         Examples: 1996-12-18T14:28:15.11
+
+        CCSDS Reference: 504.0-B-2, Section 4.2.3.
         """
         ...
 
@@ -1808,6 +1890,8 @@ class AemMetadata:
         is described in annex B, subsection B2.
 
         Examples: UTC, TAI
+
+        CCSDS Reference: 504.0-B-2, Section 4.2.3.
         """
         ...
 
@@ -1895,6 +1979,8 @@ class AngVelState:
         """
         Reference frame in which the components of the angular velocity vector are given. The set
         of allowed values is described in annex B, subsection B3.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -1906,6 +1992,8 @@ class AngVelState:
         Component of the angular velocity vector on the X axis.
 
         Units: deg/s
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -1917,6 +2005,8 @@ class AngVelState:
         Component of the angular velocity vector on the Y axis.
 
         Units: deg/s
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -1928,6 +2018,8 @@ class AngVelState:
         Component of the angular velocity vector on the Z axis.
 
         Units: deg/s
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -1937,6 +2029,8 @@ class AngVelState:
     def comment(self) -> list[str]:
         """
         One or more comment line(s). Each comment line shall begin with this keyword.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -1947,6 +2041,8 @@ class AngVelState:
         """
         Name of the reference frame that defines the starting point of the transformation. The set
         of allowed values is described in annex B, subsection B3.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -1957,6 +2053,8 @@ class AngVelState:
         """
         Name of the reference frame that defines the end point of the transformation. The set of
         allowed values is described in annex B, subsection B3.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -2084,6 +2182,8 @@ class ApmData:
     def comment(self) -> list[str]:
         """
         One or more comment line(s). Each comment line shall begin with this keyword.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -2093,6 +2193,8 @@ class ApmData:
     def epoch(self) -> str:
         """
         Epoch of the attitude elements and optional logical blocks.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -2113,6 +2215,8 @@ class ApmData:
         """
         Inertia. All mandatory elements are to be provided if the block is present. (See annex F
         for conventions and further detail.)
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -2142,6 +2246,8 @@ class ApmData:
         """
         Spin. All mandatory elements are to be provided if the block is present. (See annex F for
         conventions and further detail.)
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -2170,6 +2276,8 @@ class ApmManeuverParameters:
     def comment(self) -> list[str]:
         """
         One or more comment line(s). Each comment line shall begin with this keyword.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -2195,6 +2303,8 @@ class ApmManeuverParameters:
         Maneuver duration.
 
         Units: s
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -2204,6 +2314,8 @@ class ApmManeuverParameters:
     def man_epoch_start(self) -> str:
         """
         Epoch of start of maneuver. (For format specification, see 6.8.9.)
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -2214,6 +2326,8 @@ class ApmManeuverParameters:
         """
         Coordinate system for the torque vector. The set of allowed values is described in annex B,
         subsection B3.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -2225,6 +2339,8 @@ class ApmManeuverParameters:
         1st component of the torque vector.
 
         Units: N*m
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -2236,6 +2352,8 @@ class ApmManeuverParameters:
         2nd component of the torque vector.
 
         Units: N*m
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -2247,6 +2365,8 @@ class ApmManeuverParameters:
         3rd component of the torque vector.
 
         Units: N*m
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -2280,6 +2400,8 @@ class ApmMetadata:
         comment line shall begin with this keyword.
 
         Examples: This is a comment.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.3.
         """
         ...
 
@@ -2299,6 +2421,8 @@ class ApmMetadata:
         be set to UNKNOWN.
 
         Examples: 2000-052A
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.3.
         """
         ...
 
@@ -2314,6 +2438,8 @@ class ApmMetadata:
         the value should be set to UNKNOWN.
 
         Examples: EUTELSAT W1, MARS PATHFINDER, UNKNOWN
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.3.
         """
         ...
 
@@ -2326,6 +2452,8 @@ class ApmMetadata:
         annex B, subsection B2.
 
         Examples: UTC, TAI
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.3.
         """
         ...
 
@@ -2381,6 +2509,8 @@ class AtmosphericReentryParameters:
     def comment(self) -> list[str]:
         """
         Comments (allowed only at the beginning of each RDM data logical block).
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
         """
         ...
 
@@ -2406,6 +2536,8 @@ class AtmosphericReentryParameters:
         same value.
 
         Units: d
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
         """
         ...
 
@@ -2460,6 +2592,8 @@ class AtmosphericReentryParameters:
         body’s atmosphere.
 
         Units: km
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
         """
         ...
 
@@ -3446,6 +3580,8 @@ class CdmHeader:
         (See 6.3.4 for formatting rules.)
 
         Examples: This is a comment
+
+        CCSDS Reference: 508.0-B-1, Section 3.2.
         """
         ...
 
@@ -3458,6 +3594,8 @@ class CdmHeader:
         formatting rules.)
 
         Examples: 2010-03-12T22:31:12.000, 2010-071T22:31:12.000
+
+        CCSDS Reference: 508.0-B-1, Section 3.2.
         """
         ...
 
@@ -3482,6 +3620,8 @@ class CdmHeader:
         for formatting rules.)
 
         Examples: 201113719185, ABC-12_34
+
+        CCSDS Reference: 508.0-B-1, Section 3.2.
         """
         ...
 
@@ -3496,6 +3636,8 @@ class CdmHeader:
         for formatting rules.)
 
         Examples: JSPOC, ESA SST, CAESAR, JPL, SDC
+
+        CCSDS Reference: 508.0-B-1, Section 3.2.
         """
         ...
 
@@ -3601,6 +3743,8 @@ class CdmMetadata:
         (<https://sanaregistry.org/r/cdm_catalog>). (See 5.2.9 for formatting rules.)
 
         Examples: SATCAT
+
+        CCSDS Reference: 508.0-B-1, Section 3.4.
         """
         ...
 
@@ -3610,6 +3754,8 @@ class CdmMetadata:
     def comment(self) -> list[str]:
         """
         Comments (see 6.3.4 for formatting rules).
+
+        CCSDS Reference: 508.0-B-1, Section 3.4.
         """
         ...
 
@@ -3623,6 +3769,8 @@ class CdmMetadata:
         when using the default value for calculating collision probability.
 
         Examples: CALCULATED, DEFAULT
+
+        CCSDS Reference: 508.0-B-1, Section 3.4.
         """
         ...
 
@@ -3648,6 +3796,8 @@ class CdmMetadata:
         Orbit Determination (OD) of the CDM originator was used in the CA.
 
         Examples: EPHEMERIS SATELLITE A, NONE
+
+        CCSDS Reference: 508.0-B-1, Section 3.4.
         """
         ...
 
@@ -3675,6 +3825,8 @@ class CdmMetadata:
         designator, the value UNKNOWN should be used. (See 5.2.9 for further formatting rules.)
 
         Examples: 2002-021A, UNKNOWN
+
+        CCSDS Reference: 508.0-B-1, Section 3.4.
         """
         ...
 
@@ -3697,6 +3849,8 @@ class CdmMetadata:
         The maneuver capacity of the object. (See 1.4.3.1 for definition of 'N/A'.)
 
         Examples: YES, NO, N/A
+
+        CCSDS Reference: 508.0-B-1, Section 3.4.
         """
         ...
 
@@ -3720,6 +3874,8 @@ class CdmMetadata:
         The object to which the metadata and data apply (Object1 or Object2).
 
         Examples: OBJECT1, OBJECT2
+
+        CCSDS Reference: 508.0-B-1, Section 3.4.
         """
         ...
 
@@ -3731,6 +3887,8 @@ class CdmMetadata:
         The satellite catalog designator for the object. (See 5.2.9 for formatting rules.)
 
         Examples: 12345
+
+        CCSDS Reference: 508.0-B-1, Section 3.4.
         """
         ...
 
@@ -3742,6 +3900,8 @@ class CdmMetadata:
         Spacecraft name for the object.
 
         Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
+
+        CCSDS Reference: 508.0-B-1, Section 3.4.
         """
         ...
 
@@ -3822,6 +3982,8 @@ class CdmMetadata:
         both Object1 and Object2.
 
         Examples: GCRF, EME2000, ITRF
+
+        CCSDS Reference: 508.0-B-1, Section 3.4.
         """
         ...
 
@@ -3905,6 +4067,8 @@ class CdmStateVector:
     def comment(self) -> list[str]:
         """
         Comments (see 6.3.4 for formatting rules).
+
+        CCSDS Reference: 508.0-B-1, Section 3.5.2.
         """
         ...
 
@@ -4146,6 +4310,8 @@ class EulerAngleState:
         Angle of the first rotation.
 
         Units: deg
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -4168,6 +4334,8 @@ class EulerAngleState:
         Angle of the second rotation.
 
         Units: deg
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -4190,6 +4358,8 @@ class EulerAngleState:
         Angle of the third rotation.
 
         Units: deg
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -4210,6 +4380,8 @@ class EulerAngleState:
     def comment(self) -> list[str]:
         """
         One or more comment line(s). Each comment line shall begin with this keyword.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -4223,6 +4395,8 @@ class EulerAngleState:
         the rotation axis of the first rotation, the second letter (X, Y, or Z) represents the
         rotation axis of the second rotation, and the third letter (X, Y, or Z) represents the
         rotation axis of the third rotation.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -4233,6 +4407,8 @@ class EulerAngleState:
         """
         Name of the reference frame that defines the starting point of the transformation. The set
         of allowed values is described in annex B, subsection B3.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -4243,6 +4419,8 @@ class EulerAngleState:
         """
         Name of the reference frame that defines the end point of the transformation. The set of
         allowed values is described in annex B, subsection B3.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -4357,6 +4535,8 @@ class GroundImpactParameters:
     def comment(self) -> list[str]:
         """
         Comments (allowed only at the beginning of each RDM data logical block).
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
         """
         ...
 
@@ -4724,6 +4904,8 @@ class InertiaState:
     def comment(self) -> list[str]:
         """
         One or more comment line(s). Each comment line shall begin with this keyword.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -4734,6 +4916,8 @@ class InertiaState:
         """
         Coordinate system for the inertia tensor. The set of allowed values is described in annex B,
         subsection B3.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -4745,6 +4929,8 @@ class InertiaState:
         Moment of Inertia about the X-axis.
 
         Units: kg*m²
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -4756,6 +4942,8 @@ class InertiaState:
         Inertia Cross Product of the X and Y axes.
 
         Units: kg*m²
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -4767,6 +4955,8 @@ class InertiaState:
         Inertia Cross Product of the X and Z axes.
 
         Units: kg*m²
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -4778,6 +4968,8 @@ class InertiaState:
         Moment of Inertia about the Y-axis.
 
         Units: kg*m²
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -4789,6 +4981,8 @@ class InertiaState:
         Inertia Cross Product of the Y and Z axes.
 
         Units: kg*m²
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -4800,6 +4994,8 @@ class InertiaState:
         Moment of Inertia about the Z-axis.
 
         Units: kg*m²
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -4869,6 +5065,8 @@ class KeplerianElements:
         Argument of pericenter
 
         Units: deg
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -4878,6 +5076,8 @@ class KeplerianElements:
     def comment(self) -> list[str]:
         """
         Comments (see 7.8 for formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -4889,6 +5089,8 @@ class KeplerianElements:
         Eccentricity
 
         Units: n/a
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -4900,6 +5102,8 @@ class KeplerianElements:
         Gravitational Coefficient (Gravitational Constant × Central Mass)
 
         Units: km³/s²
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -4911,6 +5115,8 @@ class KeplerianElements:
         Inclination
 
         Units: deg
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -4933,6 +5139,8 @@ class KeplerianElements:
         Right ascension of ascending node
 
         Units: deg
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -4944,6 +5152,8 @@ class KeplerianElements:
         Semi-major axis
 
         Units: km
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -5039,6 +5249,8 @@ class MeanElements:
         Examples: 270.0
 
         Units: deg
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
         """
         ...
 
@@ -5048,6 +5260,8 @@ class MeanElements:
     def comment(self) -> list[str]:
         """
         Comments (see 7.8 for formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
         """
         ...
 
@@ -5061,6 +5275,8 @@ class MeanElements:
         Examples: 0.7303
 
         Units: n/a
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
         """
         ...
 
@@ -5072,6 +5288,8 @@ class MeanElements:
         Epoch of Mean Keplerian elements (see 7.5.10 for formatting rules)
 
         Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
         """
         ...
 
@@ -5098,6 +5316,8 @@ class MeanElements:
         Examples: 63.4
 
         Units: deg
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
         """
         ...
 
@@ -5111,6 +5331,8 @@ class MeanElements:
         Examples: 130.0
 
         Units: deg
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
         """
         ...
 
@@ -5125,6 +5347,8 @@ class MeanElements:
         Examples: 1.491325
 
         Units: km or rev/day
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
         """
         ...
 
@@ -5138,6 +5362,8 @@ class MeanElements:
         Examples: 345.0
 
         Units: deg
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
         """
         ...
 
@@ -5152,6 +5378,8 @@ class MeanElements:
         Examples: 28594.4
 
         Units: km or rev/day
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
         """
         ...
 
@@ -5358,6 +5586,8 @@ class OcmCovarianceMatrix:
         Comments (a contiguous set of one or more comment lines may be provided in the OCM
         covariance time history section only immediately after the COV_START keyword; see 7.8
         for comment formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.7.
         """
         ...
 
@@ -5467,6 +5697,8 @@ class OcmCovarianceMatrix:
         triangle off-diagonal terms (UTMWCC).
 
         Examples: LTM, UTM, FULL, LTMWCC, UTMWCC
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.7.
         """
         ...
 
@@ -5494,6 +5726,8 @@ class OcmCovarianceMatrix:
         indicated in annex B, subsection B4 and B5.
 
         Examples: TNW_INERTIA, J2000
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.7.
         """
         ...
 
@@ -5527,6 +5761,8 @@ class OcmCovarianceMatrix:
         Indicates covariance composition. Select from annex B, subsections B7 and B8.
 
         Examples: CARTP, CARTPV, ADBARV
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.7.
         """
         ...
 
@@ -5711,6 +5947,8 @@ class OcmManeuverParameters:
         Comments (a contiguous set of one or more comment lines may be provided in the OCM
         Maneuver Specification only immediately after the MAN_START keyword; see 7.8 for
         comment formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
         """
         ...
 
@@ -5880,6 +6118,8 @@ class OcmManeuverParameters:
         past a reference time and the duty cycle ON and OFF durations; TIME_AND_ANGLE denotes a
         duty cycle driven by the phasing/clocking of a space object body frame 'trigger'
         direction past a reference direction.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
         """
         ...
 
@@ -5958,6 +6198,8 @@ class OcmManeuverParameters:
         maneuver time history line, with values selected from table 6-8. Within this maneuver
         data section, the maneuver composition shall include only one TIME specification
         (TIME_ABSOLUTE or TIME_RELATIVE).
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
         """
         ...
 
@@ -5969,6 +6211,8 @@ class OcmManeuverParameters:
         Free-text field containing the maneuver device identifier used for this maneuver. 'ALL'
         indicates that this maneuver represents the summed acceleration, velocity increment,
         or thrust imparted by any/all thrusters utilized in the maneuver.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
         """
         ...
 
@@ -5991,6 +6235,8 @@ class OcmManeuverParameters:
         All supplied maneuver 'constituents' within the same MAN_BASIS and MAN_REF_FRAME
         categories shall be added together to represent the total composite maneuver
         description.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
         """
         ...
 
@@ -6077,6 +6323,8 @@ class OcmManeuverParameters:
         maneuver data block. Select from the accepted set of values indicated in annex B,
         subsections B4 and B5. The reference frame must be the same for all data elements
         within a given maneuver time history block.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
         """
         ...
 
@@ -6332,6 +6580,8 @@ class OcmMetadata:
         """
         Comments (a contiguous set of one or more comment lines may be provided in the OCM
         Metadata section; see 7.8 for comment formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
         """
         ...
 
@@ -6384,6 +6634,8 @@ class OcmMetadata:
         blocks.
 
         Examples: 2001-11-06T11:17:33
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
         """
         ...
 
@@ -6849,6 +7101,8 @@ class OcmMetadata:
         SCLK_SEC_PER_SI_SEC shall be supplied.
 
         Examples: UTC
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
         """
         ...
 
@@ -6913,6 +7167,8 @@ class OcmOdParameters:
     def comment(self) -> list[str]:
         """
         Comments (see 7.8 for formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
         """
         ...
 
@@ -7044,6 +7300,8 @@ class OcmOdParameters:
         time system recorded by the TIME_SYSTEM keyword.
 
         Examples: 2000-01-01T12:00:00Z
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
         """
         ...
 
@@ -7088,6 +7346,8 @@ class OcmOdParameters:
         Identification number for this orbit determination.
 
         Examples: 1
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
         """
         ...
 
@@ -7111,6 +7371,8 @@ class OcmOdParameters:
         Type of orbit determination method used to produce the orbit estimate.
 
         Examples: LEAST_SQUARES, KALMAN_FILTER
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
         """
         ...
 
@@ -7298,6 +7560,8 @@ class OcmPerturbations:
         Comments (a contiguous set of one or more comment lines may be provided in the OCM
         Perturbations Specification only immediately after the PERT_START keyword; see 7.8 for
         comment formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
         """
         ...
 
@@ -7837,6 +8101,8 @@ class OcmPhysicalDescription:
         Comments (a contiguous set of one or more comment lines may be provided in the OCM Space
         Object Physical Characteristics only immediately after the PHYS_START keyword; see 7.8
         for comment formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
         """
         ...
 
@@ -8441,6 +8707,8 @@ class OcmTrajState:
         conventions and sources.
 
         Examples: EARTH, MOON, ISS, EROS
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
         """
         ...
 
@@ -8452,6 +8720,8 @@ class OcmTrajState:
         Comments (a contiguous set of one or more comment lines may be provided in the
         Trajectory State Time History section only immediately after the TRAJ_START keyword;
         see 7.8 for comment formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
         """
         ...
 
@@ -8651,6 +8921,8 @@ class OcmTrajState:
         values indicated in annex B, subsection B4.
 
         Examples: ICRF3, J2000
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
         """
         ...
 
@@ -8662,6 +8934,8 @@ class OcmTrajState:
         Specifies the trajectory state type; selected per annex B, subsection B7.
 
         Examples: CARTP, CARTPV
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
         """
         ...
 
@@ -8780,6 +9054,8 @@ class OdParameters:
     def comment(self) -> list[str]:
         """
         Comments (see 6.3.4 for formatting rules).
+
+        CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
         """
         ...
 
@@ -8921,6 +9197,8 @@ class OdmHeader:
         (See 7.8 for formatting rules.)
 
         Examples: This is a comment
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.2.
         """
         ...
 
@@ -8932,6 +9210,8 @@ class OdmHeader:
         File creation date/time in UTC. (For format specification, see 7.5.10.)
 
         Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.2.
         """
         ...
 
@@ -8958,6 +9238,8 @@ class OdmHeader:
         procedures to request that originator be added to SANA registry.
 
         Examples: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.2.
         """
         ...
 
@@ -9157,6 +9439,8 @@ class OemCovarianceMatrix:
     def comment(self) -> list[str]:
         """
         Comments (see 7.8 for formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9180,6 +9464,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[4,1]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9191,6 +9477,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[4,4]`
 
         Units: km²/s²
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9202,6 +9490,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[4,2]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9213,6 +9503,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[4,3]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9224,6 +9516,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[1,1]`
 
         Units: km²
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9235,6 +9529,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[5,1]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9246,6 +9542,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[5,4]`
 
         Units: km²/s²
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9257,6 +9555,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[5,2]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9268,6 +9568,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[5,5]`
 
         Units: km²/s²
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9279,6 +9581,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[5,3]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9290,6 +9594,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[2,1]`
 
         Units: km²
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9301,6 +9607,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[2,2]`
 
         Units: km²
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9312,6 +9620,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[6,1]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9323,6 +9633,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[6,4]`
 
         Units: km²/s²
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9334,6 +9646,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[6,2]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9345,6 +9659,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[6,5]`
 
         Units: km²/s²
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9356,6 +9672,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[6,3]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9367,6 +9685,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[6,6]`
 
         Units: km²/s²
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9378,6 +9698,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[3,1]`
 
         Units: km²
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9389,6 +9711,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[3,2]`
 
         Units: km²
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9400,6 +9724,8 @@ class OemCovarianceMatrix:
         Covariance matrix `[3,3]`
 
         Units: km²
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9411,6 +9737,8 @@ class OemCovarianceMatrix:
         Epoch of covariance matrix. (See 7.5.10 for formatting rules.)
 
         Examples: 2000-01-01T12:00:00Z
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
         """
         ...
 
@@ -9440,6 +9768,8 @@ class OemData:
     def comment(self) -> list[str]:
         """
         Comments (see 7.8 for formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.4.
         """
         ...
 
@@ -9505,6 +9835,8 @@ class OemData:
         Examples: 2020-01-01T00:00:00.000 1234.567 2345.678 3456.789 1.234 2.345 3.456
 
         Units: km, km/s, km/s²
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.4.
         """
         ...
 
@@ -9611,6 +9943,8 @@ class OemMetadata:
 
         Examples: EARTH, EARTH BARYCENTER, MOON, SOLAR SYSTEM BARYCENTER, SUN,
         JUPITER BARYCENTER, STS 106, EROS
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.3.
         """
         ...
 
@@ -9620,6 +9954,8 @@ class OemMetadata:
     def comment(self) -> list[str]:
         """
         Comments (see 7.8 for formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.3.
         """
         ...
 
@@ -9664,6 +10000,8 @@ class OemMetadata:
         disclosed, the value should be set to UNKNOWN.
 
         Examples: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.3.
         """
         ...
 
@@ -9680,6 +10018,8 @@ class OemMetadata:
         be set to UNKNOWN.
 
         Examples: EUTELSAT W1, MARS PATHFINDER, STS 106, NEAR, UNKNOWN
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.3.
         """
         ...
 
@@ -9692,6 +10032,8 @@ class OemMetadata:
         3.2.3.3 should be documented in an ICD.
 
         Examples: ICRF, ITRF2000, EME2000, TEME
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.3.
         """
         ...
 
@@ -9716,6 +10058,8 @@ class OemMetadata:
         following this metadata block. (For format specification, see 7.5.10.)
 
         Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.3.
         """
         ...
 
@@ -9728,6 +10072,8 @@ class OemMetadata:
         following this metadata block. (For format specification, see 7.5.10.)
 
         Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.3.
         """
         ...
 
@@ -9740,6 +10086,8 @@ class OemMetadata:
         3.2.3.2 should be documented in an ICD.
 
         Examples: UTC, TAI, TT, GPS, TDB, TCB
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.3.
         """
         ...
 
@@ -10073,6 +10421,8 @@ class OmmMetadata:
         indicated in annex B, subsection B2.
 
         Examples: EARTH, MARS, MOON
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.3.
         """
         ...
 
@@ -10084,6 +10434,8 @@ class OmmMetadata:
         Comments (allowed at the beginning of the OMM Metadata). (See 7.8 for formatting rules.)
 
         Examples: This is a comment
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.3.
         """
         ...
 
@@ -10096,6 +10448,8 @@ class OmmMetadata:
         propagate the state.
 
         Examples: SGP, SGP4, SGP4-XP, DSST, USM
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.3.
         """
         ...
 
@@ -10116,6 +10470,8 @@ class OmmMetadata:
         to UNKNOWN.
 
         Examples: 2005-046A, 2005-046B, 2003-022A, UNKNOWN
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.3.
         """
         ...
 
@@ -10132,6 +10488,8 @@ class OmmMetadata:
         value should be set to UNKNOWN.
 
         Examples: Telkom 2, Spaceway 2, INMARSAT 4-F2, UNKNOWN
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.3.
         """
         ...
 
@@ -10149,6 +10507,8 @@ class OmmMetadata:
         reference `[H2]` or `[H3]` for further details).
 
         Examples: ICRF, ITRF2000, EME2000, TEME
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.3.
         """
         ...
 
@@ -10173,6 +10533,8 @@ class OmmMetadata:
         those in 3.2.3.2 should be documented in an ICD.
 
         Examples: UTC
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.3.
         """
         ...
 
@@ -10403,6 +10765,8 @@ class OpmCovarianceMatrix:
     def comment(self) -> list[str]:
         """
         Comments (see 7.8 for formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10424,6 +10788,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[4,1]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10435,6 +10801,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[4,4]`
 
         Units: km²/s²
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10446,6 +10814,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[4,2]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10457,6 +10827,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[4,3]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10468,6 +10840,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[1,1]`
 
         Units: km²
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10479,6 +10853,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[5,1]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10490,6 +10866,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[5,4]`
 
         Units: km²/s²
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10501,6 +10879,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[5,2]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10512,6 +10892,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[5,5]`
 
         Units: km²/s²
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10523,6 +10905,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[5,3]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10534,6 +10918,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[2,1]`
 
         Units: km²
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10545,6 +10931,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[2,2]`
 
         Units: km²
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10556,6 +10944,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[6,1]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10567,6 +10957,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[6,4]`
 
         Units: km²/s²
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10578,6 +10970,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[6,2]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10589,6 +10983,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[6,5]`
 
         Units: km²/s²
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10600,6 +10996,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[6,3]`
 
         Units: km²/s
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10611,6 +11009,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[6,6]`
 
         Units: km²/s²
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10622,6 +11022,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[3,1]`
 
         Units: km²
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10633,6 +11035,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[3,2]`
 
         Units: km²
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10644,6 +11048,8 @@ class OpmCovarianceMatrix:
         Covariance matrix `[3,3]`
 
         Units: km²
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10762,6 +11168,8 @@ class OpmManeuverParameters:
     def comment(self) -> list[str]:
         """
         Comments (see 7.8 for formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10776,6 +11184,8 @@ class OpmManeuverParameters:
 
 
         The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10787,6 +11197,8 @@ class OpmManeuverParameters:
         Maneuver duration (If = 0, impulsive maneuver)
 
         Units: s
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10798,6 +11210,8 @@ class OpmManeuverParameters:
         1st component of the velocity increment
 
         Units: km/s
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10809,6 +11223,8 @@ class OpmManeuverParameters:
         2nd component of the velocity increment
 
         Units: km/s
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10820,6 +11236,8 @@ class OpmManeuverParameters:
         3rd component of the velocity increment
 
         Units: km/s
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10829,6 +11247,8 @@ class OpmManeuverParameters:
     def man_epoch_ignition(self) -> str:
         """
         Epoch of ignition (see 7.5.10 for formatting rules)
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10839,6 +11259,8 @@ class OpmManeuverParameters:
         """
         Reference frame in which the velocity increment vector data are given. The user must
         select from the accepted set of values indicated in 3.2.4.11.
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -10886,6 +11308,8 @@ class OpmMetadata:
 
         Examples: EARTH EARTH BARYCENTER MOON SOLAR SYSTEM BARYCENTER SUN JUPITER BARYCENTER
         STS 106 EROS
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.3.
         """
         ...
 
@@ -10897,6 +11321,8 @@ class OpmMetadata:
         Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
 
         Examples: This is a comment
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.3.
         """
         ...
 
@@ -10916,6 +11342,8 @@ class OpmMetadata:
         cannot be disclosed, the value should be set to UNKNOWN.
 
         Examples: 2000-052A 1996-068A 2000-053A 1996-008A UNKNOWN
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.3.
         """
         ...
 
@@ -10932,6 +11360,8 @@ class OpmMetadata:
         UNKNOWN.
 
         Examples: EUTELSAT W1 MARS PATHFINDER STS 106 NEAR UNKNOWN
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.3.
         """
         ...
 
@@ -10944,6 +11374,8 @@ class OpmMetadata:
         Use of values other than those in 3.2.3.3 should be documented in an ICD.
 
         Examples: ICRF EME2000 ITRF2000 TEME
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.3.
         """
         ...
 
@@ -10968,6 +11400,8 @@ class OpmMetadata:
         those in 3.2.3.2 should be documented in an ICD.
 
         Examples: UTC, TAI, TT, GPS, TDB, TCB
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.3.
         """
         ...
 
@@ -11034,6 +11468,8 @@ class QuaternionState:
     def comment(self) -> list[str]:
         """
         One or more comment line(s). Each comment line shall begin with this keyword.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -11045,6 +11481,8 @@ class QuaternionState:
         Quaternion components Q1, Q2, Q3, QC.
 
         Units: dimensionless
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -11056,6 +11494,8 @@ class QuaternionState:
         Quaternion components Q1, Q2, Q3, QC.
 
         Units: dimensionless
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -11067,6 +11507,8 @@ class QuaternionState:
         Quaternion components Q1, Q2, Q3, QC.
 
         Units: dimensionless
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -11078,6 +11520,8 @@ class QuaternionState:
         Quaternion components Q1, Q2, Q3, QC.
 
         Units: dimensionless
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -11099,6 +11543,8 @@ class QuaternionState:
         """
         Name of the reference frame that defines the starting point of the transformation. The set
         of allowed values is described in annex B, subsection B3.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -11109,6 +11555,8 @@ class QuaternionState:
         """
         Name of the reference frame that defines the end point of the transformation. The set of
         allowed values is described in annex B, subsection B3.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -11521,6 +11969,8 @@ class RdmMetadata:
         taken from the orbit center column in the SANA orbit centers registry, reference `[9]`.
 
         Examples: EARTH, MOON, JUPITER
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
         """
         ...
 
@@ -11530,6 +11980,8 @@ class RdmMetadata:
     def comment(self) -> list[str]:
         """
         Comments (allowed only at the beginning of RDM metadata).
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
         """
         ...
 
@@ -11541,6 +11993,8 @@ class RdmMetadata:
         Specification of whether the re-entry is controlled or not.
 
         Examples: YES, NO, UNKNOWN
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
         """
         ...
 
@@ -11603,6 +12057,8 @@ class RdmMetadata:
         5.3.3.5).
 
         Examples: 2001-11-06T11:17:33, 2002-204T15:56:23
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
         """
         ...
 
@@ -11642,6 +12098,8 @@ class RdmMetadata:
         in 5.2.3.3).
 
         Examples: 2010-012C, 2016-001A, 1985-067CD, UNKNOWN
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
         """
         ...
 
@@ -11706,6 +12164,8 @@ class RdmMetadata:
         space debris) or UNKNOWN should be used.
 
         Examples: SENTINEL-1A, GOCE, ENVISAT, BRIZ R/B, DEBRIS, UNKNOWN
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
         """
         ...
 
@@ -11854,6 +12314,8 @@ class RdmMetadata:
         the SANA time systems registry, reference `[10]`.
 
         Examples: UTC, TAI
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
         """
         ...
 
@@ -11915,6 +12377,8 @@ class RdmSpacecraftParameters:
     def comment(self) -> list[str]:
         """
         Comments (allowed only at the beginning of each RDM data logical block).
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
         """
         ...
 
@@ -12108,6 +12572,8 @@ class RelativeMetadataData:
     def comment(self) -> list[str]:
         """
         Comments (see 6.3.4 for formatting rules).
+
+        CCSDS Reference: 508.0-B-1, Section 3.3.
         """
         ...
 
@@ -12120,6 +12586,8 @@ class RelativeMetadataData:
         TCA. Data type = double.
 
         Units: m
+
+        CCSDS Reference: 508.0-B-1, Section 3.3.
         """
         ...
 
@@ -12246,6 +12714,8 @@ class RelativeMetadataData:
     def tca(self) -> str:
         """
         The date and time in UTC of the closest approach. (See 6.3.2.6 for formatting rules.)
+
+        CCSDS Reference: 508.0-B-1, Section 3.3.
         """
         ...
 
@@ -12391,6 +12861,8 @@ class SpacecraftParameters:
     def comment(self) -> list[str]:
         """
         Comments (see 7.8 for formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -12489,6 +12961,8 @@ class SpinState:
     def comment(self) -> list[str]:
         """
         One or more comment line(s). Each comment line shall begin with this keyword.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -12565,6 +13039,8 @@ class SpinState:
         """
         Name of the reference frame that defines the starting point of the transformation. The set
         of allowed values is described in annex B, subsection B3.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -12575,6 +13051,8 @@ class SpinState:
         """
         Name of the reference frame that defines the end point of the transformation. The set of
         allowed values is described in annex B, subsection B3.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -12586,6 +13064,8 @@ class SpinState:
         Right ascension of spin axis vector in frame A.
 
         Units: deg
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -12597,6 +13077,8 @@ class SpinState:
         Phase of the satellite about the spin axis.
 
         Units: deg
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -12608,6 +13090,8 @@ class SpinState:
         Angular velocity of satellite around spin axis.
 
         Units: deg/s
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -12619,6 +13103,8 @@ class SpinState:
         Declination of the spin axis vector in frame A.
 
         Units: deg
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
         """
         ...
 
@@ -12661,6 +13147,8 @@ class StateVector:
     def comment(self) -> list[str]:
         """
         Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -12670,6 +13158,8 @@ class StateVector:
     def epoch(self) -> str:
         """
         Epoch of state vector & optional Keplerian elements (see 7.5.10 for formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -12681,6 +13171,8 @@ class StateVector:
         Position vector X-component.
 
         Units: km
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -12692,6 +13184,8 @@ class StateVector:
         Velocity vector X-component.
 
         Units: km/s
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -12703,6 +13197,8 @@ class StateVector:
         Position vector Y-component.
 
         Units: km
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -12714,6 +13210,8 @@ class StateVector:
         Velocity vector Y-component.
 
         Units: km/s
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -12725,6 +13223,8 @@ class StateVector:
         Position vector Z-component.
 
         Units: km
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -12736,6 +13236,8 @@ class StateVector:
         Velocity vector Z-component.
 
         Units: km/s
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -12786,6 +13288,8 @@ class StateVectorAcc:
     def epoch(self) -> str:
         """
         Epoch of state vector & optional Keplerian elements (see 7.5.10 for formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
         """
         ...
 
@@ -12797,6 +13301,8 @@ class StateVectorAcc:
         Position vector X-component.
 
         Units: km
+
+        CCSDS Reference: 502.0-B-3, Section 5.3.3.
         """
         ...
 
@@ -12819,6 +13325,8 @@ class StateVectorAcc:
         Velocity vector X-component.
 
         Units: km/s
+
+        CCSDS Reference: 502.0-B-3, Section 5.3.3.
         """
         ...
 
@@ -12830,6 +13338,8 @@ class StateVectorAcc:
         Position vector Y-component.
 
         Units: km
+
+        CCSDS Reference: 502.0-B-3, Section 5.3.3.
         """
         ...
 
@@ -12852,6 +13362,8 @@ class StateVectorAcc:
         Velocity vector Y-component.
 
         Units: km/s
+
+        CCSDS Reference: 502.0-B-3, Section 5.3.3.
         """
         ...
 
@@ -12863,6 +13375,8 @@ class StateVectorAcc:
         Position vector Z-component.
 
         Units: km
+
+        CCSDS Reference: 502.0-B-3, Section 5.3.3.
         """
         ...
 
@@ -12885,6 +13399,8 @@ class StateVectorAcc:
         Velocity vector Z-component.
 
         Units: km/s
+
+        CCSDS Reference: 502.0-B-3, Section 5.3.3.
         """
         ...
 
@@ -13125,6 +13641,8 @@ class TdmHeader:
         (See 4.5 for formatting rules.)
 
         Examples: This is a comment
+
+        CCSDS Reference: 503.0-B-2, Section 3.2.
         """
         ...
 
@@ -13136,6 +13654,8 @@ class TdmHeader:
         Data creation date/time in UTC. (For format specification, see 4.3.9.)
 
         Examples: 2001-11-06T11:17:33, 2002-204T15:56:23.4, 2006-001T00:00:00Z
+
+        CCSDS Reference: 503.0-B-2, Section 3.2.
         """
         ...
 
@@ -13161,6 +13681,8 @@ class TdmHeader:
         (reference `[11]`).
 
         Examples: CNES, ESA, GSFC, DLR, JPL, JAXA
+
+        CCSDS Reference: 503.0-B-2, Section 3.2.
         """
         ...
 
@@ -13608,6 +14130,8 @@ class TdmMetadata:
         some special TDMs such as tropospheric media, only one participant need be listed.
 
         Examples: DSS-63-S400K, ROSETTA, `<Quasar catalog name>`, 1997-061A, UNKNOWN
+
+        CCSDS Reference: 503.0-B-2, Section 3.3.
         """
         ...
 
@@ -13848,6 +14372,8 @@ class TdmMetadata:
         (See annex B.)
 
         Examples: UTC, TAI, GPS, SCLK
+
+        CCSDS Reference: 503.0-B-2, Section 3.3.
         """
         ...
 
@@ -14166,6 +14692,8 @@ class TleParameters:
     def comment(self) -> list[str]:
         """
         Comments (see 7.8 for formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
         """
         ...
 
@@ -14211,6 +14739,8 @@ class TleParameters:
         MEAN_ELEMENT_THEORY = SGP or PPT3). (See 4.2.4.7 for important details).
 
         Units: rev/day²
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
         """
         ...
 
@@ -14290,6 +14820,8 @@ class UserDefined:
     def comment(self) -> list[str]:
         """
         Comments (see 7.8 for formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
         """
         ...
 

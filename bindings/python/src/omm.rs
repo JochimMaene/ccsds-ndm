@@ -411,6 +411,8 @@ impl OmmMetadata {
     ///
     /// Examples: Telkom 2, Spaceway 2, INMARSAT 4-F2, UNKNOWN
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_object_name(&self) -> String {
@@ -435,6 +437,8 @@ impl OmmMetadata {
     ///
     /// Examples: 2005-046A, 2005-046B, 2003-022A, UNKNOWN
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_object_id(&self) -> String {
@@ -452,6 +456,8 @@ impl OmmMetadata {
     /// indicated in annex B, subsection B2.
     ///
     /// Examples: EARTH, MARS, MOON
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.3.
     ///
     /// :type: str
     #[getter]
@@ -474,6 +480,8 @@ impl OmmMetadata {
     ///
     /// Examples: ICRF, ITRF2000, EME2000, TEME
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_ref_frame(&self) -> String {
@@ -490,6 +498,8 @@ impl OmmMetadata {
     ///
     /// Examples: UTC
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_time_system(&self) -> String {
@@ -505,6 +515,8 @@ impl OmmMetadata {
     /// propagate the state.
     ///
     /// Examples: SGP, SGP4, SGP4-XP, DSST, USM
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.3.
     ///
     /// :type: str
     #[getter]
@@ -540,6 +552,8 @@ impl OmmMetadata {
     /// Comments (allowed at the beginning of the OMM Metadata). (See 7.8 for formatting rules.)
     ///
     /// Examples: This is a comment
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.3.
     ///
     /// :type: list[str]
     #[getter]
@@ -641,6 +655,8 @@ impl MeanElements {
 
     /// Comments (see 7.8 for formatting rules).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -655,6 +671,8 @@ impl MeanElements {
     /// Epoch of Mean Keplerian elements (see 7.5.10 for formatting rules)
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
     ///
     /// :type: str
     #[getter]
@@ -674,6 +692,8 @@ impl MeanElements {
     ///
     /// Units: n/a
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_eccentricity(&self) -> f64 {
@@ -690,6 +710,8 @@ impl MeanElements {
     /// Examples: 63.4
     ///
     /// Units: deg
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
     ///
     /// :type: float
     #[getter]
@@ -710,6 +732,8 @@ impl MeanElements {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_ra_of_asc_node(&self) -> f64 {
@@ -727,6 +751,8 @@ impl MeanElements {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_arg_of_pericenter(&self) -> f64 {
@@ -743,6 +769,8 @@ impl MeanElements {
     /// Examples: 130.0
     ///
     /// Units: deg
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
     ///
     /// :type: float
     #[getter]
@@ -762,6 +790,8 @@ impl MeanElements {
     ///
     /// Units: km or rev/day
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_semi_major_axis(&self) -> Option<f64> {
@@ -779,6 +809,8 @@ impl MeanElements {
     /// Examples: 1.491325
     ///
     /// Units: km or rev/day
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1072,6 +1104,8 @@ impl TleParameters {
 
     /// Comments (see 7.8 for formatting rules).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -1193,6 +1227,8 @@ impl TleParameters {
     /// MEAN_ELEMENT_THEORY = SGP or PPT3). (See 4.2.4.7 for important details).
     ///
     /// Units: rev/day²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
     ///
     /// :type: float
     #[getter]
