@@ -213,10 +213,6 @@ check: lint audit stubs-check test docs
 bench:
     cargo bench --manifest-path {{rust_manifest}}
 
-# Measure Python object-graph parse, reconstruction, generation, editing, and peak RSS.
-bench-python-object-model:
-    cd {{python_dir}} && uv run python benchmarks/object_model.py
-
 # Reproduce parse/generate workloads for every standalone message and combined XML NDM
 [private]
 bench-family:

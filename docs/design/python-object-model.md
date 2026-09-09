@@ -52,9 +52,7 @@ time-sensitive paths were measured before extending the graph to every message f
 - repeated scalar edits through a retained state-vector reference; and
 - the same end-to-end workloads in the competing Python package.
 
-`just bench-python-object-model` measures OEM parsing, construction from records and NumPy arrays,
-validation, generation, numeric access, editing, and isolated-process peak RSS. Results are local
-comparison evidence, not release thresholds.
+These measurements were local comparison evidence, not release thresholds.
 
 A 2026-09-09 release-build experiment compared the live model with Rust-owned copy-on-write OEM
 histories at 100,000 records. The prototype made prepared-NumPy construction 73%, bulk replacement
