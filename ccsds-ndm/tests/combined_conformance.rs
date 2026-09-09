@@ -1,5 +1,4 @@
 use std::fs;
-use std::path::{Path, PathBuf};
 
 use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::messages::ndm::CombinedNdm;
@@ -8,19 +7,15 @@ use ccsds_ndm::{from_str_with_options, Message, Notation, ParseOptions};
 use ccsds_ndm::{Ndm, Validate};
 
 mod common;
-use common::validate_xml;
+use common::{data_dir, validate_xml};
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 const OPM_WITH_MANEUVERS_KVN: &str = include_str!("../data/kvn/opm_g2.kvn");
 
-fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
-}
-
 #[test]
 fn every_shipped_combined_fixture_preserves_children_and_generates_valid_xml() {
     for name in ["ndm_g12.xml", "ndm_g21.xml"] {
-        let source = fs::read_to_string(repository_path(&format!("data/xml/{name}"))).unwrap();
+        let source = fs::read_to_string(data_dir().join("xml").join(name)).unwrap();
         let message = CombinedNdm::from_xml(&source).unwrap();
         let kinds: Vec<_> = message.messages.iter().map(Message::kind).collect();
         let xml = message.to_xml().unwrap();
@@ -41,7 +36,7 @@ fn every_shipped_combined_fixture_preserves_children_and_generates_valid_xml() {
 
 #[test]
 fn shipped_g22_is_schema_valid_but_rejected_by_the_verified_opm_semantic_gate() {
-    let source = fs::read_to_string(repository_path("data/xml/ndm_g22.xml")).unwrap();
+    let source = fs::read_to_string(data_dir().join("xml/ndm_g22.xml")).unwrap();
     validate_xml("ndm_g22.xml source", &source);
     let error = CombinedNdm::from_xml(&source).unwrap_err();
     assert!(error.to_string().contains("MASS"));
@@ -49,7 +44,7 @@ fn shipped_g22_is_schema_valid_but_rejected_by_the_verified_opm_semantic_gate() 
 
 #[test]
 fn combined_xml_rejects_illegal_root_and_constituent_attributes() {
-    let source = fs::read_to_string(repository_path("data/xml/ndm_g12.xml")).unwrap();
+    let source = fs::read_to_string(data_dir().join("xml/ndm_g12.xml")).unwrap();
     for (label, xml) in [
         (
             "root id",
@@ -74,7 +69,7 @@ fn combined_xml_rejects_illegal_root_and_constituent_attributes() {
 
 #[test]
 fn aggregate_parse_limits_apply_to_direct_combined_entry_points() {
-    let source = fs::read_to_string(repository_path("data/xml/ndm_g21.xml")).unwrap();
+    let source = fs::read_to_string(data_dir().join("xml/ndm_g21.xml")).unwrap();
     let error = from_str_with_options(
         &source,
         Some(Notation::Xml),

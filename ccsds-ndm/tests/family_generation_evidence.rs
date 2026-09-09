@@ -1,19 +1,15 @@
 mod common;
-use common::validate_xml;
+use common::{data_dir, validate_xml};
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use ccsds_ndm::{from_str, Message};
 
 const REMAINING_PREFIXES: [&str; 7] = ["omm_", "ocm_", "cdm_", "tdm_", "rdm_", "apm_", "acm_"];
 
-fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
-}
-
 fn fixture_paths(directory: &str, extension: &str) -> Vec<PathBuf> {
-    let mut paths: Vec<_> = fs::read_dir(repository_path(directory))
+    let mut paths: Vec<_> = fs::read_dir(data_dir().join(directory))
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .filter(|path| path.extension().is_some_and(|value| value == extension))
@@ -50,7 +46,7 @@ fn assert_standalone_generation(label: &str, message: &Message) {
 
 #[test]
 fn every_remaining_kvn_fixture_generates_deterministically_and_reparsably() {
-    for path in fixture_paths("data/kvn", "kvn") {
+    for path in fixture_paths("kvn", "kvn") {
         let label = path.file_name().unwrap().to_string_lossy();
         let input = fs::read_to_string(&path).unwrap();
         let message =
@@ -61,7 +57,7 @@ fn every_remaining_kvn_fixture_generates_deterministically_and_reparsably() {
 
 #[test]
 fn every_remaining_xml_fixture_generates_deterministically_and_reparsably() {
-    for path in fixture_paths("data/xml", "xml") {
+    for path in fixture_paths("xml", "xml") {
         let label = path.file_name().unwrap().to_string_lossy();
         let input = fs::read_to_string(&path).unwrap();
         let message =
@@ -92,7 +88,7 @@ fn every_remaining_xml_fixture_generates_deterministically_and_reparsably() {
 
 #[test]
 fn acm_physical_description_survives_kvn_to_xml_conversion() {
-    let input = fs::read_to_string(repository_path("data/kvn/acm_g8.kvn")).unwrap();
+    let input = fs::read_to_string(data_dir().join("kvn/acm_g8.kvn")).unwrap();
     let message = from_str(&input).unwrap();
     let xml = message.to_xml().unwrap();
     let reparsed = from_str(&xml).unwrap();
@@ -111,7 +107,7 @@ fn acm_physical_description_survives_kvn_to_xml_conversion() {
 
 #[test]
 fn aem_optional_xml_unit_annotations_are_normatively_normalized_through_kvn() {
-    let input = fs::read_to_string(repository_path("data/xml/aem_g13.xml")).unwrap();
+    let input = fs::read_to_string(data_dir().join("xml/aem_g13.xml")).unwrap();
     assert!(input.contains("<NUTATION units=\"deg\">"));
 
     let message = from_str(&input).unwrap();
@@ -129,7 +125,7 @@ fn aem_optional_xml_unit_annotations_are_normatively_normalized_through_kvn() {
 
 #[test]
 fn cdm_kvn_comments_keep_their_normative_block_association() {
-    let input = fs::read_to_string(repository_path("data/kvn/cdm_363.kvn")).unwrap();
+    let input = fs::read_to_string(data_dir().join("kvn/cdm_363.kvn")).unwrap();
     let message = from_str(&input).unwrap();
     let Message::Cdm(cdm) = message else {
         panic!("CDM fixture changed message type");
