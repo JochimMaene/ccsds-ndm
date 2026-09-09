@@ -151,6 +151,48 @@ def parse_python_binding_file(path: Path) -> dict[str, PythonClass]:
             line_end=line_end,
         )
 
+    # Fields carrying native PyO3 accessors (`#[pyo3(get)]`, `#[pyo3(get, set)]`).
+    # These declare a property without any `#[getter]`/`#[setter]` method, and their
+    # documentation lives on the field.
+    struct_pattern = re.compile(
+        r"#\[pyclass[^\]]*\]\s*(?:#\[[^\]]*\]\s*)*pub\s+struct\s+(\w+)\s*\{",
+        re.MULTILINE,
+    )
+    pyo3_attr = re.compile(r"#\[pyo3\(([^)]*)\)\]")
+    for match, body, body_line in braced_blocks(content, struct_pattern):
+        item = classes.get(match.group(1))
+        if item is None:
+            continue
+        doc: list[str] = []
+        accessors: set[str] = set()
+        for offset, raw in enumerate(body.splitlines()):
+            line = raw.strip()
+            if line.startswith("///"):
+                doc.append(line[3:].strip())
+                continue
+            if line.startswith("#["):
+                attr = pyo3_attr.search(line)
+                if attr:
+                    accessors.update(part.strip() for part in attr.group(1).split(","))
+                continue
+            field = re.match(r"(?:pub\s+)?(\w+)\s*:", line)
+            if field and accessors:
+                name = field.group(1)
+                # `get` and `set` are independent: `#[pyo3(set)]` declares a setter and no
+                # getter, and registering one anyway would mask a setter-without-getter
+                # violation. Other `#[pyo3(...)]` arguments declare neither.
+                if "get" in accessors:
+                    text = "\n".join(doc)
+                    line_no = body_line + offset
+                    item.getters.setdefault(
+                        name,
+                        PythonGetter(name, name, text, line_no - len(doc), line_no),
+                    )
+                if "set" in accessors:
+                    item.setters.add(name)
+            if line:
+                doc, accessors = [], set()
+
     impl_pattern = re.compile(r"#\[pymethods\]\s*impl\s+(\w+)\s*\{", re.MULTILINE)
     # Attributes may sit between the doc comment and `#[getter]` (for example
     # `#[gen_stub(...)]`), and their arguments may themselves contain brackets.

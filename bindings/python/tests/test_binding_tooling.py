@@ -109,3 +109,78 @@ def test_docstrings_survive_override_attributes_between_doc_and_getter(tmp_path)
     assert "CCSDS Reference: 502.0-B-3, Section 6." in annotated.docstring
     assert annotated.has_type_annotation
     assert "annotated" in example.setters
+
+
+NATIVE_ACCESSORS = """\
+#[gen_stub_pyclass]
+#[pyclass]
+pub struct Example {
+    /// The read-only identifier.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
+    id: Option<String>,
+
+    /// The nested child.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.
+    ///
+    /// :type: Child
+    #[pyo3(get, set)]
+    child: Py<Child>,
+
+    /// Write-only by design.
+    ///
+    /// :type: str
+    #[pyo3(set)]
+    write_only: String,
+
+    /// Renamed, but not a property.
+    ///
+    /// :type: str
+    #[pyo3(name = "renamed")]
+    not_a_property: String,
+
+    plain_field: String,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl Example {
+    /// Validating setter stays handwritten.
+    #[setter]
+    fn set_id(&mut self, value: String) -> PyResult<()> {
+        Ok(())
+    }
+}
+"""
+
+
+def test_native_field_accessors_are_recognised_with_their_docs(tmp_path):
+    # `#[pyo3(get, set)]` declares a property with no `#[getter]` method, and its
+    # documentation lives on the field. The audit reports such fields as unexposed
+    # and undocumented unless the parser reads them.
+    path = tmp_path / "binding.rs"
+    path.write_text(NATIVE_ACCESSORS)
+    example = parse_python_binding_file(path)["Example"]
+
+    assert set(example.getters) == {"id", "child"}
+    assert "plain_field" not in example.getters, (
+        "a field without #[pyo3(...)] is not a property"
+    )
+
+    # `get` and `set` are independent. Registering a getter for a `#[pyo3(set)]` field
+    # would hide a setter-without-getter violation from the audit, and a `#[pyo3(name)]`
+    # field declares no accessor at all.
+    assert "write_only" not in example.getters
+    assert "write_only" in example.setters
+    assert "not_a_property" not in example.getters
+    assert "not_a_property" not in example.setters
+
+    assert example.getters["id"].docstring.startswith("The read-only identifier.")
+    assert example.getters["id"].has_type_annotation
+    assert "id" in example.setters, "the handwritten #[setter] still registers"
+
+    child = example.getters["child"]
+    assert "CCSDS Reference: 502.0-B-3, Section 6." in child.docstring
+    assert "child" in example.setters, "#[pyo3(get, set)] declares a setter"
