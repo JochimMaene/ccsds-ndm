@@ -112,7 +112,7 @@ pub(crate) fn message_to_py(py: Python<'_>, message: Message) -> PyResult<Py<PyA
 fn from_str(
     py: Python,
     data: &str,
-    format: Option<&str>,
+    #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
     max_input_bytes: Option<usize>,
     max_records: Option<usize>,
 ) -> PyResult<Py<PyAny>> {
@@ -138,8 +138,8 @@ fn from_str(
 #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
 fn from_file(
     py: Python,
-    path: PathBuf,
-    format: Option<&str>,
+    #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: PathBuf,
+    #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
     max_input_bytes: Option<usize>,
     max_records: Option<usize>,
 ) -> PyResult<Py<PyAny>> {
@@ -156,7 +156,7 @@ fn from_file(
 #[pyo3(signature = (data, to_format, *, max_input_bytes=None, max_records=None))]
 fn convert(
     data: &str,
-    #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] to_format: &str,
+    #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] to_format: &str,
     max_input_bytes: Option<usize>,
     max_records: Option<usize>,
 ) -> PyResult<String> {
@@ -170,9 +170,9 @@ fn convert(
 #[pyfunction]
 #[pyo3(signature = (source_path, destination_path, to_format, *, max_input_bytes=None, max_records=None))]
 fn convert_file(
-    source_path: PathBuf,
-    destination_path: PathBuf,
-    #[gen_stub(override_type(type_repr="Literal[\"kvn\", \"xml\"]", imports=("typing")))] to_format: &str,
+    #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] source_path: PathBuf,
+    #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] destination_path: PathBuf,
+    #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] to_format: &str,
     max_input_bytes: Option<usize>,
     max_records: Option<usize>,
 ) -> PyResult<()> {

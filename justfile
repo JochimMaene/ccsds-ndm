@@ -11,6 +11,9 @@ rust_manifest := rust_dir + "/Cargo.toml"
 python_dir := "bindings/python"
 python_manifest := python_dir + "/Cargo.toml"
 
+# Interpreter used to build the stub generator; must ship a shared libpython.
+stub_python := env_var_or_default("PYO3_PYTHON", "python3")
+
 # --- Setup ------------------------------------------------------------------
 
 # Set up the Python development environment
@@ -42,15 +45,46 @@ prek:
 dev:
     cd {{python_dir}} && uv run --with maturin maturin develop
 
-# Generate Python type stubs (.pyi)
+# Generate Python type stubs (.pyi) with pyo3-stub-gen.
+#
+# The generator is an ordinary binary, so it links libpython: point `stub_python`
+# at an interpreter that ships a shared library (a uv-managed CPython reports a
+# LIBDIR that does not exist). `abi3-py310` only sets the ABI floor, so any
+# supported version works.
 [private]
 stubs:
-    cd {{python_dir}} && uv run python stubs.py
+    #!/usr/bin/env bash
+    set -euo pipefail
+    libdir="$({{stub_python}} -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))')"
+    if [ ! -d "$libdir" ]; then
+        echo "{{stub_python}} reports LIBDIR=$libdir, which does not exist." >&2
+        echo "Set stub_python to an interpreter with a shared libpython." >&2
+        exit 1
+    fi
+    PYO3_PYTHON="{{stub_python}}" LD_LIBRARY_PATH="$libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+        cargo run --quiet --manifest-path {{python_manifest}} --bin stub_gen
+    uv run --project {{python_dir}} ruff format {{python_dir}}/ccsds_ndm/__init__.pyi
 
-# Check if Python type stubs are up to date
+# Check the committed stubs match what the generator produces.
+# Generates into a temporary directory so the committed file is never rewritten.
 [private]
 stubs-check:
-    cd {{python_dir}} && uv run python stubs.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    libdir="$({{stub_python}} -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))')"
+    out="$(mktemp -d)"
+    trap 'rm -rf "$out"' EXIT
+    mkdir -p "$out/ccsds_ndm"
+    PYO3_PYTHON="{{stub_python}}" LD_LIBRARY_PATH="$libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+        cargo run --quiet --manifest-path {{python_manifest}} --bin stub_gen -- "$out"
+    uv run --project {{python_dir}} ruff format --config {{python_dir}}/pyproject.toml "$out/ccsds_ndm/__init__.pyi"
+    diff -u {{python_dir}}/ccsds_ndm/__init__.pyi "$out/ccsds_ndm/__init__.pyi"
+
+# Type-check the generated stubs. mypy caught malformed override annotations that
+# aggregate diffing did not, so this guards the generator's output.
+[private]
+typecheck:
+    cd {{python_dir}} && uv run mypy --strict ccsds_ndm/__init__.pyi
 
 # Audit Python bindings against Rust core structs
 [private]
@@ -205,7 +239,7 @@ conformance-tdm:
 verify: check package-rust package-python
 
 # Run all quality checks
-check: lint audit stubs-check test docs
+check: lint audit stubs-check typecheck test docs
 
 # --- Benchmarking -----------------------------------------------------------
 

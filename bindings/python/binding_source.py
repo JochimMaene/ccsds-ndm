@@ -152,12 +152,19 @@ def parse_python_binding_file(path: Path) -> dict[str, PythonClass]:
         )
 
     impl_pattern = re.compile(r"#\[pymethods\]\s*impl\s+(\w+)\s*\{", re.MULTILINE)
+    # Attributes may sit between the doc comment and `#[getter]` (for example
+    # `#[gen_stub(...)]`), and their arguments may themselves contain brackets.
+    attr = r"(?:[ \t]*#\[[^\n]*\n)*"
     getter_pattern = re.compile(
-        r"((?:\s*///[^\n]*\n)*)\s*#\[getter\]\s*\n(?:\s*#\[[^\]]*\]\s*\n)*\s*fn\s+(get_)?(\w+)\s*\(",
+        r"((?:\s*///[^\n]*\n)*)"
+        + attr
+        + r"\s*#\[getter\]\s*\n"
+        + attr
+        + r"\s*fn\s+(get_)?(\w+)\s*\(",
         re.MULTILINE,
     )
     setter_pattern = re.compile(
-        r"#\[setter\]\s*\n(?:\s*#\[[^\]]*\]\s*\n)*\s*fn\s+(set_)?(\w+)\s*\(",
+        r"#\[setter\]\s*\n" + attr + r"\s*fn\s+(set_)?(\w+)\s*\(",
         re.MULTILINE,
     )
     for match, body, body_line in braced_blocks(content, impl_pattern):

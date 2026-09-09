@@ -39,6 +39,7 @@ Issues = "https://github.com/JochimMaene/ccsds-ndm/issues"
 
 [dependency-groups]
 dev = [
+    "mypy>=1.11",
     "pytest>=8.3.5",
     "ruff>=0.14.14",
 ]

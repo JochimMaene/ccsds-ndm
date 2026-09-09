@@ -5,7 +5,7 @@
 """Regression tests for the shared binding-maintenance tooling."""
 
 from audit_bindings import ccsds_reference
-from binding_source import parse_rust_file
+from binding_source import parse_python_binding_file, parse_rust_file
 
 STRUCTS = """\
 /// A message.
@@ -52,3 +52,60 @@ def test_ccsds_reference_ignores_harmless_formatting_but_not_the_citation():
     ) != ccsds_reference(core)
     assert ccsds_reference("no citation here") is None
     assert ccsds_reference(None) is None
+
+
+BINDING = """\
+#[gen_stub_pyclass]
+#[pyclass]
+pub struct Example {
+    inner: core::Example,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl Example {
+    /// The plain field.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_plain(&self) -> String {
+        self.inner.plain.clone()
+    }
+
+    /// The annotated field.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.
+    ///
+    /// :type: list[Union[Oem, Cdm]]
+    #[gen_stub(override_return_type(imports=("typing"), type_repr="list[typing.Union[Oem, Cdm]]"))]
+    #[getter]
+    fn get_annotated(&self, py: Python<'_>) -> Py<PyList> {
+        self.annotated.clone_ref(py)
+    }
+
+    #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]"))]
+    #[setter]
+    fn set_annotated(&mut self, value: Vec<Py<PyAny>>) -> PyResult<()> {
+        Ok(())
+    }
+}
+"""
+
+
+def test_docstrings_survive_override_attributes_between_doc_and_getter(tmp_path):
+    # `#[gen_stub(...)]` sits between the doc comment and `#[getter]`, and its arguments
+    # nest brackets two deep. The parser must still pair the docstring with the getter,
+    # or the audit reports every annotated field as undocumented.
+    path = tmp_path / "binding.rs"
+    path.write_text(BINDING)
+    classes = parse_python_binding_file(path)
+
+    example = classes["Example"]
+    assert set(example.getters) == {"plain", "annotated"}
+    assert example.getters["plain"].docstring.startswith("The plain field.")
+
+    annotated = example.getters["annotated"]
+    assert annotated.docstring.startswith("The annotated field.")
+    assert "CCSDS Reference: 502.0-B-3, Section 6." in annotated.docstring
+    assert annotated.has_type_annotation
+    assert "annotated" in example.setters

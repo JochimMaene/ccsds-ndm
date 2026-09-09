@@ -70,5 +70,7 @@ jobs:
         run: just audit
       - name: Check stubs
         run: just stubs-check
+      - name: Type-check stubs
+        run: just typecheck
       - name: Run Python tests
         run: just test-python
