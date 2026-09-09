@@ -110,7 +110,10 @@ def parse_rust_file(path: Path) -> dict[str, RustStruct]:
         )
         body_start = match.end()
         for field_match in fields.finditer(body):
-            line = content[: body_start + field_match.start()].count("\n")
+            # Anchor on the field name, not the match start: the leading `\s*` can swallow
+            # the newline before the first field, which would resolve to the `pub struct`
+            # line and attribute the struct's own docstring to that field.
+            line = content[: body_start + field_match.start(1)].count("\n")
             name = field_match.group(1)
             item.fields[name] = RustField(
                 name,
