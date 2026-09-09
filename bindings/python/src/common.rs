@@ -5,9 +5,9 @@
 use crate::types::{parse_calendar_epoch, parse_epoch};
 use ccsds_ndm::common as core_common;
 use ccsds_ndm::types::{Acc, InterpolationDegree, Position, Velocity};
-use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pymethods};
 use std::str::FromStr;
 
 pub(crate) fn parse_interpolation_degree(

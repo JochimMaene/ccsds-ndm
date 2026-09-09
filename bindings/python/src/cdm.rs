@@ -7,10 +7,10 @@ use ccsds_ndm::messages::cdm as core_cdm;
 use ccsds_ndm::types::{self as core_types, *};
 use ccsds_ndm::Validate;
 use numpy::{PyArray1, PyArray2, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
-use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pymethods};
 
 // Helper to parse epoch strings
 fn parse_epoch_str(value: &str) -> PyResult<CalendarEpoch> {
@@ -216,9 +216,28 @@ fn build_cdm_covariance_from_array(
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct Cdm {
+    /// Unique ID for this message.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// The CDM version.
+    ///
+    /// :type: str
+    #[pyo3(get)]
     version: String,
+
+    /// The message header.
+    ///
+    /// :type: CdmHeader
+    #[pyo3(get, set)]
     header: Py<CdmHeader>,
+
+    /// The message body containing relative metadata/data and object segments.
+    ///
+    /// :type: CdmBody
+    #[pyo3(get, set)]
     body: Py<CdmBody>,
 }
 
@@ -284,7 +303,8 @@ impl Cdm {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
         let options = crate::api::parse_options(max_input_bytes, None);
@@ -297,8 +317,10 @@ impl Cdm {
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
     fn from_file(
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
         let options = crate::api::parse_options(max_input_bytes, None);
@@ -307,65 +329,25 @@ impl Cdm {
     }
 
     /// Atomically write this CDM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Cdm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to validated KVN or XML.
-    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
-    }
-
-    /// Conjunction Data Message (CDM).
-    ///
-    /// The CDM contains information about a single conjunction between a primary object (Object1)
-    /// and a secondary object (Object2). It allows satellite operators to evaluate the risk of
-    /// collision and plan avoidance maneuvers.
-    ///
-    /// The message includes:
-    /// - Positions and velocities of both objects at Time of Closest Approach (TCA).
-    /// - Covariance matrices for both objects at TCA.
-    /// - Relative position and velocity of Object2 with respect to Object1.
-    /// - Metadata describing how the data was determined (orbit determination settings).
-    ///
-    /// :type: CdmHeader
-    #[getter]
-    fn header(&self, py: Python<'_>) -> Py<CdmHeader> {
-        self.header.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_header(&mut self, value: Py<CdmHeader>) {
-        self.header = value;
-    }
-
-    /// The message body containing relative metadata/data and object segments.
-    ///
-    /// :type: CdmBody
-    #[getter]
-    fn body(&self, py: Python<'_>) -> Py<CdmBody> {
-        self.body.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_body(&mut self, value: Py<CdmBody>) {
-        self.body = value;
-    }
-
-    /// Unique ID for this message.
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// The CDM version.
-    ///
-    /// :type: str
-    #[getter]
-    fn version(&self) -> String {
-        self.version.clone()
     }
 
     #[setter]
@@ -528,7 +510,12 @@ impl CdmHeader {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct CdmBody {
+    /// Data describing the relative relationships between Object1 and Object2.
+    ///
+    /// :type: RelativeMetadataData
+    #[pyo3(get, set)]
     relative_metadata_data: Py<RelativeMetadataData>,
+
     segments: Py<PyList>,
 }
 
@@ -587,23 +574,10 @@ impl CdmBody {
         })
     }
 
-    /// Data describing the relative relationships between Object1 and Object2.
-    ///
-    /// :type: RelativeMetadataData
-    #[getter]
-    fn relative_metadata_data(&self, py: Python<'_>) -> Py<RelativeMetadataData> {
-        self.relative_metadata_data.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_relative_metadata_data(&mut self, value: Py<RelativeMetadataData>) {
-        self.relative_metadata_data = value;
-    }
-
     /// The segments containing specific data for each object.
     ///
     /// :type: list[CdmSegment]
-    #[gen_stub(override_return_type(type_repr="list[CdmSegment]"))]
+    #[gen_stub(override_return_type(type_repr = "list[CdmSegment]"))]
     #[getter]
     fn segments(&self, py: Python<'_>) -> Py<PyList> {
         self.segments.clone_ref(py)
@@ -1206,7 +1180,16 @@ impl RelativeStateVector {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct CdmSegment {
+    /// Metadata for the object.
+    ///
+    /// :type: CdmMetadata
+    #[pyo3(get, set)]
     metadata: Py<CdmMetadata>,
+
+    /// Data section for the object.
+    ///
+    /// :type: CdmData
+    #[pyo3(get, set)]
     data: Py<CdmData>,
 }
 
@@ -1237,32 +1220,6 @@ impl CdmSegment {
     #[new]
     fn new(metadata: Py<CdmMetadata>, data: Py<CdmData>) -> Self {
         Self { metadata, data }
-    }
-
-    /// Metadata for the object.
-    ///
-    /// :type: CdmMetadata
-    #[getter]
-    fn metadata(&self, py: Python<'_>) -> Py<CdmMetadata> {
-        self.metadata.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_metadata(&mut self, value: Py<CdmMetadata>) {
-        self.metadata = value;
-    }
-
-    /// Data section for the object.
-    ///
-    /// :type: CdmData
-    #[getter]
-    fn data(&self, py: Python<'_>) -> Py<CdmData> {
-        self.data.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_data(&mut self, value: Py<CdmData>) {
-        self.data = value;
     }
 
     fn __repr__(&self, py: Python<'_>) -> String {
@@ -1889,10 +1846,20 @@ impl CdmMetadata {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct CdmData {
+    /// Comments.
+    ///
+    /// :type: list[str]
+    #[pyo3(get, set)]
     comment: Vec<String>,
+
     od_parameters: Option<Py<OdParameters>>,
     additional_parameters: Option<Py<AdditionalParameters>>,
+    /// State Vector.
+    ///
+    /// :type: CdmStateVector
+    #[pyo3(get, set)]
     state_vector: Py<CdmStateVector>,
+
     covariance_matrix: Option<Py<CdmCovarianceMatrix>>,
 }
 
@@ -2002,19 +1969,6 @@ impl CdmData {
         )
     }
 
-    /// State Vector.
-    ///
-    /// :type: CdmStateVector
-    #[getter]
-    fn state_vector(&self, py: Python<'_>) -> Py<CdmStateVector> {
-        self.state_vector.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_state_vector(&mut self, value: Py<CdmStateVector>) {
-        self.state_vector = value;
-    }
-
     /// Covariance Matrix.
     ///
     /// :type: Optional[CdmCovarianceMatrix]
@@ -2028,18 +1982,6 @@ impl CdmData {
     #[setter]
     fn set_covariance_matrix(&mut self, value: Option<Py<CdmCovarianceMatrix>>) {
         self.covariance_matrix = value;
-    }
-
-    /// Comments.
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn comment(&self) -> Vec<String> {
-        self.comment.clone()
-    }
-    #[setter]
-    fn set_comment(&mut self, value: Vec<String>) {
-        self.comment = value;
     }
 
     /// Orbit Determination Parameters.
@@ -2081,10 +2023,7 @@ impl CdmData {
     }
 
     #[setter]
-    fn set_state_vector_numpy(
-        &mut self,
-        array: PyReadonlyArrayDyn<f64>,
-    ) -> PyResult<()> {
+    fn set_state_vector_numpy(&mut self, array: PyReadonlyArrayDyn<f64>) -> PyResult<()> {
         Python::attach(|py| {
             let state = CdmStateVector::from_numpy(array)?;
             self.state_vector.borrow_mut(py).inner = state.inner;

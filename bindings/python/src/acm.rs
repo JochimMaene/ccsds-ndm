@@ -6,10 +6,10 @@ use crate::common::AdmHeader;
 use crate::types::{parse_calendar_epoch, parse_epoch, parse_relative_time};
 use ccsds_ndm::messages::acm as core_acm;
 use ccsds_ndm::types::{AcmAttitudeType, AcmCovarianceLineType, AttBasisType, AttRateType, RotSeq};
-use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use std::str::FromStr;
 
 /// Attitude Comprehensive Message (ACM).
@@ -27,9 +27,28 @@ use std::str::FromStr;
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct Acm {
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[pyo3(get)]
     version: String,
+
+    /// The message header.
+    ///
+    /// :type: AdmHeader
+    #[pyo3(get, set)]
     header: Py<AdmHeader>,
+
+    /// ACM Segment.
+    ///
+    /// :type: AcmSegment
+    #[pyo3(get, set)]
     segment: Py<AcmSegment>,
 }
 
@@ -85,22 +104,6 @@ impl Acm {
         )
     }
 
-    /// The message identifier.
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn get_id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// The message version.
-    ///
-    /// :type: str
-    #[getter]
-    fn get_version(&self) -> String {
-        self.version.clone()
-    }
-
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Acm, &value)?;
@@ -119,7 +122,8 @@ impl Acm {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
@@ -133,8 +137,10 @@ impl Acm {
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_file(
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
@@ -144,57 +150,41 @@ impl Acm {
     }
 
     /// Atomically write this ACM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Acm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to validated KVN or XML.
-    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
-    }
-
-    /// Attitude Comprehensive Message (ACM).
-    ///
-    /// An ACM specifies the attitude state of a single object at multiple epochs, contained within a
-    /// specified time range. The ACM aggregates and extends APM and AEM content in a single
-    /// comprehensive hybrid message.
-    ///
-    /// Capabilities include:
-    /// - Optional rate data elements
-    /// - Optional spacecraft physical properties
-    /// - Optional covariance elements
-    /// - Optional maneuver parameters
-    /// - Optional estimator information
-    ///
-    /// :type: AdmHeader
-    #[getter]
-    fn get_header(&self, py: Python<'_>) -> Py<AdmHeader> {
-        self.header.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_header(&mut self, header: Py<AdmHeader>) {
-        self.header = header;
-    }
-
-    /// ACM Segment.
-    ///
-    /// :type: AcmSegment
-    #[getter]
-    fn get_segment(&self, py: Python<'_>) -> Py<AcmSegment> {
-        self.segment.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_segment(&mut self, value: Py<AcmSegment>) {
-        self.segment = value;
     }
 }
 
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct AcmSegment {
+    /// ACM Metadata Section.
+    ///
+    /// :type: AcmMetadata
+    #[pyo3(get, set)]
     metadata: Py<AcmMetadata>,
+
+    /// ACM Data Section.
+    ///
+    /// :type: AcmData
+    #[pyo3(get, set)]
     data: Py<AcmData>,
 }
 
@@ -225,32 +215,6 @@ impl AcmSegment {
     #[new]
     fn new(metadata: Py<AcmMetadata>, data: Py<AcmData>) -> Self {
         Self { metadata, data }
-    }
-
-    /// ACM Metadata Section.
-    ///
-    /// :type: AcmMetadata
-    #[getter]
-    fn get_metadata(&self, py: Python<'_>) -> Py<AcmMetadata> {
-        self.metadata.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_metadata(&mut self, value: Py<AcmMetadata>) {
-        self.metadata = value;
-    }
-
-    /// ACM Data Section.
-    ///
-    /// :type: AcmData
-    #[getter]
-    fn get_data(&self, py: Python<'_>) -> Py<AcmData> {
-        self.data.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_data(&mut self, value: Py<AcmData>) {
-        self.data = value;
     }
 
     /// Validate the segment against CCSDS rules.
@@ -768,7 +732,7 @@ impl AcmData {
     /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
     ///
     /// :type: list[AcmAttitudeState]
-    #[gen_stub(override_return_type(type_repr="list[AcmAttitudeState]"))]
+    #[gen_stub(override_return_type(type_repr = "list[AcmAttitudeState]"))]
     #[getter]
     fn get_att(&self, py: Python<'_>) -> Py<PyList> {
         self.att.clone_ref(py)
@@ -803,7 +767,7 @@ impl AcmData {
     /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
     ///
     /// :type: list[AcmCovarianceMatrix]
-    #[gen_stub(override_return_type(type_repr="list[AcmCovarianceMatrix]"))]
+    #[gen_stub(override_return_type(type_repr = "list[AcmCovarianceMatrix]"))]
     #[getter]
     fn get_cov(&self, py: Python<'_>) -> Py<PyList> {
         self.cov.clone_ref(py)
@@ -822,7 +786,7 @@ impl AcmData {
     /// CCSDS Reference: 504.0-B-2, Section 5.3.8.
     ///
     /// :type: list[AcmManeuverParameters]
-    #[gen_stub(override_return_type(type_repr="list[AcmManeuverParameters]"))]
+    #[gen_stub(override_return_type(type_repr = "list[AcmManeuverParameters]"))]
     #[getter]
     fn get_man(&self, py: Python<'_>) -> Py<PyList> {
         self.man.clone_ref(py)
@@ -2271,7 +2235,7 @@ impl AcmAttitudeDetermination {
     /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: list[AcmSensor]
-    #[gen_stub(override_return_type(type_repr="list[AcmSensor]"))]
+    #[gen_stub(override_return_type(type_repr = "list[AcmSensor]"))]
     #[getter]
     fn get_sensors(&self, py: Python<'_>) -> Py<PyList> {
         self.sensors.clone_ref(py)

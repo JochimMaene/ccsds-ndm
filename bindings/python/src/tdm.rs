@@ -6,10 +6,10 @@ use crate::common::parse_yes_no;
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::tdm as core_tdm;
 use ccsds_ndm::types::{self as core_types};
-use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pymethods};
 use std::str::FromStr;
 
 // ============================================================================
@@ -42,9 +42,28 @@ use std::str::FromStr;
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct Tdm {
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[pyo3(get)]
     version: String,
+
+    /// The message header.
+    ///
+    /// :type: TdmHeader
+    #[pyo3(get, set)]
     header: Py<TdmHeader>,
+
+    /// The message body.
+    ///
+    /// :type: TdmBody
+    #[pyo3(get, set)]
     body: Py<TdmBody>,
 }
 
@@ -87,22 +106,6 @@ impl Tdm {
         }
     }
 
-    /// The message identifier.
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn get_id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// The message version.
-    ///
-    /// :type: str
-    #[getter]
-    fn get_version(&self) -> String {
-        self.version.clone()
-    }
-
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Tdm, &value)?;
@@ -124,49 +127,10 @@ impl Tdm {
         )
     }
 
-    /// Tracking Data Message (TDM).
-    ///
-    /// The TDM specifies a standard message format for use in exchanging spacecraft tracking data
-    /// between space agencies. Such exchanges are used for distributing tracking data output from
-    /// routine interagency cross-supports.
-    ///
-    /// Tracking data includes data types such as:
-    /// - Doppler
-    /// - Transmit/Received frequencies
-    /// - Range
-    /// - Angles
-    /// - Delta-DOR
-    /// - Media correction (ionosphere, troposphere)
-    /// - Meteorological data
-    ///
-    /// :type: TdmHeader
-    #[getter]
-    fn get_header(&self, py: Python<'_>) -> Py<TdmHeader> {
-        self.header.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_header(&mut self, header: Py<TdmHeader>) {
-        self.header = header;
-    }
-
-    /// The message body.
-    ///
-    /// :type: TdmBody
-    #[getter]
-    fn get_body(&self, py: Python<'_>) -> Py<TdmBody> {
-        self.body.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_body(&mut self, body: Py<TdmBody>) {
-        self.body = body;
-    }
-
     /// Shortcut to access segments directly from the body.
     ///
     /// :type: list[TdmSegment]
-    #[gen_stub(override_return_type(type_repr="list[TdmSegment]"))]
+    #[gen_stub(override_return_type(type_repr = "list[TdmSegment]"))]
     #[getter]
     fn get_segments(&self, py: Python<'_>) -> Py<PyList> {
         self.body.borrow(py).segments.clone_ref(py)
@@ -191,7 +155,8 @@ impl Tdm {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
@@ -205,8 +170,10 @@ impl Tdm {
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_file(
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
@@ -216,12 +183,24 @@ impl Tdm {
     }
 
     /// Atomically write this TDM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Tdm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to validated KVN or XML.
-    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
@@ -417,7 +396,7 @@ impl TdmBody {
     /// Each segment consists of a Metadata Section and a Data Section.
     ///
     /// :type: list[TdmSegment]
-    #[gen_stub(override_return_type(type_repr="list[TdmSegment]"))]
+    #[gen_stub(override_return_type(type_repr = "list[TdmSegment]"))]
     #[getter]
     fn get_segments(&self, py: Python<'_>) -> Py<PyList> {
         self.segments.clone_ref(py)
@@ -452,7 +431,16 @@ impl TdmBody {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct TdmSegment {
+    /// Metadata section for this TDM segment.
+    ///
+    /// :type: TdmMetadata
+    #[pyo3(get, set)]
     metadata: Py<TdmMetadata>,
+
+    /// Data section for this TDM segment.
+    ///
+    /// :type: TdmData
+    #[pyo3(get, set)]
     data: Py<TdmData>,
 }
 
@@ -492,32 +480,6 @@ impl TdmSegment {
             self.metadata.borrow(py).inner.participant_1,
             self.data.borrow(py).observations.bind(py).len()
         )
-    }
-
-    /// Metadata section for this TDM segment.
-    ///
-    /// :type: TdmMetadata
-    #[getter]
-    fn get_metadata(&self, py: Python<'_>) -> Py<TdmMetadata> {
-        self.metadata.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_metadata(&mut self, metadata: Py<TdmMetadata>) {
-        self.metadata = metadata;
-    }
-
-    /// Data section for this TDM segment.
-    ///
-    /// :type: TdmData
-    #[getter]
-    fn get_data(&self, py: Python<'_>) -> Py<TdmData> {
-        self.data.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_data(&mut self, data: Py<TdmData>) {
-        self.data = data;
     }
 }
 
@@ -1836,7 +1798,12 @@ impl TdmMetadata {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct TdmData {
+    /// Comments.
+    ///
+    /// :type: list[TdmObservation]
+    #[pyo3(get, set)]
     comment: Vec<String>,
+
     observations: Py<PyList>,
 }
 
@@ -1897,23 +1864,10 @@ impl TdmData {
         format!("TdmData(observations={})", self.observations.bind(py).len())
     }
 
-    /// Comments.
-    ///
-    /// :type: list[TdmObservation]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.comment.clone()
-    }
-
-    #[setter]
-    fn set_comment(&mut self, value: Vec<String>) {
-        self.comment = value;
-    }
-
     /// Tracking data records.
     ///
     /// :type: list[TdmObservation]
-    #[gen_stub(override_return_type(type_repr="list[TdmObservation]"))]
+    #[gen_stub(override_return_type(type_repr = "list[TdmObservation]"))]
     #[getter]
     fn get_observations(&self, py: Python<'_>) -> Py<PyList> {
         self.observations.clone_ref(py)

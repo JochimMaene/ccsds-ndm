@@ -160,23 +160,17 @@ class Acm:
     @property
     def header(self) -> AdmHeader:
         r"""
-        Attitude Comprehensive Message (ACM).
-
-        An ACM specifies the attitude state of a single object at multiple epochs, contained within a
-        specified time range. The ACM aggregates and extends APM and AEM content in a single
-        comprehensive hybrid message.
-
-        Capabilities include:
-        - Optional rate data elements
-        - Optional spacecraft physical properties
-        - Optional covariance elements
-        - Optional maneuver parameters
-        - Optional estimator information
+        The message header.
 
         :type: AdmHeader
         """
     @header.setter
-    def header(self, value: AdmHeader) -> None: ...
+    def header(self, value: AdmHeader) -> None:
+        r"""
+        The message header.
+
+        :type: AdmHeader
+        """
     @property
     def segment(self) -> AcmSegment:
         r"""
@@ -185,7 +179,12 @@ class Acm:
         :type: AcmSegment
         """
     @segment.setter
-    def segment(self, value: AcmSegment) -> None: ...
+    def segment(self, value: AcmSegment) -> None:
+        r"""
+        ACM Segment.
+
+        :type: AcmSegment
+        """
     def __new__(cls, header: AdmHeader, segment: AcmSegment) -> Acm: ...
     def __repr__(self) -> builtins.str: ...
     def validate(self) -> None:
@@ -1267,7 +1266,12 @@ class AcmSegment:
         :type: AcmMetadata
         """
     @metadata.setter
-    def metadata(self, value: AcmMetadata) -> None: ...
+    def metadata(self, value: AcmMetadata) -> None:
+        r"""
+        ACM Metadata Section.
+
+        :type: AcmMetadata
+        """
     @property
     def data(self) -> AcmData:
         r"""
@@ -1276,7 +1280,12 @@ class AcmSegment:
         :type: AcmData
         """
     @data.setter
-    def data(self, value: AcmData) -> None: ...
+    def data(self, value: AcmData) -> None:
+        r"""
+        ACM Data Section.
+
+        :type: AcmData
+        """
     def __new__(cls, metadata: AcmMetadata, data: AcmData) -> AcmSegment: ...
     def validate(self, header: AdmHeader) -> None:
         r"""
@@ -1620,21 +1629,17 @@ class Aem:
     @property
     def header(self) -> AdmHeader:
         r"""
-        Attitude Ephemeris Message (AEM).
-
-        An AEM specifies the attitude state of a single object at multiple epochs, contained within a
-        specified time range. The AEM is suited to interagency exchanges that involve automated
-        interaction and require higher fidelity or higher precision dynamic modeling than is
-        possible with the APM.
-
-        The AEM allows for dynamic modeling of any number of torques (solar pressure, atmospheric
-        torques, magnetics, etc.). It requires the use of an interpolation technique to interpret
-        the attitude state at times different from the tabular epochs.
+        The message header.
 
         :type: AdmHeader
         """
     @header.setter
-    def header(self, value: AdmHeader) -> None: ...
+    def header(self, value: AdmHeader) -> None:
+        r"""
+        The message header.
+
+        :type: AdmHeader
+        """
     @property
     def segments(self) -> list[AemSegment]:
         r"""
@@ -1709,7 +1714,15 @@ class AemData:
         :type: list[str]
         """
     @comment.setter
-    def comment(self, value: typing.Sequence[builtins.str]) -> None: ...
+    def comment(self, value: typing.Sequence[builtins.str]) -> None:
+        r"""
+        Comments allowed only at the beginning of the Data section. Each comment line shall begin
+        with this keyword.
+
+        CCSDS Reference: 504.0-B-2, Section 4.2.4.
+
+        :type: list[str]
+        """
     @property
     def attitude_states(self) -> list[AttitudeState]:
         r"""
@@ -2036,7 +2049,12 @@ class AemSegment:
         :type: AemMetadata
         """
     @metadata.setter
-    def metadata(self, value: AemMetadata) -> None: ...
+    def metadata(self, value: AemMetadata) -> None:
+        r"""
+        AEM Metadata Section.
+
+        :type: AemMetadata
+        """
     @property
     def data(self) -> AemData:
         r"""
@@ -2045,7 +2063,12 @@ class AemSegment:
         :type: AemData
         """
     @data.setter
-    def data(self, value: AemData) -> None: ...
+    def data(self, value: AemData) -> None:
+        r"""
+        AEM Data Section.
+
+        :type: AemData
+        """
     def __new__(cls, metadata: AemMetadata, data: AemData) -> AemSegment: ...
     def validate(self) -> None:
         r"""
@@ -2188,19 +2211,17 @@ class Apm:
     @property
     def header(self) -> AdmHeader:
         r"""
-        Attitude Parameter Message (APM).
-
-        An APM specifies the attitude state of a single object at a specified epoch. This message
-        is suited to interagency exchanges that involve automated interaction and/or human
-        interaction, and/or human interaction, and do not require high-fidelity dynamic modeling.
-
-        The APM requires the use of a propagation technique to determine the attitude state at
-        times different from the specified epoch.
+        The message header.
 
         :type: AdmHeader
         """
     @header.setter
-    def header(self, value: AdmHeader) -> None: ...
+    def header(self, value: AdmHeader) -> None:
+        r"""
+        The message header.
+
+        :type: AdmHeader
+        """
     @property
     def segment(self) -> ApmSegment:
         r"""
@@ -2209,7 +2230,12 @@ class Apm:
         :type: ApmSegment
         """
     @segment.setter
-    def segment(self, value: ApmSegment) -> None: ...
+    def segment(self, value: ApmSegment) -> None:
+        r"""
+        APM Segment.
+
+        :type: ApmSegment
+        """
     def __new__(cls, header: AdmHeader, segment: ApmSegment) -> Apm: ...
     def __repr__(self) -> builtins.str: ...
     def validate(self) -> None:
@@ -2251,6 +2277,24 @@ class ApmData:
     r"""
     APM Data Section.
     """
+    @property
+    def comment(self) -> builtins.list[builtins.str]:
+        r"""
+        One or more comment line(s). Each comment line shall begin with this keyword.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
+
+        :type: list[str]
+        """
+    @comment.setter
+    def comment(self, value: typing.Sequence[builtins.str]) -> None:
+        r"""
+        One or more comment line(s). Each comment line shall begin with this keyword.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
+
+        :type: list[str]
+        """
     @property
     def quaternion_state(self) -> list[QuaternionState]:
         r"""
@@ -2326,17 +2370,6 @@ class ApmData:
         """
     @epoch.setter
     def epoch(self, value: builtins.str) -> None: ...
-    @property
-    def comment(self) -> builtins.list[builtins.str]:
-        r"""
-        One or more comment line(s). Each comment line shall begin with this keyword.
-
-        CCSDS Reference: 504.0-B-2, Section 3.2.4.
-
-        :type: list[str]
-        """
-    @comment.setter
-    def comment(self, value: typing.Sequence[builtins.str]) -> None: ...
     def __new__(
         cls,
         epoch: builtins.str,
@@ -2574,7 +2607,12 @@ class ApmSegment:
         :type: ApmMetadata
         """
     @metadata.setter
-    def metadata(self, value: ApmMetadata) -> None: ...
+    def metadata(self, value: ApmMetadata) -> None:
+        r"""
+        APM Metadata Section.
+
+        :type: ApmMetadata
+        """
     @property
     def data(self) -> ApmData:
         r"""
@@ -2583,7 +2621,12 @@ class ApmSegment:
         :type: ApmData
         """
     @data.setter
-    def data(self, value: ApmData) -> None: ...
+    def data(self, value: ApmData) -> None:
+        r"""
+        APM Data Section.
+
+        :type: ApmData
+        """
     def __new__(cls, metadata: ApmMetadata, data: ApmData) -> ApmSegment: ...
 
 @typing.final
@@ -2735,13 +2778,13 @@ class AtmosphericReentryParameters:
 @typing.final
 class AttitudeState:
     @property
-    def epoch(self) -> builtins.str: ...
-    @epoch.setter
-    def epoch(self, value: builtins.str) -> None: ...
-    @property
     def values(self) -> builtins.list[builtins.float]: ...
     @values.setter
     def values(self, value: typing.Sequence[builtins.float]) -> None: ...
+    @property
+    def epoch(self) -> builtins.str: ...
+    @epoch.setter
+    def epoch(self, value: builtins.str) -> None: ...
     def __new__(
         cls, epoch: builtins.str, values: typing.Sequence[builtins.float]
     ) -> AttitudeState: ...
@@ -2762,34 +2805,6 @@ class Cdm:
     - Metadata describing how the data was determined (orbit determination settings).
     """
     @property
-    def header(self) -> CdmHeader:
-        r"""
-        Conjunction Data Message (CDM).
-
-        The CDM contains information about a single conjunction between a primary object (Object1)
-        and a secondary object (Object2). It allows satellite operators to evaluate the risk of
-        collision and plan avoidance maneuvers.
-
-        The message includes:
-        - Positions and velocities of both objects at Time of Closest Approach (TCA).
-        - Covariance matrices for both objects at TCA.
-        - Relative position and velocity of Object2 with respect to Object1.
-        - Metadata describing how the data was determined (orbit determination settings).
-
-        :type: CdmHeader
-        """
-    @header.setter
-    def header(self, value: CdmHeader) -> None: ...
-    @property
-    def body(self) -> CdmBody:
-        r"""
-        The message body containing relative metadata/data and object segments.
-
-        :type: CdmBody
-        """
-    @body.setter
-    def body(self, value: CdmBody) -> None: ...
-    @property
     def id(self) -> typing.Optional[builtins.str]:
         r"""
         Unique ID for this message.
@@ -2805,6 +2820,34 @@ class Cdm:
         """
     @version.setter
     def version(self, value: builtins.str) -> None: ...
+    @property
+    def header(self) -> CdmHeader:
+        r"""
+        The message header.
+
+        :type: CdmHeader
+        """
+    @header.setter
+    def header(self, value: CdmHeader) -> None:
+        r"""
+        The message header.
+
+        :type: CdmHeader
+        """
+    @property
+    def body(self) -> CdmBody:
+        r"""
+        The message body containing relative metadata/data and object segments.
+
+        :type: CdmBody
+        """
+    @body.setter
+    def body(self, value: CdmBody) -> None:
+        r"""
+        The message body containing relative metadata/data and object segments.
+
+        :type: CdmBody
+        """
     def __new__(cls, header: CdmHeader, body: CdmBody) -> Cdm: ...
     def validate(self) -> None:
         r"""
@@ -2878,7 +2921,12 @@ class CdmBody:
         :type: RelativeMetadataData
         """
     @relative_metadata_data.setter
-    def relative_metadata_data(self, value: RelativeMetadataData) -> None: ...
+    def relative_metadata_data(self, value: RelativeMetadataData) -> None:
+        r"""
+        Data describing the relative relationships between Object1 and Object2.
+
+        :type: RelativeMetadataData
+        """
     @property
     def segments(self) -> list[CdmSegment]:
         r"""
@@ -3575,6 +3623,20 @@ class CdmData:
         Object covariance at TCA.
     """
     @property
+    def comment(self) -> builtins.list[builtins.str]:
+        r"""
+        Comments.
+
+        :type: list[str]
+        """
+    @comment.setter
+    def comment(self, value: typing.Sequence[builtins.str]) -> None:
+        r"""
+        Comments.
+
+        :type: list[str]
+        """
+    @property
     def state_vector(self) -> CdmStateVector:
         r"""
         State Vector.
@@ -3582,7 +3644,12 @@ class CdmData:
         :type: CdmStateVector
         """
     @state_vector.setter
-    def state_vector(self, value: CdmStateVector) -> None: ...
+    def state_vector(self, value: CdmStateVector) -> None:
+        r"""
+        State Vector.
+
+        :type: CdmStateVector
+        """
     @property
     def covariance_matrix(self) -> typing.Optional[CdmCovarianceMatrix]:
         r"""
@@ -3594,15 +3661,6 @@ class CdmData:
     def covariance_matrix(
         self, value: typing.Optional[CdmCovarianceMatrix]
     ) -> None: ...
-    @property
-    def comment(self) -> builtins.list[builtins.str]:
-        r"""
-        Comments.
-
-        :type: list[str]
-        """
-    @comment.setter
-    def comment(self, value: typing.Sequence[builtins.str]) -> None: ...
     @property
     def od_parameters(self) -> typing.Optional[OdParameters]:
         r"""
@@ -4143,7 +4201,12 @@ class CdmSegment:
         :type: CdmMetadata
         """
     @metadata.setter
-    def metadata(self, value: CdmMetadata) -> None: ...
+    def metadata(self, value: CdmMetadata) -> None:
+        r"""
+        Metadata for the object.
+
+        :type: CdmMetadata
+        """
     @property
     def data(self) -> CdmData:
         r"""
@@ -4152,7 +4215,12 @@ class CdmSegment:
         :type: CdmData
         """
     @data.setter
-    def data(self, value: CdmData) -> None: ...
+    def data(self, value: CdmData) -> None:
+        r"""
+        Data section for the object.
+
+        :type: CdmData
+        """
     def __new__(cls, metadata: CdmMetadata, data: CdmData) -> CdmSegment: ...
     def __repr__(self) -> builtins.str: ...
 
@@ -4291,19 +4359,6 @@ class CombinedNdm:
     with the set of tracking data messages used in the orbit determination.
     """
     @property
-    def messages(
-        self,
-    ) -> list[
-        typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]
-    ]:
-        r"""
-        List of contained navigation messages.
-
-        :type: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]]
-        """
-    @messages.setter
-    def messages(self, value: typing.Sequence[typing.Any]) -> None: ...
-    @property
     def id(self) -> typing.Optional[builtins.str]:
         r"""
         Message Identifier (optional).
@@ -4318,7 +4373,25 @@ class CombinedNdm:
         :type: list[str]
         """
     @comments.setter
-    def comments(self, value: typing.Sequence[builtins.str]) -> None: ...
+    def comments(self, value: typing.Sequence[builtins.str]) -> None:
+        r"""
+        Comments (optional).
+
+        :type: list[str]
+        """
+    @property
+    def messages(
+        self,
+    ) -> list[
+        typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]
+    ]:
+        r"""
+        List of contained navigation messages.
+
+        :type: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]]
+        """
+    @messages.setter
+    def messages(self, value: typing.Sequence[typing.Any]) -> None: ...
     def __new__(
         cls,
         messages: typing.Sequence[typing.Any],
@@ -5643,23 +5716,17 @@ class Ocm:
     @property
     def header(self) -> OdmHeader:
         r"""
-        Orbit Comprehensive Message (OCM).
-
-        An OCM specifies position and velocity of either a single object or an en masse parent/child
-        deployment scenario stemming from a single object. The OCM aggregates and extends OPM, OEM,
-        and OMM content in a single comprehensive hybrid message.
-
-        Key features:
-        - Support for single object or parent/child deployment scenarios.
-        - Aggregation of OPM, OMM, and OEM content.
-        - Extensive optional content including physical properties, covariance, maneuvers, and
-        perturbations.
-        - Well-suited for exchanges involving automated interaction and large object catalogs.
+        The message header.
 
         :type: OdmHeader
         """
     @header.setter
-    def header(self, value: OdmHeader) -> None: ...
+    def header(self, value: OdmHeader) -> None:
+        r"""
+        The message header.
+
+        :type: OdmHeader
+        """
     @property
     def segment(self) -> OcmSegment:
         r"""
@@ -5668,7 +5735,12 @@ class Ocm:
         :type: OcmSegment
         """
     @segment.setter
-    def segment(self, value: OcmSegment) -> None: ...
+    def segment(self, value: OcmSegment) -> None:
+        r"""
+        The OCM data segment.
+
+        :type: OcmSegment
+        """
     @staticmethod
     def from_str(
         data: builtins.str,
@@ -8854,7 +8926,14 @@ class OcmSegment:
         :type: OcmMetadata
         """
     @metadata.setter
-    def metadata(self, value: OcmMetadata) -> None: ...
+    def metadata(self, value: OcmMetadata) -> None:
+        r"""
+        A single segment of the OCM.
+
+        Contains metadata and data sections.
+
+        :type: OcmMetadata
+        """
     @property
     def data(self) -> OcmData:
         r"""
@@ -8863,7 +8942,12 @@ class OcmSegment:
         :type: OcmData
         """
     @data.setter
-    def data(self, value: OcmData) -> None: ...
+    def data(self, value: OcmData) -> None:
+        r"""
+        Segment data blocks.
+
+        :type: OcmData
+        """
     def __new__(cls, metadata: OcmMetadata, data: OcmData) -> OcmSegment:
         r"""
         Create a new OCM Segment.
@@ -9548,7 +9632,12 @@ class Oem:
         :type: OdmHeader
         """
     @header.setter
-    def header(self, value: OdmHeader) -> None: ...
+    def header(self, value: OdmHeader) -> None:
+        r"""
+        The message header.
+
+        :type: OdmHeader
+        """
     @property
     def segments(self) -> list[OemSegment]:
         r"""
@@ -10015,6 +10104,24 @@ class OemData:
         Comments.
     """
     @property
+    def comment(self) -> builtins.list[builtins.str]:
+        r"""
+        Comments (see 7.8 for formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.4.
+
+        :type: list[str]
+        """
+    @comment.setter
+    def comment(self, value: typing.Sequence[builtins.str]) -> None:
+        r"""
+        Comments (see 7.8 for formatting rules).
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.4.
+
+        :type: list[str]
+        """
+    @property
     def state_vector(self) -> list[StateVectorAcc]:
         r"""
         List of state vectors. Each vector contains position, velocity, and optional
@@ -10068,17 +10175,6 @@ class OemData:
     def covariance_matrix_epochs(
         self, value: typing.Sequence[builtins.str]
     ) -> None: ...
-    @property
-    def comment(self) -> builtins.list[builtins.str]:
-        r"""
-        Comments (see 7.8 for formatting rules).
-
-        CCSDS Reference: 502.0-B-3, Section 5.2.4.
-
-        :type: list[str]
-        """
-    @comment.setter
-    def comment(self, value: typing.Sequence[builtins.str]) -> None: ...
     @property
     def state_vector_numpy(self) -> numpy.typing.NDArray[numpy.float64]:
         r"""
@@ -10428,7 +10524,14 @@ class OemSegment:
         :type: OemMetadata
         """
     @metadata.setter
-    def metadata(self, value: OemMetadata) -> None: ...
+    def metadata(self, value: OemMetadata) -> None:
+        r"""
+        A single segment of the OEM.
+
+        Each segment contains metadata (context) and a list of ephemeris data points.
+
+        :type: OemMetadata
+        """
     @property
     def data(self) -> OemData:
         r"""
@@ -10437,7 +10540,12 @@ class OemSegment:
         :type: OemData
         """
     @data.setter
-    def data(self, value: OemData) -> None: ...
+    def data(self, value: OemData) -> None:
+        r"""
+        Segment data.
+
+        :type: OemData
+        """
     def __new__(cls, metadata: OemMetadata, data: OemData) -> OemSegment: ...
     def __repr__(self) -> builtins.str: ...
     def validate(self) -> None:
@@ -10485,21 +10593,17 @@ class Omm:
     @property
     def header(self) -> OdmHeader:
         r"""
-        Orbit Mean-Elements Message (OMM).
-
-        The OMM contains the orbital characteristics of a single object at a specified epoch,
-        expressed in mean Keplerian elements: mean motion, eccentricity, inclination, right
-        ascension of ascending node, argument of perigee, and mean anomaly.
-
-        These elements are adequate for providing the initial mean state of analytical and
-        semi-analytical orbit models (e.g., SGP4). The OMM includes keywords and values that may
-        be used to generate canonical NORAD Two Line Element (TLE) sets to accommodate the needs
-        of heritage users.
+        The message header.
 
         :type: OdmHeader
         """
     @header.setter
-    def header(self, value: OdmHeader) -> None: ...
+    def header(self, value: OdmHeader) -> None:
+        r"""
+        The message header.
+
+        :type: OdmHeader
+        """
     @property
     def segment(self) -> OmmSegment:
         r"""
@@ -10508,7 +10612,12 @@ class Omm:
         :type: OmmSegment
         """
     @segment.setter
-    def segment(self, value: OmmSegment) -> None: ...
+    def segment(self, value: OmmSegment) -> None:
+        r"""
+        The data segment.
+
+        :type: OmmSegment
+        """
     def __new__(cls, header: OdmHeader, segment: OmmSegment) -> Omm: ...
     def __repr__(self) -> builtins.str: ...
     def validate(self) -> None:
@@ -10590,15 +10699,6 @@ class OmmData:
     OMM Data section.
     """
     @property
-    def mean_elements(self) -> MeanElements:
-        r"""
-        Mean Keplerian Elements in the Specified Reference Frame.
-
-        :type: MeanElements
-        """
-    @mean_elements.setter
-    def mean_elements(self, value: MeanElements) -> None: ...
-    @property
     def comment(self) -> builtins.list[builtins.str]:
         r"""
         Comments.
@@ -10606,7 +10706,26 @@ class OmmData:
         :type: list[str]
         """
     @comment.setter
-    def comment(self, value: typing.Sequence[builtins.str]) -> None: ...
+    def comment(self, value: typing.Sequence[builtins.str]) -> None:
+        r"""
+        Comments.
+
+        :type: list[str]
+        """
+    @property
+    def mean_elements(self) -> MeanElements:
+        r"""
+        Mean Keplerian Elements in the Specified Reference Frame.
+
+        :type: MeanElements
+        """
+    @mean_elements.setter
+    def mean_elements(self, value: MeanElements) -> None:
+        r"""
+        Mean Keplerian Elements in the Specified Reference Frame.
+
+        :type: MeanElements
+        """
     @property
     def spacecraft_parameters(self) -> typing.Optional[SpacecraftParameters]:
         r"""
@@ -10847,7 +10966,12 @@ class OmmSegment:
         :type: OmmMetadata
         """
     @metadata.setter
-    def metadata(self, value: OmmMetadata) -> None: ...
+    def metadata(self, value: OmmMetadata) -> None:
+        r"""
+        Segment metadata.
+
+        :type: OmmMetadata
+        """
     @property
     def data(self) -> OmmData:
         r"""
@@ -10856,7 +10980,12 @@ class OmmSegment:
         :type: OmmData
         """
     @data.setter
-    def data(self, value: OmmData) -> None: ...
+    def data(self, value: OmmData) -> None:
+        r"""
+        Segment data.
+
+        :type: OmmData
+        """
     def __new__(cls, metadata: OmmMetadata, data: OmmData) -> OmmSegment: ...
     def __repr__(self) -> builtins.str: ...
 
@@ -10897,18 +11026,17 @@ class Opm:
     @property
     def header(self) -> OdmHeader:
         r"""
-        Orbit Parameter Message (OPM).
-
-        Orbit information may be exchanged between two participants by sending a state vector (see
-        reference \[H1\]) for a specified epoch using an OPM. The message recipient must have an orbit
-        propagator available that is able to propagate the OPM state vector to compute the orbit at other
-        desired epochs. For this propagation, additional ancillary information (spacecraft properties
-        such as mass, area, and maneuver planning data, if applicable) may be included with the message.
+        The message header.
 
         :type: OdmHeader
         """
     @header.setter
-    def header(self, value: OdmHeader) -> None: ...
+    def header(self, value: OdmHeader) -> None:
+        r"""
+        The message header.
+
+        :type: OdmHeader
+        """
     @property
     def segment(self) -> OpmSegment:
         r"""
@@ -10917,7 +11045,12 @@ class Opm:
         :type: OpmSegment
         """
     @segment.setter
-    def segment(self, value: OpmSegment) -> None: ...
+    def segment(self, value: OpmSegment) -> None:
+        r"""
+        The data segment.
+
+        :type: OpmSegment
+        """
     def __new__(cls, header: OdmHeader, segment: OpmSegment) -> Opm: ...
     def __repr__(self) -> builtins.str: ...
     def validate(self) -> None:
@@ -11358,7 +11491,12 @@ class OpmData:
         :type: list[str]
         """
     @comment.setter
-    def comment(self, value: typing.Sequence[builtins.str]) -> None: ...
+    def comment(self, value: typing.Sequence[builtins.str]) -> None:
+        r"""
+        Comments (see 7.8 for formatting rules).
+
+        :type: list[str]
+        """
     @property
     def state_vector(self) -> StateVector:
         r"""
@@ -11367,7 +11505,12 @@ class OpmData:
         :type: StateVector
         """
     @state_vector.setter
-    def state_vector(self, value: StateVector) -> None: ...
+    def state_vector(self, value: StateVector) -> None:
+        r"""
+        State vector components (position and velocity).
+
+        :type: StateVector
+        """
     @property
     def keplerian_elements(self) -> typing.Optional[KeplerianElements]:
         r"""
@@ -11732,7 +11875,14 @@ class OpmSegment:
         :type: OpmMetadata
         """
     @metadata.setter
-    def metadata(self, value: OpmMetadata) -> None: ...
+    def metadata(self, value: OpmMetadata) -> None:
+        r"""
+        A single segment of the OPM.
+
+        Contains metadata and data sections.
+
+        :type: OpmMetadata
+        """
     @property
     def data(self) -> OpmData:
         r"""
@@ -11741,7 +11891,12 @@ class OpmSegment:
         :type: OpmData
         """
     @data.setter
-    def data(self, value: OpmData) -> None: ...
+    def data(self, value: OpmData) -> None:
+        r"""
+        Segment data.
+
+        :type: OpmData
+        """
     def __new__(cls, metadata: OpmMetadata, data: OpmData) -> OpmSegment:
         r"""
         Create a new OPM Segment.
@@ -11921,22 +12076,17 @@ class Rdm:
     @property
     def header(self) -> RdmHeader:
         r"""
-        Re-entry Data Message (RDM).
-
-        The RDM specifies a standard message format to be used in the exchange of spacecraft
-        re-entry information between Space Situational Awareness (SSA) or Space Surveillance and
-        Tracking (SST) data providers, satellite owners/operators, and other parties.
-
-        It includes data such as:
-        - Remaining orbital lifetime
-        - Start and end of the re-entry and impact windows
-        - Impact location and probabilities
-        - Object physical properties
+        The message header.
 
         :type: RdmHeader
         """
     @header.setter
-    def header(self, value: RdmHeader) -> None: ...
+    def header(self, value: RdmHeader) -> None:
+        r"""
+        The message header.
+
+        :type: RdmHeader
+        """
     @property
     def segment(self) -> RdmSegment:
         r"""
@@ -11945,7 +12095,12 @@ class Rdm:
         :type: RdmSegment
         """
     @segment.setter
-    def segment(self, value: RdmSegment) -> None: ...
+    def segment(self, value: RdmSegment) -> None:
+        r"""
+        The RDM Body consists of a single segment.
+
+        :type: RdmSegment
+        """
     def __new__(cls, *, header: RdmHeader, segment: RdmSegment) -> Rdm: ...
     def validate(self) -> None:
         r"""
@@ -12032,6 +12187,20 @@ class RdmData:
         Comments.
     """
     @property
+    def comment(self) -> builtins.list[builtins.str]:
+        r"""
+        Comments.
+
+        :type: list[str]
+        """
+    @comment.setter
+    def comment(self, value: typing.Sequence[builtins.str]) -> None:
+        r"""
+        Comments.
+
+        :type: list[str]
+        """
+    @property
     def atmospheric_reentry_parameters(self) -> AtmosphericReentryParameters:
         r"""
         Atmospheric re-entry parameters.
@@ -12102,15 +12271,6 @@ class RdmData:
         """
     @user_defined_parameters.setter
     def user_defined_parameters(self, value: typing.Optional[UserDefined]) -> None: ...
-    @property
-    def comment(self) -> builtins.list[builtins.str]:
-        r"""
-        Comments.
-
-        :type: list[str]
-        """
-    @comment.setter
-    def comment(self, value: typing.Sequence[builtins.str]) -> None: ...
     def __new__(
         cls,
         *,
@@ -12671,7 +12831,12 @@ class RdmSegment:
         :type: RdmMetadata
         """
     @metadata.setter
-    def metadata(self, value: RdmMetadata) -> None: ...
+    def metadata(self, value: RdmMetadata) -> None:
+        r"""
+        The metadata for this RDM segment.
+
+        :type: RdmMetadata
+        """
     @property
     def data(self) -> RdmData:
         r"""
@@ -12680,7 +12845,12 @@ class RdmSegment:
         :type: RdmData
         """
     @data.setter
-    def data(self, value: RdmData) -> None: ...
+    def data(self, value: RdmData) -> None:
+        r"""
+        The data for this RDM segment.
+
+        :type: RdmData
+        """
     def __new__(cls, *, metadata: RdmMetadata, data: RdmData) -> RdmSegment: ...
     def __repr__(self) -> builtins.str: ...
 
@@ -13802,25 +13972,17 @@ class Tdm:
     @property
     def header(self) -> TdmHeader:
         r"""
-        Tracking Data Message (TDM).
-
-        The TDM specifies a standard message format for use in exchanging spacecraft tracking data
-        between space agencies. Such exchanges are used for distributing tracking data output from
-        routine interagency cross-supports.
-
-        Tracking data includes data types such as:
-        - Doppler
-        - Transmit/Received frequencies
-        - Range
-        - Angles
-        - Delta-DOR
-        - Media correction (ionosphere, troposphere)
-        - Meteorological data
+        The message header.
 
         :type: TdmHeader
         """
     @header.setter
-    def header(self, value: TdmHeader) -> None: ...
+    def header(self, value: TdmHeader) -> None:
+        r"""
+        The message header.
+
+        :type: TdmHeader
+        """
     @property
     def body(self) -> TdmBody:
         r"""
@@ -13829,7 +13991,12 @@ class Tdm:
         :type: TdmBody
         """
     @body.setter
-    def body(self, value: TdmBody) -> None: ...
+    def body(self, value: TdmBody) -> None:
+        r"""
+        The message body.
+
+        :type: TdmBody
+        """
     @property
     def segments(self) -> list[TdmSegment]:
         r"""
@@ -13937,7 +14104,12 @@ class TdmData:
         :type: list[TdmObservation]
         """
     @comment.setter
-    def comment(self, value: typing.Sequence[builtins.str]) -> None: ...
+    def comment(self, value: typing.Sequence[builtins.str]) -> None:
+        r"""
+        Comments.
+
+        :type: list[TdmObservation]
+        """
     @property
     def observations(self) -> list[TdmObservation]:
         r"""
@@ -14943,7 +15115,12 @@ class TdmSegment:
         :type: TdmMetadata
         """
     @metadata.setter
-    def metadata(self, value: TdmMetadata) -> None: ...
+    def metadata(self, value: TdmMetadata) -> None:
+        r"""
+        Metadata section for this TDM segment.
+
+        :type: TdmMetadata
+        """
     @property
     def data(self) -> TdmData:
         r"""
@@ -14952,7 +15129,12 @@ class TdmSegment:
         :type: TdmData
         """
     @data.setter
-    def data(self, value: TdmData) -> None: ...
+    def data(self, value: TdmData) -> None:
+        r"""
+        Data section for this TDM segment.
+
+        :type: TdmData
+        """
     def __new__(cls, *, metadata: TdmMetadata, data: TdmData) -> TdmSegment: ...
     def __repr__(self) -> builtins.str: ...
 

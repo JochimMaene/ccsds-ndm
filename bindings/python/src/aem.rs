@@ -7,10 +7,10 @@ use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::aem as core_aem;
 use ccsds_ndm::types::{AttitudeTypeType, RotSeq};
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
-use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 use std::str::FromStr;
 
@@ -31,9 +31,24 @@ fn parse_attitude_type(value: &str) -> PyResult<AttitudeTypeType> {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct Aem {
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[pyo3(get)]
     version: String,
+
+    /// The message header.
+    ///
+    /// :type: AdmHeader
+    #[pyo3(get, set)]
     header: Py<AdmHeader>,
+
     segments: Py<PyList>,
 }
 
@@ -110,22 +125,6 @@ impl Aem {
         )
     }
 
-    /// The message identifier.
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn get_id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// The message version.
-    ///
-    /// :type: str
-    #[getter]
-    fn get_version(&self) -> String {
-        self.version.clone()
-    }
-
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Aem, &value)?;
@@ -133,32 +132,10 @@ impl Aem {
         Ok(())
     }
 
-    /// Attitude Ephemeris Message (AEM).
-    ///
-    /// An AEM specifies the attitude state of a single object at multiple epochs, contained within a
-    /// specified time range. The AEM is suited to interagency exchanges that involve automated
-    /// interaction and require higher fidelity or higher precision dynamic modeling than is
-    /// possible with the APM.
-    ///
-    /// The AEM allows for dynamic modeling of any number of torques (solar pressure, atmospheric
-    /// torques, magnetics, etc.). It requires the use of an interpolation technique to interpret
-    /// the attitude state at times different from the tabular epochs.
-    ///
-    /// :type: AdmHeader
-    #[getter]
-    fn get_header(&self, py: Python<'_>) -> Py<AdmHeader> {
-        self.header.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_header(&mut self, header: Py<AdmHeader>) {
-        self.header = header;
-    }
-
     /// AEM Segments.
     ///
     /// :type: list[AemSegment]
-    #[gen_stub(override_return_type(type_repr="list[AemSegment]"))]
+    #[gen_stub(override_return_type(type_repr = "list[AemSegment]"))]
     #[getter]
     fn get_segments(&self, py: Python<'_>) -> Py<PyList> {
         self.segments.clone_ref(py)
@@ -179,7 +156,12 @@ impl Aem {
     }
 
     /// Serialize to validated KVN or XML.
-    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 
@@ -188,7 +170,8 @@ impl Aem {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
@@ -202,8 +185,10 @@ impl Aem {
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_file(
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
@@ -213,7 +198,14 @@ impl Aem {
     }
 
     /// Atomically write this AEM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Aem(self.to_core(py)?), &path, format)
     }
 }
@@ -221,7 +213,16 @@ impl Aem {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct AemSegment {
+    /// AEM Metadata Section.
+    ///
+    /// :type: AemMetadata
+    #[pyo3(get, set)]
     metadata: Py<AemMetadata>,
+
+    /// AEM Data Section.
+    ///
+    /// :type: AemData
+    #[pyo3(get, set)]
     data: Py<AemData>,
 }
 
@@ -252,32 +253,6 @@ impl AemSegment {
     #[new]
     fn new(metadata: Py<AemMetadata>, data: Py<AemData>) -> Self {
         Self { metadata, data }
-    }
-
-    /// AEM Metadata Section.
-    ///
-    /// :type: AemMetadata
-    #[getter]
-    fn get_metadata(&self, py: Python<'_>) -> Py<AemMetadata> {
-        self.metadata.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_metadata(&mut self, metadata: Py<AemMetadata>) {
-        self.metadata = metadata;
-    }
-
-    /// AEM Data Section.
-    ///
-    /// :type: AemData
-    #[getter]
-    fn get_data(&self, py: Python<'_>) -> Py<AemData> {
-        self.data.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_data(&mut self, data: Py<AemData>) {
-        self.data = data;
     }
 
     /// Validate the segment against CCSDS rules.
@@ -704,7 +679,15 @@ impl AemMetadata {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct AemData {
+    /// Comments allowed only at the beginning of the Data section. Each comment line shall begin
+    /// with this keyword.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.4.
+    ///
+    /// :type: list[str]
+    #[pyo3(get, set)]
     comment: Vec<String>,
+
     attitude_states: Py<PyList>,
     attitude_type: AttitudeTypeType,
 }
@@ -885,38 +868,19 @@ impl AemData {
         })
     }
 
-    /// Comments allowed only at the beginning of the Data section. Each comment line shall begin
-    /// with this keyword.
-    ///
-    /// CCSDS Reference: 504.0-B-2, Section 4.2.4.
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.comment.clone()
-    }
-
-    #[setter]
-    fn set_comment(&mut self, comment: Vec<String>) {
-        self.comment = comment;
-    }
-
     /// Attitude ephemeris data lines.
     ///
     /// CCSDS Reference: 504.0-B-2, Section 4.2.4.
     ///
     /// :type: list[AttitudeState]
-    #[gen_stub(override_return_type(type_repr="list[AttitudeState]"))]
+    #[gen_stub(override_return_type(type_repr = "list[AttitudeState]"))]
     #[getter]
     fn get_attitude_states(&self, py: Python<'_>) -> Py<PyList> {
         self.attitude_states.clone_ref(py)
     }
 
     #[setter]
-    fn set_attitude_states(
-        &mut self,
-        attitude_states: Vec<Py<AttitudeState>>,
-    ) -> PyResult<()> {
+    fn set_attitude_states(&mut self, attitude_states: Vec<Py<AttitudeState>>) -> PyResult<()> {
         Python::attach(|py| {
             if attitude_states.is_empty() {
                 self.attitude_states = PyList::empty(py).unbind();
@@ -984,7 +948,9 @@ impl AemData {
                 value
                     .extract::<PyRefMut<'_, AttitudeState>>()
                     .map_err(|_| {
-                        PyValueError::new_err(format!("attitude_states[{index}] must be AttitudeState"))
+                        PyValueError::new_err(format!(
+                            "attitude_states[{index}] must be AttitudeState"
+                        ))
                     })?;
                 parsed.push(parse_calendar_epoch(epoch)?);
             }
@@ -994,7 +960,9 @@ impl AemData {
                 let mut state = value
                     .extract::<PyRefMut<'_, AttitudeState>>()
                     .map_err(|_| {
-                        PyValueError::new_err(format!("attitude_states[{index}] must be AttitudeState"))
+                        PyValueError::new_err(format!(
+                            "attitude_states[{index}] must be AttitudeState"
+                        ))
                     })?;
                 state.epoch = epoch;
             }
@@ -1010,7 +978,10 @@ impl AemData {
     ///
     /// :type: numpy.ndarray
     #[getter]
-    fn get_attitude_states_numpy<'py>(&self, py: Python<'py>) -> PyResult<Py<numpy::PyArray2<f64>>> {
+    fn get_attitude_states_numpy<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Py<numpy::PyArray2<f64>>> {
         let states = self.state_values(py)?;
         if states.is_empty() {
             let array = PyArray::from_vec(py, Vec::<f64>::new())
@@ -1033,10 +1004,7 @@ impl AemData {
     }
 
     #[setter]
-    fn set_attitude_states_numpy(
-        &mut self,
-        array: PyReadonlyArray2<f64>,
-    ) -> PyResult<()> {
+    fn set_attitude_states_numpy(&mut self, array: PyReadonlyArray2<f64>) -> PyResult<()> {
         Python::attach(|py| {
             let shape = array.shape();
             if shape.len() != 2 {
@@ -1083,6 +1051,7 @@ impl AemData {
 #[derive(Clone)]
 pub struct AttitudeState {
     pub epoch: ccsds_ndm::types::CalendarEpoch,
+    #[pyo3(get, set)]
     pub values: Vec<f64>,
 }
 
@@ -1106,15 +1075,5 @@ impl AttitudeState {
     fn set_epoch(&mut self, value: String) -> PyResult<()> {
         self.epoch = parse_calendar_epoch(&value)?;
         Ok(())
-    }
-
-    #[getter]
-    fn get_values(&self) -> Vec<f64> {
-        self.values.clone()
-    }
-
-    #[setter]
-    fn set_values(&mut self, value: Vec<f64>) {
-        self.values = value;
     }
 }

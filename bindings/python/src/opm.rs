@@ -6,10 +6,10 @@ use crate::common::{OdmHeader, StateVector};
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::opm as core_opm;
 use ccsds_ndm::types::{Angle, Distance, Gm, Inclination};
-use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 /// Orbit Parameter Message (OPM).
 ///
@@ -28,9 +28,28 @@ use pyo3::types::PyList;
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct Opm {
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[pyo3(get)]
     version: String,
+
+    /// The message header.
+    ///
+    /// :type: OdmHeader
+    #[pyo3(get, set)]
     header: Py<OdmHeader>,
+
+    /// The data segment.
+    ///
+    /// :type: OpmSegment
+    #[pyo3(get, set)]
     segment: Py<OpmSegment>,
 }
 
@@ -86,22 +105,6 @@ impl Opm {
         )
     }
 
-    /// The message identifier.
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn get_id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// The message version.
-    ///
-    /// :type: str
-    #[getter]
-    fn get_version(&self) -> String {
-        self.version.clone()
-    }
-
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Opm, &value)?;
@@ -115,38 +118,6 @@ impl Opm {
         crate::api::validate_message(&self.to_core(py)?)
     }
 
-    /// Orbit Parameter Message (OPM).
-    ///
-    /// Orbit information may be exchanged between two participants by sending a state vector (see
-    /// reference \[H1\]) for a specified epoch using an OPM. The message recipient must have an orbit
-    /// propagator available that is able to propagate the OPM state vector to compute the orbit at other
-    /// desired epochs. For this propagation, additional ancillary information (spacecraft properties
-    /// such as mass, area, and maneuver planning data, if applicable) may be included with the message.
-    ///
-    /// :type: OdmHeader
-    #[getter]
-    fn get_header(&self, py: Python<'_>) -> Py<OdmHeader> {
-        self.header.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_header(&mut self, header: Py<OdmHeader>) {
-        self.header = header;
-    }
-
-    /// The data segment.
-    ///
-    /// :type: OpmSegment
-    #[getter]
-    fn get_segment(&self, py: Python<'_>) -> Py<OpmSegment> {
-        self.segment.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_segment(&mut self, segment: Py<OpmSegment>) {
-        self.segment = segment;
-    }
-
     /// Create an OPM message from a string.
 
     #[staticmethod]
@@ -154,7 +125,8 @@ impl Opm {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
         let options = crate::api::parse_options(max_input_bytes, None);
@@ -167,8 +139,10 @@ impl Opm {
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
     fn from_file(
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
         let options = crate::api::parse_options(max_input_bytes, None);
@@ -177,12 +151,24 @@ impl Opm {
     }
 
     /// Atomically write this OPM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Opm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to KVN or XML after mandatory CCSDS validation.
-    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
@@ -200,7 +186,18 @@ impl Opm {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct OpmSegment {
+    /// A single segment of the OPM.
+    ///
+    /// Contains metadata and data sections.
+    ///
+    /// :type: OpmMetadata
+    #[pyo3(get, set)]
     metadata: Py<OpmMetadata>,
+
+    /// Segment data.
+    ///
+    /// :type: OpmData
+    #[pyo3(get, set)]
     data: Py<OpmData>,
 }
 
@@ -246,34 +243,6 @@ impl OpmSegment {
             "OpmSegment(object_name='{}')",
             self.metadata.borrow(py).inner.object_name
         )
-    }
-
-    /// A single segment of the OPM.
-    ///
-    /// Contains metadata and data sections.
-    ///
-    /// :type: OpmMetadata
-    #[getter]
-    fn get_metadata(&self, py: Python<'_>) -> Py<OpmMetadata> {
-        self.metadata.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_metadata(&mut self, metadata: Py<OpmMetadata>) {
-        self.metadata = metadata;
-    }
-
-    /// Segment data.
-    ///
-    /// :type: OpmData
-    #[getter]
-    fn get_data(&self, py: Python<'_>) -> Py<OpmData> {
-        self.data.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_data(&mut self, data: Py<OpmData>) {
-        self.data = data;
     }
 }
 
@@ -1298,8 +1267,18 @@ impl OpmCovarianceMatrix {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct OpmData {
+    /// Comments (see 7.8 for formatting rules).
+    ///
+    /// :type: list[str]
+    #[pyo3(get, set)]
     comment: Vec<String>,
+
+    /// State vector components (position and velocity).
+    ///
+    /// :type: StateVector
+    #[pyo3(get, set)]
     state_vector: Py<StateVector>,
+
     keplerian_elements: Option<Py<KeplerianElements>>,
     spacecraft_parameters: Option<Py<crate::common::SpacecraftParameters>>,
     covariance_matrix: Option<Py<OpmCovarianceMatrix>>,
@@ -1405,37 +1384,11 @@ impl OpmData {
         })
     }
 
-    /// Comments (see 7.8 for formatting rules).
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.comment.clone()
-    }
-
-    #[setter]
-    fn set_comment(&mut self, value: Vec<String>) {
-        self.comment = value;
-    }
-
     fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "OpmData(epoch='{}')",
             self.state_vector.borrow(py).inner.epoch.as_str()
         )
-    }
-
-    /// State vector components (position and velocity).
-    ///
-    /// :type: StateVector
-    #[getter]
-    fn get_state_vector(&self, py: Python<'_>) -> Py<StateVector> {
-        self.state_vector.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_state_vector(&mut self, value: Py<StateVector>) {
-        self.state_vector = value;
     }
 
     /// Keplerian elements.
@@ -1492,17 +1445,14 @@ impl OpmData {
     /// Maneuver parameters.
     ///
     /// :type: list[OpmManeuverParameters]
-    #[gen_stub(override_return_type(type_repr="list[OpmManeuverParameters]"))]
+    #[gen_stub(override_return_type(type_repr = "list[OpmManeuverParameters]"))]
     #[getter]
     fn get_maneuver_parameters(&self, py: Python<'_>) -> Py<PyList> {
         self.maneuver_parameters.clone_ref(py)
     }
 
     #[setter]
-    fn set_maneuver_parameters(
-        &mut self,
-        value: Vec<Py<OpmManeuverParameters>>,
-    ) -> PyResult<()> {
+    fn set_maneuver_parameters(&mut self, value: Vec<Py<OpmManeuverParameters>>) -> PyResult<()> {
         Python::attach(|py| {
             self.maneuver_parameters = PyList::new(py, value)?.unbind();
             Ok(())

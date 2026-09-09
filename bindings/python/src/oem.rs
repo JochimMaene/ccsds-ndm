@@ -9,11 +9,11 @@ use ccsds_ndm::types::{
     Acc, Position, PositionCovariance, PositionVelocityCovariance, Velocity, VelocityCovariance,
 };
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
-use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use pyo3::PyClass;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 fn build_covariance_matrix(
     epoch: ccsds_ndm::types::Epoch,
@@ -172,9 +172,24 @@ fn state_vector_from_row(
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct Oem {
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[pyo3(get)]
     version: String,
+
+    /// The message header.
+    ///
+    /// :type: OdmHeader
+    #[pyo3(get, set)]
     header: Py<OdmHeader>,
+
     segments: Py<PyList>,
 }
 
@@ -236,7 +251,18 @@ impl Oem {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct OemSegment {
+    /// A single segment of the OEM.
+    ///
+    /// Each segment contains metadata (context) and a list of ephemeris data points.
+    ///
+    /// :type: OemMetadata
+    #[pyo3(get, set)]
     metadata: Py<OemMetadata>,
+
+    /// Segment data.
+    ///
+    /// :type: OemData
+    #[pyo3(get, set)]
     data: Py<OemData>,
 }
 
@@ -311,7 +337,14 @@ pub struct OemMetadata {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct OemData {
+    /// Comments (see 7.8 for formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.4.
+    ///
+    /// :type: list[str]
+    #[pyo3(get, set)]
     comment: Vec<String>,
+
     state_vector: Py<PyList>,
     covariance_matrix: Py<PyList>,
 }
@@ -475,22 +508,6 @@ impl Oem {
         )
     }
 
-    /// The message identifier.
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn get_id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// The message version.
-    ///
-    /// :type: str
-    #[getter]
-    fn get_version(&self) -> String {
-        self.version.clone()
-    }
-
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Oem, &value)?;
@@ -498,23 +515,10 @@ impl Oem {
         Ok(())
     }
 
-    /// The message header.
-    ///
-    /// :type: OdmHeader
-    #[getter]
-    fn get_header(&self, py: Python<'_>) -> Py<OdmHeader> {
-        self.header.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_header(&mut self, header: Py<OdmHeader>) {
-        self.header = header;
-    }
-
     /// The list of data segments.
     ///
     /// :type: list[OemSegment]
-    #[gen_stub(override_return_type(type_repr="list[OemSegment]"))]
+    #[gen_stub(override_return_type(type_repr = "list[OemSegment]"))]
     #[getter]
     fn get_segments(&self, py: Python<'_>) -> Py<PyList> {
         self.segments.clone_ref(py)
@@ -553,7 +557,8 @@ impl Oem {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
@@ -567,8 +572,10 @@ impl Oem {
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_file(
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
@@ -578,12 +585,24 @@ impl Oem {
     }
 
     /// Atomically write this OEM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Oem(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to validated KVN or XML.
-    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
@@ -604,34 +623,6 @@ impl OemSegment {
             metadata.inner.start_time.as_str(),
             metadata.inner.stop_time.as_str()
         )
-    }
-
-    /// A single segment of the OEM.
-    ///
-    /// Each segment contains metadata (context) and a list of ephemeris data points.
-    ///
-    /// :type: OemMetadata
-    #[getter]
-    fn get_metadata(&self, py: Python<'_>) -> Py<OemMetadata> {
-        self.metadata.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_metadata(&mut self, metadata: Py<OemMetadata>) {
-        self.metadata = metadata;
-    }
-
-    /// Segment data.
-    ///
-    /// :type: OemData
-    #[getter]
-    fn get_data(&self, py: Python<'_>) -> Py<OemData> {
-        self.data.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_data(&mut self, data: Py<OemData>) {
-        self.data = data;
     }
 
     /// Validate the segment against CCSDS rules.
@@ -1172,17 +1163,14 @@ impl OemData {
     /// CCSDS Reference: 502.0-B-3, Section 5.2.4.
     ///
     /// :type: list[StateVectorAcc]
-    #[gen_stub(override_return_type(type_repr="list[StateVectorAcc]"))]
+    #[gen_stub(override_return_type(type_repr = "list[StateVectorAcc]"))]
     #[getter]
     fn get_state_vector(&self, py: Python<'_>) -> Py<PyList> {
         self.state_vector.clone_ref(py)
     }
 
     #[setter]
-    fn set_state_vector(
-        &mut self,
-        state_vectors: Vec<Py<StateVectorAcc>>,
-    ) -> PyResult<()> {
+    fn set_state_vector(&mut self, state_vectors: Vec<Py<StateVectorAcc>>) -> PyResult<()> {
         Python::attach(|py| {
             self.state_vector = PyList::new(py, state_vectors)?.unbind();
             Ok(())
@@ -1238,7 +1226,9 @@ impl OemData {
                 let mut state = value
                     .extract::<PyRefMut<'_, StateVectorAcc>>()
                     .map_err(|_| {
-                        PyValueError::new_err(format!("state_vector[{index}] must be StateVectorAcc"))
+                        PyValueError::new_err(format!(
+                            "state_vector[{index}] must be StateVectorAcc"
+                        ))
                     })?;
                 state.inner.epoch = epoch;
             }
@@ -1256,7 +1246,7 @@ impl OemData {
     /// Matrices are given in lower triangular form in the covariance reference frame.
     ///
     /// :type: list[OemCovarianceMatrix]
-    #[gen_stub(override_return_type(type_repr="list[OemCovarianceMatrix]"))]
+    #[gen_stub(override_return_type(type_repr = "list[OemCovarianceMatrix]"))]
     #[getter]
     fn get_covariance_matrix(&self, py: Python<'_>) -> Py<PyList> {
         self.covariance_matrix.clone_ref(py)
@@ -1290,10 +1280,7 @@ impl OemData {
     }
 
     #[setter]
-    fn set_covariance_matrix_epochs(
-        &mut self,
-        epochs: Vec<String>,
-    ) -> PyResult<()> {
+    fn set_covariance_matrix_epochs(&mut self, epochs: Vec<String>) -> PyResult<()> {
         Python::attach(|py| {
             let covariance_matrices = self.covariance_matrix.bind(py);
             if covariance_matrices.is_empty() {
@@ -1333,21 +1320,6 @@ impl OemData {
             }
             Ok(())
         })
-    }
-
-    /// Comments (see 7.8 for formatting rules).
-    ///
-    /// CCSDS Reference: 502.0-B-3, Section 5.2.4.
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.comment.clone()
-    }
-
-    #[setter]
-    fn set_comment(&mut self, comments: Vec<String>) {
-        self.comment = comments;
     }
 
     /// State vectors as a NumPy array.
@@ -1421,10 +1393,7 @@ impl OemData {
     }
 
     #[setter]
-    fn set_state_vector_numpy(
-        &mut self,
-        array: PyReadonlyArray2<f64>,
-    ) -> PyResult<()> {
+    fn set_state_vector_numpy(&mut self, array: PyReadonlyArray2<f64>) -> PyResult<()> {
         Python::attach(|py| {
             let shape = array.shape();
             if shape.len() != 2 {
@@ -1468,7 +1437,9 @@ impl OemData {
                 let mut state = value
                     .extract::<PyRefMut<'_, StateVectorAcc>>()
                     .map_err(|_| {
-                        PyValueError::new_err(format!("state_vector[{index}] must be StateVectorAcc"))
+                        PyValueError::new_err(format!(
+                            "state_vector[{index}] must be StateVectorAcc"
+                        ))
                     })?;
                 state.inner = inner;
             }
@@ -1487,7 +1458,10 @@ impl OemData {
     ///
     /// :type: numpy.ndarray
     #[getter]
-    fn get_covariance_matrix_numpy<'py>(&self, py: Python<'py>) -> PyResult<Py<numpy::PyArray3<f64>>> {
+    fn get_covariance_matrix_numpy<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Py<numpy::PyArray3<f64>>> {
         let num_matrices = self.covariance_matrix.bind(py).len();
         // 6x6 matrix = 36 elements per epoch
         let mut data = Vec::with_capacity(num_matrices * 36);
@@ -1554,10 +1528,7 @@ impl OemData {
     }
 
     #[setter]
-    fn set_covariance_matrix_numpy(
-        &mut self,
-        array: PyReadonlyArrayDyn<f64>,
-    ) -> PyResult<()> {
+    fn set_covariance_matrix_numpy(&mut self, array: PyReadonlyArrayDyn<f64>) -> PyResult<()> {
         Python::attach(|py| {
             let shape = array.shape();
             let num_matrices = match shape.len() {

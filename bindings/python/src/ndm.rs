@@ -4,10 +4,10 @@
 
 use ccsds_ndm::messages::ndm as core_ndm;
 use ccsds_ndm::Message;
-use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 use crate::cdm::Cdm;
 use crate::ocm::Ocm;
@@ -29,8 +29,18 @@ use crate::tdm::Tdm;
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct CombinedNdm {
+    /// Message Identifier (optional).
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// Comments (optional).
+    ///
+    /// :type: list[str]
+    #[pyo3(get, set)]
     comments: Vec<String>,
+
     messages: Py<PyList>,
 }
 
@@ -130,7 +140,8 @@ impl CombinedNdm {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
@@ -144,8 +155,10 @@ impl CombinedNdm {
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_file(
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
@@ -158,14 +171,26 @@ impl CombinedNdm {
     ///
     /// Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError` and leaves the
     /// destination untouched.
-    fn to_file(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&Message::Ndm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to an XML string.
     ///
     /// Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError`.
-    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         let message = Message::Ndm(self.to_core(py)?);
         match crate::api::notation(format)? {
             ccsds_ndm::Notation::Kvn => message.to_kvn(),
@@ -190,27 +215,6 @@ impl CombinedNdm {
             self.messages = PyList::new(py, messages)?.unbind();
             Ok(())
         })
-    }
-
-    /// Message Identifier (optional).
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// Comments (optional).
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn comments(&self) -> Vec<String> {
-        self.comments.clone()
-    }
-
-    #[setter]
-    fn set_comments(&mut self, comments: Vec<String>) {
-        self.comments = comments;
     }
 
     fn __repr__(&self, py: Python<'_>) -> String {

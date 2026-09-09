@@ -7,10 +7,10 @@ use crate::common::OdmHeader;
 use crate::types::{parse_calendar_epoch, parse_epoch};
 use ccsds_ndm::messages::ocm as core_ocm;
 use ccsds_ndm::types::Duration;
-use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 /// Orbit Comprehensive Message (OCM).
 ///
@@ -34,9 +34,28 @@ use pyo3::types::PyList;
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct Ocm {
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[pyo3(get)]
     version: String,
+
+    /// The message header.
+    ///
+    /// :type: OdmHeader
+    #[pyo3(get, set)]
     header: Py<OdmHeader>,
+
+    /// The OCM data segment.
+    ///
+    /// :type: OcmSegment
+    #[pyo3(get, set)]
     segment: Py<OcmSegment>,
 }
 
@@ -88,7 +107,8 @@ impl Ocm {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
@@ -102,8 +122,10 @@ impl Ocm {
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
     fn from_file(
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
         max_records: Option<usize>,
     ) -> PyResult<Self> {
@@ -113,7 +135,14 @@ impl Ocm {
     }
 
     /// Atomically write this OCM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Ocm(self.to_core(py)?), &path, format)
     }
 
@@ -142,22 +171,6 @@ impl Ocm {
         )
     }
 
-    /// The message identifier.
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn get_id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// The message version.
-    ///
-    /// :type: str
-    #[getter]
-    fn get_version(&self) -> String {
-        self.version.clone()
-    }
-
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Ocm, &value)?;
@@ -171,44 +184,13 @@ impl Ocm {
         crate::api::validate_message(&self.to_core(py)?)
     }
 
-    /// Orbit Comprehensive Message (OCM).
-    ///
-    /// An OCM specifies position and velocity of either a single object or an en masse parent/child
-    /// deployment scenario stemming from a single object. The OCM aggregates and extends OPM, OEM,
-    /// and OMM content in a single comprehensive hybrid message.
-    ///
-    /// Key features:
-    /// - Support for single object or parent/child deployment scenarios.
-    /// - Aggregation of OPM, OMM, and OEM content.
-    /// - Extensive optional content including physical properties, covariance, maneuvers, and
-    /// perturbations.
-    /// - Well-suited for exchanges involving automated interaction and large object catalogs.
-    ///
-    /// :type: OdmHeader
-    #[getter]
-    fn get_header(&self, py: Python<'_>) -> Py<OdmHeader> {
-        self.header.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_header(&mut self, header: Py<OdmHeader>) {
-        self.header = header;
-    }
-
-    /// The OCM data segment.
-    ///
-    /// :type: OcmSegment
-    #[getter]
-    fn get_segment(&self, py: Python<'_>) -> Py<OcmSegment> {
-        self.segment.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_segment(&mut self, segment: Py<OcmSegment>) {
-        self.segment = segment;
-    }
     /// Serialize to KVN or XML after mandatory CCSDS validation.
-    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
@@ -226,7 +208,18 @@ impl Ocm {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct OcmSegment {
+    /// A single segment of the OCM.
+    ///
+    /// Contains metadata and data sections.
+    ///
+    /// :type: OcmMetadata
+    #[pyo3(get, set)]
     metadata: Py<OcmMetadata>,
+
+    /// Segment data blocks.
+    ///
+    /// :type: OcmData
+    #[pyo3(get, set)]
     data: Py<OcmData>,
 }
 
@@ -270,34 +263,6 @@ impl OcmSegment {
                 .as_deref()
                 .unwrap_or("N/A")
         )
-    }
-
-    /// A single segment of the OCM.
-    ///
-    /// Contains metadata and data sections.
-    ///
-    /// :type: OcmMetadata
-    #[getter]
-    fn get_metadata(&self, py: Python<'_>) -> Py<OcmMetadata> {
-        self.metadata.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_metadata(&mut self, metadata: Py<OcmMetadata>) {
-        self.metadata = metadata;
-    }
-
-    /// Segment data blocks.
-    ///
-    /// :type: OcmData
-    #[getter]
-    fn get_data(&self, py: Python<'_>) -> Py<OcmData> {
-        self.data.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_data(&mut self, data: Py<OcmData>) {
-        self.data = data;
     }
 }
 
@@ -1541,7 +1506,7 @@ impl OcmData {
     /// List of trajectory state time history blocks.
     ///
     /// :type: list[OcmTrajState]
-    #[gen_stub(override_return_type(type_repr="list[OcmTrajState]"))]
+    #[gen_stub(override_return_type(type_repr = "list[OcmTrajState]"))]
     #[getter]
     fn get_traj(&self, py: Python<'_>) -> Py<PyList> {
         self.traj.clone_ref(py)
@@ -1571,7 +1536,7 @@ impl OcmData {
     /// List of maneuver specifications.
     ///
     /// :type: list[OcmManeuverParameters]
-    #[gen_stub(override_return_type(type_repr="list[OcmManeuverParameters]"))]
+    #[gen_stub(override_return_type(type_repr = "list[OcmManeuverParameters]"))]
     #[getter]
     fn get_man(&self, py: Python<'_>) -> Py<PyList> {
         self.man.clone_ref(py)
@@ -1587,7 +1552,7 @@ impl OcmData {
     /// List of covariance time history blocks.
     ///
     /// :type: list[OcmCovarianceMatrix]
-    #[gen_stub(override_return_type(type_repr="list[OcmCovarianceMatrix]"))]
+    #[gen_stub(override_return_type(type_repr = "list[OcmCovarianceMatrix]"))]
     #[getter]
     fn get_cov(&self, py: Python<'_>) -> Py<PyList> {
         self.cov.clone_ref(py)
@@ -1887,7 +1852,7 @@ impl OcmTrajState {
     /// Contiguous set of trajectory state data lines.
     ///
     /// :type: list[TrajLine]
-    #[gen_stub(override_return_type(type_repr="list[TrajLine]"))]
+    #[gen_stub(override_return_type(type_repr = "list[TrajLine]"))]
     #[getter]
     fn get_traj_lines(&self, py: Python<'_>) -> Py<PyList> {
         self.traj_lines.clone_ref(py)
@@ -3911,7 +3876,7 @@ impl OcmCovarianceMatrix {
     /// Contiguous set of covariance matrix data lines.
     ///
     /// :type: list[CovLine]
-    #[gen_stub(override_return_type(type_repr="list[CovLine]"))]
+    #[gen_stub(override_return_type(type_repr = "list[CovLine]"))]
     #[getter]
     fn get_cov_lines(&self, py: Python<'_>) -> Py<PyList> {
         self.cov_lines.clone_ref(py)
@@ -4828,7 +4793,7 @@ impl OcmManeuverParameters {
     /// Maneuver time history data lines.
     ///
     /// :type: list[ManLine]
-    #[gen_stub(override_return_type(type_repr="list[ManLine]"))]
+    #[gen_stub(override_return_type(type_repr = "list[ManLine]"))]
     #[getter]
     fn get_man_lines(&self, py: Python<'_>) -> Py<PyList> {
         self.man_lines.clone_ref(py)

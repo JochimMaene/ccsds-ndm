@@ -11,9 +11,9 @@
 // Default units are documented in the .pyi stub files.
 
 use ccsds_ndm::types as core_types;
-use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 // =============================================================================
 // Helper Functions

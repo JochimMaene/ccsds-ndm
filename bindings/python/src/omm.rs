@@ -6,9 +6,9 @@ use crate::common::OdmHeader;
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::omm as core_omm;
 use ccsds_ndm::types::{Angle, Distance, Gm, Inclination};
-use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 // Import OpmCovarianceMatrix from opm module (shared type)
 use crate::opm::OpmCovarianceMatrix;
@@ -33,9 +33,28 @@ use crate::opm::OpmCovarianceMatrix;
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct Omm {
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[pyo3(get)]
     version: String,
+
+    /// The message header.
+    ///
+    /// :type: OdmHeader
+    #[pyo3(get, set)]
     header: Py<OdmHeader>,
+
+    /// The data segment.
+    ///
+    /// :type: OmmSegment
+    #[pyo3(get, set)]
     segment: Py<OmmSegment>,
 }
 
@@ -91,22 +110,6 @@ impl Omm {
         )
     }
 
-    /// The message identifier.
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn get_id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// The message version.
-    ///
-    /// :type: str
-    #[getter]
-    fn get_version(&self) -> String {
-        self.version.clone()
-    }
-
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Omm, &value)?;
@@ -120,47 +123,13 @@ impl Omm {
         crate::api::validate_message(&self.to_core(py)?)
     }
 
-    /// Orbit Mean-Elements Message (OMM).
-    ///
-    /// The OMM contains the orbital characteristics of a single object at a specified epoch,
-    /// expressed in mean Keplerian elements: mean motion, eccentricity, inclination, right
-    /// ascension of ascending node, argument of perigee, and mean anomaly.
-    ///
-    /// These elements are adequate for providing the initial mean state of analytical and
-    /// semi-analytical orbit models (e.g., SGP4). The OMM includes keywords and values that may
-    /// be used to generate canonical NORAD Two Line Element (TLE) sets to accommodate the needs
-    /// of heritage users.
-    ///
-    /// :type: OdmHeader
-    #[getter]
-    fn get_header(&self, py: Python<'_>) -> Py<OdmHeader> {
-        self.header.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_header(&mut self, header: Py<OdmHeader>) {
-        self.header = header;
-    }
-
-    /// The data segment.
-    ///
-    /// :type: OmmSegment
-    #[getter]
-    fn get_segment(&self, py: Python<'_>) -> Py<OmmSegment> {
-        self.segment.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_segment(&mut self, segment: Py<OmmSegment>) {
-        self.segment = segment;
-    }
-
     #[staticmethod]
     #[pyo3(signature = (data, format=None, *, max_input_bytes=None))]
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
         let options = crate::api::parse_options(max_input_bytes, None);
@@ -173,8 +142,10 @@ impl Omm {
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
     fn from_file(
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
         let options = crate::api::parse_options(max_input_bytes, None);
@@ -183,12 +154,24 @@ impl Omm {
     }
 
     /// Atomically write this OMM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Omm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to validated KVN or XML.
-    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 
@@ -270,7 +253,16 @@ impl Omm {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct OmmSegment {
+    /// Segment metadata.
+    ///
+    /// :type: OmmMetadata
+    #[pyo3(get, set)]
     metadata: Py<OmmMetadata>,
+
+    /// Segment data.
+    ///
+    /// :type: OmmData
+    #[pyo3(get, set)]
     data: Py<OmmData>,
 }
 
@@ -308,32 +300,6 @@ impl OmmSegment {
             "OmmSegment(object_name='{}')",
             self.metadata.borrow(py).inner.object_name
         )
-    }
-
-    /// Segment metadata.
-    ///
-    /// :type: OmmMetadata
-    #[getter]
-    fn get_metadata(&self, py: Python<'_>) -> Py<OmmMetadata> {
-        self.metadata.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_metadata(&mut self, metadata: Py<OmmMetadata>) {
-        self.metadata = metadata;
-    }
-
-    /// Segment data.
-    ///
-    /// :type: OmmData
-    #[getter]
-    fn get_data(&self, py: Python<'_>) -> Py<OmmData> {
-        self.data.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_data(&mut self, data: Py<OmmData>) {
-        self.data = data;
     }
 }
 
@@ -854,8 +820,18 @@ impl MeanElements {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct OmmData {
+    /// Comments.
+    ///
+    /// :type: list[str]
+    #[pyo3(get, set)]
     comment: Vec<String>,
+
+    /// Mean Keplerian Elements in the Specified Reference Frame.
+    ///
+    /// :type: MeanElements
+    #[pyo3(get, set)]
     mean_elements: Py<MeanElements>,
+
     spacecraft_parameters: Option<Py<crate::common::SpacecraftParameters>>,
     tle_parameters: Option<Py<TleParameters>>,
     covariance_matrix: Option<Py<OpmCovarianceMatrix>>,
@@ -942,32 +918,6 @@ impl OmmData {
             "OmmData(epoch='{}')",
             self.mean_elements.borrow(py).inner.epoch.as_str()
         )
-    }
-
-    /// Mean Keplerian Elements in the Specified Reference Frame.
-    ///
-    /// :type: MeanElements
-    #[getter]
-    fn get_mean_elements(&self, py: Python<'_>) -> Py<MeanElements> {
-        self.mean_elements.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_mean_elements(&mut self, value: Py<MeanElements>) {
-        self.mean_elements = value;
-    }
-
-    /// Comments.
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.comment.clone()
-    }
-
-    #[setter]
-    fn set_comment(&mut self, value: Vec<String>) {
-        self.comment = value;
     }
 
     /// Spacecraft Parameters.

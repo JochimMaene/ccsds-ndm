@@ -11,9 +11,9 @@ use crate::types::parse_calendar_epoch;
 use ccsds_ndm::common as core_common;
 use ccsds_ndm::messages::rdm as core_rdm;
 use ccsds_ndm::types::{self as core_types, *};
-use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 // ============================================================================
 // RDM - Re-entry Data Message
@@ -42,9 +42,28 @@ use pyo3::prelude::*;
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct Rdm {
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[pyo3(get)]
     version: String,
+
+    /// The message header.
+    ///
+    /// :type: RdmHeader
+    #[pyo3(get, set)]
     header: Py<RdmHeader>,
+
+    /// The RDM Body consists of a single segment.
+    ///
+    /// :type: RdmSegment
+    #[pyo3(get, set)]
     segment: Py<RdmSegment>,
 }
 
@@ -89,22 +108,6 @@ impl Rdm {
         }
     }
 
-    /// The message identifier.
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn get_id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// The message version.
-    ///
-    /// :type: str
-    #[getter]
-    fn get_version(&self) -> String {
-        self.version.clone()
-    }
-
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Rdm, &value)?;
@@ -130,42 +133,6 @@ impl Rdm {
         )
     }
 
-    /// Re-entry Data Message (RDM).
-    ///
-    /// The RDM specifies a standard message format to be used in the exchange of spacecraft
-    /// re-entry information between Space Situational Awareness (SSA) or Space Surveillance and
-    /// Tracking (SST) data providers, satellite owners/operators, and other parties.
-    ///
-    /// It includes data such as:
-    /// - Remaining orbital lifetime
-    /// - Start and end of the re-entry and impact windows
-    /// - Impact location and probabilities
-    /// - Object physical properties
-    ///
-    /// :type: RdmHeader
-    #[getter]
-    fn get_header(&self, py: Python<'_>) -> Py<RdmHeader> {
-        self.header.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_header(&mut self, header: Py<RdmHeader>) {
-        self.header = header;
-    }
-
-    /// The RDM Body consists of a single segment.
-    ///
-    /// :type: RdmSegment
-    #[getter]
-    fn get_segment(&self, py: Python<'_>) -> Py<RdmSegment> {
-        self.segment.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_segment(&mut self, segment: Py<RdmSegment>) {
-        self.segment = segment;
-    }
-
     /// Create an RDM message from a string.
     ///
     /// Parameters
@@ -185,7 +152,8 @@ impl Rdm {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
         let options = crate::api::parse_options(max_input_bytes, None);
@@ -198,8 +166,10 @@ impl Rdm {
     #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
     fn from_file(
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))] format: Option<&str>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        format: Option<&str>,
         max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
         let options = crate::api::parse_options(max_input_bytes, None);
@@ -208,7 +178,14 @@ impl Rdm {
     }
 
     /// Atomically write this RDM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))] path: std::path::PathBuf, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Rdm(self.to_core(py)?), &path, format)
     }
 
@@ -222,7 +199,12 @@ impl Rdm {
     /// -------
     /// str
     ///     The serialized string.
-    fn to_str(&self, py: Python<'_>, #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))] format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
@@ -354,7 +336,16 @@ impl RdmHeader {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct RdmSegment {
+    /// The metadata for this RDM segment.
+    ///
+    /// :type: RdmMetadata
+    #[pyo3(get, set)]
     metadata: Py<RdmMetadata>,
+
+    /// The data for this RDM segment.
+    ///
+    /// :type: RdmData
+    #[pyo3(get, set)]
     data: Py<RdmData>,
 }
 
@@ -393,30 +384,6 @@ impl RdmSegment {
             "RdmSegment(object_name='{}')",
             self.metadata.borrow(py).inner.object_name
         )
-    }
-
-    /// The metadata for this RDM segment.
-    ///
-    /// :type: RdmMetadata
-    #[getter]
-    fn get_metadata(&self, py: Python<'_>) -> Py<RdmMetadata> {
-        self.metadata.clone_ref(py)
-    }
-    #[setter]
-    fn set_metadata(&mut self, value: Py<RdmMetadata>) {
-        self.metadata = value;
-    }
-
-    /// The data for this RDM segment.
-    ///
-    /// :type: RdmData
-    #[getter]
-    fn get_data(&self, py: Python<'_>) -> Py<RdmData> {
-        self.data.clone_ref(py)
-    }
-    #[setter]
-    fn set_data(&mut self, value: Py<RdmData>) {
-        self.data = value;
     }
 }
 
@@ -1177,7 +1144,12 @@ impl RdmMetadata {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct RdmData {
+    /// Comments.
+    ///
+    /// :type: list[str]
+    #[pyo3(get, set)]
     comment: Vec<String>,
+
     atmospheric_reentry_parameters: Py<AtmosphericReentryParameters>,
     ground_impact_parameters: Option<Py<GroundImpactParameters>>,
     state_vector: Option<Py<StateVector>>,
@@ -1402,18 +1374,6 @@ impl RdmData {
     #[setter]
     fn set_user_defined_parameters(&mut self, value: Option<Py<crate::types::UserDefined>>) {
         self.user_defined_parameters = value;
-    }
-
-    /// Comments.
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.comment.clone()
-    }
-    #[setter]
-    fn set_comment(&mut self, v: Vec<String>) {
-        self.comment = v;
     }
 }
 
