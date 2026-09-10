@@ -4,8 +4,9 @@
 
 //! KVN parsing and generation benchmarks for all message types.
 //!
-//! Only the families that carry a record history are benchmarked: a flat message parses and
-//! generates in microseconds, where measurement noise dominates the result.
+//! `kvn_message_matrix` carries every standalone family, because the conformance files cite it
+//! as each family's workload evidence. Dedicated groups beyond it exist only for the families
+//! with a record history, where cost scales with the data.
 //!
 //! Groups are named `<family>_<notation>_<workload>`, except the cross-family
 //! `kvn_message_matrix`.
@@ -111,10 +112,15 @@ fn bench_acm_kvn_history_scaling(c: &mut Criterion) {
 
 fn bench_kvn_message_matrix(c: &mut Criterion) {
     let cases = [
+        ("opm", include_str!("../data/kvn/opm_g4.kvn")),
+        ("omm", include_str!("../data/kvn/omm_g7.kvn")),
         ("oem", include_str!("../data/kvn/oem_g11.kvn")),
         ("ocm", include_str!("../data/kvn/ocm_g15.kvn")),
+        ("cdm", include_str!("../data/kvn/cdm_362.kvn")),
         ("tdm", include_str!("../data/kvn/tdm_e1.kvn")),
+        ("rdm", include_str!("../data/kvn/rdm_c1.kvn")),
         ("aem", include_str!("../data/kvn/aem_g4.kvn")),
+        ("apm", include_str!("../data/kvn/apm_g1.kvn")),
         ("acm", include_str!("../data/kvn/acm_g6.kvn")),
     ];
     let mut group = c.benchmark_group("kvn_message_matrix");

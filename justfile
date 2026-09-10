@@ -234,7 +234,7 @@ check: lint audit stubs-check typecheck test docs
 bench:
     cargo bench --manifest-path {{rust_manifest}}
 
-# Reproduce parse/generate workloads for the history-carrying families and combined XML NDM
+# Reproduce parse/generate workloads for every standalone message and combined XML NDM
 [private]
 bench-family:
     cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_message_matrix

@@ -4,8 +4,9 @@
 
 //! XML parsing and generation benchmarks for all message types.
 //!
-//! Only the families that carry a record history are benchmarked: a flat message parses and
-//! generates in microseconds, where measurement noise dominates the result.
+//! `xml_message_matrix` carries every standalone family plus the combined NDM, because the
+//! conformance files cite it as each family's workload evidence. Dedicated groups beyond it exist
+//! only for the families with a record history, where cost scales with the data.
 //!
 //! Groups are named `<family>_<notation>_<workload>`, except the cross-family
 //! `xml_message_matrix`. The three `ocm_*_10k` groups compare both notations on one large
@@ -256,13 +257,16 @@ fn bench_xml_message_matrix(c: &mut Criterion) {
         .to_xml()
         .unwrap();
     let cases = vec![
+        ("opm", include_str!("../data/xml/opm_g5.xml").to_owned()),
+        ("omm", include_str!("../data/xml/omm_g10.xml").to_owned()),
         ("oem", include_str!("../data/xml/oem_g14.xml").to_owned()),
         ("ocm", include_str!("../data/xml/ocm_g20.xml").to_owned()),
+        ("cdm", include_str!("../data/xml/cdm_44.xml").to_owned()),
         ("tdm", include_str!("../data/xml/tdm_e21.xml").to_owned()),
+        ("rdm", include_str!("../data/xml/rdm_c3.xml").to_owned()),
         ("aem", include_str!("../data/xml/aem_g11.xml").to_owned()),
+        ("apm", include_str!("../data/xml/apm_g10.xml").to_owned()),
         ("acm", acm),
-        // The combined fixture holds an APM, an AEM and an ACM, so it reaches history parsing
-        // through the envelope.
         ("ndm", include_str!("../data/xml/ndm_g12.xml").to_owned()),
     ];
     let mut group = c.benchmark_group("xml_message_matrix");
