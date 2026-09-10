@@ -866,113 +866,49 @@ REENTRY_ALTITUDE = 80 [km]
         );
     }
 
+    /// The conditional RDM rules, as single mutations of a shipped fixture.
     #[test]
-    fn test_rdm_validation_orbit_lifetime_window() {
-        let kvn = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = EARTH
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 5 [d]
-REENTRY_ALTITUDE = 80 [km]
-ORBIT_LIFETIME_WINDOW_START = 6.0 [d]
-ORBIT_LIFETIME_WINDOW_END = 5.0 [d]
-"#;
-        assert!(Rdm::from_kvn(kvn).is_err());
-    }
+    fn rdm_conditional_rules_name_the_offending_field() {
+        const FIXTURE: &str = include_str!("../../data/kvn/rdm_c2.kvn");
+        const STATE_VECTOR: &str = "COMMENT State vector at the last OD epoch";
+        const COVARIANCE: &str = "COMMENT Position/velocity covariance matrix at last OD epoch";
+        Rdm::from_kvn(FIXTURE).expect("baseline fixture must satisfy every rule");
 
-    #[test]
-    fn test_rdm_validation_missing_ref_frame_when_state_vector_present() {
-        let kvn = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = EARTH
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 5 [d]
-REENTRY_ALTITUDE = 80 [km]
-EPOCH = 2023-01-01T12:00:00
-X = 7000 [km]
-Y = 0 [km]
-Z = 0 [km]
-X_DOT = 0 [km/s]
-Y_DOT = 7.5 [km/s]
-Z_DOT = 1.0 [km/s]
-"#;
-        assert!(Rdm::from_kvn(kvn).is_err());
-    }
+        let state_vector_at = FIXTURE.find(STATE_VECTOR).unwrap();
+        let covariance_at = FIXTURE.find(COVARIANCE).unwrap();
+        // Neither block is mandatory, so the truncation is a valid message in its own right.
+        let no_state_or_covariance = &FIXTURE[..state_vector_at];
+        Rdm::from_kvn(no_state_or_covariance)
+            .expect("a message with neither optional block must still parse");
+        let covariance_without_state =
+            format!("{}{}", no_state_or_covariance, &FIXTURE[covariance_at..]);
 
-    #[test]
-    fn test_rdm_validation_covariance_requires_state_vector() {
-        let kvn = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = EARTH
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-REF_FRAME = EME2000
-ORBIT_LIFETIME = 5 [d]
-REENTRY_ALTITUDE = 80 [km]
-CX_X = 0.1 [km**2]
-CY_X = 0.0 [km**2]
-CY_Y = 0.1 [km**2]
-CZ_X = 0.0 [km**2]
-CZ_Y = 0.0 [km**2]
-CZ_Z = 0.1 [km**2]
-CX_DOT_X = 0.0 [km**2/s]
-CX_DOT_Y = 0.0 [km**2/s]
-CX_DOT_Z = 0.0 [km**2/s]
-CX_DOT_X_DOT = 0.01 [km**2/s**2]
-CY_DOT_X = 0.0 [km**2/s]
-CY_DOT_Y = 0.0 [km**2/s]
-CY_DOT_Z = 0.0 [km**2/s]
-CY_DOT_X_DOT = 0.0 [km**2/s**2]
-CY_DOT_Y_DOT = 0.01 [km**2/s**2]
-CZ_DOT_X = 0.0 [km**2/s]
-CZ_DOT_Y = 0.0 [km**2/s]
-CZ_DOT_Z = 0.0 [km**2/s]
-CZ_DOT_X_DOT = 0.0 [km**2/s**2]
-CZ_DOT_Y_DOT = 0.0 [km**2/s**2]
-CZ_DOT_Z_DOT = 0.01 [km**2/s**2]
-"#;
-        assert!(Rdm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_rdm_validation_empty_object_name() {
-        // Construct with empty OBJECT_NAME
-        // Note: parser might not allow empty value for key, but if it does (e.g. "OBJECT_NAME = \n"), validation should catch it.
-        // However, if parser treats empty value as error, then this test tests parser, which is fine.
-        // But if we construct struct manually and call validate, that's what we really want to test if parser is loose.
-        // For now, let's use KVN.
-        let kvn = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
-OBJECT_NAME =
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = EARTH
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 5 [d]
-REENTRY_ALTITUDE = 80 [km]
-"#;
-        // If parser allows empty value, validate() catches it.
-        // If parser disallows, it errors anyway.
-        assert!(Rdm::from_kvn(kvn).is_err());
+        for (mutated, expected) in [
+            (
+                FIXTURE.replace(
+                    "REENTRY_ALTITUDE = 80.0 [km]",
+                    "REENTRY_ALTITUDE = 80.0 [km]\nORBIT_LIFETIME_WINDOW_START = 6.0 [d]\nORBIT_LIFETIME_WINDOW_END = 5.0 [d]",
+                ),
+                "ORBIT_LIFETIME_WINDOW_START must be <= ORBIT_LIFETIME_WINDOW_END",
+            ),
+            (
+                FIXTURE.replace("REF_FRAME = EME2000\n", ""),
+                "Missing required field: REF_FRAME (required when state vector is provided)",
+            ),
+            (
+                covariance_without_state,
+                "Missing required field: stateVector (required when covarianceMatrix is provided)",
+            ),
+            (
+                FIXTURE.replace("OBJECT_NAME = SPACEOBJECT", "OBJECT_NAME ="),
+                "Missing required field: OBJECT_NAME",
+            ),
+        ] {
+            let error = Rdm::from_kvn(&mutated).expect_err("mutation accepted");
+            assert!(
+                error.to_string().contains(expected),
+                "diagnostic did not name {expected}: {error}"
+            );
+        }
     }
 }

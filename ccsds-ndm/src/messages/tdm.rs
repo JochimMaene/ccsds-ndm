@@ -1832,179 +1832,61 @@ DATA_STOP
         assert_eq!(tdm.header.creation_date, tdm2.header.creation_date);
     }
 
+    /// Every conditional metadata rule, as a single mutation of a shipped fixture.
     #[test]
-    fn test_tdm_validation_path_exclusive() {
-        // TDM cannot have both PATH and PATH_1/PATH_2
-        let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-START_TIME = 2023-01-01T00:00:00
-STOP_TIME = 2023-01-01T01:00:00
-PARTICIPANT_1 = P1
-PARTICIPANT_2 = P2
-MODE = SEQUENTIAL
-PATH = 1,2
-PATH_1 = 1,2
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-        assert!(Tdm::from_kvn(kvn).is_err());
-    }
+    fn tdm_conditional_metadata_rules_name_the_offending_field() {
+        const FIXTURE: &str = include_str!("../../data/kvn/tdm_e2.kvn");
+        Tdm::from_kvn(FIXTURE).expect("baseline fixture must satisfy every rule");
 
-    #[test]
-    fn test_tdm_validation_path_pairs() {
-        // TDM must have both PATH_1 and PATH_2 if one is present
-        let kvn_p1_only = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-START_TIME = 2023-01-01T00:00:00
-STOP_TIME = 2023-01-01T01:00:00
-PARTICIPANT_1 = P1
-PARTICIPANT_2 = P2
-MODE = SINGLE_DIFF
-PATH_1 = 1,2
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-        assert!(Tdm::from_kvn(kvn_p1_only).is_err());
-    }
-
-    #[test]
-    fn test_tdm_validation_missing_mandatory() {
-        // Missing TIME_SYSTEM
-        let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-START_TIME = 2023-01-01T00:00:00
-STOP_TIME = 2023-01-01T01:00:00
-PARTICIPANT_1 = P1
-PARTICIPANT_2 = P2
-MODE = SEQUENTIAL
-PATH = 1,2
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-        assert!(Tdm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_tdm_validation_mode_sequential_requires_path() {
-        let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = P1
-MODE = SEQUENTIAL
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-        assert!(Tdm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_tdm_validation_mode_single_diff_requires_paths() {
-        let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = P1
-MODE = SINGLE_DIFF
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-        assert!(Tdm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_tdm_validation_interpolation_requires_degree() {
-        let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = P1
-MODE = SEQUENTIAL
-PATH = 1,2
-INTERPOLATION = LAGRANGE
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-        assert!(Tdm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_tdm_validation_corrections_applied_required() {
-        let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = P1
-MODE = SEQUENTIAL
-PATH = 1,2
-CORRECTION_RANGE = 0.5
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-        assert!(Tdm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_tdm_validation_radec_requires_reference_frame() {
-        let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = P1
-MODE = SEQUENTIAL
-PATH = 1,2
-ANGLE_TYPE = RADEC
-META_STOP
-DATA_START
-ANGLE_1 = 2023-01-01T00:00:00 100.0
-DATA_STOP
-"#;
-        assert!(Tdm::from_kvn(kvn).is_err());
-    }
-
-    #[test]
-    fn test_tdm_validation_path_indices_range() {
-        let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = P1
-MODE = SEQUENTIAL
-PATH = 1,6
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-        assert!(Tdm::from_kvn(kvn).is_err());
+        for (mutated, expected) in [
+            // PATH and PATH_n are mutually exclusive, and PATH_1 implies PATH_2.
+            (
+                FIXTURE.replace("PATH = 2,1", "PATH = 2,1\nPATH_1 = 2,1"),
+                "duplicate or mutually exclusive TDM metadata keyword",
+            ),
+            (
+                FIXTURE.replace("MODE = SEQUENTIAL\nPATH = 2,1", "MODE = SINGLE_DIFF\nPATH_1 = 2,1"),
+                "must have both PATH_1 and PATH_2 if one is present",
+            ),
+            // Unconditionally mandatory metadata.
+            (
+                FIXTURE.replace("TIME_SYSTEM = UTC\n", ""),
+                "Missing required field: TIME_SYSTEM",
+            ),
+            // Each MODE demands its own path keywords.
+            (
+                FIXTURE.replace("PATH = 2,1\n", ""),
+                "Missing required field: PATH (required when MODE=SEQUENTIAL)",
+            ),
+            (
+                FIXTURE.replace("MODE = SEQUENTIAL\nPATH = 2,1\n", "MODE = SINGLE_DIFF\n"),
+                "Missing required field: PATH_1 and PATH_2 (required when MODE=SINGLE_DIFF)",
+            ),
+            // Keywords that require a companion.
+            (
+                FIXTURE.replace("DATA_QUALITY = RAW", "INTERPOLATION = LAGRANGE\nDATA_QUALITY = RAW"),
+                "Missing required field: INTERPOLATION_DEGREE (required when INTERPOLATION is used)",
+            ),
+            (
+                FIXTURE.replace("DATA_QUALITY = RAW", "DATA_QUALITY = RAW\nCORRECTION_RANGE = 0.5"),
+                "Missing required field: CORRECTIONS_APPLIED (required when CORRECTION_* keywords are used)",
+            ),
+            (
+                FIXTURE.replace("DATA_QUALITY = RAW", "ANGLE_TYPE = RADEC\nDATA_QUALITY = RAW"),
+                "Missing required field: REFERENCE_FRAME (required when ANGLE_TYPE=RADEC)",
+            ),
+            // Path indices must refer to populated participants.
+            (
+                FIXTURE.replace("PATH = 2,1", "PATH = 1,6"),
+                "expected participant indices in range 1..5",
+            ),
+        ] {
+            let error = Tdm::from_kvn(&mutated).expect_err("mutation accepted");
+            assert!(
+                error.to_string().contains(expected),
+                "diagnostic did not name {expected}: {error}"
+            );
+        }
     }
 
     #[test]

@@ -3418,13 +3418,11 @@ MAN_STOP
     #[test]
     fn test_ocm_parsing_errors() {
         // Empty file
-        let err = Ocm::from_kvn("").unwrap_err();
-        match err {
-            CcsdsNdmError::UnexpectedEof { .. } => {}
-            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(ref err) if err.message.is_empty()) =>
-                {}
-            _ => panic!("Expected Empty file error, got: {:?}", err),
-        }
+        let error = Ocm::from_kvn("").unwrap_err();
+        let parse = error
+            .as_kvn_parse_error()
+            .unwrap_or_else(|| panic!("expected a KVN parse error, got {error:?}"));
+        assert_eq!(parse.contexts, vec!["Empty file"]);
 
         // Wrong first keyword
         let err = Ocm::from_kvn("CREATION_DATE = 2023-01-01T00:00:00").unwrap_err();
@@ -3933,19 +3931,20 @@ COV_STOP
     // Additional coverage tests for 100% coverage
     // =========================================================================
 
+    /// A header with no segment. `UnexpectedEof` is raised only by format detection and the
+    /// combined-NDM reader, so the OCM parser reports the block it was looking for instead.
     #[test]
     fn test_eof_after_meta_start() {
-        // Cover line 150: EOF before OcmSegment check
         let kvn = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 "#;
-        let err = Ocm::from_kvn(kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::UnexpectedEof { .. } => {}
-            CcsdsNdmError::Format(ref e) if matches!(**e, FormatError::Kvn(_)) => {}
-            _ => panic!("Expected EOF or KvnParse error, got: {:?}", err),
-        }
+        let error = Ocm::from_kvn(kvn).unwrap_err();
+        let parse = error
+            .as_kvn_parse_error()
+            .unwrap_or_else(|| panic!("expected a KVN parse error, got {error:?}"));
+        assert_eq!(parse.contexts, vec!["Expected META_START"]);
+        assert_eq!(parse.line, 4, "diagnostic did not point past the header");
     }
 
     #[test]

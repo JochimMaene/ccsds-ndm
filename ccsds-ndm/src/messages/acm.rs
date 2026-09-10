@@ -1755,23 +1755,22 @@ ATT_STOP
 
     #[test]
     fn test_acm_missing_mandatory_metadata() {
-        let kvn = r#"CCSDS_ACM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-ATT_START
-REF_FRAME_A = GCRF
-REF_FRAME_B = SC_BODY
-NUMBER_STATES = 4
-ATT_TYPE = QUATERNION
-0.0 0 0 0 1
-ATT_STOP
-"#;
-        // Missing OBJECT_NAME
-        assert!(Acm::from_kvn(kvn).is_err());
+        const FIXTURE: &str = include_str!("../../data/kvn/acm_g6.kvn");
+        Acm::from_kvn(FIXTURE).expect("baseline fixture must carry OBJECT_NAME");
+
+        let without_object_name = FIXTURE.replace("OBJECT_NAME = EUROBIRD-4A\n", "");
+        assert_ne!(
+            without_object_name, FIXTURE,
+            "OBJECT_NAME matched no line, so nothing was dropped"
+        );
+        let error =
+            Acm::from_kvn(&without_object_name).expect_err("message without OBJECT_NAME accepted");
+        assert!(
+            error
+                .to_string()
+                .contains("Missing required field: OBJECT_NAME in block ACM Metadata"),
+            "unexpected diagnostic: {error}"
+        );
     }
 
     #[test]

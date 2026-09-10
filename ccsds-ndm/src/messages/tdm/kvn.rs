@@ -1828,12 +1828,14 @@ DATA_STOP
 
     #[test]
     fn test_tdm_empty_file_error() {
-        let err = Tdm::from_kvn("").unwrap_err();
-        match err {
-            CcsdsNdmError::UnexpectedEof { .. } => {}
-            e if e.is_kvn_error() => {}
-            _ => panic!("Expected error, got: {:?}", err),
-        }
+        let error = Tdm::from_kvn("").unwrap_err();
+        let parse = error
+            .as_kvn_parse_error()
+            .unwrap_or_else(|| panic!("expected a KVN parse error, got {error:?}"));
+        assert_eq!(
+            parse.message,
+            "unterminated or incomplete TDM section sequence"
+        );
     }
 
     #[test]

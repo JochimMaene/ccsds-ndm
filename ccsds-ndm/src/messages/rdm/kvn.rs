@@ -1018,7 +1018,7 @@ impl RdmData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::{CcsdsNdmError, FormatError, ValidationError};
+    use crate::error::{CcsdsNdmError, FormatError};
     use crate::traits::Ndm;
     #[test]
     fn test_xsd_rdm_root_attributes() {
@@ -1775,260 +1775,58 @@ REENTRY_ALTITUDE = 80 [km]
         assert!(kvn2.contains("ORBIT_LIFETIME"));
     }
 
+    /// Every mandatory keyword, dropped one at a time from a shipped fixture.
+    ///
+    /// This was eleven copies of the same minimal message, each missing one line. `rdm_c1.kvn`
+    /// carries exactly those keywords and nothing else, so dropping one line from it is the same
+    /// case without the copies — and the baseline parse proves the other ten are still present.
     #[test]
-    fn test_rdm_header_requires_fields() {
-        let kvn_missing_creation = r#"CCSDS_RDM_VERS = 1.0
-ORIGINATOR = TEST
-MESSAGE_ID = RDM-001
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = TEST
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 1 [d]
-REENTRY_ALTITUDE = 80 [km]
-"#;
-        let err = Rdm::from_kvn(kvn_missing_creation).unwrap_err();
-        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
-        {
-            assert_eq!(field, "CREATION_DATE");
-        } else {
-            panic!("Unexpected: {:?}", err);
-        }
+    fn every_mandatory_rdm_keyword_is_reported_by_name() {
+        const FIXTURE: &str = include_str!("../../../data/kvn/rdm_c1.kvn");
+        Rdm::from_kvn(FIXTURE).expect("baseline fixture must carry every mandatory keyword");
 
-        let kvn_missing_originator = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-11-13T12:00:00
-MESSAGE_ID = RDM-001
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = TEST
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 1 [d]
-REENTRY_ALTITUDE = 80 [km]
-"#;
-        let err = Rdm::from_kvn(kvn_missing_originator).unwrap_err();
-        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
-        {
-            assert_eq!(field, "ORIGINATOR");
-        } else {
-            panic!("Unexpected: {:?}", err);
-        }
+        for (keyword, block) in [
+            ("CREATION_DATE", "Header"),
+            ("ORIGINATOR", "Header"),
+            ("MESSAGE_ID", "Header"),
+            ("OBJECT_NAME", "Metadata"),
+            ("INTERNATIONAL_DESIGNATOR", "Metadata"),
+            ("CONTROLLED_REENTRY", "Metadata"),
+            ("CENTER_NAME", "Metadata"),
+            ("TIME_SYSTEM", "Metadata"),
+            ("EPOCH_TZERO", "Metadata"),
+            ("ORBIT_LIFETIME", "Atmospheric Reentry"),
+            ("REENTRY_ALTITUDE", "Atmospheric Reentry"),
+        ] {
+            let kept: Vec<&str> = FIXTURE
+                .lines()
+                .filter(|line| !line.starts_with(&format!("{keyword} =")))
+                .collect();
+            assert_eq!(
+                kept.len(),
+                FIXTURE.lines().count() - 1,
+                "{keyword} matched no line, so nothing was dropped"
+            );
 
-        let kvn_missing_msgid = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-11-13T12:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = TEST
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 1 [d]
-REENTRY_ALTITUDE = 80 [km]
-"#;
-        let err = Rdm::from_kvn(kvn_missing_msgid).unwrap_err();
-        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
-        {
-            assert_eq!(field, "MESSAGE_ID");
-        } else {
-            panic!("Unexpected: {:?}", err);
+            let error = Rdm::from_kvn(&format!("{}\n", kept.join("\n")))
+                .expect_err("message with a mandatory keyword removed was accepted");
+            // ponytail: matching the rendered diagnostic rather than the typed variant. Only
+            // `MissingRequiredField` renders this way, so it is exact today; the ceiling is that
+            // rewording the `Display` impl breaks these tests. Match on the variant if that lands.
+            let expected = format!("Missing required field: {keyword} in block {block}");
+            assert!(
+                error.to_string().contains(&expected),
+                "dropping {keyword} reported {error}"
+            );
         }
     }
-
-    #[test]
-    fn test_rdm_metadata_requires_mandatory_fields() {
-        let kvn_missing_object_name = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-11-13T12:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = RDM-001
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = TEST
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 1 [d]
-REENTRY_ALTITUDE = 80 [km]
-"#;
-        let err = Rdm::from_kvn(kvn_missing_object_name).unwrap_err();
-        println!("RDM ERROR: {:?}", err);
-        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
-        {
-            assert_eq!(field, "OBJECT_NAME");
-        } else {
-            panic!("Unexpected: {:?}", err);
-        }
-
-        let kvn_missing_intl = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-11-13T12:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = RDM-001
-OBJECT_NAME = TEST
-CONTROLLED_REENTRY = NO
-CENTER_NAME = TEST
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 1 [d]
-REENTRY_ALTITUDE = 80 [km]
-"#;
-        let err = Rdm::from_kvn(kvn_missing_intl).unwrap_err();
-        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
-        {
-            assert_eq!(field, "INTERNATIONAL_DESIGNATOR");
-        } else {
-            panic!("Unexpected: {:?}", err);
-        }
-
-        let kvn_missing_center = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-11-13T12:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = RDM-001
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 1 [d]
-REENTRY_ALTITUDE = 80 [km]
-"#;
-        let err = Rdm::from_kvn(kvn_missing_center).unwrap_err();
-        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
-        {
-            assert_eq!(field, "CENTER_NAME");
-        } else {
-            panic!("Unexpected: {:?}", err);
-        }
-
-        let kvn_missing_timesys = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-11-13T12:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = RDM-001
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = TEST
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 1 [d]
-REENTRY_ALTITUDE = 80 [km]
-"#;
-        let err = Rdm::from_kvn(kvn_missing_timesys).unwrap_err();
-        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
-        {
-            assert_eq!(field, "TIME_SYSTEM");
-        } else {
-            panic!("Unexpected: {:?}", err);
-        }
-
-        let kvn_missing_controlled = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-11-13T12:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = RDM-001
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CENTER_NAME = TEST
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 1 [d]
-REENTRY_ALTITUDE = 80 [km]
-"#;
-        let err = Rdm::from_kvn(kvn_missing_controlled).unwrap_err();
-        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
-        {
-            assert_eq!(field, "CONTROLLED_REENTRY");
-        } else {
-            panic!("Unexpected: {:?}", err);
-        }
-
-        let kvn_missing_epoch = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-11-13T12:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = RDM-001
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = TEST
-TIME_SYSTEM = UTC
-ORBIT_LIFETIME = 1 [d]
-REENTRY_ALTITUDE = 80 [km]
-"#;
-        let err = Rdm::from_kvn(kvn_missing_epoch).unwrap_err();
-        if let Some(ValidationError::MissingRequiredField { field, .. }) = err.as_validation_error()
-        {
-            assert_eq!(field, "EPOCH_TZERO");
-        } else {
-            panic!("Unexpected: {:?}", err);
-        }
-    }
-
-    #[test]
-    fn test_rdm_data_requires_atmospheric_fields() {
-        let kvn_missing_orbit_life = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-11-13T12:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = RDM-001
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = TEST
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-REENTRY_ALTITUDE = 80 [km]
-"#;
-        let err = Rdm::from_kvn(kvn_missing_orbit_life).unwrap_err();
-        match err {
-            CcsdsNdmError::Validation(val_err) => match *val_err {
-                ValidationError::MissingRequiredField {
-                    ref block,
-                    ref field,
-                    ..
-                } => {
-                    assert_eq!(block, "Atmospheric Reentry");
-                    assert_eq!(field, "ORBIT_LIFETIME");
-                }
-                _ => panic!("Unexpected validation error: {:?}", val_err),
-            },
-            _ => panic!("Unexpected: {:?}", err),
-        }
-
-        let kvn_missing_reentry_alt = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-11-13T12:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = RDM-001
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = TEST
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 1 [d]
-"#;
-        let err = Rdm::from_kvn(kvn_missing_reentry_alt).unwrap_err();
-        match err {
-            CcsdsNdmError::Validation(val_err) => match *val_err {
-                ValidationError::MissingRequiredField {
-                    ref block,
-                    ref field,
-                    ..
-                } => {
-                    assert_eq!(block, "Atmospheric Reentry");
-                    assert_eq!(field, "REENTRY_ALTITUDE");
-                }
-                _ => panic!("Unexpected validation error: {:?}", val_err),
-            },
-            _ => panic!("Unexpected: {:?}", err),
-        }
-    }
-
     #[test]
     fn test_rdm_empty_file_error() {
-        let err = Rdm::from_kvn("").unwrap_err();
-        match err {
-            CcsdsNdmError::UnexpectedEof { .. } => {}
-            e if e.is_kvn_error() => {}
-            _ => panic!("Expected error, got: {:?}", err),
-        }
+        let error = Rdm::from_kvn("").unwrap_err();
+        let parse = error
+            .as_kvn_parse_error()
+            .unwrap_or_else(|| panic!("expected a KVN parse error, got {error:?}"));
+        assert_eq!((parse.line, parse.column), (1, 1));
     }
 
     #[test]

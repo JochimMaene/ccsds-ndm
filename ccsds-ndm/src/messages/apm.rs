@@ -378,40 +378,33 @@ QUAT_STOP
         assert_eq!(apm.body.segment.data.quaternion_state[0].quaternion.q1, 0.5);
     }
 
+    /// The two rules that reject an otherwise well-formed APM, as mutations of a shipped fixture.
+    ///
+    /// `apm_g2.kvn` is the baseline because its `OBJECT_NAME` is not preceded by comments:
+    /// dropping that line from `apm_g1.kvn` leaves a `COMMENT` at the head of the metadata and the
+    /// message is refused for comment placement instead, which is not the rule under test.
     #[test]
-    fn test_apm_validation_empty_data() {
-        let kvn = r#"CCSDS_APM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-"#;
-        // Should fail because there are no data blocks
-        let res = Apm::from_kvn(kvn);
-        assert!(res.is_err());
-    }
+    fn apm_rejects_missing_object_name_or_all_data_blocks() {
+        const FIXTURE: &str = include_str!("../../data/kvn/apm_g2.kvn");
+        Apm::from_kvn(FIXTURE).expect("baseline fixture must satisfy both rules");
 
-    #[test]
-    fn test_apm_missing_mandatory_metadata() {
-        let kvn = r#"CCSDS_APM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_ID = 999
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-QUAT_START
-REF_FRAME_A = GCRF
-REF_FRAME_B = SC_BODY
-Q1 = 0
-Q2 = 0
-Q3 = 0
-QC = 1
-QUAT_STOP
-"#;
-        // Missing OBJECT_NAME
-        assert!(Apm::from_kvn(kvn).is_err());
+        let attitude_at = FIXTURE.find("EULER_START").unwrap();
+        for (mutated, expected) in [
+            (
+                FIXTURE[..attitude_at].to_owned(),
+                "Missing required field: At least one logical block in block APM Data",
+            ),
+            (
+                FIXTURE.replace("OBJECT_NAME = GOES-P\n", ""),
+                "Missing required field: OBJECT_NAME in block APM Metadata",
+            ),
+        ] {
+            let error = Apm::from_kvn(&mutated).expect_err("mutation accepted");
+            assert!(
+                error.to_string().contains(expected),
+                "diagnostic did not name {expected}: {error}"
+            );
+        }
     }
 
     #[test]
@@ -451,7 +444,13 @@ EULER_STOP
 
         // Clear all blocks
         apm.body.segment.data.quaternion_state.clear();
-        assert!(apm.validate().is_err()); // Now empty
+        let error = apm
+            .validate()
+            .expect_err("a data section with no block was accepted");
+        assert!(
+            error.to_string().contains("At least one logical block"),
+            "unexpected diagnostic: {error}"
+        );
 
         // Add just Inertia
         apm.body.segment.data.inertia.push(InertiaState {

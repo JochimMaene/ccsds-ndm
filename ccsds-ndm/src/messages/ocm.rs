@@ -4117,6 +4117,16 @@ mod tests {
 
     use crate::traits::Ndm;
 
+    /// Fails unless `result` is an error whose diagnostic names `expected`, so a case cannot pass
+    /// because some other rule rejected the model first.
+    fn assert_diagnostic(result: Result<()>, expected: &str) {
+        let error = result.expect_err("invalid model accepted");
+        assert!(
+            error.to_string().contains(expected),
+            "diagnostic did not name {expected}: {error}"
+        );
+    }
+
     #[test]
     fn test_ocm_validation_traj_lines() {
         let mut ocm = Ocm::builder()
@@ -4680,14 +4690,18 @@ TRAJ_STOP
 
     #[test]
     fn test_ocm_validation_gaps() {
-        // 1. DRAG_COEFF_NOM <= 0.0
-        let mut phys = OcmPhysicalDescription {
-            drag_coeff_nom: Some(-1.0),
-            ..Default::default()
-        };
-        assert!(phys.validate().is_err());
-        phys.drag_coeff_nom = Some(0.0);
-        assert!(phys.validate().is_err());
+        // 1. DRAG_COEFF_NOM <= 0.0. The default description validates, so the field under test
+        // is the only reason these two reject.
+        OcmPhysicalDescription::default()
+            .validate()
+            .expect("an empty physical description is valid");
+        for rejected in [-1.0, 0.0] {
+            let phys = OcmPhysicalDescription {
+                drag_coeff_nom: Some(rejected),
+                ..Default::default()
+            };
+            assert_diagnostic(phys.validate(), "DRAG_COEFF_NOM");
+        }
 
         // 2. ORB_REVNUM < 0.0
         let mut traj = OcmTrajState::builder()
@@ -4695,24 +4709,33 @@ TRAJ_STOP
             .traj_ref_frame("GCRF")
             .traj_type("OSCULATING")
             .build();
-        traj.orb_revnum = Some(-1.0);
-        // Also needs at least one line to pass first check
         traj.traj_lines.push(TrajLine {
             epoch: "2023-01-01T00:00:00".parse().unwrap(),
             values: vec![0.0],
         });
-        assert!(traj.validate().is_err());
+        traj.validate()
+            .expect("the trajectory must be valid before ORB_REVNUM is mutated");
+        traj.orb_revnum = Some(-1.0);
+        assert_diagnostic(traj.validate(), "ORB_REVNUM must be non-negative");
 
-        // 3. OcmTrajState::traj_lines empty
+        // 3. OcmTrajState::traj_lines empty. ORB_REVNUM goes back to its valid state first, so
+        // the empty-line rule is the only one this case can be reporting.
+        traj.orb_revnum = None;
         traj.traj_lines.clear();
-        assert!(traj.validate().is_err());
+        assert_diagnostic(
+            traj.validate(),
+            "Missing required field: trajLine in block TRAJ",
+        );
 
         // 4. OcmCovarianceMatrix::cov_lines empty
         let cov = OcmCovarianceMatrix::builder()
             .cov_ref_frame("GCRF")
             .cov_type("SYMMETRIC")
             .build();
-        assert!(cov.validate().is_err());
+        assert_diagnostic(
+            cov.validate(),
+            "Missing required field: covLine in block COV",
+        );
 
         // 5. OcmManeuverParameters::man_lines empty
         let man = OcmManeuverParameters::builder()
@@ -4721,7 +4744,10 @@ TRAJ_STOP
             .man_ref_frame("GCRF")
             .man_composition("CHEMICAL")
             .build();
-        assert!(man.validate().is_err());
+        assert_diagnostic(
+            man.validate(),
+            "Missing required field: manLine in block MAN",
+        );
 
         // 6. RevNumBasis::One coverage
         let mut traj = OcmTrajState::builder()

@@ -37,7 +37,13 @@ fn opm_rejects_maneuver_fields_without_ignition_epoch() {
          MAN_DV_3 = 0.0 [km/s]\n\
          USER_DEFINED_EARTH_MODEL",
     );
-    assert!(Opm::from_kvn(&source).is_err());
+    let error = Opm::from_kvn(&source).expect_err("maneuver without its ignition epoch accepted");
+    assert!(
+        error
+            .to_string()
+            .contains("Missing required field: MAN_EPOCH_IGNITION"),
+        "unexpected diagnostic: {error}"
+    );
 }
 
 #[test]
@@ -109,14 +115,22 @@ fn assignment_values_may_end_with_marked_block_suffixes() {
 #[test]
 fn strict_xml_rejects_forbidden_xml_1_characters() {
     let xml = include_str!("../data/xml/cdm_44.xml").replace("JSPOC", "JS\u{1}POC");
-    assert!(Cdm::from_xml(&xml).is_err());
+    let error = Cdm::from_xml(&xml).expect_err("U+0001 accepted in an XML document");
+    assert!(
+        error.to_string().contains("only XML 1.0 characters"),
+        "unexpected diagnostic: {error}"
+    );
 }
 
 #[test]
 fn xml_generation_rejects_forbidden_xml_1_characters_before_streaming() {
     let mut cdm = Cdm::from_kvn(include_str!("../data/kvn/cdm_362.kvn")).unwrap();
     cdm.header.originator = "JS\u{1}POC".into();
-    assert!(cdm.to_xml().is_err());
+    let error = cdm.to_xml().expect_err("U+0001 reached XML generation");
+    assert!(
+        error.to_string().contains("only XML 1.0 characters"),
+        "unexpected diagnostic: {error}"
+    );
 
     let mut output = Vec::new();
     assert!(cdm.write_xml_to(&mut output).is_err());
@@ -127,15 +141,29 @@ fn xml_generation_rejects_forbidden_xml_1_characters_before_streaming() {
 fn kvn_generation_rejects_non_ascii_and_control_text_before_streaming() {
     let mut apm = Apm::from_kvn(include_str!("../data/kvn/apm_g1.kvn")).unwrap();
     apm.header.originator = "GSFC-é".into();
-    assert!(apm.to_kvn().is_err());
+    let error = apm.to_kvn().expect_err("non-ASCII reached KVN generation");
+    assert!(
+        error.to_string().contains("only printable ASCII records"),
+        "unexpected diagnostic: {error}"
+    );
 
     let mut output = Vec::new();
     assert!(apm.write_kvn_to(&mut output).is_err());
     assert!(output.is_empty());
 
+    // A tab is not printable ASCII either, and the streaming path must hold the same line: the
+    // two notations had already drifted apart on whether they checked it before writing.
     let mut tdm = Tdm::from_kvn(include_str!("../data/kvn/tdm_e1.kvn")).unwrap();
     tdm.header.originator = "NA\tSA".into();
-    assert!(tdm.to_kvn().is_err());
+    let error = tdm.to_kvn().expect_err("a tab reached KVN generation");
+    assert!(
+        error.to_string().contains("expected printable ASCII"),
+        "unexpected diagnostic: {error}"
+    );
+
+    let mut output = Vec::new();
+    assert!(tdm.write_kvn_to(&mut output).is_err());
+    assert!(output.is_empty(), "streaming KVN wrote bytes for a tab");
 }
 
 #[test]

@@ -1864,13 +1864,12 @@ ORIGINATOR = TEST
 
     #[test]
     fn empty_file_error() {
-        let kvn = "";
-        let err = Cdm::from_kvn(kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::UnexpectedEof { .. } => {} // Can be EOF or KvnParse depending on parser state
-            e if e.is_kvn_error() => {} // Can be EOF or KvnParse depending on parser state
-            _ => panic!("unexpected error: {:?}", err),
-        }
+        let error = Cdm::from_kvn("").unwrap_err();
+        let parse = error
+            .as_kvn_parse_error()
+            .unwrap_or_else(|| panic!("expected a KVN parse error, got {error:?}"));
+        assert_eq!(parse.message, "missing CCSDS_CDM_VERS");
+        assert_eq!((parse.line, parse.column), (1, 1));
     }
 
     #[test]
@@ -2292,28 +2291,38 @@ TCA = 2025-01-02T12:00:00
 MISS_DISTANCE = 100.0 [m]
 META_START
 "###;
-        let err = Cdm::from_kvn(kvn).unwrap_err();
-        if let CcsdsNdmError::Validation(_) = err {
-            // expected
-        }
+        let error = Cdm::from_kvn(kvn).unwrap_err();
+        let parse = error
+            .as_kvn_parse_error()
+            .unwrap_or_else(|| panic!("expected a KVN parse error, got {error:?}"));
+        assert_eq!(parse.message, "expected exactly one CDM assignment");
+        assert_eq!(parse.line, 8, "diagnostic did not point at META_START");
     }
 
+    /// A message that ends inside the relative metadata block. The parser does not report this as
+    /// an end-of-input condition — `UnexpectedEof` is raised only by format detection and by the
+    /// combined-NDM reader — it reports the first mandatory field the truncated block never
+    /// supplied, which is the diagnostic a producer can act on.
     #[test]
-    fn unexpected_end_of_input() {
+    fn truncated_relative_metadata_names_the_missing_field() {
         let kvn = r###"CCSDS_CDM_VERS = 1.0
 CREATION_DATE = 2025-01-01T00:00:00
 ORIGINATOR = TEST
 MESSAGE_ID = MSG-001
 TCA = 2025-01-02T12:00:00
 "###;
-        let err = Cdm::from_kvn(kvn).unwrap_err();
-        match err {
-            CcsdsNdmError::UnexpectedEof { .. } => {} // Can be EOF or KvnParse depending on parser state
-            CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(_)) => {}
-            CcsdsNdmError::Validation(val_err)
-                if matches!(*val_err, ValidationError::MissingRequiredField { .. }) => {}
-            _ => panic!("unexpected error: {:?}", err),
-        }
+        let error = Cdm::from_kvn(kvn).unwrap_err();
+        let validation = error
+            .as_validation_error()
+            .unwrap_or_else(|| panic!("expected a validation error, got {error:?}"));
+        assert!(
+            matches!(
+                validation,
+                ValidationError::MissingRequiredField { block, field, .. }
+                    if block == "Relative Metadata" && field == "MISS_DISTANCE"
+            ),
+            "unexpected diagnostic: {validation:?}"
+        );
     }
     #[test]
     fn test_parse_cdm_missing_relative_metadata() {
