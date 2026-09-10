@@ -57,7 +57,7 @@ preserved; the library does not evaluate ephemerides or attitudes at arbitrary e
 ## Evidence
 
 Maintainer-facing evidence lives in [`docs/conformance/`](conformance/). Those inventories link
-CCSDS requirements to focused tests, official XSD checks, diagnostics, resource limits, allocation
+CCSDS requirements to focused tests, official XSD checks, diagnostics, allocation behavior,
 budgets, and benchmarks. They support this table without making users navigate hundreds of
 capability cells.
 

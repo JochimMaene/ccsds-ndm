@@ -1,7 +1,5 @@
 use ccsds_ndm::messages::{aem::Aem, oem::Oem, opm::Opm};
-use ccsds_ndm::{
-    convert, convert_file, convert_file_with_options, Message, Ndm, Notation, ParseOptions,
-};
+use ccsds_ndm::{convert, convert_file, Message, Ndm, Notation};
 
 mod common;
 use common::{assert_rejects, FailAfter};
@@ -127,12 +125,6 @@ fn file_conversion_preserves_destinations_on_failure_for_each_message() {
             assert_eq!(mode(&destination), mode(&source));
         }
 
-        std::fs::write(&destination, b"sentinel").unwrap();
-        let options = ParseOptions::default().with_max_input_bytes(16);
-        let error =
-            convert_file_with_options(&source, &destination, Notation::Xml, &options).unwrap_err();
-        assert_eq!(error.code(), Some("resource.input_limit_exceeded"));
-        assert_eq!(std::fs::read(&destination).unwrap(), b"sentinel");
         // An existing destination is replaced after a successful conversion.
         convert_file(&source, &destination, Notation::Xml).unwrap();
         assert_eq!(

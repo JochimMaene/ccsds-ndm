@@ -1,6 +1,6 @@
 use crate::{KVN, SPIN_KVN, XML};
 use ccsds_ndm::messages::aem::Aem;
-use ccsds_ndm::{from_str_with_options, Ndm, Notation, ParseOptions};
+use ccsds_ndm::Ndm;
 
 #[test]
 fn aem_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
@@ -59,16 +59,6 @@ fn aem_kvn_rejects_non_ccsds_history_number_spellings() {
         let source = SPIN_KVN.replacen("2.6862511e+002", value, 1);
         assert!(Aem::from_kvn(&source).is_err(), "accepted {value}");
     }
-}
-
-#[test]
-fn aem_xml_preflight_enforces_the_history_limit() {
-    let records = XML.matches("<attitudeState>").count();
-    let exact = ParseOptions::default().with_max_records(records);
-    assert!(from_str_with_options(XML, Some(Notation::Xml), &exact).is_ok());
-
-    let too_small = ParseOptions::default().with_max_records(records - 1);
-    assert!(from_str_with_options(XML, Some(Notation::Xml), &too_small).is_err());
 }
 
 #[test]

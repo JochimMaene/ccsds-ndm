@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::error::{CcsdsNdmError, Result};
-use crate::options::ParseOptions;
 use crate::Message;
 use winnow::ascii::multispace1;
 use winnow::combinator::{alt, repeat};
@@ -78,19 +77,15 @@ pub(crate) fn detect_notation_bytes(input: &[u8]) -> Result<Notation> {
 }
 
 pub(crate) fn detect_message_type(s: &str) -> Result<Message> {
-    detect_message_type_with_options(s, None, &ParseOptions::default())
+    detect_message_type_as(s, None)
 }
 
-pub(crate) fn detect_message_type_with_options(
-    s: &str,
-    notation: Option<Notation>,
-    options: &ParseOptions,
-) -> Result<Message> {
+pub(crate) fn detect_message_type_as(s: &str, notation: Option<Notation>) -> Result<Message> {
     let input = without_utf8_bom(s);
     let notation = notation.map_or_else(|| detect_notation(input), Ok)?;
     let result = match notation {
-        Notation::Kvn => detect_kvn_type(input, options),
-        Notation::Xml => detect_xml_type(input, options),
+        Notation::Kvn => detect_kvn_type(input),
+        Notation::Xml => detect_xml_type(input),
     };
     result.map_err(|error| {
         if error.diagnostic().is_some() {
@@ -107,93 +102,6 @@ pub(crate) fn detect_message_type_with_options(
             )
         }
     })
-}
-
-fn validate_input_size(
-    input: &str,
-    options: &ParseOptions,
-    kind: crate::validation::MessageKind,
-    notation: crate::error::DiagnosticNotation,
-) -> Result<()> {
-    if let Some(limit) = options.max_input_bytes {
-        if input.len() > limit {
-            return Err(CcsdsNdmError::ResourceLimitExceeded {
-                resource: "input_document",
-                limit,
-                actual: input.len(),
-            }
-            .with_parse_context(kind, notation, input, None));
-        }
-    }
-    Ok(())
-}
-
-fn record_limit_error(limit: usize, actual: usize) -> CcsdsNdmError {
-    CcsdsNdmError::ResourceLimitExceeded {
-        resource: "history_records",
-        limit,
-        actual,
-    }
-}
-
-fn validate_kvn_record_limit(
-    input: &str,
-    kind: crate::validation::MessageKind,
-    options: &ParseOptions,
-) -> Result<()> {
-    let Some(limit) = options.max_records else {
-        return Ok(());
-    };
-    use crate::validation::MessageKind;
-    if !matches!(
-        kind,
-        MessageKind::Ocm | MessageKind::Tdm | MessageKind::Aem | MessageKind::Acm
-    ) {
-        return Ok(());
-    }
-
-    let mut section = None;
-    let mut records = 0usize;
-    for raw_line in input.lines() {
-        let line = raw_line.trim();
-        match line {
-            "DATA_START" if matches!(kind, MessageKind::Tdm | MessageKind::Aem) => {
-                section = Some("DATA")
-            }
-            "DATA_STOP" => section = None,
-            "TRAJ_START" if kind == MessageKind::Ocm => section = Some("TRAJ"),
-            "TRAJ_STOP" => section = None,
-            "COV_START" if matches!(kind, MessageKind::Ocm | MessageKind::Acm) => {
-                section = Some("COV")
-            }
-            "COV_STOP" => section = None,
-            "MAN_START" if kind == MessageKind::Ocm => section = Some("MAN"),
-            "MAN_START" if kind == MessageKind::Acm => {
-                records += 1;
-                section = None;
-            }
-            "MAN_STOP" => section = None,
-            "ATT_START" if kind == MessageKind::Acm => section = Some("ATT"),
-            "ATT_STOP" => section = None,
-            _ if section.is_some()
-                && !line.is_empty()
-                && !line.starts_with("COMMENT")
-                && (matches!(kind, MessageKind::Tdm | MessageKind::Aem) || !line.contains('=')) =>
-            {
-                records += 1;
-            }
-            _ => {}
-        }
-        if records > limit {
-            return Err(record_limit_error(limit, records).with_parse_context(
-                kind,
-                crate::error::DiagnosticNotation::Kvn,
-                input,
-                None,
-            ));
-        }
-    }
-    Ok(())
 }
 
 #[derive(Clone, Copy)]
@@ -246,15 +154,11 @@ impl NdmKind {
         }
     }
 
-    fn parse_kvn(self, input: &str, options: &ParseOptions) -> Result<Message> {
+    fn parse_kvn(self, input: &str) -> Result<Message> {
         match self {
-            Self::Opm => {
-                crate::messages::opm::Opm::from_kvn_with_options(input, options).map(Message::Opm)
-            }
+            Self::Opm => crate::traits::Ndm::from_kvn(input).map(Message::Opm),
             Self::Omm => crate::traits::Ndm::from_kvn(input).map(Message::Omm),
-            Self::Oem => {
-                crate::messages::oem::Oem::from_kvn_with_options(input, options).map(Message::Oem)
-            }
+            Self::Oem => crate::traits::Ndm::from_kvn(input).map(Message::Oem),
             Self::Ocm => crate::traits::Ndm::from_kvn(input).map(Message::Ocm),
             Self::Acm => crate::traits::Ndm::from_kvn(input).map(Message::Acm),
             Self::Cdm => crate::traits::Ndm::from_kvn(input).map(Message::Cdm),
@@ -268,26 +172,19 @@ impl NdmKind {
         }
     }
 
-    fn parse_xml(self, input: &str, options: &ParseOptions) -> Result<Message> {
+    fn parse_xml(self, input: &str) -> Result<Message> {
         match self {
-            Self::Opm => {
-                crate::messages::opm::Opm::from_xml_with_options(input, options).map(Message::Opm)
-            }
-            Self::Oem => {
-                crate::messages::oem::Oem::from_xml_with_options(input, options).map(Message::Oem)
-            }
+            Self::Opm => crate::traits::Ndm::from_xml(input).map(Message::Opm),
+            Self::Oem => crate::traits::Ndm::from_xml(input).map(Message::Oem),
             Self::Omm => crate::traits::Ndm::from_xml(input).map(Message::Omm),
             Self::Ocm => crate::traits::Ndm::from_xml(input).map(Message::Ocm),
             Self::Acm => crate::traits::Ndm::from_xml(input).map(Message::Acm),
             Self::Cdm => crate::traits::Ndm::from_xml(input).map(Message::Cdm),
             Self::Tdm => crate::traits::Ndm::from_xml(input).map(Message::Tdm),
             Self::Rdm => crate::traits::Ndm::from_xml(input).map(Message::Rdm),
-            Self::Aem => {
-                crate::messages::aem::Aem::from_xml_with_options(input, options).map(Message::Aem)
-            }
+            Self::Aem => crate::traits::Ndm::from_xml(input).map(Message::Aem),
             Self::Apm => crate::traits::Ndm::from_xml(input).map(Message::Apm),
-            Self::Ndm => crate::messages::ndm::CombinedNdm::from_xml_with_options(input, options)
-                .map(Message::Ndm),
+            Self::Ndm => crate::traits::Ndm::from_xml(input).map(Message::Ndm),
         }
     }
 }
@@ -349,26 +246,18 @@ fn parse_kvn_kind(input: &mut &str) -> PResult<NdmKind> {
 }
 
 /// Detects and parses KVN message type
-fn detect_kvn_type(s: &str, options: &ParseOptions) -> Result<Message> {
+fn detect_kvn_type(s: &str) -> Result<Message> {
     // We need a mutable slice for winnow, but we don't want to consume "s" for the final parsing.
     let mut input = s;
     let kind = parse_kvn_kind
         .parse_next(&mut input)
         .map_err(|_| CcsdsNdmError::UnsupportedMessage("Could not identify KVN header".into()))?;
 
-    validate_input_size(
-        s,
-        options,
-        kind.message_kind(),
-        crate::error::DiagnosticNotation::Kvn,
-    )?;
-
     if has_multiple_kvn_messages(s) {
         return Err(crate::messages::ndm::combined_kvn_unsupported());
     }
-    validate_kvn_record_limit(s, kind.message_kind(), options)?;
 
-    let result = kind.parse_kvn(s, options);
+    let result = kind.parse_kvn(s);
     result.map_err(|error| {
         ensure_parse_context(
             error,
@@ -383,7 +272,7 @@ fn detect_kvn_type(s: &str, options: &ParseOptions) -> Result<Message> {
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 
-fn detect_xml_type(s: &str, options: &ParseOptions) -> Result<Message> {
+fn detect_xml_type(s: &str) -> Result<Message> {
     let mut reader = Reader::from_str(s);
     reader.config_mut().trim_text_start = true;
     reader.config_mut().trim_text_end = true;
@@ -399,17 +288,7 @@ fn detect_xml_type(s: &str, options: &ParseOptions) -> Result<Message> {
                     ))
                 })?;
                 let message_kind = kind.message_kind();
-                validate_input_size(
-                    s,
-                    options,
-                    message_kind,
-                    crate::error::DiagnosticNotation::Xml,
-                )?;
-                // These families apply their specialised strict preflight, including these limits.
-                if !matches!(kind, NdmKind::Opm | NdmKind::Oem | NdmKind::Aem) {
-                    validate_xml_limits(s, options, message_kind)?;
-                }
-                return with_xml_parse_context(kind.parse_xml(s, options), message_kind, s);
+                return with_xml_parse_context(kind.parse_xml(s), message_kind, s);
             }
             Ok(Event::Decl(_))
             | Ok(Event::Comment(_))
@@ -441,106 +320,4 @@ fn detect_xml_type(s: &str, options: &ParseOptions) -> Result<Message> {
 
 fn ascii_whitespace(bytes: &[u8]) -> bool {
     bytes.iter().all(u8::is_ascii_whitespace)
-}
-
-fn validate_xml_limits(
-    input: &str,
-    options: &ParseOptions,
-    kind: crate::validation::MessageKind,
-) -> Result<()> {
-    let mut reader = Reader::from_str(input);
-    let mut depth = 0usize;
-    let mut records = 0usize;
-    let mut combined_child = None;
-    loop {
-        match reader.read_event() {
-            Ok(Event::Start(start)) => {
-                if kind == crate::validation::MessageKind::Ndm && depth == 1 {
-                    combined_child = xml_message_kind(start.name().as_ref());
-                }
-                depth = depth.saturating_add(1);
-                if depth > options.max_xml_depth {
-                    return Err(CcsdsNdmError::ResourceLimitExceeded {
-                        resource: "xml_depth",
-                        limit: options.max_xml_depth,
-                        actual: depth,
-                    }
-                    .with_parse_context(
-                        kind,
-                        crate::error::DiagnosticNotation::Xml,
-                        input,
-                        None,
-                    ));
-                }
-                if is_xml_record(combined_child.unwrap_or(kind), start.name().as_ref()) {
-                    records += 1;
-                    enforce_xml_record_limit(input, options, kind, records)?;
-                }
-            }
-            Ok(Event::Empty(start)) => {
-                let actual_depth = depth.saturating_add(1);
-                if actual_depth > options.max_xml_depth {
-                    return Err(CcsdsNdmError::ResourceLimitExceeded {
-                        resource: "xml_depth",
-                        limit: options.max_xml_depth,
-                        actual: actual_depth,
-                    }
-                    .with_parse_context(
-                        kind,
-                        crate::error::DiagnosticNotation::Xml,
-                        input,
-                        None,
-                    ));
-                }
-                if is_xml_record(combined_child.unwrap_or(kind), start.name().as_ref()) {
-                    records += 1;
-                    enforce_xml_record_limit(input, options, kind, records)?;
-                }
-            }
-            Ok(Event::End(_)) => {
-                depth = depth.saturating_sub(1);
-                if kind == crate::validation::MessageKind::Ndm && depth == 1 {
-                    combined_child = None;
-                }
-            }
-            Ok(Event::Eof) => return Ok(()),
-            Ok(_) => {}
-            Err(error) => return Err(error.into()),
-        }
-    }
-}
-
-fn is_xml_record(kind: crate::validation::MessageKind, name: &[u8]) -> bool {
-    use crate::validation::MessageKind;
-    match kind {
-        MessageKind::Oem => matches!(name, b"stateVector" | b"covarianceMatrix"),
-        MessageKind::Tdm => name == b"observation",
-        MessageKind::Aem => name == b"attitudeState",
-        MessageKind::Ocm => matches!(name, b"trajLine" | b"covLine" | b"manLine"),
-        MessageKind::Acm => matches!(name, b"attLine" | b"covLine" | b"man"),
-        _ => false,
-    }
-}
-
-fn xml_message_kind(name: &[u8]) -> Option<crate::validation::MessageKind> {
-    NdmKind::from_xml_root(name).map(NdmKind::message_kind)
-}
-
-fn enforce_xml_record_limit(
-    input: &str,
-    options: &ParseOptions,
-    kind: crate::validation::MessageKind,
-    records: usize,
-) -> Result<()> {
-    if let Some(limit) = options.max_records {
-        if records > limit {
-            return Err(record_limit_error(limit, records).with_parse_context(
-                kind,
-                crate::error::DiagnosticNotation::Xml,
-                input,
-                None,
-            ));
-        }
-    }
-    Ok(())
 }

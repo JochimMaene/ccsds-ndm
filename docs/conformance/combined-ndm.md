@@ -21,10 +21,9 @@ diagnostic, and generic detection rejects any KVN document carrying more than on
   child ordering, and rejection of unknown or nested message structure;
 - ordered typed preservation of the `ndm_g12.xml` and `ndm_g21.xml` constituents, followed by
   official-master-XSD validation of generated XML;
-- aggregate input-byte, XML-depth, history-record, and output-byte limits through direct Rust and
-  Python entry points;
-- complete-envelope generation preflight: invalid children or aggregate output limits write zero
-  bytes before the normative XML representation is streamed;
+- a fixed internal XML nesting safety limit through direct Rust and Python entry points;
+- complete-envelope generation preflight: invalid children write zero bytes before the normative
+  XML representation is streamed;
 - measured linear XML streaming allocation budgets from 10 to 1,000 constituents (at most twenty
   temporary allocations and 8 KiB of temporaries per additional OPM constituent); and
 - refusal of combined KVN parsing and generation with an unsupported-notation diagnostic.

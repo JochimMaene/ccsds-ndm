@@ -5,38 +5,38 @@
 //! KVN parsing and generation benchmarks for all message types.
 //!
 //! `kvn_message_matrix` carries every standalone family, because the conformance files cite it
-//! as each family's workload evidence. Dedicated groups beyond it exist only for the families
-//! with a record history, where cost scales with the data.
-//!
-//! Groups are named `<family>_<notation>_<workload>`, except the cross-family
-//! `kvn_message_matrix`.
+//! as each family's workload evidence. Beyond it, each family with a record history gets one
+//! `<family>_kvn_history_scaling` group over [`common::KVN_HISTORY_SIZES`]; `xml_benches.rs`
+//! registers the same families, at sizes chosen so every XML point has a KVN counterpart.
 
 mod common;
 
 use ccsds_ndm::messages::acm::Acm;
 use ccsds_ndm::messages::aem::Aem;
+use ccsds_ndm::messages::ocm::Ocm;
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::messages::tdm::Tdm;
-use ccsds_ndm::types::CalendarEpoch;
 use ccsds_ndm::Ndm;
-use common::create_test_oem;
+use common::{
+    create_test_acm, create_test_aem, create_test_ocm, create_test_ocm_covariance,
+    create_test_ocm_maneuver, create_test_oem, create_test_tdm, KVN_HISTORY_SIZES,
+};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::hint::black_box;
-use std::str::FromStr;
 
-fn bench_tdm_kvn_history_scaling(c: &mut Criterion) {
-    let mut template = Tdm::from_kvn(include_str!("../data/kvn/tdm_e1.kvn")).unwrap();
-    template.body.segments.truncate(1);
-    let observation = template.body.segments[0].data.observations[0].clone();
-    let mut group = c.benchmark_group("tdm_kvn_history_scaling");
-
-    for records in [100, 10_000, 50_000] {
-        let mut message = template.clone();
-        message.body.segments[0].data.observations = vec![observation.clone(); records];
+/// Register KVN parse and generation for one family across every history size.
+fn bench_kvn_history_scaling<M, B>(c: &mut Criterion, name: &str, build: B)
+where
+    M: Ndm + PartialEq,
+    B: Fn(usize) -> M,
+{
+    let mut group = c.benchmark_group(name);
+    for records in KVN_HISTORY_SIZES {
+        let message = build(records);
         let input = message.to_kvn().unwrap();
         group.throughput(Throughput::Elements(records as u64));
         group.bench_with_input(BenchmarkId::new("parse", records), &input, |b, input| {
-            b.iter(|| Tdm::from_kvn(black_box(input)).unwrap())
+            b.iter(|| M::from_kvn(black_box(input)).unwrap())
         });
         group.bench_with_input(
             BenchmarkId::new("generate", records),
@@ -45,69 +45,37 @@ fn bench_tdm_kvn_history_scaling(c: &mut Criterion) {
         );
     }
     group.finish();
+}
+
+fn bench_oem_kvn_history_scaling(c: &mut Criterion) {
+    bench_kvn_history_scaling::<Oem, _>(c, "oem_kvn_history_scaling", create_test_oem);
+}
+
+fn bench_tdm_kvn_history_scaling(c: &mut Criterion) {
+    bench_kvn_history_scaling::<Tdm, _>(c, "tdm_kvn_history_scaling", create_test_tdm);
 }
 
 fn bench_aem_kvn_history_scaling(c: &mut Criterion) {
-    let template = Aem::from_kvn(include_str!("../data/kvn/aem_g5.kvn")).unwrap();
-    let state = template.body.segment[0].data.attitude_states[0].clone();
-    let mut group = c.benchmark_group("aem_kvn_history_scaling");
-
-    for records in [100, 10_000, 50_000] {
-        let mut message = template.clone();
-        message.body.segment[0].metadata.stop_time =
-            CalendarEpoch::from_str("2006-090T23:59:59.999").unwrap();
-        message.body.segment[0].metadata.useable_stop_time =
-            Some(CalendarEpoch::from_str("2006-090T23:59:59.999").unwrap());
-        message.body.segment[0].data.attitude_states = (0..records)
-            .map(|index| {
-                let mut state = state.clone();
-                let hours = 5 + index / 3_600;
-                let minutes = (index % 3_600) / 60;
-                let seconds = index % 60;
-                let ccsds_ndm::common::AemAttitudeState::Spin(spin) = &mut state else {
-                    unreachable!()
-                };
-                spin.epoch = CalendarEpoch::from_str(&format!(
-                    "2006-090T{hours:02}:{minutes:02}:{seconds:02}.071"
-                ))
-                .unwrap();
-                state
-            })
-            .collect();
-        let input = message.to_kvn().unwrap();
-        group.throughput(Throughput::Elements(records as u64));
-        group.bench_with_input(BenchmarkId::new("parse", records), &input, |b, input| {
-            b.iter(|| Aem::from_kvn(black_box(input)).unwrap())
-        });
-        group.bench_with_input(
-            BenchmarkId::new("generate", records),
-            &message,
-            |b, message| b.iter(|| black_box(message).to_kvn().unwrap()),
-        );
-    }
-    group.finish();
+    bench_kvn_history_scaling::<Aem, _>(c, "aem_kvn_history_scaling", create_test_aem);
 }
 
 fn bench_acm_kvn_history_scaling(c: &mut Criterion) {
-    let template = Acm::from_kvn(include_str!("../data/kvn/acm_g7.kvn")).unwrap();
-    let line = template.body.segment.data.att[0].att_lines[0].clone();
-    let mut group = c.benchmark_group("acm_kvn_history_scaling");
+    bench_kvn_history_scaling::<Acm, _>(c, "acm_kvn_history_scaling", create_test_acm);
+}
 
-    for records in [100, 10_000, 50_000] {
-        let mut message = template.clone();
-        message.body.segment.data.att[0].att_lines = vec![line.clone(); records];
-        let input = message.to_kvn().unwrap();
-        group.throughput(Throughput::Elements(records as u64));
-        group.bench_with_input(BenchmarkId::new("parse", records), &input, |b, input| {
-            b.iter(|| Acm::from_kvn(black_box(input)).unwrap())
-        });
-        group.bench_with_input(
-            BenchmarkId::new("generate", records),
-            &message,
-            |b, message| b.iter(|| black_box(message).to_kvn().unwrap()),
-        );
-    }
-    group.finish();
+/// OCM carries three independent histories, each with its own line grammar.
+fn bench_ocm_kvn_history_scaling(c: &mut Criterion) {
+    bench_kvn_history_scaling::<Ocm, _>(c, "ocm_trajectory_kvn_history_scaling", create_test_ocm);
+    bench_kvn_history_scaling::<Ocm, _>(
+        c,
+        "ocm_covariance_kvn_history_scaling",
+        create_test_ocm_covariance,
+    );
+    bench_kvn_history_scaling::<Ocm, _>(
+        c,
+        "ocm_maneuver_kvn_history_scaling",
+        create_test_ocm_maneuver,
+    );
 }
 
 fn bench_kvn_message_matrix(c: &mut Criterion) {
@@ -143,34 +111,13 @@ fn bench_kvn_message_matrix(c: &mut Criterion) {
     group.finish();
 }
 
-// --- Scaling benchmarks ---
-
-fn bench_oem_kvn_scaling(c: &mut Criterion) {
-    let mut group = c.benchmark_group("oem_kvn_scaling");
-
-    for size in [10, 1_000, 50_000] {
-        let oem = create_test_oem(size);
-        let kvn_data = oem.to_kvn().unwrap();
-        group.throughput(Throughput::Elements(size as u64));
-
-        group.bench_with_input(BenchmarkId::new("parse", size), &kvn_data, |b, data| {
-            b.iter(|| Oem::from_kvn(black_box(data)).unwrap())
-        });
-
-        group.bench_with_input(BenchmarkId::new("generate", size), &oem, |b, oem| {
-            b.iter(|| black_box(oem).to_kvn().unwrap())
-        });
-    }
-
-    group.finish();
-}
-
 criterion_group!(
     benches,
+    bench_kvn_message_matrix,
+    bench_oem_kvn_history_scaling,
+    bench_ocm_kvn_history_scaling,
     bench_tdm_kvn_history_scaling,
     bench_aem_kvn_history_scaling,
     bench_acm_kvn_history_scaling,
-    bench_kvn_message_matrix,
-    bench_oem_kvn_scaling,
 );
 criterion_main!(benches);

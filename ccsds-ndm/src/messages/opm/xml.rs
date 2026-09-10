@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use super::{validate_input_size, FieldPath, Opm, OpmBody};
+use super::{FieldPath, Opm, OpmBody};
 use crate::common::OdmHeader;
 use crate::error::{Result, ValidationError};
 use serde::Serialize;
@@ -36,11 +36,7 @@ impl Serialize for Opm {
     }
 }
 
-fn validate_xml_envelope(
-    xml: &str,
-    options: &crate::options::ParseOptions,
-    source_edition: &mut Option<String>,
-) -> Result<()> {
+fn validate_xml_envelope(xml: &str, source_edition: &mut Option<String>) -> Result<()> {
     use crate::xml::XmlSequenceRule;
 
     const OPM: &[&[u8]] = &[b"header", b"body"];
@@ -167,7 +163,6 @@ fn validate_xml_envelope(
         xml,
         b"opm",
         "OPM",
-        options,
         source_edition,
         crate::xml::MessageSchema {
             child_rule: rule,
@@ -231,21 +226,15 @@ fn validate_xml_envelope(
                 b"parameter" => element == b"USER_DEFINED",
                 _ => false,
             },
-            // An OPM holds one state, so it has no repeatable history record to bound here.
-            is_record: |_: &[u8]| false,
         },
     )
 }
 
 impl Opm {
-    pub(crate) fn from_xml_with_options(
-        xml: &str,
-        options: &crate::options::ParseOptions,
-    ) -> Result<Self> {
+    pub(crate) fn from_xml_strict(xml: &str) -> Result<Self> {
         let mut source_edition = None;
         (|| {
-            validate_input_size(xml, options)?;
-            validate_xml_envelope(xml, options, &mut source_edition)?;
+            validate_xml_envelope(xml, &mut source_edition)?;
             let opm: Self = crate::xml::from_str_with_context(xml, "OPM")?;
             crate::traits::Validate::validate(&opm)?;
             Ok(opm)

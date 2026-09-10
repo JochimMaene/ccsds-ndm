@@ -77,7 +77,7 @@ impl Ndm for Aem {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        Self::from_xml_with_options(xml, &crate::options::ParseOptions::default())
+        Self::from_xml_strict(xml)
     }
 
     fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {

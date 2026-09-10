@@ -7,8 +7,8 @@
 //! This module implements KVN parsing for OEM using winnow parser combinators.
 
 use super::{
-    absolute_epoch_error, validate_input_size, validate_within_path, Oem, OemBody,
-    OemCovarianceMatrix, OemData, OemEpochRangeCheck, OemMetadata, OemSegment,
+    absolute_epoch_error, validate_within_path, Oem, OemBody, OemCovarianceMatrix, OemData,
+    OemEpochRangeCheck, OemMetadata, OemSegment,
 };
 use crate::common::StateVectorAcc;
 use crate::error::{InternalParserError, Result, ValidationError};
@@ -200,7 +200,7 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
 
     // An ephemeris record occupies exactly one line, so only padding may follow its components.
     // Without this anchor, leftover tokens are re-read as another record, which both accepts
-    // several records packed onto one line and undercounts them against `max_records`.
+    // several records packed onto one line.
     ws.parse_next(input)?;
     if !at_record_end(input) {
         return Err(cut_err(
@@ -834,20 +834,16 @@ impl Oem {
         Ok(())
     }
 
-    /// Strictly parse and validate an OEM KVN document with caller resource limits.
-    pub(crate) fn from_kvn_with_options(
-        kvn: &str,
-        options: &crate::options::ParseOptions,
-    ) -> Result<Self> {
+    /// Strictly parse and validate an OEM KVN document.
+    pub(crate) fn from_kvn_strict(kvn: &str) -> Result<Self> {
         let source_edition = kvn.split(['\r', '\n']).find_map(|line| {
             line.split_once('=')
                 .filter(|(key, _)| key.trim() == "CCSDS_OEM_VERS")
                 .map(|(_, value)| value.trim())
         });
         (|| {
-            validate_input_size(kvn, options)?;
             let normalized = crate::kvn::normalize_line_endings(kvn);
-            validate_syntax(&normalized, options)?;
+            validate_syntax(&normalized)?;
             let oem = Self::from_kvn_str(&normalized)?;
             crate::traits::Validate::validate(&oem)?;
             Ok(oem)
@@ -907,7 +903,7 @@ impl ToKvn for OemMetadata {
 ///
 /// Expects `kvn` to have gone through [`crate::kvn::normalize_line_endings`], so every remaining
 /// carriage return is part of a CRLF pair.
-pub(super) fn validate_syntax(kvn: &str, options: &crate::options::ParseOptions) -> Result<()> {
+pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
     use crate::error::{CcsdsNdmError, FormatError};
 
     fn invalid(line: usize, offset: usize, message: impl AsRef<str>) -> CcsdsNdmError {
@@ -965,25 +961,11 @@ pub(super) fn validate_syntax(kvn: &str, options: &crate::options::ParseOptions)
     let mut segments = 0usize;
     let mut state_records = 0usize;
     let mut covariance_records = 0usize;
-    let mut total_records = 0usize;
     let mut covariance_row = 0usize;
     let mut covariance_epoch_seen = false;
     let mut covariance_frame_seen = false;
     let mut covariance_closed = false;
     let mut offset = 0usize;
-
-    let enforce_record_limit = |actual: usize| -> Result<()> {
-        if let Some(limit) = options.max_records {
-            if actual > limit {
-                return Err(CcsdsNdmError::ResourceLimitExceeded {
-                    resource: "history_records",
-                    limit,
-                    actual,
-                });
-            }
-        }
-        Ok(())
-    };
 
     for (index, raw_line) in kvn.split('\n').enumerate() {
         let line_number = index + 1;
@@ -1118,8 +1100,6 @@ pub(super) fn validate_syntax(kvn: &str, options: &crate::options::ParseOptions)
                             covariance_epoch_seen = true;
                             covariance_frame_seen = false;
                             covariance_records += 1;
-                            total_records += 1;
-                            enforce_record_limit(total_records)?;
                         }
                         "COV_REF_FRAME"
                             if covariance_epoch_seen
@@ -1148,8 +1128,6 @@ pub(super) fn validate_syntax(kvn: &str, options: &crate::options::ParseOptions)
             _ => match phase {
                 Phase::Ephemeris if !covariance_closed => {
                     state_records += 1;
-                    total_records += 1;
-                    enforce_record_limit(total_records)?;
                 }
                 Phase::Covariance if covariance_epoch_seen && covariance_row < 6 => {
                     covariance_row += 1;

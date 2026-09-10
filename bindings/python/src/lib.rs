@@ -108,19 +108,15 @@ pub(crate) fn message_to_py(py: Python<'_>, message: Message) -> PyResult<Py<PyA
 ///     If the input is invalid or unsupported.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(signature = (data, format=None, *, max_input_bytes=None, max_records=None))]
+#[pyo3(signature = (data, format=None))]
 fn from_str(
     py: Python,
     data: &str,
     #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
     format: Option<&str>,
-    max_input_bytes: Option<usize>,
-    max_records: Option<usize>,
 ) -> PyResult<Py<PyAny>> {
-    let options = api::parse_options(max_input_bytes, max_records);
-    let message =
-        ccsds_ndm::from_str_with_options(data, format.map(api::notation).transpose()?, &options)
-            .map_err(ccsds_error_to_pyerr)?;
+    let message = ccsds_ndm::from_str_with_notation(data, format.map(api::notation).transpose()?)
+        .map_err(ccsds_error_to_pyerr)?;
     message_to_py(py, message)
 }
 
@@ -136,19 +132,16 @@ fn from_str(
 ///     The parsed NDM object.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
+#[pyo3(signature = (path, format=None))]
 fn from_file(
     py: Python,
     #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
     path: PathBuf,
     #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
     format: Option<&str>,
-    max_input_bytes: Option<usize>,
-    max_records: Option<usize>,
 ) -> PyResult<Py<PyAny>> {
-    let options = api::parse_options(max_input_bytes, max_records);
     let notation = format.map(api::notation).transpose()?;
-    let message = ccsds_ndm::from_file_with_options(&path, notation, &options)
+    let message = ccsds_ndm::from_file_with_notation(&path, notation)
         .map_err(|error| file_parse_error_to_pyerr(error, notation, None))?;
     message_to_py(py, message)
 }
@@ -156,23 +149,19 @@ fn from_file(
 /// Convert any recognized NDM message between KVN and XML through the shared generation gate.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(signature = (data, to_format, *, max_input_bytes=None, max_records=None))]
+#[pyo3(signature = (data, to_format))]
 fn convert(
     data: &str,
     #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
     to_format: &str,
-    max_input_bytes: Option<usize>,
-    max_records: Option<usize>,
 ) -> PyResult<String> {
-    let parse = api::parse_options(max_input_bytes, max_records);
-    ccsds_ndm::convert_with_options(data, api::notation(to_format)?, &parse)
-        .map_err(ccsds_error_to_pyerr)
+    ccsds_ndm::convert(data, api::notation(to_format)?).map_err(ccsds_error_to_pyerr)
 }
 
 /// Convert any recognized NDM file and atomically replace the destination on success.
 #[gen_stub_pyfunction]
 #[pyfunction]
-#[pyo3(signature = (source_path, destination_path, to_format, *, max_input_bytes=None, max_records=None))]
+#[pyo3(signature = (source_path, destination_path, to_format))]
 fn convert_file(
     #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
     source_path: PathBuf,
@@ -180,17 +169,9 @@ fn convert_file(
     destination_path: PathBuf,
     #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
     to_format: &str,
-    max_input_bytes: Option<usize>,
-    max_records: Option<usize>,
 ) -> PyResult<()> {
-    let parse = api::parse_options(max_input_bytes, max_records);
-    ccsds_ndm::convert_file_with_options(
-        &source_path,
-        &destination_path,
-        api::notation(to_format)?,
-        &parse,
-    )
-    .map_err(ccsds_error_to_pyerr)
+    ccsds_ndm::convert_file(&source_path, &destination_path, api::notation(to_format)?)
+        .map_err(ccsds_error_to_pyerr)
 }
 
 /// The Python module definition.

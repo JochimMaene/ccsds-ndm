@@ -1,9 +1,9 @@
 use ccsds_ndm::messages::{
-    acm::Acm, aem::Aem, apm::Apm, cdm::Cdm, ocm::Ocm, oem::Oem, omm::Omm, opm::Opm, rdm::Rdm,
-    tdm::Tdm,
+    acm::Acm, aem::Aem, apm::Apm, cdm::Cdm, ndm::CombinedNdm, ocm::Ocm, oem::Oem, omm::Omm,
+    opm::Opm, rdm::Rdm, tdm::Tdm,
 };
+use ccsds_ndm::Message;
 use ccsds_ndm::Ndm;
-use ccsds_ndm::{from_str_with_options, Message, Notation, ParseOptions};
 
 #[test]
 fn opm_preserves_comment_before_user_defined_after_optional_maneuvers() {
@@ -207,16 +207,6 @@ fn multiline_xml_comments_convert_to_separate_kvn_records() {
 }
 
 #[test]
-fn opm_maneuvers_are_not_history_records_in_either_notation() {
-    let kvn = include_str!("../data/kvn/opm_g2.kvn");
-    let options = ParseOptions::default().with_max_records(0);
-    from_str_with_options(kvn, Some(Notation::Kvn), &options).unwrap();
-
-    let xml = Opm::from_kvn(kvn).unwrap().to_xml().unwrap();
-    from_str_with_options(&xml, Some(Notation::Xml), &options).unwrap();
-}
-
-#[test]
 fn kvn_lexical_errors_have_the_same_category_for_string_and_streaming_output() {
     let mut message = Apm::from_kvn(include_str!("../data/kvn/apm_g1.kvn")).unwrap();
     message.header.originator = "GSFC-é".into();
@@ -389,19 +379,9 @@ fn opm_xml_still_rejects_a_genuinely_out_of_order_child() {
 }
 
 #[test]
-fn self_closing_elements_count_towards_the_xml_depth_limit() {
-    // A self-closing element occupies a nesting level even though it never opens a frame, so it
-    // has to be measured against the limit the same way a start tag is. Here COMMENT is the only
-    // thing at depth 3, and it is spelled empty.
-    let document = concat!(
-        r#"<opm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" "#,
-        r#"id="CCSDS_OPM_VERS" version="3.0">"#,
-        "<header><COMMENT/></header></opm>",
-    );
-    let options = ParseOptions::default().with_max_xml_depth(2);
-    let error = ccsds_ndm::from_str_with_options(document, None, &options)
-        .unwrap_err()
-        .to_string();
+fn combined_xml_depth_has_a_fixed_safety_limit() {
+    let document = format!("{}{}", "<ndm>".repeat(17), "</ndm>".repeat(17));
+    let error = CombinedNdm::from_xml(&document).unwrap_err().to_string();
     assert!(error.contains("xml_depth"), "unexpected error: {error}");
 }
 

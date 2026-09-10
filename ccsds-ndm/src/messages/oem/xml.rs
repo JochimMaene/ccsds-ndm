@@ -2,18 +2,14 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use super::{validate_input_size, Oem};
+use super::Oem;
 use crate::error::Result;
 use crate::types::{
     AccUnits, PositionCovarianceUnits, PositionUnits, PositionVelocityCovarianceUnits,
     VelocityCovarianceUnits, VelocityUnits,
 };
 
-pub(super) fn validate_envelope(
-    xml: &str,
-    options: &crate::options::ParseOptions,
-    source_edition: &mut Option<String>,
-) -> Result<()> {
+pub(super) fn validate_envelope(xml: &str, source_edition: &mut Option<String>) -> Result<()> {
     use crate::xml::XmlSequenceRule;
 
     const OEM: &[&[u8]] = &[b"header", b"body"];
@@ -102,7 +98,6 @@ pub(super) fn validate_envelope(
         xml,
         b"oem",
         "OEM",
-        options,
         source_edition,
         crate::xml::MessageSchema {
             child_rule: rule,
@@ -141,9 +136,6 @@ pub(super) fn validate_envelope(
                 ),
                 _ => false,
             },
-            // Both repeatable OEM data records are bounded before serde materializes any of
-            // them.
-            is_record: |element: &[u8]| matches!(element, b"stateVector" | b"covarianceMatrix"),
         },
     )
 }
@@ -208,15 +200,11 @@ impl Oem {
         Ok(())
     }
 
-    /// Strictly parse and validate an OEM XML document with caller resource limits.
-    pub(crate) fn from_xml_with_options(
-        xml: &str,
-        options: &crate::options::ParseOptions,
-    ) -> Result<Self> {
+    /// Strictly parse and validate an OEM XML document.
+    pub(crate) fn from_xml_strict(xml: &str) -> Result<Self> {
         let mut source_edition = None;
         (|| {
-            validate_input_size(xml, options)?;
-            validate_envelope(xml, options, &mut source_edition)?;
+            validate_envelope(xml, &mut source_edition)?;
             let mut oem: Self = crate::xml::from_str_with_context(xml, "OEM")?;
             oem.normalize_implicit_units();
             crate::traits::Validate::validate(&oem)?;

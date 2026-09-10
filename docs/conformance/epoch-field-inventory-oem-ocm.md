@@ -113,7 +113,7 @@ additionally requires the composition time tag to be first, selects the legal ep
 (`TIME_ABSOLUTE` or `TIME_RELATIVE`), and rejects duplicate values. Python exposes the
 value as `str` while sharing the same mutation-time validation.
 
-The 10k trajectory benchmark records 5.85–6.03 ms XML parsing, 4.02–4.03 ms KVN parsing, and about
+The trajectory scaling benchmark at 10,000 records records 5.85–6.03 ms XML parsing, 4.02–4.03 ms KVN parsing, and about
 2.21 MB of retained trajectory/value storage after parsing. The `CalendarEpoch` narrowing is
 `repr(transparent)` over the existing inline value, so it does not change the trajectory record
 layout.

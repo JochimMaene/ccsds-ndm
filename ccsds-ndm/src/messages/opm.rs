@@ -61,7 +61,7 @@ impl Ndm for Opm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        Self::from_kvn_with_options(kvn, &crate::options::ParseOptions::default())
+        Self::from_kvn_strict(kvn)
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -69,7 +69,7 @@ impl Ndm for Opm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        Self::from_xml_with_options(xml, &crate::options::ParseOptions::default())
+        Self::from_xml_strict(xml)
     }
 
     fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
@@ -79,19 +79,6 @@ impl Ndm for Opm {
     fn write_xml_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
         crate::generation::write_xml_to(self, output)
     }
-}
-
-fn validate_input_size(input: &str, options: &crate::options::ParseOptions) -> Result<()> {
-    if let Some(limit) = options.max_input_bytes {
-        if input.len() > limit {
-            return Err(crate::error::CcsdsNdmError::ResourceLimitExceeded {
-                resource: "input_document",
-                limit,
-                actual: input.len(),
-            });
-        }
-    }
-    Ok(())
 }
 
 /// A diagnostic field path that is only materialized when an error is reported.

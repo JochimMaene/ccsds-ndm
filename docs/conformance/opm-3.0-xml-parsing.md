@@ -12,7 +12,7 @@ CCSDS 502.0-B-3 with editorial corrigendum 1 controls semantics not expressed by
 | Lexical types, units, numerics, epochs, and semantic validation | Covered | Typed deserialization plus the shared OPM validation mutation/boundary suites cover all public numeric blocks, epoch positions, unit wrappers, required strings, anomaly choice, maneuvers, and user data. |
 | Optional blocks and meaning preservation | Covered | `opm::conversion` compares complete typed models across every shipped fixture in both notation directions, including comments, units, repeated maneuvers, covariance, and user-defined parameters. |
 | Structured diagnostics | Covered | `opm::parsing` fixes operation/notation/message/edition/code and semantic model paths. XML locations remain absent where `quick-xml` does not reliably expose them; the API does not invent a position. |
-| Resource behavior | Covered | `opm::parsing` enforces an optional exact input-byte bound and a safe default XML depth of 16 with caller override. |
+| Resource behavior | Covered | XML nesting has a fixed internal safety limit of 16. |
 | Performance and fuzzing | Covered | The `xml_message_matrix/parse/opm` workload is in the Criterion/CodSpeed-compatible corpus. The generic XML fuzz target reaches OPM from a checked-in minimal OPM seed, and the reproducible smoke command completes without a crash. Strict structure preflight is allocation-bounded; wall-clock thresholds and sustained fuzzing are optional discovery/maturity work, not deterministic pre-1.0 gates. |
 
 The XML schema permits `COMMENT` and `USER_DEFINED` entries to be interleaved inside

@@ -75,14 +75,12 @@ The parser checks supplied units against each field's CCSDS unit enum. Required 
 attributes must be present, incompatible KVN units are rejected, and dimensionless fields reject
 spurious units. Values are never silently reinterpreted under a different unit.
 
-Parsing limits and generation guarantees
------------------------------------------
+Parsing and generation guarantees
+---------------------------------
 
-Python's ``from_str`` and ``from_file`` accept ``max_input_bytes`` on every message and
-``max_records`` on record-bearing messages. Rust additionally exposes ``from_str_with_options``
-for an XML-depth policy. Input bytes are unlimited by default; XML depth defaults to 16 because
-valid messages have a small fixed schema depth. Parsing remains bounded materialization;
-streaming parsing is intentionally absent.
+Callers that accept untrusted input should enforce size limits at their system boundary. XML
+nesting retains a fixed internal safety limit. Parsing materializes complete messages; streaming
+parsing is intentionally absent.
 
 Generation always validates the complete message before writing any caller-visible bytes and
 preserves the edition stored on the message. In Python, use ``to_str(format)`` for a string and

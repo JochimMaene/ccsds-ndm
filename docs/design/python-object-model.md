@@ -68,10 +68,5 @@ on this workload before earning its complexity.
 
 ## Parsing resource controls
 
-Python parsing exposes `max_input_bytes` and, for record-bearing formats, `max_records` as
-keyword-only advanced controls. They solve real boundary and batch-processing needs and correspond
-to limits users can reason about.
-
-XML nesting depth remains a safe internal parser limit. CCSDS document depth is determined by the
-schema, so asking each caller to select `max_xml_depth` adds API surface without improving the
-normal workflow. The Rust core retains its parser option for lower-level and non-Python uses.
+Parsing exposes no resource-policy knobs. Callers that accept untrusted input should enforce size
+limits at their system boundary; XML nesting retains a fixed internal safety limit.

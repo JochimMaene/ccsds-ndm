@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 
 pub(super) fn validate_aem_xml_envelope(
     xml: &str,
-    options: &crate::options::ParseOptions,
     source_edition: &mut Option<String>,
 ) -> Result<()> {
     use crate::xml::XmlSequenceRule;
@@ -16,7 +15,6 @@ pub(super) fn validate_aem_xml_envelope(
         xml,
         b"aem",
         "AEM",
-        options,
         source_edition,
         crate::xml::MessageSchema {
             child_rule: |parent: &[u8], child: &[u8]| {
@@ -54,7 +52,6 @@ pub(super) fn validate_aem_xml_envelope(
                             | b"NUTATION_VEL"
                     )
             },
-            is_record: |element: &[u8]| element == b"attitudeState",
         },
     )
 }
@@ -158,12 +155,9 @@ fn aem_xml_children(parent: &[u8]) -> Option<&'static [&'static [u8]]> {
 }
 
 impl Aem {
-    pub(crate) fn from_xml_with_options(
-        xml: &str,
-        options: &crate::options::ParseOptions,
-    ) -> Result<Self> {
+    pub(crate) fn from_xml_strict(xml: &str) -> Result<Self> {
         let mut source_edition = None;
-        validate_aem_xml_envelope(xml, options, &mut source_edition)?;
+        validate_aem_xml_envelope(xml, &mut source_edition)?;
         let aem: Self = crate::xml::from_str_with_context(xml, "AEM")?;
         crate::traits::Validate::validate(&aem)?;
         Ok(aem)

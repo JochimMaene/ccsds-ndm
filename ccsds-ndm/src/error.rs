@@ -947,12 +947,11 @@ impl CcsdsNdmError {
             Self::UnexpectedEof { .. } => Some("parse.unexpected_eof"),
             Self::UnsupportedNotation { .. } => Some("unsupported.notation"),
             Self::UnsupportedOutputVersion { .. } => Some("generation.unsupported_output_version"),
-            Self::ResourceLimitExceeded { resource, .. } => match *resource {
-                "input_document" => Some("resource.input_limit_exceeded"),
-                "xml_depth" => Some("resource.xml_depth_limit_exceeded"),
-                "history_records" => Some("resource.record_limit_exceeded"),
-                _ => None,
-            },
+            Self::ResourceLimitExceeded {
+                resource: "xml_depth",
+                ..
+            } => Some("resource.xml_depth_limit_exceeded"),
+            Self::ResourceLimitExceeded { .. } => None,
             _ => None,
         }
     }

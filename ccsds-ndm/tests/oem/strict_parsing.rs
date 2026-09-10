@@ -1,7 +1,6 @@
 use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::Ndm;
-use ccsds_ndm::ParseOptions;
 
 #[test]
 fn kvn_rejects_unknown_duplicate_reordered_malformed_and_misplaced_content() {
@@ -181,41 +180,8 @@ fn xml_contextual_epoch_fields_reject_invalid_values() {
     }
 }
 
-#[test]
-fn input_depth_and_history_limits_are_exact() {
-    let message = Oem::from_xml(XML).unwrap();
-    let record_count: usize = message
-        .body
-        .segment
-        .iter()
-        .map(|segment| segment.data.state_vector.len() + segment.data.covariance_matrix.len())
-        .sum();
-
-    ccsds_ndm::from_str_with_options(
-        XML,
-        None,
-        &ParseOptions::default()
-            .with_max_input_bytes(XML.len())
-            .with_max_records(record_count),
-    )
-    .expect("exact input and record limits should pass");
-
-    for options in [
-        ParseOptions::default().with_max_input_bytes(XML.len() - 1),
-        ParseOptions::default().with_max_records(record_count - 1),
-        ParseOptions::default().with_max_xml_depth(1),
-    ] {
-        assert!(
-            ccsds_ndm::from_str_with_options(XML, None, &options).is_err(),
-            "undersized resource limit was ignored"
-        );
-    }
-}
-
 /// An ephemeris record occupies exactly one line (ODM 7.3.7), so a line holding more than one
-/// record must be rejected rather than silently re-read as several records. Accepting packed
-/// records also broke the `max_records` contract, because the strict pass counts ephemeris
-/// lines while the parser materialized one record per token group.
+/// record must be rejected rather than silently re-read as several records.
 #[test]
 fn kvn_rejects_ephemeris_records_packed_onto_one_line() {
     let source = KVN_FIXTURES[0];
@@ -241,31 +207,6 @@ fn kvn_rejects_ephemeris_records_packed_onto_one_line() {
             "accepted {label} on a single line"
         );
     }
-
-    // `max_records` counts ephemeris lines, so the fixture must pass at exactly its own record
-    // count and fail one below it; a packed line can no longer inflate that count unnoticed.
-    let record_count = Oem::from_kvn(source)
-        .expect("fixture should parse")
-        .body
-        .segment
-        .iter()
-        .map(|segment| segment.data.state_vector.len())
-        .sum::<usize>();
-    ccsds_ndm::from_str_with_options(
-        source,
-        None,
-        &ParseOptions::default().with_max_records(record_count),
-    )
-    .expect("fixture should pass a limit equal to its record count");
-    assert!(
-        ccsds_ndm::from_str_with_options(
-            source,
-            None,
-            &ParseOptions::default().with_max_records(record_count - 1),
-        )
-        .is_err(),
-        "KVN ephemeris lines were not counted against max_records"
-    );
 }
 
 /// A malformed component must be diagnosed as a bad number rather than as a short record, and

@@ -37,8 +37,8 @@
 //! ```
 
 use super::{
-    validate_input_size, FieldPath, KeplerianElements, ManeuverParameters, Opm, OpmBody, OpmData,
-    OpmMetadata, OpmSegment,
+    FieldPath, KeplerianElements, ManeuverParameters, Opm, OpmBody, OpmData, OpmMetadata,
+    OpmSegment,
 };
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::*;
@@ -1011,17 +1011,13 @@ fn validate_kvn_syntax(kvn: &str) -> Result<()> {
 }
 
 impl Opm {
-    pub(crate) fn from_kvn_with_options(
-        kvn: &str,
-        options: &crate::options::ParseOptions,
-    ) -> Result<Self> {
+    pub(crate) fn from_kvn_strict(kvn: &str) -> Result<Self> {
         let source_edition = kvn.split(['\r', '\n']).find_map(|line| {
             line.split_once('=')
                 .filter(|(key, _)| key.trim() == "CCSDS_OPM_VERS")
                 .map(|(_, value)| value.trim())
         });
         (|| {
-            validate_input_size(kvn, options)?;
             let normalized = crate::kvn::normalize_line_endings(kvn);
             validate_kvn_syntax(&normalized)?;
             let opm = Self::from_kvn_str(&normalized)?;

@@ -16,7 +16,7 @@ and `conversion.rs`. Its `main.rs` holds fixtures and shared diagnostic assertio
 | Reference-fixture preservation and official XSD validation | AEM conversion, OEM generation, OPM conversion/generation |
 | Notation-specific normalization, precision, or unrepresentable data | Family conversion/generation tests |
 | Typed/generic output, determinism, streaming, preflight, sink errors, atomic file conversion | `message_output_contract.rs` |
-| Input/depth/history limits | Family parsing/limits tests and shared `api_options.rs` / `family_contract.rs` |
+| XML nesting safety | Shared XML parsing tests and `review_feedback_regressions.rs` |
 | Allocation growth | Separate `*_allocations.rs` binaries (global allocator instrumentation) |
 
 Use one valid baseline and labelled mutations for related cases. Keep independently

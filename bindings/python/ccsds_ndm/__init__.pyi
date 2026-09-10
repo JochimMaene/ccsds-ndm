@@ -193,19 +193,12 @@ class Acm:
         """
     @staticmethod
     def from_str(
-        data: builtins.str,
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
-        max_records: typing.Optional[builtins.int] = None,
+        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Acm: ...
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
-        max_records: typing.Optional[builtins.int] = None,
     ) -> Acm:
         r"""
         Parse an ACM from a KVN or XML file.
@@ -1663,19 +1656,12 @@ class Aem:
         """
     @staticmethod
     def from_str(
-        data: builtins.str,
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
-        max_records: typing.Optional[builtins.int] = None,
+        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Aem: ...
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
-        max_records: typing.Optional[builtins.int] = None,
     ) -> Aem:
         r"""
         Parse an AEM from a KVN or XML file.
@@ -2248,17 +2234,12 @@ class Apm:
         """
     @staticmethod
     def from_str(
-        data: builtins.str,
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
+        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Apm: ...
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
     ) -> Apm:
         r"""
         Parse an APM from a KVN or XML file.
@@ -2855,10 +2836,7 @@ class Cdm:
         """
     @staticmethod
     def from_str(
-        data: builtins.str,
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
+        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Cdm:
         r"""
         Parse a CDM from a string with optional format.
@@ -2879,8 +2857,6 @@ class Cdm:
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
     ) -> Cdm:
         r"""
         Parse a CDM from a KVN or XML file.
@@ -4404,11 +4380,7 @@ class CombinedNdm:
         """
     @staticmethod
     def from_str(
-        data: builtins.str,
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
-        max_records: typing.Optional[builtins.int] = None,
+        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> CombinedNdm:
         r"""
         Parse an XML combined NDM. KVN has no combined representation.
@@ -4417,9 +4389,6 @@ class CombinedNdm:
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
-        max_records: typing.Optional[builtins.int] = None,
     ) -> CombinedNdm:
         r"""
         Parse an XML combined NDM file. KVN has no combined representation.
@@ -5743,11 +5712,7 @@ class Ocm:
         """
     @staticmethod
     def from_str(
-        data: builtins.str,
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
-        max_records: typing.Optional[builtins.int] = None,
+        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Ocm:
         r"""
         Create an OCM message from a string.
@@ -5768,9 +5733,6 @@ class Ocm:
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
-        max_records: typing.Optional[builtins.int] = None,
     ) -> Ocm:
         r"""
         Parse an OCM from a KVN or XML file.
@@ -9657,11 +9619,7 @@ class Oem:
         """
     @staticmethod
     def from_str(
-        data: builtins.str,
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
-        max_records: typing.Optional[builtins.int] = None,
+        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Oem:
         r"""
         Create an OEM message from a string.
@@ -9683,9 +9641,6 @@ class Oem:
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
-        max_records: typing.Optional[builtins.int] = None,
     ) -> Oem:
         r"""
         Parse an OEM from a KVN or XML file.
@@ -10626,17 +10581,12 @@ class Omm:
         """
     @staticmethod
     def from_str(
-        data: builtins.str,
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
+        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Omm: ...
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
     ) -> Omm:
         r"""
         Parse an OMM from a KVN or XML file.
@@ -11059,10 +11009,7 @@ class Opm:
         """
     @staticmethod
     def from_str(
-        data: builtins.str,
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
+        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Opm:
         r"""
         Create an OPM message from a string.
@@ -11071,8 +11018,6 @@ class Opm:
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
     ) -> Opm:
         r"""
         Parse an OPM from a KVN or XML file.
@@ -12109,10 +12054,7 @@ class Rdm:
     def __repr__(self) -> builtins.str: ...
     @staticmethod
     def from_str(
-        data: builtins.str,
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
+        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Rdm:
         r"""
         Create an RDM message from a string.
@@ -12134,8 +12076,6 @@ class Rdm:
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
     ) -> Rdm:
         r"""
         Parse an RDM from a KVN or XML file.
@@ -14012,11 +13952,7 @@ class Tdm:
     def __repr__(self) -> builtins.str: ...
     @staticmethod
     def from_str(
-        data: builtins.str,
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
-        max_records: typing.Optional[builtins.int] = None,
+        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Tdm:
         r"""
         Create a TDM message from a string.
@@ -14038,9 +13974,6 @@ class Tdm:
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-        *,
-        max_input_bytes: typing.Optional[builtins.int] = None,
-        max_records: typing.Optional[builtins.int] = None,
     ) -> Tdm:
         r"""
         Parse a TDM from a KVN or XML file.
@@ -15499,11 +15432,7 @@ class YesNo(enum.Enum):
     def __repr__(self) -> builtins.str: ...
 
 def convert(
-    data: builtins.str,
-    to_format: typing.Literal["kvn", "xml"],
-    *,
-    max_input_bytes: typing.Optional[builtins.int] = None,
-    max_records: typing.Optional[builtins.int] = None,
+    data: builtins.str, to_format: typing.Literal["kvn", "xml"]
 ) -> builtins.str:
     r"""
     Convert any recognized NDM message between KVN and XML through the shared generation gate.
@@ -15513,9 +15442,6 @@ def convert_file(
     source_path: builtins.str | os.PathLike[builtins.str],
     destination_path: builtins.str | os.PathLike[builtins.str],
     to_format: typing.Literal["kvn", "xml"],
-    *,
-    max_input_bytes: typing.Optional[builtins.int] = None,
-    max_records: typing.Optional[builtins.int] = None,
 ) -> None:
     r"""
     Convert any recognized NDM file and atomically replace the destination on success.
@@ -15524,9 +15450,6 @@ def convert_file(
 def from_file(
     path: builtins.str | os.PathLike[builtins.str],
     format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-    *,
-    max_input_bytes: typing.Optional[builtins.int] = None,
-    max_records: typing.Optional[builtins.int] = None,
 ) -> typing.Any:
     r"""
     Parse from a file path (KVN or XML).
@@ -15542,11 +15465,7 @@ def from_file(
     """
 
 def from_str(
-    data: builtins.str,
-    format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-    *,
-    max_input_bytes: typing.Optional[builtins.int] = None,
-    max_records: typing.Optional[builtins.int] = None,
+    data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
 ) -> typing.Any:
     r"""
     Parse a string containing KVN or XML.
