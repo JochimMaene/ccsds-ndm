@@ -234,7 +234,7 @@ check: lint audit stubs-check typecheck test docs
 bench:
     cargo bench --manifest-path {{rust_manifest}}
 
-# Reproduce parse/generate workloads for every standalone message and combined XML NDM
+# Reproduce parse/generate workloads for the history-carrying families and combined XML NDM
 [private]
 bench-family:
     cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_message_matrix
@@ -251,6 +251,10 @@ bench-build:
 [private]
 bench-run:
     cd {{rust_dir}} && cargo codspeed run
+
+# Run the Python binding benchmark; pass --codspeed under the CodSpeed action
+bench-python *args:
+    cd {{python_dir}} && uv run pytest benchmarks {{args}}
 
 # --- Build and Documentation ------------------------------------------------
 

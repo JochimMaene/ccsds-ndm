@@ -36,3 +36,12 @@ jobs:
           mode: simulation
           run: just bench-run
           token: ${{ secrets.CODSPEED_TOKEN }}
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Run the Python binding benchmark
+        uses: CodSpeedHQ/action@v4
+        with:
+          mode: simulation
+          run: just bench-python --codspeed
+          token: ${{ secrets.CODSPEED_TOKEN }}

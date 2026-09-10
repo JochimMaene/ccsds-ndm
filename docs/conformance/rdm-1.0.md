@@ -72,15 +72,14 @@ verification are the packaged gates.
 
 ## Reproducible performance observation
 
-```text
-cargo bench --manifest-path ccsds-ndm/Cargo.toml --bench kvn_benches -- 'kvn_message_matrix/(parse|generate)/rdm' --sample-size 20 --measurement-time 2 --warm-up-time 1
-cargo bench --manifest-path ccsds-ndm/Cargo.toml --bench xml_benches -- 'xml_message_matrix/(parse|generate)/rdm' --sample-size 20 --measurement-time 2 --warm-up-time 1
-```
+An RDM carries no record history, so it is not registered in the benchmark suite: the whole
+message parses and generates in microseconds, where measurement noise dominates the result.
 
-On 2026-07-18 the observed 95% intervals were 6.551-7.445 us for KVN parse,
-2.394-2.822 us for KVN generation, 29.363-43.171 us for XML parse, and 7.320-9.582 us for XML
-generation. These are observations, not unexplained release thresholds; the registered family
-benchmarks provide the CodSpeed comparison surface for subsequent changes.
+On 2026-07-18, while RDM was still registered, the observed 95% intervals were 6.551-7.445 us for
+KVN parse, 2.394-2.822 us for KVN generation, 29.363-43.171 us for XML parse, and 7.320-9.582 us
+for XML generation. Those observations are why the family was retired from the suite. Regressions
+in shared parsing and generation surface through the history-carrying families, which exercise the
+same code at a scale where a change is visible.
 
 ## Remaining verification work
 

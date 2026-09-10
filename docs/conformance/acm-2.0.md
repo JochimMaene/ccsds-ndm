@@ -23,7 +23,7 @@ This inventory records maintainer evidence for standalone ACM 2.0. The
 | Fixture preservation | All four shipped KVN fixtures preserve their complete typed model through KVN and XML. Generated XML validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
 | Generation boundary | Materialized and streaming KVN generation reject non-ASCII text and numbers exceeding the CCSDS significant-digit representation before writing bytes while preserving ACM's arbitrary line lengths. Fixed-shape CP, momentum, target-attitude, and attitude-history records are validated. |
 | Resource behaviour | Attitude and covariance rows allocate exact numeric capacity. History generation uses allocation-free numeric-record/vector writers; streaming validation and generation use record-independent temporary storage. |
-| Reproducible workloads | `acm_kvn_history_scaling` registers 100, 1,000, 10,000, and 50,000-record parse/generate workloads in the Criterion/CodSpeed-compatible KVN harness. |
+| Reproducible workloads | `acm_kvn_history_scaling` registers 100, 10,000, and 50,000-record parse/generate workloads in the Criterion/CodSpeed-compatible KVN harness. |
 
 ## Normative inventory reconciliation
 

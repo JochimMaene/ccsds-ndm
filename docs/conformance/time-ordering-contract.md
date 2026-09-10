@@ -90,8 +90,8 @@ Before exposing or advertising an ordering check, add fixtures for:
 3. mixed branches, missing context, MET/MRT, SCLK, and unknown time-system values; and
 4. the exact OCM/AEM/ACM block boundaries in the table above.
 
-The 10k OCM trajectory, covariance, and maneuver benchmark groups measure validation with the
-comparator. The successful path allocates nothing. `Epoch` retains only its spelling and
+The 10k OCM trajectory, covariance, and maneuver benchmark groups exercise the comparator through
+generation, which validates before writing. The successful path allocates nothing. `Epoch` retains only its spelling and
 classification (66 bytes); comparison work is transient, so records that are never ordered do not
 pay a persistent cache cost. XSD timezone-offset spellings are rejected before comparison under
 the stricter book-level calendar-field rules.

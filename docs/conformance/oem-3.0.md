@@ -18,7 +18,7 @@ schema 3.0. Python delegation is reviewed separately in `odm-3.0-surfaces.md`.
 | XML generation | OEM 3.0 XSD in NDM/XML 4.0.0 | Deterministic validated XML; every shipped OEM fixture generates output accepted by the official schema | `oem::generation` |
 | Conversion | ODM 5 and project semantic-preservation policy | KVN↔XML preserves the complete normalized typed model and edition; XML states with partial acceleration fail KVN conversion instead of becoming ambiguous | `oem::conversion` |
 | Resource behavior | Project conformance policy | Optional exact input/output, XML-depth, and history-record limits; atomic file replacement; allocation-stable streaming KVN generation | `oem::strict_parsing`, `oem::conversion`, `oem::generation`, `oem_kvn_allocations` |
-| Scale | Project performance contract | Reproducible KVN parse/generate workloads at 10–50,000 records and XML workloads at 100–10,000 records; timing remains informational | `cargo bench -p ccsds-ndm --bench kvn_benches -- kvn_scaling` and `cargo bench -p ccsds-ndm --bench xml_benches -- xml_scaling` |
+| Scale | Project performance contract | Reproducible KVN parse/generate workloads at 10, 1,000 and 50,000 records and XML workloads at 100, 1,000 and 10,000 records; timing remains informational | `cargo bench -p ccsds-ndm --bench kvn_benches -- oem_kvn_scaling` and `cargo bench -p ccsds-ndm --bench xml_benches -- oem_xml_scaling` |
 
 ## Deliberate boundaries
 
@@ -51,7 +51,7 @@ schema 3.0. Python delegation is reviewed separately in `odm-3.0-surfaces.md`.
 
 ## Reproduction
 
-Run `just verify` for the full quality checks plus packaged-artifact gates. Run `cargo bench -p ccsds-ndm --bench kvn_benches -- kvn_scaling` and `cargo bench -p ccsds-ndm --bench xml_benches -- xml_scaling` separately to collect informational scaling
+Run `just verify` for the full quality checks plus packaged-artifact gates. Run `cargo bench -p ccsds-ndm --bench kvn_benches -- oem_kvn_scaling` and `cargo bench -p ccsds-ndm --bench xml_benches -- oem_xml_scaling` separately to collect informational scaling
 measurements on the current host.
 
 `just conformance-oem` runs the focused OEM suite and KVN allocation check, plus

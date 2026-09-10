@@ -41,6 +41,7 @@ Issues = "https://github.com/JochimMaene/ccsds-ndm/issues"
 dev = [
     "mypy>=1.11",
     "pytest>=8.3.5",
+    "pytest-codspeed>=3.0",
     "ruff>=0.14.14",
 ]
 

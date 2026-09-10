@@ -23,8 +23,8 @@ This inventory records maintainer evidence for standalone TDM 2.0. The
 | Shared surfaces and limits | `family_contract`, `family_generation_evidence`, Python option tests, and the family benchmark matrices exercise shared bounded parsing/generation, diagnostics, and dispatch. |
 
 The existing exhaustive TDM unit tests exercise every observation variant and the indexed metadata
-families. `tdm_kvn_history_scaling` (100-50,000 observations) and `tdm_xml_history_scaling`
-(100-10,000 observations) provide reproducible Criterion workloads.
+families. `tdm_kvn_history_scaling` (100, 10,000 and 50,000 observations) and `tdm_xml_history_scaling`
+(100, 1,000 and 10,000 observations) provide reproducible Criterion workloads.
 
 ## Complete ICS reconciliation
 
@@ -71,8 +71,8 @@ The observed Criterion 95% time intervals were:
 
 | Notation/path | 100 records | 1,000 records | 10,000 records | 50,000 records |
 | --- | --- | --- | --- | --- |
-| KVN parse | 45.373-52.422 us | 391.26-411.11 us | 4.0251-4.4088 ms | 20.266-21.816 ms |
-| KVN generate | 14.725-16.980 us | 120.95-125.71 us | 1.2416-1.3050 ms | 6.5180-7.2676 ms |
+| KVN parse | 45.373-52.422 us | not registered | 4.0251-4.4088 ms | 20.266-21.816 ms |
+| KVN generate | 14.725-16.980 us | not registered | 1.2416-1.3050 ms | 6.5180-7.2676 ms |
 | XML parse | 131.83-148.38 us | 1.2382-1.3194 ms | 12.481-13.709 ms | not registered |
 | XML generate | 40.812-45.052 us | 395.03-421.06 us | 4.5055-5.1199 ms | not registered |
 

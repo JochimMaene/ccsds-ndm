@@ -30,7 +30,9 @@ Constructing a message from caller data
 
 Generation validates the complete message before writing any caller-visible bytes.
 For repeated-record shapes (OEM state vectors, AEM states), prefer the
-documented ``from_numpy`` entry points at scale; see the construction benchmark notes.
+documented ``from_numpy`` entry points at scale. ``just bench-python`` runs the
+``OemData.from_numpy`` benchmark at 10,000 records; it is tracked by CodSpeed alongside the
+Rust benchmarks.
 
 Editing nested Python models
 ----------------------------

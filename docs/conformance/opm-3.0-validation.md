@@ -18,7 +18,7 @@ semantics require caller context and are not guessed.
 | Diagnostic ordering | Covered | `Validate::validate` fails at the first model-order error. `opm::validation` fixes this contract. Work is linear in the supplied model, including repeated collections. |
 | Offline/caller-context behavior | Covered | Core validation performs no registry or network lookup. Context-dependent membership and mission plausibility are documented as outside self-contained validation; no unproven context API is added. |
 | Notation separation | Covered | `opm::validation` is notation-neutral. XML-safe text is enforced by the OPM XML generation hook and XML parser; KVN lexical checks remain in `ToKvn::validate_kvn` and the strict KVN parser. |
-| Representative cost | Covered | `opm_validate/{valid_rich,invalid_aggregate,valid_1000_maneuvers}` uses the existing Criterion/CodSpeed-compatible benchmark harness. The workload is reproducible; wall-clock results are informational under the proportionate pre-1.0 policy. |
+| Representative cost | Covered | Generation validates the complete message before writing a byte, so the allocation gates in `opm_kvn_allocations` and `opm_xml_allocations` bound the validation walk deterministically. OPM is not wall-clock benchmarked; it validates in microseconds. |
 
 The inventory is implementation evidence, not a conformance claim. The support matrix controls the
 advertised status.
