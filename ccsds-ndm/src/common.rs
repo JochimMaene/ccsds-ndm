@@ -2245,32 +2245,15 @@ impl OpmCovarianceMatrix {
     }
 }
 
-/// Report whether a lower-triangular covariance keyword names a diagonal entry.
-///
-/// The six diagonal entries are variances, so a negative value is not a producer rounding
-/// artifact but an impossible matrix. Off-diagonal covariances may legitimately be negative.
-/// Full positive-semidefinite checking is deliberately not attempted: it needs a numerical
-/// tolerance policy that rounded producer data would otherwise trip.
-pub(crate) fn is_covariance_variance(field: &str) -> bool {
-    matches!(
-        field,
-        "CX_X" | "CY_Y" | "CZ_Z" | "CX_DOT_X_DOT" | "CY_DOT_Y_DOT" | "CZ_DOT_Z_DOT"
-    )
-}
-
 /// Reject a covariance entry that cannot represent a real matrix element.
 pub(crate) fn covariance_value_error(field: &'static str, value: f64) -> Option<ValidationError> {
-    let expected = if !value.is_finite() {
-        "a finite number"
-    } else if is_covariance_variance(field) && value < 0.0 {
-        "a non-negative variance on the covariance diagonal"
-    } else {
+    if value.is_finite() {
         return None;
-    };
+    }
     Some(ValidationError::InvalidValue {
         field: field.into(),
         value: value.to_string(),
-        expected: expected.into(),
+        expected: "a finite number".into(),
         line: None,
     })
 }
@@ -3560,46 +3543,15 @@ mod tests {
     }
 
     #[test]
-    fn opm_covariance_rejects_a_negative_variance() {
+    fn opm_covariance_accepts_negative_values() {
         use crate::traits::Validate;
 
-        for (name, mutate) in [
-            (
-                "CX_X",
-                (|cov: &mut OpmCovarianceMatrix| cov.cx_x.value = -1.0)
-                    as fn(&mut OpmCovarianceMatrix),
-            ),
-            ("CY_Y", |cov| cov.cy_y.value = -1.0),
-            ("CZ_Z", |cov| cov.cz_z.value = -1.0),
-            ("CX_DOT_X_DOT", |cov| cov.cx_dot_x_dot.value = -1.0),
-            ("CY_DOT_Y_DOT", |cov| cov.cy_dot_y_dot.value = -1.0),
-            ("CZ_DOT_Z_DOT", |cov| cov.cz_dot_z_dot.value = -1.0),
-        ] {
-            let mut cov = opm_covariance_fixture();
-            mutate(&mut cov);
-            let error = cov
-                .validate()
-                .expect_err("a negative variance is not a representable covariance");
-            assert!(
-                error.to_string().contains(name)
-                    && error
-                        .to_string()
-                        .contains("a non-negative variance on the covariance diagonal"),
-                "unexpected error for {name}: {error}"
-            );
-        }
-    }
-
-    #[test]
-    fn opm_covariance_accepts_a_negative_off_diagonal_term() {
-        use crate::traits::Validate;
-
-        // Off-diagonal entries are covariances, not variances, so a negative value is physical.
         let mut cov = opm_covariance_fixture();
+        cov.cx_x.value = -1.0;
         cov.cy_x.value = -2.0;
         cov.cz_dot_y.value = -17.0;
         cov.validate()
-            .expect("negative off-diagonal covariances are valid");
+            .expect("the ODM does not constrain covariance signs");
     }
 
     #[test]
