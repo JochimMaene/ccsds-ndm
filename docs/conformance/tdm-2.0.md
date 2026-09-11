@@ -12,7 +12,7 @@ This inventory records maintainer evidence for standalone TDM 2.0. The
 
 ## Executable evidence
 
-`just conformance-tdm` establishes:
+The TDM suites establish:
 
 | Concern | Evidence |
 | --- | --- |
@@ -83,7 +83,7 @@ claims.
 
 ## Remaining verification work
 
-TDM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its ICS feature inventory and packaged
+TDM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its ICS feature inventory and packaged
 surfaces are reconciled, and the recorded timing observations below remain informational.
 
 Both accepted input editions are covered for value domains. The observation value domains above are enforced

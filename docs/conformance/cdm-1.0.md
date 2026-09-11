@@ -13,7 +13,7 @@ This inventory records maintainer evidence for standalone CDM 1.0. The
 
 ## Executable evidence
 
-`just conformance-cdm` runs `cdm_conformance`, which establishes:
+The `cdm_conformance` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |
@@ -53,5 +53,5 @@ shared built-artifact gates.
 
 ## Status
 
-CDM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). No family-specific promotion blocker is
+CDM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). No family-specific promotion blocker is
 known; only the exact-cell review remains.

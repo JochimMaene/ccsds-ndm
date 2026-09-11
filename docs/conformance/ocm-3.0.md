@@ -14,7 +14,7 @@ This inventory records maintainer evidence for standalone OCM 3.0. The
 
 ## Executable evidence
 
-`just conformance-ocm` runs `ocm_conformance` and `ocm_kvn_allocations`, which establish:
+The `ocm_conformance` and `ocm_kvn_allocations` suites establish:
 
 | Concern | Evidence |
 | --- | --- |
@@ -83,6 +83,6 @@ by all family cells.
 
 ## Status
 
-OCM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its family-specific open items are the five
+OCM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its family-specific open items are the five
 deliberately unvalidated values listed above, of which `DAYS_SINCE_*_OBS` and the phase-angle range
 are book/XSD conflicts rather than gaps.

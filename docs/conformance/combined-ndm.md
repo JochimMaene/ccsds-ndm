@@ -1,6 +1,6 @@
 # Combined NDM conformance inventory
 
-Status: `implemented-unverified`.
+Status: **Available**.
 
 The combined instantiation is the XML `ndm` envelope defined by CCSDS 505.0-B-3, section 4.11,
 and `ccsds-ndm/data/xsd/ndmxml-4.0.0-master-4.0.xsd`. It is the only representation this library
@@ -15,7 +15,7 @@ section 2.5, ADM section 2.5.1). A previously shipped sequential-KVN convenience
 therefore removed; combined KVN parsing and generation now fail with the `unsupported.notation`
 diagnostic, and generic detection rejects any KVN document carrying more than one message header.
 
-`just conformance-combined` establishes:
+The combined-NDM suites establish:
 
 - exact root and constituent attribute contracts, document-root/trailing-content checks, schema
   child ordering, and rejection of unknown or nested message structure;
@@ -56,6 +56,6 @@ and `package-rust` are the shared built-artifact gates.
 
 ## Status
 
-Combined NDM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its family-specific blocker is the
+Combined NDM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its family-specific blocker is the
 XSD-valid G22 versus standalone OPM maneuver/`MASS` semantic conflict, which must be resolved
 independently of the exact-cell review.

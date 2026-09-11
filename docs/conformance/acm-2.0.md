@@ -13,7 +13,7 @@ This inventory records maintainer evidence for standalone ACM 2.0. The
 
 ## Executable evidence
 
-`just conformance-acm` runs `acm_conformance` and `acm_kvn_allocations`, which establish:
+The `acm_conformance` and `acm_kvn_allocations` suites establish:
 
 | Concern | Evidence |
 | --- | --- |
@@ -53,5 +53,5 @@ are the common built-artifact gates.
 
 ## Status
 
-ACM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). No family-specific promotion blocker is
+ACM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). No family-specific promotion blocker is
 known; only the exact-cell review remains.

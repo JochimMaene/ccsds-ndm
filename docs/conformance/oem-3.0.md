@@ -3,7 +3,7 @@
 This inventory covers the core CCSDS OEM 3.0 behavior: strict KVN and XML parsing, typed-model
 validation, KVN and XML generation, and conversion in both notation directions. The normative
 sources are CCSDS 502.0-B-3 with Editorial Corrigendum 1 and the NDM/XML 4.0.0 schema set with OEM
-schema 3.0. Python delegation is reviewed separately in `odm-3.0-surfaces.md`.
+schema 3.0.
 
 ## Requirement map
 
@@ -12,12 +12,12 @@ schema 3.0. Python delegation is reviewed separately in `odm-3.0-surfaces.md`.
 | Message identity and structure | ODM 5.1–5.2; tables 5-1 through 5-4 | One OEM root, ordered header/body/segments, one object throughout the message, and a fixed time system | `oem::strict_parsing`, `oem::diagnostics`, `oem::validation` |
 | KVN lexical and record structure | ODM 5.2.4–5.2.5, 7.3–7.9, A2.5.3 | Printable ASCII, 254-character lines, LF/CR/CRLF/LFCR handling, fixed keyword order, exact 7/10-field ephemeris records, exact triangular covariance rows, and normative comment placement | `oem::strict_parsing`, `oem::generation` |
 | XML structure | ODM 8; `ndmxml-4.0.0-oem-3.0.xsd` and common schema | Exact root/envelope, ordered known elements, bounded nesting, no DTD or trailing document, and rejection of unknown model content | `oem::strict_parsing` |
-| Time semantics | ODM 5.1.3, 5.2.3–5.2.5, 7.5.10 | Absolute OEM time tags, consistent metadata spans, nonoverlapping consecutive useable spans, ephemeris records within their total span and in nondecreasing order, and strictly increasing covariance epochs | `oem::validation` |
+| Time semantics | ODM 5.1.3, 5.2.3–5.2.5, 7.5.10 | Absolute OEM time tags, consistent metadata spans, nonoverlapping consecutive useable spans, ephemeris records within their total span, and strictly increasing covariance epochs | `oem::validation` |
 | Typed values | ODM 5.2 and 7.5 | Required content, finite numeric values, interpolation/degree dependency, and fixed implicit OEM units normalized across notations | OEM unit tests, `oem::validation`, `oem::conversion` |
 | KVN generation | ODM 5.2, 7.3–7.9 | Deterministic ordered output, ODM-compatible numbers rounded when necessary to at most 16 significant digits, complete acceleration triples, printable bounded lines, and validation before output | `oem::generation`, `oem_kvn_allocations` |
 | XML generation | OEM 3.0 XSD in NDM/XML 4.0.0 | Deterministic validated XML; every shipped OEM fixture generates output accepted by the official schema | `oem::generation` |
 | Conversion | ODM 5 and project semantic-preservation policy | KVN↔XML preserves the complete normalized typed model and edition; XML states with partial acceleration fail KVN conversion instead of becoming ambiguous | `oem::conversion` |
-| Resource behavior | Project conformance policy | Fixed XML nesting safety limit, atomic file replacement, and allocation-stable streaming KVN generation | `oem::strict_parsing`, `oem::conversion`, `oem::generation`, `oem_kvn_allocations` |
+| Resource behavior | Project conformance policy | Fixed XML nesting safety limit, atomic file replacement, allocation-stable streaming KVN generation, and XML parsing without per-record heap allocation | `oem::strict_parsing`, `oem::conversion`, `oem::generation`, `oem_kvn_allocations`, `oem_xml_allocations` |
 | Scale | Project performance contract | Reproducible parse/generate workloads at 100, 10,000 and 50,000 records in KVN and at 100 and 10,000 in XML; timing remains informational | `cargo bench -p ccsds-ndm --bench kvn_benches -- oem_kvn_history_scaling` and `cargo bench -p ccsds-ndm --bench xml_benches -- oem_xml_history_scaling` |
 
 ## Deliberate boundaries
@@ -46,13 +46,13 @@ schema 3.0. Python delegation is reviewed separately in `odm-3.0-surfaces.md`.
   metadata total span because the normative XML example `oem_g14.xml` places its covariance epoch
   beyond `STOP_TIME`; the library does not invent a stricter rule where the authoritative inputs
   conflict.
-- Python parity is covered by the focused adapter and packaged-artifact evidence in
-  `odm-3.0-surfaces.md`; the adapter contains no independent OEM rules.
+- Python parity is covered by `test_oem.py`, the shared binding tests, and the packaged-wheel
+  gate in `just package-python`; the adapter contains no independent OEM rules.
 
 ## Reproduction
 
 Run `just verify` for the full quality checks plus packaged-artifact gates. Run `cargo bench -p ccsds-ndm --bench kvn_benches -- oem_kvn_history_scaling` and `cargo bench -p ccsds-ndm --bench xml_benches -- oem_xml_history_scaling` separately to collect informational scaling
 measurements on the current host.
 
-`just conformance-oem` runs the focused OEM suite and KVN allocation check, plus
-`message_output_contract` for the shared AEM/OEM/OPM output and atomic-file guarantees.
+The `oem`, `oem_kvn_allocations`, and `oem_xml_allocations` suites carry the focused evidence,
+plus `message_output_contract` for the shared AEM/OEM/OPM output and atomic-file guarantees.

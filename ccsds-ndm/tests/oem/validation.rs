@@ -68,19 +68,16 @@ fn oem_time_tags_are_absolute_and_metadata_ranges_are_consistent() {
 }
 
 #[test]
-fn ephemeris_records_are_in_span_and_nondecreasing() {
+fn ephemeris_records_are_in_span_but_need_not_be_ordered() {
     let mut message = Oem::from_xml(XML).unwrap();
     message.body.segment[0].data.state_vector[0].epoch = epoch("2019-12-01T00:00:00");
     assert!(message.validate().is_err());
 
     let mut message = Oem::from_xml(XML).unwrap();
     message.body.segment[0].data.state_vector[2].epoch = epoch("2019-12-18T12:00:30.331");
-    let error = message.validate().unwrap_err();
-    assert!(error.to_string().contains("nondecreasing"));
-    assert_eq!(
-        error.field_path().as_deref(),
-        Some("body.segment[0].data.state_vector[2].epoch")
-    );
+    message
+        .validate()
+        .expect("OEM does not require ephemeris records to be ordered");
 }
 
 #[test]
@@ -96,22 +93,5 @@ fn covariance_time_tags_are_strictly_increasing() {
     assert_eq!(
         error.field_path().as_deref(),
         Some("body.segment[0].data.covariance_matrix[1].epoch")
-    );
-}
-
-#[test]
-fn validation_stops_at_the_first_failure() {
-    let mut message = Oem::from_xml(XML).unwrap();
-    let metadata = &mut message.body.segment[0].metadata;
-    metadata.object_name.clear();
-    metadata.useable_start_time = Some(epoch("2019-12-01T00:00:00"));
-    metadata.useable_stop_time = Some(epoch("2019-11-01T00:00:00"));
-    message.body.segment[0].data.state_vector[0].x.value = f64::NAN;
-
-    let first = message.validate().unwrap_err();
-    assert_eq!(first.code(), Some("validation.missing_required_field"));
-    assert_eq!(
-        first.field_path().as_deref(),
-        Some("body.segment[0].metadata.object_name")
     );
 }

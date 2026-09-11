@@ -13,8 +13,7 @@ This inventory records maintainer evidence for standalone AEM 2.0. The
 
 ## Executable evidence
 
-`just conformance-aem` runs `aem`, `aem_kvn_allocations`, and
-`message_output_contract`, which establish:
+The `aem`, `aem_kvn_allocations`, and `message_output_contract` suites establish:
 
 | Concern | Evidence |
 | --- | --- |
@@ -61,6 +60,6 @@ and `package-rust` provide the common built-artifact gates.
 
 ## Status
 
-AEM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its family-specific blocker is the
+AEM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its family-specific blocker is the
 interpolation-degree/example conflict described above, which blocks promotion of the affected
 semantic claim independently of the exact-cell review.

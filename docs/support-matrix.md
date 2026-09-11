@@ -18,7 +18,7 @@ rather than silently discarded.
 | Message / edition | KVN | XML | Rust | Python | Status |
 | --- | --- | --- | --- | --- | --- |
 | OPM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | **Verified** |
-| OEM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | **Verified** |
+| OEM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
 | OPM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
 | OEM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
 | OMM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | **Verified** |

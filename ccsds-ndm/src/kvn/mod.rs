@@ -32,7 +32,7 @@ pub(crate) mod strict;
 /// are rendered against the caller's original input, so the two must stay aligned.
 ///
 /// OEM and OPM enable this, which is what lets both accept all four normative terminators; see
-/// `docs/conformance/oem-3.0.md` and `docs/conformance/opm-3.0-kvn-parsing.md`. The remaining
+/// `docs/conformance/oem-3.0.md` and `docs/conformance/opm-3.0.md`. The remaining
 /// families never normalize, so [`strict::validate_odm_assignments`] still rejects a lone
 /// carriage return for them — it only ever strips a trailing one, so CRLF parses everywhere.
 /// Widening the other eight is a per-family conformance decision that has not been taken.

@@ -142,86 +142,6 @@ test-python:
 # Run both Rust and Python tests
 test: test-rust test-python
 
-# Run all OPM behavior, allocation, and shared output-contract checks.
-#
-# This is one whole-target gate rather than per-concern slices: `cargo test <filter>` exits 0 when
-# the filter matches nothing, so a name-filtered slice would silently empty the gate on a module
-# rename.
-[private]
-conformance-opm:
-    cargo test --manifest-path {{rust_manifest}} --test opm --test opm_kvn_allocations --test opm_xml_allocations --test message_output_contract
-
-[private]
-conformance-opm-python:
-    cd {{python_dir}} && uv run pytest tests/test_opm.py tests/test_parse_and_generation_options.py
-
-# Run the focused OEM 3.0 Rust parsing, validation, generation, conversion, and resource evidence
-[private]
-conformance-oem:
-    cargo test --manifest-path {{rust_manifest}} --test oem
-    cargo test --manifest-path {{rust_manifest}} --test oem_kvn_allocations
-    cargo test --manifest-path {{rust_manifest}} --test message_output_contract
-
-# Run the focused OMM 3.0 strictness, preservation, and generation evidence
-[private]
-conformance-omm:
-    cargo test --manifest-path {{rust_manifest}} --test omm_conformance
-    cargo test --manifest-path {{rust_manifest}} --test fixed_family_allocations
-
-# Run the focused OEM/OMM Python adapter evidence
-[private]
-conformance-odm-surfaces:
-    cd {{python_dir}} && uv run pytest tests/test_verified_odm_surfaces.py tests/test_parse_and_generation_options.py
-
-# Run the focused standalone OCM 3.0 conformance and history-allocation evidence.
-[private]
-conformance-ocm:
-    cargo test --manifest-path {{rust_manifest}} --test ocm_conformance
-    cargo test --manifest-path {{rust_manifest}} --test ocm_kvn_allocations
-
-# Run the focused standalone CDM 1.0 conformance evidence.
-[private]
-conformance-cdm:
-    cargo test --manifest-path {{rust_manifest}} --test cdm_conformance
-
-# Run the focused standalone AEM 2.0 conformance and history-allocation evidence.
-[private]
-conformance-aem:
-    cargo test --manifest-path {{rust_manifest}} --test aem
-    cargo test --manifest-path {{rust_manifest}} --test aem_kvn_allocations
-    cargo test --manifest-path {{rust_manifest}} --test message_output_contract
-
-# Run the focused standalone ACM 2.0 conformance and history-allocation evidence.
-[private]
-conformance-acm:
-    cargo test --manifest-path {{rust_manifest}} --test acm_conformance
-    cargo test --manifest-path {{rust_manifest}} --test acm_kvn_allocations
-
-# Run the focused combined NDM envelope, surface, and allocation evidence.
-[private]
-conformance-combined:
-    cargo test --manifest-path {{rust_manifest}} --test combined_conformance
-    cargo test --manifest-path {{rust_manifest}} --test combined_ndm
-    cargo test --manifest-path {{rust_manifest}} --test combined_allocations
-
-# Run the focused standalone APM 2.0 conformance evidence.
-[private]
-conformance-apm:
-    cargo test --manifest-path {{rust_manifest}} --test apm_conformance
-    cargo test --manifest-path {{rust_manifest}} --test fixed_family_allocations
-
-# Run the focused standalone RDM 1.0 conformance evidence.
-[private]
-conformance-rdm:
-    cargo test --manifest-path {{rust_manifest}} --test rdm_conformance
-    cargo test --manifest-path {{rust_manifest}} --test fixed_family_allocations
-
-# Run the focused standalone TDM 2.0 conformance and history-allocation evidence.
-[private]
-conformance-tdm:
-    cargo test --manifest-path {{rust_manifest}} --test tdm_conformance
-    cargo test --manifest-path {{rust_manifest}} --test tdm_kvn_allocations
-
 # Complete verification path: full quality checks plus packaged-artifact gates.
 verify: check package-rust package-python
 
@@ -233,12 +153,6 @@ check: lint audit stubs-check typecheck test docs
 # Run Rust benchmarks
 bench:
     cargo bench --manifest-path {{rust_manifest}}
-
-# Reproduce parse/generate workloads for every standalone message and combined XML NDM
-[private]
-bench-family:
-    cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_message_matrix
-    cargo bench --manifest-path {{rust_manifest}} --bench xml_benches -- xml_message_matrix
 
 # --- CodSpeed ---------------------------------------------------------------
 

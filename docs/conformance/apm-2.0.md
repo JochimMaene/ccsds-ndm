@@ -14,7 +14,7 @@ This inventory records maintainer evidence for standalone APM 2.0. The
 
 ## Executable evidence
 
-`just conformance-apm` runs `apm_conformance`, which establishes:
+The `apm_conformance` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |
@@ -73,5 +73,5 @@ benchmarks provide the CodSpeed comparison surface for subsequent changes.
 
 ## Remaining verification work
 
-APM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its ICS feature inventory and packaged
+APM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its ICS feature inventory and packaged
 surfaces are reconciled, and no family-specific promotion blocker is known.

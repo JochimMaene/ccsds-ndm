@@ -14,7 +14,7 @@ This inventory records maintainer evidence for standalone OMM 3.0. The
 
 ## Executable evidence
 
-`just conformance-omm` runs `omm_conformance`, which establishes:
+The `omm_conformance` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |
@@ -53,8 +53,9 @@ shared policy on [externally governed values](family-shared-contract.md#external
 
 `fixed_family_allocations` records strict KVN parse budgets of at most 128 allocations/24,000
 bytes and preflighted streaming-generation budgets of at most 48 allocations/2,000 bytes for the
-shipped OMM fixture. `test_omm.py` and the shared Python options
-matrix exercise typed parsing, both notations, files, TLE conversion, diagnostics, and limits.
+shipped OMM fixture. `test_omm.py`, `test_api_consistency.py`, and the shared Python
+options matrix exercise typed parsing, both notations, files, TLE conversion, diagnostics, and
+limits.
 Strict binding audit, generated-stub/doc checks, the full wheel test, and the publishable Rust
 artifact check are the reproducible packaged gates.
 

@@ -13,7 +13,7 @@ This inventory records maintainer evidence for standalone RDM 1.0. The
 
 ## Executable evidence
 
-`just conformance-rdm` runs `rdm_conformance`, which establishes:
+The `rdm_conformance` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |
@@ -84,6 +84,6 @@ benchmarks provide the CodSpeed comparison surface for subsequent changes.
 
 ## Remaining verification work
 
-RDM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its ICS feature inventory and packaged
+RDM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its ICS feature inventory and packaged
 surfaces are reconciled, and the `NOMINAL_IMPACT_ALT` book/XSD conflict recorded above is now
 resolved. No family-specific promotion blocker remains; only the exact-cell review.

@@ -204,7 +204,6 @@ struct OemEpochRangeCheck<'a> {
     stop: &'a Epoch,
     start_key: Option<crate::types::EpochOrderKey<'a>>,
     stop_key: Option<crate::types::EpochOrderKey<'a>>,
-    previous_state: Option<crate::types::EpochOrderKey<'a>>,
     previous_covariance: Option<crate::types::EpochOrderKey<'a>>,
 }
 
@@ -215,7 +214,6 @@ impl<'a> OemEpochRangeCheck<'a> {
             stop: &metadata.stop_time,
             start_key: metadata.start_time.order_key(),
             stop_key: metadata.stop_time.order_key(),
-            previous_state: None,
             previous_covariance: None,
         }
     }
@@ -255,21 +253,6 @@ impl<'a> OemEpochRangeCheck<'a> {
                 .at_path(path()),
             );
         }
-        if matches!(
-            (self.previous_state, current),
-            (Some(prior), Some(current)) if prior.compare(&current) == Some(Ordering::Greater)
-        ) {
-            report(
-                ValidationError::InvalidValue {
-                    field: "stateVector EPOCH".into(),
-                    value: state.epoch.to_string(),
-                    expected: "nondecreasing ephemeris time tags".into(),
-                    line: None,
-                }
-                .at_path(path()),
-            );
-        }
-        self.previous_state = current;
     }
 
     fn covariance(
@@ -877,8 +860,14 @@ impl crate::traits::Validate for OemCovarianceMatrix {
             return Err(error.into());
         }
         for (field, value) in self.values() {
-            if let Some(error) = crate::common::covariance_value_error(field, value) {
-                return Err(error.into());
+            if !value.is_finite() {
+                return Err(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.to_string(),
+                    expected: "a finite number".into(),
+                    line: None,
+                }
+                .into());
             }
         }
         Ok(())
@@ -923,17 +912,16 @@ mod tests {
     use crate::traits::{Ndm, Validate};
 
     #[test]
-    fn covariance_validation_distinguishes_variances_from_off_diagonal_terms() {
+    fn covariance_validation_accepts_negative_values_but_rejects_non_finite_values() {
         let negative_variance =
             include_str!("../../data/kvn/oem_g13.kvn").replace("3.3313494e-04", "-3.3313494e-04");
-        let error = Oem::from_kvn(&negative_variance).expect_err("negative variance must fail");
-        let message = error.to_string();
-        assert!(message.contains("CX_X"));
-        assert!(message.contains("a non-negative variance on the covariance diagonal"));
+        let mut oem = Oem::from_kvn(&negative_variance)
+            .expect("OEM does not specify a sign constraint for covariance values");
+        oem.to_kvn()
+            .expect("negative covariance values must generate");
 
-        let valid_off_diagonal = include_str!("../../data/kvn/oem_g13.kvn");
-        assert!(valid_off_diagonal.contains("-3.0700078e-04"));
-        Oem::from_kvn(valid_off_diagonal).expect("negative off-diagonal values are valid");
+        oem.body.segment[0].data.covariance_matrix[0].cx_x.value = f64::NAN;
+        assert!(oem.validate().is_err());
     }
 
     #[test]

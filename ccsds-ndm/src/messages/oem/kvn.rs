@@ -665,7 +665,7 @@ impl Oem {
             writer.write_comments(&segment.data.comment);
             writer.write_empty();
             for (state_index, state) in segment.data.state_vector.iter().enumerate() {
-                // The fused generation pass below applies the stronger OEM absolute/range/order
+                // The fused generation pass below applies the stronger OEM absolute/range
                 // epoch checks and checks every numeric component through `OdmFloat`. Calling the
                 // generic state validator here would scan the same epoch and values a second time.
                 let mut epoch_error = None;
@@ -805,10 +805,15 @@ impl Oem {
                                     field.to_ascii_lowercase()
                                 )
                             };
-                            if let Some(error) =
-                                crate::common::covariance_value_error(field, *value)
-                            {
-                                return Err(error.at_path(path()).into());
+                            if !value.is_finite() {
+                                return Err(ValidationError::InvalidValue {
+                                    field: (*field).into(),
+                                    value: value.to_string(),
+                                    expected: "a finite number".into(),
+                                    line: None,
+                                }
+                                .at_path(path())
+                                .into());
                             }
                             if !OdmFloat::write_if_valid(*value, line) {
                                 return Err(crate::validation::unrepresentable_number(

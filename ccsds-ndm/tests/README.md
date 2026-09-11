@@ -1,7 +1,8 @@
 # AEM, OEM, and OPM tests
 
-Run `just conformance-aem`, `just conformance-oem`, or `just conformance-opm`.
-Run `just test-rust` for the entire Rust suite.
+Run one family from the repository root with
+`cargo test --manifest-path ccsds-ndm/Cargo.toml --test aem` (or `--test oem`, `--test opm`).
+Run `just test` for the entire suite.
 
 Each message uses the same coverage checklist; case counts differ because the
 formats have different rules.

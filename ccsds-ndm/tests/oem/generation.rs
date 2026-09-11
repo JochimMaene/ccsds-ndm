@@ -56,12 +56,7 @@ fn generation_diagnostics_identify_the_message_and_field() {
 }
 
 #[test]
-fn kvn_generation_rejects_semantically_invalid_mutations() {
-    let mut negative_variance = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
-    negative_variance.body.segment[0].data.covariance_matrix[0]
-        .cx_x
-        .value = -1.0;
-
+fn kvn_generation_rejects_overlapping_useable_spans() {
     let mut overlapping_useable_spans = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
     overlapping_useable_spans.body.segment[1]
         .metadata
@@ -70,12 +65,7 @@ fn kvn_generation_rejects_semantically_invalid_mutations() {
         .metadata
         .useable_start_time = Some("2019-12-28T21:22:00.331".parse().unwrap());
 
-    for (field, message) in [
-        ("CX_X", negative_variance),
-        ("USEABLE_START_TIME", overlapping_useable_spans),
-    ] {
-        assert_rejects(&message, field);
-    }
+    assert_rejects(&overlapping_useable_spans, "USEABLE_START_TIME");
 }
 
 #[test]
