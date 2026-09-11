@@ -11,63 +11,6 @@ fn is_ascii_whitespace(bytes: &[u8]) -> bool {
     bytes.iter().all(u8::is_ascii_whitespace)
 }
 
-fn history_record_count(message: &Message) -> usize {
-    match message {
-        Message::Oem(message) => message
-            .body
-            .segment
-            .iter()
-            .map(|segment| segment.data.state_vector.len() + segment.data.covariance_matrix.len())
-            .sum(),
-        Message::Ocm(message) => {
-            let data = &message.body.segment.data;
-            data.traj
-                .iter()
-                .map(|block| block.traj_lines.len())
-                .sum::<usize>()
-                + data
-                    .cov
-                    .iter()
-                    .map(|block| block.cov_lines.len())
-                    .sum::<usize>()
-                + data
-                    .man
-                    .iter()
-                    .map(|block| block.man_lines.len())
-                    .sum::<usize>()
-        }
-        Message::Tdm(message) => message
-            .body
-            .segments
-            .iter()
-            .map(|segment| segment.data.observations.len())
-            .sum(),
-        Message::Aem(message) => message
-            .body
-            .segment
-            .iter()
-            .map(|segment| segment.data.attitude_states.len())
-            .sum(),
-        Message::Acm(message) => {
-            let data = &message.body.segment.data;
-            data.att
-                .iter()
-                .map(|block| block.att_lines.len())
-                .sum::<usize>()
-                + data
-                    .cov
-                    .iter()
-                    .map(|block| block.cov_lines.len())
-                    .sum::<usize>()
-                + data.man.len()
-        }
-        Message::Ndm(message) => message.messages.iter().map(history_record_count).sum(),
-        Message::Opm(_) | Message::Omm(_) | Message::Cdm(_) | Message::Rdm(_) | Message::Apm(_) => {
-            0
-        }
-    }
-}
-
 fn invalid_envelope(message: impl Into<String>) -> CcsdsNdmError {
     CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(message.into())))
 }
@@ -117,27 +60,27 @@ fn validate_combined_child_attributes(start: &quick_xml::events::BytesStart<'_>)
     Ok(())
 }
 
-fn validate_combined_xml_depth(xml: &str, limit: usize) -> Result<()> {
+fn validate_combined_xml_depth(xml: &str) -> Result<()> {
     let mut reader = quick_xml::Reader::from_str(xml);
     let mut depth = 0usize;
     loop {
         match reader.read_event() {
             Ok(quick_xml::events::Event::Start(_)) => {
                 depth = depth.saturating_add(1);
-                if depth > limit {
+                if depth > crate::xml::XML_DEPTH_LIMIT {
                     return Err(CcsdsNdmError::ResourceLimitExceeded {
                         resource: "xml_depth",
-                        limit,
+                        limit: crate::xml::XML_DEPTH_LIMIT,
                         actual: depth,
                     });
                 }
             }
             Ok(quick_xml::events::Event::Empty(_)) => {
                 let actual = depth.saturating_add(1);
-                if actual > limit {
+                if actual > crate::xml::XML_DEPTH_LIMIT {
                     return Err(CcsdsNdmError::ResourceLimitExceeded {
                         resource: "xml_depth",
-                        limit,
+                        limit: crate::xml::XML_DEPTH_LIMIT,
                         actual,
                     });
                 }
@@ -255,7 +198,7 @@ impl Ndm for CombinedNdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        Self::from_xml_with_options(xml, &crate::options::ParseOptions::default())
+        Self::from_xml_strict(xml)
     }
 
     /// Always returns `UnsupportedNotation`; combined NDM has no KVN representation.
@@ -306,25 +249,12 @@ impl CombinedNdm {
         Ok(())
     }
 
-    /// Strictly parse a combined XML instantiation with bounded child parsing.
-    pub(crate) fn from_xml_with_options(
-        xml: &str,
-        options: &crate::options::ParseOptions,
-    ) -> Result<Self> {
+    /// Strictly parse a combined XML instantiation.
+    pub(crate) fn from_xml_strict(xml: &str) -> Result<Self> {
         use quick_xml::events::Event;
         use quick_xml::reader::Reader;
 
-        if options
-            .max_input_bytes
-            .is_some_and(|limit| xml.len() > limit)
-        {
-            return Err(CcsdsNdmError::ResourceLimitExceeded {
-                resource: "input_document",
-                limit: options.max_input_bytes.unwrap(),
-                actual: xml.len(),
-            });
-        }
-        validate_combined_xml_depth(xml, options.max_xml_depth)?;
+        validate_combined_xml_depth(xml)?;
         crate::xml::validate_document_root(xml, b"ndm", "combined NDM")?;
 
         let mut reader = Reader::from_str(xml);
@@ -334,7 +264,6 @@ impl CombinedNdm {
         let mut id = None;
         let mut comments = Vec::new();
         let mut messages = Vec::new();
-        let mut records = 0usize;
 
         let invalid = |message: &str| {
             CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(message.into())))
@@ -427,23 +356,10 @@ impl CombinedNdm {
                             let end_pos = reader.buffer_position() as usize;
                             let full_element = &xml[actual_start_pos..end_pos];
 
-                            let mut child_options = options.clone();
-                            if let Some(limit) = options.max_records {
-                                child_options.max_records = Some(limit.saturating_sub(records));
-                            }
-                            let msg = crate::from_str_with_options(
+                            let msg = crate::from_str_with_notation(
                                 full_element,
                                 Some(crate::detect::Notation::Xml),
-                                &child_options,
                             )?;
-                            records = records.saturating_add(history_record_count(&msg));
-                            if options.max_records.is_some_and(|limit| records > limit) {
-                                return Err(CcsdsNdmError::ResourceLimitExceeded {
-                                    resource: "history_records",
-                                    limit: options.max_records.unwrap(),
-                                    actual: records,
-                                });
-                            }
                             messages.push(msg);
                         }
                         _ => {

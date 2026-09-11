@@ -21,19 +21,9 @@
 //!   [`Ndm::from_kvn`](crate::traits::Ndm::from_kvn) or the crate-level auto-detection helpers.
 //! - **Serialization**: Uses a custom `KvnWriter` to ensure correct formatting and indentation.
 
-pub(crate) mod acm;
-pub(crate) mod aem;
-pub(crate) mod apm;
-pub(crate) mod cdm;
-pub(crate) mod ocm;
-pub(crate) mod oem;
-pub(crate) mod omm;
-pub(crate) mod opm;
 pub(crate) mod parser;
-pub(crate) mod rdm;
 pub mod ser;
 pub(crate) mod strict;
-pub(crate) mod tdm;
 
 /// Normalize CR, LFCR, and CRLF terminators so line-oriented passes only have to handle LF.
 ///
@@ -42,7 +32,7 @@ pub(crate) mod tdm;
 /// are rendered against the caller's original input, so the two must stay aligned.
 ///
 /// OEM and OPM enable this, which is what lets both accept all four normative terminators; see
-/// `docs/conformance/oem-3.0.md` and `docs/conformance/opm-3.0-kvn-parsing.md`. The remaining
+/// `docs/conformance/oem-3.0.md` and `docs/conformance/opm-3.0.md`. The remaining
 /// families never normalize, so [`strict::validate_odm_assignments`] still rejects a lone
 /// carriage return for them — it only ever strips a trailing one, so CRLF parses everywhere.
 /// Widening the other eight is a per-family conformance decision that has not been taken.

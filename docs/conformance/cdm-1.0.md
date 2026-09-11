@@ -13,7 +13,7 @@ This inventory records maintainer evidence for standalone CDM 1.0. The
 
 ## Executable evidence
 
-`just conformance-cdm` runs `cdm_conformance`, which establishes:
+The `cdm_conformance` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |
@@ -22,7 +22,7 @@ This inventory records maintainer evidence for standalone CDM 1.0. The
 | Delimiter-free COMMENT decision | A leading KVN comment run before the first data keyword is normatively retained on the outer data block; no textual delimiter exists from which to infer a split. If the typed model populates the first present nested block's comments, every materialized and streaming KVN generation route rejects the state before output. The shipped XML fixture demonstrates this richer, XML-only association and is therefore intentionally not convertible to KVN. |
 | Typed preservation and generation | All three shipped KVN fixtures retain their complete typed model through deterministic KVN and XML generation. The shipped XML fixture retains its model through XML generation. Every generated XML document validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
 | KVN fixed-point preflight | CDM's shape is a fixed, bounded set of scalar records. A private generation preflight writes and reparses that bounded representation before caller-visible output, rejecting lexical violations, multiline normalization, comment reassociation, or any other typed-model change. Streaming rejection is proven to write zero bytes. |
-| Shared surfaces and limits | `family_contract`, Python option tests, and the shared generation plumbing exercise bounded parsing/generation, structured diagnostics, and Rust-core delegation. No separate CDM semantics are implemented in an adapter. |
+| Shared surfaces | `family_contract`, Python API tests, and the shared generation plumbing exercise parsing, generation, structured diagnostics, and Rust-core delegation. No separate CDM semantics are implemented in an adapter. |
 
 ## Normative inventory reconciliation
 
@@ -53,5 +53,5 @@ shared built-artifact gates.
 
 ## Status
 
-CDM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). No family-specific promotion blocker is
+CDM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). No family-specific promotion blocker is
 known; only the exact-cell review remains.

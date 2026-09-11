@@ -1,11 +1,10 @@
 use std::fs;
-use std::path::{Path, PathBuf};
 
 use ccsds_ndm::messages::apm::Apm;
 use ccsds_ndm::Ndm;
 
 mod common;
-use common::{assert_rejects, validate_xml};
+use common::{assert_rejects, data_dir, validate_xml};
 
 const KVN: &str = include_str!("../data/kvn/apm_g1.kvn");
 const XML: &str = include_str!("../data/xml/apm_g10.xml");
@@ -30,10 +29,6 @@ NUTATION_PER = 100
 NUTATION_PHASE = 45
 SPIN_STOP
 "#;
-
-fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
-}
 
 #[test]
 fn apm_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
@@ -122,7 +117,7 @@ fn apm_xml_rejects_unknown_nested_content_attributes_and_ordering_errors() {
 #[test]
 fn every_shipped_apm_fixture_preserves_the_typed_model_and_generates_valid_xml() {
     for name in ["apm_g1.kvn", "apm_g2.kvn", "apm_g3.kvn"] {
-        let source = fs::read_to_string(repository_path(&format!("data/kvn/{name}"))).unwrap();
+        let source = fs::read_to_string(data_dir().join("kvn").join(name)).unwrap();
         let message = Apm::from_kvn(&source).unwrap();
         let kvn = message.to_kvn().unwrap();
         assert_eq!(Apm::from_kvn(&kvn).unwrap(), message, "{name} KVN model");

@@ -30,8 +30,8 @@ This is simpler and more familiar than introducing a custom ownership rule solel
 
 ## Why this design
 
-- Direct mutation is the shortest common workflow and is understood by Python users without
-  library-specific concepts.
+- Generation from caller data is the primary workflow; parsing remains core. Direct mutation stays supported and is understood by Python users without
+  library-specific concepts, but it is no longer claimed to be the shortest common workflow.
 - Child identity makes retained references predictable, including after a child is removed from a
   collection.
 - The complete edited graph is what validation and generation observe, so there is no stale
@@ -52,12 +52,14 @@ time-sensitive paths were measured before extending the graph to every message f
 - repeated scalar edits through a retained state-vector reference; and
 - the same end-to-end workloads in the competing Python package.
 
-Those historical measurements were not retained in a reproducible repository workload, so they do
-not support a current comparative-performance claim. `just bench-python-object-model` now measures
-small and 10,000-record OEM parsing, Rust-graph reconstruction and validation, XML generation,
-retained-child edits, edit-plus-validation, and isolated-process peak RSS. Results are comparison
-evidence, not release thresholds. The initial machine-local measurements and limitations are
-recorded in [Python object-model performance baseline](python-object-model-performance.md).
+These measurements were local comparison evidence, not release thresholds.
+
+A 2026-09-09 release-build experiment compared the live model with Rust-owned copy-on-write OEM
+histories at 100,000 records. The prototype made prepared-NumPy construction 73%, bulk replacement
+75%, and validation 40% faster; XML generation improved 9% and its peak RSS fell from 224 to 160
+MiB. NumPy export became 82% slower, while record construction used 138 rather than 118 MiB. It
+removed only nine production lines and added snapshot semantics and explicit update methods, so it
+was rejected for increasing ownership complexity despite useful performance gains.
 
 A comparison with another package is valid only when both libraries process the same generated
 document on the same machine. A specialized native repeated sequence still must preserve direct
@@ -66,10 +68,5 @@ on this workload before earning its complexity.
 
 ## Parsing resource controls
 
-Python parsing exposes `max_input_bytes` and, for record-bearing formats, `max_records` as
-keyword-only advanced controls. They solve real boundary and batch-processing needs and correspond
-to limits users can reason about.
-
-XML nesting depth remains a safe internal parser limit. CCSDS document depth is determined by the
-schema, so asking each caller to select `max_xml_depth` adds API surface without improving the
-normal workflow. The Rust core retains its parser option for lower-level and non-Python uses.
+Parsing exposes no resource-policy knobs. Callers that accept untrusted input should enforce size
+limits at their system boundary; XML nesting retains a fixed internal safety limit.

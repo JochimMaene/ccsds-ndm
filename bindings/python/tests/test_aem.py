@@ -40,6 +40,7 @@ class TestAem:
             ref_frame_b="SC_BODY_1",
             start_time="2023-01-01T00:00:00",
             stop_time="2023-01-01T01:00:00",
+            time_system="UTC",
             attitude_type="QUATERNION",
             interpolation_method="LINEAR",
             interpolation_degree=1,
@@ -57,6 +58,7 @@ class TestAem:
                 ref_frame_b="SC_BODY_1",
                 start_time="2023-01-01T00:00:00",
                 stop_time="2023-01-01T01:00:00",
+                time_system="UTC",
                 attitude_type="NOT_IN_XSD_ENUM",
             )
 
@@ -83,6 +85,7 @@ class TestAem:
             ref_frame_b="SC_BODY_1",
             start_time="2023-01-01T00:00:00",
             stop_time="2023-01-01T01:00:00",
+            time_system="UTC",
         )
         with pytest.raises(ValueError):
             meta.start_time = "123.5"
@@ -137,6 +140,7 @@ class TestAem:
             ref_frame_b="SC_BODY_1",
             start_time="2023-01-01T00:00:00",
             stop_time="2023-01-01T01:00:00",
+            time_system="UTC",
             attitude_type="QUATERNION",
         )
         state1 = AttitudeState("2023-01-01T00:00:00", [0.0, 0.0, 0.0, 1.0])
@@ -144,16 +148,12 @@ class TestAem:
         segment = AemSegment(meta, data)
         return Aem(header, [segment])
 
-    def test_aem_from_numpy_requires_explicit_type_for_ambiguous_width(self):
+    def test_aem_from_numpy_requires_explicit_type(self):
         epochs = ["2023-01-01T00:00:00"]
         values = np.array([[0.0, 0.0, 0.0, 1.0]])
 
-        with pytest.raises(ValueError, match="Ambiguous 4-column AEM data"):
+        with pytest.raises(TypeError):
             AemData.from_numpy(epochs, values, comment=[])
-
-        values_6 = np.array([[1.0, 2.0, 3.0, 0.1, 0.2, 0.3]])
-        with pytest.raises(ValueError, match="Ambiguous 6-column AEM data"):
-            AemData.from_numpy(epochs, values_6, comment=[])
 
     def test_aem_from_numpy_rejects_wrong_width_without_defaults(self):
         epochs = ["2023-01-01T00:00:00"]
@@ -173,8 +173,33 @@ class TestAem:
         assert states[0].epoch == "2023-01-01T00:00:00"
         assert states[0].values == [10.0, 20.0, 30.0, 0.5]
 
+    def test_attitude_states_epochs_reject_bad_input_without_partial_writes(self):
+        state1 = AttitudeState("2023-01-01T00:00:00", [0.0, 0.0, 0.0, 1.0])
+        state2 = AttitudeState("2023-01-01T00:01:00", [0.0, 0.0, 0.0, 1.0])
+        data = AemData(
+            attitude_states=[state1, state2],
+            attitude_type="QUATERNION",
+            comment=[],
+        )
+        original = data.attitude_states[0].epoch
+
+        with pytest.raises(ValueError):
+            data.attitude_states_epochs = [
+                "2024-01-01T00:00:00",
+                "not-a-timestamp",
+            ]
+        assert data.attitude_states[0].epoch == original
+
+        data.attitude_states[1] = "not an attitude state"
+        with pytest.raises(ValueError, match=r"attitude_states\[1\]"):
+            data.attitude_states_epochs = [
+                "2024-01-01T00:00:00",
+                "2024-01-01T00:01:00",
+            ]
+        assert data.attitude_states[0].epoch == original
+
     def test_aem_set_epochs_without_states_raises(self):
-        data = AemData(attitude_states=[], comment=[])
+        data = AemData(attitude_states=[], attitude_type="QUATERNION", comment=[])
         with pytest.raises(ValueError, match="Cannot set epochs"):
             data.attitude_states_epochs = ["2023-01-01T00:00:00"]
 
@@ -202,7 +227,7 @@ class TestAem:
         state = aem.segments[0].data.attitude_states[0]
         state.values = [float("nan"), 0.0, 0.0, 1.0]
 
-        with pytest.raises(ccsds_ndm.NdmValidationError, match="Quaternion"):
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="Q1"):
             aem.to_str(format="xml")
 
     def test_file_io(self, tmp_path):
@@ -221,6 +246,29 @@ class TestAem:
         aem = self._create_valid_aem()
         assert aem.header.originator == "TEST"
         assert len(aem.segments) == 1
+
+    def test_interpolation_degree_zero_is_rejected_not_dropped(self):
+        with pytest.raises(ValueError, match="positive integer"):
+            AemMetadata(
+                object_name="SAT1",
+                object_id="2023-001A",
+                ref_frame_a="EME2000",
+                ref_frame_b="SC_BODY_1",
+                start_time="2023-01-01T00:00:00",
+                stop_time="2023-01-01T01:00:00",
+                time_system="UTC",
+                interpolation_degree=0,
+            )
+
+        meta = self._create_valid_aem().segments[0].metadata
+        meta.interpolation_degree = 5
+        assert meta.interpolation_degree == 5
+        with pytest.raises(ValueError, match="positive integer"):
+            meta.interpolation_degree = 0
+        assert meta.interpolation_degree == 5
+
+        meta.interpolation_degree = None
+        assert meta.interpolation_degree is None
 
 
 if __name__ == "__main__":

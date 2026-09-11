@@ -7,6 +7,7 @@ use ccsds_ndm::Message;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 use crate::cdm::Cdm;
 use crate::ocm::Ocm;
@@ -25,10 +26,21 @@ use crate::tdm::Tdm;
 /// spacecraft attitude that depends upon a particular orbital state (an APM and its
 /// associated OPM could be conveniently conveyed in a single NDM); (3) an ephemeris message
 /// with the set of tracking data messages used in the orbit determination.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct CombinedNdm {
+    /// Message Identifier (optional).
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// Comments (optional).
+    ///
+    /// :type: list[str]
+    #[pyo3(get, set)]
     comments: Vec<String>,
+
     messages: Py<PyList>,
 }
 
@@ -98,6 +110,7 @@ fn py_messages_to_core(py: Python<'_>, messages: &[Py<PyAny>]) -> PyResult<Vec<M
         .collect()
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl CombinedNdm {
     #[new]
@@ -123,31 +136,28 @@ impl CombinedNdm {
 
     /// Parse an XML combined NDM. KVN has no combined representation.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, *, max_input_bytes=None, max_records=None))]
+    #[pyo3(signature = (data, format=None))]
     fn from_str(
         py: Python<'_>,
         data: &str,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
-        max_input_bytes: Option<usize>,
-        max_records: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_records);
-        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
+        let inner = crate::api::parse_typed(data, format)?;
         Self::from_core(py, inner)
     }
 
     /// Parse an XML combined NDM file. KVN has no combined representation.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
+    #[pyo3(signature = (path, format=None))]
     fn from_file(
         py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
-        max_input_bytes: Option<usize>,
-        max_records: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_records);
-        let inner = crate::api::parse_typed_file_with_options(&path, format, &options)?;
+        let inner = crate::api::parse_typed_file(&path, format)?;
         Self::from_core(py, inner)
     }
 
@@ -155,14 +165,26 @@ impl CombinedNdm {
     ///
     /// Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError` and leaves the
     /// destination untouched.
-    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&Message::Ndm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to an XML string.
     ///
     /// Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError`.
-    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         let message = Message::Ndm(self.to_core(py)?);
         match crate::api::notation(format)? {
             ccsds_ndm::Notation::Kvn => message.to_kvn(),
@@ -174,37 +196,19 @@ impl CombinedNdm {
     /// List of contained navigation messages.
     ///
     /// :type: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]]
+    #[gen_stub(override_return_type(imports=("typing"), type_repr="list[typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]]"))]
     #[getter]
     fn messages(&self, py: Python<'_>) -> Py<PyList> {
         self.messages.clone_ref(py)
     }
 
     #[setter]
-    fn set_messages(&mut self, py: Python, messages: Vec<Py<PyAny>>) -> PyResult<()> {
-        py_messages_to_core(py, &messages)?;
-        self.messages = PyList::new(py, messages)?.unbind();
-        Ok(())
-    }
-
-    /// Message Identifier (optional).
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// Comments (optional).
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn comments(&self) -> Vec<String> {
-        self.comments.clone()
-    }
-
-    #[setter]
-    fn set_comments(&mut self, comments: Vec<String>) {
-        self.comments = comments;
+    fn set_messages(&mut self, messages: Vec<Py<PyAny>>) -> PyResult<()> {
+        Python::attach(|py| {
+            py_messages_to_core(py, &messages)?;
+            self.messages = PyList::new(py, messages)?.unbind();
+            Ok(())
+        })
     }
 
     fn __repr__(&self, py: Python<'_>) -> String {

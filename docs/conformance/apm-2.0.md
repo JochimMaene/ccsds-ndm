@@ -14,7 +14,7 @@ This inventory records maintainer evidence for standalone APM 2.0. The
 
 ## Executable evidence
 
-`just conformance-apm` runs `apm_conformance`, which establishes:
+The `apm_conformance` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |
@@ -22,7 +22,7 @@ This inventory records maintainer evidence for standalone APM 2.0. The
 | XML structure | The shared XML sequence engine is registered for the complete APM root, header, metadata, data, and six attitude logical-block families, including nested quaternion components. It rejects unknown, duplicate, and reordered children and non-schema attributes. |
 | Valid input and preservation | All three shipped KVN fixtures and the shipped XML fixture parse through the public strict API. Generated KVN and XML reparse to the same typed model. |
 | XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
-| Shared resource and surface contract | `family_contract`, `family_generation_evidence`, the Python options tests, and family Criterion matrices provide the common bounded parsing/generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
+| Shared surface contract | `family_contract`, `family_generation_evidence`, the Python API tests, and family Criterion matrices provide common parsing, generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
 
 The existing APM unit suite separately covers each attitude logical-block family, optional
 quaternion/Euler derivatives, maneuver delta mass, the spin nutation choice and the values inside
@@ -54,7 +54,7 @@ remain caller-provided under the shared policy on [externally governed values](f
 `fixed_family_allocations` fixes strict KVN parse budgets at 136 allocations/24,000 bytes and
 preflighted streaming generation at 48 allocations/2,000 bytes for the shipped APM fixture.
 `test_apm.py` plus the shared Python options matrix cover construction, setters, both
-notations, files, epochs, and resource limits. Strict binding audit, stubs/doc checks, wheel
+notations, files, and epochs. Strict binding audit, stubs/doc checks, wheel
 verification, and Rust artifact verification are the packaged gates.
 
 ## Reproducible performance observation
@@ -73,5 +73,5 @@ benchmarks provide the CodSpeed comparison surface for subsequent changes.
 
 ## Remaining verification work
 
-APM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its ICS feature inventory and packaged
+APM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its ICS feature inventory and packaged
 surfaces are reconciled, and no family-specific promotion blocker is known.

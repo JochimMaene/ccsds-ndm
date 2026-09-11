@@ -1,20 +1,15 @@
+mod common;
+use common::{data_dir, validate_xml};
+
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::PathBuf;
 
 use ccsds_ndm::{from_str, Message};
-use tempfile::NamedTempFile;
 
-const REMAINING_PREFIXES: [&str; 8] = [
-    "omm_", "ocm_", "cdm_", "tdm_", "rdm_", "aem_", "apm_", "acm_",
-];
-
-fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
-}
+const REMAINING_PREFIXES: [&str; 7] = ["omm_", "ocm_", "cdm_", "tdm_", "rdm_", "apm_", "acm_"];
 
 fn fixture_paths(directory: &str, extension: &str) -> Vec<PathBuf> {
-    let mut paths: Vec<_> = fs::read_dir(repository_path(directory))
+    let mut paths: Vec<_> = fs::read_dir(data_dir().join(directory))
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .filter(|path| path.extension().is_some_and(|value| value == extension))
@@ -32,23 +27,6 @@ fn fixture_paths(directory: &str, extension: &str) -> Vec<PathBuf> {
     paths
 }
 
-fn validate_official_xsd(label: &str, xml: &str) {
-    let document = NamedTempFile::new().unwrap();
-    fs::write(document.path(), xml).unwrap();
-    let output = Command::new("xmllint")
-        .arg("--noout")
-        .arg("--schema")
-        .arg(repository_path("data/xsd/ndmxml-4.0.0-master-4.0.xsd"))
-        .arg(document.path())
-        .output()
-        .unwrap_or_else(|error| panic!("xmllint is required for conformance evidence: {error}"));
-    assert!(
-        output.status.success(),
-        "{label} generated invalid XML: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-}
-
 fn assert_standalone_generation(label: &str, message: &Message) {
     let kvn = message
         .to_kvn()
@@ -61,14 +39,14 @@ fn assert_standalone_generation(label: &str, message: &Message) {
         .to_xml()
         .unwrap_or_else(|error| panic!("{label} XML generation failed: {error}"));
     assert_eq!(message.to_xml().unwrap(), xml, "{label} XML changed");
-    validate_official_xsd(label, &xml);
+    validate_xml(label, &xml);
     let reparsed_xml = from_str(&xml).unwrap();
     assert_eq!(reparsed_xml.kind(), message.kind());
 }
 
 #[test]
 fn every_remaining_kvn_fixture_generates_deterministically_and_reparsably() {
-    for path in fixture_paths("data/kvn", "kvn") {
+    for path in fixture_paths("kvn", "kvn") {
         let label = path.file_name().unwrap().to_string_lossy();
         let input = fs::read_to_string(&path).unwrap();
         let message =
@@ -79,7 +57,7 @@ fn every_remaining_kvn_fixture_generates_deterministically_and_reparsably() {
 
 #[test]
 fn every_remaining_xml_fixture_generates_deterministically_and_reparsably() {
-    for path in fixture_paths("data/xml", "xml") {
+    for path in fixture_paths("xml", "xml") {
         let label = path.file_name().unwrap().to_string_lossy();
         let input = fs::read_to_string(&path).unwrap();
         let message =
@@ -100,7 +78,7 @@ fn every_remaining_xml_fixture_generates_deterministically_and_reparsably() {
             );
             let xml = message.to_xml().unwrap();
             assert_eq!(message.to_xml().unwrap(), xml);
-            validate_official_xsd(&label, &xml);
+            validate_xml(&label, &xml);
             assert_eq!(from_str(&xml).unwrap().kind(), message.kind());
             continue;
         }
@@ -110,7 +88,7 @@ fn every_remaining_xml_fixture_generates_deterministically_and_reparsably() {
 
 #[test]
 fn acm_physical_description_survives_kvn_to_xml_conversion() {
-    let input = fs::read_to_string(repository_path("data/kvn/acm_g8.kvn")).unwrap();
+    let input = fs::read_to_string(data_dir().join("kvn/acm_g8.kvn")).unwrap();
     let message = from_str(&input).unwrap();
     let xml = message.to_xml().unwrap();
     let reparsed = from_str(&xml).unwrap();
@@ -129,7 +107,7 @@ fn acm_physical_description_survives_kvn_to_xml_conversion() {
 
 #[test]
 fn aem_optional_xml_unit_annotations_are_normatively_normalized_through_kvn() {
-    let input = fs::read_to_string(repository_path("data/xml/aem_g13.xml")).unwrap();
+    let input = fs::read_to_string(data_dir().join("xml/aem_g13.xml")).unwrap();
     assert!(input.contains("<NUTATION units=\"deg\">"));
 
     let message = from_str(&input).unwrap();
@@ -142,12 +120,12 @@ fn aem_optional_xml_unit_annotations_are_normatively_normalized_through_kvn() {
     // Section 7.6.10 makes these fixed XML unit annotations optional.
     assert!(normalized_xml.contains("<NUTATION>2</NUTATION>"));
     assert!(!normalized_xml.contains("<NUTATION units="));
-    validate_official_xsd("AEM optional unit normalization", &normalized_xml);
+    validate_xml("AEM optional unit normalization", &normalized_xml);
 }
 
 #[test]
 fn cdm_kvn_comments_keep_their_normative_block_association() {
-    let input = fs::read_to_string(repository_path("data/kvn/cdm_363.kvn")).unwrap();
+    let input = fs::read_to_string(data_dir().join("kvn/cdm_363.kvn")).unwrap();
     let message = from_str(&input).unwrap();
     let Message::Cdm(cdm) = message else {
         panic!("CDM fixture changed message type");

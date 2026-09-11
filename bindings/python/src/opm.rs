@@ -9,6 +9,7 @@ use ccsds_ndm::types::{Angle, Distance, Gm, Inclination};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 /// Orbit Parameter Message (OPM).
 ///
@@ -24,11 +25,31 @@ use pyo3::types::PyList;
 ///     The message header.
 /// segment : OpmSegment
 ///     The data segment.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct Opm {
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[pyo3(get)]
     version: String,
+
+    /// The message header.
+    ///
+    /// :type: OdmHeader
+    #[pyo3(get, set)]
     header: Py<OdmHeader>,
+
+    /// The data segment.
+    ///
+    /// :type: OpmSegment
+    #[pyo3(get, set)]
     segment: Py<OpmSegment>,
 }
 
@@ -59,6 +80,7 @@ impl Opm {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Opm {
     #[new]
@@ -83,22 +105,6 @@ impl Opm {
         )
     }
 
-    /// The message identifier.
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn get_id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// The message version.
-    ///
-    /// :type: str
-    #[getter]
-    fn get_version(&self) -> String {
-        self.version.clone()
-    }
-
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Opm, &value)?;
@@ -112,74 +118,53 @@ impl Opm {
         crate::api::validate_message(&self.to_core(py)?)
     }
 
-    /// Orbit Parameter Message (OPM).
-    ///
-    /// Orbit information may be exchanged between two participants by sending a state vector (see
-    /// reference \[H1\]) for a specified epoch using an OPM. The message recipient must have an orbit
-    /// propagator available that is able to propagate the OPM state vector to compute the orbit at other
-    /// desired epochs. For this propagation, additional ancillary information (spacecraft properties
-    /// such as mass, area, and maneuver planning data, if applicable) may be included with the message.
-    ///
-    /// :type: OdmHeader
-    #[getter]
-    fn get_header(&self, py: Python<'_>) -> Py<OdmHeader> {
-        self.header.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_header(&mut self, header: Py<OdmHeader>) {
-        self.header = header;
-    }
-
-    /// The data segment.
-    ///
-    /// :type: OpmSegment
-    #[getter]
-    fn get_segment(&self, py: Python<'_>) -> Py<OpmSegment> {
-        self.segment.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_segment(&mut self, segment: Py<OpmSegment>) {
-        self.segment = segment;
-    }
-
     /// Create an OPM message from a string.
 
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, *, max_input_bytes=None))]
+    #[pyo3(signature = (data, format=None))]
     fn from_str(
         py: Python<'_>,
         data: &str,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
-        max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, None);
-        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
+        let inner = crate::api::parse_typed(data, format)?;
         Self::from_core(py, inner)
     }
 
     /// Parse an OPM from a KVN or XML file.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
+    #[pyo3(signature = (path, format=None))]
     fn from_file(
         py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
-        max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, None);
-        let inner = crate::api::parse_typed_file_with_options(&path, format, &options)?;
+        let inner = crate::api::parse_typed_file(&path, format)?;
         Self::from_core(py, inner)
     }
 
     /// Atomically write this OPM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Opm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to KVN or XML after mandatory CCSDS validation.
-    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
@@ -194,9 +179,21 @@ impl Opm {
 ///     Segment metadata.
 /// data : OpmData
 ///     Segment data.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct OpmSegment {
+    /// A single segment of the OPM.
+    ///
+    /// Contains metadata and data sections.
+    ///
+    /// :type: OpmMetadata
+    #[pyo3(get, set)]
     metadata: Py<OpmMetadata>,
+
+    /// Segment data.
+    ///
+    /// :type: OpmData
+    #[pyo3(get, set)]
     data: Py<OpmData>,
 }
 
@@ -221,6 +218,7 @@ impl OpmSegment {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OpmSegment {
     /// Create a new OPM Segment.
@@ -242,34 +240,6 @@ impl OpmSegment {
             self.metadata.borrow(py).inner.object_name
         )
     }
-
-    /// A single segment of the OPM.
-    ///
-    /// Contains metadata and data sections.
-    ///
-    /// :type: OpmMetadata
-    #[getter]
-    fn get_metadata(&self, py: Python<'_>) -> Py<OpmMetadata> {
-        self.metadata.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_metadata(&mut self, metadata: Py<OpmMetadata>) {
-        self.metadata = metadata;
-    }
-
-    /// Segment data.
-    ///
-    /// :type: OpmData
-    #[getter]
-    fn get_data(&self, py: Python<'_>) -> Py<OpmData> {
-        self.data.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_data(&mut self, data: Py<OpmData>) {
-        self.data = data;
-    }
 }
 
 /// OPM Metadata Section.
@@ -290,21 +260,23 @@ impl OpmSegment {
 ///     Epoch of the reference frame, if not intrinsic to the definition (ISO 8601).
 /// comment : list[str], optional
 ///     Comments.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OpmMetadata {
     pub inner: core_opm::OpmMetadata,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OpmMetadata {
     #[new]
     #[pyo3(signature = (
         object_name,
         object_id,
-        center_name=String::from("EARTH"),
-        ref_frame=None,
-        time_system=None,
+        center_name,
+        ref_frame,
+        time_system,
         ref_frame_epoch=None,
         comment=None
     ))]
@@ -312,14 +284,11 @@ impl OpmMetadata {
         object_name: String,
         object_id: String,
         center_name: String,
-        ref_frame: Option<String>,
-        time_system: Option<String>,
+        ref_frame: String,
+        time_system: String,
         ref_frame_epoch: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let ref_frame = ref_frame.unwrap_or_else(|| "GCRF".to_string());
-        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
-
         Ok(Self {
             inner: core_opm::OpmMetadata {
                 object_name,
@@ -348,6 +317,8 @@ impl OpmMetadata {
     ///
     /// Examples: EUTELSAT W1 MARS PATHFINDER STS 106 NEAR UNKNOWN
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_object_name(&self) -> String {
@@ -371,6 +342,8 @@ impl OpmMetadata {
     ///
     /// Examples: 2000-052A 1996-068A 2000-053A 1996-008A UNKNOWN
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_object_id(&self) -> String {
@@ -390,6 +363,8 @@ impl OpmMetadata {
     /// Examples: EARTH EARTH BARYCENTER MOON SOLAR SYSTEM BARYCENTER SUN JUPITER BARYCENTER
     /// STS 106 EROS
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_center_name(&self) -> String {
@@ -406,6 +381,8 @@ impl OpmMetadata {
     ///
     /// Examples: ICRF EME2000 ITRF2000 TEME
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_ref_frame(&self) -> String {
@@ -421,6 +398,8 @@ impl OpmMetadata {
     /// those in 3.2.3.2 should be documented in an ICD.
     ///
     /// Examples: UTC, TAI, TT, GPS, TDB, TCB
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.3.
     ///
     /// :type: str
     #[getter]
@@ -456,6 +435,8 @@ impl OpmMetadata {
     /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
     ///
     /// Examples: This is a comment
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.3.
     ///
     /// :type: list[str]
     #[getter]
@@ -512,12 +493,14 @@ impl OpmMetadata {
 ///     True anomaly. Units: deg.
 /// mean_anomaly : float or None
 ///     Mean anomaly. Units: deg.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct KeplerianElements {
     pub inner: core_opm::KeplerianElements,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl KeplerianElements {
     #[new]
@@ -581,6 +564,8 @@ impl KeplerianElements {
 
     /// Comments (see 7.8 for formatting rules).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -595,6 +580,8 @@ impl KeplerianElements {
     /// Semi-major axis
     ///
     /// Units: km
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -611,6 +598,8 @@ impl KeplerianElements {
     ///
     /// Units: n/a
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_eccentricity(&self) -> f64 {
@@ -625,6 +614,8 @@ impl KeplerianElements {
     /// Inclination
     ///
     /// Units: deg
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -643,6 +634,8 @@ impl KeplerianElements {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_ra_of_asc_node(&self) -> f64 {
@@ -658,6 +651,8 @@ impl KeplerianElements {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_arg_of_pericenter(&self) -> f64 {
@@ -672,6 +667,8 @@ impl KeplerianElements {
     /// Gravitational Coefficient (Gravitational Constant × Central Mass)
     ///
     /// Units: km³/s²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -772,12 +769,14 @@ impl KeplerianElements {
 /// cx_x : float
 ///     Position X covariance [1,1]. Units: km².
 ///     ... (see Parameters for full list of attributes with units)
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OpmCovarianceMatrix {
     pub inner: ccsds_ndm::common::OpmCovarianceMatrix,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OpmCovarianceMatrix {
     #[new]
@@ -884,6 +883,8 @@ impl OpmCovarianceMatrix {
 
     /// Comments (see 7.8 for formatting rules).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -898,6 +899,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[1,1]`
     ///
     /// Units: km²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -914,6 +917,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cy_x(&self) -> f64 {
@@ -928,6 +933,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[2,2]`
     ///
     /// Units: km²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -944,6 +951,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cz_x(&self) -> f64 {
@@ -958,6 +967,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[3,2]`
     ///
     /// Units: km²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -974,6 +985,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cz_z(&self) -> f64 {
@@ -988,6 +1001,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[4,1]`
     ///
     /// Units: km²/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1004,6 +1019,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cx_dot_y(&self) -> f64 {
@@ -1018,6 +1035,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[4,3]`
     ///
     /// Units: km²/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1034,6 +1053,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cy_dot_x(&self) -> f64 {
@@ -1048,6 +1069,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[5,2]`
     ///
     /// Units: km²/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1064,6 +1087,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cy_dot_z(&self) -> f64 {
@@ -1078,6 +1103,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[6,1]`
     ///
     /// Units: km²/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1094,6 +1121,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cz_dot_y(&self) -> f64 {
@@ -1108,6 +1137,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[6,3]`
     ///
     /// Units: km²/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1124,6 +1155,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²/s²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cx_dot_x_dot(&self) -> f64 {
@@ -1138,6 +1171,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[5,4]`
     ///
     /// Units: km²/s²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1154,6 +1189,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²/s²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cy_dot_y_dot(&self) -> f64 {
@@ -1168,6 +1205,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[6,4]`
     ///
     /// Units: km²/s²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1184,6 +1223,8 @@ impl OpmCovarianceMatrix {
     ///
     /// Units: km²/s²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_cz_dot_y_dot(&self) -> f64 {
@@ -1198,6 +1239,8 @@ impl OpmCovarianceMatrix {
     /// Covariance matrix `[6,6]`
     ///
     /// Units: km²/s²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1217,10 +1260,21 @@ impl OpmCovarianceMatrix {
 /// ----------
 /// state_vector : StateVector
 ///     State vector.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct OpmData {
+    /// Comments (see 7.8 for formatting rules).
+    ///
+    /// :type: list[str]
+    #[pyo3(get, set)]
     comment: Vec<String>,
+
+    /// State vector components (position and velocity).
+    ///
+    /// :type: StateVector
+    #[pyo3(get, set)]
     state_vector: Py<StateVector>,
+
     keplerian_elements: Option<Py<KeplerianElements>>,
     spacecraft_parameters: Option<Py<crate::common::SpacecraftParameters>>,
     covariance_matrix: Option<Py<OpmCovarianceMatrix>>,
@@ -1305,6 +1359,7 @@ impl OpmData {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OpmData {
     #[new]
@@ -1325,37 +1380,11 @@ impl OpmData {
         })
     }
 
-    /// Comments (see 7.8 for formatting rules).
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.comment.clone()
-    }
-
-    #[setter]
-    fn set_comment(&mut self, value: Vec<String>) {
-        self.comment = value;
-    }
-
     fn __repr__(&self, py: Python<'_>) -> String {
         format!(
             "OpmData(epoch='{}')",
             self.state_vector.borrow(py).inner.epoch.as_str()
         )
-    }
-
-    /// State vector components (position and velocity).
-    ///
-    /// :type: StateVector
-    #[getter]
-    fn get_state_vector(&self, py: Python<'_>) -> Py<StateVector> {
-        self.state_vector.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_state_vector(&mut self, value: Py<StateVector>) {
-        self.state_vector = value;
     }
 
     /// Keplerian elements.
@@ -1412,19 +1441,18 @@ impl OpmData {
     /// Maneuver parameters.
     ///
     /// :type: list[OpmManeuverParameters]
+    #[gen_stub(override_return_type(type_repr = "list[OpmManeuverParameters]"))]
     #[getter]
     fn get_maneuver_parameters(&self, py: Python<'_>) -> Py<PyList> {
         self.maneuver_parameters.clone_ref(py)
     }
 
     #[setter]
-    fn set_maneuver_parameters(
-        &mut self,
-        py: Python<'_>,
-        value: Vec<Py<OpmManeuverParameters>>,
-    ) -> PyResult<()> {
-        self.maneuver_parameters = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_maneuver_parameters(&mut self, value: Vec<Py<OpmManeuverParameters>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.maneuver_parameters = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// User defined parameters.
@@ -1464,12 +1492,14 @@ impl OpmData {
 ///     Velocity change in 2nd axis (km/s).
 /// man_dv_3 : float
 ///     Velocity change in 3rd axis (km/s).
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OpmManeuverParameters {
     pub inner: core_opm::ManeuverParameters,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OpmManeuverParameters {
     #[new]
@@ -1509,6 +1539,8 @@ impl OpmManeuverParameters {
 
     /// Comments (see 7.8 for formatting rules).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -1521,6 +1553,8 @@ impl OpmManeuverParameters {
     }
 
     /// Epoch of ignition (see 7.5.10 for formatting rules)
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: str
     #[getter]
@@ -1537,6 +1571,8 @@ impl OpmManeuverParameters {
     /// Maneuver duration (If = 0, impulsive maneuver)
     ///
     /// Units: s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -1556,6 +1592,8 @@ impl OpmManeuverParameters {
     ///
     /// The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_man_delta_mass(&self) -> f64 {
@@ -1569,6 +1607,8 @@ impl OpmManeuverParameters {
 
     /// Reference frame in which the velocity increment vector data are given. The user must
     /// select from the accepted set of values indicated in 3.2.4.11.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: str
     #[getter]
@@ -1585,6 +1625,8 @@ impl OpmManeuverParameters {
     ///
     /// Units: km/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_man_dv_1(&self) -> f64 {
@@ -1600,6 +1642,8 @@ impl OpmManeuverParameters {
     ///
     /// Units: km/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_man_dv_2(&self) -> f64 {
@@ -1614,6 +1658,8 @@ impl OpmManeuverParameters {
     /// 3rd component of the velocity increment
     ///
     /// Units: km/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
     #[getter]

@@ -2,434 +2,20 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::common::AdmHeader;
+use crate::common::{parse_interpolation_degree, AdmHeader};
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::aem as core_aem;
-use ccsds_ndm::types::{
-    Angle, AngleRate, AttitudeTypeType, Duration, InterpolationDegree, QuaternionDotComponent,
-    RotSeq,
-};
+use ccsds_ndm::types::{AttitudeTypeType, RotSeq};
 use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 use std::str::FromStr;
 
-fn expected_values_len(attitude_type: &AttitudeTypeType) -> usize {
-    match attitude_type {
-        AttitudeTypeType::Quaternion => 4,
-        AttitudeTypeType::QuaternionDerivative => 8,
-        AttitudeTypeType::QuaternionAngVel => 7,
-        AttitudeTypeType::EulerAngle => 3,
-        AttitudeTypeType::EulerAngleDerivative => 6,
-        AttitudeTypeType::EulerAngleAngVel => 6,
-        AttitudeTypeType::Spin => 4,
-        AttitudeTypeType::SpinNutation => 7,
-        AttitudeTypeType::SpinNutationMom => 7,
-    }
-}
-
-fn infer_attitude_type_from_values_len(values_len: usize) -> PyResult<AttitudeTypeType> {
-    match values_len {
-        3 => Ok(AttitudeTypeType::EulerAngle),
-        4 => Err(PyValueError::new_err(
-            "Ambiguous 4-column AEM data; specify attitude_type explicitly (QUATERNION or SPIN)",
-        )),
-        6 => Err(PyValueError::new_err(
-            "Ambiguous 6-column AEM data; specify attitude_type explicitly (EULER_ANGLE/DERIVATIVE or EULER_ANGLE/ANGVEL)",
-        )),
-        7 => Err(PyValueError::new_err(
-            "Ambiguous 7-column AEM data; specify attitude_type explicitly (QUATERNION/ANGVEL, SPIN/NUTATION, or SPIN/NUTATION_MOM)",
-        )),
-        8 => Ok(AttitudeTypeType::QuaternionDerivative),
-        _ => Err(PyValueError::new_err(format!(
-            "Unsupported AEM data width {}. Allowed widths are 3, 4, 6, 7, 8",
-            values_len
-        ))),
-    }
-}
-
-fn parse_attitude_type_or_infer(
-    attitude_type: Option<&str>,
-    values_len: usize,
-) -> PyResult<AttitudeTypeType> {
-    match attitude_type {
-        Some(raw) => {
-            AttitudeTypeType::from_str(raw).map_err(|e| PyValueError::new_err(e.to_string()))
-        }
-        None => infer_attitude_type_from_values_len(values_len),
-    }
-}
-
-fn build_state_from_values(
-    epoch: ccsds_ndm::types::CalendarEpoch,
-    values: &[f64],
-    attitude_type: &AttitudeTypeType,
-) -> PyResult<core_aem::AemAttitudeStateWrapper> {
-    let expected = expected_values_len(attitude_type);
-    if values.len() != expected {
-        return Err(PyValueError::new_err(format!(
-            "ATTITUDE_TYPE {} requires {} values per row, got {}",
-            attitude_type,
-            expected,
-            values.len()
-        )));
-    }
-
-    use ccsds_ndm::common::{
-        AemAttitudeState, AngVel, EulerAngle, EulerAngleAngVel, EulerAngleDerivative, Quaternion,
-        QuaternionAngVel, QuaternionDerivative, QuaternionDot, QuaternionEphemeris, Spin,
-        SpinNutation, SpinNutationMom,
-    };
-
-    let state = match attitude_type {
-        AttitudeTypeType::Quaternion => {
-            AemAttitudeState::QuaternionEphemeris(QuaternionEphemeris {
-                epoch,
-                quaternion: Quaternion {
-                    q1: values[0],
-                    q2: values[1],
-                    q3: values[2],
-                    qc: values[3],
-                },
-            })
-        }
-        AttitudeTypeType::QuaternionDerivative => {
-            AemAttitudeState::QuaternionDerivative(QuaternionDerivative {
-                epoch,
-                quaternion: Quaternion {
-                    q1: values[0],
-                    q2: values[1],
-                    q3: values[2],
-                    qc: values[3],
-                },
-                quaternion_dot: QuaternionDot {
-                    q1_dot: QuaternionDotComponent {
-                        value: values[4],
-                        units: None,
-                    },
-                    q2_dot: QuaternionDotComponent {
-                        value: values[5],
-                        units: None,
-                    },
-                    q3_dot: QuaternionDotComponent {
-                        value: values[6],
-                        units: None,
-                    },
-                    qc_dot: QuaternionDotComponent {
-                        value: values[7],
-                        units: None,
-                    },
-                },
-            })
-        }
-        AttitudeTypeType::QuaternionAngVel => {
-            AemAttitudeState::QuaternionAngVel(QuaternionAngVel {
-                epoch,
-                quaternion: Quaternion {
-                    q1: values[0],
-                    q2: values[1],
-                    q3: values[2],
-                    qc: values[3],
-                },
-                ang_vel: AngVel {
-                    angvel_x: AngleRate {
-                        value: values[4],
-                        units: None,
-                    },
-                    angvel_y: AngleRate {
-                        value: values[5],
-                        units: None,
-                    },
-                    angvel_z: AngleRate {
-                        value: values[6],
-                        units: None,
-                    },
-                },
-            })
-        }
-        AttitudeTypeType::EulerAngle => AemAttitudeState::EulerAngle(EulerAngle {
-            epoch,
-            angle_1: Angle {
-                value: values[0],
-                units: None,
-            },
-            angle_2: Angle {
-                value: values[1],
-                units: None,
-            },
-            angle_3: Angle {
-                value: values[2],
-                units: None,
-            },
-        }),
-        AttitudeTypeType::EulerAngleDerivative => {
-            AemAttitudeState::EulerAngleDerivative(EulerAngleDerivative {
-                epoch,
-                angle_1: Angle {
-                    value: values[0],
-                    units: None,
-                },
-                angle_2: Angle {
-                    value: values[1],
-                    units: None,
-                },
-                angle_3: Angle {
-                    value: values[2],
-                    units: None,
-                },
-                angle_1_dot: AngleRate {
-                    value: values[3],
-                    units: None,
-                },
-                angle_2_dot: AngleRate {
-                    value: values[4],
-                    units: None,
-                },
-                angle_3_dot: AngleRate {
-                    value: values[5],
-                    units: None,
-                },
-            })
-        }
-        AttitudeTypeType::EulerAngleAngVel => {
-            AemAttitudeState::EulerAngleAngVel(EulerAngleAngVel {
-                epoch,
-                angle_1: Angle {
-                    value: values[0],
-                    units: None,
-                },
-                angle_2: Angle {
-                    value: values[1],
-                    units: None,
-                },
-                angle_3: Angle {
-                    value: values[2],
-                    units: None,
-                },
-                angvel_x: AngleRate {
-                    value: values[3],
-                    units: None,
-                },
-                angvel_y: AngleRate {
-                    value: values[4],
-                    units: None,
-                },
-                angvel_z: AngleRate {
-                    value: values[5],
-                    units: None,
-                },
-            })
-        }
-        AttitudeTypeType::Spin => AemAttitudeState::Spin(Spin {
-            epoch,
-            spin_alpha: Angle {
-                value: values[0],
-                units: None,
-            },
-            spin_delta: Angle {
-                value: values[1],
-                units: None,
-            },
-            spin_angle: Angle {
-                value: values[2],
-                units: None,
-            },
-            spin_angle_vel: AngleRate {
-                value: values[3],
-                units: None,
-            },
-        }),
-        AttitudeTypeType::SpinNutation => AemAttitudeState::SpinNutation(SpinNutation {
-            epoch,
-            spin_alpha: Angle {
-                value: values[0],
-                units: None,
-            },
-            spin_delta: Angle {
-                value: values[1],
-                units: None,
-            },
-            spin_angle: Angle {
-                value: values[2],
-                units: None,
-            },
-            spin_angle_vel: AngleRate {
-                value: values[3],
-                units: None,
-            },
-            nutation: Angle {
-                value: values[4],
-                units: None,
-            },
-            nutation_per: Duration {
-                value: values[5],
-                units: None,
-            },
-            nutation_phase: Angle {
-                value: values[6],
-                units: None,
-            },
-        }),
-        AttitudeTypeType::SpinNutationMom => AemAttitudeState::SpinNutationMom(SpinNutationMom {
-            epoch,
-            spin_alpha: Angle {
-                value: values[0],
-                units: None,
-            },
-            spin_delta: Angle {
-                value: values[1],
-                units: None,
-            },
-            spin_angle: Angle {
-                value: values[2],
-                units: None,
-            },
-            spin_angle_vel: AngleRate {
-                value: values[3],
-                units: None,
-            },
-            momentum_alpha: Angle {
-                value: values[4],
-                units: None,
-            },
-            momentum_delta: Angle {
-                value: values[5],
-                units: None,
-            },
-            nutation_vel: AngleRate {
-                value: values[6],
-                units: None,
-            },
-        }),
-    };
-
-    Ok(state.into())
-}
-
-fn values_from_content(
-    content: ccsds_ndm::common::AemAttitudeState,
-) -> (ccsds_ndm::types::CalendarEpoch, Vec<f64>) {
-    match content {
-        ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(v) => (
-            v.epoch,
-            vec![
-                v.quaternion.q1,
-                v.quaternion.q2,
-                v.quaternion.q3,
-                v.quaternion.qc,
-            ],
-        ),
-        ccsds_ndm::common::AemAttitudeState::QuaternionDerivative(v) => (
-            v.epoch,
-            vec![
-                v.quaternion.q1,
-                v.quaternion.q2,
-                v.quaternion.q3,
-                v.quaternion.qc,
-                v.quaternion_dot.q1_dot.value,
-                v.quaternion_dot.q2_dot.value,
-                v.quaternion_dot.q3_dot.value,
-                v.quaternion_dot.qc_dot.value,
-            ],
-        ),
-        ccsds_ndm::common::AemAttitudeState::QuaternionAngVel(v) => (
-            v.epoch,
-            vec![
-                v.quaternion.q1,
-                v.quaternion.q2,
-                v.quaternion.q3,
-                v.quaternion.qc,
-                v.ang_vel.angvel_x.value,
-                v.ang_vel.angvel_y.value,
-                v.ang_vel.angvel_z.value,
-            ],
-        ),
-        ccsds_ndm::common::AemAttitudeState::EulerAngle(v) => (
-            v.epoch,
-            vec![v.angle_1.value, v.angle_2.value, v.angle_3.value],
-        ),
-        ccsds_ndm::common::AemAttitudeState::EulerAngleDerivative(v) => (
-            v.epoch,
-            vec![
-                v.angle_1.value,
-                v.angle_2.value,
-                v.angle_3.value,
-                v.angle_1_dot.value,
-                v.angle_2_dot.value,
-                v.angle_3_dot.value,
-            ],
-        ),
-        ccsds_ndm::common::AemAttitudeState::EulerAngleAngVel(v) => (
-            v.epoch,
-            vec![
-                v.angle_1.value,
-                v.angle_2.value,
-                v.angle_3.value,
-                v.angvel_x.value,
-                v.angvel_y.value,
-                v.angvel_z.value,
-            ],
-        ),
-        ccsds_ndm::common::AemAttitudeState::Spin(v) => (
-            v.epoch,
-            vec![
-                v.spin_alpha.value,
-                v.spin_delta.value,
-                v.spin_angle.value,
-                v.spin_angle_vel.value,
-            ],
-        ),
-        ccsds_ndm::common::AemAttitudeState::SpinNutation(v) => (
-            v.epoch,
-            vec![
-                v.spin_alpha.value,
-                v.spin_delta.value,
-                v.spin_angle.value,
-                v.spin_angle_vel.value,
-                v.nutation.value,
-                v.nutation_per.value,
-                v.nutation_phase.value,
-            ],
-        ),
-        ccsds_ndm::common::AemAttitudeState::SpinNutationMom(v) => (
-            v.epoch,
-            vec![
-                v.spin_alpha.value,
-                v.spin_delta.value,
-                v.spin_angle.value,
-                v.spin_angle_vel.value,
-                v.momentum_alpha.value,
-                v.momentum_delta.value,
-                v.nutation_vel.value,
-            ],
-        ),
-    }
-}
-
-fn attitude_type_from_content(content: &ccsds_ndm::common::AemAttitudeState) -> AttitudeTypeType {
-    match content {
-        ccsds_ndm::common::AemAttitudeState::QuaternionEphemeris(_) => AttitudeTypeType::Quaternion,
-        ccsds_ndm::common::AemAttitudeState::QuaternionDerivative(_) => {
-            AttitudeTypeType::QuaternionDerivative
-        }
-        ccsds_ndm::common::AemAttitudeState::QuaternionAngVel(_) => {
-            AttitudeTypeType::QuaternionAngVel
-        }
-        ccsds_ndm::common::AemAttitudeState::EulerAngle(_) => AttitudeTypeType::EulerAngle,
-        ccsds_ndm::common::AemAttitudeState::EulerAngleDerivative(_) => {
-            AttitudeTypeType::EulerAngleDerivative
-        }
-        ccsds_ndm::common::AemAttitudeState::EulerAngleAngVel(_) => {
-            AttitudeTypeType::EulerAngleAngVel
-        }
-        ccsds_ndm::common::AemAttitudeState::Spin(_) => AttitudeTypeType::Spin,
-        ccsds_ndm::common::AemAttitudeState::SpinNutation(_) => AttitudeTypeType::SpinNutation,
-        ccsds_ndm::common::AemAttitudeState::SpinNutationMom(_) => {
-            AttitudeTypeType::SpinNutationMom
-        }
-    }
+fn parse_attitude_type(value: &str) -> PyResult<AttitudeTypeType> {
+    AttitudeTypeType::from_str(value).map_err(|error| PyValueError::new_err(error.to_string()))
 }
 
 /// Attitude Ephemeris Message (AEM).
@@ -442,11 +28,27 @@ fn attitude_type_from_content(content: &ccsds_ndm::common::AemAttitudeState) -> 
 /// The AEM allows for dynamic modeling of any number of torques (solar pressure, atmospheric
 /// torques, magnetics, etc.). It requires the use of an interpolation technique to interpret
 /// the attitude state at times different from the tabular epochs.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct Aem {
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[pyo3(get)]
     version: String,
+
+    /// The message header.
+    ///
+    /// :type: AdmHeader
+    #[pyo3(get, set)]
     header: Py<AdmHeader>,
+
     segments: Py<PyList>,
 }
 
@@ -495,6 +97,7 @@ impl Aem {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Aem {
     #[new]
@@ -522,22 +125,6 @@ impl Aem {
         )
     }
 
-    /// The message identifier.
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn get_id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// The message version.
-    ///
-    /// :type: str
-    #[getter]
-    fn get_version(&self) -> String {
-        self.version.clone()
-    }
-
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Aem, &value)?;
@@ -545,40 +132,21 @@ impl Aem {
         Ok(())
     }
 
-    /// Attitude Ephemeris Message (AEM).
-    ///
-    /// An AEM specifies the attitude state of a single object at multiple epochs, contained within a
-    /// specified time range. The AEM is suited to interagency exchanges that involve automated
-    /// interaction and require higher fidelity or higher precision dynamic modeling than is
-    /// possible with the APM.
-    ///
-    /// The AEM allows for dynamic modeling of any number of torques (solar pressure, atmospheric
-    /// torques, magnetics, etc.). It requires the use of an interpolation technique to interpret
-    /// the attitude state at times different from the tabular epochs.
-    ///
-    /// :type: AdmHeader
-    #[getter]
-    fn get_header(&self, py: Python<'_>) -> Py<AdmHeader> {
-        self.header.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_header(&mut self, header: Py<AdmHeader>) {
-        self.header = header;
-    }
-
     /// AEM Segments.
     ///
     /// :type: list[AemSegment]
+    #[gen_stub(override_return_type(type_repr = "list[AemSegment]"))]
     #[getter]
     fn get_segments(&self, py: Python<'_>) -> Py<PyList> {
         self.segments.clone_ref(py)
     }
 
     #[setter]
-    fn set_segments(&mut self, py: Python<'_>, segments: Vec<Py<AemSegment>>) -> PyResult<()> {
-        self.segments = PyList::new(py, segments)?.unbind();
-        Ok(())
+    fn set_segments(&mut self, segments: Vec<Py<AemSegment>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.segments = PyList::new(py, segments)?.unbind();
+            Ok(())
+        })
     }
 
     /// Validate the message against CCSDS rules.
@@ -588,48 +156,67 @@ impl Aem {
     }
 
     /// Serialize to validated KVN or XML.
-    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, *, max_input_bytes=None, max_records=None))]
+    #[pyo3(signature = (data, format=None))]
     fn from_str(
         py: Python<'_>,
         data: &str,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
-        max_input_bytes: Option<usize>,
-        max_records: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_records);
-        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
+        let inner = crate::api::parse_typed(data, format)?;
         Self::from_core(py, inner)
     }
 
     /// Parse an AEM from a KVN or XML file.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
+    #[pyo3(signature = (path, format=None))]
     fn from_file(
         py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
-        max_input_bytes: Option<usize>,
-        max_records: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_records);
-        let inner = crate::api::parse_typed_file_with_options(&path, format, &options)?;
+        let inner = crate::api::parse_typed_file(&path, format)?;
         Self::from_core(py, inner)
     }
 
     /// Atomically write this AEM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Aem(self.to_core(py)?), &path, format)
     }
 }
 
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct AemSegment {
+    /// AEM Metadata Section.
+    ///
+    /// :type: AemMetadata
+    #[pyo3(get, set)]
     metadata: Py<AemMetadata>,
+
+    /// AEM Data Section.
+    ///
+    /// :type: AemData
+    #[pyo3(get, set)]
     data: Py<AemData>,
 }
 
@@ -654,37 +241,12 @@ impl AemSegment {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AemSegment {
     #[new]
     fn new(metadata: Py<AemMetadata>, data: Py<AemData>) -> Self {
         Self { metadata, data }
-    }
-
-    /// AEM Metadata Section.
-    ///
-    /// :type: AemMetadata
-    #[getter]
-    fn get_metadata(&self, py: Python<'_>) -> Py<AemMetadata> {
-        self.metadata.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_metadata(&mut self, metadata: Py<AemMetadata>) {
-        self.metadata = metadata;
-    }
-
-    /// AEM Data Section.
-    ///
-    /// :type: AemData
-    #[getter]
-    fn get_data(&self, py: Python<'_>) -> Py<AemData> {
-        self.data.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_data(&mut self, data: Py<AemData>) {
-        self.data = data;
     }
 
     /// Validate the segment against CCSDS rules.
@@ -696,12 +258,14 @@ impl AemSegment {
 }
 
 /// AEM Metadata Section.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AemMetadata {
     pub inner: core_aem::AemMetadata,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AemMetadata {
     #[new]
@@ -709,11 +273,11 @@ impl AemMetadata {
     #[pyo3(signature = (
         object_name,
         object_id,
-        ref_frame_a=None,
-        ref_frame_b=None,
-        start_time=None,
-        stop_time=None,
-        time_system=None,
+        ref_frame_a,
+        ref_frame_b,
+        start_time,
+        stop_time,
+        time_system,
         attitude_type=String::from("QUATERNION"),
         center_name=None,
         useable_start_time=None,
@@ -727,11 +291,11 @@ impl AemMetadata {
     fn new(
         object_name: String,
         object_id: String,
-        ref_frame_a: Option<String>,
-        ref_frame_b: Option<String>,
-        start_time: Option<String>,
-        stop_time: Option<String>,
-        time_system: Option<String>,
+        ref_frame_a: String,
+        ref_frame_b: String,
+        start_time: String,
+        stop_time: String,
+        time_system: String,
         attitude_type: String,
         center_name: Option<String>,
         useable_start_time: Option<String>,
@@ -742,15 +306,6 @@ impl AemMetadata {
         interpolation_degree: Option<u32>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        use std::num::NonZeroU32;
-
-        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
-        let ref_frame_a = ref_frame_a.unwrap_or_else(|| "GCRF".to_string());
-        let ref_frame_b = ref_frame_b.unwrap_or_else(|| "GCRF".to_string());
-        let start_time =
-            start_time.ok_or_else(|| PyValueError::new_err("start_time is required"))?;
-        let stop_time = stop_time.ok_or_else(|| PyValueError::new_err("stop_time is required"))?;
-
         let attitude_type = AttitudeTypeType::from_str(&attitude_type)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
 
@@ -778,9 +333,7 @@ impl AemMetadata {
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
                 angvel_frame,
                 interpolation_method,
-                interpolation_degree: interpolation_degree
-                    .and_then(NonZeroU32::new)
-                    .map(InterpolationDegree),
+                interpolation_degree: parse_interpolation_degree(interpolation_degree)?,
             },
         })
     }
@@ -799,6 +352,8 @@ impl AemMetadata {
     /// the value should be set to UNKNOWN.
     ///
     /// Examples: EUTELSAT W1
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
     /// :type: str
     #[getter]
@@ -823,6 +378,8 @@ impl AemMetadata {
     ///
     /// Examples: 2000-052A
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_object_id(&self) -> String {
@@ -838,6 +395,8 @@ impl AemMetadata {
     /// begin with this keyword.
     ///
     /// Examples: This is a comment.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
     /// :type: list[str]
     #[getter]
@@ -872,6 +431,8 @@ impl AemMetadata {
     ///
     /// Examples: ICRF, SC_BODY_1, INSTRUMENT_A
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_ref_frame_a(&self) -> String {
@@ -887,6 +448,8 @@ impl AemMetadata {
     /// allowed values is described in annex B, subsection B3.
     ///
     /// Examples: SC_BODY_1, INSTRUMENT_A
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
     /// :type: str
     #[getter]
@@ -904,6 +467,8 @@ impl AemMetadata {
     ///
     /// Examples: UTC, TAI
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_time_system(&self) -> String {
@@ -919,6 +484,8 @@ impl AemMetadata {
     /// metadata block.
     ///
     /// Examples: 1996-12-18T14:28:15.11
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
     /// :type: str
     #[getter]
@@ -936,6 +503,8 @@ impl AemMetadata {
     /// metadata block.
     ///
     /// Examples: 1996-12-18T14:28:15.11
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
     /// :type: str
     #[getter]
@@ -998,6 +567,8 @@ impl AemMetadata {
     ///
     /// Examples: QUATERNION, QUATERNION/DERIVATIVE, QUATERNION/ANGVEL, EULER_ANGLE,
     /// EULER_ANGLE/DERIVATIVE, EULER_ANGLE/ANGVEL, SPIN, SPIN/NUTATION, SPIN/NUTATION_MOM
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
     /// :type: str
     #[getter]
@@ -1083,19 +654,36 @@ impl AemMetadata {
     }
 
     #[setter]
-    fn set_interpolation_degree(&mut self, value: Option<u32>) {
-        self.inner.interpolation_degree = value
-            .and_then(std::num::NonZeroU32::new)
-            .map(InterpolationDegree);
+    fn set_interpolation_degree(&mut self, value: Option<u32>) -> PyResult<()> {
+        self.inner.interpolation_degree = parse_interpolation_degree(value)?;
+        Ok(())
     }
 }
 
 /// AEM Data Section.
+///
+/// Parameters
+/// ----------
+///     attitude_states : list[AttitudeState]
+///     Attitude states.
+///     attitude_type : str
+///     CCSDS attitude type shared by every state.
+///     comment : list[str], optional
+///     Comments.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct AemData {
+    /// Comments allowed only at the beginning of the Data section. Each comment line shall begin
+    /// with this keyword.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.4.
+    ///
+    /// :type: list[str]
+    #[pyo3(get, set)]
     comment: Vec<String>,
+
     attitude_states: Py<PyList>,
-    attitude_type: Option<AttitudeTypeType>,
+    attitude_type: AttitudeTypeType,
 }
 
 impl AemData {
@@ -1103,10 +691,7 @@ impl AemData {
         let mut attitude_type = None;
         let mut states = Vec::with_capacity(value.attitude_states.len());
         for state in value.attitude_states {
-            let content = state
-                .content()
-                .ok_or_else(|| PyValueError::new_err("Attitude state is missing content"))?;
-            let this_type = attitude_type_from_content(&content);
+            let this_type = state.attitude_type();
             if attitude_type
                 .as_ref()
                 .is_some_and(|existing| existing != &this_type)
@@ -1116,13 +701,14 @@ impl AemData {
                 ));
             }
             attitude_type = Some(this_type);
-            let (epoch, values) = values_from_content(content);
+            let (epoch, values) = state.into_epoch_values();
             states.push(Py::new(py, AttitudeState { epoch, values })?);
         }
         Ok(Self {
             comment: value.comment,
             attitude_states: PyList::new(py, states)?.unbind(),
-            attitude_type,
+            attitude_type: attitude_type
+                .ok_or_else(|| PyValueError::new_err("AEM data requires an attitude state"))?,
         })
     }
 
@@ -1147,43 +733,35 @@ impl AemData {
             .collect()
     }
 
-    fn resolved_type(
+    fn validate_widths(
         &self,
         values: &[(ccsds_ndm::types::CalendarEpoch, Vec<f64>)],
-    ) -> PyResult<Option<AttitudeTypeType>> {
-        let Some((_, first)) = values.first() else {
-            return Ok(self.attitude_type.clone());
-        };
-        if values.iter().any(|(_, values)| values.len() != first.len()) {
-            return Err(PyValueError::new_err(
-                "All attitude states must have the same number of values",
-            ));
+    ) -> PyResult<()> {
+        let expected = self.attitude_type.value_count();
+        if let Some((_, values)) = values.iter().find(|(_, values)| values.len() != expected) {
+            return Err(PyValueError::new_err(format!(
+                "ATTITUDE_TYPE {} requires {expected} values per state, got {}",
+                self.attitude_type,
+                values.len()
+            )));
         }
-        match self.attitude_type.as_ref() {
-            Some(attitude_type) => {
-                let expected = expected_values_len(attitude_type);
-                if first.len() != expected {
-                    return Err(PyValueError::new_err(format!(
-                        "ATTITUDE_TYPE {attitude_type} requires {expected} values per state, got {}",
-                        first.len()
-                    )));
-                }
-                Ok(Some(attitude_type.clone()))
-            }
-            None => parse_attitude_type_or_infer(None, first.len()).map(Some),
-        }
+        Ok(())
     }
 
     fn to_core(&self, py: Python<'_>) -> PyResult<core_aem::AemData> {
         let values = self.state_values(py)?;
-        let attitude_type = self.resolved_type(&values)?;
-        let attitude_states = match attitude_type {
-            Some(attitude_type) => values
-                .into_iter()
-                .map(|(epoch, values)| build_state_from_values(epoch, &values, &attitude_type))
-                .collect::<PyResult<Vec<_>>>()?,
-            None => Vec::new(),
-        };
+        self.validate_widths(&values)?;
+        let attitude_states = values
+            .into_iter()
+            .map(|(epoch, values)| {
+                ccsds_ndm::common::AemAttitudeState::from_values(
+                    epoch,
+                    &values,
+                    &self.attitude_type,
+                )
+                .ok_or_else(|| PyValueError::new_err("attitude state width changed"))
+            })
+            .collect::<PyResult<Vec<_>>>()?;
         Ok(core_aem::AemData {
             comment: self.comment.clone(),
             attitude_states,
@@ -1191,38 +769,28 @@ impl AemData {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AemData {
     #[new]
-    #[pyo3(signature = (attitude_states, attitude_type=None, comment=None))]
+    #[pyo3(signature = (attitude_states, attitude_type, comment=None))]
     fn new(
         py: Python<'_>,
         attitude_states: Vec<Py<AttitudeState>>,
-        attitude_type: Option<String>,
+        attitude_type: String,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let attitude_type = if attitude_states.is_empty() {
-            attitude_type
-                .as_deref()
-                .map(AttitudeTypeType::from_str)
-                .transpose()
-                .map_err(|error| PyValueError::new_err(error.to_string()))?
-        } else {
-            let widths: std::collections::BTreeSet<usize> = attitude_states
-                .iter()
-                .map(|state| state.borrow(py).values.len())
-                .collect();
-            if widths.len() != 1 {
-                return Err(PyValueError::new_err(
-                    "All attitude states must have the same number of values",
-                ));
-            }
-            let width = *widths.iter().next().unwrap();
-            Some(parse_attitude_type_or_infer(
-                attitude_type.as_deref(),
-                width,
-            )?)
-        };
+        let attitude_type = parse_attitude_type(&attitude_type)?;
+        let expected = attitude_type.value_count();
+        if let Some(state) = attitude_states
+            .iter()
+            .find(|state| state.borrow(py).values.len() != expected)
+        {
+            return Err(PyValueError::new_err(format!(
+                "ATTITUDE_TYPE {attitude_type} requires {expected} values per state, got {}",
+                state.borrow(py).values.len()
+            )));
+        }
 
         Ok(Self {
             comment: comment.unwrap_or_default(),
@@ -1245,12 +813,12 @@ impl AemData {
     }
 
     #[staticmethod]
-    #[pyo3(signature = (epochs, array, attitude_type=None, comment=None))]
+    #[pyo3(signature = (epochs, array, attitude_type, comment=None))]
     fn from_numpy(
         py: Python<'_>,
         epochs: Vec<String>,
         array: PyReadonlyArray2<f64>,
-        attitude_type: Option<String>,
+        attitude_type: String,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         let shape = array.shape();
@@ -1263,8 +831,8 @@ impl AemData {
             ));
         }
 
-        let resolved_type = parse_attitude_type_or_infer(attitude_type.as_deref(), shape[1])?;
-        let expected_cols = expected_values_len(&resolved_type);
+        let resolved_type = parse_attitude_type(&attitude_type)?;
+        let expected_cols = resolved_type.value_count();
         if shape[1] != expected_cols {
             return Err(PyValueError::new_err(format!(
                 "ATTITUDE_TYPE {} requires {} columns, got {}",
@@ -1290,70 +858,42 @@ impl AemData {
         Ok(Self {
             comment: comment.unwrap_or_default(),
             attitude_states: PyList::new(py, attitude_states)?.unbind(),
-            attitude_type: Some(resolved_type),
+            attitude_type: resolved_type,
         })
-    }
-
-    /// Comments allowed only at the beginning of the Data section. Each comment line shall begin
-    /// with this keyword.
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.comment.clone()
-    }
-
-    #[setter]
-    fn set_comment(&mut self, comment: Vec<String>) {
-        self.comment = comment;
     }
 
     /// Attitude ephemeris data lines.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.4.
+    ///
     /// :type: list[AttitudeState]
+    #[gen_stub(override_return_type(type_repr = "list[AttitudeState]"))]
     #[getter]
     fn get_attitude_states(&self, py: Python<'_>) -> Py<PyList> {
         self.attitude_states.clone_ref(py)
     }
 
     #[setter]
-    fn set_attitude_states(
-        &mut self,
-        py: Python<'_>,
-        attitude_states: Vec<Py<AttitudeState>>,
-    ) -> PyResult<()> {
-        if attitude_states.is_empty() {
-            self.attitude_states = PyList::empty(py).unbind();
-            return Ok(());
-        }
+    fn set_attitude_states(&mut self, attitude_states: Vec<Py<AttitudeState>>) -> PyResult<()> {
+        Python::attach(|py| {
+            if attitude_states.is_empty() {
+                self.attitude_states = PyList::empty(py).unbind();
+                return Ok(());
+            }
 
-        let widths: std::collections::BTreeSet<usize> = attitude_states
-            .iter()
-            .map(|state| state.borrow(py).values.len())
-            .collect();
-        if widths.len() != 1 {
-            return Err(PyValueError::new_err(
-                "All attitude states must have the same number of values",
-            ));
-        }
-
-        let width = *widths.iter().next().unwrap();
-        let resolved_type = if let Some(existing_type) = self.attitude_type.as_ref() {
-            let existing_width = expected_values_len(existing_type);
-            if existing_width != width {
+            let expected = self.attitude_type.value_count();
+            if attitude_states
+                .iter()
+                .any(|state| state.borrow(py).values.len() != expected)
+            {
                 return Err(PyValueError::new_err(format!(
-                    "Expected {} values per state based on existing data, got {}",
-                    existing_width, width
+                    "ATTITUDE_TYPE {} requires {expected} values per state",
+                    self.attitude_type
                 )));
             }
-            existing_type.clone()
-        } else {
-            parse_attitude_type_or_infer(None, width)?
-        };
-
-        self.attitude_type = Some(resolved_type);
-        self.attitude_states = PyList::new(py, attitude_states)?.unbind();
-        Ok(())
+            self.attitude_states = PyList::new(py, attitude_states)?.unbind();
+            Ok(())
+        })
     }
 
     /// Epochs for attitude states (ISO 8601).
@@ -1361,38 +901,67 @@ impl AemData {
     /// :type: list[str]
     #[getter]
     fn get_attitude_states_epochs(&self, py: Python<'_>) -> PyResult<Vec<String>> {
-        Ok(self
-            .state_values(py)?
-            .into_iter()
-            .map(|(epoch, _)| epoch.as_str().to_string())
-            .collect())
+        self.attitude_states
+            .bind(py)
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .extract::<PyRef<'_, AttitudeState>>()
+                    .map(|state| state.epoch.as_str().to_string())
+                    .map_err(|_| {
+                        PyValueError::new_err(format!(
+                            "attitude_states[{index}] must be AttitudeState"
+                        ))
+                    })
+            })
+            .collect()
     }
 
     #[setter]
-    fn set_attitude_states_epochs(&mut self, py: Python<'_>, epochs: Vec<String>) -> PyResult<()> {
-        let states = self.attitude_states.bind(py);
-        if states.is_empty() {
-            return Err(PyValueError::new_err(
-                "Cannot set epochs when no attitude states exist; create states first",
-            ));
-        }
+    fn set_attitude_states_epochs(&mut self, epochs: Vec<String>) -> PyResult<()> {
+        Python::attach(|py| {
+            let states = self.attitude_states.bind(py);
+            if states.is_empty() {
+                return Err(PyValueError::new_err(
+                    "Cannot set epochs when no attitude states exist; create states first",
+                ));
+            }
 
-        if epochs.len() != states.len() {
-            return Err(PyValueError::new_err(
-                "Number of epochs must match number of attitude states",
-            ));
-        }
+            if epochs.len() != states.len() {
+                return Err(PyValueError::new_err(
+                    "Number of epochs must match number of attitude states",
+                ));
+            }
 
-        for (index, epoch) in epochs.into_iter().enumerate() {
-            let value = states.get_item(index)?;
-            let mut state = value
-                .extract::<PyRefMut<'_, AttitudeState>>()
-                .map_err(|_| {
-                    PyValueError::new_err(format!("attitude_states[{index}] must be AttitudeState"))
-                })?;
-            state.epoch = parse_calendar_epoch(&epoch)?;
-        }
-        Ok(())
+            // Validate every epoch and every element type before mutating anything, so a failure
+            // partway through the list cannot leave the earlier records already rewritten.
+            let mut parsed = Vec::with_capacity(epochs.len());
+            for (index, epoch) in epochs.iter().enumerate() {
+                let value = states.get_item(index)?;
+                value
+                    .extract::<PyRefMut<'_, AttitudeState>>()
+                    .map_err(|_| {
+                        PyValueError::new_err(format!(
+                            "attitude_states[{index}] must be AttitudeState"
+                        ))
+                    })?;
+                parsed.push(parse_calendar_epoch(epoch)?);
+            }
+
+            for (index, epoch) in parsed.into_iter().enumerate() {
+                let value = states.get_item(index)?;
+                let mut state = value
+                    .extract::<PyRefMut<'_, AttitudeState>>()
+                    .map_err(|_| {
+                        PyValueError::new_err(format!(
+                            "attitude_states[{index}] must be AttitudeState"
+                        ))
+                    })?;
+                state.epoch = epoch;
+            }
+            Ok(())
+        })
     }
 
     /// Get attitude states as a 2D NumPy array.
@@ -1403,7 +972,10 @@ impl AemData {
     ///
     /// :type: numpy.ndarray
     #[getter]
-    fn get_attitude_states_numpy<'py>(&self, py: Python<'py>) -> PyResult<Py<PyAny>> {
+    fn get_attitude_states_numpy<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Py<numpy::PyArray2<f64>>> {
         let states = self.state_values(py)?;
         if states.is_empty() {
             let array = PyArray::from_vec(py, Vec::<f64>::new())
@@ -1412,24 +984,12 @@ impl AemData {
             return Ok(array.into());
         }
 
-        let resolved_type = self.resolved_type(&states)?.ok_or_else(|| {
-            PyValueError::new_err("Attitude type is unavailable for non-empty data")
-        })?;
-        let first_values = states[0].1.clone();
-        let expected_cols = first_values.len();
-
-        let mut data = Vec::with_capacity(states.len() * expected_cols);
-        data.extend(first_values);
-
-        for (_, values) in states.into_iter().skip(1) {
-            if values.len() != expected_cols {
-                return Err(PyValueError::new_err(
-                    "NumPy access requires all attitude states to have the same data width",
-                ));
-            }
-            data.extend(values);
-        }
-        debug_assert_eq!(expected_values_len(&resolved_type), expected_cols);
+        self.validate_widths(&states)?;
+        let expected_cols = self.attitude_type.value_count();
+        let data = states
+            .into_iter()
+            .flat_map(|(_, values)| values)
+            .collect::<Vec<_>>();
 
         let array = PyArray::from_vec(py, data)
             .reshape([self.attitude_states.bind(py).len(), expected_cols])
@@ -1438,61 +998,58 @@ impl AemData {
     }
 
     #[setter]
-    fn set_attitude_states_numpy(
-        &mut self,
-        py: Python<'_>,
-        array: PyReadonlyArray2<f64>,
-    ) -> PyResult<()> {
-        let shape = array.shape();
-        if shape.len() != 2 {
-            return Err(PyValueError::new_err("NumPy array must be 2-dimensional"));
-        }
-        let states = self.attitude_states.bind(py);
-        if states.is_empty() {
-            return Err(PyValueError::new_err(
-                "Attitude epochs are missing; set attitude_states_epochs or use from_numpy",
-            ));
-        }
-        if states.len() != shape[0] {
-            return Err(PyValueError::new_err(
-                "Number of rows must match number of attitude states",
-            ));
-        }
+    fn set_attitude_states_numpy(&mut self, array: PyReadonlyArray2<f64>) -> PyResult<()> {
+        Python::attach(|py| {
+            let shape = array.shape();
+            if shape.len() != 2 {
+                return Err(PyValueError::new_err("NumPy array must be 2-dimensional"));
+            }
+            let states = self.attitude_states.bind(py);
+            if states.is_empty() {
+                return Err(PyValueError::new_err(
+                    "Attitude epochs are missing; set attitude_states_epochs or use from_numpy",
+                ));
+            }
+            if states.len() != shape[0] {
+                return Err(PyValueError::new_err(
+                    "Number of rows must match number of attitude states",
+                ));
+            }
 
-        let current = self.state_values(py)?;
-        let resolved_type = self.resolved_type(&current)?.ok_or_else(|| {
-            PyValueError::new_err("Attitude type is unavailable for non-empty data")
-        })?;
-        let expected_cols = expected_values_len(&resolved_type);
-        if shape[1] != expected_cols {
-            return Err(PyValueError::new_err(format!(
-                "NumPy array must have {} columns for this attitude state type",
-                expected_cols
-            )));
-        }
-        let array_view = array.as_array();
-        for i in 0..shape[0] {
-            let row = array_view.row(i);
-            let row_values: Vec<f64> = row.iter().copied().collect();
-            let value = states.get_item(i)?;
-            let mut state = value
-                .extract::<PyRefMut<'_, AttitudeState>>()
-                .map_err(|_| {
-                    PyValueError::new_err(format!("attitude_states[{i}] must be AttitudeState"))
-                })?;
-            state.values = row_values;
-        }
-        Ok(())
+            let expected_cols = self.attitude_type.value_count();
+            if shape[1] != expected_cols {
+                return Err(PyValueError::new_err(format!(
+                    "NumPy array must have {} columns for this attitude state type",
+                    expected_cols
+                )));
+            }
+            let array_view = array.as_array();
+            for i in 0..shape[0] {
+                let row = array_view.row(i);
+                let row_values: Vec<f64> = row.iter().copied().collect();
+                let value = states.get_item(i)?;
+                let mut state = value
+                    .extract::<PyRefMut<'_, AttitudeState>>()
+                    .map_err(|_| {
+                        PyValueError::new_err(format!("attitude_states[{i}] must be AttitudeState"))
+                    })?;
+                state.values = row_values;
+            }
+            Ok(())
+        })
     }
 }
 
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AttitudeState {
     pub epoch: ccsds_ndm::types::CalendarEpoch,
+    #[pyo3(get, set)]
     pub values: Vec<f64>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AttitudeState {
     #[new]
@@ -1512,15 +1069,5 @@ impl AttitudeState {
     fn set_epoch(&mut self, value: String) -> PyResult<()> {
         self.epoch = parse_calendar_epoch(&value)?;
         Ok(())
-    }
-
-    #[getter]
-    fn get_values(&self) -> Vec<f64> {
-        self.values.clone()
-    }
-
-    #[setter]
-    fn set_values(&mut self, value: Vec<f64>) {
-        self.values = value;
     }
 }

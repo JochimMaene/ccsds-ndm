@@ -74,3 +74,12 @@ fn aem_epoch_fields_require_calendar_or_ordinal_form() {
     );
     assert!(Aem::from_xml(&invalid_state).is_err());
 }
+
+#[test]
+fn xml_parsing_rejects_non_calendar_adm_creation_date() {
+    let invalid = AEM_XML.replace(
+        "<CREATION_DATE>2008-071T17:09:49</CREATION_DATE>",
+        "<CREATION_DATE>12345</CREATION_DATE>",
+    );
+    assert!(Aem::from_xml(&invalid).is_err());
+}

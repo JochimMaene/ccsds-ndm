@@ -10,6 +10,7 @@ use ccsds_ndm::types::Duration;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 /// Orbit Comprehensive Message (OCM).
 ///
@@ -30,11 +31,31 @@ use pyo3::types::PyList;
 ///     The message header.
 /// segment : OcmSegment
 ///     The OCM data segment.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct Ocm {
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[pyo3(get)]
     version: String,
+
+    /// The message header.
+    ///
+    /// :type: OdmHeader
+    #[pyo3(get, set)]
     header: Py<OdmHeader>,
+
+    /// The OCM data segment.
+    ///
+    /// :type: OcmSegment
+    #[pyo3(get, set)]
     segment: Py<OcmSegment>,
 }
 
@@ -65,6 +86,7 @@ impl Ocm {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Ocm {
     /// Create an OCM message from a string.
@@ -81,36 +103,40 @@ impl Ocm {
     /// Ocm
     ///     The parsed Ocm object.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, *, max_input_bytes=None, max_records=None))]
+    #[pyo3(signature = (data, format=None))]
     fn from_str(
         py: Python<'_>,
         data: &str,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
-        max_input_bytes: Option<usize>,
-        max_records: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_records);
-        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
+        let inner = crate::api::parse_typed(data, format)?;
         Self::from_core(py, inner)
     }
 
     /// Parse an OCM from a KVN or XML file.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
+    #[pyo3(signature = (path, format=None))]
     fn from_file(
         py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
-        max_input_bytes: Option<usize>,
-        max_records: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_records);
-        let inner = crate::api::parse_typed_file_with_options(&path, format, &options)?;
+        let inner = crate::api::parse_typed_file(&path, format)?;
         Self::from_core(py, inner)
     }
 
     /// Atomically write this OCM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Ocm(self.to_core(py)?), &path, format)
     }
 
@@ -139,22 +165,6 @@ impl Ocm {
         )
     }
 
-    /// The message identifier.
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn get_id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// The message version.
-    ///
-    /// :type: str
-    #[getter]
-    fn get_version(&self) -> String {
-        self.version.clone()
-    }
-
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Ocm, &value)?;
@@ -168,44 +178,13 @@ impl Ocm {
         crate::api::validate_message(&self.to_core(py)?)
     }
 
-    /// Orbit Comprehensive Message (OCM).
-    ///
-    /// An OCM specifies position and velocity of either a single object or an en masse parent/child
-    /// deployment scenario stemming from a single object. The OCM aggregates and extends OPM, OEM,
-    /// and OMM content in a single comprehensive hybrid message.
-    ///
-    /// Key features:
-    /// - Support for single object or parent/child deployment scenarios.
-    /// - Aggregation of OPM, OMM, and OEM content.
-    /// - Extensive optional content including physical properties, covariance, maneuvers, and
-    /// perturbations.
-    /// - Well-suited for exchanges involving automated interaction and large object catalogs.
-    ///
-    /// :type: OdmHeader
-    #[getter]
-    fn get_header(&self, py: Python<'_>) -> Py<OdmHeader> {
-        self.header.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_header(&mut self, header: Py<OdmHeader>) {
-        self.header = header;
-    }
-
-    /// The OCM data segment.
-    ///
-    /// :type: OcmSegment
-    #[getter]
-    fn get_segment(&self, py: Python<'_>) -> Py<OcmSegment> {
-        self.segment.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_segment(&mut self, segment: Py<OcmSegment>) {
-        self.segment = segment;
-    }
     /// Serialize to KVN or XML after mandatory CCSDS validation.
-    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
@@ -220,9 +199,21 @@ impl Ocm {
 ///     Segment metadata.
 /// data : OcmData
 ///     Segment data blocks.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct OcmSegment {
+    /// A single segment of the OCM.
+    ///
+    /// Contains metadata and data sections.
+    ///
+    /// :type: OcmMetadata
+    #[pyo3(get, set)]
     metadata: Py<OcmMetadata>,
+
+    /// Segment data blocks.
+    ///
+    /// :type: OcmData
+    #[pyo3(get, set)]
     data: Py<OcmData>,
 }
 
@@ -247,6 +238,7 @@ impl OcmSegment {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OcmSegment {
     /// Create a new OCM Segment.
@@ -265,34 +257,6 @@ impl OcmSegment {
                 .as_deref()
                 .unwrap_or("N/A")
         )
-    }
-
-    /// A single segment of the OCM.
-    ///
-    /// Contains metadata and data sections.
-    ///
-    /// :type: OcmMetadata
-    #[getter]
-    fn get_metadata(&self, py: Python<'_>) -> Py<OcmMetadata> {
-        self.metadata.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_metadata(&mut self, metadata: Py<OcmMetadata>) {
-        self.metadata = metadata;
-    }
-
-    /// Segment data blocks.
-    ///
-    /// :type: OcmData
-    #[getter]
-    fn get_data(&self, py: Python<'_>) -> Py<OcmData> {
-        self.data.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_data(&mut self, data: Py<OcmData>) {
-        self.data = data;
     }
 }
 
@@ -404,12 +368,14 @@ impl OcmSegment {
 /// epoch_tzero : str
 ///     Epoch T-Zero.
 ///     ... (see Parameters for full list)
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OcmMetadata {
     pub inner: core_ocm::OcmMetadata,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OcmMetadata {
     /// Create a new OcmMetadata object.
@@ -417,7 +383,7 @@ impl OcmMetadata {
     #[pyo3(signature = (
         *,
         epoch_tzero,
-        time_system=None,
+        time_system,
         object_name=None,
 
         international_designator=None,
@@ -469,7 +435,7 @@ impl OcmMetadata {
     #[allow(clippy::too_many_arguments)]
     fn new(
         epoch_tzero: String,
-        time_system: Option<String>,
+        time_system: String,
         object_name: Option<String>,
 
         international_designator: Option<String>,
@@ -519,8 +485,6 @@ impl OcmMetadata {
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         use ccsds_ndm::types::{DayInterval, TimeOffset};
-
-        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
 
         let object_type_enum = match object_type {
             Some(ref ob) => Some(parse_object_description(ob)?),
@@ -623,6 +587,8 @@ impl OcmMetadata {
     ///
     /// Examples: UTC
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: str
     #[getter]
     fn get_time_system(&self) -> String {
@@ -640,6 +606,8 @@ impl OcmMetadata {
     /// blocks.
     ///
     /// Examples: 2001-11-06T11:17:33
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: str
     #[getter]
@@ -907,6 +875,8 @@ impl OcmMetadata {
 
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
     /// Metadata section; see 7.8 for comment formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: list[str]
     #[getter]
@@ -1410,6 +1380,7 @@ impl OcmMetadata {
 /// This struct is the primary data container for the OCM. It holds all the
 /// different data blocks, such as trajectory, physical properties, covariance,
 /// maneuvers, and other related information.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct OcmData {
     traj: Py<PyList>,
@@ -1514,6 +1485,7 @@ impl OcmData {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OcmData {
     #[new]
@@ -1528,15 +1500,18 @@ impl OcmData {
     /// List of trajectory state time history blocks.
     ///
     /// :type: list[OcmTrajState]
+    #[gen_stub(override_return_type(type_repr = "list[OcmTrajState]"))]
     #[getter]
     fn get_traj(&self, py: Python<'_>) -> Py<PyList> {
         self.traj.clone_ref(py)
     }
 
     #[setter]
-    fn set_traj(&mut self, py: Python<'_>, value: Vec<Py<OcmTrajState>>) -> PyResult<()> {
-        self.traj = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_traj(&mut self, value: Vec<Py<OcmTrajState>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.traj = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Space object physical characteristics.
@@ -1555,27 +1530,33 @@ impl OcmData {
     /// List of maneuver specifications.
     ///
     /// :type: list[OcmManeuverParameters]
+    #[gen_stub(override_return_type(type_repr = "list[OcmManeuverParameters]"))]
     #[getter]
     fn get_man(&self, py: Python<'_>) -> Py<PyList> {
         self.man.clone_ref(py)
     }
     #[setter]
-    fn set_man(&mut self, py: Python<'_>, value: Vec<Py<OcmManeuverParameters>>) -> PyResult<()> {
-        self.man = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_man(&mut self, value: Vec<Py<OcmManeuverParameters>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.man = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// List of covariance time history blocks.
     ///
     /// :type: list[OcmCovarianceMatrix]
+    #[gen_stub(override_return_type(type_repr = "list[OcmCovarianceMatrix]"))]
     #[getter]
     fn get_cov(&self, py: Python<'_>) -> Py<PyList> {
         self.cov.clone_ref(py)
     }
     #[setter]
-    fn set_cov(&mut self, py: Python<'_>, value: Vec<Py<OcmCovarianceMatrix>>) -> PyResult<()> {
-        self.cov = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_cov(&mut self, value: Vec<Py<OcmCovarianceMatrix>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.cov = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Perturbation parameters.
@@ -1659,6 +1640,7 @@ impl OcmData {
 ///     Comma-delimited set of SI unit designations for the trajectory state elements.
 /// comment : list[str], optional
 ///     Comments.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct OcmTrajState {
     inner: core_ocm::OcmTrajState,
@@ -1698,6 +1680,7 @@ impl OcmTrajState {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OcmTrajState {
     /// Create a new OcmTrajState object.
@@ -1815,6 +1798,8 @@ impl OcmTrajState {
     ///
     /// Examples: EARTH, MOON, ISS, EROS
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
+    ///
     /// :type: str
     #[getter]
     fn get_center_name(&self) -> String {
@@ -1830,6 +1815,8 @@ impl OcmTrajState {
     ///
     /// Examples: ICRF3, J2000
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
+    ///
     /// :type: str
     #[getter]
     fn get_traj_ref_frame(&self) -> String {
@@ -1844,6 +1831,8 @@ impl OcmTrajState {
     ///
     /// Examples: CARTP, CARTPV
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
+    ///
     /// :type: str
     #[getter]
     fn get_traj_type(&self) -> String {
@@ -1857,19 +1846,24 @@ impl OcmTrajState {
     /// Contiguous set of trajectory state data lines.
     ///
     /// :type: list[TrajLine]
+    #[gen_stub(override_return_type(type_repr = "list[TrajLine]"))]
     #[getter]
     fn get_traj_lines(&self, py: Python<'_>) -> Py<PyList> {
         self.traj_lines.clone_ref(py)
     }
     #[setter]
-    fn set_traj_lines(&mut self, py: Python<'_>, value: Vec<Py<TrajLine>>) -> PyResult<()> {
-        self.traj_lines = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_traj_lines(&mut self, value: Vec<Py<TrajLine>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.traj_lines = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Comments (a contiguous set of one or more comment lines may be provided in the
     /// Trajectory State Time History section only immediately after the TRAJ_START keyword;
     /// see 7.8 for comment formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
     ///
     /// :type: list[str]
     #[getter]
@@ -2189,12 +2183,14 @@ impl OcmTrajState {
 /// values : list of float
 ///     Trajectory state elements for this epoch.
 ///     (Mandatory)
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct TrajLine {
     pub inner: core_ocm::TrajLine,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TrajLine {
     /// Create a new TrajLine object.
@@ -2253,12 +2249,14 @@ impl TrajLine {
 /// comment : list[str], optional
 ///     Comments.
 ///     (Optional)
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OcmPhysicalDescription {
     pub inner: core_ocm::OcmPhysicalDescription,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OcmPhysicalDescription {
     /// Create a new OcmPhysicalDescription object.
@@ -2555,6 +2553,8 @@ impl OcmPhysicalDescription {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM Space
     /// Object Physical Characteristics only immediately after the PHYS_START keyword; see 7.8
     /// for comment formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: list[str]
     #[getter]
@@ -3525,6 +3525,7 @@ impl OcmPhysicalDescription {
 /// comment : list[str], optional
 ///     Comments.
 ///     (Optional)
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct OcmCovarianceMatrix {
     inner: core_ocm::OcmCovarianceMatrix,
@@ -3564,6 +3565,7 @@ impl OcmCovarianceMatrix {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OcmCovarianceMatrix {
     #[new]
@@ -3725,6 +3727,8 @@ impl OcmCovarianceMatrix {
     ///
     /// Examples: TNW_INERTIA, J2000
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
+    ///
     /// :type: str
     #[getter]
     fn get_cov_ref_frame(&self) -> String {
@@ -3806,6 +3810,8 @@ impl OcmCovarianceMatrix {
     ///
     /// Examples: CARTP, CARTPV, ADBARV
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
+    ///
     /// :type: str
     #[getter]
     fn get_cov_type(&self) -> String {
@@ -3822,6 +3828,8 @@ impl OcmCovarianceMatrix {
     /// triangle off-diagonal terms (UTMWCC).
     ///
     /// Examples: LTM, UTM, FULL, LTMWCC, UTMWCC
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
     ///
     /// :type: str
     #[getter]
@@ -3862,19 +3870,24 @@ impl OcmCovarianceMatrix {
     /// Contiguous set of covariance matrix data lines.
     ///
     /// :type: list[CovLine]
+    #[gen_stub(override_return_type(type_repr = "list[CovLine]"))]
     #[getter]
     fn get_cov_lines(&self, py: Python<'_>) -> Py<PyList> {
         self.cov_lines.clone_ref(py)
     }
     #[setter]
-    fn set_cov_lines(&mut self, py: Python<'_>, value: Vec<Py<CovLine>>) -> PyResult<()> {
-        self.cov_lines = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_cov_lines(&mut self, value: Vec<Py<CovLine>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.cov_lines = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
     /// covariance time history section only immediately after the COV_START keyword; see 7.8
     /// for comment formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
     ///
     /// :type: list[str]
     #[getter]
@@ -3895,12 +3908,14 @@ impl OcmCovarianceMatrix {
 ///     Absolute or relative time tag.
 /// values : list of float
 ///     Covariance matrix elements for this epoch.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct CovLine {
     pub inner: core_ocm::CovLine,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl CovLine {
     /// Create a new CovLine object.
@@ -3993,6 +4008,7 @@ impl CovLine {
 ///     SI unit designations for the maneuver elements.
 /// comment : list of str, optional
 ///     Comments for this maneuver block.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct OcmManeuverParameters {
     inner: core_ocm::OcmManeuverParameters,
@@ -4032,6 +4048,7 @@ impl OcmManeuverParameters {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OcmManeuverParameters {
     /// Create a new OcmManeuverParameters object.
@@ -4212,6 +4229,8 @@ impl OcmManeuverParameters {
     /// categories shall be added together to represent the total composite maneuver
     /// description.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: str
     #[getter]
     fn get_man_id(&self) -> String {
@@ -4300,6 +4319,8 @@ impl OcmManeuverParameters {
     /// indicates that this maneuver represents the summed acceleration, velocity increment,
     /// or thrust imparted by any/all thrusters utilized in the maneuver.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: str
     #[getter]
     fn get_man_device_id(&self) -> String {
@@ -4373,6 +4394,8 @@ impl OcmManeuverParameters {
     /// subsections B4 and B5. The reference frame must be the same for all data elements
     /// within a given maneuver time history block.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: str
     #[getter]
     fn get_man_ref_frame(&self) -> String {
@@ -4420,6 +4443,8 @@ impl OcmManeuverParameters {
     /// past a reference time and the duty cycle ON and OFF durations; TIME_AND_ANGLE denotes a
     /// duty cycle driven by the phasing/clocking of a space object body frame 'trigger'
     /// direction past a reference direction.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: str
     #[getter]
@@ -4730,6 +4755,8 @@ impl OcmManeuverParameters {
     /// data section, the maneuver composition shall include only one TIME specification
     /// (TIME_ABSOLUTE or TIME_RELATIVE).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: str
     #[getter]
     fn get_man_composition(&self) -> String {
@@ -4760,19 +4787,24 @@ impl OcmManeuverParameters {
     /// Maneuver time history data lines.
     ///
     /// :type: list[ManLine]
+    #[gen_stub(override_return_type(type_repr = "list[ManLine]"))]
     #[getter]
     fn get_man_lines(&self, py: Python<'_>) -> Py<PyList> {
         self.man_lines.clone_ref(py)
     }
     #[setter]
-    fn set_man_lines(&mut self, py: Python<'_>, value: Vec<Py<ManLine>>) -> PyResult<()> {
-        self.man_lines = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_man_lines(&mut self, value: Vec<Py<ManLine>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.man_lines = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
     /// Maneuver Specification only immediately after the MAN_START keyword; see 7.8 for
     /// comment formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: list[str]
     #[getter]
@@ -4793,12 +4825,14 @@ impl OcmManeuverParameters {
 ///     Ignition epoch.
 /// values : list of str
 ///     Maneuver elements for this epoch.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct ManLine {
     pub inner: core_ocm::ManLine,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl ManLine {
     /// Create a new ManLine object.
@@ -4858,12 +4892,14 @@ impl ManLine {
 /// comment : list[str], optional
 ///     Comments.
 ///     (Optional)
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OcmPerturbations {
     pub inner: core_ocm::OcmPerturbations,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OcmPerturbations {
     /// Create a new OcmPerturbations object.
@@ -4884,6 +4920,8 @@ impl OcmPerturbations {
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
     /// Perturbations Specification only immediately after the PERT_START keyword; see 7.8 for
     /// comment formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
     ///
     /// :type: list[str]
     #[getter]
@@ -5363,12 +5401,14 @@ impl OcmPerturbations {
 /// comment : list[str], optional
 ///     Comments.
 ///     (Optional)
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct OcmOdParameters {
     pub inner: core_ocm::OcmOdParameters,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl OcmOdParameters {
     #[new]
@@ -5425,6 +5465,8 @@ impl OcmOdParameters {
 
     /// Comments (see 7.8 for formatting rules).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -5437,6 +5479,8 @@ impl OcmOdParameters {
     /// Identification number for this orbit determination.
     ///
     /// Examples: 1
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: str
     #[getter]
@@ -5466,6 +5510,8 @@ impl OcmOdParameters {
     ///
     /// Examples: LEAST_SQUARES, KALMAN_FILTER
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: str
     #[getter]
     fn get_od_method(&self) -> String {
@@ -5480,6 +5526,8 @@ impl OcmOdParameters {
     /// time system recorded by the TIME_SYSTEM keyword.
     ///
     /// Examples: 2000-01-01T12:00:00Z
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: str
     #[getter]

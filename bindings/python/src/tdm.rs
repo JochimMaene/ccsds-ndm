@@ -9,6 +9,7 @@ use ccsds_ndm::types::{self as core_types};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pymethods};
 use std::str::FromStr;
 
 // ============================================================================
@@ -38,11 +39,31 @@ use std::str::FromStr;
 /// body : TdmBody
 ///     The message body containing segments.
 ///     (Mandatory)
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct Tdm {
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[pyo3(get)]
     version: String,
+
+    /// The message header.
+    ///
+    /// :type: TdmHeader
+    #[pyo3(get, set)]
     header: Py<TdmHeader>,
+
+    /// The message body.
+    ///
+    /// :type: TdmBody
+    #[pyo3(get, set)]
     body: Py<TdmBody>,
 }
 
@@ -71,6 +92,7 @@ impl Tdm {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Tdm {
     #[new]
@@ -82,22 +104,6 @@ impl Tdm {
             id: Some("CCSDS_TDM_VERS".to_string()),
             version: "2.0".to_string(),
         }
-    }
-
-    /// The message identifier.
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn get_id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// The message version.
-    ///
-    /// :type: str
-    #[getter]
-    fn get_version(&self) -> String {
-        self.version.clone()
     }
 
     #[setter]
@@ -121,48 +127,10 @@ impl Tdm {
         )
     }
 
-    /// Tracking Data Message (TDM).
-    ///
-    /// The TDM specifies a standard message format for use in exchanging spacecraft tracking data
-    /// between space agencies. Such exchanges are used for distributing tracking data output from
-    /// routine interagency cross-supports.
-    ///
-    /// Tracking data includes data types such as:
-    /// - Doppler
-    /// - Transmit/Received frequencies
-    /// - Range
-    /// - Angles
-    /// - Delta-DOR
-    /// - Media correction (ionosphere, troposphere)
-    /// - Meteorological data
-    ///
-    /// :type: TdmHeader
-    #[getter]
-    fn get_header(&self, py: Python<'_>) -> Py<TdmHeader> {
-        self.header.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_header(&mut self, header: Py<TdmHeader>) {
-        self.header = header;
-    }
-
-    /// The message body.
-    ///
-    /// :type: TdmBody
-    #[getter]
-    fn get_body(&self, py: Python<'_>) -> Py<TdmBody> {
-        self.body.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_body(&mut self, body: Py<TdmBody>) {
-        self.body = body;
-    }
-
     /// Shortcut to access segments directly from the body.
     ///
     /// :type: list[TdmSegment]
+    #[gen_stub(override_return_type(type_repr = "list[TdmSegment]"))]
     #[getter]
     fn get_segments(&self, py: Python<'_>) -> Py<PyList> {
         self.body.borrow(py).segments.clone_ref(py)
@@ -183,41 +151,50 @@ impl Tdm {
     /// Tdm
     ///     The parsed TDM object.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, *, max_input_bytes=None, max_records=None))]
+    #[pyo3(signature = (data, format=None))]
     fn from_str(
         py: Python<'_>,
         data: &str,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
-        max_input_bytes: Option<usize>,
-        max_records: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_records);
-        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
+        let inner = crate::api::parse_typed(data, format)?;
         Self::from_core(py, inner)
     }
 
     /// Parse a TDM from a KVN or XML file.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
+    #[pyo3(signature = (path, format=None))]
     fn from_file(
         py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
-        max_input_bytes: Option<usize>,
-        max_records: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_records);
-        let inner = crate::api::parse_typed_file_with_options(&path, format, &options)?;
+        let inner = crate::api::parse_typed_file(&path, format)?;
         Self::from_core(py, inner)
     }
 
     /// Atomically write this TDM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Tdm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to validated KVN or XML.
-    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
@@ -242,12 +219,14 @@ impl Tdm {
 /// comment : list[str], optional
 ///     Comments.
 ///     (Optional)
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct TdmHeader {
     pub inner: core_tdm::TdmHeader,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TdmHeader {
     #[new]
@@ -278,6 +257,8 @@ impl TdmHeader {
     ///
     /// Examples: CNES, ESA, GSFC, DLR, JPL, JAXA
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.2.
+    ///
     /// :type: str
     #[getter]
     fn get_originator(&self) -> String {
@@ -292,6 +273,8 @@ impl TdmHeader {
     /// Data creation date/time in UTC. (For format specification, see 4.3.9.)
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23.4, 2006-001T00:00:00Z
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.2.
     ///
     /// :type: str
     #[getter]
@@ -326,6 +309,8 @@ impl TdmHeader {
     ///
     /// Examples: This is a comment
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.2.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -348,6 +333,7 @@ impl TdmHeader {
 /// ----------
 /// segments : list[TdmSegment]
 ///     List of data segments.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct TdmBody {
     segments: Py<PyList>,
@@ -384,6 +370,7 @@ impl TdmBody {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TdmBody {
     #[new]
@@ -403,15 +390,18 @@ impl TdmBody {
     /// Each segment consists of a Metadata Section and a Data Section.
     ///
     /// :type: list[TdmSegment]
+    #[gen_stub(override_return_type(type_repr = "list[TdmSegment]"))]
     #[getter]
     fn get_segments(&self, py: Python<'_>) -> Py<PyList> {
         self.segments.clone_ref(py)
     }
 
     #[setter]
-    fn set_segments(&mut self, py: Python<'_>, value: Vec<Py<TdmSegment>>) -> PyResult<()> {
-        self.segments = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_segments(&mut self, value: Vec<Py<TdmSegment>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.segments = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 }
 
@@ -432,9 +422,19 @@ impl TdmBody {
 /// data : TdmData
 ///     Segment data.
 ///     (Mandatory)
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct TdmSegment {
+    /// Metadata section for this TDM segment.
+    ///
+    /// :type: TdmMetadata
+    #[pyo3(get, set)]
     metadata: Py<TdmMetadata>,
+
+    /// Data section for this TDM segment.
+    ///
+    /// :type: TdmData
+    #[pyo3(get, set)]
     data: Py<TdmData>,
 }
 
@@ -459,6 +459,7 @@ impl TdmSegment {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TdmSegment {
     #[new]
@@ -473,32 +474,6 @@ impl TdmSegment {
             self.metadata.borrow(py).inner.participant_1,
             self.data.borrow(py).observations.bind(py).len()
         )
-    }
-
-    /// Metadata section for this TDM segment.
-    ///
-    /// :type: TdmMetadata
-    #[getter]
-    fn get_metadata(&self, py: Python<'_>) -> Py<TdmMetadata> {
-        self.metadata.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_metadata(&mut self, metadata: Py<TdmMetadata>) {
-        self.metadata = metadata;
-    }
-
-    /// Data section for this TDM segment.
-    ///
-    /// :type: TdmData
-    #[getter]
-    fn get_data(&self, py: Python<'_>) -> Py<TdmData> {
-        self.data.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_data(&mut self, data: Py<TdmData>) {
-        self.data = data;
     }
 }
 
@@ -521,19 +496,21 @@ impl TdmSegment {
 /// -------------------
 /// Many optional parameters are available to describe the tracking configuration,
 /// signal path, frequencies, and corrections. See CCSDS TDM Blue Book for full details.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct TdmMetadata {
     pub inner: core_tdm::TdmMetadata,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TdmMetadata {
     #[new]
     #[pyo3(signature = (
         *,
         participant_1,
-        time_system=None,
+        time_system,
         track_id=None,
         data_types=None,
         start_time=None,
@@ -597,7 +574,7 @@ impl TdmMetadata {
     #[allow(clippy::too_many_arguments)]
     fn new(
         participant_1: String,
-        time_system: Option<String>,
+        time_system: String,
         track_id: Option<String>,
 
         data_types: Option<String>,
@@ -660,8 +637,6 @@ impl TdmMetadata {
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         use std::str::FromStr;
-
-        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
 
         let mode = match mode {
             Some(ref ob) => Some(parse_tdm_mode(ob)?),
@@ -852,6 +827,8 @@ impl TdmMetadata {
     ///
     /// Examples: UTC, TAI, GPS, SCLK
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: str
     #[getter]
     fn get_time_system(&self) -> String {
@@ -908,6 +885,8 @@ impl TdmMetadata {
     /// some special TDMs such as tropospheric media, only one participant need be listed.
     ///
     /// Examples: DSS-63-S400K, ROSETTA, `<Quasar catalog name>`, 1997-061A, UNKNOWN
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
     ///
     /// :type: str
     #[getter]
@@ -1810,9 +1789,15 @@ impl TdmMetadata {
 /// comment : list[str], optional
 ///     Comments in the data section.
 ///     (Optional)
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct TdmData {
+    /// Comments.
+    ///
+    /// :type: list[TdmObservation]
+    #[pyo3(get, set)]
     comment: Vec<String>,
+
     observations: Py<PyList>,
 }
 
@@ -1853,6 +1838,7 @@ impl TdmData {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TdmData {
     #[new]
@@ -1872,31 +1858,21 @@ impl TdmData {
         format!("TdmData(observations={})", self.observations.bind(py).len())
     }
 
-    /// Comments.
-    ///
-    /// :type: list[TdmObservation]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.comment.clone()
-    }
-
-    #[setter]
-    fn set_comment(&mut self, value: Vec<String>) {
-        self.comment = value;
-    }
-
     /// Tracking data records.
     ///
     /// :type: list[TdmObservation]
+    #[gen_stub(override_return_type(type_repr = "list[TdmObservation]"))]
     #[getter]
     fn get_observations(&self, py: Python<'_>) -> Py<PyList> {
         self.observations.clone_ref(py)
     }
 
     #[setter]
-    fn set_observations(&mut self, py: Python<'_>, value: Vec<Py<TdmObservation>>) -> PyResult<()> {
-        self.observations = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_observations(&mut self, value: Vec<Py<TdmObservation>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.observations = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 }
 
@@ -1916,77 +1892,21 @@ impl TdmData {
 ///     Tracking observable value. Note: For phase counts that require full precision strings,
 ///     use internal representation handling (this constructor takes float for simplicity,
 ///     but the object can hold string representations internally).
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct TdmObservation {
     pub inner: core_tdm::TdmObservation,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TdmObservation {
     #[new]
     #[pyo3(signature = (*, epoch, keyword, value))]
     fn new(epoch: String, keyword: String, value: f64) -> PyResult<Self> {
-        use core_tdm::TdmObservationData;
-
-        // Parse the keyword to get the correct observation type
-        let data = match keyword.as_str() {
-            "RANGE" => TdmObservationData::Range(value),
-            "DOPPLER_COUNT" => TdmObservationData::DopplerCount(value),
-            "DOPPLER_INSTANTANEOUS" => TdmObservationData::DopplerInstantaneous(value),
-            "DOPPLER_INTEGRATED" => TdmObservationData::DopplerIntegrated(value),
-            "CARRIER_POWER" => TdmObservationData::CarrierPower(value),
-            "PC_N0" => TdmObservationData::PcN0(value),
-            "PR_N0" => TdmObservationData::PrN0(value),
-            "RECEIVE_FREQ" => TdmObservationData::ReceiveFreq(value),
-            "RECEIVE_FREQ_1" => TdmObservationData::ReceiveFreq1(value),
-            "RECEIVE_FREQ_2" => TdmObservationData::ReceiveFreq2(value),
-            "RECEIVE_FREQ_3" => TdmObservationData::ReceiveFreq3(value),
-            "RECEIVE_FREQ_4" => TdmObservationData::ReceiveFreq4(value),
-            "RECEIVE_FREQ_5" => TdmObservationData::ReceiveFreq5(value),
-            "TRANSMIT_FREQ_1" => TdmObservationData::TransmitFreq1(value),
-            "TRANSMIT_FREQ_2" => TdmObservationData::TransmitFreq2(value),
-            "TRANSMIT_FREQ_3" => TdmObservationData::TransmitFreq3(value),
-            "TRANSMIT_FREQ_4" => TdmObservationData::TransmitFreq4(value),
-            "TRANSMIT_FREQ_5" => TdmObservationData::TransmitFreq5(value),
-            "TRANSMIT_FREQ_RATE_1" => TdmObservationData::TransmitFreqRate1(value),
-            "TRANSMIT_FREQ_RATE_2" => TdmObservationData::TransmitFreqRate2(value),
-            "TRANSMIT_FREQ_RATE_3" => TdmObservationData::TransmitFreqRate3(value),
-            "TRANSMIT_FREQ_RATE_4" => TdmObservationData::TransmitFreqRate4(value),
-            "TRANSMIT_FREQ_RATE_5" => TdmObservationData::TransmitFreqRate5(value),
-            "ANGLE_1" => TdmObservationData::Angle1(value),
-            "ANGLE_2" => TdmObservationData::Angle2(value),
-            "VLBI_DELAY" => TdmObservationData::VlbiDelay(value),
-            "CLOCK_BIAS" => TdmObservationData::ClockBias(value),
-            "CLOCK_DRIFT" => TdmObservationData::ClockDrift(value),
-            "PRESSURE" => TdmObservationData::Pressure(value),
-            "RHUMIDITY" => {
-                TdmObservationData::Rhumidity(ccsds_ndm::types::Percentage { value, units: None })
-            }
-            "TEMPERATURE" => TdmObservationData::Temperature(value),
-            "TROPO_DRY" => TdmObservationData::TropoDry(value),
-            "TROPO_WET" => TdmObservationData::TropoWet(value),
-            "STEC" => TdmObservationData::Stec(value),
-            "MAG" => TdmObservationData::Mag(value),
-            "RCS" => TdmObservationData::Rcs(value),
-            "DOR" => TdmObservationData::Dor(value),
-            "RECEIVE_PHASE_CT_1" => TdmObservationData::ReceivePhaseCt1(value),
-            "RECEIVE_PHASE_CT_2" => TdmObservationData::ReceivePhaseCt2(value),
-            "RECEIVE_PHASE_CT_3" => TdmObservationData::ReceivePhaseCt3(value),
-            "RECEIVE_PHASE_CT_4" => TdmObservationData::ReceivePhaseCt4(value),
-            "RECEIVE_PHASE_CT_5" => TdmObservationData::ReceivePhaseCt5(value),
-            "TRANSMIT_PHASE_CT_1" => TdmObservationData::TransmitPhaseCt1(value),
-            "TRANSMIT_PHASE_CT_2" => TdmObservationData::TransmitPhaseCt2(value),
-            "TRANSMIT_PHASE_CT_3" => TdmObservationData::TransmitPhaseCt3(value),
-            "TRANSMIT_PHASE_CT_4" => TdmObservationData::TransmitPhaseCt4(value),
-            "TRANSMIT_PHASE_CT_5" => TdmObservationData::TransmitPhaseCt5(value),
-            _ => {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Unknown observation keyword: {}",
-                    keyword
-                )))
-            }
-        };
+        let data = core_tdm::TdmObservationData::from_key_value(&keyword, value)
+            .map_err(crate::errors::ccsds_error_to_pyerr)?;
 
         Ok(Self {
             inner: core_tdm::TdmObservation {
@@ -2034,7 +1954,7 @@ impl TdmObservation {
     /// :type: Optional[float]
     #[getter]
     fn get_value(&self) -> Option<f64> {
-        self.inner.data.value_to_string().parse::<f64>().ok()
+        Some(self.inner.data.value())
     }
 
     /// Measurement value as string.
@@ -2048,13 +1968,15 @@ impl TdmObservation {
     }
 }
 
-#[pyclass(eq, eq_int)]
+#[gen_stub_pyclass_enum]
+#[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq, Copy)]
 pub enum TdmMode {
     Sequential,
     SingleDiff,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TdmMode {
     fn __str__(&self) -> &'static str {
@@ -2081,7 +2003,8 @@ pub fn parse_tdm_mode(ob: &Bound<'_, PyAny>) -> PyResult<core_types::TdmMode> {
     }
 }
 
-#[pyclass(eq, eq_int)]
+#[gen_stub_pyclass_enum]
+#[pyclass(from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq, Copy)]
 pub enum TdmPath {
     Path1,
@@ -2089,6 +2012,7 @@ pub enum TdmPath {
     Path3,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl TdmPath {
     fn __str__(&self) -> &'static str {
