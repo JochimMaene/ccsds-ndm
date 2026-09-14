@@ -375,6 +375,18 @@ pub(super) fn validate_sequences(xml: &str) -> Result<()> {
 impl Ocm {
     pub(crate) fn validate_xml_representability(&self) -> Result<()> {
         let data = &self.body.segment.data;
+        if let Some(value) = data.phys.as_ref().and_then(|phys| phys.drag_coeff_nom) {
+            if value <= 0.0 {
+                return Err(ValidationError::OutOfRange {
+                    name: "DRAG_COEFF_NOM".into(),
+                    value: value.to_string(),
+                    expected: "> 0 for the 3.0 XML edition".into(),
+                    line: None,
+                }
+                .at_path("body.segment.data.phys")
+                .into());
+            }
+        }
         for (index, man) in data.man.iter().enumerate() {
             for (field, angle) in [
                 ("DC_PA_START_ANGLE", man.dc_pa_start_angle.as_ref()),

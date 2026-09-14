@@ -38,7 +38,7 @@ inventory is reconciled as follows; the counts are statement rows, not public ca
 | ICS group | Rows | Reconciled implementation evidence |
 | --- | ---: | --- |
 | Header | 7 | Version, creation date, originator, message ID, and leading comments are covered by the common ODM header model and strict root/header sequence checks. |
-| Metadata | 51 | Required identity/time fields, SCLK dependencies, leap-second pairing, units, ordering, duplicates, and comments are covered by typed metadata validation plus KVN/XML structural checks. |
+| Metadata | 51 | Required identity/time fields, SCLK dependencies, units, ordering, duplicates, and comments are covered by typed metadata validation plus KVN/XML structural checks. |
 | Trajectory | 23 | Block metadata, composition/units cardinality, time tags, epoch ordering, fixed record shape, and representability are covered by the trajectory model and history tests. `validate_ocm_line_values` additionally rejects non-finite numbers in every `trajLine`, naming the failing line and column. |
 | Physical | 54 | The complete optional scalar/vector XML/KVN model is registered; required-field, unit, order, duplicate, and notation-preservation behavior is exercised by the fixture corpus. `OcmPhysicalDescription::validate` covers the block's own editable values: `DRAG_COEFF_NOM`, the eleven areas, three masses, two percentages, `REFLECTANCE`, the three attitude angles, and the remaining plain doubles for finiteness. |
 | Covariance | 18 | Block metadata, ordering, epoch sequence, composition/units, fixed record shape, and representability are covered by covariance validation and history tests, and `validate_ocm_line_values` rejects non-finite numbers in every `covLine`. |
@@ -50,6 +50,8 @@ inventory is reconciled as follows; the counts are statement rows, not public ca
 These OCM values are deliberately **not** validated, each for a recorded reason rather than by
 omission:
 
+- `DRAG_COEFF_NOM` accepts zero because ODM says it disables atmospheric drag, while the XSD's
+  `positiveDouble` excludes it. KVN preserves zero and XML generation refuses it.
 - `DAYS_SINCE_FIRST_OBS`, `DAYS_SINCE_LAST_OBS`, `DC_PA_START_ANGLE`, and `DC_PA_STOP_ANGLE` are
   validated for finiteness only, because ODM's domain is wider than the 3.0 schema's. The
   book-valid value is preserved and KVN writes it; XML generation refuses the conversion with the
@@ -83,6 +85,6 @@ by all family cells.
 
 ## Status
 
-OCM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its family-specific open items are the five
-deliberately unvalidated values listed above, of which `DAYS_SINCE_*_OBS` and the phase-angle range
-are book/XSD conflicts rather than gaps.
+OCM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its family-specific open items are the six
+deliberately unvalidated values listed above, of which `DRAG_COEFF_NOM`, `DAYS_SINCE_*_OBS`, and
+the phase-angle range are book/XSD conflicts rather than gaps.

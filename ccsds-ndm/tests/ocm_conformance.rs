@@ -405,11 +405,26 @@ fn maneuver_line_numeric_columns_must_hold_numbers() {
     assert_rejects(&message, "THR_X");
 }
 
-/// Three OCM values have a book domain wider than the 3.0 schema's, so they follow the same
+/// Some OCM values have a book domain wider than the 3.0 schema's, so they follow the same
 /// P3/P4 split as RDM's `NOMINAL_IMPACT_ALT`: the model preserves the book-valid value, `validate`
 /// enforces only finiteness or sign-free finiteness, and XML generation refuses the conversion.
 #[test]
 fn ocm_book_wider_than_xsd_values_are_refused_at_xml_only() {
+    // ODM says zero disables atmospheric drag; the XSD requires a positive value.
+    let mut message = Ocm::from_kvn(KVN).unwrap();
+    message
+        .body
+        .segment
+        .data
+        .phys
+        .as_mut()
+        .unwrap()
+        .drag_coeff_nom = Some(0.0);
+    message.validate().expect("ODM permits zero");
+    assert!(message.to_kvn().is_ok());
+    let error = message.to_xml().expect_err("positiveDouble excludes zero");
+    assert!(error.to_string().contains("DRAG_COEFF_NOM"), "{error}");
+
     // ODM permits any finite phase angle; `angleType` is [-360, 360).
     for outside in [360.0, -400.0] {
         let mut message = time_and_angle_message();

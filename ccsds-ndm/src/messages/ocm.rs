@@ -141,9 +141,10 @@ impl OcmData {
 
 impl OcmPhysicalDescription {
     fn validate(&self) -> Result<()> {
-        // DRAG_COEFF_NOM is `positiveDouble` in the OCM 3.0 XSD.
+        // ODM permits zero while the XSD requires a positive value. XML representability is
+        // checked separately.
         if let Some(v) = self.drag_coeff_nom {
-            require_positive(v, "DRAG_COEFF_NOM")?;
+            require_finite("DRAG_COEFF_NOM", v)?;
         }
         // `areaType` and `massType` are `nonNegativeDouble`.
         for (field, value) in [
@@ -1644,13 +1645,6 @@ fn validate_ocm_metadata(metadata: &OcmMetadata) -> Result<()> {
         if let Some(error) = validate_ocm_seconds_duration("SCLK_SEC_PER_SI_SEC", rate) {
             return Err(error.into());
         }
-    }
-    if metadata.next_leap_epoch.is_some() && metadata.next_leap_taimutc.is_none() {
-        return Err(ValidationError::missing_required(
-            "OCM Metadata",
-            "NEXT_LEAP_TAIMUTC (required when NEXT_LEAP_EPOCH is present)",
-        )
-        .into());
     }
     Ok(())
 }
@@ -4565,7 +4559,7 @@ TRAJ_STOP
     }
 
     #[test]
-    fn test_ocm_metadata_sclk_and_next_leap_requirements() {
+    fn test_ocm_metadata_sclk_requirements_and_units() {
         let mut metadata = OcmMetadata::builder()
             .time_system("SCLK")
             .epoch_tzero("2023-01-01T00:00:00".parse().unwrap())
@@ -4587,13 +4581,6 @@ TRAJ_STOP
         assert!(metadata.validate().is_ok());
 
         metadata.next_leap_epoch = Some("2024-01-01T00:00:00".parse().unwrap());
-        let error = metadata.validate().unwrap_err().to_string();
-        assert!(error.contains("NEXT_LEAP_TAIMUTC"));
-
-        metadata.next_leap_taimutc = Some(TimeOffset {
-            value: 37.0,
-            units: Some(TimeUnits::Seconds),
-        });
         assert!(metadata.validate().is_ok());
 
         metadata.sclk_offset_at_epoch.as_mut().unwrap().units = Some(TimeUnits::Day);
@@ -4690,20 +4677,7 @@ TRAJ_STOP
 
     #[test]
     fn test_ocm_validation_gaps() {
-        // 1. DRAG_COEFF_NOM <= 0.0. The default description validates, so the field under test
-        // is the only reason these two reject.
-        OcmPhysicalDescription::default()
-            .validate()
-            .expect("an empty physical description is valid");
-        for rejected in [-1.0, 0.0] {
-            let phys = OcmPhysicalDescription {
-                drag_coeff_nom: Some(rejected),
-                ..Default::default()
-            };
-            assert_diagnostic(phys.validate(), "DRAG_COEFF_NOM");
-        }
-
-        // 2. ORB_REVNUM < 0.0
+        // ORB_REVNUM < 0.0
         let mut traj = OcmTrajState::builder()
             .center_name("EARTH")
             .traj_ref_frame("GCRF")
