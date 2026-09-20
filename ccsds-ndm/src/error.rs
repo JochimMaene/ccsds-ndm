@@ -947,12 +947,11 @@ impl CcsdsNdmError {
             Self::UnexpectedEof { .. } => Some("parse.unexpected_eof"),
             Self::UnsupportedNotation { .. } => Some("unsupported.notation"),
             Self::UnsupportedOutputVersion { .. } => Some("generation.unsupported_output_version"),
-            Self::ResourceLimitExceeded { resource, .. } => match *resource {
-                "input_document" => Some("resource.input_limit_exceeded"),
-                "xml_depth" => Some("resource.xml_depth_limit_exceeded"),
-                "history_records" => Some("resource.record_limit_exceeded"),
-                _ => None,
-            },
+            Self::ResourceLimitExceeded {
+                resource: "xml_depth",
+                ..
+            } => Some("resource.xml_depth_limit_exceeded"),
+            Self::ResourceLimitExceeded { .. } => None,
             _ => None,
         }
     }
@@ -1005,18 +1004,6 @@ impl CcsdsNdmError {
         }
     }
 
-    /// Returns the inner epoch error if this is an EpochError.
-    #[cfg(test)]
-    pub(crate) fn as_epoch_error(&self) -> Option<&EpochError> {
-        match self {
-            CcsdsNdmError::Generation { source, .. } | CcsdsNdmError::Parsing { source, .. } => {
-                source.as_epoch_error()
-            }
-            CcsdsNdmError::Epoch(e) => Some(e),
-            _ => None,
-        }
-    }
-
     /// Returns the inner I/O error if this is an IoError.
     pub fn as_io_error(&self) -> Option<&std::io::Error> {
         match self {
@@ -1028,31 +1015,10 @@ impl CcsdsNdmError {
         }
     }
 
-    /// Returns the inner XML error if this is an XmlError.
-    #[cfg(test)]
-    pub(crate) fn as_xml_error(&self) -> Option<&quick_xml::Error> {
-        match self {
-            CcsdsNdmError::Generation { source, .. } | CcsdsNdmError::Parsing { source, .. } => {
-                source.as_xml_error()
-            }
-            CcsdsNdmError::Format(e) => match **e {
-                FormatError::Xml(ref xe) => Some(xe),
-                _ => None,
-            },
-            _ => None,
-        }
-    }
-
     /// Returns true if this is any FormatError.
     #[cfg(test)]
     pub(crate) fn is_format_error(&self) -> bool {
         matches!(self, CcsdsNdmError::Format(_))
-    }
-
-    /// Returns true if this is a KVN FormatError.
-    #[cfg(test)]
-    pub(crate) fn is_kvn_error(&self) -> bool {
-        self.as_kvn_parse_error().is_some()
     }
 
     /// Returns true if this is a ValidationError.
@@ -1061,48 +1027,12 @@ impl CcsdsNdmError {
         self.as_validation_error().is_some()
     }
 
-    /// Returns true if this is an I/O error.
-    #[cfg(test)]
-    pub(crate) fn is_io_error(&self) -> bool {
-        matches!(self, CcsdsNdmError::Io(_))
-    }
-
-    /// Returns true if this is an epoch error.
-    #[cfg(test)]
-    pub(crate) fn is_epoch_error(&self) -> bool {
-        matches!(self, CcsdsNdmError::Epoch(_))
-    }
-
     /// Returns the inner EnumParseError if this is a FormatError::Enum.
     #[cfg(test)]
     pub(crate) fn as_enum_error(&self) -> Option<&EnumParseError> {
         match self {
             CcsdsNdmError::Format(e) => match **e {
                 FormatError::Enum(ref ee) => Some(ee),
-                _ => None,
-            },
-            _ => None,
-        }
-    }
-
-    /// Returns the inner ParseIntError if this is a FormatError::ParseInt.
-    #[cfg(test)]
-    pub(crate) fn as_parse_int_error(&self) -> Option<&std::num::ParseIntError> {
-        match self {
-            CcsdsNdmError::Format(e) => match **e {
-                FormatError::ParseInt(ref pie) => Some(pie),
-                _ => None,
-            },
-            _ => None,
-        }
-    }
-
-    /// Returns the inner ParseFloatError if this is a FormatError::ParseFloat.
-    #[cfg(test)]
-    pub(crate) fn as_parse_float_error(&self) -> Option<&std::num::ParseFloatError> {
-        match self {
-            CcsdsNdmError::Format(e) => match **e {
-                FormatError::ParseFloat(ref pfe) => Some(pfe),
                 _ => None,
             },
             _ => None,
@@ -1272,7 +1202,6 @@ mod tests {
         let io_err = std::io::Error::other("io");
         let err: CcsdsNdmError = io_err.into();
         assert!(err.as_io_error().is_some());
-        assert!(err.is_io_error());
         assert_eq!(format!("{}", err), "I/O error: io");
 
         let val_err = ValidationError::Generic {
@@ -1287,7 +1216,6 @@ mod tests {
         let err: CcsdsNdmError = fmt_err.into();
         assert!(err.as_format_error().is_some());
         assert!(err.is_format_error());
-        assert!(!err.is_kvn_error());
 
         let enum_err = EnumParseError {
             field: "F",
@@ -1297,18 +1225,22 @@ mod tests {
         let err: CcsdsNdmError = enum_err.into();
         assert!(err.as_enum_error().is_some());
 
-        let pfe_err = "abc".parse::<f64>().unwrap_err();
-        let err: CcsdsNdmError = pfe_err.into();
-        assert!(err.as_parse_float_error().is_some());
+        // The `From` conversions are the behaviour worth pinning; matching the variant does that
+        // without an accessor that only this test would call.
+        let err: CcsdsNdmError = "abc".parse::<f64>().unwrap_err().into();
+        assert!(matches!(
+            err.as_format_error(),
+            Some(FormatError::ParseFloat(_))
+        ));
 
-        let pie_err = "abc".parse::<i32>().unwrap_err();
-        let err: CcsdsNdmError = pie_err.into();
-        assert!(err.as_parse_int_error().is_some());
+        let err: CcsdsNdmError = "abc".parse::<i32>().unwrap_err().into();
+        assert!(matches!(
+            err.as_format_error(),
+            Some(FormatError::ParseInt(_))
+        ));
 
-        let epoch_err = EpochError::InvalidFormat("2023".into());
-        let err: CcsdsNdmError = CcsdsNdmError::Epoch(epoch_err);
-        assert!(err.as_epoch_error().is_some());
-        assert!(err.is_epoch_error());
+        let err = CcsdsNdmError::Epoch(EpochError::InvalidFormat("2023".into()));
+        assert!(matches!(err, CcsdsNdmError::Epoch(_)));
 
         let eof_err = CcsdsNdmError::UnexpectedEof {
             context: "ctx".into(),
@@ -1323,7 +1255,7 @@ mod tests {
     fn test_format_error_variants() {
         let xml_err = quick_xml::Error::Io(std::sync::Arc::new(std::io::Error::other("io")));
         let err: CcsdsNdmError = FormatError::Xml(xml_err).into();
-        assert!(err.as_xml_error().is_some());
+        assert!(matches!(err.as_format_error(), Some(FormatError::Xml(_))));
 
         let fmt_err = FormatError::XmlWithContext {
             context: "ctx".into(),

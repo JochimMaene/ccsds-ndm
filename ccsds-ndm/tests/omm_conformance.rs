@@ -1,21 +1,16 @@
 use std::fs;
-use std::path::{Path, PathBuf};
 
 use ccsds_ndm::messages::omm::Omm;
 use ccsds_ndm::types::ElementSetNo;
 use ccsds_ndm::Ndm;
 
 mod common;
-use common::validate_xml;
+use common::{data_dir, validate_xml};
 
 const KVN: &str = include_str!("../data/kvn/omm_g9.kvn");
 const XML: &str = include_str!("../data/xml/omm_g10.xml");
 /// The only shipped OMM fixture that carries a covariance matrix.
 const KVN_WITH_COVARIANCE: &str = include_str!("../data/kvn/omm_g8.kvn");
-
-fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
-}
 
 fn assert_kvn_rejected(label: &str, source: String) {
     assert!(Omm::from_kvn(&source).is_err(), "accepted {label}");
@@ -98,7 +93,7 @@ fn omm_xml_rejects_unknown_nested_content_and_ordering_errors() {
 #[test]
 fn every_shipped_omm_fixture_preserves_the_typed_model_and_generates_valid_xml() {
     for name in ["omm_g7.kvn", "omm_g8.kvn", "omm_g9.kvn"] {
-        let source = fs::read_to_string(repository_path(&format!("data/kvn/{name}"))).unwrap();
+        let source = fs::read_to_string(data_dir().join("kvn").join(name)).unwrap();
         let message = Omm::from_kvn(&source).unwrap();
         let kvn = message.to_kvn().unwrap();
         assert_eq!(Omm::from_kvn(&kvn).unwrap(), message, "{name} KVN model");

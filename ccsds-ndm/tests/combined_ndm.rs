@@ -2,11 +2,10 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::Ndm;
-use ccsds_ndm::{from_str, from_str_with_options, Message, ParseOptions};
+use ccsds_ndm::{from_str, Message};
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 
@@ -50,18 +49,6 @@ fn combined_xml_parser_enforces_the_normative_envelope() {
     assert!(CombinedNdm::from_xml("<ndm>").is_err());
     assert!(CombinedNdm::from_xml("<ndm></ndm><ndm></ndm>").is_err());
     assert!(CombinedNdm::from_xml("<ndm></ndm>").is_ok());
-
-    let aem = Aem::from_xml(include_str!("../data/xml/aem_g11.xml")).unwrap();
-    let input = CombinedNdm {
-        id: None,
-        comments: Vec::new(),
-        messages: vec![Message::Aem(aem)],
-    }
-    .to_xml()
-    .unwrap();
-    let options = ccsds_ndm::ParseOptions::default().with_max_records(0);
-    let error = ccsds_ndm::from_str_with_options(&input, None, &options).unwrap_err();
-    assert_eq!(error.code(), Some("resource.record_limit_exceeded"));
 }
 
 #[test]
@@ -101,14 +88,6 @@ INTERPOLATION_DEGREE = 1
 META_STOP
 2021-01-01T12:00:00.000 6500.0 0.0 0.0 0.0 7.5 0.0
 "#;
-
-    let error = from_str_with_options(
-        input,
-        None,
-        &ParseOptions::default().with_max_input_bytes(input.len() - 1),
-    )
-    .unwrap_err();
-    assert_eq!(error.code(), Some("resource.input_limit_exceeded"));
 
     let error = from_str(input).unwrap_err();
     let diagnostic = error.diagnostic().unwrap();
@@ -348,4 +327,22 @@ fn combined_envelope_carries_one_message_of_every_family() {
         panic!("combined envelope did not round-trip");
     };
     assert_eq!(reparsed.messages.len(), messages.len());
+}
+
+#[test]
+fn combined_validation_checks_the_cdm_root_envelope() {
+    // `Cdm`'s inherent `validate` shadows the trait method; it must not be weaker.
+    let mut cdm =
+        ccsds_ndm::messages::cdm::Cdm::from_kvn(include_str!("../data/kvn/cdm_362.kvn")).unwrap();
+    cdm.id = Some("NOT_A_CDM".into());
+
+    cdm.validate().expect_err("bad root id must be rejected");
+
+    let combined = CombinedNdm {
+        id: None,
+        comments: Vec::new(),
+        messages: vec![Message::Cdm(cdm)],
+    };
+    ccsds_ndm::Validate::validate(&combined)
+        .expect_err("combined envelope must reject a malformed CDM root");
 }

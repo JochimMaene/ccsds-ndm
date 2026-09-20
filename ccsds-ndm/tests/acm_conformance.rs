@@ -1,19 +1,14 @@
 use std::fs;
-use std::path::{Path, PathBuf};
 
 use ccsds_ndm::messages::acm::Acm;
 use ccsds_ndm::types::{AngleRate, Vec4Double};
 use ccsds_ndm::Ndm;
 
 mod common;
-use common::{assert_rejects, validate_xml};
+use common::{assert_rejects, data_dir, validate_xml};
 
 const ATT_KVN: &str = include_str!("../data/kvn/acm_g7.kvn");
 const COV_KVN: &str = include_str!("../data/kvn/acm_g9.kvn");
-
-fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
-}
 
 #[test]
 fn acm_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
@@ -102,7 +97,7 @@ fn acm_xml_rejects_unknown_nested_content_attributes_and_ordering_errors() {
 #[test]
 fn every_shipped_acm_fixture_preserves_the_typed_model_and_generates_valid_xml() {
     for name in ["acm_g6.kvn", "acm_g7.kvn", "acm_g8.kvn", "acm_g9.kvn"] {
-        let source = fs::read_to_string(repository_path(&format!("data/kvn/{name}"))).unwrap();
+        let source = fs::read_to_string(data_dir().join("kvn").join(name)).unwrap();
         let message = Acm::from_kvn(&source).unwrap();
         let kvn = message.to_kvn().unwrap();
         assert_eq!(Acm::from_kvn(&kvn).unwrap(), message, "{name} KVN model");
@@ -131,22 +126,24 @@ fn acm_vectors_and_units_survive_both_notations() {
 
 #[test]
 fn every_kvn_generation_gate_rejects_invalid_state_before_output() {
-    let mut cases: Vec<(&str, Acm)> = Vec::new();
     let mut non_ascii = Acm::from_kvn(ATT_KVN).unwrap();
     non_ascii.body.segment.metadata.object_name = "ST5 €".to_owned();
-    cases.push(("non-ASCII text", non_ascii));
-    let mut overlong = Acm::from_kvn(ATT_KVN).unwrap();
-    overlong.body.segment.metadata.object_name = "X".repeat(240);
-    cases.push(("overlong record", overlong));
-    for (label, message) in cases {
-        assert!(message.to_kvn().is_err(), "materialized accepted {label}");
-        let mut output = Vec::new();
-        assert!(
-            message.write_kvn_to(&mut output).is_err(),
-            "streaming accepted {label}"
-        );
-        assert!(output.is_empty(), "streaming wrote bytes for {label}");
-    }
+    assert!(non_ascii.to_kvn().is_err());
+    let mut output = Vec::new();
+    assert!(non_ascii.write_kvn_to(&mut output).is_err());
+    assert!(output.is_empty());
+}
+
+#[test]
+fn acm_accepts_arbitrary_line_lengths() {
+    let long_name = "X".repeat(300);
+    let source = ATT_KVN.replace("OBJECT_NAME = SDO", &format!("OBJECT_NAME = {long_name}"));
+    let message = Acm::from_kvn(&source).unwrap();
+    let generated = message.to_kvn().unwrap();
+    assert!(generated.lines().any(|line| line.len() > 254));
+    let mut streamed = Vec::new();
+    message.write_kvn_to(&mut streamed).unwrap();
+    assert_eq!(streamed, generated.as_bytes());
 }
 
 #[test]

@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::errors::ccsds_error_to_pyerr;
-use ccsds_ndm::options::ParseOptions;
 use ccsds_ndm::validation::MessageKind;
 use ccsds_ndm::{Message, Notation};
 use ccsds_ndm::{Ndm, Validate};
@@ -69,30 +68,14 @@ fn expect_typed<T: FromMessage>(message: Message) -> PyResult<T> {
     })
 }
 
-pub fn parse_options(max_input_bytes: Option<usize>, max_records: Option<usize>) -> ParseOptions {
-    ParseOptions {
-        max_input_bytes,
-        max_records,
-        ..ParseOptions::default()
-    }
-}
-
-pub fn parse_typed_with_options<T: FromMessage>(
-    data: &str,
-    format: Option<&str>,
-    options: &ParseOptions,
-) -> PyResult<T> {
-    let message = ccsds_ndm::from_str_with_options(data, selected_notation(format)?, options)
+pub fn parse_typed<T: FromMessage>(data: &str, format: Option<&str>) -> PyResult<T> {
+    let message = ccsds_ndm::from_str_with_notation(data, selected_notation(format)?)
         .map_err(ccsds_error_to_pyerr)?;
     expect_typed(message)
 }
 
-pub fn parse_typed_file_with_options<T: FromMessage>(
-    path: &Path,
-    format: Option<&str>,
-    options: &ParseOptions,
-) -> PyResult<T> {
-    let message = ccsds_ndm::from_file_with_options(path, selected_notation(format)?, options)
+pub fn parse_typed_file<T: FromMessage>(path: &Path, format: Option<&str>) -> PyResult<T> {
+    let message = ccsds_ndm::from_file_with_notation(path, selected_notation(format)?)
         .map_err(ccsds_error_to_pyerr)?;
     expect_typed(message)
 }

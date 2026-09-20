@@ -13,6 +13,7 @@
 use ccsds_ndm::types as core_types;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 // =============================================================================
 // Helper Functions
@@ -49,12 +50,14 @@ pub fn parse_relative_time(s: &str) -> PyResult<core_types::RelativeTime> {
 ///     A dictionary of user-defined parameters and their values.
 /// comment : list[str], optional
 ///     Comments.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Default)]
 pub struct UserDefined {
     pub inner: core_types::UserDefined,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl UserDefined {
     /// Create a new UserDefined object.
@@ -85,6 +88,8 @@ impl UserDefined {
     }
 
     /// Comments (see 7.8 for formatting rules).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
     ///
     /// :type: list[str]
     #[getter]

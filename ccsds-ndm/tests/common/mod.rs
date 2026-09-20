@@ -66,3 +66,40 @@ pub fn validate_xml(label: &str, xml: &str) {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+#[allow(dead_code)]
+#[derive(Debug)]
+pub struct FailAfter {
+    pub accepted: Vec<u8>,
+    limit: usize,
+}
+
+#[allow(dead_code)]
+impl FailAfter {
+    pub fn new(limit: usize) -> Self {
+        Self {
+            accepted: Vec::new(),
+            limit,
+        }
+    }
+}
+
+impl std::io::Write for FailAfter {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        let remaining = self.limit.saturating_sub(self.accepted.len());
+        if remaining == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                "deliberate test sink failure",
+            ));
+        }
+
+        let accepted = remaining.min(buffer.len());
+        self.accepted.extend_from_slice(&buffer[..accepted]);
+        Ok(accepted)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}

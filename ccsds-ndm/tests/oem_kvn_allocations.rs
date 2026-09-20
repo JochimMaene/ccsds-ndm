@@ -1,6 +1,6 @@
 use ccsds_ndm::messages::oem::Oem;
+use ccsds_ndm::Message;
 use ccsds_ndm::Ndm;
-use ccsds_ndm::{Message, ParseOptions};
 use stats_alloc::{Region, Stats, StatsAlloc, INSTRUMENTED_SYSTEM};
 use std::alloc::System;
 use std::hint::black_box;
@@ -100,12 +100,7 @@ fn oem_kvn_generation_and_parsing_have_bounded_storage() {
     );
 
     let source = many_small_segments(100);
-    let Message::Oem(parsed) = ccsds_ndm::from_str_with_options(
-        &source,
-        None,
-        &ParseOptions::default().with_max_records(300),
-    )
-    .unwrap() else {
+    let Message::Oem(parsed) = ccsds_ndm::from_str(&source).unwrap() else {
         unreachable!()
     };
     let records: usize = parsed

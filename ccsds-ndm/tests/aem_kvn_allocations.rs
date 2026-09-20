@@ -1,7 +1,8 @@
 use std::alloc::System;
 use std::hint::black_box;
 
-use ccsds_ndm::messages::aem::{Aem, AemAttitudeStateWrapper};
+use ccsds_ndm::common::AemAttitudeState;
+use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::types::CalendarEpoch;
 use ccsds_ndm::Ndm;
 use stats_alloc::{Region, Stats, StatsAlloc, INSTRUMENTED_SYSTEM};
@@ -22,10 +23,12 @@ fn aem(records: usize) -> Aem {
             let hours = 5 + index / 3_600;
             let minutes = (index % 3_600) / 60;
             let seconds = index % 60;
-            state.spin.as_mut().unwrap().epoch =
-                format!("2006-090T{hours:02}:{minutes:02}:{seconds:02}.071")
-                    .parse()
-                    .unwrap();
+            let AemAttitudeState::Spin(spin) = &mut state else {
+                unreachable!()
+            };
+            spin.epoch = format!("2006-090T{hours:02}:{minutes:02}:{seconds:02}.071")
+                .parse()
+                .unwrap();
             state
         })
         .collect();
@@ -65,7 +68,7 @@ fn aem_history_parse_and_streaming_generation_have_bounded_allocation_growth() {
         large_parse.allocations <= small_parse.allocations + (1_000 - 10) + 12,
         "KVN parse exceeded one owned epoch allocation per state: small={small_parse:?}, large={large_parse:?}"
     );
-    let typed_budget = (1_000 - 10) * std::mem::size_of::<AemAttitudeStateWrapper>() * 2 + 8_192;
+    let typed_budget = (1_000 - 10) * std::mem::size_of::<AemAttitudeState>() * 2 + 8_192;
     assert!(
         large_parse.bytes_allocated <= small_parse.bytes_allocated + typed_budget,
         "KVN parse exceeded typed-state storage budget: small={small_parse:?}, large={large_parse:?}"

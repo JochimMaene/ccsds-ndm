@@ -11,6 +11,9 @@ rust_manifest := rust_dir + "/Cargo.toml"
 python_dir := "bindings/python"
 python_manifest := python_dir + "/Cargo.toml"
 
+# Interpreter used to build the stub generator; must ship a shared libpython.
+stub_python := env_var_or_default("PYO3_PYTHON", "python3")
+
 # --- Setup ------------------------------------------------------------------
 
 # Set up the Python development environment
@@ -42,25 +45,46 @@ prek:
 dev:
     cd {{python_dir}} && uv run --with maturin maturin develop
 
-# Generate Python type stubs (.pyi)
+# Generate Python type stubs (.pyi) with pyo3-stub-gen.
+#
+# The generator is an ordinary binary, so it links libpython: point `stub_python`
+# at an interpreter that ships a shared library (a uv-managed CPython reports a
+# LIBDIR that does not exist). `abi3-py310` only sets the ABI floor, so any
+# supported version works.
 [private]
 stubs:
-    cd {{python_dir}} && uv run python stubs.py
+    #!/usr/bin/env bash
+    set -euo pipefail
+    libdir="$({{stub_python}} -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))')"
+    if [ ! -d "$libdir" ]; then
+        echo "{{stub_python}} reports LIBDIR=$libdir, which does not exist." >&2
+        echo "Set stub_python to an interpreter with a shared libpython." >&2
+        exit 1
+    fi
+    PYO3_PYTHON="{{stub_python}}" LD_LIBRARY_PATH="$libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+        cargo run --quiet --manifest-path {{python_manifest}} --bin stub_gen
+    uv run --project {{python_dir}} ruff format {{python_dir}}/ccsds_ndm/__init__.pyi
 
-# Check if Python type stubs are up to date
+# Check the committed stubs match what the generator produces.
+# Generates into a temporary directory so the committed file is never rewritten.
 [private]
 stubs-check:
-    cd {{python_dir}} && uv run python stubs.py --check
+    #!/usr/bin/env bash
+    set -euo pipefail
+    libdir="$({{stub_python}} -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))')"
+    out="$(mktemp -d)"
+    trap 'rm -rf "$out"' EXIT
+    mkdir -p "$out/ccsds_ndm"
+    PYO3_PYTHON="{{stub_python}}" LD_LIBRARY_PATH="$libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+        cargo run --quiet --manifest-path {{python_manifest}} --bin stub_gen -- "$out"
+    uv run --project {{python_dir}} ruff format --config {{python_dir}}/pyproject.toml "$out/ccsds_ndm/__init__.pyi"
+    diff -u {{python_dir}}/ccsds_ndm/__init__.pyi "$out/ccsds_ndm/__init__.pyi"
 
-# Sync docstrings from Rust to Python
+# Type-check the generated stubs. mypy caught malformed override annotations that
+# aggregate diffing did not, so this guards the generator's output.
 [private]
-sync-docs:
-    cd {{python_dir}} && uv run python sync_docstrings.py
-
-# Check if docstrings are in sync
-[private]
-sync-docs-check:
-    cd {{python_dir}} && uv run python sync_docstrings.py --check
+typecheck:
+    cd {{python_dir}} && uv run mypy --strict ccsds_ndm/__init__.pyi
 
 # Audit Python bindings against Rust core structs
 [private]
@@ -118,201 +142,17 @@ test-python:
 # Run both Rust and Python tests
 test: test-rust test-python
 
-# Run the OPM 3.0 Rust XML-generation conformance slice
-[private]
-conformance-opm-xml:
-    cargo test --manifest-path {{rust_manifest}} --test opm_3_xml_generation_conformance
-    cargo test --manifest-path {{rust_manifest}} --test opm_epoch_xml_generation
-    cargo test --manifest-path {{rust_manifest}} --test opm_keplerian_xml_generation
-    cargo test --manifest-path {{rust_manifest}} --test opm_maneuver_duration_units
-    cargo test --manifest-path {{rust_manifest}} --test opm_xml_root_envelope
-    cargo test --manifest-path {{rust_manifest}} --test opm_xml_writer_failure
-    cargo test --manifest-path {{rust_manifest}} --test opm_xml_allocations
-
-# Run the OPM 3.0 Rust KVN-generation conformance slice
-[private]
-conformance-opm-kvn:
-    cargo test --manifest-path {{rust_manifest}} --test opm_3_kvn_generation_conformance
-    cargo test --manifest-path {{rust_manifest}} --test opm_kvn_writer_failure
-    cargo test --manifest-path {{rust_manifest}} --test opm_kvn_allocations
-
-# Run strict OPM parsing, validation, and conversion evidence
-[private]
-conformance-opm-parse:
-    cargo test --manifest-path {{rust_manifest}} --test opm_strict_kvn_parsing
-    cargo test --manifest-path {{rust_manifest}} --test opm_strict_xml_parsing
-    cargo test --manifest-path {{rust_manifest}} --test opm_parse_diagnostics
-    cargo test --manifest-path {{rust_manifest}} --test opm_parse_limits
-
-[private]
-conformance-opm-validation:
-    cargo test --manifest-path {{rust_manifest}} --test opm_validation
-
-[private]
-conformance-opm-conversion:
-    cargo test --manifest-path {{rust_manifest}} --test opm_conversion
-
-[private]
-conformance-opm-python:
-    cd {{python_dir}} && uv run pytest tests/test_opm.py tests/test_parse_and_generation_options.py
-
-# Run the focused OEM 3.0 Rust parsing, validation, generation, conversion, and resource evidence
-[private]
-conformance-oem:
-    cargo test --manifest-path {{rust_manifest}} --test oem_strict_parsing
-    cargo test --manifest-path {{rust_manifest}} --test oem_parse_diagnostics
-    cargo test --manifest-path {{rust_manifest}} --test oem_validation
-    cargo test --manifest-path {{rust_manifest}} --test oem_generation_conformance
-    cargo test --manifest-path {{rust_manifest}} --test oem_conversion
-    cargo test --manifest-path {{rust_manifest}} --test oem_kvn_allocations
-
-# Run the focused OMM 3.0 strictness, preservation, and generation evidence
-[private]
-conformance-omm:
-    cargo test --manifest-path {{rust_manifest}} --test omm_conformance
-    cargo test --manifest-path {{rust_manifest}} --test fixed_family_allocations
-
-# Run the focused OEM/OMM Python adapter evidence
-[private]
-conformance-odm-surfaces:
-    cd {{python_dir}} && uv run pytest tests/test_verified_odm_surfaces.py tests/test_parse_and_generation_options.py
-
-# Run the focused standalone OCM 3.0 conformance and history-allocation evidence.
-[private]
-conformance-ocm:
-    cargo test --manifest-path {{rust_manifest}} --test ocm_conformance
-    cargo test --manifest-path {{rust_manifest}} --test ocm_kvn_allocations
-
-# Run the focused standalone CDM 1.0 conformance evidence.
-[private]
-conformance-cdm:
-    cargo test --manifest-path {{rust_manifest}} --test cdm_conformance
-
-# Run the focused standalone AEM 2.0 conformance and history-allocation evidence.
-[private]
-conformance-aem:
-    cargo test --manifest-path {{rust_manifest}} --test aem_conformance
-    cargo test --manifest-path {{rust_manifest}} --test aem_semantic_validation
-    cargo test --manifest-path {{rust_manifest}} --test aem_kvn_allocations
-
-# Run the focused standalone ACM 2.0 conformance and history-allocation evidence.
-[private]
-conformance-acm:
-    cargo test --manifest-path {{rust_manifest}} --test acm_conformance
-    cargo test --manifest-path {{rust_manifest}} --test acm_kvn_allocations
-
-# Run the focused combined NDM envelope, surface, and allocation evidence.
-[private]
-conformance-combined:
-    cargo test --manifest-path {{rust_manifest}} --test combined_conformance
-    cargo test --manifest-path {{rust_manifest}} --test combined_ndm
-    cargo test --manifest-path {{rust_manifest}} --test combined_allocations
-
-# Run the focused standalone APM 2.0 conformance evidence.
-[private]
-conformance-apm:
-    cargo test --manifest-path {{rust_manifest}} --test apm_conformance
-    cargo test --manifest-path {{rust_manifest}} --test fixed_family_allocations
-
-# Run the focused standalone RDM 1.0 conformance evidence.
-[private]
-conformance-rdm:
-    cargo test --manifest-path {{rust_manifest}} --test rdm_conformance
-    cargo test --manifest-path {{rust_manifest}} --test fixed_family_allocations
-
-# Run the focused standalone TDM 2.0 conformance and history-allocation evidence.
-[private]
-conformance-tdm:
-    cargo test --manifest-path {{rust_manifest}} --test tdm_conformance
-    cargo test --manifest-path {{rust_manifest}} --test tdm_kvn_allocations
-
-# Reproduce the complete OEM 3.0 Rust technical verification and artifact evidence
-[private]
-verify-oem:
-    just check
-    just conformance-oem
-    just conformance-odm-surfaces
-    cargo check --manifest-path {{rust_manifest}} --all-features --benches
-    just docs
-    just package-rust
-    just package-python
-
-# Reproduce the complete OMM 3.0 technical and packaged-surface evidence
-[private]
-verify-omm:
-    just check
-    just conformance-omm
-    just conformance-odm-surfaces
-    cargo check --manifest-path {{rust_manifest}} --all-features --benches
-    just docs
-    just package-rust
-    just package-python
-
-# Reproduce the complete OPM 3.0 technical verification and artifact evidence
-[private]
-verify-opm:
-    just check
-    just conformance-opm-xml
-    just conformance-opm-kvn
-    just conformance-opm-parse
-    just conformance-opm-validation
-    just conformance-opm-conversion
-    just conformance-opm-python
-    cargo check --manifest-path {{rust_manifest}} --all-features --benches
-    just docs
-    just package-rust
-    just package-python
+# Complete verification path: full quality checks plus packaged-artifact gates.
+verify: check package-rust package-python
 
 # Run all quality checks
-check: lint audit stubs-check sync-docs-check test docs
+check: lint audit stubs-check typecheck test docs
 
 # --- Benchmarking -----------------------------------------------------------
 
 # Run Rust benchmarks
 bench:
     cargo bench --manifest-path {{rust_manifest}}
-
-# Measure Python object-graph parse, reconstruction, generation, editing, and peak RSS.
-bench-python-object-model:
-    cd {{python_dir}} && uv run python benchmarks/object_model.py
-
-# Benchmark materialized and streaming OPM XML generation
-[private]
-bench-opm-xml:
-    cargo bench --manifest-path {{rust_manifest}} --bench xml_benches -- xml_generate_opm
-
-# Benchmark materialized and streaming OPM KVN generation
-[private]
-bench-opm-kvn:
-    cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_generate_opm
-
-# Benchmark OPM strict parsing and typed validation
-[private]
-bench-opm-parse:
-    cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_parse_opm
-    cargo bench --manifest-path {{rust_manifest}} --bench xml_benches -- xml_parse_opm
-
-[private]
-bench-opm-validation:
-    cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- opm_validate
-
-# Reproduce OEM parsing and generation scaling; timings are informational
-[private]
-bench-oem:
-    cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_scaling
-    cargo bench --manifest-path {{rust_manifest}} --bench xml_benches -- xml_scaling
-
-# Reproduce parse/generate workloads for every standalone message and combined XML NDM
-[private]
-bench-family:
-    cargo bench --manifest-path {{rust_manifest}} --bench kvn_benches -- kvn_message_matrix
-    cargo bench --manifest-path {{rust_manifest}} --bench xml_benches -- xml_message_matrix
-
-# --- Coverage ---------------------------------------------------------------
-
-# Generate code coverage report
-coverage:
-    cargo llvm-cov --manifest-path {{rust_manifest}} --all-features --workspace --codecov --output-path codecov.json
 
 # --- CodSpeed ---------------------------------------------------------------
 
@@ -325,6 +165,10 @@ bench-build:
 [private]
 bench-run:
     cd {{rust_dir}} && cargo codspeed run
+
+# Run the Python binding benchmark; pass --codspeed under the CodSpeed action
+bench-python *args:
+    cd {{python_dir}} && uv run pytest benchmarks {{args}}
 
 # --- Build and Documentation ------------------------------------------------
 

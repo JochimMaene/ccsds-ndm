@@ -1,5 +1,4 @@
 use std::fs;
-use std::path::{Path, PathBuf};
 
 use ccsds_ndm::common::{GroundImpactParameters, OdParameters, RdmSpacecraftParameters};
 use ccsds_ndm::messages::rdm::Rdm;
@@ -10,14 +9,10 @@ use ccsds_ndm::types::{
 use ccsds_ndm::{Ndm, Validate};
 
 mod common;
-use common::{assert_rejects, validate_xml};
+use common::{assert_rejects, data_dir, validate_xml};
 
 const KVN: &str = include_str!("../data/kvn/rdm_c2.kvn");
 const XML: &str = include_str!("../data/xml/rdm_c4.xml");
-
-fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
-}
 
 #[test]
 fn rdm_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
@@ -518,7 +513,7 @@ fn completed_optional_blocks_accept_valid_boundaries() {
 #[test]
 fn every_shipped_rdm_fixture_preserves_the_typed_model_and_generates_valid_xml() {
     for name in ["rdm_c1.kvn", "rdm_c2.kvn"] {
-        let source = fs::read_to_string(repository_path(&format!("data/kvn/{name}"))).unwrap();
+        let source = fs::read_to_string(data_dir().join("kvn").join(name)).unwrap();
         let message = Rdm::from_kvn(&source).unwrap();
         let kvn = message.to_kvn().unwrap();
         assert_eq!(Rdm::from_kvn(&kvn).unwrap(), message, "{name} KVN model");
@@ -528,7 +523,7 @@ fn every_shipped_rdm_fixture_preserves_the_typed_model_and_generates_valid_xml()
     }
 
     for name in ["rdm_c3.xml", "rdm_c4.xml"] {
-        let source = fs::read_to_string(repository_path(&format!("data/xml/{name}"))).unwrap();
+        let source = fs::read_to_string(data_dir().join("xml").join(name)).unwrap();
         let message = Rdm::from_xml(&source).unwrap();
         let xml = message.to_xml().unwrap();
         assert_eq!(Rdm::from_xml(&xml).unwrap(), message, "{name} XML model");

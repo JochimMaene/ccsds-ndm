@@ -142,7 +142,6 @@ mod fsutil;
 mod generation;
 pub(crate) mod kvn;
 pub mod messages;
-pub mod options;
 mod traits;
 pub mod types;
 mod utils;
@@ -150,11 +149,10 @@ pub mod validation;
 pub mod versioning;
 pub(crate) mod xml;
 
-pub use conversion::{convert, convert_file, convert_file_with_options, convert_with_options};
+pub use conversion::{convert, convert_file};
 pub use detect::Notation;
 use error::{CcsdsNdmError, Result};
 pub(crate) use kvn::parser::parse_block;
-pub use options::ParseOptions;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -448,13 +446,9 @@ pub fn from_str(s: &str) -> Result<Message> {
     detect::detect_message_type(s)
 }
 
-/// Parse an NDM from a string with optional notation selection and resource limits.
-pub fn from_str_with_options(
-    input: &str,
-    notation: Option<Notation>,
-    options: &ParseOptions,
-) -> Result<Message> {
-    detect::detect_message_type_with_options(input, notation, options)
+/// Parse an NDM from a string with optional notation selection.
+pub fn from_str_with_notation(input: &str, notation: Option<Notation>) -> Result<Message> {
+    detect::detect_message_type_as(input, notation)
 }
 
 /// Parse an NDM from a file path, auto-detecting the message format (KVN or XML) and type.
@@ -482,16 +476,14 @@ pub fn from_str_with_options(
 /// let ndm = from_file("satellite.opm").unwrap();
 /// ```
 pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Message> {
-    let content = fs::read_to_string(path).map_err(CcsdsNdmError::from)?;
-    from_str(&content)
+    from_file_with_notation(path, None)
 }
 
-/// Parse an NDM file with bounded reading, optional notation selection, and parse limits.
-pub fn from_file_with_options<P: AsRef<Path>>(
+/// Parse an NDM file with optional notation selection.
+pub fn from_file_with_notation<P: AsRef<Path>>(
     path: P,
     notation: Option<Notation>,
-    options: &ParseOptions,
 ) -> Result<Message> {
-    let content = fsutil::read_to_string(path.as_ref(), options.max_input_bytes)?;
-    from_str_with_options(&content, notation, options)
+    let content = fs::read_to_string(path).map_err(CcsdsNdmError::from)?;
+    from_str_with_notation(&content, notation)
 }

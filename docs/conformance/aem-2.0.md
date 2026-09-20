@@ -13,7 +13,7 @@ This inventory records maintainer evidence for standalone AEM 2.0. The
 
 ## Executable evidence
 
-`just conformance-aem` runs `aem_conformance` and `aem_kvn_allocations`, which establish:
+The `aem`, `aem_kvn_allocations`, and `message_output_contract` suites establish:
 
 | Concern | Evidence |
 | --- | --- |
@@ -23,7 +23,7 @@ This inventory records maintainer evidence for standalone AEM 2.0. The
 | Optional fixed units | AEM KVN history records forbid unit annotations (504.0-B-2 section 6.9.2) while the fixed XML unit attributes are optional (section 7.6.10). Optional fixed XML units on derivative, angle, rate, nutation, and momentum values are therefore deliberately normalized to omission on an XML-to-KVN-to-XML hop, while values, choices, and record counts remain preserved. A dedicated regression verifies the output stays schema-valid. |
 | Generation boundary | Materialized and streaming KVN generation reject non-ASCII/overlong text and history numbers exceeding the ODM significant-digit representation before writing bytes. |
 | Resource behaviour | History parsing uses a fixed eight-number stack buffer rather than a heap vector per record; owned epoch/state storage remains linear. Validation and streaming generation avoid per-record temporary allocation. Materialized output remains output-proportional. |
-| Reproducible workloads | `aem_kvn_history_scaling` registers 100, 1,000, 10,000, and 50,000-record parse/generate workloads in the Criterion/CodSpeed-compatible KVN harness. |
+| Reproducible workloads | `aem_kvn_history_scaling` registers 100, 10,000 and 50,000-record parse/generate workloads and `aem_xml_history_scaling` the first two, the sizes every history-carrying family shares. |
 | Self-contained timeline semantics | Metadata requires an ordered total span; usable bounds must lie within it and be ordered. Every state epoch must lie within the total span and state epochs must be strictly increasing without repetition. Adjacent blocks cannot move usable time backwards. Invalid timelines fail materialized and streaming generation before output. |
 
 ## Normative inventory reconciliation
@@ -37,14 +37,19 @@ Annex A, section A2.2.2 contains 25 AEM implementation-conformance statement row
 | 25 | Attitude ephemeris data | All nine table 4-4 attitude-state alternatives are typed and exclusive, have fixed record widths/order/units, preserve their epochs and values, and are exercised by the all-types XML fixture. Root validation additionally revisits every branch and every record, not only index zero: quaternion normalisation on the three quaternion branches, angle bounds on all Euler and spin angles, a non-negative `NUTATION_PER`, and finiteness of every rate, derivative, and momentum component. This is distinct from the KVN significant-digit representability preflight, which is a different rule at a different boundary. |
 
 Section 4.2.4.8.1's strictly increasing, non-repeated epoch requirement and the metadata/cross-block
-usable-span rules have direct semantic regression tests in `aem_semantic_validation`.
+usable-span rules have direct semantic regression tests in `aem::validation`.
 
-There is one normative-example conflict that the library resolves in favor of accepting the
-published CCSDS fixture: `ccsds-ndm/data/kvn/aem_g4.kvn` declares interpolation degree 7 but contains four
-records. Enforcing “at least degree + 1 records” would reject that official example. The degree
-field and its conditional presence are validated, but record-count capacity is therefore not used
-as a rejection rule. This exception is explicit and must be resolved before any affected semantic
-cell is promoted.
+There is one normative-example conflict that remains **unresolved**: `ccsds-ndm/data/kvn/aem_g4.kvn`
+declares interpolation degree 7 but contains four records. The governing prose (ADM 504.0-B-2
+§4.2.4.8.4, via `docs/ccsds-books/adm.rst`) requires that all data blocks contain a sufficient
+number of attitude ephemeris data records to allow the recommended interpolation method to be
+carried out consistently throughout the AEM. That rule is stated in terms of sufficiency for the
+method, not as an explicit `degree + 1` numeric shall, so the numeric capacity threshold — and
+whether it varies by interpolation method — is not established from the cited text. The degree
+field and its conditional presence with `INTERPOLATION_METHOD` are validated, but record-count
+capacity is not used as a rejection rule, which means the published fixture is accepted while the
+sufficiency requirement has no numeric enforcement. This stays a promotion blocker until the
+method-specific requirement is determined from the standard or a corrigendum.
 
 ## Public-surface and artifact evidence
 
@@ -55,6 +60,6 @@ and `package-rust` provide the common built-artifact gates.
 
 ## Status
 
-AEM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its family-specific blocker is the
+AEM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its family-specific blocker is the
 interpolation-degree/example conflict described above, which blocks promotion of the affected
 semantic claim independently of the exact-cell review.

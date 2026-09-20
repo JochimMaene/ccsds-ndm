@@ -12,6 +12,7 @@ Usage:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -46,6 +47,7 @@ class AuditIssue:
         "missing_exposure",  # Rust field not exposed in Python
         "missing_docstring",  # Python getter lacks docstring
         "missing_type_annotation",  # Python getter lacks :type:
+        "missing_ccsds_reference",  # Python getter drops or contradicts the core CCSDS citation
         "missing_rust_docstring",  # Rust field lacks docstring
         "struct_not_found",  # Python class has no matching Rust struct
         "missing_setter",  # Getter exists but setter is missing and no read-only reason
@@ -80,6 +82,24 @@ def collect_python_classes(binding_dir: Path) -> dict[str, PythonClass]:
 # ---------------------------------------------------------------------------
 
 
+_CCSDS_REFERENCE = re.compile(
+    r"\*{0,2}CCSDS Reference\*{0,2}:\s*(.+?)\s*$", re.MULTILINE
+)
+
+
+def ccsds_reference(docstring: str | None) -> str | None:
+    """The CCSDS book citation in a docstring, normalised for harmless formatting drift.
+
+    The core Rust docs bold the label (`**CCSDS Reference**:`) and the Python docstrings
+    do not, so only the citation text is compared, with runs of whitespace collapsed and
+    a trailing period ignored.
+    """
+    match = _CCSDS_REFERENCE.search(docstring or "")
+    if not match:
+        return None
+    return " ".join(match.group(1).replace("**", "").split()).rstrip(".")
+
+
 def audit_bindings(
     rust_structs: dict[str, RustStruct],
     python_classes: dict[str, PythonClass],
@@ -93,6 +113,7 @@ def audit_bindings(
         "missing_exposure": 0,
         "missing_docstring": 0,
         "missing_type_annotation": 0,
+        "missing_ccsds_reference": 0,
         "python_only_fields": 0,
         "readonly_documented": 0,
         "missing_setter": 0,
@@ -215,6 +236,28 @@ def audit_bindings(
                     )
                 )
 
+            # The CCSDS book reference must reach Python, and must still say the same thing.
+            core_ref = ccsds_reference(rust_field.docstring)
+            python_ref = ccsds_reference(py_getter.docstring)
+            if core_ref and core_ref != python_ref:
+                result.stats["missing_ccsds_reference"] += 1
+                detail = (
+                    f"says '{python_ref}', core says '{core_ref}'"
+                    if python_ref
+                    else f"drops the CCSDS reference '{core_ref}'"
+                )
+                result.issues.append(
+                    AuditIssue(
+                        struct_name=class_name,
+                        field_name=python_field_name,
+                        issue_type="missing_ccsds_reference",
+                        message=(
+                            f"Python getter '{class_name}.{python_field_name}' {detail} "
+                            f"(from '{rust_struct_name}.{field_name}')"
+                        ),
+                    )
+                )
+
         # Count Python-only fields
         for py_field in py_class.getters.keys():
             if is_python_only(class_name, py_field):
@@ -245,6 +288,7 @@ def print_report(result: AuditResult) -> None:
                     "missing_exposure": "✗",
                     "missing_docstring": "⚠",
                     "missing_type_annotation": "⚠",
+                    "missing_ccsds_reference": "⚠",
                     "missing_rust_docstring": "ℹ",
                     "struct_not_found": "✗",
                     "missing_setter": "✗",
@@ -262,6 +306,7 @@ def print_report(result: AuditResult) -> None:
     print(f"  Missing exposure: {result.stats['missing_exposure']}")
     print(f"  Missing docstrings: {result.stats['missing_docstring']}")
     print(f"  Missing :type: annotations: {result.stats['missing_type_annotation']}")
+    print(f"  CCSDS reference mismatches: {result.stats['missing_ccsds_reference']}")
     print(f"  Python-only fields: {result.stats['python_only_fields']} (OK)")
     if "readonly_documented" in result.stats:
         print(

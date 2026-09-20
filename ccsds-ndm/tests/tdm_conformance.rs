@@ -1,19 +1,14 @@
 use std::fs;
-use std::path::{Path, PathBuf};
 
 use ccsds_ndm::messages::tdm::{Tdm, TdmObservationData};
 use ccsds_ndm::types::{Percentage, TdmRangeUnits};
 use ccsds_ndm::{Ndm, Validate};
 
 mod common;
-use common::{assert_rejects, validate_xml};
+use common::{assert_rejects, data_dir, validate_xml};
 
 const KVN: &str = include_str!("../data/kvn/tdm_e1.kvn");
 const XML: &str = include_str!("../data/xml/tdm_e21.xml");
-
-fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
-}
 
 #[test]
 fn tdm_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
@@ -375,7 +370,7 @@ fn unambiguous_tdm_numeric_boundaries_generate_valid_xml() {
 
 #[test]
 fn every_shipped_tdm_fixture_preserves_the_typed_model_and_generates_valid_xml() {
-    let kvn_dir = repository_path("data/kvn");
+    let kvn_dir = data_dir().join("kvn");
     let mut kvn_files = fs::read_dir(&kvn_dir)
         .unwrap()
         .map(|entry| entry.unwrap().path())
@@ -400,7 +395,7 @@ fn every_shipped_tdm_fixture_preserves_the_typed_model_and_generates_valid_xml()
     }
 
     for name in ["tdm_e21.xml", "tdm_e23.xml"] {
-        let source = fs::read_to_string(repository_path(&format!("data/xml/{name}"))).unwrap();
+        let source = fs::read_to_string(data_dir().join("xml").join(name)).unwrap();
         let message = Tdm::from_xml(&source).unwrap();
         let xml = message.to_xml().unwrap();
         assert_eq!(Tdm::from_xml(&xml).unwrap(), message, "{name} XML model");

@@ -11,7 +11,7 @@ XML generation all agree with the Rust core. This deliberately does not duplicat
 mutation matrix for every field; it proves that reconstruction and delegation preserve the
 enforcement boundary for each shape.
 
-See ``docs/design/validation-rollout.md`` category 6.
+See ``docs/design/validation-contract.md`` and the per-family conformance documents.
 """
 
 import pathlib
@@ -55,7 +55,8 @@ class TestRoutingShapes:
         states = aem.segments[1].data.attitude_states
         assert len(states) > 1
         broken = list(states[1].values)
-        broken[0] = 5.0  # destroys quaternion normalisation
+        # In range per component, so the norm check is what rejects this.
+        broken[0] = 0.5  # destroys quaternion normalisation
         states[1].values = broken
         assert_all_surfaces_reject(aem, "Quaternion not normalized")
 

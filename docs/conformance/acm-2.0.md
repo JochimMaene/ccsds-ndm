@@ -13,17 +13,17 @@ This inventory records maintainer evidence for standalone ACM 2.0. The
 
 ## Executable evidence
 
-`just conformance-acm` runs `acm_conformance` and `acm_kvn_allocations`, which establish:
+The `acm_conformance` and `acm_kvn_allocations` suites establish:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN structure | The family-local scanner rejects non-ASCII/control input, overlong records, malformed/unknown/duplicate/reordered assignments, misplaced comments, assignments after history data, unknown/nested/mismatched blocks, invalid outer-block order/repetition, invalid SENSOR nesting, and trailing content. |
+| KVN structure | The family-local scanner rejects non-ASCII/control input, malformed/unknown/duplicate/reordered assignments, misplaced comments, assignments after history data, unknown/nested/mismatched blocks, invalid outer-block order/repetition, invalid SENSOR nesting, and trailing content. ACM lines may have arbitrary length under CCSDS 504.0-B-2 section 6.6.2. |
 | XML structure | The shared sequence engine covers root/header/body/segment, metadata, all six data block types, nested sensor data, history records, user-defined parameters, and their legal attributes. Unknown, duplicate, reordered, and illegal-attribute content is rejected. |
 | Schema-model fidelity | ACM 2.0 covariance identifiers and basis identifiers, AD Euler sequence, sensor covariance count, frequency units, CP vector units, and target-momentum vector units are modeled. Non-schema `COV_CONFIDENCE`, `AD_EPOCH`, split CP/momentum aliases, and AD `ATTITUDE_TYPE` are rejected rather than emitted or silently lost. |
 | Fixture preservation | All four shipped KVN fixtures preserve their complete typed model through KVN and XML. Generated XML validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
-| Generation boundary | Materialized and streaming KVN generation reject non-ASCII/overlong text and numbers exceeding the ODM significant-digit representation before writing bytes. Fixed-shape CP, momentum, target-attitude, and attitude-history records are validated. |
+| Generation boundary | Materialized and streaming KVN generation reject non-ASCII text and numbers exceeding the CCSDS significant-digit representation before writing bytes while preserving ACM's arbitrary line lengths. Fixed-shape CP, momentum, target-attitude, and attitude-history records are validated. |
 | Resource behaviour | Attitude and covariance rows allocate exact numeric capacity. History generation uses allocation-free numeric-record/vector writers; streaming validation and generation use record-independent temporary storage. |
-| Reproducible workloads | `acm_kvn_history_scaling` registers 100, 1,000, 10,000, and 50,000-record parse/generate workloads in the Criterion/CodSpeed-compatible KVN harness. |
+| Reproducible workloads | `acm_kvn_history_scaling` registers 100, 10,000 and 50,000-record parse/generate workloads and `acm_xml_history_scaling` the first two, the sizes every history-carrying family shares. |
 
 ## Normative inventory reconciliation
 
@@ -53,5 +53,5 @@ are the common built-artifact gates.
 
 ## Status
 
-ACM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). No family-specific promotion blocker is
+ACM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). No family-specific promotion blocker is
 known; only the exact-cell review remains.

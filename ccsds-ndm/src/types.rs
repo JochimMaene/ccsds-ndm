@@ -1329,50 +1329,6 @@ pub(crate) fn require_finite(field: &'static str, value: f64) -> Result<()> {
 // Macros to reduce boilerplate for unit enums and wrappers
 //----------------------------------------------------------------------
 
-/// Defines a unit enum with serde renames, plus Display, Default, and FromStr,
-/// and a `UnitValue<f64, UnitEnum>` type alias with the provided name.
-///
-/// Usage:
-/// define_unit_type!(
-///     Position, PositionUnits, Km, { Km => "km" }
-/// );
-macro_rules! define_unit_type {
-    ($type_alias:ident, $unit_enum:ident, $default_variant:ident, { $($variant:ident => $str_rep:expr),+ $(,)? }) => {
-        #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-        pub enum $unit_enum {
-            $(#[serde(rename = $str_rep)] $variant),+
-        }
-
-        impl Default for $unit_enum {
-            fn default() -> Self { Self::$default_variant }
-        }
-
-        impl std::fmt::Display for $unit_enum {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self {
-                    $(Self::$variant => write!(f, $str_rep)),+
-                }
-            }
-        }
-
-        impl std::str::FromStr for $unit_enum {
-            type Err = crate::error::EnumParseError;
-            fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-                match s {
-                    $($str_rep => Ok(Self::$variant)),+,
-                    _ => Err(crate::error::EnumParseError {
-                        field: "unit",
-                        value: s.to_string(),
-                        expected: stringify!($($str_rep),+),
-                    })
-                }
-            }
-        }
-
-        pub type $type_alias = UnitValue<f64, $unit_enum>;
-    };
-}
-
 /// Defines a "required" wrapper struct that always carries units (no Option)
 /// and constructs with the provided default unit variant.
 ///
@@ -1497,6 +1453,20 @@ macro_rules! define_unit_enum {
                 }) }
             }
         }
+    };
+}
+
+/// Defines a unit enum with [`define_unit_enum!`], plus a `UnitValue<f64, UnitEnum>` type alias
+/// with the provided name.
+///
+/// Usage:
+/// define_unit_type!(
+///     Position, PositionUnits, Km, { Km => "km" }
+/// );
+macro_rules! define_unit_type {
+    ($type_alias:ident, $unit_enum:ident, $default_variant:ident, { $($variant:ident => $str_rep:expr),+ $(,)? }) => {
+        define_unit_enum!($unit_enum, $default_variant, { $($variant => $str_rep),+ });
+        pub type $type_alias = UnitValue<f64, $unit_enum>;
     };
 }
 
@@ -3977,6 +3947,18 @@ pub enum AttitudeTypeType {
     SpinNutationMom,
 }
 
+impl AttitudeTypeType {
+    pub const fn value_count(&self) -> usize {
+        match self {
+            Self::Quaternion | Self::Spin => 4,
+            Self::QuaternionDerivative => 8,
+            Self::QuaternionAngVel | Self::SpinNutation | Self::SpinNutationMom => 7,
+            Self::EulerAngle => 3,
+            Self::EulerAngleDerivative | Self::EulerAngleAngVel => 6,
+        }
+    }
+}
+
 impl std::str::FromStr for AttitudeTypeType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
@@ -5104,6 +5086,19 @@ mod tests {
         assert!(PositiveInteger::new(1).is_ok());
         assert!(PositiveInteger::new(100).is_ok());
         assert!(PositiveInteger::new(0).is_err());
+    }
+
+    #[test]
+    fn attitude_type_value_counts_match_aem_layouts() {
+        assert_eq!(AttitudeTypeType::Quaternion.value_count(), 4);
+        assert_eq!(AttitudeTypeType::QuaternionDerivative.value_count(), 8);
+        assert_eq!(AttitudeTypeType::QuaternionAngVel.value_count(), 7);
+        assert_eq!(AttitudeTypeType::EulerAngle.value_count(), 3);
+        assert_eq!(AttitudeTypeType::EulerAngleDerivative.value_count(), 6);
+        assert_eq!(AttitudeTypeType::EulerAngleAngVel.value_count(), 6);
+        assert_eq!(AttitudeTypeType::Spin.value_count(), 4);
+        assert_eq!(AttitudeTypeType::SpinNutation.value_count(), 7);
+        assert_eq!(AttitudeTypeType::SpinNutationMom.value_count(), 7);
     }
 
     #[test]

@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use ccsds_ndm::from_str;
+
+mod common;
+use common::data_dir;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -35,10 +38,6 @@ fn all_shipped_samples_parse_strictly() {
     }
 
     assert!(failures.is_empty(), "{}", failures.join("\n"));
-}
-
-fn data_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("data")
 }
 
 fn sorted_files(dir: &Path, extension: &str) -> Vec<PathBuf> {

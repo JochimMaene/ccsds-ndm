@@ -1,6 +1,6 @@
 # Combined NDM conformance inventory
 
-Status: `implemented-unverified`.
+Status: **Available**.
 
 The combined instantiation is the XML `ndm` envelope defined by CCSDS 505.0-B-3, section 4.11,
 and `ccsds-ndm/data/xsd/ndmxml-4.0.0-master-4.0.xsd`. It is the only representation this library
@@ -15,16 +15,15 @@ section 2.5, ADM section 2.5.1). A previously shipped sequential-KVN convenience
 therefore removed; combined KVN parsing and generation now fail with the `unsupported.notation`
 diagnostic, and generic detection rejects any KVN document carrying more than one message header.
 
-`just conformance-combined` establishes:
+The combined-NDM suites establish:
 
 - exact root and constituent attribute contracts, document-root/trailing-content checks, schema
   child ordering, and rejection of unknown or nested message structure;
 - ordered typed preservation of the `ndm_g12.xml` and `ndm_g21.xml` constituents, followed by
   official-master-XSD validation of generated XML;
-- aggregate input-byte, XML-depth, history-record, and output-byte limits through direct Rust and
-  Python entry points;
-- complete-envelope generation preflight: invalid children or aggregate output limits write zero
-  bytes before the normative XML representation is streamed;
+- a fixed internal XML nesting safety limit through direct Rust and Python entry points;
+- complete-envelope generation preflight: invalid children write zero bytes before the normative
+  XML representation is streamed;
 - measured linear XML streaming allocation budgets from 10 to 1,000 constituents (at most twenty
   temporary allocations and 8 KiB of temporaries per additional OPM constituent); and
 - refusal of combined KVN parsing and generation with an unsupported-notation diagnostic.
@@ -41,7 +40,7 @@ CCSDS 505.0-B-3 sections 4.11.3–4.11.8 define the envelope rather than a separ
 | Requirement | Decision and evidence |
 | --- | --- |
 | Root element is `ndm` | Exact-root and trailing-content tests reject any other document envelope. |
-| Root uses the standard attributes; `id` and `version` apply to the root | The strict attribute contract accepts only the schema/root namespace attributes plus `id` and `version`; unknown attributes are rejected. |
+| Root carries no `id`/`version`; they apply to constituents | `ndmxml-4.0.0-ndm-4.0.xsd` `ndmType` declares no attributes and shipped `ndm_g12/g21.xml` carry none on the root; the strict root contract therefore accepts only namespace/schema attributes and rejects `id`/`version` there. Constituent `id`/`version` remain required per child. |
 | Constituent application elements use only their own `id` and `version` attributes | Every registered child family is sequence-validated by its standalone parser; envelope tests reject illegal constituent attributes and nested message roots. |
 | Any combination of constituent NDM types is permitted, in document order | The typed `Vec<Message>` preserves heterogeneous order; G12 and G21 prove multi-message and multi-family preservation. |
 | A combined message should contain at least one constituent | This is a `SHOULD`, while the official XSD permits zero children. The parser accepts an empty envelope and documents the recommendation rather than inventing a schema-incompatible `SHALL`. |
@@ -57,6 +56,6 @@ and `package-rust` are the shared built-artifact gates.
 
 ## Status
 
-Combined NDM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its family-specific blocker is the
+Combined NDM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its family-specific blocker is the
 XSD-valid G22 versus standalone OPM maneuver/`MASS` semantic conflict, which must be resolved
 independently of the exact-cell review.

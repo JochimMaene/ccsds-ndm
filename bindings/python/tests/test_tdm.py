@@ -93,6 +93,19 @@ class TestTdm:
         with pytest.raises(ValueError):
             TdmObservation(epoch="123.5", keyword="RANGE", value=1.0)
 
+    def test_out_of_range_rhumidity_is_rejected(self):
+        with pytest.raises(ccsds_ndm.NdmValidationError):
+            TdmObservation(
+                epoch="2023-01-01T00:00:00", keyword="RHUMIDITY", value=150.0
+            )
+
+        assert (
+            TdmObservation(
+                epoch="2023-01-01T00:00:00", keyword="RHUMIDITY", value=65.5
+            ).value
+            == 65.5
+        )
+
     def test_mutated_metadata_is_revalidated(self):
         tdm = self._create_valid_tdm()
         metadata = tdm.body.segments[0].metadata

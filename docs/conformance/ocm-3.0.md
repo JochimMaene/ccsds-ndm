@@ -14,18 +14,18 @@ This inventory records maintainer evidence for standalone OCM 3.0. The
 
 ## Executable evidence
 
-`just conformance-ocm` runs `ocm_conformance` and `ocm_kvn_allocations`, which establish:
+The `ocm_conformance` and `ocm_kvn_allocations` suites establish:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN lexical and marked-block structure | The OCM scanner rejects non-ASCII/control input, overlong keyword records, malformed or unknown assignments, duplicate and reordered keywords, unknown/nested/mismatched blocks, invalid logical-block order, and comments outside the beginning of a block. Complete Annex G covariance history records are not split merely because they exceed the keyword-record limit. |
+| KVN lexical and marked-block structure | The OCM scanner rejects non-ASCII/control input, malformed or unknown assignments, duplicate and reordered keywords, unknown/nested/mismatched blocks, invalid logical-block order, and comments outside the beginning of a block. OCM lines may have arbitrary length under CCSDS 502.0-B-3 section 7.3.3. |
 | XML structure | The shared XML sequence engine is registered for the complete OCM root, header, metadata, data, trajectory, physical, covariance, maneuver, perturbation, orbit-determination, and user-defined structures. It rejects unknown, duplicate, reordered, and non-schema nested content and attributes. |
 | Silent-loss corrections | Complex `pert`, `od`, and `user` elements no longer use the scalar nullable adapter, so they survive XML parsing. KVN retains optional GM units. `DC_REF_DIR` and `DC_BODY_TRIGGER` use the schema's single three-number lexical value rather than generating nested Rust field elements. |
 | Fixture and history preservation | All five shipped KVN fixtures and the shipped XML fixture retain their typed model under source-notation regeneration. KVN/XML crossings retain trajectory, physical, covariance, maneuver, perturbation, OD, and user blocks represented by the corpus. Every generated XML document validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
-| Generation boundary | Materialized and streaming KVN generation reject non-ASCII free text and overlong keyword records, while finite trajectory/covariance numbers are rounded when necessary to the CCSDS digit limit. The TIME_AND_ANGLE vector regression proves both notation paths. |
+| Generation boundary | Materialized and streaming KVN generation reject non-ASCII free text while preserving OCM's arbitrary line lengths; finite trajectory/covariance numbers are rounded when necessary to the CCSDS digit limit. The TIME_AND_ANGLE vector regression proves both notation paths. |
 | Resource behaviour | Parsing 10 versus 1,000 trajectory and covariance records uses one owned numeric vector allocation per record without per-record reallocation. Maneuver parsing is bounded by its owned strings/vectors. Validated streaming generation has record-independent temporary allocation overhead for trajectory, covariance, and maneuver histories; materialized storage stays output-proportional. |
-| Reproducible workloads | Existing `ocm_trajectory_10k`, `ocm_covariance_10k`, and `ocm_maneuver_10k` Criterion groups measure KVN/XML parse, generation, and validation. The shared family matrices add representative small-message comparisons. |
-| Shared surfaces and limits | `family_contract`, Python option tests, and the shared generation plumbing exercise bounded parsing/generation, structured diagnostics, and Rust-core delegation. |
+| Reproducible workloads | `ocm_{trajectory,covariance,maneuver}_{kvn,xml}_history_scaling` measure parse and generation of each history kind — CARTPV trajectory, CARTP covariance, relative-time maneuver — at 100, 10,000 and 50,000 records in KVN and the first two in XML, the sizes every history-carrying family shares. The shared family matrices add representative small-message comparisons. |
+| Shared surfaces | `family_contract`, Python API tests, and the shared generation plumbing exercise parsing, generation, structured diagnostics, and Rust-core delegation. |
 
 The two shipped KVN comments that used a Greek eta were normalized to the ASCII word `eta`; strict
 KVN processing does not silently accept or regenerate the non-ASCII spelling.
@@ -38,7 +38,7 @@ inventory is reconciled as follows; the counts are statement rows, not public ca
 | ICS group | Rows | Reconciled implementation evidence |
 | --- | ---: | --- |
 | Header | 7 | Version, creation date, originator, message ID, and leading comments are covered by the common ODM header model and strict root/header sequence checks. |
-| Metadata | 51 | Required identity/time fields, SCLK dependencies, leap-second pairing, units, ordering, duplicates, and comments are covered by typed metadata validation plus KVN/XML structural checks. |
+| Metadata | 51 | Required identity/time fields, SCLK dependencies, units, ordering, duplicates, and comments are covered by typed metadata validation plus KVN/XML structural checks. |
 | Trajectory | 23 | Block metadata, composition/units cardinality, time tags, epoch ordering, fixed record shape, and representability are covered by the trajectory model and history tests. `validate_ocm_line_values` additionally rejects non-finite numbers in every `trajLine`, naming the failing line and column. |
 | Physical | 54 | The complete optional scalar/vector XML/KVN model is registered; required-field, unit, order, duplicate, and notation-preservation behavior is exercised by the fixture corpus. `OcmPhysicalDescription::validate` covers the block's own editable values: `DRAG_COEFF_NOM`, the eleven areas, three masses, two percentages, `REFLECTANCE`, the three attitude angles, and the remaining plain doubles for finiteness. |
 | Covariance | 18 | Block metadata, ordering, epoch sequence, composition/units, fixed record shape, and representability are covered by covariance validation and history tests, and `validate_ocm_line_values` rejects non-finite numbers in every `covLine`. |
@@ -50,6 +50,8 @@ inventory is reconciled as follows; the counts are statement rows, not public ca
 These OCM values are deliberately **not** validated, each for a recorded reason rather than by
 omission:
 
+- `DRAG_COEFF_NOM` accepts zero because ODM says it disables atmospheric drag, while the XSD's
+  `positiveDouble` excludes it. KVN preserves zero and XML generation refuses it.
 - `DAYS_SINCE_FIRST_OBS`, `DAYS_SINCE_LAST_OBS`, `DC_PA_START_ANGLE`, and `DC_PA_STOP_ANGLE` are
   validated for finiteness only, because ODM's domain is wider than the 3.0 schema's. The
   book-valid value is preserved and KVN writes it; XML generation refuses the conversion with the
@@ -83,6 +85,6 @@ by all family cells.
 
 ## Status
 
-OCM remains `implemented-unverified` under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its family-specific open items are the five
-deliberately unvalidated values listed above, of which `DAYS_SINCE_*_OBS` and the phase-angle range
-are book/XSD conflicts rather than gaps.
+OCM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its family-specific open items are the six
+deliberately unvalidated values listed above, of which `DRAG_COEFF_NOM`, `DAYS_SINCE_*_OBS`, and
+the phase-angle range are book/XSD conflicts rather than gaps.

@@ -11,9 +11,13 @@ fi
 
 temporary="$(mktemp -d)"
 trap 'rm -rf "${temporary}"' EXIT
-uv venv --python 3.10 "${temporary}/venv"
-uv pip install --python "${temporary}/venv/bin/python" "${wheels[0]}"
-"${temporary}/venv/bin/python" - \
+uv venv --python "${CCSDS_NDM_VERIFY_PYTHON:-3.10}" "${temporary}/venv"
+uv pip install --python "${temporary}/venv" "${wheels[0]}"
+venv_python="${temporary}/venv/bin/python"
+if [[ ! -x "${venv_python}" ]]; then
+    venv_python="${temporary}/venv/Scripts/python.exe"
+fi
+"${venv_python}" - \
     "${root}/ccsds-ndm/data/kvn/oem_g11.kvn" \
     "${root}/ccsds-ndm/data/xml/oem_g14.xml" \
     "${root}/ccsds-ndm/data/kvn/omm_g9.kvn" \

@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use ccsds_ndm::from_str;
 use ccsds_ndm::messages::acm::Acm;
 use ccsds_ndm::messages::cdm::Cdm;
 use ccsds_ndm::messages::ocm::{Ocm, OcmPhysicalDescription};
@@ -11,7 +12,6 @@ use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::messages::tdm::{Tdm, TdmObservationData};
 use ccsds_ndm::Ndm;
 use ccsds_ndm::Validate;
-use ccsds_ndm::{from_str, from_str_with_options, Message, Notation, ParseOptions};
 
 const OPM_KVN: &str = include_str!("../data/kvn/opm_g1.kvn");
 const OPM_XML: &str = include_str!("../data/xml/opm_g5.xml");
@@ -23,78 +23,6 @@ const RDM_XML: &str = include_str!("../data/xml/rdm_c4.xml");
 const TDM_XML: &str = include_str!("../data/xml/tdm_e21.xml");
 const CDM_XML: &str = include_str!("../data/xml/cdm_44.xml");
 const PERMISSIVE_XML: &str = include_str!("../data/xml/ndm_g22.xml");
-const OMM_KVN: &str = include_str!("../data/kvn/omm_g7.kvn");
-const OMM_XML: &str = include_str!("../data/xml/omm_g10.xml");
-
-#[test]
-fn generic_parse_options_bound_non_opm_inputs_and_xml_depth() {
-    let exact = ParseOptions::default().with_max_input_bytes(OMM_KVN.len());
-    assert!(matches!(
-        from_str_with_options(OMM_KVN, Some(Notation::Kvn), &exact).unwrap(),
-        Message::Omm(_)
-    ));
-
-    let too_small = ParseOptions::default().with_max_input_bytes(OMM_KVN.len() - 1);
-    let error = from_str_with_options(OMM_KVN, Some(Notation::Kvn), &too_small).unwrap_err();
-    assert_eq!(error.code(), Some("resource.input_limit_exceeded"));
-
-    let shallow = ParseOptions::default().with_max_xml_depth(1);
-    let error = from_str_with_options(OMM_XML, Some(Notation::Xml), &shallow).unwrap_err();
-    assert_eq!(error.code(), Some("resource.xml_depth_limit_exceeded"));
-}
-
-#[test]
-fn history_record_limits_cover_each_concrete_history_message() {
-    use ccsds_ndm::{from_str_with_options, Message, Notation, ParseOptions};
-
-    let cases = [
-        (
-            include_str!("../data/kvn/tdm_e1.kvn"),
-            ccsds_ndm::validation::MessageKind::Tdm,
-        ),
-        (
-            include_str!("../data/kvn/aem_g4.kvn"),
-            ccsds_ndm::validation::MessageKind::Aem,
-        ),
-        (
-            include_str!("../data/kvn/ocm_g15.kvn"),
-            ccsds_ndm::validation::MessageKind::Ocm,
-        ),
-        (
-            include_str!("../data/kvn/acm_g6.kvn"),
-            ccsds_ndm::validation::MessageKind::Acm,
-        ),
-    ];
-    let options = ParseOptions::default().with_max_records(0);
-    for (input, kind) in cases {
-        let error = from_str_with_options(input, Some(Notation::Kvn), &options).unwrap_err();
-        let diagnostic = error.diagnostic().expect("structured record diagnostic");
-        assert_eq!(diagnostic.message_kind, kind);
-        assert_eq!(diagnostic.code, Some("resource.record_limit_exceeded"));
-    }
-
-    let xml_cases = [
-        include_str!("../data/xml/tdm_e23.xml"),
-        include_str!("../data/xml/aem_g11.xml"),
-        include_str!("../data/xml/ocm_g20.xml"),
-    ];
-    for input in xml_cases {
-        let error = from_str_with_options(input, Some(Notation::Xml), &options).unwrap_err();
-        assert_eq!(
-            error.code(),
-            Some("resource.record_limit_exceeded"),
-            "{error}"
-        );
-    }
-
-    let acm = ccsds_ndm::from_str(include_str!("../data/kvn/acm_g6.kvn")).unwrap();
-    let Message::Acm(acm) = acm else {
-        panic!("expected ACM fixture");
-    };
-    let xml = acm.to_xml().unwrap();
-    let error = from_str_with_options(&xml, Some(Notation::Xml), &options).unwrap_err();
-    assert_eq!(error.code(), Some("resource.record_limit_exceeded"));
-}
 
 #[test]
 fn strict_parsing_remains_the_default() {

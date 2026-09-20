@@ -27,6 +27,7 @@ use std::io::Write as IoWrite;
 
 /// Header for CCSDS XML messages.
 const XML_HEADER: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+pub(crate) const XML_DEPTH_LIMIT: usize = 16;
 
 pub(crate) fn validate_document_root(s: &str, root: &[u8], type_name: &str) -> Result<()> {
     let mut source_edition = None;
@@ -36,12 +37,9 @@ pub(crate) fn validate_document_root(s: &str, root: &[u8], type_name: &str) -> R
         &mut source_edition,
         DocumentRules {
             root: Some(root),
-            max_depth: None,
             allow_default_namespace: true,
             child_rule: None,
             attribute_allowed: None,
-            is_record: None,
-            max_records: None,
         },
     )
 }
@@ -127,48 +125,37 @@ impl XmlSequenceRule {
 type ChildRule<'a> = dyn Fn(&[u8], &[u8]) -> Option<XmlSequenceRule> + 'a;
 type AttributeRule<'a> = dyn Fn(&[u8], &[u8]) -> bool + 'a;
 
-type RecordRule<'a> = dyn Fn(&[u8]) -> bool + 'a;
-
 struct DocumentRules<'a> {
     root: Option<&'a [u8]>,
-    max_depth: Option<usize>,
     allow_default_namespace: bool,
     child_rule: Option<&'a ChildRule<'a>>,
     attribute_allowed: Option<&'a AttributeRule<'a>>,
-    /// Families with repeatable history records bound them during this pass, before serde
-    /// materializes any of them.
-    is_record: Option<&'a RecordRule<'a>>,
-    max_records: Option<usize>,
 }
 
 /// The message-specific half of XML structural validation: which children a parent admits and in
 /// what order, which attributes an element admits, and which elements are countable history
 /// records. Everything else about the walk is family-independent.
-pub(crate) struct MessageSchema<Child, Attribute, Record> {
+pub(crate) struct MessageSchema<Child, Attribute> {
     pub child_rule: Child,
     pub attribute_allowed: Attribute,
-    pub is_record: Record,
 }
 
 /// Validate a standalone XML message in one event pass and retain its source edition for
 /// diagnostics.
-pub(crate) fn validate_standalone_document<Child, Attribute, Record>(
+pub(crate) fn validate_standalone_document<Child, Attribute>(
     s: &str,
     root: &[u8],
     type_name: &str,
-    options: &crate::options::ParseOptions,
     source_edition: &mut Option<String>,
-    schema: MessageSchema<Child, Attribute, Record>,
+    schema: MessageSchema<Child, Attribute>,
 ) -> Result<()>
 where
     Child: Fn(&[u8], &[u8]) -> Option<XmlSequenceRule>,
     Attribute: Fn(&[u8], &[u8]) -> bool,
-    Record: Fn(&[u8]) -> bool,
 {
     let MessageSchema {
         child_rule,
         attribute_allowed,
-        is_record,
     } = schema;
     validate_document(
         s,
@@ -176,12 +163,9 @@ where
         source_edition,
         DocumentRules {
             root: Some(root),
-            max_depth: Some(options.max_xml_depth),
             allow_default_namespace: false,
             child_rule: Some(&child_rule),
             attribute_allowed: Some(&attribute_allowed),
-            is_record: Some(&is_record),
-            max_records: options.max_records,
         },
     )
 }
@@ -243,27 +227,6 @@ fn validate_document(
     let mut root_seen = false;
     let mut root_closed = false;
     let mut event_seen = false;
-    let mut records = 0usize;
-
-    fn count_record(records: &mut usize, child: &[u8], rules: &DocumentRules<'_>) -> Result<()> {
-        let Some(is_record) = rules.is_record else {
-            return Ok(());
-        };
-        if !is_record(child) {
-            return Ok(());
-        }
-        *records += 1;
-        if let Some(limit) = rules.max_records {
-            if *records > limit {
-                return Err(CcsdsNdmError::ResourceLimitExceeded {
-                    resource: "history_records",
-                    limit,
-                    actual: *records,
-                });
-            }
-        }
-        Ok(())
-    }
 
     loop {
         match reader.read_event() {
@@ -301,21 +264,18 @@ fn validate_document(
                 {
                     validate_attributes(&start, child, attribute_allowed, &invalid_sequence)?;
                     apply_sequence_rule(parent, child, child_rule, &invalid_sequence)?;
-                    count_record(&mut records, child, &rules)?;
                 }
                 stack.push(Frame {
                     name: ElementName::new(child),
                     last_rank: None,
                 });
                 depth += 1;
-                if let Some(limit) = rules.max_depth {
-                    if depth > limit {
-                        return Err(CcsdsNdmError::ResourceLimitExceeded {
-                            resource: "xml_depth",
-                            limit,
-                            actual: depth,
-                        });
-                    }
+                if depth > XML_DEPTH_LIMIT {
+                    return Err(CcsdsNdmError::ResourceLimitExceeded {
+                        resource: "xml_depth",
+                        limit: XML_DEPTH_LIMIT,
+                        actual: depth,
+                    });
                 }
             }
             Ok(Event::Empty(start)) => {
@@ -345,19 +305,16 @@ fn validate_document(
                 {
                     validate_attributes(&start, child, attribute_allowed, &invalid_sequence)?;
                     apply_sequence_rule(parent, child, child_rule, &invalid_sequence)?;
-                    count_record(&mut records, child, &rules)?;
                 }
                 // A self-closing element occupies a level even though it never opens a frame,
                 // so it has to be measured against the limit the same way a start tag is.
-                if let Some(limit) = rules.max_depth {
-                    let actual = depth + 1;
-                    if actual > limit {
-                        return Err(CcsdsNdmError::ResourceLimitExceeded {
-                            resource: "xml_depth",
-                            limit,
-                            actual,
-                        });
-                    }
+                let actual = depth + 1;
+                if actual > XML_DEPTH_LIMIT {
+                    return Err(CcsdsNdmError::ResourceLimitExceeded {
+                        resource: "xml_depth",
+                        limit: XML_DEPTH_LIMIT,
+                        actual,
+                    });
                 }
             }
             Ok(Event::End(_)) => {
@@ -465,12 +422,9 @@ pub(crate) fn validate_element_sequences(
         &mut source_edition,
         DocumentRules {
             root: None,
-            max_depth: None,
             allow_default_namespace: true,
             child_rule: Some(&child_rule),
             attribute_allowed: Some(&attribute_allowed),
-            is_record: None,
-            max_records: None,
         },
     )
 }

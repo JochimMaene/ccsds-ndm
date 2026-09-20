@@ -11,7 +11,45 @@
 use ccsds_ndm::error::{CcsdsNdmError, DiagnosticNotation, FormatError};
 use ccsds_ndm::validation::MessageKind;
 use ccsds_ndm::Notation;
-use pyo3::create_exception;
+/// Declares a custom exception with stub metadata.
+///
+/// `pyo3_stub_gen::create_exception!` renders a custom exception's `PyStubType` as
+/// `builtins.<Name>`, so a subclass of one of ours emits `builtins.NdmError` as its base
+/// and fails type checking. Same expansion, but the name is unqualified.
+///
+/// Tracked upstream as Jij-Inc/pyo3-stub-gen#384, "create_exception! treats non-builtin
+/// base exceptions as builtins in stubs" (open against 0.23.0). Drop this macro and go
+/// back to `pyo3_stub_gen::create_exception!` once that is released.
+macro_rules! create_exception {
+    ($module:expr, $name:ident, $base:ty, $doc:expr) => {
+        ::pyo3::create_exception!($module, $name, $base, $doc);
+
+        impl ::pyo3_stub_gen::PyStubType for $name {
+            fn type_output() -> ::pyo3_stub_gen::TypeInfo {
+                ::pyo3_stub_gen::TypeInfo::unqualified(stringify!($name))
+            }
+        }
+
+        ::pyo3_stub_gen::impl_py_runtime_type!($name);
+
+        ::pyo3_stub_gen::inventory::submit! {
+            ::pyo3_stub_gen::type_info::PyClassInfo {
+                pyclass_name: stringify!($name),
+                struct_id: std::any::TypeId::of::<$name>,
+                getters: &[],
+                setters: &[],
+                module: Some(stringify!($module)),
+                doc: $doc,
+                bases: &[|| <$base as ::pyo3_stub_gen::PyStubType>::type_output()],
+                has_eq: false,
+                has_ord: false,
+                has_hash: false,
+                has_str: false,
+                subclass: true,
+            }
+        }
+    };
+}
 use pyo3::exceptions::{PyException, PyOSError, PyValueError};
 use pyo3::prelude::*;
 

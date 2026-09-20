@@ -31,7 +31,9 @@ LIVE_NESTED_CASES = [
     (Acm, ROOT / "ccsds-ndm/data/kvn/acm_g6.kvn", lambda value: value.segment.metadata),
     (
         Aem,
-        ROOT / "ccsds-ndm/data/kvn/aem_g4.kvn",
+        # Single-segment fixture: renaming one segment's object in a multi-segment AEM now
+        # trips the message-level OBJECT_NAME/OBJECT_ID consistency check.
+        ROOT / "ccsds-ndm/data/kvn/aem_g5.kvn",
         lambda value: value.segments[0].metadata,
     ),
     (Apm, ROOT / "ccsds-ndm/data/kvn/apm_g1.kvn", lambda value: value.segment.metadata),
@@ -161,13 +163,6 @@ def test_nested_model_changes_are_live_without_an_editor():
     assert isinstance(combined.messages[0], Opm)
 
 
-def test_editor_api_is_not_part_of_the_public_surface():
-    assert "edit" not in ccsds_ndm.__all__
-    assert "Editor" not in ccsds_ndm.__all__
-    assert not hasattr(ccsds_ndm, "edit")
-    assert not hasattr(ccsds_ndm, "Editor")
-
-
 @pytest.mark.parametrize(
     ("cls", "path", "get_nested"),
     LIVE_NESTED_CASES,
@@ -233,3 +228,31 @@ def test_live_lists_report_the_bad_index_at_the_generation_gate():
 
     with pytest.raises(ValueError, match=r"segments\[1\] must be OemSegment"):
         message.to_str("kvn")
+
+
+def test_interpretation_metadata_has_no_implicit_defaults():
+    with pytest.raises(TypeError):
+        ccsds_ndm.OpmMetadata(object_name="S", object_id="I")
+    with pytest.raises(TypeError):
+        ccsds_ndm.OemMetadata("S", "I", "2023-01-01T00:00:00", "2023-01-01T01:00:00")
+    with pytest.raises(TypeError):
+        ccsds_ndm.AemMetadata(
+            object_name="S",
+            object_id="I",
+            start_time="2023-01-01T00:00:00",
+            stop_time="2023-01-01T01:00:00",
+        )
+    with pytest.raises(TypeError):
+        ccsds_ndm.TdmMetadata(participant_1="P")
+    with pytest.raises(TypeError):
+        ccsds_ndm.OcmMetadata(epoch_tzero="2023-01-01T00:00:00")
+    with pytest.raises(TypeError):
+        ccsds_ndm.ApmMetadata(object_name="S", object_id="I")
+    with pytest.raises(TypeError):
+        ccsds_ndm.AcmMetadata(object_name="S", epoch_tzero="2023-01-01T00:00:00")
+    with pytest.raises(TypeError):
+        ccsds_ndm.RdmMetadata(
+            object_name="S",
+            international_designator="I",
+            epoch_tzero="2023-01-01T00:00:00",
+        )

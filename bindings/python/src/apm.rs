@@ -8,6 +8,7 @@ use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::apm as core_apm;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 /// Attitude Parameter Message (APM).
 ///
@@ -17,11 +18,31 @@ use pyo3::types::PyList;
 ///
 /// The APM requires the use of a propagation technique to determine the attitude state at
 /// times different from the specified epoch.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct Apm {
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[pyo3(get)]
     version: String,
+
+    /// The message header.
+    ///
+    /// :type: AdmHeader
+    #[pyo3(get, set)]
     header: Py<AdmHeader>,
+
+    /// APM Segment.
+    ///
+    /// :type: ApmSegment
+    #[pyo3(get, set)]
     segment: Py<ApmSegment>,
 }
 
@@ -52,6 +73,7 @@ impl Apm {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Apm {
     #[new]
@@ -76,60 +98,11 @@ impl Apm {
         )
     }
 
-    /// The message identifier.
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn get_id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// The message version.
-    ///
-    /// :type: str
-    #[getter]
-    fn get_version(&self) -> String {
-        self.version.clone()
-    }
-
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Apm, &value)?;
         self.version = value;
         Ok(())
-    }
-
-    /// Attitude Parameter Message (APM).
-    ///
-    /// An APM specifies the attitude state of a single object at a specified epoch. This message
-    /// is suited to interagency exchanges that involve automated interaction and/or human
-    /// interaction, and/or human interaction, and do not require high-fidelity dynamic modeling.
-    ///
-    /// The APM requires the use of a propagation technique to determine the attitude state at
-    /// times different from the specified epoch.
-    ///
-    /// :type: AdmHeader
-    #[getter]
-    fn get_header(&self, py: Python<'_>) -> Py<AdmHeader> {
-        self.header.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_header(&mut self, header: Py<AdmHeader>) {
-        self.header = header;
-    }
-
-    /// APM Segment.
-    ///
-    /// :type: ApmSegment
-    #[getter]
-    fn get_segment(&self, py: Python<'_>) -> Py<ApmSegment> {
-        self.segment.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_segment(&mut self, segment: Py<ApmSegment>) {
-        self.segment = segment;
     }
 
     /// Validate the message against CCSDS rules.
@@ -139,46 +112,67 @@ impl Apm {
     }
 
     /// Serialize to validated KVN or XML.
-    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, *, max_input_bytes=None))]
+    #[pyo3(signature = (data, format=None))]
     fn from_str(
         py: Python<'_>,
         data: &str,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
-        max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, None);
-        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
+        let inner = crate::api::parse_typed(data, format)?;
         Self::from_core(py, inner)
     }
 
     /// Parse an APM from a KVN or XML file.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
+    #[pyo3(signature = (path, format=None))]
     fn from_file(
         py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
-        max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, None);
-        let inner = crate::api::parse_typed_file_with_options(&path, format, &options)?;
+        let inner = crate::api::parse_typed_file(&path, format)?;
         Self::from_core(py, inner)
     }
 
     /// Atomically write this APM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Apm(self.to_core(py)?), &path, format)
     }
 }
 
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct ApmSegment {
+    /// APM Metadata Section.
+    ///
+    /// :type: ApmMetadata
+    #[pyo3(get, set)]
     metadata: Py<ApmMetadata>,
+
+    /// APM Data Section.
+    ///
+    /// :type: ApmData
+    #[pyo3(get, set)]
     data: Py<ApmData>,
 }
 
@@ -203,66 +197,41 @@ impl ApmSegment {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl ApmSegment {
     #[new]
     fn new(metadata: Py<ApmMetadata>, data: Py<ApmData>) -> Self {
         Self { metadata, data }
     }
-
-    /// APM Metadata Section.
-    ///
-    /// :type: ApmMetadata
-    #[getter]
-    fn get_metadata(&self, py: Python<'_>) -> Py<ApmMetadata> {
-        self.metadata.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_metadata(&mut self, metadata: Py<ApmMetadata>) {
-        self.metadata = metadata;
-    }
-
-    /// APM Data Section.
-    ///
-    /// :type: ApmData
-    #[getter]
-    fn get_data(&self, py: Python<'_>) -> Py<ApmData> {
-        self.data.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_data(&mut self, data: Py<ApmData>) {
-        self.data = data;
-    }
 }
 
 /// APM Metadata Section.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct ApmMetadata {
     pub inner: core_apm::ApmMetadata,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl ApmMetadata {
     #[new]
     #[pyo3(signature = (
         object_name,
         object_id,
-        time_system=None,
+        time_system,
         center_name=None,
         comment=None
     ))]
     fn new(
         object_name: String,
         object_id: String,
-        time_system: Option<String>,
+        time_system: String,
         center_name: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
-
         Ok(Self {
             inner: core_apm::ApmMetadata {
                 comment: comment.unwrap_or_default(),
@@ -281,6 +250,8 @@ impl ApmMetadata {
     /// the value should be set to UNKNOWN.
     ///
     /// Examples: EUTELSAT W1, MARS PATHFINDER, UNKNOWN
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.3.
     ///
     /// :type: str
     #[getter]
@@ -305,6 +276,8 @@ impl ApmMetadata {
     ///
     /// Examples: 2000-052A
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_object_id(&self) -> String {
@@ -320,6 +293,8 @@ impl ApmMetadata {
     /// comment line shall begin with this keyword.
     ///
     /// Examples: This is a comment.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.3.
     ///
     /// :type: list[str]
     #[getter]
@@ -354,6 +329,8 @@ impl ApmMetadata {
     ///
     /// Examples: UTC, TAI
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.3.
+    ///
     /// :type: str
     #[getter]
     fn get_time_system(&self) -> String {
@@ -367,9 +344,17 @@ impl ApmMetadata {
 }
 
 /// APM Data Section.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct ApmData {
+    /// One or more comment line(s). Each comment line shall begin with this keyword.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
+    /// :type: list[str]
+    #[pyo3(get, set)]
     comment: Vec<String>,
+
     epoch: ccsds_ndm::types::CalendarEpoch,
     quaternion_state: Py<PyList>,
     euler_angle_state: Py<PyList>,
@@ -448,6 +433,7 @@ impl ApmData {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl ApmData {
     #[new]
@@ -489,107 +475,115 @@ impl ApmData {
     /// (See annex F for conventions and further detail.)
     ///
     /// :type: list[QuaternionState]
+    #[gen_stub(override_return_type(type_repr = "list[QuaternionState]"))]
     #[getter]
     fn get_quaternion_state(&self, py: Python<'_>) -> Py<PyList> {
         self.quaternion_state.clone_ref(py)
     }
 
     #[setter]
-    fn set_quaternion_state(
-        &mut self,
-        py: Python<'_>,
-        value: Vec<Py<QuaternionState>>,
-    ) -> PyResult<()> {
-        self.quaternion_state = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_quaternion_state(&mut self, value: Vec<Py<QuaternionState>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.quaternion_state = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Euler angle elements. All mandatory elements of the logical block are to be provided if the
     /// block is present. (See annex F for conventions and further detail.)
     ///
     /// :type: list[EulerAngleState]
+    #[gen_stub(override_return_type(type_repr = "list[EulerAngleState]"))]
     #[getter]
     fn get_euler_angle_state(&self, py: Python<'_>) -> Py<PyList> {
         self.euler_angle_state.clone_ref(py)
     }
 
     #[setter]
-    fn set_euler_angle_state(
-        &mut self,
-        py: Python<'_>,
-        value: Vec<Py<EulerAngleState>>,
-    ) -> PyResult<()> {
-        self.euler_angle_state = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_euler_angle_state(&mut self, value: Vec<Py<EulerAngleState>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.euler_angle_state = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Angular velocity vector.
     ///
     /// :type: list[AngVelState]
+    #[gen_stub(override_return_type(type_repr = "list[AngVelState]"))]
     #[getter]
     fn get_angular_velocity(&self, py: Python<'_>) -> Py<PyList> {
         self.angular_velocity.clone_ref(py)
     }
 
     #[setter]
-    fn set_angular_velocity(
-        &mut self,
-        py: Python<'_>,
-        value: Vec<Py<AngVelState>>,
-    ) -> PyResult<()> {
-        self.angular_velocity = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_angular_velocity(&mut self, value: Vec<Py<AngVelState>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.angular_velocity = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Spin. All mandatory elements are to be provided if the block is present. (See annex F for
     /// conventions and further detail.)
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: list[SpinState]
+    #[gen_stub(override_return_type(type_repr = "list[SpinState]"))]
     #[getter]
     fn get_spin(&self, py: Python<'_>) -> Py<PyList> {
         self.spin.clone_ref(py)
     }
 
     #[setter]
-    fn set_spin(&mut self, py: Python<'_>, value: Vec<Py<SpinState>>) -> PyResult<()> {
-        self.spin = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_spin(&mut self, value: Vec<Py<SpinState>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.spin = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Inertia. All mandatory elements are to be provided if the block is present. (See annex F
     /// for conventions and further detail.)
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: list[InertiaState]
+    #[gen_stub(override_return_type(type_repr = "list[InertiaState]"))]
     #[getter]
     fn get_inertia(&self, py: Python<'_>) -> Py<PyList> {
         self.inertia.clone_ref(py)
     }
 
     #[setter]
-    fn set_inertia(&mut self, py: Python<'_>, value: Vec<Py<InertiaState>>) -> PyResult<()> {
-        self.inertia = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_inertia(&mut self, value: Vec<Py<InertiaState>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.inertia = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Maneuver Parameters.
     ///
     /// :type: list[ApmManeuverParameters]
+    #[gen_stub(override_return_type(type_repr = "list[ApmManeuverParameters]"))]
     #[getter]
     fn get_maneuver_parameters(&self, py: Python<'_>) -> Py<PyList> {
         self.maneuver_parameters.clone_ref(py)
     }
 
     #[setter]
-    fn set_maneuver_parameters(
-        &mut self,
-        py: Python<'_>,
-        value: Vec<Py<ApmManeuverParameters>>,
-    ) -> PyResult<()> {
-        self.maneuver_parameters = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_maneuver_parameters(&mut self, value: Vec<Py<ApmManeuverParameters>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.maneuver_parameters = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// Epoch of the attitude elements and optional logical blocks.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: str
     #[getter]
@@ -602,31 +596,20 @@ impl ApmData {
         self.epoch = parse_calendar_epoch(&value)?;
         Ok(())
     }
-
-    /// One or more comment line(s). Each comment line shall begin with this keyword.
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.comment.clone()
-    }
-
-    #[setter]
-    fn set_comment(&mut self, value: Vec<String>) {
-        self.comment = value;
-    }
 }
 
 /// Maneuver Parameters block.
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct ApmManeuverParameters {
     pub inner: ccsds_ndm::common::AttManeuverState,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl ApmManeuverParameters {
     #[new]
@@ -674,6 +657,8 @@ impl ApmManeuverParameters {
 
     /// Epoch of start of maneuver. (For format specification, see 6.8.9.)
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: str
     #[getter]
     fn get_man_epoch_start(&self) -> String {
@@ -690,6 +675,8 @@ impl ApmManeuverParameters {
     ///
     /// Units: s
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_man_duration(&self) -> f64 {
@@ -703,6 +690,8 @@ impl ApmManeuverParameters {
 
     /// Coordinate system for the torque vector. The set of allowed values is described in annex B,
     /// subsection B3.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: str
     #[getter]
@@ -719,6 +708,8 @@ impl ApmManeuverParameters {
     ///
     /// Units: N*m
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_man_tor_x(&self) -> f64 {
@@ -734,6 +725,8 @@ impl ApmManeuverParameters {
     ///
     /// Units: N*m
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: float
     #[getter]
     fn get_man_tor_y(&self) -> f64 {
@@ -748,6 +741,8 @@ impl ApmManeuverParameters {
     /// 3rd component of the torque vector.
     ///
     /// Units: N*m
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: float
     #[getter]
@@ -783,6 +778,8 @@ impl ApmManeuverParameters {
     }
 
     /// One or more comment line(s). Each comment line shall begin with this keyword.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: list[str]
     #[getter]

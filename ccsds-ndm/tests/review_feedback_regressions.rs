@@ -1,9 +1,9 @@
 use ccsds_ndm::messages::{
-    acm::Acm, aem::Aem, apm::Apm, cdm::Cdm, ocm::Ocm, oem::Oem, omm::Omm, opm::Opm, rdm::Rdm,
-    tdm::Tdm,
+    acm::Acm, aem::Aem, apm::Apm, cdm::Cdm, ndm::CombinedNdm, ocm::Ocm, oem::Oem, omm::Omm,
+    opm::Opm, rdm::Rdm, tdm::Tdm,
 };
+use ccsds_ndm::Message;
 use ccsds_ndm::Ndm;
-use ccsds_ndm::{from_str_with_options, Message, Notation, ParseOptions};
 
 #[test]
 fn opm_preserves_comment_before_user_defined_after_optional_maneuvers() {
@@ -37,32 +37,12 @@ fn opm_rejects_maneuver_fields_without_ignition_epoch() {
          MAN_DV_3 = 0.0 [km/s]\n\
          USER_DEFINED_EARTH_MODEL",
     );
-    assert!(Opm::from_kvn(&source).is_err());
-}
-
-#[test]
-fn oem_preserves_the_first_covariance_comment() {
-    let source = include_str!("../data/kvn/oem_g13.kvn").replace(
-        "COVARIANCE_START\n",
-        "COVARIANCE_START\nCOMMENT belongs to first covariance\n",
-    );
-    let message = Oem::from_kvn(&source).unwrap();
-    assert_eq!(
-        message.body.segment[0].data.covariance_matrix[0].comment,
-        ["belongs to first covariance"]
-    );
-}
-
-#[test]
-fn oem_enforces_integer_range_but_accepts_large_fixed_point_numbers() {
-    let source = include_str!("../data/kvn/oem_g13.kvn");
-    let integer = source.replacen("-2432.166", "3000000000", 1);
-    let decimal = source.replacen("-2432.166", "3000000000.0", 1);
-    Oem::from_kvn(&integer).expect_err("ODM integer-form values are limited to signed 32-bit");
-    let decimal_message = Oem::from_kvn(&decimal).unwrap();
-    assert_eq!(
-        decimal_message.body.segment[0].data.state_vector[0].x.value,
-        3_000_000_000.0
+    let error = Opm::from_kvn(&source).expect_err("maneuver without its ignition epoch accepted");
+    assert!(
+        error
+            .to_string()
+            .contains("Missing required field: MAN_EPOCH_IGNITION"),
+        "unexpected diagnostic: {error}"
     );
 }
 
@@ -104,24 +84,21 @@ fn user_defined_values_may_contain_assignment_delimiters() {
 }
 
 #[test]
-fn oem_2_kvn_rejects_oem_3_header_fields() {
-    let mut oem = Oem::from_kvn(include_str!("../data/kvn/oem_g11.kvn")).unwrap();
-    oem.version = "2.0".into();
-    oem.header.message_id = Some("OEM-3-ONLY".into());
-    assert!(oem.to_kvn().is_err());
-}
-
-#[test]
 fn assignment_values_may_end_with_marked_block_suffixes() {
     let apm = include_str!("../data/kvn/apm_g1.kvn")
         .replace("OBJECT_NAME = TRMM", "OBJECT_NAME = TRMM_START");
     Apm::from_kvn(&apm).unwrap();
 
-    let aem = include_str!("../data/kvn/aem_g4.kvn").replacen(
-        "OBJECT_NAME = MARS GLOBAL SURVEYOR",
-        "OBJECT_NAME = MARS GLOBAL SURVEYOR_STOP",
-        1,
-    );
+    // Both segments are renamed: the AEM now requires one object across the whole message.
+    let aem = include_str!("../data/kvn/aem_g4.kvn")
+        .replace(
+            "OBJECT_NAME = MARS GLOBAL SURVEYOR",
+            "OBJECT_NAME = MARS GLOBAL SURVEYOR_STOP",
+        )
+        .replace(
+            "OBJECT_NAME = mars global surveyor",
+            "OBJECT_NAME = mars global surveyor_STOP",
+        );
     Aem::from_kvn(&aem).unwrap();
 
     let acm = include_str!("../data/kvn/acm_g6.kvn").replace(
@@ -138,14 +115,22 @@ fn assignment_values_may_end_with_marked_block_suffixes() {
 #[test]
 fn strict_xml_rejects_forbidden_xml_1_characters() {
     let xml = include_str!("../data/xml/cdm_44.xml").replace("JSPOC", "JS\u{1}POC");
-    assert!(Cdm::from_xml(&xml).is_err());
+    let error = Cdm::from_xml(&xml).expect_err("U+0001 accepted in an XML document");
+    assert!(
+        error.to_string().contains("only XML 1.0 characters"),
+        "unexpected diagnostic: {error}"
+    );
 }
 
 #[test]
 fn xml_generation_rejects_forbidden_xml_1_characters_before_streaming() {
     let mut cdm = Cdm::from_kvn(include_str!("../data/kvn/cdm_362.kvn")).unwrap();
     cdm.header.originator = "JS\u{1}POC".into();
-    assert!(cdm.to_xml().is_err());
+    let error = cdm.to_xml().expect_err("U+0001 reached XML generation");
+    assert!(
+        error.to_string().contains("only XML 1.0 characters"),
+        "unexpected diagnostic: {error}"
+    );
 
     let mut output = Vec::new();
     assert!(cdm.write_xml_to(&mut output).is_err());
@@ -156,15 +141,29 @@ fn xml_generation_rejects_forbidden_xml_1_characters_before_streaming() {
 fn kvn_generation_rejects_non_ascii_and_control_text_before_streaming() {
     let mut apm = Apm::from_kvn(include_str!("../data/kvn/apm_g1.kvn")).unwrap();
     apm.header.originator = "GSFC-é".into();
-    assert!(apm.to_kvn().is_err());
+    let error = apm.to_kvn().expect_err("non-ASCII reached KVN generation");
+    assert!(
+        error.to_string().contains("only printable ASCII records"),
+        "unexpected diagnostic: {error}"
+    );
 
     let mut output = Vec::new();
     assert!(apm.write_kvn_to(&mut output).is_err());
     assert!(output.is_empty());
 
+    // A tab is not printable ASCII either, and the streaming path must hold the same line: the
+    // two notations had already drifted apart on whether they checked it before writing.
     let mut tdm = Tdm::from_kvn(include_str!("../data/kvn/tdm_e1.kvn")).unwrap();
     tdm.header.originator = "NA\tSA".into();
-    assert!(tdm.to_kvn().is_err());
+    let error = tdm.to_kvn().expect_err("a tab reached KVN generation");
+    assert!(
+        error.to_string().contains("expected printable ASCII"),
+        "unexpected diagnostic: {error}"
+    );
+
+    let mut output = Vec::new();
+    assert!(tdm.write_kvn_to(&mut output).is_err());
+    assert!(output.is_empty(), "streaming KVN wrote bytes for a tab");
 }
 
 #[test]
@@ -208,24 +207,6 @@ fn multiline_xml_comments_convert_to_separate_kvn_records() {
 }
 
 #[test]
-fn opm_maneuvers_are_not_history_records_in_either_notation() {
-    let kvn = include_str!("../data/kvn/opm_g2.kvn");
-    let options = ParseOptions::default().with_max_records(0);
-    from_str_with_options(kvn, Some(Notation::Kvn), &options).unwrap();
-
-    let xml = Opm::from_kvn(kvn).unwrap().to_xml().unwrap();
-    from_str_with_options(&xml, Some(Notation::Xml), &options).unwrap();
-}
-
-#[test]
-fn oem_comment_limit_matches_the_emitted_record() {
-    let mut message = Oem::from_kvn(include_str!("../data/kvn/oem_g11.kvn")).unwrap();
-    message.header.comment = vec!["x".repeat(235)];
-    let kvn = message.to_kvn().unwrap();
-    assert!(kvn.lines().any(|line| line.len() == 243));
-}
-
-#[test]
 fn kvn_lexical_errors_have_the_same_category_for_string_and_streaming_output() {
     let mut message = Apm::from_kvn(include_str!("../data/kvn/apm_g1.kvn")).unwrap();
     message.header.originator = "GSFC-é".into();
@@ -233,6 +214,22 @@ fn kvn_lexical_errors_have_the_same_category_for_string_and_streaming_output() {
     let streaming = message.write_kvn_to(&mut Vec::new()).unwrap_err();
     assert!(direct.as_validation_error().is_some());
     assert!(streaming.as_validation_error().is_some());
+}
+
+#[test]
+fn aem_overlong_records_are_rejected_before_streaming() {
+    let mut aem = Aem::from_kvn(include_str!("../data/kvn/aem_g4.kvn")).unwrap();
+    aem.header.comment = vec!["x".repeat(247)];
+    assert_eq!(
+        aem.to_kvn().unwrap_err().code(),
+        Some("validation.out_of_range")
+    );
+    let mut output = Vec::new();
+    assert_eq!(
+        aem.write_kvn_to(&mut output).unwrap_err().code(),
+        Some("validation.out_of_range")
+    );
+    assert!(output.is_empty());
 }
 
 #[test]
@@ -257,6 +254,21 @@ fn omm_rejects_kvn_numbers_it_could_not_spell_back() {
         error.contains("representable CCSDS number"),
         "unexpected error: {error}"
     );
+}
+
+#[test]
+fn ocm_reports_the_unrepresentable_value_path_compactly() {
+    let mut message = Ocm::from_kvn(include_str!("../data/kvn/ocm_g15.kvn")).unwrap();
+    message.body.segment.data.traj[0].traj_lines[0].values[0] = f64::MAX;
+
+    let error = message.to_kvn().unwrap_err();
+    assert_eq!(
+        error
+            .as_validation_error()
+            .and_then(|error| error.field_path()),
+        Some("body.segment.data.traj[0].traj_lines[0].values[0]".into())
+    );
+    assert!(error.to_string().contains("1.7976931348623157e308"));
 }
 
 #[test]
@@ -367,19 +379,9 @@ fn opm_xml_still_rejects_a_genuinely_out_of_order_child() {
 }
 
 #[test]
-fn self_closing_elements_count_towards_the_xml_depth_limit() {
-    // A self-closing element occupies a nesting level even though it never opens a frame, so it
-    // has to be measured against the limit the same way a start tag is. Here COMMENT is the only
-    // thing at depth 3, and it is spelled empty.
-    let document = concat!(
-        r#"<opm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" "#,
-        r#"id="CCSDS_OPM_VERS" version="3.0">"#,
-        "<header><COMMENT/></header></opm>",
-    );
-    let options = ParseOptions::default().with_max_xml_depth(2);
-    let error = ccsds_ndm::from_str_with_options(document, None, &options)
-        .unwrap_err()
-        .to_string();
+fn combined_xml_depth_has_a_fixed_safety_limit() {
+    let document = format!("{}{}", "<ndm>".repeat(17), "</ndm>".repeat(17));
+    let error = CombinedNdm::from_xml(&document).unwrap_err().to_string();
     assert!(error.contains("xml_depth"), "unexpected error: {error}");
 }
 

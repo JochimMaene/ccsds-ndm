@@ -18,7 +18,7 @@ rather than silently discarded.
 | Message / edition | KVN | XML | Rust | Python | Status |
 | --- | --- | --- | --- | --- | --- |
 | OPM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | **Verified** |
-| OEM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | **Verified** |
+| OEM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
 | OPM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
 | OEM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
 | OMM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | **Verified** |
@@ -57,7 +57,7 @@ preserved; the library does not evaluate ephemerides or attitudes at arbitrary e
 ## Evidence
 
 Maintainer-facing evidence lives in [`docs/conformance/`](conformance/). Those inventories link
-CCSDS requirements to focused tests, official XSD checks, diagnostics, resource limits, allocation
+CCSDS requirements to focused tests, official XSD checks, diagnostics, allocation behavior,
 budgets, and benchmarks. They support this table without making users navigate hundreds of
 capability cells.
 

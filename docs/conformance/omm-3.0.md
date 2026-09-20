@@ -14,7 +14,7 @@ This inventory records maintainer evidence for standalone OMM 3.0. The
 
 ## Executable evidence
 
-`just conformance-omm` runs `omm_conformance`, which establishes:
+The `omm_conformance` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |
@@ -24,7 +24,7 @@ This inventory records maintainer evidence for standalone OMM 3.0. The
 | XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
 | Numeric values in every block | Validation rejects non-finite values in the mean-elements, spacecraft, TLE, and covariance blocks before either notation is generated, and restates the `inclinationType` and `elementSetNoType` ranges that the typed wrappers enforce only in their constructors. Schema range facets are comparisons, which NaN passes, so finiteness is checked in its own right. |
 | KVN number spelling | Every OMM floating-point field — mean elements, spacecraft parameters, TLE parameters, and the shared covariance block — is written through the ODM 7.7.1 number writer, so generated KVN reparses instead of carrying `Display` spellings such as `0.30000000000000004`. Values whose shortest round-tripping spelling would not fit are rejected before generation rather than emitted. |
-| Shared resource and surface contract | `family_contract`, `family_generation_evidence`, the Python options tests, and family Criterion matrices provide the common bounded parsing/generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
+| Shared surface contract | `family_contract`, `family_generation_evidence`, the Python API tests, and family Criterion matrices provide common parsing, generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
 
 The existing OMM unit suite separately covers the mean-elements choice, TLE theory-dependent
 requirements and mutually exclusive choices, numeric constraints, reference-frame epochs, TLE
@@ -53,8 +53,9 @@ shared policy on [externally governed values](family-shared-contract.md#external
 
 `fixed_family_allocations` records strict KVN parse budgets of at most 128 allocations/24,000
 bytes and preflighted streaming-generation budgets of at most 48 allocations/2,000 bytes for the
-shipped OMM fixture. `test_omm.py` and the shared Python options
-matrix exercise typed parsing, both notations, files, TLE conversion, diagnostics, and limits.
+shipped OMM fixture. `test_omm.py`, `test_api_consistency.py`, and the shared Python
+options matrix exercise typed parsing, both notations, files, TLE conversion, diagnostics, and
+limits.
 Strict binding audit, generated-stub/doc checks, the full wheel test, and the publishable Rust
 artifact check are the reproducible packaged gates.
 

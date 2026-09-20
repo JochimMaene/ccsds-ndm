@@ -1,4 +1,4 @@
-use ccsds_ndm::{from_str, from_str_with_options, Message, Notation, ParseOptions};
+use ccsds_ndm::{from_str, from_str_with_notation, Message, Notation};
 
 fn standalone_cases() -> [(&'static str, &'static str); 10] {
     [
@@ -16,31 +16,18 @@ fn standalone_cases() -> [(&'static str, &'static str); 10] {
 }
 
 #[test]
-fn every_standalone_message_uses_the_shared_bounded_contract() {
+fn every_standalone_message_uses_the_shared_parse_contract() {
     for (name, input) in standalone_cases() {
-        let message = from_str_with_options(
-            input,
-            Some(Notation::Kvn),
-            &ParseOptions::default().with_max_input_bytes(input.len()),
-        )
-        .unwrap_or_else(|error| panic!("{name} bounded parse failed: {error}"));
+        let message = from_str_with_notation(input, Some(Notation::Kvn))
+            .unwrap_or_else(|error| panic!("{name} parse failed: {error}"));
         let kind = message.kind();
         assert_eq!(kind.as_str(), name);
-
-        let too_small_input = ParseOptions::default().with_max_input_bytes(input.len() - 1);
-        let error =
-            from_str_with_options(input, Some(Notation::Kvn), &too_small_input).unwrap_err();
-        let diagnostic = error
-            .diagnostic()
-            .unwrap_or_else(|| panic!("{name} input limit lacked a diagnostic"));
-        assert_eq!(diagnostic.message_kind, kind);
-        assert_eq!(diagnostic.code, Some("resource.input_limit_exceeded"));
 
         for (notation, output) in [
             (Notation::Kvn, message.to_kvn().unwrap()),
             (Notation::Xml, message.to_xml().unwrap()),
         ] {
-            let reparsed = from_str_with_options(&output, Some(notation), &ParseOptions::default())
+            let reparsed = from_str_with_notation(&output, Some(notation))
                 .unwrap_or_else(|error| panic!("{name} generated output did not parse: {error}"));
             assert_eq!(reparsed.kind(), kind);
         }

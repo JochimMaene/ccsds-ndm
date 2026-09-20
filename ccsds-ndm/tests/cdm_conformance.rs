@@ -1,18 +1,13 @@
 use std::fs;
-use std::path::{Path, PathBuf};
 
 use ccsds_ndm::messages::cdm::Cdm;
 use ccsds_ndm::Ndm;
 
 mod common;
-use common::validate_xml;
+use common::{assert_rejects, data_dir, validate_xml};
 
 const KVN: &str = include_str!("../data/kvn/cdm_363.kvn");
 const XML: &str = include_str!("../data/xml/cdm_44.xml");
-
-fn repository_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
-}
 
 #[test]
 fn edited_shared_od_parameters_are_revalidated_in_cdm() {
@@ -27,16 +22,7 @@ fn edited_shared_od_parameters_are_revalidated_in_cdm() {
         .unwrap()
         .value = f64::NAN;
 
-    let error = message.validate().unwrap_err();
-    assert!(error.to_string().contains("WEIGHTED_RMS"), "{error}");
-    assert!(message.to_kvn().is_err());
-    assert!(message.to_xml().is_err());
-
-    let mut output = Vec::new();
-    assert!(message.write_kvn_to(&mut output).is_err());
-    assert!(output.is_empty());
-    assert!(message.write_xml_to(&mut output).is_err());
-    assert!(output.is_empty());
+    assert_rejects(&message, "WEIGHTED_RMS");
 }
 
 #[test]
@@ -86,17 +72,7 @@ fn edited_cdm_numeric_values_are_validated_before_any_output() {
                 }
             };
             *target = value;
-            let error = message
-                .validate()
-                .expect_err("invalid edited value accepted");
-            assert!(error.to_string().contains(field), "{field}: {error}");
-            assert!(message.to_xml().is_err(), "{field}={value}");
-            assert!(message.to_kvn().is_err(), "{field}={value}");
-            let mut output = Vec::new();
-            assert!(message.write_xml_to(&mut output).is_err());
-            assert!(output.is_empty());
-            assert!(message.write_kvn_to(&mut output).is_err());
-            assert!(output.is_empty());
+            assert_rejects(&message, field);
         }
     }
     for probability in [0.0, 1.0] {
@@ -212,7 +188,7 @@ fn cdm_xml_rejects_unknown_nested_content_attributes_and_ordering_errors() {
 #[test]
 fn every_shipped_cdm_fixture_preserves_typed_content_and_generates_valid_xml() {
     for name in ["cdm_362.kvn", "cdm_363.kvn", "cdm_364.kvn"] {
-        let source = fs::read_to_string(repository_path(&format!("data/kvn/{name}"))).unwrap();
+        let source = fs::read_to_string(data_dir().join("kvn").join(name)).unwrap();
         let message = Cdm::from_kvn(&source).unwrap();
         let kvn = message.to_kvn().unwrap();
         assert_eq!(Cdm::from_kvn(&kvn).unwrap(), message, "{name} KVN model");

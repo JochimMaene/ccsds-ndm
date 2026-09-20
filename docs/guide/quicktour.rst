@@ -17,6 +17,44 @@ Installation
 Parsing Messages
 ----------------
 
+**Constructing Messages**
+
+Build a small complete message from explicit metadata and caller data, then generate
+valid output. Generation validates the complete message before writing.
+
+.. tabs::
+
+   .. code-tab:: py
+
+        import ccsds_ndm
+        from ccsds_ndm import OdmHeader, Opm, OpmData, OpmMetadata, OpmSegment, StateVector
+
+        header = OdmHeader("2023-01-01T00:00:00", "TEST")
+        meta = OpmMetadata(
+            object_name="SAT1",
+            object_id="2023-001A",
+            center_name="EARTH",
+            ref_frame="GCRF",
+            time_system="UTC",
+        )
+        state = StateVector(
+            epoch="2023-01-01T00:00:00",
+            x=7000.0, y=0.0, z=0.0, x_dot=0.0, y_dot=7.5, z_dot=0.0,
+            comments=None,
+        )
+        opm = Opm(
+            header=header,
+            segment=OpmSegment(metadata=meta, data=OpmData(state_vector=state, comment=[])),
+        )
+        opm.to_file("output.opm", "kvn")
+
+   .. code-tab:: rust
+
+        use ccsds_ndm::messages::opm::{Opm, OpmBody, OpmData, OpmMetadata, OpmSegment};
+
+        // See ccsds-ndm/examples/builder_demo.rs for a minimal state-vector OPM
+        // built with public builders, then validated generation with to_kvn()/to_xml().
+
 **Generic Parsing**
 
 Use the top-level functions when you want to handle any message type dynamically.
@@ -45,9 +83,10 @@ If you know the file type (e.g., OPM), you can parse it directly into the struct
    .. code-tab:: py
 
         import ccsds_ndm
+        from ccsds_ndm import Opm
 
         # Returns an Opm object directly
-        opm = ccsds_ndm.from_file("example.opm")
+        opm = Opm.from_file("example.opm")
 
    .. code-tab:: rust
 

@@ -1,23 +1,13 @@
 //! Notation conversion composed from strict typed parsers and validated generators.
 
 use crate::error::Result;
-use crate::options::ParseOptions;
 use std::path::Path;
 
 use crate::detect::Notation;
 
 /// Strictly convert any detected NDM message between KVN and XML.
 pub fn convert(input: &str, target: Notation) -> Result<String> {
-    convert_with_options(input, target, &ParseOptions::default())
-}
-
-/// Strictly convert with explicit parsing controls.
-pub fn convert_with_options(
-    input: &str,
-    target: Notation,
-    parse_options: &ParseOptions,
-) -> Result<String> {
-    let message = crate::from_str_with_options(input, None, parse_options)?;
+    let message = crate::from_str(input)?;
     match target {
         Notation::Kvn => message.to_kvn(),
         Notation::Xml => message.to_xml(),
@@ -30,22 +20,7 @@ pub fn convert_file(
     destination_path: impl AsRef<Path>,
     target: Notation,
 ) -> Result<()> {
-    convert_file_with_options(
-        source_path,
-        destination_path,
-        target,
-        &ParseOptions::default(),
-    )
-}
-
-/// Strictly convert a file with explicit parsing controls.
-pub fn convert_file_with_options(
-    source_path: impl AsRef<Path>,
-    destination_path: impl AsRef<Path>,
-    target: Notation,
-    parse_options: &ParseOptions,
-) -> Result<()> {
-    let message = crate::from_file_with_options(source_path, None, parse_options)?;
+    let message = crate::from_file(source_path)?;
     match target {
         Notation::Kvn => message.to_kvn_file(destination_path),
         Notation::Xml => message.to_xml_file(destination_path),

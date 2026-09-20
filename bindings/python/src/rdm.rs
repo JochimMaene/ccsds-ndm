@@ -13,6 +13,7 @@ use ccsds_ndm::messages::rdm as core_rdm;
 use ccsds_ndm::types::{self as core_types, *};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 // ============================================================================
 // RDM - Re-entry Data Message
@@ -38,11 +39,31 @@ use pyo3::prelude::*;
 /// segment : RdmSegment
 ///     The message segment containing metadata and data.
 ///     (Mandatory)
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct Rdm {
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[pyo3(get)]
     version: String,
+
+    /// The message header.
+    ///
+    /// :type: RdmHeader
+    #[pyo3(get, set)]
     header: Py<RdmHeader>,
+
+    /// The RDM Body consists of a single segment.
+    ///
+    /// :type: RdmSegment
+    #[pyo3(get, set)]
     segment: Py<RdmSegment>,
 }
 
@@ -73,6 +94,7 @@ impl Rdm {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Rdm {
     #[new]
@@ -84,22 +106,6 @@ impl Rdm {
             id: Some("CCSDS_RDM_VERS".to_string()),
             version: "1.0".to_string(),
         }
-    }
-
-    /// The message identifier.
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn get_id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// The message version.
-    ///
-    /// :type: str
-    #[getter]
-    fn get_version(&self) -> String {
-        self.version.clone()
     }
 
     #[setter]
@@ -127,42 +133,6 @@ impl Rdm {
         )
     }
 
-    /// Re-entry Data Message (RDM).
-    ///
-    /// The RDM specifies a standard message format to be used in the exchange of spacecraft
-    /// re-entry information between Space Situational Awareness (SSA) or Space Surveillance and
-    /// Tracking (SST) data providers, satellite owners/operators, and other parties.
-    ///
-    /// It includes data such as:
-    /// - Remaining orbital lifetime
-    /// - Start and end of the re-entry and impact windows
-    /// - Impact location and probabilities
-    /// - Object physical properties
-    ///
-    /// :type: RdmHeader
-    #[getter]
-    fn get_header(&self, py: Python<'_>) -> Py<RdmHeader> {
-        self.header.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_header(&mut self, header: Py<RdmHeader>) {
-        self.header = header;
-    }
-
-    /// The RDM Body consists of a single segment.
-    ///
-    /// :type: RdmSegment
-    #[getter]
-    fn get_segment(&self, py: Python<'_>) -> Py<RdmSegment> {
-        self.segment.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_segment(&mut self, segment: Py<RdmSegment>) {
-        self.segment = segment;
-    }
-
     /// Create an RDM message from a string.
     ///
     /// Parameters
@@ -178,34 +148,40 @@ impl Rdm {
     /// Rdm
     ///     The parsed RDM object.
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, *, max_input_bytes=None))]
+    #[pyo3(signature = (data, format=None))]
     fn from_str(
         py: Python<'_>,
         data: &str,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
-        max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, None);
-        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
+        let inner = crate::api::parse_typed(data, format)?;
         Self::from_core(py, inner)
     }
 
     /// Parse an RDM from a KVN or XML file.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, *, max_input_bytes=None))]
+    #[pyo3(signature = (path, format=None))]
     fn from_file(
         py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
-        max_input_bytes: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, None);
-        let inner = crate::api::parse_typed_file_with_options(&path, format, &options)?;
+        let inner = crate::api::parse_typed_file(&path, format)?;
         Self::from_core(py, inner)
     }
 
     /// Atomically write this RDM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Rdm(self.to_core(py)?), &path, format)
     }
 
@@ -219,7 +195,12 @@ impl Rdm {
     /// -------
     /// str
     ///     The serialized string.
-    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
     }
 }
@@ -244,12 +225,14 @@ impl Rdm {
 /// comment : list[str], optional
 ///     Comments.
 ///     (Optional)
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RdmHeader {
     pub inner: core_rdm::RdmHeader,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl RdmHeader {
     #[new]
@@ -346,9 +329,19 @@ impl RdmHeader {
 /// data : RdmData
 ///     Segment data.
 ///     (Mandatory)
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct RdmSegment {
+    /// The metadata for this RDM segment.
+    ///
+    /// :type: RdmMetadata
+    #[pyo3(get, set)]
     metadata: Py<RdmMetadata>,
+
+    /// The data for this RDM segment.
+    ///
+    /// :type: RdmData
+    #[pyo3(get, set)]
     data: Py<RdmData>,
 }
 
@@ -373,6 +366,7 @@ impl RdmSegment {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl RdmSegment {
     #[new]
@@ -386,30 +380,6 @@ impl RdmSegment {
             "RdmSegment(object_name='{}')",
             self.metadata.borrow(py).inner.object_name
         )
-    }
-
-    /// The metadata for this RDM segment.
-    ///
-    /// :type: RdmMetadata
-    #[getter]
-    fn get_metadata(&self, py: Python<'_>) -> Py<RdmMetadata> {
-        self.metadata.clone_ref(py)
-    }
-    #[setter]
-    fn set_metadata(&mut self, value: Py<RdmMetadata>) {
-        self.metadata = value;
-    }
-
-    /// The data for this RDM segment.
-    ///
-    /// :type: RdmData
-    #[getter]
-    fn get_data(&self, py: Python<'_>) -> Py<RdmData> {
-        self.data.clone_ref(py)
-    }
-    #[setter]
-    fn set_data(&mut self, value: Py<RdmData>) {
-        self.data = value;
     }
 }
 
@@ -435,12 +405,14 @@ impl RdmSegment {
 ///     Epoch from which the ORBIT_LIFETIME is calculated.
 ///
 ///     Optional
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RdmMetadata {
     pub inner: core_rdm::RdmMetadata,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl RdmMetadata {
     #[new]
@@ -450,8 +422,8 @@ impl RdmMetadata {
         international_designator,
         epoch_tzero,
         controlled_reentry=None,
-        center_name=String::from("EARTH"),
-        time_system=None,
+        center_name,
+        time_system,
         catalog_name=None,
         object_designator=None,
         object_type=None,
@@ -484,7 +456,7 @@ impl RdmMetadata {
         epoch_tzero: String,
         controlled_reentry: Option<Bound<'_, PyAny>>,
         center_name: String,
-        time_system: Option<String>,
+        time_system: String,
 
         catalog_name: Option<String>,
         object_designator: Option<String>,
@@ -523,8 +495,6 @@ impl RdmMetadata {
             Some(ref ob) => Some(parse_object_description(ob)?),
             None => None,
         };
-
-        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
 
         let intrack_thrust_enum = match intrack_thrust {
             Some(s) => Some(YesNo::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))?),
@@ -610,6 +580,8 @@ impl RdmMetadata {
     ///
     /// Examples: SENTINEL-1A, GOCE, ENVISAT, BRIZ R/B, DEBRIS, UNKNOWN
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: str
     #[getter]
     fn get_object_name(&self) -> String {
@@ -628,6 +600,8 @@ impl RdmMetadata {
     /// in 5.2.3.3).
     ///
     /// Examples: 2010-012C, 2016-001A, 1985-067CD, UNKNOWN
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: str
     #[getter]
@@ -728,6 +702,8 @@ impl RdmMetadata {
     ///
     /// Examples: YES, NO, UNKNOWN
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: str
     #[getter]
     fn get_controlled_reentry(&self) -> String {
@@ -748,6 +724,8 @@ impl RdmMetadata {
     ///
     /// Examples: EARTH, MOON, JUPITER
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: str
     #[getter]
     fn get_center_name(&self) -> String {
@@ -763,6 +741,8 @@ impl RdmMetadata {
     ///
     /// Examples: UTC, TAI
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: str
     #[getter]
     fn get_time_system(&self) -> String {
@@ -777,6 +757,8 @@ impl RdmMetadata {
     /// 5.3.3.5).
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: str
     #[getter]
@@ -1118,6 +1100,8 @@ impl RdmMetadata {
 
     /// Comments (allowed only at the beginning of RDM metadata).
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -1153,9 +1137,15 @@ impl RdmMetadata {
 ///     User defined parameters.
 /// comment : list[str], optional
 ///     Comments.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct RdmData {
+    /// Comments.
+    ///
+    /// :type: list[str]
+    #[pyo3(get, set)]
     comment: Vec<String>,
+
     atmospheric_reentry_parameters: Py<AtmosphericReentryParameters>,
     ground_impact_parameters: Option<Py<GroundImpactParameters>>,
     state_vector: Option<Py<StateVector>>,
@@ -1238,6 +1228,7 @@ impl RdmData {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl RdmData {
     #[new]
@@ -1380,18 +1371,6 @@ impl RdmData {
     fn set_user_defined_parameters(&mut self, value: Option<Py<crate::types::UserDefined>>) {
         self.user_defined_parameters = value;
     }
-
-    /// Comments.
-    ///
-    /// :type: list[str]
-    #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.comment.clone()
-    }
-    #[setter]
-    fn set_comment(&mut self, v: Vec<String>) {
-        self.comment = v;
-    }
 }
 
 // ============================================================================
@@ -1406,12 +1385,14 @@ impl RdmData {
 ///     Remaining time in orbit (days).
 /// reentry_altitude : float
 ///     Defined re-entry altitude (km).
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AtmosphericReentryParameters {
     pub inner: core_common::AtmosphericReentryParameters,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AtmosphericReentryParameters {
     #[new]
@@ -1478,6 +1459,8 @@ impl AtmosphericReentryParameters {
     ///
     /// Units: d
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: float
     #[getter]
     fn get_orbit_lifetime(&self) -> f64 {
@@ -1493,6 +1476,8 @@ impl AtmosphericReentryParameters {
     /// body’s atmosphere.
     ///
     /// Units: km
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: float
     #[getter]
@@ -1628,6 +1613,8 @@ impl AtmosphericReentryParameters {
 
     /// Comments (allowed only at the beginning of each RDM data logical block).
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_comment(&self) -> Vec<String> {
@@ -1648,12 +1635,14 @@ impl AtmosphericReentryParameters {
 // ============================================================================
 
 /// RDM spacecraft parameters (rdmSpacecraftParametersType).
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct RdmSpacecraftParameters {
     pub inner: core_common::RdmSpacecraftParameters,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl RdmSpacecraftParameters {
     #[new]
@@ -1835,6 +1824,8 @@ impl RdmSpacecraftParameters {
     }
 
     /// Comments (allowed only at the beginning of each RDM data logical block).
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: list[str]
     #[getter]

@@ -9,6 +9,7 @@ use ccsds_ndm::types::{AcmAttitudeType, AcmCovarianceLineType, AttBasisType, Att
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 use std::str::FromStr;
 
 /// Attitude Comprehensive Message (ACM).
@@ -23,11 +24,31 @@ use std::str::FromStr;
 /// - Optional covariance elements
 /// - Optional maneuver parameters
 /// - Optional estimator information
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct Acm {
+    /// The message identifier.
+    ///
+    /// :type: Optional[str]
+    #[pyo3(get)]
     id: Option<String>,
+
+    /// The message version.
+    ///
+    /// :type: str
+    #[pyo3(get)]
     version: String,
+
+    /// The message header.
+    ///
+    /// :type: AdmHeader
+    #[pyo3(get, set)]
     header: Py<AdmHeader>,
+
+    /// ACM Segment.
+    ///
+    /// :type: AcmSegment
+    #[pyo3(get, set)]
     segment: Py<AcmSegment>,
 }
 
@@ -58,6 +79,7 @@ impl Acm {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Acm {
     #[new]
@@ -82,22 +104,6 @@ impl Acm {
         )
     }
 
-    /// The message identifier.
-    ///
-    /// :type: Optional[str]
-    #[getter]
-    fn get_id(&self) -> Option<String> {
-        self.id.clone()
-    }
-
-    /// The message version.
-    ///
-    /// :type: str
-    #[getter]
-    fn get_version(&self) -> String {
-        self.version.clone()
-    }
-
     #[setter]
     fn set_version(&mut self, value: String) -> PyResult<()> {
         crate::common::validate_version(ccsds_ndm::validation::MessageKind::Acm, &value)?;
@@ -112,85 +118,67 @@ impl Acm {
     }
 
     #[staticmethod]
-    #[pyo3(signature = (data, format=None, *, max_input_bytes=None, max_records=None))]
+    #[pyo3(signature = (data, format=None))]
     fn from_str(
         py: Python<'_>,
         data: &str,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
-        max_input_bytes: Option<usize>,
-        max_records: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_records);
-        let inner = crate::api::parse_typed_with_options(data, format, &options)?;
+        let inner = crate::api::parse_typed(data, format)?;
         Self::from_core(py, inner)
     }
 
     /// Parse an ACM from a KVN or XML file.
     #[staticmethod]
-    #[pyo3(signature = (path, format=None, *, max_input_bytes=None, max_records=None))]
+    #[pyo3(signature = (path, format=None))]
     fn from_file(
         py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
-        max_input_bytes: Option<usize>,
-        max_records: Option<usize>,
     ) -> PyResult<Self> {
-        let options = crate::api::parse_options(max_input_bytes, max_records);
-        let inner = crate::api::parse_typed_file_with_options(&path, format, &options)?;
+        let inner = crate::api::parse_typed_file(&path, format)?;
         Self::from_core(py, inner)
     }
 
     /// Atomically write this ACM as KVN or XML.
-    fn to_file(&self, py: Python<'_>, path: std::path::PathBuf, format: &str) -> PyResult<()> {
+    fn to_file(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
+        path: std::path::PathBuf,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<()> {
         crate::api::generate_file(&ccsds_ndm::Message::Acm(self.to_core(py)?), &path, format)
     }
 
     /// Serialize to validated KVN or XML.
-    fn to_str(&self, py: Python<'_>, format: &str) -> PyResult<String> {
+    fn to_str(
+        &self,
+        py: Python<'_>,
+        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
+        format: &str,
+    ) -> PyResult<String> {
         crate::api::generate_string(&self.to_core(py)?, format)
-    }
-
-    /// Attitude Comprehensive Message (ACM).
-    ///
-    /// An ACM specifies the attitude state of a single object at multiple epochs, contained within a
-    /// specified time range. The ACM aggregates and extends APM and AEM content in a single
-    /// comprehensive hybrid message.
-    ///
-    /// Capabilities include:
-    /// - Optional rate data elements
-    /// - Optional spacecraft physical properties
-    /// - Optional covariance elements
-    /// - Optional maneuver parameters
-    /// - Optional estimator information
-    ///
-    /// :type: AdmHeader
-    #[getter]
-    fn get_header(&self, py: Python<'_>) -> Py<AdmHeader> {
-        self.header.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_header(&mut self, header: Py<AdmHeader>) {
-        self.header = header;
-    }
-
-    /// ACM Segment.
-    ///
-    /// :type: AcmSegment
-    #[getter]
-    fn get_segment(&self, py: Python<'_>) -> Py<AcmSegment> {
-        self.segment.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_segment(&mut self, value: Py<AcmSegment>) {
-        self.segment = value;
     }
 }
 
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct AcmSegment {
+    /// ACM Metadata Section.
+    ///
+    /// :type: AcmMetadata
+    #[pyo3(get, set)]
     metadata: Py<AcmMetadata>,
+
+    /// ACM Data Section.
+    ///
+    /// :type: AcmData
+    #[pyo3(get, set)]
     data: Py<AcmData>,
 }
 
@@ -215,37 +203,12 @@ impl AcmSegment {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AcmSegment {
     #[new]
     fn new(metadata: Py<AcmMetadata>, data: Py<AcmData>) -> Self {
         Self { metadata, data }
-    }
-
-    /// ACM Metadata Section.
-    ///
-    /// :type: AcmMetadata
-    #[getter]
-    fn get_metadata(&self, py: Python<'_>) -> Py<AcmMetadata> {
-        self.metadata.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_metadata(&mut self, value: Py<AcmMetadata>) {
-        self.metadata = value;
-    }
-
-    /// ACM Data Section.
-    ///
-    /// :type: AcmData
-    #[getter]
-    fn get_data(&self, py: Python<'_>) -> Py<AcmData> {
-        self.data.clone_ref(py)
-    }
-
-    #[setter]
-    fn set_data(&mut self, value: Py<AcmData>) {
-        self.data = value;
     }
 
     /// Validate the segment against CCSDS rules.
@@ -257,12 +220,14 @@ impl AcmSegment {
 }
 
 /// ACM Metadata Section.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AcmMetadata {
     pub inner: core_acm::AcmMetadata,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AcmMetadata {
     #[new]
@@ -270,19 +235,17 @@ impl AcmMetadata {
     #[pyo3(signature = (
         object_name,
         epoch_tzero,
-        time_system=None,
+        time_system,
         international_designator=None,
         comment=None
     ))]
     fn new(
         object_name: String,
         epoch_tzero: String,
-        time_system: Option<String>,
+        time_system: String,
         international_designator: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let time_system = time_system.unwrap_or_else(|| "UTC".to_string());
-
         Ok(Self {
             inner: core_acm::AcmMetadata {
                 comment: comment.unwrap_or_default(),
@@ -318,6 +281,8 @@ impl AcmMetadata {
     /// omitted).
     ///
     /// Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
     ///
     /// :type: str
     #[getter]
@@ -356,6 +321,8 @@ impl AcmMetadata {
     /// with this keyword.
     ///
     /// Examples: This is a comment.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
     ///
     /// :type: list[str]
     #[getter]
@@ -490,6 +457,8 @@ impl AcmMetadata {
     ///
     /// Examples: UTC, TAI
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
+    ///
     /// :type: str
     #[getter]
     fn get_time_system(&self) -> String {
@@ -506,6 +475,8 @@ impl AcmMetadata {
     /// Metadata section.
     ///
     /// Examples: 2016-11-10T00:00:00
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
     ///
     /// :type: str
     #[getter]
@@ -626,6 +597,7 @@ impl AcmMetadata {
 }
 
 /// ACM Data Section.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct AcmData {
     att: Py<PyList>,
@@ -709,6 +681,7 @@ impl AcmData {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AcmData {
     #[new]
@@ -734,6 +707,8 @@ impl AcmData {
 
     /// A single user-defined Data section.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.10.
+    ///
     /// :type: UserDefined | None
     #[getter]
     fn get_user(&self, py: Python<'_>) -> Option<Py<crate::types::UserDefined>> {
@@ -748,19 +723,26 @@ impl AcmData {
     /// One or more optional attitude state time histories (each consisting of one or more attitude
     /// states).
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
+    ///
     /// :type: list[AcmAttitudeState]
+    #[gen_stub(override_return_type(type_repr = "list[AcmAttitudeState]"))]
     #[getter]
     fn get_att(&self, py: Python<'_>) -> Py<PyList> {
         self.att.clone_ref(py)
     }
 
     #[setter]
-    fn set_att(&mut self, py: Python<'_>, value: Vec<Py<AcmAttitudeState>>) -> PyResult<()> {
-        self.att = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_att(&mut self, value: Vec<Py<AcmAttitudeState>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.att = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// A single space object physical characteristics section.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.6.
     ///
     /// :type: AcmPhysicalDescription | None
     #[getter]
@@ -776,33 +758,45 @@ impl AcmData {
     /// One or more optional covariance time histories (each consisting of one or more covariance
     /// matrix diagonals).
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
+    ///
     /// :type: list[AcmCovarianceMatrix]
+    #[gen_stub(override_return_type(type_repr = "list[AcmCovarianceMatrix]"))]
     #[getter]
     fn get_cov(&self, py: Python<'_>) -> Py<PyList> {
         self.cov.clone_ref(py)
     }
 
     #[setter]
-    fn set_cov(&mut self, py: Python<'_>, value: Vec<Py<AcmCovarianceMatrix>>) -> PyResult<()> {
-        self.cov = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_cov(&mut self, value: Vec<Py<AcmCovarianceMatrix>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.cov = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// One or more optional maneuver specification section(s).
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.8.
+    ///
     /// :type: list[AcmManeuverParameters]
+    #[gen_stub(override_return_type(type_repr = "list[AcmManeuverParameters]"))]
     #[getter]
     fn get_man(&self, py: Python<'_>) -> Py<PyList> {
         self.man.clone_ref(py)
     }
 
     #[setter]
-    fn set_man(&mut self, py: Python<'_>, value: Vec<Py<AcmManeuverParameters>>) -> PyResult<()> {
-        self.man = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_man(&mut self, value: Vec<Py<AcmManeuverParameters>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.man = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 
     /// A single attitude determination Data section.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: AcmAttitudeDetermination | None
     #[getter]
@@ -824,12 +818,14 @@ impl AcmData {
 }
 
 /// ACM Data: Attitude State Time History Section.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AcmAttitudeState {
     pub inner: core_acm::AcmAttitudeState,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AcmAttitudeState {
     #[new]
@@ -882,6 +878,8 @@ impl AcmAttitudeState {
     /// Comments allowed only immediately after the ATT_START keyword.
     ///
     /// Examples: This is a comment.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
     ///
     /// :type: list[str]
     #[getter]
@@ -955,6 +953,8 @@ impl AcmAttitudeState {
     ///
     /// Examples: J2000
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
+    ///
     /// :type: str
     #[getter]
     fn get_ref_frame_a(&self) -> String {
@@ -970,6 +970,8 @@ impl AcmAttitudeState {
     /// allowed values is described in annex B, subsection B3.
     ///
     /// Examples: SC_BODY_1
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
     ///
     /// :type: str
     #[getter]
@@ -987,6 +989,8 @@ impl AcmAttitudeState {
     ///
     /// Examples: 3, 4, 7
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
+    ///
     /// :type: int
     #[getter]
     fn get_number_states(&self) -> u32 {
@@ -1002,6 +1006,8 @@ impl AcmAttitudeState {
     /// listed before rate data. The units that shall be used are given in annex B, subsection B4.
     ///
     /// Examples: QUATERNION, EULER_ANGLES, DCM
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
     ///
     /// :type: str
     #[getter]
@@ -1053,6 +1059,8 @@ impl AcmAttitudeState {
     /// Data lines that consist of attitude data followed by rate data. (For the data units, see
     /// above [ATT_TYPE and RATE_TYPE keywords]).
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
+    ///
     /// :type: list[list[float]]
     #[getter]
     fn get_att_lines(&self) -> Vec<Vec<f64>> {
@@ -1073,12 +1081,14 @@ impl AcmAttitudeState {
 }
 
 /// ACM Data: Space Object Physical Characteristics Section.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AcmPhysicalDescription {
     pub inner: core_acm::AcmPhysicalDescription,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AcmPhysicalDescription {
     #[new]
@@ -1106,6 +1116,8 @@ impl AcmPhysicalDescription {
     /// Comments allowed only immediately after the PHYS_START keyword.
     ///
     /// Examples: This is a comment.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.6.
     ///
     /// :type: list[str]
     #[getter]
@@ -1316,12 +1328,14 @@ impl AcmPhysicalDescription {
 }
 
 /// ACM Data: Covariance Time History Section.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AcmCovarianceMatrix {
     pub inner: core_acm::AcmCovarianceMatrix,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AcmCovarianceMatrix {
     #[new]
@@ -1359,6 +1373,8 @@ impl AcmCovarianceMatrix {
     /// Comments allowed only immediately after the COV_START keyword.
     ///
     /// Examples: THIS is a comment.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
     ///
     /// :type: list[str]
     #[getter]
@@ -1449,6 +1465,8 @@ impl AcmCovarianceMatrix {
     ///
     /// Examples: ANGLE, ANGLE_GYROBIAS
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
+    ///
     /// :type: str
     #[getter]
     fn get_cov_type(&self) -> String {
@@ -1464,6 +1482,8 @@ impl AcmCovarianceMatrix {
 
     /// Optional confidence level of the covariance matrix.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
+    ///
     /// :type: float | None
     #[getter]
     fn get_cov_confidence(&self) -> Option<f64> {
@@ -1477,6 +1497,8 @@ impl AcmCovarianceMatrix {
 
     /// Covariance data lines (diagonal terms only). (For the data units, see annex B, subsection
     /// B6.)
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
     ///
     /// :type: list[list[float]]
     #[getter]
@@ -1498,12 +1520,14 @@ impl AcmCovarianceMatrix {
 }
 
 /// ACM Data: Maneuver Specification Section.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AcmManeuverParameters {
     pub inner: core_acm::AcmManeuverParameters,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AcmManeuverParameters {
     #[new]
@@ -1530,6 +1554,8 @@ impl AcmManeuverParameters {
     /// Comments allowed only immediately after the MAN_START keyword.
     ///
     /// Examples: This is a comment.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.8.
     ///
     /// :type: list[str]
     #[getter]
@@ -1732,12 +1758,14 @@ impl AcmManeuverParameters {
 }
 
 /// ACM Data: Sensor Data Section.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct AcmSensor {
     pub inner: core_acm::AcmSensor,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AcmSensor {
     #[new]
@@ -1770,6 +1798,8 @@ impl AcmSensor {
     /// Comments allowed only immediately after the SENSOR_START keyword.
     ///
     /// Examples: This is a comment.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: list[str]
     #[getter]
@@ -1862,6 +1892,7 @@ impl AcmSensor {
 }
 
 /// ACM Data: Attitude Determination Data Section.
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct AcmAttitudeDetermination {
     inner: core_acm::AcmAttitudeDetermination,
@@ -1901,6 +1932,7 @@ impl AcmAttitudeDetermination {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl AcmAttitudeDetermination {
     #[new]
@@ -1934,6 +1966,8 @@ impl AcmAttitudeDetermination {
     /// Comments allowed only immediately after the AD_START keyword.
     ///
     /// Examples: This is a comment.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: list[str]
     #[getter]
@@ -2064,6 +2098,8 @@ impl AcmAttitudeDetermination {
 
     /// Epoch of the attitude determination.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
+    ///
     /// :type: str | None
     #[getter]
     fn get_ad_epoch(&self) -> Option<String> {
@@ -2106,6 +2142,8 @@ impl AcmAttitudeDetermination {
     /// listed before rate states.
     ///
     /// Examples: QUATERNION
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: str | None
     #[getter]
@@ -2188,15 +2226,20 @@ impl AcmAttitudeDetermination {
 
     /// Sensor data blocks.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
+    ///
     /// :type: list[AcmSensor]
+    #[gen_stub(override_return_type(type_repr = "list[AcmSensor]"))]
     #[getter]
     fn get_sensors(&self, py: Python<'_>) -> Py<PyList> {
         self.sensors.clone_ref(py)
     }
 
     #[setter]
-    fn set_sensors(&mut self, py: Python<'_>, value: Vec<Py<AcmSensor>>) -> PyResult<()> {
-        self.sensors = PyList::new(py, value)?.unbind();
-        Ok(())
+    fn set_sensors(&mut self, value: Vec<Py<AcmSensor>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.sensors = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 }
