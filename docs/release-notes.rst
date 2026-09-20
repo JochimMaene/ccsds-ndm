@@ -4,6 +4,16 @@ Release notes
 Unreleased
 ----------
 
+Rust parsing controls (breaking change)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``ParseOptions`` and the ``from_str_with_options``, ``from_file_with_options``,
+``convert_with_options``, and ``convert_file_with_options`` functions have been
+removed. Use ``from_str``/``from_file`` or their ``*_with_notation`` variants,
+and use ``convert``/``convert_file`` for conversion. Applications that need
+input-size or record-count limits should enforce them before parsing; XML depth
+remains protected by the library's fixed safety limit.
+
 Python metadata construction (breaking change)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
