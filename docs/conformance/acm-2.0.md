@@ -13,7 +13,7 @@ This inventory records maintainer evidence for standalone ACM 2.0. The
 
 ## Executable evidence
 
-The `acm_conformance` and `acm_kvn_allocations` suites establish:
+The `acm` and `acm_kvn_allocations` suites establish:
 
 | Concern | Evidence |
 | --- | --- |

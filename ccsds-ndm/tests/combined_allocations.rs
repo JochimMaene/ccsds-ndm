@@ -3,8 +3,7 @@ use std::hint::black_box;
 
 use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::Message;
-use ccsds_ndm::Ndm;
+use ccsds_ndm::{Message, Ndm};
 use stats_alloc::{Region, Stats, StatsAlloc, INSTRUMENTED_SYSTEM};
 
 #[global_allocator]

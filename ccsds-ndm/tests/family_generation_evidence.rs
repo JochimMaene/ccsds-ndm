@@ -1,172 +1,85 @@
+use crate::common::mutated;
 mod common;
-use common::{data_dir, validate_xml};
-
-use std::fs;
-use std::path::PathBuf;
+use common::{fixtures, validate_xml};
 
 use ccsds_ndm::{from_str, Message};
 
-const REMAINING_PREFIXES: [&str; 7] = ["omm_", "ocm_", "cdm_", "tdm_", "rdm_", "apm_", "acm_"];
+// OPM, OEM, and AEM keep their corpus checks in their family suites.
+const FAMILY_PREFIXES: [&str; 7] = ["omm_", "ocm_", "cdm_", "tdm_", "rdm_", "apm_", "acm_"];
 
-fn fixture_paths(directory: &str, extension: &str) -> Vec<PathBuf> {
-    let mut paths: Vec<_> = fs::read_dir(data_dir().join(directory))
-        .unwrap()
-        .map(|entry| entry.unwrap().path())
-        .filter(|path| path.extension().is_some_and(|value| value == extension))
-        .filter(|path| {
-            path.file_name()
-                .and_then(|value| value.to_str())
-                .is_some_and(|name| {
-                    REMAINING_PREFIXES
-                        .iter()
-                        .any(|prefix| name.starts_with(prefix))
-                })
-        })
-        .collect();
-    paths.sort();
-    paths
-}
-
-fn assert_standalone_generation(label: &str, message: &Message) {
+fn assert_kvn_generation(label: &str, message: &Message, expected: &Message) {
     let kvn = message
         .to_kvn()
         .unwrap_or_else(|error| panic!("{label} KVN generation failed: {error}"));
     assert_eq!(message.to_kvn().unwrap(), kvn, "{label} KVN changed");
-    let reparsed_kvn = from_str(&kvn).unwrap();
-    assert_eq!(reparsed_kvn.kind(), message.kind());
+    let reparsed_kvn = from_str(&kvn)
+        .unwrap_or_else(|error| panic!("{label} generated KVN did not parse: {error}"));
+    assert_eq!(&reparsed_kvn, expected, "{label} KVN model");
+}
 
+fn assert_xml_generation(label: &str, message: &Message) {
     let xml = message
         .to_xml()
         .unwrap_or_else(|error| panic!("{label} XML generation failed: {error}"));
     assert_eq!(message.to_xml().unwrap(), xml, "{label} XML changed");
     validate_xml(label, &xml);
-    let reparsed_xml = from_str(&xml).unwrap();
-    assert_eq!(reparsed_xml.kind(), message.kind());
+    let reparsed_xml = from_str(&xml)
+        .unwrap_or_else(|error| panic!("{label} generated XML did not parse: {error}"));
+    assert_eq!(&reparsed_xml, message, "{label} XML model");
 }
 
 #[test]
-fn every_remaining_kvn_fixture_generates_deterministically_and_reparsably() {
-    for path in fixture_paths("kvn", "kvn") {
-        let label = path.file_name().unwrap().to_string_lossy();
-        let input = fs::read_to_string(&path).unwrap();
-        let message =
-            from_str(&input).unwrap_or_else(|error| panic!("{label} strict parse failed: {error}"));
-        assert_standalone_generation(&label, &message);
-    }
-}
-
-#[test]
-fn every_remaining_xml_fixture_generates_deterministically_and_reparsably() {
-    for path in fixture_paths("xml", "xml") {
-        let label = path.file_name().unwrap().to_string_lossy();
-        let input = fs::read_to_string(&path).unwrap();
-        let message =
-            from_str(&input).unwrap_or_else(|error| panic!("{label} strict parse failed: {error}"));
-        if matches!(label.as_ref(), "tdm_e21.xml" | "cdm_44.xml" | "ocm_g20.xml") {
-            // XML permits Unicode strings; TDM KVN is restricted to printable ASCII. The
-            // reference participant name contains typographic quotes, so conversion must fail
-            // rather than emit KVN that the strict parser cannot accept.
-            //
-            // OCM G-20 contains multiline assignment and history values that KVN cannot retain
-            // without changing them. The CDM XML fixture independently populates both the outer
-            // data COMMENT and its
-            // first nested OD COMMENT. CDM KVN has no delimiter for that boundary, so conversion
-            // must likewise reject the ambiguous state instead of guessing a split.
-            assert!(
-                message.to_kvn().is_err(),
-                "{label} unexpectedly generated KVN"
-            );
-            let xml = message.to_xml().unwrap();
-            assert_eq!(message.to_xml().unwrap(), xml);
-            validate_xml(&label, &xml);
-            assert_eq!(from_str(&xml).unwrap().kind(), message.kind());
-            continue;
+fn kvn_fixtures_preserve_models_and_generate_deterministically() {
+    for prefix in FAMILY_PREFIXES {
+        for (label, input) in fixtures(prefix, "kvn") {
+            let message = from_str(&input)
+                .unwrap_or_else(|error| panic!("{label} strict parse failed: {error}"));
+            assert_kvn_generation(&label, &message, &message);
+            assert_xml_generation(&label, &message);
         }
-        assert_standalone_generation(&label, &message);
     }
 }
 
 #[test]
-fn acm_physical_description_survives_kvn_to_xml_conversion() {
-    let input = fs::read_to_string(data_dir().join("kvn/acm_g8.kvn")).unwrap();
-    let message = from_str(&input).unwrap();
-    let xml = message.to_xml().unwrap();
-    let reparsed = from_str(&xml).unwrap();
-    let Message::Acm(acm) = reparsed else {
-        panic!("generated ACM XML changed message type");
-    };
-    let physical = acm
-        .body
-        .segment
-        .data
-        .phys
-        .expect("ACM physical description was dropped");
-    assert_eq!(physical.wet_mass.unwrap().value, 1916.0);
-    assert_eq!(physical.cp_ref_frame.as_deref(), Some("SC_BODY_1"));
-}
-
-#[test]
-fn aem_optional_xml_unit_annotations_are_normatively_normalized_through_kvn() {
-    let input = fs::read_to_string(data_dir().join("xml/aem_g13.xml")).unwrap();
-    assert!(input.contains("<NUTATION units=\"deg\">"));
-
-    let message = from_str(&input).unwrap();
-    let kvn = message.to_kvn().unwrap();
-    // CCSDS 504.0-B-2 section 6.9.2 forbids units in AEM KVN data lines.
-    assert!(!kvn.contains("[deg]"));
-    assert!(!kvn.contains("[deg/s]"));
-
-    let normalized_xml = from_str(&kvn).unwrap().to_xml().unwrap();
-    // Section 7.6.10 makes these fixed XML unit annotations optional.
-    assert!(normalized_xml.contains("<NUTATION>2</NUTATION>"));
-    assert!(!normalized_xml.contains("<NUTATION units="));
-    validate_xml("AEM optional unit normalization", &normalized_xml);
-}
-
-#[test]
-fn cdm_kvn_comments_keep_their_normative_block_association() {
-    let input = fs::read_to_string(data_dir().join("kvn/cdm_363.kvn")).unwrap();
-    let message = from_str(&input).unwrap();
-    let Message::Cdm(cdm) = message else {
-        panic!("CDM fixture changed message type");
-    };
-
-    assert_eq!(
-        cdm.body.relative_metadata_data.comment,
-        ["Relative Metadata/Data"]
-    );
-
-    let first = &cdm.body.segments[0];
-    assert_eq!(first.metadata.comment, ["Object1 Metadata"]);
-    // KVN has no delimiter between the outer data comments and the first nested block's
-    // comments. Preserve the leading run and its position without guessing a split.
-    assert_eq!(
-        first.data.comment,
-        ["Object1 Data", "Object1 OD Parameters"]
-    );
-    assert!(first
-        .data
-        .od_parameters
-        .as_ref()
-        .unwrap()
-        .comment
-        .is_empty());
-    assert_eq!(
-        first.data.additional_parameters.as_ref().unwrap().comment,
-        [
-            "Object1 Additional Parameters",
-            "Apogee Altitude=779 km",
-            "Perigee Altitude=765 km",
-            "Inclination=86.4 deg",
-        ]
-    );
-    assert_eq!(first.data.state_vector.comment, ["Object1 State Vector"]);
-    assert_eq!(
-        first.data.covariance_matrix.as_ref().unwrap().comment,
-        ["Object1 Covariance in the RTN Coordinate Frame"]
-    );
-
-    let original = Message::Cdm(cdm.clone());
-    let regenerated = original.to_kvn().unwrap();
-    assert_eq!(from_str(&regenerated).unwrap(), original);
+fn xml_fixtures_preserve_models_and_generate_deterministically() {
+    for (label, input) in fixtures("", "xml").into_iter().filter(|(name, _)| {
+        FAMILY_PREFIXES
+            .iter()
+            .any(|prefix| name.starts_with(prefix))
+    }) {
+        let message =
+            from_str(&input).unwrap_or_else(|error| panic!("{label} strict parse failed: {error}"));
+        assert_xml_generation(&label, &message);
+        match label.as_ref() {
+            // KVN cannot represent Unicode participant names, nested CDM comment
+            // associations, or multiline OCM assignment/history values.
+            "tdm_e21.xml" | "cdm_44.xml" | "ocm_g20.xml" => {
+                let error = message.to_kvn().expect_err(&label);
+                // CDM and OCM use generic validation errors without stable codes.
+                let reason = if label == "cdm_44.xml" {
+                    "COMMENT"
+                } else {
+                    "printable ASCII"
+                };
+                assert!(error.to_string().contains(reason), "{label}: {error}");
+            }
+            "apm_g10.xml" => {
+                // A multiline XML comment becomes separate KVN COMMENT records.
+                let normalized = mutated(
+                    &input,
+                    "launch\ntime</COMMENT>",
+                    "launch</COMMENT><COMMENT>time</COMMENT>",
+                );
+                assert_ne!(normalized, input, "{label} multiline comment is missing");
+                assert_kvn_generation(&label, &message, &from_str(&normalized).unwrap());
+            }
+            "omm_g10.xml" => {
+                // KVN assignment values omit surrounding whitespace.
+                let normalized = mutated(&input, "<MESSAGE_ID> OMM", "<MESSAGE_ID>OMM");
+                assert_ne!(normalized, input, "{label} padded message ID is missing");
+                assert_kvn_generation(&label, &message, &from_str(&normalized).unwrap());
+            }
+            _ => assert_kvn_generation(&label, &message, &message),
+        }
+    }
 }

@@ -14,7 +14,7 @@ This inventory records maintainer evidence for standalone APM 2.0. The
 
 ## Executable evidence
 
-The `apm_conformance` suite establishes:
+The `apm` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |

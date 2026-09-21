@@ -13,8 +13,6 @@ use crate::common::{
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::traits::Ndm;
-#[cfg(test)]
-use crate::traits::Validate;
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 
@@ -986,83 +984,5 @@ impl AemData {
     pub fn validate(&self, attitude_type: &AttitudeTypeType) -> Result<()> {
         self.validate_structure()?;
         self.validate_attitude_type(attitude_type)
-    }
-}
-
-//----------------------------------------------------------------------
-// Tests
-//----------------------------------------------------------------------
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_aem_data_validation_mismatches() {
-        use crate::common::*;
-
-        let valid_q = AemAttitudeState::QuaternionEphemeris(QuaternionEphemeris {
-            epoch: "2023-01-01T00:00:00".parse().unwrap(),
-            quaternion: Quaternion::new(0.0, 0.0, 0.0, 1.0).unwrap(),
-        });
-
-        let valid_euler = AemAttitudeState::EulerAngle(EulerAngle {
-            epoch: "2023-01-01T00:00:00".parse().unwrap(),
-            angle_1: Angle::new(10.0, None).unwrap(),
-            angle_2: Angle::new(20.0, None).unwrap(),
-            angle_3: Angle::new(30.0, None).unwrap(),
-        });
-
-        // Type mismatch: Expects QUATERNION, gets EULER_ANGLE
-        let data = AemData {
-            comment: vec![],
-            attitude_states: vec![valid_euler.clone()],
-        };
-        assert!(data.validate(&AttitudeTypeType::Quaternion).is_err());
-
-        // Type mismatch: Expects EULER_ANGLE, gets QUATERNION
-        let data_q = AemData {
-            comment: vec![],
-            attitude_states: vec![valid_q.clone()],
-        };
-        assert!(data_q.validate(&AttitudeTypeType::EulerAngle).is_err());
-
-        // Check all other variants against a wrong type declaration
-        let cases = vec![
-            AttitudeTypeType::QuaternionDerivative,
-            AttitudeTypeType::QuaternionAngVel,
-            AttitudeTypeType::EulerAngleDerivative,
-            AttitudeTypeType::EulerAngleAngVel,
-            AttitudeTypeType::Spin,
-            AttitudeTypeType::SpinNutation,
-            AttitudeTypeType::SpinNutationMom,
-        ];
-
-        for attitude_type in cases {
-            let d = AemData {
-                comment: vec![],
-                attitude_states: vec![valid_q.clone()],
-            };
-            assert!(
-                d.validate(&attitude_type).is_err(),
-                "Expected error for type {}",
-                attitude_type
-            );
-        }
-    }
-
-    #[test]
-    fn test_aem_data_requires_attitude_state() {
-        let data = AemData {
-            comment: vec![],
-            attitude_states: vec![],
-        };
-        assert!(crate::traits::Validate::validate(&data).is_err());
-    }
-
-    #[test]
-    fn test_aem_body_requires_segment() {
-        let body = AemBody { segment: vec![] };
-        assert!(body.validate().is_err());
     }
 }

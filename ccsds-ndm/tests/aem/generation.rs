@@ -1,4 +1,4 @@
-use crate::common::{assert_rejects, validate_xml};
+use crate::common::{assert_rejects, mutated, validate_xml};
 use crate::{KVN, SPIN_KVN, XML};
 use ccsds_ndm::common::AemAttitudeState;
 use ccsds_ndm::messages::aem::Aem;
@@ -6,10 +6,15 @@ use ccsds_ndm::Ndm;
 
 #[test]
 fn aem_xml_emits_canonical_uppercase_attitude_types() {
-    let lowercase = XML
-        .replace("QUATERNION/DERIVATIVE", "quaternion/derivative")
-        .replace("QUATERNION/ANGVEL", "quaternion/angvel")
-        .replace("QUATERNION", "quaternion");
+    let lowercase = mutated(
+        &mutated(
+            &mutated(XML, "QUATERNION/DERIVATIVE", "quaternion/derivative"),
+            "QUATERNION/ANGVEL",
+            "quaternion/angvel",
+        ),
+        "QUATERNION",
+        "quaternion",
+    );
     let generated = Aem::from_xml(&lowercase).unwrap().to_xml().unwrap();
 
     for value in ["QUATERNION", "QUATERNION/DERIVATIVE", "QUATERNION/ANGVEL"] {
@@ -150,4 +155,20 @@ fn kvn_generation_rounds_history_numbers_to_the_ccsds_digit_limit() {
     };
     state.spin_alpha.value = 1.234_567_890_123_456_7;
     assert!(message.to_kvn().unwrap().contains("1.234567890123457e0"));
+}
+
+#[test]
+fn aem_overlong_records_are_rejected_before_streaming() {
+    let mut aem = Aem::from_kvn(include_str!("../../data/kvn/aem_g4.kvn")).unwrap();
+    aem.header.comment = vec!["x".repeat(247)];
+    assert_eq!(
+        aem.to_kvn().unwrap_err().code(),
+        Some("validation.out_of_range")
+    );
+    let mut output = Vec::new();
+    assert_eq!(
+        aem.write_kvn_to(&mut output).unwrap_err().code(),
+        Some("validation.out_of_range")
+    );
+    assert!(output.is_empty());
 }

@@ -2,6 +2,9 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+mod common;
+use crate::common::mutated_once;
+
 use ccsds_ndm::messages::{oem::Oem, omm::Omm, opm::Opm};
 use ccsds_ndm::Ndm;
 use std::path::Path;
@@ -41,12 +44,15 @@ fn validate_with_odm_2_xsd(family: &str, xml: &str) {
 }
 
 fn edition_2(input: &str) -> String {
-    input
-        .lines()
-        .filter(|line| !line.starts_with("MESSAGE_ID"))
-        .collect::<Vec<_>>()
-        .join("\n")
-        .replacen("3.0", "2.0", 1)
+    mutated_once(
+        &input
+            .lines()
+            .filter(|line| !line.starts_with("MESSAGE_ID"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        "3.0",
+        "2.0",
+    )
 }
 
 #[test]
@@ -56,6 +62,7 @@ fn opm_2_generation_is_schema_valid_and_round_trips() {
     validate_with_odm_2_xsd("opm", &xml);
     let parsed = Opm::from_xml(&xml).unwrap();
     assert_eq!(parsed.version, "2.0");
+    assert_eq!(parsed, opm);
 }
 
 #[test]
@@ -65,6 +72,7 @@ fn oem_2_generation_is_schema_valid_and_round_trips() {
     validate_with_odm_2_xsd("oem", &xml);
     let parsed = Oem::from_xml(&xml).unwrap();
     assert_eq!(parsed.version, "2.0");
+    assert_eq!(parsed, oem);
 }
 
 #[test]
@@ -74,6 +82,7 @@ fn omm_2_generation_is_schema_valid_and_round_trips() {
     validate_with_odm_2_xsd("omm", &xml);
     let parsed = Omm::from_xml(&xml).unwrap();
     assert_eq!(parsed.version, "2.0");
+    assert_eq!(parsed, omm);
 }
 
 #[test]

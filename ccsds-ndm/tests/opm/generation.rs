@@ -2,10 +2,11 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::common::validate_xml;
+use crate::common::{mutated, validate_xml};
+
 use crate::{
     assert_invalid_value_diagnostic, assert_missing_required, opm, opm_with_maneuvers,
-    validation_error_source, OPM_3_KVN_FIXTURES, OPM_3_XML_FIXTURES,
+    validation_error_source, OPM_3_KVN_FIXTURES,
 };
 use ccsds_ndm::error::{Result, ValidationError};
 use ccsds_ndm::messages::opm::Opm;
@@ -35,24 +36,22 @@ fn assert_missing_object_name<T: std::fmt::Debug>(surface: &str, result: Result<
 
 #[test]
 fn every_shipped_opm_3_fixture_generates_xsd_valid_xml() {
-    for (name, kvn) in OPM_3_KVN_FIXTURES {
-        let opm =
-            Opm::from_kvn(kvn).unwrap_or_else(|error| panic!("failed to parse {name}: {error}"));
-        assert_eq!(opm.version, "3.0", "{name} is not an OPM 3.0 fixture");
+    for (name, source) in crate::common::fixtures("opm", "kvn")
+        .into_iter()
+        .chain(crate::common::fixtures("opm", "xml"))
+    {
+        let opm = if name.ends_with(".kvn") {
+            Opm::from_kvn(&source)
+        } else {
+            Opm::from_xml(&source)
+        }
+        .unwrap_or_else(|error| panic!("{name}: {error}"));
+        assert_eq!(opm.version, "3.0", "{name}");
         let xml = opm
             .to_xml()
-            .unwrap_or_else(|error| panic!("failed to generate XML for {name}: {error}"));
-        validate_xml(name, &xml);
-    }
-
-    for (name, xml) in OPM_3_XML_FIXTURES {
-        let opm =
-            Opm::from_xml(xml).unwrap_or_else(|error| panic!("failed to parse {name}: {error}"));
-        assert_eq!(opm.version, "3.0", "{name} is not an OPM 3.0 fixture");
-        let generated = opm
-            .to_xml()
-            .unwrap_or_else(|error| panic!("failed to regenerate XML for {name}: {error}"));
-        validate_xml(name, &generated);
+            .unwrap_or_else(|error| panic!("{name}: {error}"));
+        validate_xml(&name, &xml);
+        assert_eq!(Opm::from_xml(&xml).unwrap(), opm, "{name}");
     }
 }
 
@@ -724,7 +723,8 @@ fn opm_kvn_canonicalizes_gm_units_to_the_odm_spelling() {
 
 #[test]
 fn opm_kvn_gm_units_survive_a_kvn_round_trip() {
-    let source = include_str!("../../data/kvn/opm_g2.kvn").replace(
+    let source = mutated(
+        include_str!("../../data/kvn/opm_g2.kvn"),
         "GM = 398600.4415 [km**3/s**2]",
         "GM = 398600.4415 [KM**3/S**2]",
     );
@@ -939,7 +939,13 @@ fn opm_kvn_epoch_lines_are_bounded_by_the_epoch_type() {
     let longest_epoch = format!("2000-001T00:00:00.{}", "0".repeat(46));
     assert_eq!(longest_epoch.len(), 64);
     let epoch = CalendarEpoch::from_str(&longest_epoch).expect("64-byte epoch should be valid");
-    assert!(CalendarEpoch::from_str(&format!("{longest_epoch}0")).is_err());
+    assert!(matches!(
+        CalendarEpoch::from_str(&format!("{longest_epoch}0")).unwrap_err(),
+        ccsds_ndm::types::EpochError::TooLong {
+            length: 65,
+            maximum: 64
+        }
+    ));
 
     let mut message =
         Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).expect("fixture should parse");
@@ -959,8 +965,7 @@ fn invalid_opm_kvn_is_rejected_across_public_generation_entry_points() {
     let mut message = opm();
     message.header.originator = "ESOC 🚀".to_owned();
 
-    assert!(message.to_kvn().is_err());
-    assert!(message.to_kvn().is_err());
+    crate::common::assert_validation_field(&message.to_kvn().unwrap_err(), "ORIGINATOR");
 
     let mut output = Vec::new();
     let error = message
@@ -971,13 +976,12 @@ fn invalid_opm_kvn_is_rejected_across_public_generation_entry_points() {
     assert!(output.is_empty());
 
     let erased = Message::Opm(message);
-    assert!(erased.to_kvn().is_err());
-    assert!(erased.to_kvn().is_err());
+    crate::common::assert_validation_field(&erased.to_kvn().unwrap_err(), "ORIGINATOR");
 
     let directory = tempfile::tempdir().expect("temporary directory should be created");
     let path = directory.path().join("opm.kvn");
     std::fs::write(&path, b"unchanged").expect("sentinel should be written");
-    assert!(erased.to_kvn_file(&path).is_err());
+    crate::common::assert_validation_field(&erased.to_kvn_file(&path).unwrap_err(), "ORIGINATOR");
     assert_eq!(
         std::fs::read(path).expect("sentinel should remain readable"),
         b"unchanged"

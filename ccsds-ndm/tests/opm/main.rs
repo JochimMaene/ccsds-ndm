@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use common::validation_error_source;
+
 #[path = "../common/mod.rs"]
 mod common;
 mod conversion;
@@ -20,8 +22,6 @@ const OPM_3_KVN_FIXTURES: [(&str, &str); 4] = [
     ("opm_g3.kvn", include_str!("../../data/kvn/opm_g3.kvn")),
     ("opm_g4.kvn", include_str!("../../data/kvn/opm_g4.kvn")),
 ];
-const OPM_3_XML_FIXTURES: [(&str, &str); 1] =
-    [("opm_g5.xml", include_str!("../../data/xml/opm_g5.xml"))];
 
 fn opm() -> Opm {
     Opm::from_kvn(KVN).unwrap()
@@ -61,13 +61,6 @@ fn assert_missing_required<T: std::fmt::Debug>(
     );
 }
 
-fn validation_error_source(error: &ValidationError) -> &ValidationError {
-    match error {
-        ValidationError::AtPath { source, .. } => validation_error_source(source),
-        error => error,
-    }
-}
-
 fn assert_invalid_value_diagnostic<T: std::fmt::Debug>(
     surface: &str,
     result: Result<T>,
@@ -105,3 +98,6 @@ fn assert_out_of_range_diagnostic<T: std::fmt::Debug>(
     );
     assert!(error.as_validation_error().is_some());
 }
+
+mod minimal;
+mod model;

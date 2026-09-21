@@ -14,7 +14,7 @@ This inventory records maintainer evidence for standalone OCM 3.0. The
 
 ## Executable evidence
 
-The `ocm_conformance` and `ocm_kvn_allocations` suites establish:
+The `ocm` and `ocm_kvn_allocations` suites establish:
 
 | Concern | Evidence |
 | --- | --- |

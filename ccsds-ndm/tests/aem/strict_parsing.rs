@@ -1,3 +1,4 @@
+use crate::common::{mutated, mutated_once};
 use crate::{KVN, SPIN_KVN, XML};
 use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::Ndm;
@@ -10,42 +11,49 @@ fn aem_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
     for (label, source) in [
         (
             "duplicate metadata keyword",
-            KVN.replace(object, &format!("{object}\n{object}")),
+            mutated(KVN, object, &format!("{object}\n{object}")),
         ),
         (
             "reordered metadata",
-            KVN.replace(
+            mutated(
+                KVN,
                 &format!("{object}\n{object_id}"),
                 &format!("{object_id}\n{object}"),
             ),
         ),
         (
             "unknown metadata",
-            KVN.replace(object, &format!("{object}\nUNKNOWN = value")),
+            mutated(KVN, object, &format!("{object}\nUNKNOWN = value")),
         ),
         (
             "comment after history begins",
-            KVN.replace(first_state, &format!("{first_state}\nCOMMENT misplaced")),
+            mutated(
+                KVN,
+                first_state,
+                &format!("{first_state}\nCOMMENT misplaced"),
+            ),
         ),
-        ("mismatched block", KVN.replace("META_STOP", "DATA_STOP")),
-        ("unknown block", KVN.replace("DATA_START", "UNKNOWN_START")),
+        ("mismatched block", mutated(KVN, "META_STOP", "DATA_STOP")),
+        ("unknown block", mutated(KVN, "DATA_START", "UNKNOWN_START")),
         (
             "XML-only metadata keyword in KVN",
-            KVN.replace(
+            mutated(
+                KVN,
                 "ATTITUDE_TYPE = QUATERNION",
                 "ATTITUDE_TYPE = QUATERNION\nANGVEL_FRAME = A",
             ),
         ),
         (
             "zero interpolation degree",
-            SPIN_KVN.replace(
+            mutated(
+                SPIN_KVN,
                 "ATTITUDE_TYPE = SPIN",
                 "ATTITUDE_TYPE = SPIN\nINTERPOLATION_DEGREE = 0",
             ),
         ),
         (
             "missing interpolation degree",
-            KVN.replace("INTERPOLATION_DEGREE = 7\n", ""),
+            mutated(KVN, "INTERPOLATION_DEGREE = 7\n", ""),
         ),
         ("trailing assignment", format!("{KVN}UNKNOWN = value\n")),
     ] {
@@ -56,8 +64,9 @@ fn aem_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
 #[test]
 fn aem_kvn_rejects_non_ccsds_history_number_spellings() {
     for value in [".5", "1e0", "1.2345678901234567"] {
-        let source = SPIN_KVN.replacen("2.6862511e+002", value, 1);
-        assert!(Aem::from_kvn(&source).is_err(), "accepted {value}");
+        let source = mutated_once(SPIN_KVN, "2.6862511e+002", value);
+        let error = Aem::from_kvn(&source).unwrap_err();
+        assert_eq!(error.code(), Some("parse.kvn.syntax"), "{value}: {error}");
     }
 }
 
@@ -69,39 +78,37 @@ fn aem_xml_rejects_unknown_choice_content_attributes_and_ordering_errors() {
     for (label, source) in [
         (
             "unknown attitude state choice",
-            XML.replace("<attitudeState>", "<attitudeState><UNKNOWN/>"),
+            mutated(XML, "<attitudeState>", "<attitudeState><UNKNOWN/>"),
         ),
         (
             "two attitude state choices",
-            XML.replace(
-                "</quaternionEphemeris>",
+            mutated(XML, "</quaternionEphemeris>",
                 "</quaternionEphemeris><spin><EPOCH>2000-100T00:00:00.000</EPOCH><SPIN_ALPHA>1</SPIN_ALPHA><SPIN_DELTA>2</SPIN_DELTA><SPIN_ANGLE>3</SPIN_ANGLE><SPIN_ANGLE_VEL>4</SPIN_ANGLE_VEL></spin>",
             ),
         ),
         (
             "unknown container attribute",
-            XML.replace("<attitudeState>", "<attitudeState unexpected=\"value\">"),
+            mutated(XML, "<attitudeState>", "<attitudeState unexpected=\"value\">"),
         ),
         (
             "illegal quaternion units",
-            XML.replace("<Q1>-0.005068</Q1>", "<Q1 units=\"1\">-0.005068</Q1>"),
+            mutated(XML, "<Q1>-0.005068</Q1>", "<Q1 units=\"1\">-0.005068</Q1>"),
         ),
         (
             "missing Euler rotation sequence",
-            XML.replace("<EULER_ROT_SEQ>XYZ</EULER_ROT_SEQ>", ""),
+            mutated(XML, "<EULER_ROT_SEQ>XYZ</EULER_ROT_SEQ>", ""),
         ),
         (
             "missing angular velocity frame",
-            XML.replace("<ANGVEL_FRAME>REF_FRAME_B</ANGVEL_FRAME>", ""),
+            mutated(XML, "<ANGVEL_FRAME>REF_FRAME_B</ANGVEL_FRAME>", ""),
         ),
         (
             "duplicate epoch",
-            XML.replace(epoch, &format!("{epoch}{epoch}")),
+            mutated(XML, epoch, &format!("{epoch}{epoch}")),
         ),
         (
             "reordered metadata",
-            XML.replace(
-                &format!("{object}\n{object_id}"),
+            mutated(XML, &format!("{object}\n{object_id}"),
                 &format!("{object_id}\n{object}"),
             ),
         ),
@@ -112,7 +119,7 @@ fn aem_xml_rejects_unknown_choice_content_attributes_and_ordering_errors() {
 
 #[test]
 fn aem_kvn_accepts_carriage_return_only_line_endings() {
-    let cr_only = KVN.replace("\r\n", "\n").replace('\n', "\r");
+    let cr_only = mutated(&KVN.replace("\r\n", "\n"), "\n", "\r");
     assert!(!cr_only.contains('\n'), "fixture still holds line feeds");
 
     let from_cr = Aem::from_kvn(&cr_only).unwrap();

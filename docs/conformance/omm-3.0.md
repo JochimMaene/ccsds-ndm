@@ -14,7 +14,7 @@ This inventory records maintainer evidence for standalone OMM 3.0. The
 
 ## Executable evidence
 
-The `omm_conformance` suite establishes:
+The `omm` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |

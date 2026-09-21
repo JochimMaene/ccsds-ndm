@@ -6,8 +6,6 @@ use crate::common::OdmHeader;
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
 use crate::traits::Ndm;
-#[cfg(test)]
-use crate::traits::Validate;
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -4109,8 +4107,6 @@ impl OcmOdParameters {
 mod tests {
     use super::*;
 
-    use crate::traits::Ndm;
-
     /// Fails unless `result` is an error whose diagnostic names `expected`, so a case cannot pass
     /// because some other rule rejected the model first.
     fn assert_diagnostic(result: Result<()>, expected: &str) {
@@ -4122,551 +4118,15 @@ mod tests {
     }
 
     #[test]
-    fn test_ocm_validation_traj_lines() {
-        let mut ocm = Ocm::builder()
-            .header(
-                OdmHeader::builder()
-                    .originator("TEST")
-                    .creation_date("2000-01-01T00:00:00".parse().unwrap())
-                    .build(),
-            )
-            .body(
-                OcmBody::builder()
-                    .segment(Box::new(
-                        OcmSegment::builder()
-                            .metadata(
-                                OcmMetadata::builder()
-                                    .time_system("UTC")
-                                    .epoch_tzero("2000-01-01T00:00:00".parse().unwrap())
-                                    .build(),
-                            )
-                            .data(OcmData::default())
-                            .build(),
-                    ))
-                    .build(),
-            )
-            .version("3.0")
-            .build();
-
-        let traj = OcmTrajState::builder()
-            .center_name("EARTH")
-            .traj_ref_frame("GCRF")
-            .traj_type("CARTPV")
-            .build();
-        // Missing lines
-        ocm.body.segment.data.traj.push(traj);
-        assert!(ocm.validate().is_err());
-
-        // Fix it
-        ocm.body.segment.data.traj[0].traj_lines.push(TrajLine {
-            epoch: "2000-01-01T00:00:00".parse().unwrap(),
-            values: vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-        });
-        assert!(ocm.validate().is_ok());
-
-        for value in ["2000-366T23:59:60Z", "12345.5"] {
-            ocm.body.segment.data.traj[0].traj_lines[0].epoch = value.parse().unwrap();
-            assert!(ocm.validate().is_ok(), "valid trajectory epoch {value}");
-        }
-
-        for value in ["2001-366T00:00:00", "2023-01-01T24:00:00", "+", "123."] {
-            ocm.body.segment.data.traj[0].traj_lines[0].epoch = value.parse().unwrap();
-            assert!(ocm.validate().is_err(), "invalid trajectory epoch {value}");
-        }
-    }
-
-    #[test]
     fn traj_line_deserialization_rejects_non_epoch_first_token() {
         let xml = "<trajLine>not-an-epoch 1 2 3</trajLine>";
         assert!(crate::xml::from_str::<TrajLine>(xml).is_err());
     }
 
     #[test]
-    fn test_ocm_validation_cov_lines_epochs() {
-        let mut cov = OcmCovarianceMatrix::builder()
-            .cov_ref_frame("GCRF")
-            .cov_type("CARTPV")
-            .cov_lines(vec![CovLine {
-                epoch: "2000-01-01T00:00:00".parse().unwrap(),
-                values: vec![1.0],
-            }])
-            .build();
-        assert!(cov.validate().is_ok());
-
-        for value in ["2000-366T23:59:60Z", "12345.5"] {
-            cov.cov_lines[0].epoch = value.parse().unwrap();
-            assert!(cov.validate().is_ok(), "valid covariance epoch {value}");
-        }
-
-        for value in ["2001-366T00:00:00", "2023-01-01T24:00:00", "+", "123."] {
-            cov.cov_lines[0].epoch = value.parse().unwrap();
-            assert!(cov.validate().is_err(), "invalid covariance epoch {value}");
-        }
-    }
-
-    #[test]
-    fn ocm_history_blocks_reject_mixed_epoch_branches() {
-        let mut traj = OcmTrajState::builder()
-            .center_name("EARTH")
-            .traj_ref_frame("GCRF")
-            .traj_type("CARTPV")
-            .traj_lines(vec![
-                TrajLine {
-                    epoch: "2000-01-01T00:00:00".parse().unwrap(),
-                    values: vec![1.0],
-                },
-                TrajLine {
-                    epoch: "1.0".parse().unwrap(),
-                    values: vec![2.0],
-                },
-            ])
-            .build();
-        assert!(traj.validate().is_err());
-
-        traj.traj_lines[1].epoch = "2000-01-01T00:00:01".parse().unwrap();
-        assert!(traj.validate().is_ok());
-
-        let mut cov = OcmCovarianceMatrix::builder()
-            .cov_ref_frame("GCRF")
-            .cov_type("CARTPV")
-            .cov_lines(vec![
-                CovLine {
-                    epoch: "1.0".parse().unwrap(),
-                    values: vec![1.0],
-                },
-                CovLine {
-                    epoch: "2000-01-01T00:00:01".parse().unwrap(),
-                    values: vec![2.0],
-                },
-            ])
-            .build();
-        assert!(cov.validate().is_err());
-
-        cov.cov_lines[1].epoch = "2.0".parse().unwrap();
-        assert!(cov.validate().is_ok());
-    }
-
-    #[test]
-    fn ocm_history_blocks_reject_duplicate_and_decreasing_epochs() {
-        let mut traj = OcmTrajState::builder()
-            .center_name("EARTH")
-            .traj_ref_frame("GCRF")
-            .traj_type("CARTPV")
-            .traj_lines(vec![
-                TrajLine {
-                    epoch: "1".parse().unwrap(),
-                    values: vec![1.0],
-                },
-                TrajLine {
-                    epoch: "+1.0".parse().unwrap(),
-                    values: vec![2.0],
-                },
-            ])
-            .build();
-        assert!(traj.validate().is_err());
-
-        traj.traj_lines[1].epoch = "0.5".parse().unwrap();
-        assert!(traj.validate().is_err());
-
-        traj.traj_lines[1].epoch = "2".parse().unwrap();
-        assert!(traj.validate().is_ok());
-
-        let mut man = OcmManeuverParameters::builder()
-            .man_id("MAN-1")
-            .man_device_id("THR-1")
-            .man_ref_frame("GCRF")
-            .man_composition("TIME_RELATIVE, THR_X")
-            .man_lines(vec![
-                ManLine {
-                    epoch: "1".parse().unwrap(),
-                    values: vec!["1".to_string()],
-                },
-                ManLine {
-                    epoch: "1.0".parse().unwrap(),
-                    values: vec!["2".to_string()],
-                },
-            ])
-            .build();
-        assert!(man.validate().is_err());
-
-        man.man_lines[1].epoch = "2".parse().unwrap();
-        assert!(man.validate().is_ok());
-    }
-
-    #[test]
     fn cov_line_deserialization_rejects_non_epoch_first_token() {
         let xml = "<covLine>not-an-epoch 1 2 3</covLine>";
         assert!(crate::xml::from_str::<CovLine>(xml).is_err());
-    }
-
-    #[test]
-    fn test_ocm_validation_orb_revnum() {
-        let mut traj = OcmTrajState::builder()
-            .center_name("EARTH")
-            .traj_ref_frame("GCRF")
-            .traj_type("CARTPV")
-            .build();
-        traj.traj_lines.push(TrajLine {
-            epoch: "2000-01-01T00:00:00".parse().unwrap(),
-            values: vec![1.0],
-        });
-        traj.orb_revnum = Some(-1.0);
-
-        assert!(traj.validate().is_err());
-
-        traj.orb_revnum = Some(0.0);
-        assert!(traj.validate().is_ok());
-    }
-
-    #[test]
-    fn parse_simple_ocm() {
-        let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
-CENTER_NAME = EARTH
-TRAJ_REF_FRAME = GCRF
-TRAJ_TYPE = CARTPV
-2023-01-01T00:00:00 1 2 3 4 5 6
-TRAJ_STOP
-"#;
-        let ocm = Ocm::from_kvn(kvn).unwrap();
-        assert_eq!(ocm.body.segment.data.traj.len(), 1);
-        assert_eq!(ocm.body.segment.data.traj[0].traj_lines[0].values.len(), 6);
-    }
-
-    // =========================================================================
-    // XSD COMPLIANCE TESTS - Group 1: Mandatory Metadata Fields
-    // XSD: TIME_SYSTEM and EPOCH_TZERO are mandatory (no minOccurs="0")
-    // =========================================================================
-
-    #[test]
-    fn test_xsd_sample_ocm_g20_xml() {
-        // Parse official CCSDS OCM XML example G-20
-        let xml = include_str!("../../data/xml/ocm_g20.xml");
-        let ocm = Ocm::from_xml(xml).unwrap();
-
-        // Verify mandatory metadata
-        assert!(!ocm.body.segment.metadata.time_system.is_empty());
-    }
-
-    #[test]
-    fn test_xsd_kvn_roundtrip() {
-        // Full roundtrip: KVN -> Ocm -> KVN
-        let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
-CENTER_NAME = EARTH
-TRAJ_REF_FRAME = GCRF
-TRAJ_TYPE = CARTPV
-2023-01-01T00:00:00 1000 2000 3000 4 5 6
-TRAJ_STOP
-"#;
-        let ocm = Ocm::from_kvn(kvn).unwrap();
-        let output = ocm.to_kvn().unwrap();
-
-        // Parse output again
-        let ocm2 = Ocm::from_kvn(&output).unwrap();
-        assert_eq!(
-            ocm.body.segment.metadata.time_system,
-            ocm2.body.segment.metadata.time_system
-        );
-        assert_eq!(
-            ocm.body.segment.data.traj.len(),
-            ocm2.body.segment.data.traj.len()
-        );
-    }
-
-    #[test]
-    fn test_to_xml_roundtrip() {
-        // Cover to_xml method (lines 79-81)
-        // Use the official XML example which is known to be valid
-        let xml = include_str!("../../data/xml/ocm_g20.xml");
-        let ocm = Ocm::from_xml(xml).unwrap();
-        let xml_out = ocm.to_xml().unwrap();
-        assert!(xml_out.contains("ocm"));
-        // Verify we can serialize without error
-        assert!(xml_out.len() > 100);
-    }
-
-    #[test]
-    fn test_xml_roundtrip_with_all_blocks() {
-        // Cover XML serialization for TrajLine, CovLine, ManLine
-        // Use the official XML example to test XML roundtrip
-        let xml = include_str!("../../data/xml/ocm_g20.xml");
-        let ocm = Ocm::from_xml(xml).unwrap();
-
-        // Verify structure was parsed
-        assert!(!ocm.body.segment.data.traj.is_empty());
-
-        // Convert back to XML to exercise serialize methods
-        let xml_out = ocm.to_xml().unwrap();
-        assert!(xml_out.contains("traj"));
-    }
-
-    #[test]
-    fn test_covline_serialize_deserialize() {
-        // Check if there are COV blocks
-        // The official file may not have covariance data in line format
-        // So we manually build one and check serialization
-        let cov_line = CovLine {
-            epoch: "2023-01-01T00:00:00".parse().unwrap(),
-            values: vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-        };
-
-        // Test the epoch's wire spelling used by KVN/XML generation.
-        let display = format!("{}", cov_line.epoch);
-        assert!(display.contains("2023-01-01T00:00:00"));
-    }
-
-    #[test]
-    fn test_covline_xml_serialization() {
-        // Cover lines 1555-1565: CovLine serialize for XML
-        // Test serialization by wrapping in an XML struct
-        use serde::{Deserialize, Serialize};
-
-        #[derive(Serialize, Deserialize)]
-        struct TestWrapper {
-            cov_line: CovLine,
-        }
-
-        let cov_line = CovLine {
-            epoch: "2023-01-01T00:00:00".parse().unwrap(),
-            values: vec![1.0, 2.0, 3.0],
-        };
-
-        let wrapper = TestWrapper { cov_line };
-
-        // Use quick-xml to serialize (which uses the custom Serialize impl)
-        let xml = quick_xml::se::to_string(&wrapper).unwrap();
-        assert!(xml.contains("2023-01-01T00:00:00"));
-        assert!(xml.contains("1"));
-        assert!(xml.contains("2"));
-        assert!(xml.contains("3"));
-
-        // Deserialize and verify using quick-xml
-        let deserialized: TestWrapper = quick_xml::de::from_str(&xml).unwrap();
-        assert_eq!(deserialized.cov_line.epoch.as_str(), "2023-01-01T00:00:00");
-        assert_eq!(deserialized.cov_line.values.len(), 3);
-    }
-
-    #[test]
-    fn test_manline_xml_serialization() {
-        // Cover lines 1859-1885: ManLine serialize/deserialize for XML
-        use serde::{Deserialize, Serialize};
-
-        #[derive(Serialize, Deserialize)]
-        struct TestWrapper {
-            man_line: ManLine,
-        }
-
-        let man_line = ManLine {
-            epoch: "2023-01-01T00:00:00".parse().unwrap(),
-            values: vec!["1.0".to_string(), "2.0".to_string(), "3.0".to_string()],
-        };
-
-        let wrapper = TestWrapper { man_line };
-
-        // Use quick-xml to serialize
-        let xml = quick_xml::se::to_string(&wrapper).unwrap();
-        assert!(xml.contains("2023-01-01T00:00:00"));
-
-        // Deserialize and verify
-        let deserialized: TestWrapper = quick_xml::de::from_str(&xml).unwrap();
-        assert_eq!(deserialized.man_line.epoch.as_str(), "2023-01-01T00:00:00");
-        assert_eq!(deserialized.man_line.values.len(), 3);
-    }
-
-    #[test]
-    fn test_ocm_validation_man_line_epoch_matches_composition() {
-        let mut man = OcmManeuverParameters::builder()
-            .man_id("MAN-1")
-            .man_device_id("THR-1")
-            .man_ref_frame("GCRF")
-            .man_composition("TIME_RELATIVE, MAN_DURA")
-            .man_lines(vec![ManLine {
-                epoch: "123.5".parse().unwrap(),
-                values: vec!["10.0".to_string()],
-            }])
-            .build();
-        assert!(man.validate().is_ok());
-
-        man.man_lines[0].epoch = "2023-001T00:00:00".parse().unwrap();
-        assert!(man.validate().is_err());
-
-        man.man_composition = "TIME_ABSOLUTE, MAN_DURA".to_string();
-        assert!(man.validate().is_ok());
-
-        man.man_lines[0].epoch = "123.5".parse().unwrap();
-        assert!(man.validate().is_err());
-    }
-
-    #[test]
-    fn test_ocm_validation_man_duty_cycle_requirements_and_period() {
-        let mut man = OcmManeuverParameters::builder()
-            .man_id("MAN-1")
-            .man_device_id("THR-1")
-            .man_ref_frame("GCRF")
-            .dc_type(ManDc::Time)
-            .man_composition("TIME_ABSOLUTE, DV_X")
-            .man_lines(vec![ManLine {
-                epoch: "2023-01-01T00:00:00".parse().unwrap(),
-                values: vec!["1.0".to_string()],
-            }])
-            .build();
-        man.dc_win_open = Some("2023-01-01T00:00:00".parse().unwrap());
-        man.dc_win_close = Some("2023-01-01T01:00:00".parse().unwrap());
-        man.dc_exec_start = Some("2023-01-01T00:10:00".parse().unwrap());
-        man.dc_exec_stop = Some("2023-01-01T00:50:00".parse().unwrap());
-        man.dc_ref_time = Some("2023-01-01T00:00:00".parse().unwrap());
-        man.dc_time_pulse_duration = Some(Duration::new(60.0, Some(TimeUnits::Seconds)).unwrap());
-        man.dc_time_pulse_period = Some(Duration::new(120.0, Some(TimeUnits::Seconds)).unwrap());
-        assert!(man.validate().is_ok());
-
-        man.dc_exec_start = Some("2022-12-31T23:50:00".parse().unwrap());
-        let error = man.validate().unwrap_err().to_string();
-        assert!(error.contains("DC_EXEC_START"));
-        man.dc_exec_start = Some("2023-01-01T00:10:00".parse().unwrap());
-
-        man.dc_exec_stop = Some("2023-01-01T01:10:00".parse().unwrap());
-        let error = man.validate().unwrap_err().to_string();
-        assert!(error.contains("DC_EXEC_STOP"));
-        man.dc_exec_stop = Some("2023-01-01T00:50:00".parse().unwrap());
-
-        man.dc_time_pulse_period = Some(Duration::new(30.0, Some(TimeUnits::Seconds)).unwrap());
-        let error = man.validate().unwrap_err().to_string();
-        assert!(error.contains("DC_TIME_PULSE_PERIOD"));
-        assert!(error.contains("DC_TIME_PULSE_DURATION"));
-
-        man.dc_time_pulse_period = Some(Duration::new(120.0, Some(TimeUnits::Seconds)).unwrap());
-        man.dc_exec_stop = None;
-        let error = man.validate().unwrap_err().to_string();
-        assert!(error.contains("DC_EXEC_STOP"));
-
-        man.dc_exec_stop = Some("2023-01-01T00:50:00".parse().unwrap());
-        man.dc_max_cycles = Some(0);
-        let error = man.validate().unwrap_err().to_string();
-        assert!(error.contains("DC_MAX_CYCLES"));
-    }
-
-    #[test]
-    fn test_ocm_metadata_sclk_requirements_and_units() {
-        let mut metadata = OcmMetadata::builder()
-            .time_system("SCLK")
-            .epoch_tzero("2023-01-01T00:00:00".parse().unwrap())
-            .build();
-        let error = metadata.validate().unwrap_err().to_string();
-        assert!(error.contains("SCLK_OFFSET_AT_EPOCH"));
-
-        metadata.sclk_offset_at_epoch = Some(TimeOffset {
-            value: 100.0,
-            units: Some(TimeUnits::Seconds),
-        });
-        let error = metadata.validate().unwrap_err().to_string();
-        assert!(error.contains("SCLK_SEC_PER_SI_SEC"));
-
-        metadata.sclk_sec_per_si_sec = Some(Duration {
-            value: 1.0,
-            units: Some(TimeUnits::Seconds),
-        });
-        assert!(metadata.validate().is_ok());
-
-        metadata.next_leap_epoch = Some("2024-01-01T00:00:00".parse().unwrap());
-        assert!(metadata.validate().is_ok());
-
-        metadata.sclk_offset_at_epoch.as_mut().unwrap().units = Some(TimeUnits::Day);
-        let error = metadata.validate().unwrap_err().to_string();
-        assert!(error.contains("SCLK_OFFSET_AT_EPOCH"));
-
-        metadata.sclk_offset_at_epoch.as_mut().unwrap().units = Some(TimeUnits::Seconds);
-        metadata.sclk_sec_per_si_sec.as_mut().unwrap().units = Some(TimeUnits::Day);
-        let error = metadata.validate().unwrap_err().to_string();
-        assert!(error.contains("SCLK_SEC_PER_SI_SEC"));
-    }
-
-    #[test]
-    fn test_ocm_validation_man_duty_cycle_angle_requirements_and_epoch_branch() {
-        let mut man = OcmManeuverParameters::builder()
-            .man_id("MAN-1")
-            .man_device_id("THR-1")
-            .man_ref_frame("GCRF")
-            .dc_type(ManDc::TimeAndAngle)
-            .man_composition("TIME_RELATIVE, DV_X")
-            .man_lines(vec![ManLine {
-                epoch: "1".parse().unwrap(),
-                values: vec!["1.0".to_string()],
-            }])
-            .build();
-        man.dc_win_open = Some("0".parse().unwrap());
-        man.dc_win_close = Some("10".parse().unwrap());
-        man.dc_exec_start = Some("1".parse().unwrap());
-        man.dc_exec_stop = Some("9".parse().unwrap());
-        man.dc_ref_time = Some("0".parse().unwrap());
-        man.dc_time_pulse_duration = Some(Duration::new(1.0, None).unwrap());
-        man.dc_time_pulse_period = Some(Duration::new(2.0, None).unwrap());
-        man.dc_ref_dir = Some(Vec3Double::new(1.0, 0.0, 0.0));
-        man.dc_body_frame = Some("SC_BODY".to_string());
-        man.dc_body_trigger = Some(Vec3Double::new(0.0, 1.0, 0.0));
-        man.dc_pa_start_angle = Some("0".parse().unwrap());
-        man.dc_pa_stop_angle = Some("180".parse().unwrap());
-        assert!(man.validate().is_ok());
-
-        man.dc_body_trigger = None;
-        let error = man.validate().unwrap_err().to_string();
-        assert!(error.contains("DC_BODY_TRIGGER"));
-
-        man.dc_body_trigger = Some(Vec3Double::new(0.0, 1.0, 0.0));
-        man.dc_win_open = Some("2023-01-01T00:00:00".parse().unwrap());
-        let error = man.validate().unwrap_err().to_string();
-        assert!(error.contains("DC_WIN_OPEN"));
-
-        man.dc_win_open = Some("0".parse().unwrap());
-        // ODM permits any finite phase angle, so 360 is semantically valid; the XSD's
-        // [-360, 360) is a representability limit checked at XML generation instead.
-        man.dc_pa_start_angle = Some(Angle {
-            value: 360.0,
-            units: Some(AngleUnits::Deg),
-        });
-        man.validate().expect("ODM imposes no phase-angle range");
-
-        man.dc_pa_start_angle = Some(Angle {
-            value: f64::NAN,
-            units: Some(AngleUnits::Deg),
-        });
-        let error = man.validate().unwrap_err().to_string();
-        assert!(error.contains("DC_PA_START_ANGLE"));
-    }
-
-    #[test]
-    fn test_ocm_validation_man_composition_requires_one_time_tag_first() {
-        let line = ManLine {
-            epoch: "2023-001T00:00:00".parse().unwrap(),
-            values: vec!["10.0".to_string()],
-        };
-        for composition in [
-            "EPOCH, MAN_DURA",
-            "MAN_DURA, TIME_ABSOLUTE",
-            "TIME_RELATIVE, TIME_ABSOLUTE, MAN_DURA",
-            "",
-        ] {
-            let man = OcmManeuverParameters::builder()
-                .man_id("MAN-1")
-                .man_device_id("THR-1")
-                .man_ref_frame("GCRF")
-                .man_composition(composition)
-                .man_lines(vec![line.clone()])
-                .build();
-            assert!(man.validate().is_err(), "invalid composition {composition}");
-        }
     }
 
     #[test]
@@ -4740,5 +4200,284 @@ TRAJ_STOP
         let kvn = writer.finish();
         assert!(kvn.contains("ORB_REVNUM_BASIS"));
         assert!(kvn.contains("= 1"));
+    }
+
+    #[test]
+    fn ocm_history_blocks_reject_duplicate_and_decreasing_epochs() {
+        let mut traj = OcmTrajState::builder()
+            .center_name("EARTH")
+            .traj_ref_frame("GCRF")
+            .traj_type("CARTPV")
+            .traj_lines(vec![
+                TrajLine {
+                    epoch: "1".parse().unwrap(),
+                    values: vec![1.0],
+                },
+                TrajLine {
+                    epoch: "+1.0".parse().unwrap(),
+                    values: vec![2.0],
+                },
+            ])
+            .build();
+        assert!(traj.validate().is_err());
+
+        traj.traj_lines[1].epoch = "0.5".parse().unwrap();
+        assert!(traj.validate().is_err());
+
+        traj.traj_lines[1].epoch = "2".parse().unwrap();
+        assert!(traj.validate().is_ok());
+
+        let mut man = OcmManeuverParameters::builder()
+            .man_id("MAN-1")
+            .man_device_id("THR-1")
+            .man_ref_frame("GCRF")
+            .man_composition("TIME_RELATIVE, THR_X")
+            .man_lines(vec![
+                ManLine {
+                    epoch: "1".parse().unwrap(),
+                    values: vec!["1".to_string()],
+                },
+                ManLine {
+                    epoch: "1.0".parse().unwrap(),
+                    values: vec!["2".to_string()],
+                },
+            ])
+            .build();
+        assert!(man.validate().is_err());
+
+        man.man_lines[1].epoch = "2".parse().unwrap();
+        assert!(man.validate().is_ok());
+    }
+
+    #[test]
+    fn ocm_history_blocks_reject_mixed_epoch_branches() {
+        let mut traj = OcmTrajState::builder()
+            .center_name("EARTH")
+            .traj_ref_frame("GCRF")
+            .traj_type("CARTPV")
+            .traj_lines(vec![
+                TrajLine {
+                    epoch: "2000-01-01T00:00:00".parse().unwrap(),
+                    values: vec![1.0],
+                },
+                TrajLine {
+                    epoch: "1.0".parse().unwrap(),
+                    values: vec![2.0],
+                },
+            ])
+            .build();
+        assert!(traj.validate().is_err());
+
+        traj.traj_lines[1].epoch = "2000-01-01T00:00:01".parse().unwrap();
+        assert!(traj.validate().is_ok());
+
+        let mut cov = OcmCovarianceMatrix::builder()
+            .cov_ref_frame("GCRF")
+            .cov_type("CARTPV")
+            .cov_lines(vec![
+                CovLine {
+                    epoch: "1.0".parse().unwrap(),
+                    values: vec![1.0],
+                },
+                CovLine {
+                    epoch: "2000-01-01T00:00:01".parse().unwrap(),
+                    values: vec![2.0],
+                },
+            ])
+            .build();
+        assert!(cov.validate().is_err());
+
+        cov.cov_lines[1].epoch = "2.0".parse().unwrap();
+        assert!(cov.validate().is_ok());
+    }
+
+    #[test]
+    fn test_ocm_validation_cov_lines_epochs() {
+        let mut cov = OcmCovarianceMatrix::builder()
+            .cov_ref_frame("GCRF")
+            .cov_type("CARTPV")
+            .cov_lines(vec![CovLine {
+                epoch: "2000-01-01T00:00:00".parse().unwrap(),
+                values: vec![1.0],
+            }])
+            .build();
+        assert!(cov.validate().is_ok());
+
+        for value in ["2000-366T23:59:60Z", "12345.5"] {
+            cov.cov_lines[0].epoch = value.parse().unwrap();
+            assert!(cov.validate().is_ok(), "valid covariance epoch {value}");
+        }
+
+        for value in ["2001-366T00:00:00", "2023-01-01T24:00:00", "+", "123."] {
+            cov.cov_lines[0].epoch = value.parse().unwrap();
+            assert!(cov.validate().is_err(), "invalid covariance epoch {value}");
+        }
+    }
+
+    #[test]
+    fn test_ocm_validation_man_composition_requires_one_time_tag_first() {
+        let line = ManLine {
+            epoch: "2023-001T00:00:00".parse().unwrap(),
+            values: vec!["10.0".to_string()],
+        };
+        for composition in [
+            "EPOCH, MAN_DURA",
+            "MAN_DURA, TIME_ABSOLUTE",
+            "TIME_RELATIVE, TIME_ABSOLUTE, MAN_DURA",
+            "",
+        ] {
+            let man = OcmManeuverParameters::builder()
+                .man_id("MAN-1")
+                .man_device_id("THR-1")
+                .man_ref_frame("GCRF")
+                .man_composition(composition)
+                .man_lines(vec![line.clone()])
+                .build();
+            assert!(man.validate().is_err(), "invalid composition {composition}");
+        }
+    }
+
+    #[test]
+    fn test_ocm_validation_man_duty_cycle_angle_requirements_and_epoch_branch() {
+        let mut man = OcmManeuverParameters::builder()
+            .man_id("MAN-1")
+            .man_device_id("THR-1")
+            .man_ref_frame("GCRF")
+            .dc_type(ManDc::TimeAndAngle)
+            .man_composition("TIME_RELATIVE, DV_X")
+            .man_lines(vec![ManLine {
+                epoch: "1".parse().unwrap(),
+                values: vec!["1.0".to_string()],
+            }])
+            .build();
+        man.dc_win_open = Some("0".parse().unwrap());
+        man.dc_win_close = Some("10".parse().unwrap());
+        man.dc_exec_start = Some("1".parse().unwrap());
+        man.dc_exec_stop = Some("9".parse().unwrap());
+        man.dc_ref_time = Some("0".parse().unwrap());
+        man.dc_time_pulse_duration = Some(Duration::new(1.0, None).unwrap());
+        man.dc_time_pulse_period = Some(Duration::new(2.0, None).unwrap());
+        man.dc_ref_dir = Some(Vec3Double::new(1.0, 0.0, 0.0));
+        man.dc_body_frame = Some("SC_BODY".to_string());
+        man.dc_body_trigger = Some(Vec3Double::new(0.0, 1.0, 0.0));
+        man.dc_pa_start_angle = Some("0".parse().unwrap());
+        man.dc_pa_stop_angle = Some("180".parse().unwrap());
+        assert!(man.validate().is_ok());
+
+        man.dc_body_trigger = None;
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_BODY_TRIGGER"));
+
+        man.dc_body_trigger = Some(Vec3Double::new(0.0, 1.0, 0.0));
+        man.dc_win_open = Some("2023-01-01T00:00:00".parse().unwrap());
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_WIN_OPEN"));
+
+        man.dc_win_open = Some("0".parse().unwrap());
+        // ODM permits any finite phase angle, so 360 is semantically valid; the XSD's
+        // [-360, 360) is a representability limit checked at XML generation instead.
+        man.dc_pa_start_angle = Some(Angle {
+            value: 360.0,
+            units: Some(AngleUnits::Deg),
+        });
+        man.validate().expect("ODM imposes no phase-angle range");
+
+        man.dc_pa_start_angle = Some(Angle {
+            value: f64::NAN,
+            units: Some(AngleUnits::Deg),
+        });
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_PA_START_ANGLE"));
+    }
+
+    #[test]
+    fn test_ocm_validation_man_duty_cycle_requirements_and_period() {
+        let mut man = OcmManeuverParameters::builder()
+            .man_id("MAN-1")
+            .man_device_id("THR-1")
+            .man_ref_frame("GCRF")
+            .dc_type(ManDc::Time)
+            .man_composition("TIME_ABSOLUTE, DV_X")
+            .man_lines(vec![ManLine {
+                epoch: "2023-01-01T00:00:00".parse().unwrap(),
+                values: vec!["1.0".to_string()],
+            }])
+            .build();
+        man.dc_win_open = Some("2023-01-01T00:00:00".parse().unwrap());
+        man.dc_win_close = Some("2023-01-01T01:00:00".parse().unwrap());
+        man.dc_exec_start = Some("2023-01-01T00:10:00".parse().unwrap());
+        man.dc_exec_stop = Some("2023-01-01T00:50:00".parse().unwrap());
+        man.dc_ref_time = Some("2023-01-01T00:00:00".parse().unwrap());
+        man.dc_time_pulse_duration = Some(Duration::new(60.0, Some(TimeUnits::Seconds)).unwrap());
+        man.dc_time_pulse_period = Some(Duration::new(120.0, Some(TimeUnits::Seconds)).unwrap());
+        assert!(man.validate().is_ok());
+
+        man.dc_exec_start = Some("2022-12-31T23:50:00".parse().unwrap());
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_EXEC_START"));
+        man.dc_exec_start = Some("2023-01-01T00:10:00".parse().unwrap());
+
+        man.dc_exec_stop = Some("2023-01-01T01:10:00".parse().unwrap());
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_EXEC_STOP"));
+        man.dc_exec_stop = Some("2023-01-01T00:50:00".parse().unwrap());
+
+        man.dc_time_pulse_period = Some(Duration::new(30.0, Some(TimeUnits::Seconds)).unwrap());
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_TIME_PULSE_PERIOD"));
+        assert!(error.contains("DC_TIME_PULSE_DURATION"));
+
+        man.dc_time_pulse_period = Some(Duration::new(120.0, Some(TimeUnits::Seconds)).unwrap());
+        man.dc_exec_stop = None;
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_EXEC_STOP"));
+
+        man.dc_exec_stop = Some("2023-01-01T00:50:00".parse().unwrap());
+        man.dc_max_cycles = Some(0);
+        let error = man.validate().unwrap_err().to_string();
+        assert!(error.contains("DC_MAX_CYCLES"));
+    }
+
+    #[test]
+    fn test_ocm_validation_man_line_epoch_matches_composition() {
+        let mut man = OcmManeuverParameters::builder()
+            .man_id("MAN-1")
+            .man_device_id("THR-1")
+            .man_ref_frame("GCRF")
+            .man_composition("TIME_RELATIVE, MAN_DURA")
+            .man_lines(vec![ManLine {
+                epoch: "123.5".parse().unwrap(),
+                values: vec!["10.0".to_string()],
+            }])
+            .build();
+        assert!(man.validate().is_ok());
+
+        man.man_lines[0].epoch = "2023-001T00:00:00".parse().unwrap();
+        assert!(man.validate().is_err());
+
+        man.man_composition = "TIME_ABSOLUTE, MAN_DURA".to_string();
+        assert!(man.validate().is_ok());
+
+        man.man_lines[0].epoch = "123.5".parse().unwrap();
+        assert!(man.validate().is_err());
+    }
+
+    #[test]
+    fn test_ocm_validation_orb_revnum() {
+        let mut traj = OcmTrajState::builder()
+            .center_name("EARTH")
+            .traj_ref_frame("GCRF")
+            .traj_type("CARTPV")
+            .build();
+        traj.traj_lines.push(TrajLine {
+            epoch: "2000-01-01T00:00:00".parse().unwrap(),
+            values: vec![1.0],
+        });
+        traj.orb_revnum = Some(-1.0);
+
+        assert!(traj.validate().is_err());
+
+        traj.orb_revnum = Some(0.0);
+        assert!(traj.validate().is_ok());
     }
 }

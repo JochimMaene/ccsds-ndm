@@ -2,6 +2,9 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+mod common;
+use crate::common::mutated;
+
 use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::Ndm;
 use ccsds_ndm::{detect::detect_notation, from_str, Message, Notation};
@@ -16,7 +19,10 @@ fn notation_detection_and_auto_parse_are_bom_safe() {
         detect_notation("\u{feff}\nCCSDS_OPM_VERS = 3.0").unwrap(),
         Notation::Kvn
     );
-    assert!(detect_notation("\u{feff} \r\n").is_err());
+    assert!(matches!(
+        detect_notation("\u{feff} \r\n").unwrap_err(),
+        ccsds_ndm::error::CcsdsNdmError::UnexpectedEof { .. }
+    ));
 
     assert!(matches!(
         from_str(&format!("\u{feff}{OPM_KVN}")).unwrap(),
@@ -29,7 +35,7 @@ fn notation_detection_and_auto_parse_are_bom_safe() {
 }
 
 #[test]
-fn test_kvn_detection_does_not_bypass_strict_preamble_rules() {
+fn kvn_detection_does_not_bypass_strict_preamble_rules() {
     let input = r#"
 
     COMMENT This file starts with blank lines
@@ -58,14 +64,14 @@ fn test_kvn_detection_does_not_bypass_strict_preamble_rules() {
 }
 
 #[test]
-fn test_kvn_detection_does_not_bypass_printable_ascii_rules() {
+fn kvn_detection_does_not_bypass_printable_ascii_rules() {
     let input = "\r\n\tCOMMENT Tab indented\r\n\t\t\r\nCCSDS_OPM_VERS = 3.0\r\nCREATION_DATE = 2024-01-01T00:00:00\r\nORIGINATOR=X\r\nOBJECT_NAME=Y\r\nOBJECT_ID=1\r\nCENTER_NAME=EARTH\r\nREF_FRAME=GCRF\r\nTIME_SYSTEM=UTC\r\nEPOCH=2024-01-01T00:00:00\r\nX=0\r\nY=0\r\nZ=0\r\nX_DOT=0\r\nY_DOT=0\r\nZ_DOT=0\r\n";
     let error = from_str(input).expect_err("tabs are not printable ASCII");
     assert_eq!(error.code(), Some("parse.kvn.syntax"));
 }
 
 #[test]
-fn test_xml_detection_does_not_bypass_declaration_placement() {
+fn xml_detection_does_not_bypass_declaration_placement() {
     let input = r#"
     <?xml version="1.0" encoding="UTF-8"?>
     <!-- A comment before the root element -->
@@ -105,7 +111,7 @@ fn test_xml_detection_does_not_bypass_declaration_placement() {
 }
 
 #[test]
-fn test_detect_failure_unknown_header() {
+fn detect_failure_unknown_header() {
     let input = r#"
     COMMENT This looks like NDM but has unknown header
     CCSDS_UNKNOWN_VERS = 1.0
@@ -117,7 +123,8 @@ fn test_detect_failure_unknown_header() {
 
 #[test]
 fn kvn_header_names_inside_values_do_not_create_a_combined_message() {
-    let input = OPM_KVN.replace(
+    let input = mutated(
+        OPM_KVN,
         "COMMENT GEOCENTRIC, CARTESIAN, EARTH FIXED",
         "COMMENT text mentioning CCSDS_OEM_VERS is not an OEM header",
     );
@@ -150,4 +157,10 @@ fn xml_detection_accepts_an_empty_combined_instantiation() {
         panic!("an empty combined instantiation should preserve its NDM identity");
     };
     assert!(message.messages.is_empty());
+}
+
+#[test]
+fn unrecognized_kvn_input_is_rejected() {
+    let error = ccsds_ndm::from_str("NOT_A_CCSDS_MESSAGE").unwrap_err();
+    assert!(error.to_string().contains("Could not identify KVN header"));
 }

@@ -5,47 +5,30 @@
 use ccsds_ndm::from_str;
 
 mod common;
-use common::data_dir;
-use std::fs;
-use std::path::{Path, PathBuf};
+use common::fixtures;
 
 #[test]
 fn all_shipped_samples_parse_strictly() {
-    let data_root = data_dir();
     let mut failures = Vec::new();
 
-    for file in sorted_files(&data_root.join("kvn"), "kvn") {
-        if let Err(error) = from_str(&fs::read_to_string(&file).unwrap()) {
-            failures.push(format!("{} failed to parse: {error}", file.display()));
+    for (name, source) in fixtures("", "kvn") {
+        if let Err(error) = from_str(&source) {
+            failures.push(format!("{name} failed to parse: {error}"));
         }
     }
 
-    for file in sorted_files(&data_root.join("xml"), "xml") {
-        let parsed = from_str(&fs::read_to_string(&file).unwrap());
-        let known_nonconformant = file
-            .file_name()
-            .is_some_and(|name| name.eq_ignore_ascii_case("ndm_g22.xml"));
+    for (name, source) in fixtures("", "xml") {
+        let parsed = from_str(&source);
+        let known_nonconformant = name == "ndm_g22.xml";
         match (known_nonconformant, parsed) {
             (true, Ok(_)) => failures.push(format!(
-                "{} parsed strictly despite missing conditionally required OPM data",
-                file.display()
+                "{name} parsed strictly despite missing conditionally required OPM data"
             )),
-            (false, Err(error)) => {
-                failures.push(format!("{} failed to parse: {error}", file.display()))
-            }
+            (false, Err(error)) => failures.push(format!("{name} failed to parse: {error}")),
+            (true, Err(error)) => common::assert_validation_field(&error, "MASS"),
             _ => {}
         }
     }
 
     assert!(failures.is_empty(), "{}", failures.join("\n"));
-}
-
-fn sorted_files(dir: &Path, extension: &str) -> Vec<PathBuf> {
-    let mut files: Vec<_> = fs::read_dir(dir)
-        .unwrap()
-        .map(|entry| entry.unwrap().path())
-        .filter(|path| path.extension().is_some_and(|value| value == extension))
-        .collect();
-    files.sort();
-    files
 }

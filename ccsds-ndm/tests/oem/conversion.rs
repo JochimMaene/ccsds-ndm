@@ -1,7 +1,6 @@
 use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::messages::oem::Oem;
-use ccsds_ndm::Ndm;
-use ccsds_ndm::{convert, Notation};
+use ccsds_ndm::{convert, Ndm, Notation};
 
 #[test]
 fn both_directions_preserve_the_complete_typed_model() {

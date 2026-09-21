@@ -13,7 +13,7 @@ This inventory records maintainer evidence for standalone CDM 1.0. The
 
 ## Executable evidence
 
-The `cdm_conformance` suite establishes:
+The `cdm` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |

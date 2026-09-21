@@ -13,7 +13,7 @@ This inventory records maintainer evidence for standalone RDM 1.0. The
 
 ## Executable evidence
 
-The `rdm_conformance` suite establishes:
+The `rdm` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |

@@ -1,3 +1,4 @@
+use crate::common::{mutated, mutated_once};
 use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::Ndm;
@@ -16,22 +17,35 @@ fn kvn_rejects_unknown_duplicate_reordered_malformed_and_misplaced_content() {
     for (label, invalid) in [
         (
             "duplicate keyword",
-            source.replace(object_name, &format!("{object_name}\n{object_name}")),
+            mutated(
+                source,
+                object_name,
+                &format!("{object_name}\n{object_name}"),
+            ),
         ),
         (
             "reordered keywords",
-            source.replace(
+            mutated(
+                source,
                 &format!("{object_name}\n{object_id}"),
                 &format!("{object_id}\n{object_name}"),
             ),
         ),
         (
             "unknown keyword",
-            source.replace(object_name, &format!("{object_name}\nUNKNOWN = value")),
+            mutated(
+                source,
+                object_name,
+                &format!("{object_name}\nUNKNOWN = value"),
+            ),
         ),
         (
             "misplaced comment",
-            source.replace(object_name, &format!("{object_name}\nCOMMENT misplaced")),
+            mutated(
+                source,
+                object_name,
+                &format!("{object_name}\nCOMMENT misplaced"),
+            ),
         ),
         (
             "trailing content",
@@ -39,32 +53,32 @@ fn kvn_rejects_unknown_duplicate_reordered_malformed_and_misplaced_content() {
         ),
         (
             "non-ASCII content",
-            source.replace(object_name, &format!("{object_name} €")),
+            mutated(source, object_name, &format!("{object_name} €")),
         ),
         (
             "lone carriage return",
-            source.replace("OBJECT_NAME", "OBJECT\r_NAME"),
+            mutated(source, "OBJECT_NAME", "OBJECT\r_NAME"),
         ),
         (
             "seventeen-digit fixed number",
-            source.replacen("2789.619", "1.2345678901234567", 1),
+            mutated_once(source, "2789.619", "1.2345678901234567"),
         ),
         (
             "floating point without decimal mantissa",
-            source.replacen("2789.619", "1e3", 1),
+            mutated_once(source, "2789.619", "1e3"),
         ),
     ] {
         assert!(Oem::from_kvn(&invalid).is_err(), "accepted {label}");
     }
 
-    let crlf = source.replace('\n', "\r\n");
+    let crlf = mutated(source, "\n", "\r\n");
     assert_eq!(
         Oem::from_kvn(&crlf).expect("CRLF should parse"),
         Oem::from_kvn(source).expect("LF should parse")
     );
     for (label, input) in [
-        ("CR", source.replace('\n', "\r")),
-        ("LFCR", source.replace('\n', "\n\r")),
+        ("CR", mutated(source, "\n", "\r")),
+        ("LFCR", mutated(source, "\n", "\n\r")),
     ] {
         assert_eq!(
             Oem::from_kvn(&input).unwrap_or_else(|error| panic!("{label} should parse: {error}")),
@@ -75,13 +89,16 @@ fn kvn_rejects_unknown_duplicate_reordered_malformed_and_misplaced_content() {
 
 #[test]
 fn kvn_comment_separator_is_not_part_of_the_value() {
-    let source =
-        KVN_FIXTURES[0].replacen("CCSDS_OEM_VERS = 3.0", "CCSDS_OEM_VERS = 3.0\nCOMMENT ", 1);
+    let source = mutated_once(
+        KVN_FIXTURES[0],
+        "CCSDS_OEM_VERS = 3.0",
+        "CCSDS_OEM_VERS = 3.0\nCOMMENT ",
+    );
     assert_eq!(Oem::from_kvn(&source).unwrap().header.comment, vec![""]);
 
     // A producer that omits the separator entirely is still read as an empty comment, matching
     // the other ODM families. Generation always writes the normative `COMMENT ` spelling.
-    let bare = source.replacen("COMMENT \n", "COMMENT\n", 1);
+    let bare = mutated_once(&source, "COMMENT \n", "COMMENT\n");
     assert_eq!(Oem::from_kvn(&bare).unwrap().header.comment, vec![""]);
 }
 
@@ -94,35 +111,36 @@ fn xml_rejects_wrong_envelope_unknown_duplicate_reordered_and_trailing_content()
     for (label, invalid) in [
         (
             "wrong root",
-            source.replace("<oem ", "<omm ").replace("</oem>", "</omm>"),
+            mutated(&mutated(source, "<oem ", "<omm "), "</oem>", "</omm>"),
         ),
         (
             "unknown root attribute",
-            source.replace("<oem ", "<oem unexpected=\"value\" "),
+            mutated(source, "<oem ", "<oem unexpected=\"value\" "),
         ),
         (
             "unknown element",
-            source.replace("<metadata>", "<metadata><UNKNOWN>value</UNKNOWN>"),
+            mutated(source, "<metadata>", "<metadata><UNKNOWN>value</UNKNOWN>"),
         ),
         (
             "unknown container attribute",
-            source.replace("<metadata>", "<metadata unexpected=\"value\">"),
+            mutated(source, "<metadata>", "<metadata unexpected=\"value\">"),
         ),
         (
             "unknown leaf attribute",
-            source.replacen("<X>", "<X unexpected=\"value\">", 1),
+            mutated_once(source, "<X>", "<X unexpected=\"value\">"),
         ),
         (
             "units on a non-unit element",
-            source.replacen("<OBJECT_NAME>", "<OBJECT_NAME units=\"km\">", 1),
+            mutated_once(source, "<OBJECT_NAME>", "<OBJECT_NAME units=\"km\">"),
         ),
         (
             "duplicate element",
-            source.replace(object_name, &format!("{object_name}{object_name}")),
+            mutated(source, object_name, &format!("{object_name}{object_name}")),
         ),
         (
             "reordered elements",
-            source.replace(
+            mutated(
+                source,
                 &format!("{object_name}\n{object_id}"),
                 &format!("{object_id}\n{object_name}"),
             ),
@@ -130,7 +148,7 @@ fn xml_rejects_wrong_envelope_unknown_duplicate_reordered_and_trailing_content()
         ("trailing element", format!("{source}<junk/>")),
         (
             "document type",
-            source.replacen("<oem ", "<!DOCTYPE oem><oem ", 1),
+            mutated_once(source, "<oem ", "<!DOCTYPE oem><oem "),
         ),
     ] {
         assert!(Oem::from_xml(&invalid).is_err(), "accepted {label}");
@@ -155,7 +173,10 @@ fn xml_declaration_is_optional_but_must_lead_the_document() {
     assert_eq!(Oem::from_xml(&format!("\u{feff}{XML}")).unwrap(), baseline);
 
     // Only the position is normative: a declaration cannot follow content.
-    assert!(Oem::from_xml(&format!("<!-- lead-in -->\n{XML}")).is_err());
+    crate::common::assert_invalid_format(
+        &Oem::from_xml(&format!("<!-- lead-in -->\n{XML}")).unwrap_err(),
+        "an XML declaration, when present, must begin the document",
+    );
 }
 
 #[test]
@@ -172,7 +193,7 @@ fn xml_contextual_epoch_fields_reject_invalid_values() {
         ("<EPOCH>2019-12-18T12:00:00.331</EPOCH>", "<EPOCH>+</EPOCH>"),
         ("<EPOCH>2019-12-28T22:28:00.331</EPOCH>", "<EPOCH>.</EPOCH>"),
     ] {
-        let invalid = XML.replacen(needle, replacement, 1);
+        let invalid = mutated_once(XML, needle, replacement);
         assert!(
             Oem::from_xml(&invalid).is_err(),
             "accepted invalid contextual epoch replacement {replacement:?}"
@@ -202,10 +223,8 @@ fn kvn_rejects_ephemeris_records_packed_onto_one_line() {
             format!("{record} 2019-12-18T12:00:30.331"),
         ),
     ] {
-        assert!(
-            Oem::from_kvn(&source.replace(record, &packed)).is_err(),
-            "accepted {label} on a single line"
-        );
+        let error = Oem::from_kvn(&mutated(source, record, &packed)).unwrap_err();
+        assert_eq!(error.code(), Some("parse.kvn.syntax"), "{label}: {error}");
     }
 }
 
@@ -222,13 +241,14 @@ fn kvn_ephemeris_records_tolerate_padding_and_name_malformed_components() {
 
     let padded = format!("{record}   ");
     assert_eq!(
-        Oem::from_kvn(&source.replace(record, &padded)).expect("trailing spaces should parse"),
+        Oem::from_kvn(&mutated(source, record, &padded)).expect("trailing spaces should parse"),
         expected,
         "trailing spaces changed the parsed model"
     );
     // A tab is not a KVN blank; the strict pass rejects it as non-printable before parsing.
     let tabbed = format!("{record}\t");
-    assert!(Oem::from_kvn(&source.replace(record, &tabbed)).is_err());
+    let error = Oem::from_kvn(&mutated(source, record, &tabbed)).unwrap_err();
+    assert_eq!(error.code(), Some("parse.kvn.syntax"), "{error}");
 
     let no_final_newline = source.trim_end_matches('\n');
     assert_eq!(
@@ -241,11 +261,11 @@ fn kvn_ephemeris_records_tolerate_padding_and_name_malformed_components() {
         expected,
     );
 
-    let large_decimal = source.replacen("-280.045", "3000000000.0", 1);
+    let large_decimal = mutated_once(source, "-280.045", "3000000000.0");
     Oem::from_kvn(&large_decimal).expect("large decimal-form values should parse");
 
     for malformed in ["1.2345678901234567", "2147483648", "1e3", "1.", "nan"] {
-        let invalid = source.replacen("-280.045", malformed, 1);
+        let invalid = mutated_once(source, "-280.045", malformed);
         let error = Oem::from_kvn(&invalid)
             .expect_err(&format!("accepted malformed component {malformed}"))
             .to_string();

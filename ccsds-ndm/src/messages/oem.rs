@@ -14,9 +14,6 @@ use serde::{Deserialize, Serialize};
 mod kvn;
 mod xml;
 
-#[cfg(test)]
-use std::num::NonZeroU32;
-
 fn absolute_epoch_error(epoch: &Epoch, field: &'static str) -> Option<ValidationError> {
     (epoch.kind() != EpochKind::Calendar || epoch.calendar_fields_are_valid() != Some(true)).then(
         || ValidationError::InvalidValue {
@@ -899,61 +896,5 @@ impl OemCovarianceMatrix {
             ("CZ_DOT_Y_DOT", self.cz_dot_y_dot.value),
             ("CZ_DOT_Z_DOT", self.cz_dot_z_dot.value),
         ]
-    }
-}
-
-//----------------------------------------------------------------------
-// Tests
-//----------------------------------------------------------------------
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::traits::{Ndm, Validate};
-
-    #[test]
-    fn covariance_validation_accepts_negative_values_but_rejects_non_finite_values() {
-        let negative_variance =
-            include_str!("../../data/kvn/oem_g13.kvn").replace("3.3313494e-04", "-3.3313494e-04");
-        let mut oem = Oem::from_kvn(&negative_variance)
-            .expect("OEM does not specify a sign constraint for covariance values");
-        oem.to_kvn()
-            .expect("negative covariance values must generate");
-
-        oem.body.segment[0].data.covariance_matrix[0].cx_x.value = f64::NAN;
-        assert!(oem.validate().is_err());
-    }
-
-    #[test]
-    fn serializes_multiple_covariance_matrices_in_one_block() {
-        let oem = Oem::from_kvn(include_str!("../../data/kvn/oem_g13.kvn")).unwrap();
-        assert_eq!(oem.body.segment[0].data.covariance_matrix.len(), 2);
-
-        let output = oem.to_kvn().unwrap();
-        assert_eq!(output.matches("COVARIANCE_START").count(), 1);
-        assert_eq!(output.matches("COVARIANCE_STOP").count(), 1);
-        assert_eq!(output.matches("EPOCH").count(), 2);
-    }
-
-    #[test]
-    fn validates_required_model_invariants() {
-        let mut metadata = OemMetadata::builder()
-            .object_name("SAT")
-            .object_id("1")
-            .center_name("EARTH")
-            .ref_frame("GCRF")
-            .time_system("UTC")
-            .start_time(Epoch::new("2023-01-01T12:00:00").unwrap())
-            .stop_time(Epoch::new("2023-01-01T13:00:00").unwrap())
-            .build();
-
-        metadata.interpolation = Some("LAGRANGE".into());
-        assert!(metadata.validate().is_err());
-
-        metadata.interpolation_degree =
-            Some(InterpolationDegree::from(NonZeroU32::new(5).unwrap()));
-        assert!(metadata.validate().is_ok());
-        assert!(OemData::builder().build().validate().is_err());
-        assert!(OemBody { segment: vec![] }.validate().is_err());
     }
 }

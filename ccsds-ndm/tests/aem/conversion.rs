@@ -1,35 +1,10 @@
-use crate::common::{data_dir, validate_xml};
+use crate::common::{fixtures, validate_xml};
 use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::Ndm;
-use std::fs;
-
-/// Every `aem_*` fixture in `data/<extension>/`, sorted for a stable failure order.
-///
-/// Discovered rather than listed so a newly shipped fixture is covered without editing a test.
-fn fixtures(extension: &str) -> Vec<(String, String)> {
-    let directory = data_dir().join(extension);
-    let mut found: Vec<(String, String)> = fs::read_dir(&directory)
-        .unwrap_or_else(|error| panic!("{} is not readable: {error}", directory.display()))
-        .map(|entry| entry.unwrap().path())
-        .filter(|path| {
-            path.extension().is_some_and(|value| value == extension)
-                && path
-                    .file_name()
-                    .is_some_and(|name| name.to_string_lossy().starts_with("aem_"))
-        })
-        .map(|path| {
-            let name = path.file_name().unwrap().to_string_lossy().into_owned();
-            (name, fs::read_to_string(&path).unwrap())
-        })
-        .collect();
-    found.sort();
-    assert!(!found.is_empty(), "no aem_* {extension} fixtures found");
-    found
-}
 
 #[test]
 fn every_shipped_aem_fixture_preserves_states_and_generates_valid_xml() {
-    for (name, source) in fixtures("kvn") {
+    for (name, source) in fixtures("aem_", "kvn") {
         let message = Aem::from_kvn(&source).unwrap();
         let kvn = message.to_kvn().unwrap();
         assert_eq!(Aem::from_kvn(&kvn).unwrap(), message, "{name} KVN model");
@@ -37,7 +12,7 @@ fn every_shipped_aem_fixture_preserves_states_and_generates_valid_xml() {
         assert_eq!(Aem::from_xml(&xml).unwrap(), message, "{name} XML model");
         validate_xml(&name, &xml);
     }
-    for (name, source) in fixtures("xml") {
+    for (name, source) in fixtures("aem_", "xml") {
         let message = Aem::from_xml(&source).unwrap();
         let xml = message.to_xml().unwrap();
         assert_eq!(Aem::from_xml(&xml).unwrap(), message, "{name} XML model");
@@ -53,4 +28,22 @@ fn every_shipped_aem_fixture_preserves_states_and_generates_valid_xml() {
         let expected = Aem::from_xml(&expected_xml).unwrap();
         assert_eq!(normalized, expected, "{name} normalized KVN model");
     }
+}
+
+#[test]
+fn aem_optional_xml_unit_annotations_are_normatively_normalized_through_kvn() {
+    let input = include_str!("../../data/xml/aem_g13.xml");
+    assert!(input.contains("<NUTATION units=\"deg\">"));
+
+    let message = Aem::from_xml(input).unwrap();
+    let kvn = message.to_kvn().unwrap();
+    // CCSDS 504.0-B-2 section 6.9.2 forbids units in AEM KVN data lines.
+    assert!(!kvn.contains("[deg]"));
+    assert!(!kvn.contains("[deg/s]"));
+
+    let normalized_xml = Aem::from_kvn(&kvn).unwrap().to_xml().unwrap();
+    // Section 7.6.10 makes these fixed XML unit annotations optional.
+    assert!(normalized_xml.contains("<NUTATION>2</NUTATION>"));
+    assert!(!normalized_xml.contains("<NUTATION units="));
+    validate_xml("AEM optional unit normalization", &normalized_xml);
 }

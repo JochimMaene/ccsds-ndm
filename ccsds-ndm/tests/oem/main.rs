@@ -12,3 +12,6 @@ pub(crate) const KVN_FIXTURES: [&str; 3] = [
     include_str!("../../data/kvn/oem_g13.kvn"),
 ];
 pub(crate) const XML: &str = include_str!("../../data/xml/oem_g14.xml");
+
+mod minimal;
+mod model;

@@ -1,6 +1,5 @@
 use ccsds_ndm::messages::oem::Oem;
-use ccsds_ndm::Message;
-use ccsds_ndm::Ndm;
+use ccsds_ndm::{Message, Ndm};
 use stats_alloc::{Region, Stats, StatsAlloc, INSTRUMENTED_SYSTEM};
 use std::alloc::System;
 use std::hint::black_box;

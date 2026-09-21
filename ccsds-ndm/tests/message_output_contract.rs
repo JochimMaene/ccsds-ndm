@@ -1,3 +1,6 @@
+use ccsds_ndm::messages::apm::Apm;
+use ccsds_ndm::messages::cdm::Cdm;
+use ccsds_ndm::messages::tdm::Tdm;
 use ccsds_ndm::messages::{aem::Aem, oem::Oem, opm::Opm};
 use ccsds_ndm::{convert, convert_file, Message, Ndm, Notation};
 
@@ -19,8 +22,13 @@ fn assert_output_contract<M: Ndm + Clone>(valid: &M, invalid: &M, wrap: fn(M) ->
     let erased = wrap(valid.clone());
     assert_eq!(erased.to_kvn().unwrap(), kvn);
     assert_eq!(erased.to_xml().unwrap(), xml);
-    assert!(wrap(invalid.clone()).to_kvn().is_err());
-    assert!(wrap(invalid.clone()).to_xml().is_err());
+    let expected = invalid.validate().unwrap_err();
+    for error in [
+        wrap(invalid.clone()).to_kvn().unwrap_err(),
+        wrap(invalid.clone()).to_xml().unwrap_err(),
+    ] {
+        assert_eq!(error.as_validation_error(), expected.as_validation_error());
+    }
 
     for (notation, expected) in [(Notation::Kvn, &kvn), (Notation::Xml, &xml)] {
         // Fail before output, inside the prefix, and at the end of the document.
@@ -134,12 +142,127 @@ fn file_conversion_preserves_destinations_on_failure_for_each_message() {
 
         std::fs::write(&source, "invalid message").unwrap();
         std::fs::write(&destination, b"sentinel").unwrap();
-        assert!(convert_file(&source, &destination, Notation::Xml).is_err());
+        let error = convert_file(&source, &destination, Notation::Xml).unwrap_err();
+        assert!(
+            error.to_string().contains("Could not identify KVN header"),
+            "unexpected diagnostic: {error}"
+        );
         assert_eq!(std::fs::read(&destination).unwrap(), b"sentinel");
         assert_eq!(
             std::fs::read_dir(directory.path()).unwrap().count(),
             2,
             "conversion left temporary files"
         );
+    }
+}
+
+#[test]
+fn xml_generation_rejects_forbidden_xml_1_characters_before_streaming() {
+    let mut cdm = Cdm::from_kvn(include_str!("../data/kvn/cdm_362.kvn")).unwrap();
+    cdm.header.originator = "JS\u{1}POC".into();
+    let error = cdm.to_xml().expect_err("U+0001 reached XML generation");
+    assert!(
+        error.to_string().contains("only XML 1.0 characters"),
+        "unexpected diagnostic: {error}"
+    );
+
+    let mut output = Vec::new();
+    crate::common::assert_validation_field(
+        &cdm.write_xml_to(&mut output).unwrap_err(),
+        "XML 1.0 characters",
+    );
+    assert!(output.is_empty());
+}
+
+#[test]
+fn kvn_generation_rejects_non_ascii_and_control_text_before_streaming() {
+    let mut apm = Apm::from_kvn(include_str!("../data/kvn/apm_g1.kvn")).unwrap();
+    apm.header.originator = "GSFC-é".into();
+    let error = apm.to_kvn().expect_err("non-ASCII reached KVN generation");
+    assert!(
+        error.to_string().contains("only printable ASCII records"),
+        "unexpected diagnostic: {error}"
+    );
+
+    let mut output = Vec::new();
+    crate::common::assert_validation_field(
+        &apm.write_kvn_to(&mut output).unwrap_err(),
+        "printable ASCII",
+    );
+    assert!(output.is_empty());
+
+    // A tab is not printable ASCII either, and the streaming path must hold the same line: the
+    // two notations had already drifted apart on whether they checked it before writing.
+    let mut tdm = Tdm::from_kvn(include_str!("../data/kvn/tdm_e1.kvn")).unwrap();
+    tdm.header.originator = "NA\tSA".into();
+    let error = tdm.to_kvn().expect_err("a tab reached KVN generation");
+    assert!(
+        error.to_string().contains("expected printable ASCII"),
+        "unexpected diagnostic: {error}"
+    );
+
+    let mut output = Vec::new();
+    crate::common::assert_validation_field(
+        &tdm.write_kvn_to(&mut output).unwrap_err(),
+        "ORIGINATOR",
+    );
+    assert!(output.is_empty(), "streaming KVN wrote bytes for a tab");
+}
+
+#[test]
+fn type_erased_file_errors_keep_non_opm_generation_context() {
+    let message = Message::Oem(Oem::from_kvn(include_str!("../data/kvn/oem_g11.kvn")).unwrap());
+    let directory = tempfile::tempdir().unwrap();
+
+    for error in [
+        message.to_kvn_file(directory.path()).unwrap_err(),
+        message.to_xml_file(directory.path()).unwrap_err(),
+    ] {
+        let diagnostic = error.diagnostic().expect("file error should have context");
+        assert_eq!(diagnostic.message_kind.as_str(), "OEM");
+        assert_eq!(diagnostic.source_edition, Some("3.0"));
+    }
+}
+
+/// Every family must reach the same bytes through the buffered and streaming entry points.
+#[test]
+fn streaming_generation_matches_buffered_output_for_every_family() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    for fixture in [
+        "kvn/acm_g6.kvn",
+        "kvn/aem_g4.kvn",
+        "kvn/apm_g1.kvn",
+        "kvn/cdm_362.kvn",
+        "kvn/ocm_g15.kvn",
+        "kvn/oem_g11.kvn",
+        "kvn/omm_g7.kvn",
+        "kvn/opm_g1.kvn",
+        "kvn/rdm_c1.kvn",
+        "kvn/tdm_e1.kvn",
+        "xml/ndm_g12.xml",
+    ] {
+        let message = ccsds_ndm::from_file(root.join("data").join(fixture)).unwrap();
+
+        let mut xml = Vec::new();
+        message.write_xml_to(&mut xml).unwrap();
+        assert_eq!(String::from_utf8(xml).unwrap(), message.to_xml().unwrap());
+
+        let mut kvn = Vec::new();
+        let streamed = message.write_kvn_to(&mut kvn);
+        match message {
+            // Combined NDM has no KVN representation; both paths must refuse it.
+            Message::Ndm(_) => {
+                assert_eq!(streamed.unwrap_err().code(), Some("unsupported.notation"));
+                assert_eq!(
+                    message.to_kvn().unwrap_err().code(),
+                    Some("unsupported.notation")
+                );
+                assert!(kvn.is_empty(), "{fixture}");
+            }
+            _ => {
+                streamed.unwrap();
+                assert_eq!(String::from_utf8(kvn).unwrap(), message.to_kvn().unwrap());
+            }
+        }
     }
 }

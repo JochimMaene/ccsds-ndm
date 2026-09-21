@@ -19,7 +19,10 @@ fn all_segments_must_describe_one_object_and_one_time_system() {
 
     let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
     message.body.segment[1].metadata.object_id = "DIFFERENT".into();
-    assert!(message.validate().is_err());
+    crate::common::assert_validation_field(
+        &message.validate().unwrap_err(),
+        "OBJECT_NAME/OBJECT_ID",
+    );
 }
 
 #[test]
@@ -64,14 +67,14 @@ fn oem_time_tags_are_absolute_and_metadata_ranges_are_consistent() {
 
     let mut message = Oem::from_xml(XML).unwrap();
     message.body.segment[0].metadata.useable_start_time = Some(epoch("2019-12-01T00:00:00"));
-    assert!(message.validate().is_err());
+    crate::common::assert_validation_field(&message.validate().unwrap_err(), "USEABLE_START_TIME");
 }
 
 #[test]
 fn ephemeris_records_are_in_span_but_need_not_be_ordered() {
     let mut message = Oem::from_xml(XML).unwrap();
     message.body.segment[0].data.state_vector[0].epoch = epoch("2019-12-01T00:00:00");
-    assert!(message.validate().is_err());
+    crate::common::assert_validation_field(&message.validate().unwrap_err(), "stateVector EPOCH");
 
     let mut message = Oem::from_xml(XML).unwrap();
     message.body.segment[0].data.state_vector[2].epoch = epoch("2019-12-18T12:00:30.331");

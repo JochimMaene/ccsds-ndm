@@ -6,26 +6,18 @@
 //! outer element is rejected during notation/type detection, whether the
 //! wrapper looks plausible (`<message>`) or arbitrary (`<somethingExtra>`).
 
-mod common;
-
 use ccsds_ndm::error::CcsdsNdmError;
 use ccsds_ndm::from_str;
 
 const XML_DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
 
-fn valid_cdm() -> String {
-    std::fs::read_to_string(common::data_dir().join("xml").join("cdm_44.xml"))
-        .expect("CDM fixture is readable")
-}
+const CDM: &str = include_str!("../data/xml/cdm_44.xml");
 
 /// Wrap the fixture's root element in `wrapper`, keeping the XML declaration
 /// first so the document stays well-formed and only the nesting is at fault.
 fn wrapped_in(wrapper: &str) -> String {
-    let cdm = valid_cdm();
-    let body = cdm
-        .split_once("?>")
-        .map_or(cdm.as_str(), |(_, rest)| rest)
-        .trim();
+    let cdm = CDM;
+    let body = cdm.split_once("?>").map_or(cdm, |(_, rest)| rest).trim();
     format!("{XML_DECL}\n<{wrapper}>\n{body}\n</{wrapper}>\n")
 }
 
@@ -34,7 +26,7 @@ fn wrapped_in(wrapper: &str) -> String {
 #[test]
 fn unwrapped_fixture_parses() {
     assert!(
-        from_str(&valid_cdm()).is_ok(),
+        from_str(CDM).is_ok(),
         "CDM fixture must parse unwrapped for the wrapper cases to mean anything"
     );
 }
