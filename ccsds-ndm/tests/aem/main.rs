@@ -1,8 +1,11 @@
 #[path = "../common/mod.rs"]
 mod common;
 mod conversion;
+mod epochs;
 mod generation;
-mod strict_parsing;
+mod minimal;
+mod model;
+mod parsing;
 mod validation;
 
 pub(crate) const KVN: &str = include_str!("../../data/kvn/aem_g4.kvn");

@@ -1,3 +1,4 @@
+use crate::common::mutated;
 use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::error::{DiagnosticNotation, DiagnosticOperation};
 use ccsds_ndm::messages::oem::Oem;
@@ -10,7 +11,11 @@ fn kvn_syntax_diagnostics_are_located_and_machine_readable() {
         .lines()
         .find(|line| line.trim_start().starts_with("OBJECT_NAME"))
         .unwrap();
-    let input = KVN_FIXTURES[0].replace(object_name, &format!("{object_name}\nUNKNOWN = value"));
+    let input = mutated(
+        KVN_FIXTURES[0],
+        object_name,
+        &format!("{object_name}\nUNKNOWN = value"),
+    );
     let error = Oem::from_kvn(&input).expect_err("unknown keyword should fail");
     let diagnostic = error.diagnostic().expect("parse context should be present");
 
@@ -30,9 +35,15 @@ fn carriage_return_diagnostics_keep_the_edition_and_excerpt_to_one_record() {
         .lines()
         .find(|line| line.trim_start().starts_with("OBJECT_NAME"))
         .unwrap();
-    let input = KVN_FIXTURES[0]
-        .replace(object_name, &format!("{object_name}\nUNKNOWN = value"))
-        .replace('\n', "\r");
+    let input = mutated(
+        &mutated(
+            KVN_FIXTURES[0],
+            object_name,
+            &format!("{object_name}\nUNKNOWN = value"),
+        ),
+        "\n",
+        "\r",
+    );
     let error = Oem::from_kvn(&input).expect_err("unknown keyword should fail");
     let diagnostic = error.diagnostic().unwrap();
 
@@ -46,7 +57,7 @@ fn semantic_paths_survive_parse_context() {
         .lines()
         .find(|line| line.trim_start().starts_with("OBJECT_NAME"))
         .unwrap();
-    let input = KVN_FIXTURES[0].replace(object_name, "OBJECT_NAME =");
+    let input = mutated(KVN_FIXTURES[0], object_name, "OBJECT_NAME =");
     let error = Oem::from_kvn(&input).expect_err("empty object name should fail");
     let diagnostic = error.diagnostic().expect("parse context should be present");
     assert_eq!(diagnostic.code, Some("validation.missing_required_field"));
@@ -58,7 +69,7 @@ fn semantic_paths_survive_parse_context() {
 
 #[test]
 fn xml_syntax_diagnostics_identify_the_notation_without_inventing_a_location() {
-    let input = XML.replace("<oem ", "<omm ").replace("</oem>", "</omm>");
+    let input = mutated(&mutated(XML, "<oem ", "<omm "), "</oem>", "</omm>");
     let error = Oem::from_xml(&input).expect_err("wrong root should fail");
     let diagnostic = error.diagnostic().expect("parse context should be present");
     assert_eq!(diagnostic.operation, DiagnosticOperation::Parse);

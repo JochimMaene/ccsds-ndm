@@ -44,7 +44,10 @@ fn aem_enforces_metadata_spans_and_record_order() {
         .contains("strictly increasing"));
 
     let mut output = Vec::new();
-    assert!(repeated_epoch.write_kvn_to(&mut output).is_err());
+    crate::common::assert_validation_field(
+        &repeated_epoch.write_kvn_to(&mut output).unwrap_err(),
+        "attitudeState EPOCH",
+    );
     assert!(output.is_empty());
 
     let mut outside_span = valid_aem();

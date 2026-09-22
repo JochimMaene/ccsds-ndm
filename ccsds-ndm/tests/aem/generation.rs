@@ -1,4 +1,4 @@
-use crate::common::{assert_rejects, validate_xml};
+use crate::common::{assert_rejects, mutated, validate_xml};
 use crate::{KVN, SPIN_KVN, XML};
 use ccsds_ndm::common::AemAttitudeState;
 use ccsds_ndm::messages::aem::Aem;
@@ -6,10 +6,15 @@ use ccsds_ndm::Ndm;
 
 #[test]
 fn aem_xml_emits_canonical_uppercase_attitude_types() {
-    let lowercase = XML
-        .replace("QUATERNION/DERIVATIVE", "quaternion/derivative")
-        .replace("QUATERNION/ANGVEL", "quaternion/angvel")
-        .replace("QUATERNION", "quaternion");
+    let lowercase = mutated(
+        &mutated(
+            &mutated(XML, "QUATERNION/DERIVATIVE", "quaternion/derivative"),
+            "QUATERNION/ANGVEL",
+            "quaternion/angvel",
+        ),
+        "QUATERNION",
+        "quaternion",
+    );
     let generated = Aem::from_xml(&lowercase).unwrap().to_xml().unwrap();
 
     for value in ["QUATERNION", "QUATERNION/DERIVATIVE", "QUATERNION/ANGVEL"] {
@@ -23,10 +28,10 @@ fn every_kvn_generation_gate_rejects_invalid_state_before_output() {
     let mut cases: Vec<(&str, Aem)> = Vec::new();
     let mut non_ascii = Aem::from_kvn(SPIN_KVN).unwrap();
     non_ascii.body.segment[0].metadata.object_name = "ST5 €".to_owned();
-    cases.push(("non-ASCII text", non_ascii));
+    cases.push(("printable ASCII", non_ascii));
     let mut overlong = Aem::from_kvn(SPIN_KVN).unwrap();
     overlong.body.segment[0].metadata.object_name = "X".repeat(240);
-    cases.push(("overlong record", overlong));
+    cases.push(("KVN record", overlong));
     let mut unrepresentable = Aem::from_kvn(SPIN_KVN).unwrap();
     let AemAttitudeState::Spin(state) =
         &mut unrepresentable.body.segment[0].data.attitude_states[0]
@@ -34,13 +39,16 @@ fn every_kvn_generation_gate_rejects_invalid_state_before_output() {
         unreachable!()
     };
     state.spin_angle_vel.value = f64::MAX;
-    cases.push(("unrepresentable number", unrepresentable));
+    cases.push(("representable CCSDS spelling", unrepresentable));
     for (label, message) in cases {
-        assert!(message.to_kvn().is_err(), "materialized accepted {label}");
+        let error = message.to_kvn().unwrap_err();
+        crate::common::assert_validation_field(&error, label);
         let mut output = Vec::new();
-        assert!(
-            message.write_kvn_to(&mut output).is_err(),
-            "streaming accepted {label}"
+        let streamed = message.write_kvn_to(&mut output).unwrap_err();
+        assert_eq!(
+            streamed.as_validation_error(),
+            error.as_validation_error(),
+            "{label}"
         );
         assert!(output.is_empty(), "streaming wrote bytes for {label}");
     }
@@ -150,4 +158,20 @@ fn kvn_generation_rounds_history_numbers_to_the_ccsds_digit_limit() {
     };
     state.spin_alpha.value = 1.234_567_890_123_456_7;
     assert!(message.to_kvn().unwrap().contains("1.234567890123457e0"));
+}
+
+#[test]
+fn aem_overlong_records_are_rejected_before_streaming() {
+    let mut aem = Aem::from_kvn(include_str!("../../data/kvn/aem_g4.kvn")).unwrap();
+    aem.header.comment = vec!["x".repeat(247)];
+    assert_eq!(
+        aem.to_kvn().unwrap_err().code(),
+        Some("validation.out_of_range")
+    );
+    let mut output = Vec::new();
+    assert_eq!(
+        aem.write_kvn_to(&mut output).unwrap_err().code(),
+        Some("validation.out_of_range")
+    );
+    assert!(output.is_empty());
 }

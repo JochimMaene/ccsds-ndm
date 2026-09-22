@@ -3,7 +3,9 @@ mod common;
 mod conversion;
 mod diagnostics;
 mod generation;
-mod strict_parsing;
+mod minimal;
+mod model;
+mod parsing;
 mod validation;
 
 pub(crate) const KVN_FIXTURES: [&str; 3] = [

@@ -13,7 +13,7 @@ This inventory records maintainer evidence for standalone AEM 2.0. The
 
 ## Executable evidence
 
-The `aem`, `aem_kvn_allocations`, and `message_output_contract` suites establish:
+The `aem`, `aem_kvn_allocations`, and `library::output` suites establish:
 
 | Concern | Evidence |
 | --- | --- |

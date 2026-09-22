@@ -1,23 +1,18 @@
+use crate::common::mutated;
 use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::Ndm;
-use ccsds_ndm::{convert, Notation};
+use ccsds_ndm::{convert, Ndm, Notation};
 
-const KVN_FIXTURES: [&str; 4] = [
-    include_str!("../../data/kvn/opm_g1.kvn"),
-    include_str!("../../data/kvn/opm_g2.kvn"),
-    include_str!("../../data/kvn/opm_g3.kvn"),
-    include_str!("../../data/kvn/opm_g4.kvn"),
-];
 const XML_FIXTURE: &str = include_str!("../../data/xml/opm_g5.xml");
 
 #[test]
 fn both_conversion_directions_preserve_the_complete_typed_model() {
-    for source in KVN_FIXTURES {
-        let expected = Opm::from_kvn(source).expect("KVN fixture should parse");
-        let xml = convert(source, Notation::Xml).expect("KVN to XML conversion should work");
+    for (name, source) in crate::common::fixtures("opm", "kvn") {
+        let expected = Opm::from_kvn(&source).expect("KVN fixture should parse");
+        let xml = convert(&source, Notation::Xml).expect("KVN to XML conversion should work");
         assert_eq!(
             Opm::from_xml(&xml).expect("output XML should parse"),
-            expected
+            expected,
+            "{name}"
         );
     }
 
@@ -31,7 +26,7 @@ fn both_conversion_directions_preserve_the_complete_typed_model() {
 
 #[test]
 fn xml_to_kvn_rounds_values_to_the_ccsds_digit_limit() {
-    let mut message = Opm::from_kvn(KVN_FIXTURES[0]).expect("fixture should parse");
+    let mut message = Opm::from_kvn(crate::OPM_3_KVN_FIXTURES[0].1).expect("fixture should parse");
     message.body.segment.data.state_vector.x.value = 1.234_567_890_123_456_7;
     let xml = message.to_xml().expect("XML can represent the f64 exactly");
 
@@ -48,12 +43,15 @@ fn xml_to_kvn_rounds_values_to_the_ccsds_digit_limit() {
 /// KVN collapses them. This test fixes that contract.
 #[test]
 fn kvn_merges_data_and_state_vector_comments_into_the_data_section() {
-    let xml = XML_FIXTURE
-        .replace("<data>", "<data>\n<COMMENT>DATA BLOCK</COMMENT>")
-        .replace(
-            "<stateVector>",
-            "<stateVector>\n<COMMENT>STATE BLOCK</COMMENT>",
-        );
+    let xml = mutated(
+        &mutated(
+            XML_FIXTURE,
+            "<data>",
+            "<data>\n<COMMENT>DATA BLOCK</COMMENT>",
+        ),
+        "<stateVector>",
+        "<stateVector>\n<COMMENT>STATE BLOCK</COMMENT>",
+    );
     let source = Opm::from_xml(&xml).expect("XML distinguishes the two comment positions");
     assert_eq!(source.body.segment.data.comment, ["DATA BLOCK"]);
     assert_eq!(
@@ -82,4 +80,20 @@ fn kvn_merges_data_and_state_vector_comments_into_the_data_section() {
     let round_tripped_xml = merged.to_xml().expect("merged model should generate XML");
     assert!(round_tripped_xml.contains("<COMMENT>DATA BLOCK</COMMENT>"));
     assert!(round_tripped_xml.contains("<COMMENT>STATE BLOCK</COMMENT>"));
+}
+
+#[test]
+fn multiline_xml_comments_convert_to_separate_kvn_records() {
+    let xml = mutated(
+        include_str!("../../data/xml/opm_g5.xml"),
+        "THIS IS AN XML VERSION OF THE OPM",
+        "line one\nline two",
+    );
+    let message = Opm::from_xml(&xml).unwrap();
+    let kvn = message.to_kvn().unwrap();
+    assert!(kvn.contains("COMMENT line one\nCOMMENT line two\n"));
+
+    let mut streamed = Vec::new();
+    message.write_kvn_to(&mut streamed).unwrap();
+    assert_eq!(streamed, kvn.as_bytes());
 }

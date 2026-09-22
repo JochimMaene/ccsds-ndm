@@ -14,7 +14,7 @@ This inventory records maintainer evidence for standalone APM 2.0. The
 
 ## Executable evidence
 
-The `apm_conformance` suite establishes:
+The `apm` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |
@@ -22,7 +22,7 @@ The `apm_conformance` suite establishes:
 | XML structure | The shared XML sequence engine is registered for the complete APM root, header, metadata, data, and six attitude logical-block families, including nested quaternion components. It rejects unknown, duplicate, and reordered children and non-schema attributes. |
 | Valid input and preservation | All three shipped KVN fixtures and the shipped XML fixture parse through the public strict API. Generated KVN and XML reparse to the same typed model. |
 | XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
-| Shared surface contract | `family_contract`, `family_generation_evidence`, the Python API tests, and family Criterion matrices provide common parsing, generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
+| Shared surface contract | `library::parsing` and `library::output`, `conformance::generation`, the Python API tests, and family Criterion matrices provide common parsing, generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
 
 The existing APM unit suite separately covers each attitude logical-block family, optional
 quaternion/Euler derivatives, maneuver delta mass, the spin nutation choice and the values inside

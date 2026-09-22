@@ -2,16 +2,19 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use ccsds_ndm::error::{Result, ValidationError};
+use ccsds_ndm::messages::opm::Opm;
+use ccsds_ndm::Ndm;
+use common::validation_error_source;
+
 #[path = "../common/mod.rs"]
 mod common;
 mod conversion;
 mod generation;
+mod minimal;
+mod model;
 mod parsing;
 mod validation;
-
-use ccsds_ndm::error::{Result, ValidationError};
-use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::Ndm;
 
 const KVN: &str = include_str!("../../data/kvn/opm_g1.kvn");
 const OPM_3_KVN_FIXTURES: [(&str, &str); 4] = [
@@ -20,8 +23,6 @@ const OPM_3_KVN_FIXTURES: [(&str, &str); 4] = [
     ("opm_g3.kvn", include_str!("../../data/kvn/opm_g3.kvn")),
     ("opm_g4.kvn", include_str!("../../data/kvn/opm_g4.kvn")),
 ];
-const OPM_3_XML_FIXTURES: [(&str, &str); 1] =
-    [("opm_g5.xml", include_str!("../../data/xml/opm_g5.xml"))];
 
 fn opm() -> Opm {
     Opm::from_kvn(KVN).unwrap()
@@ -61,13 +62,6 @@ fn assert_missing_required<T: std::fmt::Debug>(
     );
 }
 
-fn validation_error_source(error: &ValidationError) -> &ValidationError {
-    match error {
-        ValidationError::AtPath { source, .. } => validation_error_source(source),
-        error => error,
-    }
-}
-
 fn assert_invalid_value_diagnostic<T: std::fmt::Debug>(
     surface: &str,
     result: Result<T>,
@@ -105,3 +99,20 @@ fn assert_out_of_range_diagnostic<T: std::fmt::Debug>(
     );
     assert!(error.as_validation_error().is_some());
 }
+
+const MINIMAL: &str = r#"CCSDS_OPM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+EPOCH = 2023-01-01T00:00:00
+X = 1000 [km]
+Y = 2000 [km]
+Z = 3000 [km]
+X_DOT = 1.0 [km/s]
+Y_DOT = 2.0 [km/s]
+Z_DOT = 3.0 [km/s]
+"#;

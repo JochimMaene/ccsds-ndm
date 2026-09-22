@@ -12,15 +12,17 @@ normative mapping required to promote a capability cell to `verified`.
 | Version-aware generation gate | Every standalone `Message` output dispatches through `Ndm` and preserves its stored edition. |
 | Validated generation | String, streaming, Python, and conversion paths delegate to the Rust `Ndm` boundary. |
 | Structured diagnostics | Shared parsing and generation wrappers retain notation, message kind, edition context, stable resource codes, and bounded token excerpts. |
-| Rust/Python consistency | `family_contract` and `test_parse_and_generation_options.py` exercise generic dispatch without per-message adapter semantics. |
+| Rust/Python consistency | `library::parsing` and `library::output` and `test_parse_and_generation_options.py` exercise generic dispatch without per-message adapter semantics. |
 | Strict XML envelope | Standalone roots, attributes, trailing documents, unknown structural fields, and the normative combined `ndm` envelope are checked without accepting arbitrary wrapper flattening. |
 | Reproducible performance workload | `kvn_message_matrix` covers KVN parse/generate for all ten standalone families; `xml_message_matrix` covers XML parse/generate for those ten plus combined NDM. The CodSpeed workflow executes both benchmark targets. Wall-clock results remain informational. |
 
-`family_generation_evidence` additionally runs every shipped fixture for the eight remaining
-standalone families through deterministic KVN and XML generation, reparses both outputs, and checks
-all generated XML against the official master XSD. It regression-tests preservation of the ACM
-physical-description block, which was previously lost by applying the scalar nullable adapter to a
-complex XML element. The focused OCM evidence applies the same correction to its perturbation,
+`conformance::generation` runs the shipped OMM, OCM, CDM, TDM, RDM, APM, and ACM fixtures
+through deterministic generation and complete-model comparisons, with explicit expectations for
+notation-specific normalization or rejection. It checks generated XML against the official master
+XSD; OPM, OEM, and AEM retain their corpus checks in their family suites. Family-specific regressions
+live with the corresponding family tests, including preservation of the ACM physical-description
+block, which was previously lost by applying the scalar nullable adapter to a complex XML element.
+The focused OCM evidence applies the same correction to its perturbation,
 orbit-determination, and user-defined blocks, and separately proves the schema's scalar lexical form
 for TIME_AND_ANGLE direction vectors, which is described in [ocm-3.0.md](ocm-3.0.md).
 
