@@ -2,18 +2,19 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use ccsds_ndm::error::{Result, ValidationError};
+use ccsds_ndm::messages::opm::Opm;
+use ccsds_ndm::Ndm;
 use common::validation_error_source;
 
 #[path = "../common/mod.rs"]
 mod common;
 mod conversion;
 mod generation;
+mod minimal;
+mod model;
 mod parsing;
 mod validation;
-
-use ccsds_ndm::error::{Result, ValidationError};
-use ccsds_ndm::messages::opm::Opm;
-use ccsds_ndm::Ndm;
 
 const KVN: &str = include_str!("../../data/kvn/opm_g1.kvn");
 const OPM_3_KVN_FIXTURES: [(&str, &str); 4] = [
@@ -99,5 +100,19 @@ fn assert_out_of_range_diagnostic<T: std::fmt::Debug>(
     assert!(error.as_validation_error().is_some());
 }
 
-mod minimal;
-mod model;
+const MINIMAL: &str = r#"CCSDS_OPM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+OBJECT_NAME = SAT1
+OBJECT_ID = 999
+CENTER_NAME = EARTH
+REF_FRAME = GCRF
+TIME_SYSTEM = UTC
+EPOCH = 2023-01-01T00:00:00
+X = 1000 [km]
+Y = 2000 [km]
+Z = 3000 [km]
+X_DOT = 1.0 [km/s]
+Y_DOT = 2.0 [km/s]
+Z_DOT = 3.0 [km/s]
+"#;

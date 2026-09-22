@@ -1,111 +1,8 @@
 use crate::common::{assert_rejects, mutated, validate_xml};
+use crate::{ATT_KVN, COV_KVN};
 use ccsds_ndm::messages::acm::Acm;
 use ccsds_ndm::types::{AngleRate, Vec4Double};
 use ccsds_ndm::Ndm;
-
-const ATT_KVN: &str = include_str!("../../data/kvn/acm_g7.kvn");
-const COV_KVN: &str = include_str!("../../data/kvn/acm_g9.kvn");
-
-#[test]
-fn acm_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
-    let object = "OBJECT_NAME = SDO";
-    let designator = "INTERNATIONAL_DESIGNATOR = 2010-005A";
-    let first_state = "0.000000 0.1153 -0.1424 0.8704 0.4571 2.271e-06 -4.405e-06 -3.785e-06";
-    for (label, source) in [
-        (
-            "duplicate metadata keyword",
-            mutated(ATT_KVN, object, &format!("{object}\n{object}")),
-        ),
-        (
-            "reordered metadata",
-            mutated(
-                ATT_KVN,
-                &format!("{object}\n{designator}"),
-                &format!("{designator}\n{object}"),
-            ),
-        ),
-        (
-            "unknown attitude keyword",
-            mutated(
-                ATT_KVN,
-                "ATT_TYPE = QUATERNION",
-                "ATT_TYPE = QUATERNION\nUNKNOWN = 1",
-            ),
-        ),
-        (
-            "comment after history",
-            mutated(
-                ATT_KVN,
-                first_state,
-                &format!("{first_state}\nCOMMENT misplaced"),
-            ),
-        ),
-        (
-            "assignment after history",
-            mutated(
-                ATT_KVN,
-                first_state,
-                &format!("{first_state}\nRATE_TYPE = GYRO_BIAS"),
-            ),
-        ),
-        (
-            "sensor outside AD",
-            mutated(ATT_KVN, "ATT_STOP", "ATT_STOP\nSENSOR_START\nSENSOR_STOP"),
-        ),
-        ("mismatched block", mutated(ATT_KVN, "ATT_STOP", "COV_STOP")),
-        (
-            "unknown block",
-            mutated(ATT_KVN, "ATT_START", "UNKNOWN_START"),
-        ),
-        ("trailing assignment", format!("{ATT_KVN}UNKNOWN = value\n")),
-    ] {
-        let error = Acm::from_kvn(&source).unwrap_err();
-        assert_eq!(error.code(), Some("parse.kvn.syntax"), "{label}: {error}");
-    }
-}
-
-#[test]
-fn acm_xml_rejects_unknown_nested_content_attributes_and_ordering_errors() {
-    let xml = Acm::from_kvn(COV_KVN).unwrap().to_xml().unwrap();
-    let object = "<OBJECT_NAME>LRO</OBJECT_NAME>";
-    let designator = "<INTERNATIONAL_DESIGNATOR>2009-031A</INTERNATIONAL_DESIGNATOR>";
-    for (label, source) in [
-        (
-            "unknown covariance child",
-            mutated(&xml, "<cov>", "<cov><UNKNOWN/>"),
-        ),
-        (
-            "illegal covariance-line attribute",
-            mutated(&xml, "<covLine>", "<covLine units=\"1\">"),
-        ),
-        (
-            "unknown sensor attribute",
-            mutated(&xml, "<sensorData>", "<sensorData unexpected=\"value\">"),
-        ),
-        (
-            "duplicate covariance type",
-            mutated(&xml, "</COV_TYPE>", "</COV_TYPE><COV_TYPE>ANGLE</COV_TYPE>"),
-        ),
-        (
-            "reordered metadata",
-            mutated(
-                &xml,
-                &format!("{object}{designator}"),
-                &format!("{designator}{object}"),
-            ),
-        ),
-    ] {
-        let error = Acm::from_xml(&source).unwrap_err();
-        assert!(
-            matches!(
-                error.as_format_error(),
-                Some(ccsds_ndm::error::FormatError::InvalidFormat(_))
-            ),
-            "{label}: {error}"
-        );
-    }
-}
-
 #[test]
 fn acm_vectors_and_units_survive_both_notations() {
     let physical = Acm::from_kvn(include_str!("../../data/kvn/acm_g8.kvn")).unwrap();
@@ -306,4 +203,39 @@ fn acm_physical_description_survives_kvn_to_xml_conversion() {
         .expect("ACM physical description was dropped");
     assert_eq!(physical.wet_mass.unwrap().value, 1916.0);
     assert_eq!(physical.cp_ref_frame.as_deref(), Some("SC_BODY_1"));
+}
+
+#[test]
+fn acm_sensor_xml_roundtrip() {
+    let kvn = r#"CCSDS_ACM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = SAT1
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+AD_START
+ATTITUDE_STATES = QUATERNION
+REF_FRAME_A = GCRF
+REF_FRAME_B = SC_BODY_1
+SENSOR_START
+SENSOR_NUMBER = 1
+SENSOR_USED = AST
+SENSOR_STOP
+AD_STOP
+"#;
+
+    let acm = Acm::from_kvn(kvn).expect("failed to parse ACM KVN");
+    let xml = acm.to_xml().expect("failed to serialize ACM XML");
+    let parsed = Acm::from_xml(&xml).expect("failed to parse ACM XML");
+    assert_eq!(parsed, acm);
+    assert_eq!(
+        parsed.body.segment.data.ad.as_ref().unwrap().sensors.len(),
+        1
+    );
+    assert_eq!(
+        parsed.body.segment.data.ad.as_ref().unwrap().sensors[0].sensor_number,
+        Some(1)
+    );
 }

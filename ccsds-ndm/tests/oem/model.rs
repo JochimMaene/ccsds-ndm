@@ -20,17 +20,6 @@ fn covariance_validation_accepts_negative_values_but_rejects_non_finite_values()
 }
 
 #[test]
-fn serializes_multiple_covariance_matrices_in_one_block() {
-    let oem = Oem::from_kvn(include_str!("../../data/kvn/oem_g13.kvn")).unwrap();
-    assert_eq!(oem.body.segment[0].data.covariance_matrix.len(), 2);
-
-    let output = oem.to_kvn().unwrap();
-    assert_eq!(output.matches("COVARIANCE_START").count(), 1);
-    assert_eq!(output.matches("COVARIANCE_STOP").count(), 1);
-    assert_eq!(output.matches("EPOCH").count(), 2);
-}
-
-#[test]
 fn validates_required_model_invariants() {
     let mut metadata = OemMetadata::builder()
         .object_name("SAT")

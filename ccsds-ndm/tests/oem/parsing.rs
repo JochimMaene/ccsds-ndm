@@ -68,7 +68,12 @@ fn kvn_rejects_unknown_duplicate_reordered_malformed_and_misplaced_content() {
             mutated_once(source, "2789.619", "1e3"),
         ),
     ] {
-        assert!(Oem::from_kvn(&invalid).is_err(), "accepted {label}");
+        let error = Oem::from_kvn(&invalid).unwrap_err();
+        if label == "trailing content" {
+            crate::common::assert_invalid_epoch(&error, "UNKNOWN");
+        } else {
+            assert_eq!(error.code(), Some("parse.kvn.syntax"), "{label}: {error}");
+        }
     }
 
     let crlf = mutated(source, "\n", "\r\n");
@@ -151,7 +156,8 @@ fn xml_rejects_wrong_envelope_unknown_duplicate_reordered_and_trailing_content()
             mutated_once(source, "<oem ", "<!DOCTYPE oem><oem "),
         ),
     ] {
-        assert!(Oem::from_xml(&invalid).is_err(), "accepted {label}");
+        let error = Oem::from_xml(&invalid).unwrap_err();
+        assert_eq!(error.code(), Some("parse.xml.syntax"), "{label}: {error}");
     }
 }
 
@@ -181,23 +187,30 @@ fn xml_declaration_is_optional_but_must_lead_the_document() {
 
 #[test]
 fn xml_contextual_epoch_fields_reject_invalid_values() {
-    for (needle, replacement) in [
+    for (field, needle, replacement) in [
         (
+            "START_TIME",
             "<START_TIME>2019-12-18T12:00:00.331</START_TIME>",
             "<START_TIME>2023-02-29T12:00:00</START_TIME>",
         ),
         (
+            "USEABLE_START_TIME",
             "<USEABLE_START_TIME>2019-12-18T12:10:00.331</USEABLE_START_TIME>",
             "<USEABLE_START_TIME>+</USEABLE_START_TIME>",
         ),
-        ("<EPOCH>2019-12-18T12:00:00.331</EPOCH>", "<EPOCH>+</EPOCH>"),
-        ("<EPOCH>2019-12-28T22:28:00.331</EPOCH>", "<EPOCH>.</EPOCH>"),
+        (
+            "EPOCH",
+            "<EPOCH>2019-12-18T12:00:00.331</EPOCH>",
+            "<EPOCH>+</EPOCH>",
+        ),
+        (
+            "EPOCH",
+            "<EPOCH>2019-12-28T22:28:00.331</EPOCH>",
+            "<EPOCH>.</EPOCH>",
+        ),
     ] {
         let invalid = mutated_once(XML, needle, replacement);
-        assert!(
-            Oem::from_xml(&invalid).is_err(),
-            "accepted invalid contextual epoch replacement {replacement:?}"
-        );
+        crate::common::assert_validation_field(&Oem::from_xml(&invalid).unwrap_err(), field);
     }
 }
 

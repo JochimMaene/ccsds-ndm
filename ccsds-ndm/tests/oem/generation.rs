@@ -2,7 +2,6 @@ use crate::common::{assert_rejects, mutated, mutated_once, validate_xml};
 use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::{Message, Ndm};
-
 #[test]
 fn every_shipped_fixture_generates_deterministic_xsd_valid_xml_and_reparseable_kvn() {
     let messages = ["kvn", "xml"].into_iter().flat_map(|extension| {
@@ -264,4 +263,15 @@ fn oem_with_state_vector_components(replacement: &str) -> Oem {
         input = mutated_once(&input, &format!(">{value}<"), &format!(">{replacement}<"));
     }
     Oem::from_xml(&input).unwrap()
+}
+
+#[test]
+fn serializes_multiple_covariance_matrices_in_one_block() {
+    let oem = Oem::from_kvn(include_str!("../../data/kvn/oem_g13.kvn")).unwrap();
+    assert_eq!(oem.body.segment[0].data.covariance_matrix.len(), 2);
+
+    let output = oem.to_kvn().unwrap();
+    assert_eq!(output.matches("COVARIANCE_START").count(), 1);
+    assert_eq!(output.matches("COVARIANCE_STOP").count(), 1);
+    assert_eq!(output.matches("EPOCH").count(), 2);
 }

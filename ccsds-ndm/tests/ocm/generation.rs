@@ -1,100 +1,11 @@
 use crate::common::{assert_rejects, mutated, validate_xml};
+use crate::KVN;
 use ccsds_ndm::messages::ocm::Ocm;
 use ccsds_ndm::types::{
-    Angle, Area, DayInterval, Duration, Gm, ManDc, Mass, NonNegativeDouble, Percentage,
-    Probability, Vec3Double,
+    Angle, Area, DayInterval, Duration, Gm, ManDc, Mass, NonNegativeDouble, ObjectDescription,
+    Percentage, Probability, RevNumBasis, TrajBasis, Vec3Double,
 };
 use ccsds_ndm::{Ndm, Validate};
-
-const KVN: &str = include_str!("../../data/kvn/ocm_g18.kvn");
-const XML: &str = include_str!("../../data/xml/ocm_g20.xml");
-
-#[test]
-fn ocm_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
-    let center = "CENTER_NAME = EARTH";
-    let frame = "TRAJ_REF_FRAME = TOD_EARTH";
-    for (label, source) in [
-        (
-            "duplicate metadata keyword",
-            mutated(
-                KVN,
-                "TIME_SYSTEM = UTC",
-                "TIME_SYSTEM = UTC\nTIME_SYSTEM = UTC",
-            ),
-        ),
-        (
-            "reordered trajectory keywords",
-            mutated(
-                KVN,
-                &format!("{center}\n{frame}"),
-                &format!("{frame}\n{center}"),
-            ),
-        ),
-        (
-            "unknown trajectory keyword",
-            mutated(KVN, center, &format!("{center}\nUNKNOWN = value")),
-        ),
-        (
-            "comment after trajectory content",
-            mutated(KVN, center, &format!("{center}\nCOMMENT misplaced")),
-        ),
-        ("unknown block", mutated(KVN, "TRAJ_START", "UNKNOWN_START")),
-        (
-            "mismatched block end",
-            mutated(KVN, "TRAJ_STOP", "COV_STOP"),
-        ),
-        (
-            "out-of-order logical block",
-            mutated(
-                &mutated(KVN, "PHYS_START", "PERT_START"),
-                "PHYS_STOP",
-                "PERT_STOP",
-            ),
-        ),
-        ("trailing assignment", format!("{KVN}UNKNOWN = value\n")),
-        (
-            "non-ASCII assignment",
-            mutated(KVN, center, &format!("{center} €")),
-        ),
-    ] {
-        let error = Ocm::from_kvn(&source).unwrap_err();
-        assert_eq!(error.code(), Some("parse.kvn.syntax"), "{label}: {error}");
-    }
-}
-
-#[test]
-fn ocm_xml_rejects_unknown_nested_content_attributes_and_ordering_errors() {
-    let center = "<CENTER_NAME>EARTH</CENTER_NAME>";
-    let time_system = "<TIME_SYSTEM>UT1</TIME_SYSTEM>";
-    for (label, source) in [
-        (
-            "unknown data child",
-            mutated(XML, "<data>", "<data><UNKNOWN>1</UNKNOWN>"),
-        ),
-        (
-            "unknown trajectory child",
-            mutated(XML, "<traj>", "<traj><UNKNOWN>1</UNKNOWN>"),
-        ),
-        (
-            "unknown leaf attribute",
-            mutated(XML, center, "<CENTER_NAME unexpected=\"value\">EARTH</CENTER_NAME>"),
-        ),
-        (
-            "duplicate metadata child",
-            mutated(XML, time_system, &format!("{time_system}{time_system}")),
-        ),
-        (
-            "reordered metadata children",
-            mutated(XML, "<OBJECT_NAME>OSPREY 5</OBJECT_NAME>\n<INTERNATIONAL_DESIGNATOR>2022-999A</INTERNATIONAL_DESIGNATOR>",
-                "<INTERNATIONAL_DESIGNATOR>2022-999A</INTERNATIONAL_DESIGNATOR>\n<OBJECT_NAME>OSPREY 5</OBJECT_NAME>",
-            ),
-        ),
-    ] {
-        let error = Ocm::from_xml(&source).unwrap_err();
-        assert!(matches!(error.as_format_error(), Some(ccsds_ndm::error::FormatError::InvalidFormat(_))), "{label}: {error}");
-    }
-}
-
 /// A fixture maneuver promoted to `TIME_AND_ANGLE`, whose required companion fields are all
 /// populated. Three tests need this same starting point and then diverge on one value.
 fn time_and_angle_message() -> Ocm {
@@ -510,35 +421,518 @@ fn ocm_reports_the_unrepresentable_value_path_compactly() {
 }
 
 #[test]
-fn malformed_ocm_records_are_never_silent() {
-    let invalid = crate::common::mutated_once(
-        include_str!("../../data/kvn/ocm_g15.kvn"),
-        "120.0 5478.6",
-        "MALFORMED TRAJECTORY RECORD\n120.0 5478.6",
-    );
+fn kvn_roundtrip() {
+    // Full roundtrip: KVN -> Ocm -> KVN
+    let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+TRAJ_START
+CENTER_NAME = EARTH
+TRAJ_REF_FRAME = GCRF
+TRAJ_TYPE = CARTPV
+2023-01-01T00:00:00 1000 2000 3000 4 5 6
+TRAJ_STOP
+"#;
+    let ocm = Ocm::from_kvn(kvn).unwrap();
+    let output = ocm.to_kvn().unwrap();
 
-    assert_eq!(
-        Ocm::from_kvn(&invalid).unwrap_err().code(),
-        Some("parse.kvn.syntax")
-    );
+    // Parse output again
+    let ocm2 = Ocm::from_kvn(&output).unwrap();
+    assert_eq!(ocm2, ocm);
 }
 
 #[test]
-fn missing_ocm_record_block_stops_fail_at_eof() {
-    let trajectory_without_stop = include_str!("../../data/kvn/ocm_g15.kvn")
-        .strip_suffix("TRAJ_STOP\n")
-        .expect("fixture ends with TRAJ_STOP");
+fn od_optional_fields_roundtrip() {
+    let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+OD_START
+OD_ID = OD1
+OD_PREV_ID = OD0
+OD_METHOD = BATCH_LS
+OD_EPOCH = 2023-01-01T00:00:00
+DAYS_SINCE_FIRST_OBS = 30 [d]
+DAYS_SINCE_LAST_OBS = 1 [d]
+RECOMMENDED_OD_SPAN = 7 [d]
+ACTUAL_OD_SPAN = 7.5 [d]
+OBS_AVAILABLE = 1000
+OBS_USED = 950
+TRACKS_AVAILABLE = 50
+TRACKS_USED = 48
+MAXIMUM_OBS_GAP = 0.5 [d]
+OD_EPOCH_EIGMAJ = 100 [m]
+OD_EPOCH_EIGINT = 50 [m]
+OD_EPOCH_EIGMIN = 25 [m]
+OD_MAX_PRED_EIGMAJ = 200 [m]
+OD_MIN_PRED_EIGMIN = 10 [m]
+OD_CONFIDENCE = 95 [%]
+GDOP = 1.5
+SOLVE_N = 6
+SOLVE_STATES = X Y Z VX VY VZ
+CONSIDER_N = 2
+CONSIDER_PARAMS = CD CR
+SEDR = 0.001 [W/kg]
+SENSORS_N = 3
+SENSORS = SENSOR_A SENSOR_B SENSOR_C
+WEIGHTED_RMS = 1.2
+DATA_TYPES = RANGE DOPPLER
+OD_STOP
+"#;
+    let ocm = Ocm::from_kvn(kvn).unwrap();
+    let od = ocm.body.segment.data.od.as_ref().unwrap();
+
+    // Verify all fields were parsed
+    assert_eq!(od.od_prev_id, Some("OD0".to_string()));
+    assert!(od.actual_od_span.is_some());
+    assert_eq!(od.obs_available, Some(1000));
+    assert_eq!(od.obs_used, Some(950));
+    assert_eq!(od.tracks_available, Some(50));
+    assert_eq!(od.tracks_used, Some(48));
+    assert!(od.maximum_obs_gap.is_some());
+    assert!(od.od_epoch_eigmaj.is_some());
+    assert!(od.od_epoch_eigint.is_some());
+    assert!(od.od_epoch_eigmin.is_some());
+    assert!(od.od_max_pred_eigmaj.is_some());
+    assert!(od.od_min_pred_eigmin.is_some());
+    assert!(od.od_confidence.is_some());
+    assert_eq!(od.gdop, Some(1.5));
+    assert_eq!(od.solve_n, Some(6));
+    assert!(od.solve_states.is_some());
+    assert_eq!(od.consider_n, Some(2));
+    assert!(od.consider_params.is_some());
+    assert!(od.sedr.is_some());
+    assert_eq!(od.sensors_n, Some(3));
+    assert_eq!(od.sensors, Some("SENSOR_A SENSOR_B SENSOR_C".to_string()));
+    assert_eq!(od.weighted_rms, Some(NonNegativeDouble::new(1.2).unwrap()));
+    assert_eq!(od.data_types, Some("RANGE DOPPLER".to_string()));
+
+    let output = ocm.to_kvn().unwrap();
+    assert_eq!(Ocm::from_kvn(&output).unwrap(), ocm);
+}
+
+#[test]
+fn test_ocm_data_write_kvn_all_blocks() {
+    let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+TRAJ_START
+CENTER_NAME = EARTH
+TRAJ_REF_FRAME = GCRF
+TRAJ_TYPE = CARTPV
+2023-01-01T00:00:00 1 2 3 4 5 6
+TRAJ_STOP
+COV_START
+COV_REF_FRAME = RSW
+COV_TYPE = CARTPV
+COV_ORDERING = LTM
+2023-01-01T00:00:00 1e-6 0 1e-6 0 0 1e-6
+COV_STOP
+MAN_START
+MAN_ID = MAN_1
+MAN_DEVICE_ID = THRUSTER_1
+MAN_REF_FRAME = RSW
+DC_TYPE = CONTINUOUS
+MAN_COMPOSITION = TIME_ABSOLUTE, DV_X, DV_Y, DV_Z
+2023-01-01T00:00:00 0.1 0 0
+MAN_STOP
+PERT_START
+ATMOSPHERIC_MODEL = NRLMSISE-00
+PERT_STOP
+OD_START
+OD_ID = OD1
+OD_METHOD = LS
+OD_EPOCH = 2023-01-01T00:00:00
+OD_STOP
+USER_START
+COMMENT user comment
+USER_DEFINED_CUSTOM_PARAM = custom_value
+USER_STOP
+"#;
+    let ocm = Ocm::from_kvn(kvn).unwrap();
+    let output = ocm.to_kvn().unwrap();
+    assert_eq!(Ocm::from_kvn(&output).unwrap(), ocm);
+}
+
+#[test]
+fn test_cov_write_kvn_all_optional_fields() {
+    let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+COV_START
+COMMENT cov comment
+COV_ID = COV_001
+COV_PREV_ID = COV_000
+COV_NEXT_ID = COV_002
+COV_BASIS = DETERMINED
+COV_BASIS_ID = BASIS_001
+COV_REF_FRAME = RSW
+COV_FRAME_EPOCH = 2023-01-01T00:00:00
+COV_SCALE_MIN = 0.5
+COV_SCALE_MAX = 2.0
+COV_CONFIDENCE = 95 [%]
+COV_TYPE = CARTPV
+COV_ORDERING = LTM
+COV_UNITS = km**2
+2023-01-01T00:00:00 1e-6 0 1e-6 0 0 1e-6
+COV_STOP
+"#;
+    let ocm = Ocm::from_kvn(kvn).unwrap();
+    let cov = &ocm.body.segment.data.cov[0];
+
+    // Verify all optional fields were parsed
+    assert_eq!(cov.comment, vec!["cov comment"]);
+    assert_eq!(cov.cov_id, Some("COV_001".to_string()));
+    assert_eq!(cov.cov_prev_id, Some("COV_000".to_string()));
+    assert_eq!(cov.cov_next_id, Some("COV_002".to_string()));
+    assert!(cov.cov_basis.is_some());
+    assert_eq!(cov.cov_basis_id, Some("BASIS_001".to_string()));
+    assert!(cov.cov_frame_epoch.is_some());
+    assert_eq!(cov.cov_scale_min, Some(0.5));
+    assert_eq!(cov.cov_scale_max, Some(2.0));
+    assert!(cov.cov_confidence.is_some());
+    assert_eq!(cov.cov_units, Some("km**2".to_string()));
+
+    let output = ocm.to_kvn().unwrap();
+    assert_eq!(Ocm::from_kvn(&output).unwrap(), ocm);
+}
+
+#[test]
+fn test_man_all_optional_fields_write_kvn() {
+    let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+MAN_START
+MAN_ID = MAN_1
+MAN_PREV_ID = MAN_0
+MAN_NEXT_ID = MAN_2
+MAN_BASIS = PLANNED
+MAN_BASIS_ID = PLAN_001
+MAN_DEVICE_ID = THRUSTER_1
+MAN_PREV_EPOCH = 2022-12-31T00:00:00
+MAN_NEXT_EPOCH = 2023-01-02T00:00:00
+MAN_PURPOSE = ORBIT_RAISING
+MAN_PRED_SOURCE = FDSS
+MAN_REF_FRAME = RSW
+MAN_FRAME_EPOCH = 2023-01-01T00:00:00
+GRAV_ASSIST_NAME = MOON
+DC_TYPE = TIME
+DC_WIN_OPEN = 2023-01-01T00:00:00
+DC_WIN_CLOSE = 2023-01-01T02:00:00
+DC_MIN_CYCLES = 1
+DC_MAX_CYCLES = 10
+DC_EXEC_START = 2023-01-01T00:30:00
+DC_EXEC_STOP = 2023-01-01T01:30:00
+DC_REF_TIME = 2023-01-01T01:00:00
+DC_TIME_PULSE_DURATION = 60 [s]
+DC_TIME_PULSE_PERIOD = 120 [s]
+DC_REF_DIR = 1 0 0
+DC_BODY_FRAME = SC_BODY
+DC_BODY_TRIGGER = 0 1 0
+DC_PA_START_ANGLE = 0 [deg]
+DC_PA_STOP_ANGLE = 180 [deg]
+MAN_COMPOSITION = TIME_ABSOLUTE, DV_X, DV_Y, DV_Z
+MAN_UNITS = km/s km/s km/s
+2023-01-01T00:00:00 0.1 0 0
+MAN_STOP
+"#;
+    let ocm = Ocm::from_kvn(kvn).unwrap();
+    let man = &ocm.body.segment.data.man[0];
+
+    // Verify optional fields
+    assert_eq!(man.man_prev_id, Some("MAN_0".to_string()));
+    assert_eq!(man.man_next_id, Some("MAN_2".to_string()));
+    assert!(man.man_basis.is_some());
+    assert!(man.grav_assist_name.is_some());
+    assert!(man.dc_win_open.is_some());
+    assert!(man.dc_min_cycles.is_some());
+    assert!(man.dc_ref_dir.is_some());
+    assert!(man.dc_body_trigger.is_some());
+    assert!(man.dc_pa_start_angle.is_some());
+
+    let output = ocm.to_kvn().unwrap();
+    assert_eq!(Ocm::from_kvn(&output).unwrap(), ocm);
+}
+
+#[test]
+fn test_pert_all_optional_fields_write_kvn() {
+    let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+PERT_START
+ATMOSPHERIC_MODEL = NRLMSISE-00
+GRAVITY_MODEL = EGM2008 70x70
+EQUATORIAL_RADIUS = 6378.137 [km]
+GM = 398600.4415 [km**3/s**2]
+N_BODY_PERTURBATIONS = MOON SUN JUPITER
+CENTRAL_BODY_ROTATION = 7.2921e-5 [deg/s]
+OBLATE_FLATTENING = 0.003353
+OCEAN_TIDES_MODEL = GOT4.7
+SOLID_TIDES_MODEL = IERS2010
+REDUCTION_THEORY = IERS2010
+ALBEDO_MODEL = EARTH_ALBEDO
+ALBEDO_GRID_SIZE = 36
+SHADOW_MODEL = CYLINDRICAL
+SHADOW_BODIES = MOON
+SRP_MODEL = FLAT_PLATE
+SW_DATA_SOURCE = CSSI
+SW_DATA_EPOCH = 2023-01-01T00:00:00
+SW_INTERP_METHOD = LINEAR
+FIXED_GEOMAG_KP = 3 [nT]
+FIXED_GEOMAG_AP = 15 [nT]
+FIXED_GEOMAG_DST = -10 [nT]
+FIXED_F10P7 = 150 [SFU]
+FIXED_F10P7_MEAN = 145 [SFU]
+FIXED_M10P7 = 148 [SFU]
+FIXED_M10P7_MEAN = 143 [SFU]
+FIXED_S10P7 = 147 [SFU]
+FIXED_S10P7_MEAN = 142 [SFU]
+FIXED_Y10P7 = 146 [SFU]
+FIXED_Y10P7_MEAN = 141 [SFU]
+PERT_STOP
+"#;
+    let ocm = Ocm::from_kvn(kvn).unwrap();
+    let pert = ocm.body.segment.data.pert.as_ref().unwrap();
+
+    // Verify all fields
+    assert!(pert.central_body_rotation.is_some());
+    assert!(pert.oblate_flattening.is_some());
+    assert!(pert.albedo_grid_size.is_some());
+    assert!(pert.sw_data_epoch.is_some());
+    assert!(pert.fixed_geomag_kp.is_some());
+    assert!(pert.fixed_m10p7.is_some());
+
+    let output = ocm.to_kvn().unwrap();
+    assert_eq!(Ocm::from_kvn(&output).unwrap(), ocm);
+}
+
+#[test]
+fn test_ocm_metadata_all_fields() {
+    let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+COMMENT meta comment
+OBJECT_NAME = SAT1
+INTERNATIONAL_DESIGNATOR = 2023-001A
+CATALOG_NAME = SATCAT
+OBJECT_DESIGNATOR = 12345
+ALTERNATE_NAMES = SAT_ALT
+ORIGINATOR_POC = JOHN DOE
+ORIGINATOR_POSITION = ENGINEER
+ORIGINATOR_PHONE = 123-456
+ORIGINATOR_EMAIL = john@example.com
+ORIGINATOR_ADDRESS = 123 Street
+TECH_ORG = SPACE_CORP
+TECH_POC = JANE DOE
+TECH_POSITION = SCIENTIST
+TECH_PHONE = 987-654
+TECH_EMAIL = jane@example.com
+TECH_ADDRESS = 456 Avenue
+PREVIOUS_MESSAGE_ID = MSG_001
+NEXT_MESSAGE_ID = MSG_003
+ADM_MSG_LINK = ADM_LINK
+CDM_MSG_LINK = CDM_LINK
+PRM_MSG_LINK = PRM_LINK
+RDM_MSG_LINK = RDM_LINK
+TDM_MSG_LINK = TDM_LINK
+OPERATOR = OPS_TEAM
+OWNER = OWNER_TEAM
+COUNTRY = USA
+CONSTELLATION = STARLINK
+OBJECT_TYPE = PAYLOAD
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+OPS_STATUS = OPERATIONAL
+ORBIT_CATEGORY = LEO
+OCM_DATA_ELEMENTS = ALL
+SCLK_OFFSET_AT_EPOCH = 0.1 [s]
+SCLK_SEC_PER_SI_SEC = 0.99 [s]
+PREVIOUS_MESSAGE_EPOCH = 2022-12-31T23:00:00
+NEXT_MESSAGE_EPOCH = 2023-01-01T01:00:00
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-02T00:00:00
+TIME_SPAN = 1.0 [d]
+TAIMUTC_AT_TZERO = 37.0 [s]
+NEXT_LEAP_EPOCH = 2024-01-01T00:00:00
+NEXT_LEAP_TAIMUTC = 38.0 [s]
+UT1MUTC_AT_TZERO = -0.1 [s]
+EOP_SOURCE = IERS
+INTERP_METHOD_EOP = LINEAR
+CELESTIAL_SOURCE = IAU
+META_STOP
+"#;
+    let ocm = Ocm::from_kvn(kvn).unwrap();
+    let meta = &ocm.body.segment.metadata;
+    assert_eq!(meta.object_name, Some("SAT1".to_string()));
+    assert_eq!(meta.object_type, Some(ObjectDescription::Payload));
+    assert!(meta.sclk_offset_at_epoch.is_some());
+
+    let output = ocm.to_kvn().unwrap();
+    let ocm2 = Ocm::from_kvn(&output).unwrap();
+    assert_eq!(ocm2, ocm);
+}
+
+#[test]
+fn test_traj_all_fields() {
+    let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+TRAJ_START
+COMMENT traj comment
+TRAJ_ID = T1
+TRAJ_PREV_ID = T0
+TRAJ_NEXT_ID = T2
+TRAJ_BASIS = PREDICTED
+TRAJ_BASIS_ID = B1
+INTERPOLATION = LINEAR
+INTERPOLATION_DEGREE = 1
+PROPAGATOR = SGP4
+CENTER_NAME = EARTH
+TRAJ_REF_FRAME = GCRF
+TRAJ_FRAME_EPOCH = 2023-01-01T00:00:00
+USEABLE_START_TIME = 2023-01-01T00:00:00
+USEABLE_STOP_TIME = 2023-01-02T00:00:00
+ORB_REVNUM = 1234
+ORB_REVNUM_BASIS = 1
+TRAJ_TYPE = CARTPV
+ORB_AVERAGING = NONE
+TRAJ_UNITS = km km/s
+2023-01-01T00:00:00 1 2 3 4 5 6
+TRAJ_STOP
+"#;
+    let ocm = Ocm::from_kvn(kvn).unwrap();
+    let traj = &ocm.body.segment.data.traj[0];
+    assert_eq!(traj.traj_id, Some("T1".to_string()));
+    assert_eq!(traj.traj_basis, Some(TrajBasis::Predicted));
+    assert_eq!(traj.orb_revnum_basis, Some(RevNumBasis::One));
+
+    let output = ocm.to_kvn().unwrap();
+    assert_eq!(Ocm::from_kvn(&output).unwrap(), ocm);
+}
+
+#[test]
+fn test_phys_all_fields_robust() {
+    let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+PHYS_START
+MANUFACTURER = ACME
+BUS_MODEL = B1
+DOCKED_WITH = SAT2
+DRAG_CONST_AREA = 1.0 [m**2]
+DRAG_COEFF_NOM = 2.2
+DRAG_UNCERTAINTY = 10 [%]
+INITIAL_WET_MASS = 1000 [kg]
+WET_MASS = 900 [kg]
+DRY_MASS = 800 [kg]
+OEB_PARENT_FRAME = GCRF
+OEB_PARENT_FRAME_EPOCH = 2023-01-01T00:00:00
+OEB_Q1 = 0
+OEB_Q2 = 0
+OEB_Q3 = 0
+OEB_QC = 1
+OEB_MAX = 5 [m]
+OEB_INT = 3 [m]
+OEB_MIN = 2 [m]
+AREA_ALONG_OEB_MAX = 15 [m**2]
+AREA_ALONG_OEB_INT = 10 [m**2]
+AREA_ALONG_OEB_MIN = 6 [m**2]
+AREA_MIN_FOR_PC = 5 [m**2]
+AREA_MAX_FOR_PC = 20 [m**2]
+AREA_TYP_FOR_PC = 10 [m**2]
+RCS = 1 [m**2]
+RCS_MIN = 0.5 [m**2]
+RCS_MAX = 2 [m**2]
+SRP_CONST_AREA = 12 [m**2]
+SOLAR_RAD_COEFF = 1.5
+SOLAR_RAD_UNCERTAINTY = 5 [%]
+VM_ABSOLUTE = 4.5
+VM_APPARENT_MIN = 5.0
+VM_APPARENT = 5.5
+VM_APPARENT_MAX = 6.0
+REFLECTANCE = 0.8
+ATT_CONTROL_MODE = THREE_AXIS
+ATT_ACTUATOR_TYPE = REACTION_WHEELS
+ATT_KNOWLEDGE = 0.1 [deg]
+ATT_CONTROL = 0.5 [deg]
+ATT_POINTING = 0.2 [deg]
+AVG_MANEUVER_FREQ = 12 [#/yr]
+MAX_THRUST = 0.1 [N]
+DV_BOL = 0.5 [km/s]
+DV_REMAINING = 0.2 [km/s]
+IXX = 100 [kg*m**2]
+IYY = 150 [kg*m**2]
+IZZ = 150 [kg*m**2]
+IXY = 1 [kg*m**2]
+IXZ = 2 [kg*m**2]
+IYZ = 3 [kg*m**2]
+PHYS_STOP
+"#;
+    let ocm = Ocm::from_kvn(kvn).unwrap();
+    let phys = ocm.body.segment.data.phys.as_ref().unwrap();
+    assert_eq!(phys.manufacturer, Some("ACME".to_string()));
+    assert_eq!(phys.ixx.as_ref().unwrap().value, 100.0);
+
+    let output = ocm.to_kvn().unwrap();
+    assert_eq!(Ocm::from_kvn(&output).unwrap(), ocm);
+}
+
+#[test]
+fn test_traj_orb_revnum_basis_zero() {
+    let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+TRAJ_START
+CENTER_NAME = EARTH
+TRAJ_REF_FRAME = GCRF
+ORB_REVNUM = 100
+ORB_REVNUM_BASIS = 0
+TRAJ_TYPE = CARTPV
+2023-01-01T00:00:00 1 2 3 4 5 6
+TRAJ_STOP
+"#;
+    let ocm = Ocm::from_kvn(kvn).unwrap();
     assert_eq!(
-        Ocm::from_kvn(trajectory_without_stop).unwrap_err().code(),
-        Some("parse.kvn.syntax")
+        ocm.body.segment.data.traj[0].orb_revnum_basis,
+        Some(RevNumBasis::Zero)
     );
 
-    let maneuver_without_stop = include_str!("../../data/kvn/ocm_g17.kvn")
-        .split_once("\nMAN_STOP")
-        .expect("fixture contains MAN_STOP")
-        .0;
-    assert_eq!(
-        Ocm::from_kvn(maneuver_without_stop).unwrap_err().code(),
-        Some("parse.kvn.syntax")
-    );
+    let output = ocm.to_kvn().unwrap();
+    assert_eq!(Ocm::from_kvn(&output).unwrap(), ocm);
 }

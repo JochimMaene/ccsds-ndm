@@ -25,7 +25,7 @@ The `ocm` and `ocm_kvn_allocations` suites establish:
 | Generation boundary | Materialized and streaming KVN generation reject non-ASCII free text while preserving OCM's arbitrary line lengths; finite trajectory/covariance numbers are rounded when necessary to the CCSDS digit limit. The TIME_AND_ANGLE vector regression proves both notation paths. |
 | Resource behaviour | Parsing 10 versus 1,000 trajectory and covariance records uses one owned numeric vector allocation per record without per-record reallocation. Maneuver parsing is bounded by its owned strings/vectors. Validated streaming generation has record-independent temporary allocation overhead for trajectory, covariance, and maneuver histories; materialized storage stays output-proportional. |
 | Reproducible workloads | `ocm_{trajectory,covariance,maneuver}_{kvn,xml}_history_scaling` measure parse and generation of each history kind — CARTPV trajectory, CARTP covariance, relative-time maneuver — at 100, 10,000 and 50,000 records in KVN and the first two in XML, the sizes every history-carrying family shares. The shared family matrices add representative small-message comparisons. |
-| Shared surfaces | `family_contract`, Python API tests, and the shared generation plumbing exercise parsing, generation, structured diagnostics, and Rust-core delegation. |
+| Shared surfaces | `library::parsing` and `library::output`, Python API tests, and the shared generation plumbing exercise parsing, generation, structured diagnostics, and Rust-core delegation. |
 
 The two shipped KVN comments that used a Greek eta were normalized to the ASCII word `eta`; strict
 KVN processing does not silently accept or regenerate the non-ASCII spelling.

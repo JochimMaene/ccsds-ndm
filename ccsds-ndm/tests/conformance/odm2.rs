@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-mod common;
 use crate::common::mutated_once;
 
 use ccsds_ndm::messages::{oem::Oem, omm::Omm, opm::Opm};
@@ -57,7 +56,7 @@ fn edition_2(input: &str) -> String {
 
 #[test]
 fn opm_2_generation_is_schema_valid_and_round_trips() {
-    let opm = Opm::from_kvn(&edition_2(include_str!("../data/kvn/opm_g1.kvn"))).unwrap();
+    let opm = Opm::from_kvn(&edition_2(include_str!("../../data/kvn/opm_g1.kvn"))).unwrap();
     let xml = opm.to_xml().unwrap();
     validate_with_odm_2_xsd("opm", &xml);
     let parsed = Opm::from_xml(&xml).unwrap();
@@ -67,7 +66,7 @@ fn opm_2_generation_is_schema_valid_and_round_trips() {
 
 #[test]
 fn oem_2_generation_is_schema_valid_and_round_trips() {
-    let oem = Oem::from_kvn(&edition_2(include_str!("../data/kvn/oem_g11.kvn"))).unwrap();
+    let oem = Oem::from_kvn(&edition_2(include_str!("../../data/kvn/oem_g11.kvn"))).unwrap();
     let xml = oem.to_xml().unwrap();
     validate_with_odm_2_xsd("oem", &xml);
     let parsed = Oem::from_xml(&xml).unwrap();
@@ -77,7 +76,7 @@ fn oem_2_generation_is_schema_valid_and_round_trips() {
 
 #[test]
 fn omm_2_generation_is_schema_valid_and_round_trips() {
-    let omm = Omm::from_kvn(&edition_2(include_str!("../data/kvn/omm_g7.kvn"))).unwrap();
+    let omm = Omm::from_kvn(&edition_2(include_str!("../../data/kvn/omm_g7.kvn"))).unwrap();
     let xml = omm.to_xml().unwrap();
     validate_with_odm_2_xsd("omm", &xml);
     let parsed = Omm::from_xml(&xml).unwrap();
@@ -87,7 +86,7 @@ fn omm_2_generation_is_schema_valid_and_round_trips() {
 
 #[test]
 fn odm_2_generation_rejects_odm_3_only_fields() {
-    let mut opm = Opm::from_kvn(&edition_2(include_str!("../data/kvn/opm_g1.kvn"))).unwrap();
+    let mut opm = Opm::from_kvn(&edition_2(include_str!("../../data/kvn/opm_g1.kvn"))).unwrap();
     opm.header.message_id = Some("OPM-3-ONLY".into());
     let error = opm.to_xml().unwrap_err();
     assert_eq!(error.field_path().as_deref(), Some("header.message_id"));

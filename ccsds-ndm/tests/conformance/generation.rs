@@ -1,6 +1,5 @@
 use crate::common::mutated;
-mod common;
-use common::{fixtures, validate_xml};
+use crate::common::{fixtures, validate_xml};
 
 use ccsds_ndm::{from_str, Message};
 

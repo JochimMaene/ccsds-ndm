@@ -1,6 +1,53 @@
 #[path = "../common/mod.rs"]
 mod common;
-mod conformance;
 mod epochs;
+mod generation;
 mod minimal;
 mod model;
+mod parsing;
+
+const KVN: &str = include_str!("../../data/kvn/apm_g1.kvn");
+const XML: &str = include_str!("../../data/xml/apm_g10.xml");
+const SPIN_KVN: &str = r#"CCSDS_APM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+OBJECT_NAME = TEST
+OBJECT_ID = 2023-001A
+TIME_SYSTEM = UTC
+META_STOP
+EPOCH = 2023-01-01T00:00:00
+SPIN_START
+REF_FRAME_A = J2000
+REF_FRAME_B = SC_BODY_1
+SPIN_ALPHA = 10
+SPIN_DELTA = 20
+SPIN_ANGLE = 30
+SPIN_ANGLE_VEL = 0.1
+NUTATION = 5
+NUTATION_PER = 100
+NUTATION_PHASE = 45
+SPIN_STOP
+"#;
+
+fn sample_apm_kvn() -> String {
+    r#"CCSDS_APM_VERS = 2.0
+CREATION_DATE = 2002-11-04T17:22:31
+ORIGINATOR = NASA/JPL
+META_START
+OBJECT_NAME = MARS GLOBAL SURVEYOR
+OBJECT_ID = 1996-062A
+TIME_SYSTEM = UTC
+META_STOP
+EPOCH = 2002-11-04T17:22:31
+QUAT_START
+REF_FRAME_A = EME2000
+REF_FRAME_B = SC_BODY_1
+Q1 = 0.5
+Q2 = 0.5
+Q3 = 0.5
+QC = 0.5
+QUAT_STOP
+"#
+    .to_string()
+}

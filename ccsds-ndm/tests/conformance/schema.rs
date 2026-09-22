@@ -1,4 +1,3 @@
-mod common;
 use crate::common::mutated;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -39,7 +38,7 @@ class XsdValidate {
 
 #[test]
 fn xerces_oracle_rejects_nan_for_positive_double() {
-    let control = include_str!("../data/xml/rdm_c3.xml");
+    let control = include_str!("../../data/xml/rdm_c3.xml");
     let valid = xerces_validates(control);
     assert!(
         valid.status.success(),

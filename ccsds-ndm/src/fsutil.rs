@@ -35,3 +35,36 @@ pub(crate) fn atomic_write(
     temporary.persist(path).map_err(std::io::Error::from)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{ErrorKind, Write};
+
+    #[test]
+    fn failed_write_discards_partial_output_and_cleans_up() {
+        for existing in [false, true] {
+            let directory = tempfile::tempdir().unwrap();
+            let destination = directory.path().join("message");
+            if existing {
+                fs::write(&destination, b"original").unwrap();
+            }
+            let error = atomic_write(&destination, |output| {
+                output.write_all(b"partial document")?;
+                Err(std::io::Error::other("deliberate failure").into())
+            })
+            .unwrap_err();
+            assert!(matches!(error, CcsdsNdmError::Io(ref error)
+                if error.kind() == ErrorKind::Other && error.to_string() == "deliberate failure"));
+            if existing {
+                assert_eq!(fs::read(&destination).unwrap(), b"original");
+            } else {
+                assert!(!destination.exists());
+            }
+            assert_eq!(
+                fs::read_dir(directory.path()).unwrap().count(),
+                usize::from(existing)
+            );
+        }
+    }
+}

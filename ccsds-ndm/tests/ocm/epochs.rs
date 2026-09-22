@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::mutated;
-
 use ccsds_ndm::messages::ocm::Ocm;
 use ccsds_ndm::Ndm;
 
@@ -223,4 +222,121 @@ fn trajectory_history_time_tags_must_use_one_epoch_branch() {
         &Ocm::from_xml(&mixed_xml).unwrap_err(),
         "trajLine epoch",
     );
+}
+
+#[test]
+fn metadata_reference_epochs_require_calendar_form() {
+    let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+PREVIOUS_MESSAGE_EPOCH = 2022-12-31T23:00:00
+NEXT_MESSAGE_EPOCH = 2023-01-01T01:00:00
+NEXT_LEAP_EPOCH = 2024-01-01T00:00:00
+NEXT_LEAP_TAIMUTC = 37 [s]
+META_STOP
+"#;
+
+    for key in [
+        "EPOCH_TZERO",
+        "PREVIOUS_MESSAGE_EPOCH",
+        "NEXT_MESSAGE_EPOCH",
+        "NEXT_LEAP_EPOCH",
+    ] {
+        let needle = format!("{key} = ");
+        let start = kvn.find(&needle).expect("reference epoch key in fixture") + needle.len();
+        let end = kvn[start..]
+            .find('\n')
+            .map_or(kvn.len(), |offset| start + offset);
+        let invalid = format!("{}123.5{}", &kvn[..start], &kvn[end..]);
+        crate::common::assert_invalid_epoch(&Ocm::from_kvn(&invalid).unwrap_err(), "123.5");
+    }
+
+    let ocm = Ocm::from_kvn(kvn).expect("calendar reference epochs should parse");
+    assert_eq!(
+        ocm.body.segment.metadata.epoch_tzero.as_str(),
+        "2023-01-01T00:00:00"
+    );
+    assert_eq!(
+        ocm.body.segment.metadata.next_leap_epoch.unwrap().as_str(),
+        "2024-01-01T00:00:00"
+    );
+}
+
+#[test]
+fn frame_reference_epochs_require_calendar_form() {
+    let kvn = r#"CCSDS_OCM_VERS = 3.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+EPOCH_TZERO = 2023-01-01T00:00:00
+META_STOP
+TRAJ_START
+CENTER_NAME = EARTH
+TRAJ_REF_FRAME = GCRF
+TRAJ_FRAME_EPOCH = 2023-01-01T00:00:00
+TRAJ_TYPE = CARTPV
+2023-01-01T00:00:00 1 2 3 4 5 6
+TRAJ_STOP
+PHYS_START
+OEB_PARENT_FRAME_EPOCH = 2023-01-01T00:00:00
+PHYS_STOP
+COV_START
+COV_REF_FRAME = GCRF
+COV_FRAME_EPOCH = 2023-01-01T00:00:00
+COV_TYPE = CARTPV
+COV_ORDERING = LTM
+2023-01-01T00:00:00 1 0 0 0 0 1
+COV_STOP
+MAN_START
+MAN_ID = MAN-1
+MAN_DEVICE_ID = THR-1
+MAN_REF_FRAME = GCRF
+MAN_FRAME_EPOCH = 2023-01-01T00:00:00
+MAN_COMPOSITION = TIME_ABSOLUTE, DV_X
+2023-01-01T00:00:00 1
+MAN_STOP
+"#;
+
+    let ocm = Ocm::from_kvn(kvn).expect("calendar frame epochs should parse");
+    let segment = &ocm.body.segment;
+    assert_eq!(
+        segment.data.traj[0].traj_frame_epoch.unwrap().as_str(),
+        "2023-01-01T00:00:00"
+    );
+    assert_eq!(
+        segment
+            .data
+            .phys
+            .as_ref()
+            .unwrap()
+            .oeb_parent_frame_epoch
+            .unwrap()
+            .as_str(),
+        "2023-01-01T00:00:00"
+    );
+    assert_eq!(
+        segment.data.cov[0].cov_frame_epoch.unwrap().as_str(),
+        "2023-01-01T00:00:00"
+    );
+    assert_eq!(
+        segment.data.man[0].man_frame_epoch.unwrap().as_str(),
+        "2023-01-01T00:00:00"
+    );
+
+    for key in [
+        "TRAJ_FRAME_EPOCH",
+        "OEB_PARENT_FRAME_EPOCH",
+        "COV_FRAME_EPOCH",
+        "MAN_FRAME_EPOCH",
+    ] {
+        let invalid = kvn.replace(
+            &format!("{key} = 2023-01-01T00:00:00"),
+            &format!("{key} = 123.5"),
+        );
+        crate::common::assert_invalid_epoch(&Ocm::from_kvn(&invalid).unwrap_err(), "123.5");
+    }
 }

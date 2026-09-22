@@ -28,10 +28,10 @@ fn every_kvn_generation_gate_rejects_invalid_state_before_output() {
     let mut cases: Vec<(&str, Aem)> = Vec::new();
     let mut non_ascii = Aem::from_kvn(SPIN_KVN).unwrap();
     non_ascii.body.segment[0].metadata.object_name = "ST5 €".to_owned();
-    cases.push(("non-ASCII text", non_ascii));
+    cases.push(("printable ASCII", non_ascii));
     let mut overlong = Aem::from_kvn(SPIN_KVN).unwrap();
     overlong.body.segment[0].metadata.object_name = "X".repeat(240);
-    cases.push(("overlong record", overlong));
+    cases.push(("KVN record", overlong));
     let mut unrepresentable = Aem::from_kvn(SPIN_KVN).unwrap();
     let AemAttitudeState::Spin(state) =
         &mut unrepresentable.body.segment[0].data.attitude_states[0]
@@ -39,13 +39,16 @@ fn every_kvn_generation_gate_rejects_invalid_state_before_output() {
         unreachable!()
     };
     state.spin_angle_vel.value = f64::MAX;
-    cases.push(("unrepresentable number", unrepresentable));
+    cases.push(("representable CCSDS spelling", unrepresentable));
     for (label, message) in cases {
-        assert!(message.to_kvn().is_err(), "materialized accepted {label}");
+        let error = message.to_kvn().unwrap_err();
+        crate::common::assert_validation_field(&error, label);
         let mut output = Vec::new();
-        assert!(
-            message.write_kvn_to(&mut output).is_err(),
-            "streaming accepted {label}"
+        let streamed = message.write_kvn_to(&mut output).unwrap_err();
+        assert_eq!(
+            streamed.as_validation_error(),
+            error.as_validation_error(),
+            "{label}"
         );
         assert!(output.is_empty(), "streaming wrote bytes for {label}");
     }

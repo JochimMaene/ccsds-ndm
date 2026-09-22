@@ -1,155 +1,8 @@
-use crate::common::{assert_rejects, mutated, mutated_once, validate_xml};
+use crate::common::{assert_rejects, validate_xml};
+use crate::KVN;
 use ccsds_ndm::messages::tdm::{Tdm, TdmObservationData};
-use ccsds_ndm::types::{Percentage, TdmRangeUnits};
+use ccsds_ndm::types::Percentage;
 use ccsds_ndm::{Ndm, Validate};
-
-const KVN: &str = include_str!("../../data/kvn/tdm_e1.kvn");
-const XML: &str = include_str!("../../data/xml/tdm_e21.xml");
-
-#[test]
-fn tdm_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
-    let time_system = "TIME_SYSTEM = UTC";
-    let participant = "PARTICIPANT_1 = DSS-25";
-    let observation = "TRANSMIT_FREQ_2 = 2005-159T17:41:00 32023442781.733";
-    for (label, source) in [
-        (
-            "duplicate header keyword",
-            mutated(
-                KVN,
-                "ORIGINATOR = NASA",
-                "ORIGINATOR = NASA\nORIGINATOR = NASA",
-            ),
-        ),
-        (
-            "duplicate metadata keyword",
-            mutated(KVN, time_system, &format!("{time_system}\n{time_system}")),
-        ),
-        (
-            "unknown metadata keyword",
-            mutated(KVN, time_system, &format!("{time_system}\nUNKNOWN = value")),
-        ),
-        (
-            "comment after an observation",
-            mutated(
-                KVN,
-                observation,
-                &format!("{observation}\nCOMMENT misplaced"),
-            ),
-        ),
-        ("unknown block", mutated(KVN, "META_START", "UNKNOWN_START")),
-        (
-            "mismatched block end",
-            mutated(KVN, "META_STOP", "DATA_STOP"),
-        ),
-        ("trailing assignment", format!("{KVN}UNKNOWN = value\n")),
-        (
-            "non-ASCII content",
-            mutated(KVN, participant, &format!("{participant} €")),
-        ),
-    ] {
-        let error = Tdm::from_kvn(&source).unwrap_err();
-        assert_eq!(error.code(), Some("parse.kvn.syntax"), "{label}: {error}");
-    }
-}
-
-#[test]
-fn tdm_xml_rejects_unknown_nested_content_attributes_and_ordering_errors() {
-    let epoch = "<EPOCH>2007-069T15:22:22.000</EPOCH>";
-    let observable = "<TRANSMIT_FREQ_1>7167941264.0</TRANSMIT_FREQ_1>";
-    for (label, source) in [
-        (
-            "unknown metadata child",
-            mutated(XML, "<metadata>", "<metadata><UNKNOWN>1</UNKNOWN>"),
-        ),
-        (
-            "unknown observation child",
-            mutated(XML, "<observation>", "<observation><UNKNOWN>1</UNKNOWN>"),
-        ),
-        (
-            "unknown container attribute",
-            mutated(XML, "<metadata>", "<metadata unexpected=\"value\">"),
-        ),
-        (
-            "unknown leaf attribute",
-            mutated(
-                XML,
-                observable,
-                "<TRANSMIT_FREQ_1 unexpected=\"value\">7167941264.0</TRANSMIT_FREQ_1>",
-            ),
-        ),
-        (
-            "duplicate epoch",
-            mutated_once(XML, epoch, &format!("{epoch}{epoch}")),
-        ),
-        (
-            "reordered observation members",
-            mutated_once(
-                XML,
-                &format!("{epoch}\n{observable}"),
-                &format!("{observable}\n{epoch}"),
-            ),
-        ),
-    ] {
-        let error = Tdm::from_xml(&source).unwrap_err();
-        assert!(
-            matches!(
-                error.as_format_error(),
-                Some(ccsds_ndm::error::FormatError::InvalidFormat(_))
-            ),
-            "{label}: {error}"
-        );
-    }
-}
-
-#[test]
-fn tdm_xml_accepts_the_schema_defined_optional_observation_units() {
-    let angle = mutated_once(
-        XML,
-        "<TRANSMIT_FREQ_1>7167941264.0</TRANSMIT_FREQ_1>",
-        "<ANGLE_1 units=\"deg\">1.0</ANGLE_1>",
-    );
-    Tdm::from_xml(&angle).expect("ANGLE_1 units=deg is allowed by the TDM schema");
-
-    let humidity = mutated_once(
-        XML,
-        "<TRANSMIT_FREQ_1>7167941264.0</TRANSMIT_FREQ_1>",
-        "<RHUMIDITY units=\"%\">50.0</RHUMIDITY>",
-    );
-    let mut message =
-        Tdm::from_xml(&humidity).expect("RHUMIDITY units=% is allowed by the TDM schema");
-    crate::common::assert_validation_field(&message.to_kvn().unwrap_err(), "PARTICIPANT_1");
-    message.body.segments[0].metadata.participant_1 = "DSS-25".into();
-    let normalized = Tdm::from_kvn(&message.to_kvn().unwrap()).unwrap();
-    match &normalized.body.segments[0].data.observations[0].data {
-        ccsds_ndm::messages::tdm::TdmObservationData::Rhumidity(value) => {
-            assert_eq!(value.value, 50.0);
-            assert!(value.units.is_none());
-        }
-        other => panic!("expected normalized humidity, got {other:?}"),
-    }
-}
-
-#[test]
-fn tdm_xml_accepts_every_schema_range_units_spelling() {
-    for (units, canonical, spellings) in [
-        (TdmRangeUnits::Km, "km", ["km", "KM"]),
-        (TdmRangeUnits::Seconds, "s", ["s", "S"]),
-        (TdmRangeUnits::Ru, "RU", ["RU", "ru"]),
-    ] {
-        let mut message = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e9.kvn")).unwrap();
-        message.body.segments[0].metadata.range_units = Some(units);
-        let xml = message.to_xml().unwrap();
-        for spelling in spellings {
-            let candidate = mutated(
-                &xml,
-                &format!("<RANGE_UNITS>{canonical}</RANGE_UNITS>"),
-                &format!("<RANGE_UNITS>{spelling}</RANGE_UNITS>"),
-            );
-            Tdm::from_xml(&candidate).unwrap_or_else(|error| panic!("{spelling}: {error}"));
-        }
-    }
-}
-
 #[test]
 fn edited_tdm_metadata_numbers_are_revalidated_before_output() {
     for field in [
@@ -380,4 +233,103 @@ fn unambiguous_tdm_numeric_boundaries_generate_valid_xml() {
     let xml = message.to_xml().unwrap();
     validate_xml("TDM numeric boundaries", &xml);
     assert_eq!(Tdm::from_xml(&xml).unwrap(), message);
+}
+
+#[test]
+fn kitchen_sink_roundtrip() {
+    let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+MESSAGE_ID = KITCHEN-SINK-001
+META_START
+TRACK_ID = TRACK_001
+DATA_TYPES = RANGE,DOPPLER_INTEGRATED
+TIME_SYSTEM = UTC
+START_TIME = 2023-01-01T00:00:00
+STOP_TIME = 2023-01-01T01:00:00
+PARTICIPANT_1 = DSS-14
+PARTICIPANT_2 = SPACECRAFT_A
+PARTICIPANT_3 = QUASAR_1
+PARTICIPANT_4 = RELAY_SAT
+PARTICIPANT_5 = DSS-25
+MODE = SEQUENTIAL
+PATH = 1,2,1
+EPHEMERIS_NAME_1 = DSS14_EPHEM
+EPHEMERIS_NAME_2 = SC_EPHEM
+EPHEMERIS_NAME_3 = QUASAR_EPHEM
+EPHEMERIS_NAME_4 = RELAY_EPHEM
+EPHEMERIS_NAME_5 = DSS25_EPHEM
+TRANSMIT_BAND = X
+RECEIVE_BAND = Ka
+TURNAROUND_NUMERATOR = 880
+TURNAROUND_DENOMINATOR = 749
+TIMETAG_REF = RECEIVE
+INTEGRATION_INTERVAL = 60.0
+INTEGRATION_REF = MIDDLE
+FREQ_OFFSET = 0.0
+RANGE_MODE = COHERENT
+RANGE_MODULUS = 32768.0
+RANGE_UNITS = km
+ANGLE_TYPE = AZEL
+REFERENCE_FRAME = EME2000
+INTERPOLATION = LAGRANGE
+INTERPOLATION_DEGREE = 7
+DOPPLER_COUNT_BIAS = 240000000.0
+DOPPLER_COUNT_SCALE = 1000
+DOPPLER_COUNT_ROLLOVER = NO
+TRANSMIT_DELAY_1 = 0.000077
+RECEIVE_DELAY_1 = 0.000088
+DATA_QUALITY = VALIDATED
+CORRECTION_RANGE = 0.001
+CORRECTIONS_APPLIED = YES
+META_STOP
+DATA_START
+COMMENT Range measurements
+RANGE = 2023-01-01T00:00:00 1000.0
+RANGE = 2023-01-01T00:01:00 1001.0
+DOPPLER_INTEGRATED = 2023-01-01T00:02:00 -0.5
+DATA_STOP
+"#;
+    let tdm = Tdm::from_kvn(kvn).expect("parse kvn");
+    let generated = tdm.to_kvn().expect("generate kvn");
+    let tdm2 = Tdm::from_kvn(&generated).expect("parse generated kvn");
+
+    assert_eq!(tdm2, tdm);
+}
+
+#[test]
+fn xml_sample_parsing() {
+    let xml = include_str!("../../data/xml/tdm_e21.xml");
+    let mut tdm = Tdm::from_xml(xml).expect("parse xml");
+    assert!(!tdm.body.segments.is_empty());
+
+    crate::common::assert_validation_field(&tdm.to_kvn().unwrap_err(), "PARTICIPANT_1");
+    tdm.body.segments[0].metadata.participant_1 = "DSS-25".into();
+    let generated_kvn = tdm.to_kvn().expect("convert to kvn");
+    let tdm2 = Tdm::from_kvn(&generated_kvn).expect("parse generated kvn");
+
+    assert_eq!(tdm2, tdm);
+}
+
+#[test]
+fn rhumidity_xml_roundtrip_omits_empty_units_attr() {
+    let kvn = r#"CCSDS_TDM_VERS = 2.0
+CREATION_DATE = 2023-01-01T00:00:00
+ORIGINATOR = TEST
+META_START
+TIME_SYSTEM = UTC
+PARTICIPANT_1 = DSS-10
+META_STOP
+DATA_START
+RHUMIDITY = 2023-01-01T00:03:00 12
+DATA_STOP
+"#;
+
+    let tdm = Tdm::from_kvn(kvn).expect("failed to parse TDM KVN");
+    let xml = tdm.to_xml().expect("failed to serialize TDM XML");
+    assert!(!xml.contains(r#"RHUMIDITY units="""#));
+    assert!(xml.contains("<RHUMIDITY>12</RHUMIDITY>"));
+
+    let parsed = Tdm::from_xml(&xml).expect("failed to parse TDM XML");
+    assert_eq!(parsed, tdm);
 }

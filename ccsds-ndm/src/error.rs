@@ -1273,11 +1273,10 @@ mod tests {
         }));
         // Offset 6 is start of LINE2
         err = err.with_location(input, 6);
-        if let CcsdsNdmError::Validation(ve) = err {
-            if let ValidationError::Generic { line, .. } = *ve {
-                assert_eq!(line, Some(2));
-            }
-        }
+        assert!(matches!(
+            err.as_validation_error(),
+            Some(ValidationError::Generic { line: Some(2), .. })
+        ));
 
         let kvn_err = KvnParseError {
             line: 0,
@@ -1288,9 +1287,10 @@ mod tests {
         };
         let mut err = CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(kvn_err))));
         err = err.with_location(input, 12); // start of LINE3
-        if let Some(ke) = err.as_kvn_parse_error() {
-            assert_eq!(ke.line, 3);
-        }
+        let ke = err
+            .as_kvn_parse_error()
+            .expect("KVN error must be preserved");
+        assert_eq!((ke.line, ke.column), (3, 1));
     }
 
     #[test]

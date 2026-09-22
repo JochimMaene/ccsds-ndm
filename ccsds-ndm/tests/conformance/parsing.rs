@@ -4,8 +4,7 @@
 
 use ccsds_ndm::from_str;
 
-mod common;
-use common::fixtures;
+use crate::common::fixtures;
 
 #[test]
 fn all_shipped_samples_parse_strictly() {
@@ -25,7 +24,7 @@ fn all_shipped_samples_parse_strictly() {
                 "{name} parsed strictly despite missing conditionally required OPM data"
             )),
             (false, Err(error)) => failures.push(format!("{name} failed to parse: {error}")),
-            (true, Err(error)) => common::assert_validation_field(&error, "MASS"),
+            (true, Err(error)) => crate::common::assert_validation_field(&error, "MASS"),
             _ => {}
         }
     }

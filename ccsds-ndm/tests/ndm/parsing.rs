@@ -1,38 +1,11 @@
+use ccsds_ndm::error::{DiagnosticNotation, DiagnosticOperation};
 // SPDX-FileCopyrightText: 2025 Jochim Maene <jochim.maene+github@gmail.com>
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use crate::common::mutated_once;
 use ccsds_ndm::messages::ndm::CombinedNdm;
-use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::{from_str, Message, Ndm};
-
-const OPM_KVN: &str = include_str!("../../data/kvn/opm_g1.kvn");
-
-#[test]
-fn combined_generation_preserves_child_checks() {
-    let opm = Opm::from_kvn(OPM_KVN).unwrap();
-    let combined = CombinedNdm {
-        id: None,
-        comments: Vec::new(),
-        messages: vec![Message::Opm(opm.clone())],
-    };
-    let message = Message::Ndm(combined.clone());
-
-    message.to_xml().unwrap();
-
-    let mut invalid_xml = opm;
-    invalid_xml.header.originator = "control \u{1}".into();
-    let invalid_xml = CombinedNdm {
-        id: None,
-        comments: Vec::new(),
-        messages: vec![Message::Opm(invalid_xml)],
-    };
-    let error = invalid_xml.to_xml().unwrap_err();
-    assert_eq!(
-        error.diagnostic().unwrap().message_kind,
-        ccsds_ndm::validation::MessageKind::Opm
-    );
-}
 
 #[test]
 fn combined_xml_parser_enforces_the_normative_envelope() {
@@ -313,59 +286,6 @@ fn combined_ndm_xml_attitude() {
     }
 }
 
-/// The combined envelope dispatches per-family validation and generation for every constituent.
-#[test]
-fn combined_envelope_carries_one_message_of_every_family() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("data/kvn");
-    let messages: Vec<Message> = [
-        "acm_g6.kvn",
-        "aem_g4.kvn",
-        "apm_g1.kvn",
-        "cdm_362.kvn",
-        "ocm_g15.kvn",
-        "oem_g11.kvn",
-        "omm_g7.kvn",
-        "opm_g1.kvn",
-        "rdm_c1.kvn",
-        "tdm_e1.kvn",
-    ]
-    .iter()
-    .map(|fixture| ccsds_ndm::from_file(root.join(fixture)).unwrap())
-    .collect();
-
-    let combined = CombinedNdm {
-        id: None,
-        comments: Vec::new(),
-        messages: messages.clone(),
-    };
-    ccsds_ndm::Validate::validate(&combined).unwrap();
-
-    let xml = Message::Ndm(combined).to_xml().unwrap();
-    let Message::Ndm(reparsed) = ccsds_ndm::from_str(&xml).unwrap() else {
-        panic!("combined envelope did not round-trip");
-    };
-    assert_eq!(reparsed.messages.len(), messages.len());
-}
-
-#[test]
-fn combined_validation_checks_the_cdm_root_envelope() {
-    // `Cdm`'s inherent `validate` shadows the trait method; it must not be weaker.
-    let mut cdm =
-        ccsds_ndm::messages::cdm::Cdm::from_kvn(include_str!("../../data/kvn/cdm_362.kvn"))
-            .unwrap();
-    cdm.id = Some("NOT_A_CDM".into());
-
-    cdm.validate().expect_err("bad root id must be rejected");
-
-    let combined = CombinedNdm {
-        id: None,
-        comments: Vec::new(),
-        messages: vec![Message::Cdm(cdm)],
-    };
-    ccsds_ndm::Validate::validate(&combined)
-        .expect_err("combined envelope must reject a malformed CDM root");
-}
-
 #[test]
 fn combined_xml_depth_has_a_fixed_safety_limit() {
     let document = format!("{}{}", "<ndm>".repeat(17), "</ndm>".repeat(17));
@@ -378,5 +298,43 @@ fn strict_parsing_remains_the_default() {
     crate::common::assert_validation_field(
         &ccsds_ndm::from_str(include_str!("../../data/xml/ndm_g22.xml")).unwrap_err(),
         "MASS",
+    );
+}
+
+#[test]
+fn combined_xml_rejects_illegal_root_and_constituent_attributes() {
+    let source = include_str!("../../data/xml/ndm_g12.xml");
+    for (label, xml) in [
+        (
+            "attribute 'id' is not allowed on the combined NDM root",
+            mutated_once(source, "<ndm ", "<ndm id=\"not-allowed\" "),
+        ),
+        (
+            "unknown combined NDM root attribute 'unexpected'",
+            mutated_once(source, "<ndm ", "<ndm unexpected=\"value\" "),
+        ),
+        (
+            "attribute 'unexpected' is not allowed on a combined NDM constituent",
+            mutated_once(source, "<apm id=", "<apm unexpected=\"value\" id="),
+        ),
+        (
+            "combined NDM constituents require exactly one id and version attribute",
+            mutated_once(source, " version=\"2.0\"", ""),
+        ),
+    ] {
+        crate::common::assert_invalid_format(&CombinedNdm::from_xml(&xml).unwrap_err(), label);
+    }
+}
+
+#[test]
+fn combined_kvn_is_reported_as_an_unsupported_notation() {
+    let error = CombinedNdm::from_kvn("CCSDS_OPM_VERS = 3.0\n").unwrap_err();
+    let diagnostic = error.diagnostic().unwrap();
+    assert_eq!(diagnostic.code, Some("unsupported.notation"));
+    assert_eq!(diagnostic.operation, DiagnosticOperation::Parse);
+    assert_eq!(diagnostic.notation, DiagnosticNotation::Kvn);
+    assert_eq!(
+        diagnostic.message_kind,
+        ccsds_ndm::validation::MessageKind::Ndm
     );
 }

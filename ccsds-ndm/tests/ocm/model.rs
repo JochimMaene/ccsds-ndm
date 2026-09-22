@@ -3,7 +3,7 @@ use ccsds_ndm::messages::ocm::{
     CovLine, ManLine, Ocm, OcmBody, OcmData, OcmMetadata, OcmSegment, OcmTrajState, TrajLine,
 };
 use ccsds_ndm::types::{Duration, TimeOffset, TimeUnits};
-use ccsds_ndm::{Ndm, Validate};
+use ccsds_ndm::Validate;
 #[test]
 fn ocm_validation_traj_lines() {
     let mut ocm = Ocm::builder()
@@ -58,66 +58,7 @@ fn ocm_validation_traj_lines() {
     }
 }
 
-#[test]
-fn parse_simple_ocm() {
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
-CENTER_NAME = EARTH
-TRAJ_REF_FRAME = GCRF
-TRAJ_TYPE = CARTPV
-2023-01-01T00:00:00 1 2 3 4 5 6
-TRAJ_STOP
-"#;
-    let ocm = Ocm::from_kvn(kvn).unwrap();
-    assert_eq!(ocm.body.segment.data.traj.len(), 1);
-    assert_eq!(ocm.body.segment.data.traj[0].traj_lines[0].values.len(), 6);
-}
-
-// =========================================================================
-// XSD COMPLIANCE TESTS - Group 1: Mandatory Metadata Fields
 // XSD: TIME_SYSTEM and EPOCH_TZERO are mandatory (no minOccurs="0")
-// =========================================================================
-
-#[test]
-fn sample_ocm_g20_xml() {
-    // Parse official CCSDS OCM XML example G-20
-    let xml = include_str!("../../data/xml/ocm_g20.xml");
-    let ocm = Ocm::from_xml(xml).unwrap();
-
-    // Verify mandatory metadata
-    assert!(!ocm.body.segment.metadata.time_system.is_empty());
-}
-
-#[test]
-fn kvn_roundtrip() {
-    // Full roundtrip: KVN -> Ocm -> KVN
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
-CENTER_NAME = EARTH
-TRAJ_REF_FRAME = GCRF
-TRAJ_TYPE = CARTPV
-2023-01-01T00:00:00 1000 2000 3000 4 5 6
-TRAJ_STOP
-"#;
-    let ocm = Ocm::from_kvn(kvn).unwrap();
-    let output = ocm.to_kvn().unwrap();
-
-    // Parse output again
-    let ocm2 = Ocm::from_kvn(&output).unwrap();
-    assert_eq!(ocm2, ocm);
-}
 
 #[test]
 fn covline_xml_serialization() {
