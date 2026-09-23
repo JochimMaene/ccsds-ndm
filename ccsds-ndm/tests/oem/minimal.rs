@@ -18,7 +18,7 @@ META_STOP
 "#;
 
 const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
-<oem id="CCSDS_OEM_VERS" version="3.0">
+<oem xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="CCSDS_OEM_VERS" version="3.0">
   <header>
     <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
     <ORIGINATOR>TEST</ORIGINATOR>

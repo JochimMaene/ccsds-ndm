@@ -313,6 +313,8 @@ impl ApmMetadata {
     ///
     /// Examples: EARTH, BARYCENTER, MOON
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.3.
+    ///
     /// :type: str | None
     #[getter]
     fn get_center_name(&self) -> Option<String> {
@@ -390,22 +392,9 @@ impl ApmData {
     fn to_core(&self, py: Python<'_>) -> PyResult<core_apm::ApmData> {
         macro_rules! core_list {
             ($values:expr, $wrapper:ty, $name:literal) => {
-                $values
-                    .bind(py)
-                    .iter()
-                    .enumerate()
-                    .map(|(index, value)| {
-                        value
-                            .extract::<PyRef<'_, $wrapper>>()
-                            .map(|value| value.inner.clone())
-                            .map_err(|_| {
-                                pyo3::exceptions::PyValueError::new_err(format!(
-                                    "{}[{index}] has the wrong type",
-                                    $name
-                                ))
-                            })
-                    })
-                    .collect::<PyResult<Vec<_>>>()?
+                crate::common::extract_records($values.bind(py), $name, |value: &$wrapper| {
+                    Ok(value.inner.clone())
+                })?
             };
         }
         Ok(core_apm::ApmData {
@@ -474,6 +463,8 @@ impl ApmData {
     /// Attitude quaternion. All mandatory elements are to be provided if the block is present.
     /// (See annex F for conventions and further detail.)
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: list[QuaternionState]
     #[gen_stub(override_return_type(type_repr = "list[QuaternionState]"))]
     #[getter]
@@ -492,6 +483,8 @@ impl ApmData {
     /// Euler angle elements. All mandatory elements of the logical block are to be provided if the
     /// block is present. (See annex F for conventions and further detail.)
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: list[EulerAngleState]
     #[gen_stub(override_return_type(type_repr = "list[EulerAngleState]"))]
     #[getter]
@@ -508,6 +501,8 @@ impl ApmData {
     }
 
     /// Angular velocity vector.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: list[AngVelState]
     #[gen_stub(override_return_type(type_repr = "list[AngVelState]"))]
@@ -565,6 +560,8 @@ impl ApmData {
     }
 
     /// Maneuver Parameters.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: list[ApmManeuverParameters]
     #[gen_stub(override_return_type(type_repr = "list[ApmManeuverParameters]"))]
@@ -761,6 +758,8 @@ impl ApmManeuverParameters {
     ///
     ///
     /// The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: Optional[float]
     #[getter]

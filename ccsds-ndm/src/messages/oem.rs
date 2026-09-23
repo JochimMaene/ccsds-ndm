@@ -6,23 +6,77 @@ use crate::common::{OdmHeader, StateVectorAcc};
 use crate::error::{CcsdsNdmError, Result, ValidationError};
 use crate::traits::Ndm;
 use crate::types::{
-    CalendarEpoch, Epoch, EpochKind, InterpolationDegree, PositionCovariance,
-    PositionVelocityCovariance, VelocityCovariance,
+    Epoch, EpochKind, InterpolationDegree, PositionCovariance, PositionVelocityCovariance,
+    VelocityCovariance,
 };
 use serde::{Deserialize, Serialize};
 
 mod kvn;
 mod xml;
 
-fn absolute_epoch_error(epoch: &Epoch, field: &'static str) -> Option<ValidationError> {
-    (epoch.kind() != EpochKind::Calendar || epoch.calendar_fields_are_valid() != Some(true)).then(
-        || ValidationError::InvalidValue {
-            field: field.into(),
-            value: epoch.to_string(),
-            expected: "a valid CCSDS calendar or ordinal absolute time tag".into(),
-            line: None,
-        },
-    )
+// ODM 7.5.9: underscores and runs of blanks denote the same text value; 7.5.3 admits the
+// all-uppercase and all-lowercase spellings of one value.
+fn text_value_eq(left: &str, right: &str) -> bool {
+    let words = |value| str::split(value, [' ', '_']).filter(|word: &&str| !word.is_empty());
+    let mut right_words = words(right);
+    words(left).all(|word| {
+        right_words
+            .next()
+            .is_some_and(|other| word.eq_ignore_ascii_case(other))
+    }) && right_words.next().is_none()
+}
+
+/// Whether `TIME_SYSTEM` denotes elapsed time rather than an absolute time scale.
+fn is_elapsed_time_system(time_system: &str) -> bool {
+    ["MET", "MRT"]
+        .iter()
+        .any(|elapsed| time_system.eq_ignore_ascii_case(elapsed))
+}
+
+/// ODM 7.5.10 time tags: calendar or ordinal layout with at most 16 fractional digits, the
+/// fixed-point maximum. MET and MRT durations use three-digit days (3.2.3.2).
+fn epoch_error(epoch: &Epoch, field: &'static str, time_system: &str) -> Option<ValidationError> {
+    let valid_layout = epoch.kind() == EpochKind::Calendar
+        && (epoch.calendar_fields_are_valid() == Some(true)
+            || is_elapsed_time_system(time_system) && epoch.is_elapsed_time());
+    (!valid_layout || epoch.fraction_digits() > 16).then(|| ValidationError::InvalidValue {
+        field: field.into(),
+        value: epoch.to_string(),
+        expected: "a CCSDS calendar or ordinal time tag with at most 16 fractional digits".into(),
+        line: None,
+    })
+}
+
+/// Time systems listed in ODM 3.2.3.2.
+const BOOK_TIME_SYSTEMS: &[&str] = &[
+    "GMST", "GPS", "MET", "MRT", "SCLK", "TAI", "TCB", "TDB", "TCG", "TT", "UT1", "UTC",
+];
+
+/// Reference frames listed in ODM 3.2.3.3.
+const BOOK_REF_FRAMES: &[&str] = &[
+    "EME2000", "GCRF", "GRC", "ICRF", "ITRF2000", "ITRF-93", "ITRF-97", "MCI", "TDR", "TEME", "TOD",
+];
+
+/// ODM 7.5.3 (KVN): normative text values are exclusively uppercase or exclusively lowercase.
+/// Only the values the book itself lists are known to be normative; ICD-defined values such as
+/// a mission frame are not, so their spelling is left alone. XML text follows xsd:string
+/// (8.13.5), so this is checked at the KVN boundary only.
+fn normative_case_error(
+    field: &'static str,
+    value: &str,
+    book_values: &[&str],
+) -> Option<ValidationError> {
+    let upper = value.bytes().any(|byte| byte.is_ascii_uppercase());
+    let lower = value.bytes().any(|byte| byte.is_ascii_lowercase());
+    let listed = book_values
+        .iter()
+        .any(|listed| value.trim().eq_ignore_ascii_case(listed));
+    (upper && lower && listed).then(|| ValidationError::InvalidValue {
+        field: field.into(),
+        value: value.to_owned(),
+        expected: "an all-uppercase or all-lowercase value".into(),
+        line: None,
+    })
 }
 
 fn validate_within_path(
@@ -73,6 +127,46 @@ impl crate::traits::Validate for Oem {
     }
 }
 
+impl Oem {
+    /// The first 7.5.3 case violation among the book-listed values this message would carry
+    /// in KVN.
+    pub(crate) fn kvn_case_error(&self) -> Option<ValidationError> {
+        self.body
+            .segment
+            .iter()
+            .enumerate()
+            .find_map(|(index, segment)| {
+                let metadata = &segment.metadata;
+                [
+                    ("REF_FRAME", "ref_frame", &metadata.ref_frame, BOOK_REF_FRAMES),
+                    ("TIME_SYSTEM", "time_system", &metadata.time_system, BOOK_TIME_SYSTEMS),
+                ]
+                .into_iter()
+                .find_map(|(field, member, value, listed)| {
+                    normative_case_error(field, value, listed)
+                        .map(|error| error.at_path(format!("body.segment[{index}].metadata.{member}")))
+                })
+                .or_else(|| {
+                    segment
+                        .data
+                        .covariance_matrix
+                        .iter()
+                        .enumerate()
+                        .find_map(|(covariance, matrix)| {
+                            let frame = matrix.cov_ref_frame.as_deref()?;
+                            normative_case_error("COV_REF_FRAME", frame, BOOK_REF_FRAMES).map(
+                                |error| {
+                                    error.at_path(format!(
+                                        "body.segment[{index}].data.covariance_matrix[{covariance}].cov_ref_frame"
+                                    ))
+                                },
+                            )
+                        })
+                })
+            })
+    }
+}
+
 impl crate::traits::Validate for OemBody {
     fn validate(&self) -> Result<()> {
         self.validate_identity()?;
@@ -85,57 +179,63 @@ impl crate::traits::Validate for OemBody {
 
 impl OemBody {
     fn validate_identity(&self) -> Result<()> {
-        if self.segment.is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
+        let Some(first) = self.segment.first() else {
+            return Err(ValidationError::MissingRequiredField {
                 block: "OEM Body".into(),
                 field: "segment (at least one required)".into(),
                 line: None,
             }
             .at_path("segment")
             .into());
-        }
-        if let Some(first) = self.segment.first() {
-            let ts = &first.metadata.time_system;
-            let object_name = &first.metadata.object_name;
-            let object_id = &first.metadata.object_id;
-            for (index, segment) in self.segment.iter().enumerate().skip(1) {
-                if segment.metadata.time_system != *ts {
-                    return Err(crate::error::ValidationError::InvalidValue {
-                        field: "TIME_SYSTEM".into(),
-                        value: segment.metadata.time_system.clone(),
-                        expected: format!(
-                            "consistent TIME_SYSTEM across OEM segments (expected {})",
-                            ts
-                        )
-                        .into(),
-                        line: None,
-                    }
-                    .at_path(format!("segment[{index}].metadata.time_system"))
-                    .into());
+        };
+        let metadata = &first.metadata;
+        for (index, segment) in self.segment.iter().enumerate().skip(1) {
+            // ODM 5.2.4.5: one time system throughout, in either permitted case (7.5.3).
+            if !segment
+                .metadata
+                .time_system
+                .eq_ignore_ascii_case(&metadata.time_system)
+            {
+                return Err(ValidationError::InvalidValue {
+                    field: "TIME_SYSTEM".into(),
+                    value: segment.metadata.time_system.clone(),
+                    expected: format!(
+                        "consistent TIME_SYSTEM across OEM segments (expected {})",
+                        metadata.time_system
+                    )
+                    .into(),
+                    line: None,
                 }
-                if segment.metadata.object_name != *object_name
-                    || segment.metadata.object_id != *object_id
-                {
-                    return Err(crate::error::ValidationError::InvalidValue {
-                        field: "OBJECT_NAME/OBJECT_ID".into(),
-                        value: format!(
-                            "{}/{}",
-                            segment.metadata.object_name, segment.metadata.object_id
-                        ),
-                        expected: format!(
-                            "one object throughout the OEM (expected {object_name}/{object_id})"
-                        )
-                        .into(),
-                        line: None,
-                    }
-                    .at_path(format!("segment[{index}].metadata.object_id"))
-                    .into());
+                .at_path(format!("segment[{index}].metadata.time_system"))
+                .into());
+            }
+            // ODM 5.1.3: one object throughout.
+            if !text_value_eq(&segment.metadata.object_name, &metadata.object_name)
+                || !text_value_eq(&segment.metadata.object_id, &metadata.object_id)
+            {
+                return Err(ValidationError::InvalidValue {
+                    field: "OBJECT_NAME/OBJECT_ID".into(),
+                    value: format!(
+                        "{}/{}",
+                        segment.metadata.object_name, segment.metadata.object_id
+                    ),
+                    expected: format!(
+                        "one object throughout the OEM (expected {}/{})",
+                        metadata.object_name, metadata.object_id
+                    )
+                    .into(),
+                    line: None,
                 }
+                .at_path(format!("segment[{index}].metadata.object_id"))
+                .into());
             }
         }
         Ok(())
     }
 
+    /// ODM 5.2.4.4: consecutive useable spans must not overlap, except at a shared endpoint.
+    /// The book constrains only the USEABLE keywords, so a pair is checked only when both are
+    /// present; total spans may overlap.
     fn validate_useable_spans(&self) -> Result<()> {
         use std::cmp::Ordering;
 
@@ -171,7 +271,7 @@ impl crate::traits::Validate for OemSegment {
     fn validate(&self) -> Result<()> {
         validate_within_path(self.metadata.validate(), || "metadata".into())?;
         validate_within_path(self.data.validate(), || "data".into())?;
-        match self.first_epoch_range_error() {
+        match self.first_epoch_error() {
             Some(error) => Err(error.into()),
             None => Ok(()),
         }
@@ -179,172 +279,136 @@ impl crate::traits::Validate for OemSegment {
 }
 
 impl OemSegment {
-    /// Return the first epoch ordering or range violation in this segment, if any.
-    fn first_epoch_range_error(&self) -> Option<ValidationError> {
-        let mut first = None;
-        let mut report = |error| {
-            first.get_or_insert(error);
-        };
-        let mut range = OemEpochRangeCheck::new(&self.metadata);
-        for (index, state) in self.data.state_vector.iter().enumerate() {
-            range.state(index, state, &mut report);
-        }
-        for (index, covariance) in self.data.covariance_matrix.iter().enumerate() {
-            range.covariance(index, covariance, &mut report);
-        }
-        first
+    /// Return the first invalid, out-of-span, or out-of-order data epoch in this segment.
+    fn first_epoch_error(&self) -> Option<ValidationError> {
+        let range = OemEpochRange::new(&self.metadata);
+        let states = self
+            .data
+            .state_vector
+            .iter()
+            .enumerate()
+            .find_map(|(index, state)| {
+                range
+                    .error(&state.epoch, "stateVector EPOCH")
+                    .map(|error| error.at_path(format!("data.state_vector[{index}].epoch")))
+            });
+        states.or_else(|| {
+            let mut previous = None;
+            self.data
+                .covariance_matrix
+                .iter()
+                .enumerate()
+                .find_map(|(index, covariance)| {
+                    range
+                        .covariance_error(&covariance.epoch, &mut previous)
+                        .map(|error| {
+                            error.at_path(format!("data.covariance_matrix[{index}].epoch"))
+                        })
+                })
+        })
     }
 }
 
-struct OemEpochRangeCheck<'a> {
-    start: &'a Epoch,
-    stop: &'a Epoch,
-    start_key: Option<crate::types::EpochOrderKey<'a>>,
-    stop_key: Option<crate::types::EpochOrderKey<'a>>,
-    previous_covariance: Option<crate::types::EpochOrderKey<'a>>,
+/// The total time span of one segment, against which its data epochs are checked.
+struct OemEpochRange<'a> {
+    metadata: &'a OemMetadata,
+    start: Option<crate::types::EpochOrderKey<'a>>,
+    stop: Option<crate::types::EpochOrderKey<'a>>,
 }
 
-impl<'a> OemEpochRangeCheck<'a> {
+impl<'a> OemEpochRange<'a> {
     fn new(metadata: &'a OemMetadata) -> Self {
         Self {
-            start: &metadata.start_time,
-            stop: &metadata.stop_time,
-            start_key: metadata.start_time.order_key(),
-            stop_key: metadata.stop_time.order_key(),
-            previous_covariance: None,
+            metadata,
+            start: metadata.start_time.order_key(),
+            stop: metadata.stop_time.order_key(),
         }
     }
 
-    fn state(
-        &mut self,
-        index: usize,
-        state: &'a StateVectorAcc,
-        report: &mut impl FnMut(ValidationError),
-    ) {
+    /// Table 5-3: START_TIME and STOP_TIME bound both the ephemeris and the covariance data.
+    fn error(&self, epoch: &Epoch, field: &'static str) -> Option<ValidationError> {
         use std::cmp::Ordering;
 
-        let path = || format!("data.state_vector[{index}].epoch");
-        if let Some(error) = absolute_epoch_error(&state.epoch, "stateVector EPOCH") {
-            report(error.at_path(path()));
+        if let Some(error) = epoch_error(epoch, field, &self.metadata.time_system) {
+            return Some(error);
         }
-        let current = state.epoch.order_key();
-        let in_total_span = match (self.start_key, current, self.stop_key) {
+        let outside = match (self.start, epoch.order_key(), self.stop) {
             (Some(start), Some(current), Some(stop)) => {
-                start.compare(&current) != Some(Ordering::Greater)
-                    && current.compare(&stop) != Some(Ordering::Greater)
+                start.compare(&current) == Some(Ordering::Greater)
+                    || current.compare(&stop) == Some(Ordering::Greater)
             }
-            _ => true,
+            _ => false,
         };
-        if !in_total_span {
-            report(
-                ValidationError::OutOfRange {
-                    name: "stateVector EPOCH".into(),
-                    value: state.epoch.to_string(),
-                    expected: format!(
-                        "within START_TIME {} and STOP_TIME {}",
-                        self.start, self.stop
-                    )
-                    .into(),
-                    line: None,
-                }
-                .at_path(path()),
-            );
-        }
+        outside.then(|| ValidationError::OutOfRange {
+            name: field.into(),
+            value: epoch.to_string(),
+            expected: format!(
+                "within START_TIME {} and STOP_TIME {}",
+                self.metadata.start_time, self.metadata.stop_time
+            )
+            .into(),
+            line: None,
+        })
     }
 
-    fn covariance(
-        &mut self,
-        index: usize,
-        covariance: &'a OemCovarianceMatrix,
-        report: &mut impl FnMut(ValidationError),
-    ) {
+    /// ODM 5.2.5.7: multiple covariance matrices are ordered by increasing time tag. Equal
+    /// tags are not excluded.
+    fn covariance_error(
+        &self,
+        epoch: &'a Epoch,
+        previous: &mut Option<crate::types::EpochOrderKey<'a>>,
+    ) -> Option<ValidationError> {
         use std::cmp::Ordering;
 
-        let current = covariance.epoch.order_key();
-        if matches!(
-            (self.previous_covariance, current),
-            (Some(prior), Some(current)) if prior.compare(&current) != Some(Ordering::Less)
-        ) {
-            report(
-                ValidationError::InvalidValue {
-                    field: "covarianceMatrix EPOCH".into(),
-                    value: covariance.epoch.to_string(),
-                    expected: "strictly increasing covariance time tags".into(),
-                    line: None,
-                }
-                .at_path(format!("data.covariance_matrix[{index}].epoch")),
-            );
+        if let Some(error) = self.error(epoch, "covarianceMatrix EPOCH") {
+            return Some(error);
         }
-        self.previous_covariance = current;
+        let current = epoch.order_key();
+        let decreasing = matches!(
+            (*previous, current),
+            (Some(prior), Some(current)) if prior.compare(&current) == Some(Ordering::Greater)
+        );
+        *previous = current;
+        decreasing.then(|| ValidationError::InvalidValue {
+            field: "covarianceMatrix EPOCH".into(),
+            value: epoch.to_string(),
+            expected: "covariance time tags in increasing order".into(),
+            line: None,
+        })
     }
 }
 
 impl crate::traits::Validate for OemMetadata {
     fn validate(&self) -> Result<()> {
-        if self.object_name.trim().is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "OEM Metadata".into(),
-                field: "OBJECT_NAME".into(),
-                line: None,
+        for (field, value) in [
+            ("OBJECT_NAME", &self.object_name),
+            ("OBJECT_ID", &self.object_id),
+            ("CENTER_NAME", &self.center_name),
+            ("REF_FRAME", &self.ref_frame),
+            ("TIME_SYSTEM", &self.time_system),
+        ] {
+            if value.trim().is_empty() {
+                return Err(ValidationError::missing_required("OEM Metadata", field).into());
             }
-            .into());
-        }
-        if self.object_id.trim().is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "OEM Metadata".into(),
-                field: "OBJECT_ID".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.center_name.trim().is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "OEM Metadata".into(),
-                field: "CENTER_NAME".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.ref_frame.trim().is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "OEM Metadata".into(),
-                field: "REF_FRAME".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.time_system.trim().is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "OEM Metadata".into(),
-                field: "TIME_SYSTEM".into(),
-                line: None,
-            }
-            .into());
         }
         for (field, epoch) in [
-            ("START_TIME", &self.start_time),
-            ("STOP_TIME", &self.stop_time),
+            ("START_TIME", Some(&self.start_time)),
+            ("STOP_TIME", Some(&self.stop_time)),
+            ("USEABLE_START_TIME", self.useable_start_time.as_ref()),
+            ("USEABLE_STOP_TIME", self.useable_stop_time.as_ref()),
+            ("REF_FRAME_EPOCH", self.ref_frame_epoch.as_ref()),
         ] {
-            if let Some(error) = absolute_epoch_error(epoch, field) {
+            if let Some(error) =
+                epoch.and_then(|epoch| epoch_error(epoch, field, &self.time_system))
+            {
                 return Err(error.into());
             }
         }
-        for (field, epoch) in [
-            ("USEABLE_START_TIME", self.useable_start_time.as_ref()),
-            ("USEABLE_STOP_TIME", self.useable_stop_time.as_ref()),
-        ] {
-            if let Some(epoch) = epoch {
-                if let Some(error) = absolute_epoch_error(epoch, field) {
-                    return Err(error.into());
-                }
-            }
-        }
         if self.interpolation.is_some() && self.interpolation_degree.is_none() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "OEM Metadata".into(),
-                field: "INTERPOLATION_DEGREE (required when INTERPOLATION is present)".into(),
-                line: None,
-            }
+            return Err(ValidationError::missing_required(
+                "OEM Metadata",
+                "INTERPOLATION_DEGREE (required when INTERPOLATION is present)",
+            )
             .into());
         }
         match self.first_time_span_error() {
@@ -403,18 +467,10 @@ impl OemMetadata {
 
 impl crate::traits::Validate for OemData {
     fn validate(&self) -> Result<()> {
-        self.validate_presence()?;
-        for (index, state_vector) in self.state_vector.iter().enumerate() {
-            validate_within_path(state_vector.validate(), || {
-                format!("state_vector[{index}]").into()
-            })?;
-        }
-        for (index, covariance) in self.covariance_matrix.iter().enumerate() {
-            validate_within_path(covariance.validate(), || {
-                format!("covariance_matrix[{index}]").into()
-            })?;
-        }
-        Ok(())
+        // Record epochs depend on the segment TIME_SYSTEM, XML values follow xsd:double
+        // (ODM 8.13.4), and frame spelling is a KVN rule, so the segment and the KVN
+        // boundary check the records.
+        self.validate_presence()
     }
 }
 
@@ -547,17 +603,14 @@ pub struct OemMetadata {
     #[builder(into)]
     pub ref_frame: String,
     /// Epoch of reference frame, if not intrinsic to the definition of the reference frame.
-    /// (See 7.5.10 for formatting rules.)
+    /// (See 7.5.10 for formatting rules.) Like the other OEM epochs, it is interpreted in
+    /// TIME_SYSTEM (7.5.11), so MET and MRT values are durations (3.2.3.2).
     ///
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
-    pub ref_frame_epoch: Option<CalendarEpoch>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ref_frame_epoch: Option<Epoch>,
     /// Time system used for ephemeris and covariance data. Use of values other than those in
     /// 3.2.3.2 should be documented in an ICD.
     ///
@@ -583,11 +636,7 @@ pub struct OemMetadata {
     /// **Examples**: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub useable_start_time: Option<Epoch>,
     /// Stop time of USEABLE time span covered by ephemeris data immediately following this
     /// metadata block. (For format specification, see 7.5.10.) This optional keyword allows the
@@ -599,11 +648,7 @@ pub struct OemMetadata {
     /// **Examples**: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub useable_stop_time: Option<Epoch>,
     /// End of TOTAL time span covered by ephemeris data and covariance data immediately
     /// following this metadata block. (For format specification, see 7.5.10.)
@@ -618,11 +663,7 @@ pub struct OemMetadata {
     /// **Examples**: HERMITE, LINEAR, LAGRANGE
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub interpolation: Option<String>,
     /// Recommended interpolation degree for ephemeris data in the immediately following set of
@@ -632,11 +673,7 @@ pub struct OemMetadata {
     /// **Examples**: 5, 8
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interpolation_degree: Option<InterpolationDegree>,
 }
 
@@ -712,11 +749,7 @@ pub struct OemCovarianceMatrix {
     /// **Examples**: ICRF, EME2000
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub cov_ref_frame: Option<String>,
 
@@ -849,26 +882,6 @@ pub struct OemCovarianceMatrix {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
     pub cz_dot_z_dot: VelocityCovariance,
-}
-
-impl crate::traits::Validate for OemCovarianceMatrix {
-    fn validate(&self) -> Result<()> {
-        if let Some(error) = absolute_epoch_error(&self.epoch, "EPOCH") {
-            return Err(error.into());
-        }
-        for (field, value) in self.values() {
-            if !value.is_finite() {
-                return Err(ValidationError::InvalidValue {
-                    field: field.into(),
-                    value: value.to_string(),
-                    expected: "a finite number".into(),
-                    line: None,
-                }
-                .into());
-            }
-        }
-        Ok(())
-    }
 }
 
 impl OemCovarianceMatrix {

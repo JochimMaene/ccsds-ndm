@@ -50,6 +50,60 @@ fn consecutive_useable_spans_may_touch_but_not_overlap() {
 }
 
 #[test]
+fn total_spans_may_overlap_when_useable_bounds_are_omitted() {
+    // ODM 5.2.4.4 forbids overlap only between USEABLE_STOP_TIME and the next
+    // USEABLE_START_TIME; STOP_TIME may exceed the next START_TIME.
+    for (omit_stop, omit_start) in [(true, true), (true, false), (false, true)] {
+        let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+        if omit_stop {
+            message.body.segment[0].metadata.useable_stop_time = None;
+        }
+        let second = &mut message.body.segment[1].metadata;
+        second.start_time = epoch("2019-12-28T21:00:00");
+        second.useable_start_time = (!omit_start).then(|| epoch("2019-12-28T21:01:00"));
+        message.validate().expect("overlapping total spans");
+        assert_eq!(Oem::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+        assert_eq!(Oem::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    }
+}
+
+#[test]
+fn time_system_comparison_accepts_normative_lowercase_spelling() {
+    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    message.body.segment[1]
+        .metadata
+        .time_system
+        .make_ascii_lowercase();
+    message.validate().unwrap();
+    assert_eq!(Oem::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+}
+
+#[test]
+fn object_identity_compares_ccsds_text_values_without_rewriting_them() {
+    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    message.body.segment[1].metadata.object_name = "MARS_GLOBAL  SURVEYOR".into();
+    message.validate().unwrap();
+    assert_eq!(Oem::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+
+    // ODM 7.5.3 admits the all-lowercase spelling of the same value.
+    message.body.segment[1]
+        .metadata
+        .object_name
+        .make_ascii_lowercase();
+    message.body.segment[1]
+        .metadata
+        .object_id
+        .make_ascii_lowercase();
+    message.validate().unwrap();
+
+    message.body.segment[1].metadata.object_name = "MARS GLOBAL SURVEYOR 2".into();
+    crate::common::assert_validation_field(
+        &message.validate().unwrap_err(),
+        "OBJECT_NAME/OBJECT_ID",
+    );
+}
+
+#[test]
 fn oem_time_tags_are_absolute_and_metadata_ranges_are_consistent() {
     let mut message = Oem::from_xml(XML).unwrap();
     message.body.segment[0].data.state_vector[0].epoch = epoch("123.5");
@@ -84,17 +138,232 @@ fn ephemeris_records_are_in_span_but_need_not_be_ordered() {
 }
 
 #[test]
-fn covariance_time_tags_are_strictly_increasing() {
+fn covariance_epochs_must_be_within_the_total_span() {
+    let valid = Oem::from_xml(XML).unwrap();
+    let kvn = valid.to_kvn().unwrap();
+    let covariance_epoch_line = kvn.lines().find(|line| line.starts_with("EPOCH")).unwrap();
+    for value in ["2019-12-18T11:59:59", "2019-12-28T22:28:01"] {
+        let mut invalid = valid.clone();
+        invalid.body.segment[0].data.covariance_matrix[0].epoch = epoch(value);
+        let xml = crate::common::mutated(
+            XML,
+            "<EPOCH>2019-12-28T22:28:00.331</EPOCH>",
+            &format!("<EPOCH>{value}</EPOCH>"),
+        );
+        let kvn = crate::common::mutated(&kvn, covariance_epoch_line, &format!("EPOCH = {value}"));
+        for error in [
+            invalid.validate().unwrap_err(),
+            invalid.to_kvn().unwrap_err(),
+            invalid.to_xml().unwrap_err(),
+            Oem::from_xml(&xml).unwrap_err(),
+            Oem::from_kvn(&kvn).unwrap_err(),
+        ] {
+            assert_eq!(error.code(), Some("validation.out_of_range"));
+            assert_eq!(
+                error.field_path().as_deref(),
+                Some("body.segment[0].data.covariance_matrix[0].epoch")
+            );
+        }
+    }
+    for boundary in [
+        valid.body.segment[0].metadata.start_time,
+        valid.body.segment[0].metadata.stop_time,
+    ] {
+        let mut message = valid.clone();
+        message.body.segment[0].data.covariance_matrix[0].epoch = boundary;
+        message.validate().expect("inclusive total span");
+    }
+
+    // The original, informative G-14 example ends its total span before the covariance.
+    let original = crate::common::mutated(
+        XML,
+        "<STOP_TIME>2019-12-28T22:28:00.331</STOP_TIME>",
+        "<STOP_TIME>2019-12-28T21:28:00.331</STOP_TIME>",
+    );
+    let error = Oem::from_xml(&original).unwrap_err();
+    crate::common::assert_validation_field(&error, "covarianceMatrix EPOCH");
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[0].data.covariance_matrix[0].epoch")
+    );
+}
+
+#[test]
+fn covariance_time_tags_are_ordered_by_increasing_time() {
+    // ODM 5.2.5.7 orders matrices by increasing time tag; it does not exclude equal tags.
     let mut message = Oem::from_xml(XML).unwrap();
-    let covariance = message.body.segment[0].data.covariance_matrix[0].clone();
+    let mut covariance = message.body.segment[0].data.covariance_matrix[0].clone();
+    covariance.cov_ref_frame = Some("RTN".into());
+    message.body.segment[0]
+        .data
+        .covariance_matrix
+        .push(covariance.clone());
+    message.validate().unwrap();
+
+    covariance.epoch = message.body.segment[0].metadata.start_time;
     message.body.segment[0]
         .data
         .covariance_matrix
         .push(covariance);
     let error = message.validate().unwrap_err();
-    assert!(error.to_string().contains("strictly increasing"));
+    crate::common::assert_validation_field(&error, "covarianceMatrix EPOCH");
     assert_eq!(
         error.field_path().as_deref(),
-        Some("body.segment[0].data.covariance_matrix[1].epoch")
+        Some("body.segment[0].data.covariance_matrix[2].epoch")
     );
+}
+
+#[test]
+fn elapsed_time_systems_use_three_digit_day_durations() {
+    // ODM 3.2.3.2: MET and MRT times are durations from an epoch in three-digit days.
+    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    message.body.segment.truncate(1);
+    let segment = &mut message.body.segment[0];
+    segment.metadata.time_system = "MET".into();
+    segment.metadata.start_time = epoch("0000-000T00:00:00");
+    segment.metadata.useable_start_time = None;
+    segment.metadata.useable_stop_time = None;
+    segment.metadata.stop_time = epoch("0000-400T00:00:00");
+    segment.data.state_vector.truncate(2);
+    segment.data.state_vector[0].epoch = epoch("0000-000T00:10:00");
+    segment.data.state_vector[1].epoch = epoch("0000-399T23:59:59.5");
+    message.validate().unwrap();
+    assert_eq!(Oem::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+
+    // 7.5.11: REF_FRAME_EPOCH is also interpreted in TIME_SYSTEM.
+    message.body.segment[0].metadata.ref_frame_epoch = Some(epoch("0000-000T00:00:00"));
+    message.validate().unwrap();
+    assert_eq!(Oem::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    assert_eq!(Oem::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+
+    message.body.segment[0].data.state_vector[1].epoch = epoch("0000-400T00:00:01");
+    crate::common::assert_validation_field(&message.validate().unwrap_err(), "stateVector EPOCH");
+    message.body.segment[0].data.state_vector[1].epoch = epoch("0000-399T00:00:00");
+    message.body.segment[0].metadata.time_system = "UTC".into();
+    crate::common::assert_validation_field(&message.validate().unwrap_err(), "START_TIME");
+    message.body.segment[0].metadata.start_time = epoch("2020-001T00:00:00");
+    message.body.segment[0].metadata.stop_time = epoch("2020-366T00:00:00");
+    for state in &mut message.body.segment[0].data.state_vector {
+        state.epoch = epoch("2020-002T00:00:00");
+    }
+    crate::common::assert_validation_field(&message.validate().unwrap_err(), "REF_FRAME_EPOCH");
+}
+
+#[test]
+fn kvn_values_listed_in_the_book_use_a_single_case() {
+    // ODM 7.5.3 is a KVN rule for normative values: those listed in 3.2.3.2 and 3.2.3.3. XML
+    // text follows xsd:string (8.13.5), which the schema leaves unrestricted here.
+    for (from, to, field) in [
+        ("TIME_SYSTEM = UTC", "TIME_SYSTEM = Utc", "TIME_SYSTEM"),
+        ("REF_FRAME = EME2000", "REF_FRAME = Eme2000", "REF_FRAME"),
+    ] {
+        let kvn = crate::common::mutated_once(KVN_FIXTURES[0], from, to);
+        crate::common::assert_validation_field(&Oem::from_kvn(&kvn).unwrap_err(), field);
+    }
+
+    // ICD-defined values and registry centers keep their spelling in KVN.
+    let custom = crate::common::mutated_once(
+        KVN_FIXTURES[0],
+        "REF_FRAME = EME2000",
+        "REF_FRAME = MissionFrame",
+    );
+    let custom = crate::common::mutated_once(
+        &custom,
+        "CENTER_NAME = MARS BARYCENTER",
+        "CENTER_NAME = Mars Barycenter",
+    );
+    Oem::from_kvn(&custom).unwrap();
+
+    // The same spellings are valid XML; only conversion to KVN refuses them.
+    let mut message = Oem::from_xml(XML).unwrap();
+    message.body.segment[0].metadata.time_system = "Utc".into();
+    message.body.segment[0].data.covariance_matrix[0].cov_ref_frame = Some("Icrf".into());
+    message.validate().unwrap();
+    let reparsed = Oem::from_xml(&message.to_xml().unwrap()).unwrap();
+    assert_eq!(reparsed, message);
+    crate::common::assert_validation_field(&message.to_kvn().unwrap_err(), "TIME_SYSTEM");
+    message.body.segment[0].metadata.time_system = "UTC".into();
+    crate::common::assert_validation_field(&message.to_kvn().unwrap_err(), "COV_REF_FRAME");
+}
+
+#[test]
+fn xml_values_follow_xsd_double_but_kvn_needs_finite_numbers() {
+    // ODM 8.13.4 gives XML numbers the xsd:double conventions, including INF and NaN; KVN
+    // numbers (7.5.5-7.5.7) are finite.
+    let source = crate::common::mutated_once(XML, "<X>2789.6</X>", "<X>NaN</X>");
+    let source =
+        crate::common::mutated_once(&source, "<Y_DOT>-2.50</Y_DOT>", "<Y_DOT>-INF</Y_DOT>");
+    let source = crate::common::mutated_once(
+        &source,
+        "<CX_X>0.316</CX_X>",
+        "<CX_X><![CDATA[INF]]></CX_X>",
+    );
+    let message = Oem::from_xml(&source).unwrap();
+    assert!(message.body.segment[0].data.state_vector[0]
+        .x
+        .value
+        .is_nan());
+    assert_eq!(
+        message.body.segment[0].data.covariance_matrix[0].cx_x.value,
+        f64::INFINITY
+    );
+    let xml = message.to_xml().unwrap();
+    crate::common::validate_xml("non-finite OEM values", &xml);
+    let reparsed = Oem::from_xml(&xml).unwrap();
+    assert!(reparsed.body.segment[0].data.state_vector[0]
+        .x
+        .value
+        .is_nan());
+    let error = message.to_kvn().unwrap_err();
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[0].data.state_vector[0].x")
+    );
+
+    // XSD 1.0 spells the special values only INF, -INF, and NaN, however the text is encoded.
+    for spelling in [
+        "inf",
+        "+INF",
+        "nan",
+        "Infinity",
+        "<![CDATA[inf]]>",
+        "i&#110;f",
+    ] {
+        let invalid =
+            crate::common::mutated_once(XML, "<X>2789.6</X>", &format!("<X>{spelling}</X>"));
+        let error = Oem::from_xml(&invalid).unwrap_err();
+        assert_eq!(
+            error.code(),
+            Some("parse.xml.syntax"),
+            "{spelling}: {error}"
+        );
+        assert!(
+            error.to_string().contains("is not an xsd:double value"),
+            "{spelling}: {error}"
+        );
+    }
+    let comment = crate::common::mutated_once(
+        XML,
+        "<COMMENT>OEM WITH OPTIONAL ACCELERATIONS</COMMENT>",
+        "<COMMENT>nan</COMMENT>",
+    );
+    Oem::from_xml(&comment).unwrap();
+}
+
+#[test]
+fn epoch_fractions_stop_at_the_fixed_point_maximum() {
+    // ODM 7.5.10: fractional seconds may use up to the 16 digits of a fixed-point number.
+    let mut message = Oem::from_xml(XML).unwrap();
+    message.body.segment[0].data.state_vector[1].epoch =
+        epoch("2019-12-18T12:01:00.3310000000000000Z");
+    message.validate().unwrap();
+    message.body.segment[0].data.state_vector[1].epoch =
+        epoch("2019-12-18T12:01:00.33100000000000000Z");
+    crate::common::assert_validation_field(&message.validate().unwrap_err(), "stateVector EPOCH");
+
+    let mut message = Oem::from_xml(XML).unwrap();
+    message.header.creation_date = "2019-11-04T17:22:31.3310000000000000".parse().unwrap();
+    message.validate().unwrap();
+    message.header.creation_date = "2019-11-04T17:22:31.33100000000000000".parse().unwrap();
+    crate::common::assert_validation_field(&message.validate().unwrap_err(), "CREATION_DATE");
 }

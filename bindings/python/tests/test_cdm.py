@@ -293,9 +293,18 @@ class TestCdmRealWorldCorpus:
     def test_operational_cdm_with_bare_nil_is_rejected(self):
         path = Path(__file__).resolve().parent / "test_cdm.xml"
 
-        with pytest.raises(ccsds_ndm.NdmFormatError) as excinfo:
+        # The operational file also shares the declaration's line with the root element.
+        with pytest.raises(ccsds_ndm.NdmFormatError, match="first line"):
             ccsds_ndm.from_file(str(path), format="xml")
 
+        # With the envelope NDM/XML 4.2-4.3 requires, the bare `nil` is what remains invalid.
+        declared = path.read_text().replace(
+            "?><cdm ",
+            '?>\n<cdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ',
+            1,
+        )
+        with pytest.raises(ccsds_ndm.NdmFormatError) as excinfo:
+            ccsds_ndm.from_str(declared, format="xml")
         assert "nil" in str(excinfo.value)
 
 

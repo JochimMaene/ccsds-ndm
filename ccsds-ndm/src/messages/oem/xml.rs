@@ -9,6 +9,11 @@ use crate::types::{
     VelocityCovarianceUnits, VelocityUnits,
 };
 
+/// State vector elements holding xsd:double values.
+const STATE_VALUES: &[&[u8]] = &[
+    b"X", b"Y", b"Z", b"X_DOT", b"Y_DOT", b"Z_DOT", b"X_DDOT", b"Y_DDOT", b"Z_DDOT",
+];
+
 pub(super) fn validate_envelope(xml: &str, source_edition: &mut Option<String>) -> Result<()> {
     use crate::xml::XmlSequenceRule;
 
@@ -101,39 +106,9 @@ pub(super) fn validate_envelope(xml: &str, source_edition: &mut Option<String>) 
         source_edition,
         crate::xml::MessageSchema {
             child_rule: rule,
+            // Every state and covariance value element, and only those, carries units.
             attribute_allowed: |element: &[u8], attribute: &[u8]| match attribute {
-                b"units" => matches!(
-                    element,
-                    b"X" | b"Y"
-                        | b"Z"
-                        | b"X_DOT"
-                        | b"Y_DOT"
-                        | b"Z_DOT"
-                        | b"X_DDOT"
-                        | b"Y_DDOT"
-                        | b"Z_DDOT"
-                        | b"CX_X"
-                        | b"CY_X"
-                        | b"CY_Y"
-                        | b"CZ_X"
-                        | b"CZ_Y"
-                        | b"CZ_Z"
-                        | b"CX_DOT_X"
-                        | b"CX_DOT_Y"
-                        | b"CX_DOT_Z"
-                        | b"CX_DOT_X_DOT"
-                        | b"CY_DOT_X"
-                        | b"CY_DOT_Y"
-                        | b"CY_DOT_Z"
-                        | b"CY_DOT_X_DOT"
-                        | b"CY_DOT_Y_DOT"
-                        | b"CZ_DOT_X"
-                        | b"CZ_DOT_Y"
-                        | b"CZ_DOT_Z"
-                        | b"CZ_DOT_X_DOT"
-                        | b"CZ_DOT_Y_DOT"
-                        | b"CZ_DOT_Z_DOT"
-                ),
+                b"units" => STATE_VALUES.contains(&element) || COVARIANCE[3..].contains(&element),
                 _ => false,
             },
         },

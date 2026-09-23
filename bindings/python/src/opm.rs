@@ -6,7 +6,6 @@ use crate::common::{OdmHeader, StateVector};
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::opm as core_opm;
 use ccsds_ndm::types::{Angle, Distance, Gm, Inclination};
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
@@ -417,6 +416,8 @@ impl OpmMetadata {
     ///
     /// Examples: 2001-11-06T11:17:33 2002-204T15:56:23Z
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_ref_frame_epoch(&self) -> Option<String> {
@@ -685,6 +686,8 @@ impl KeplerianElements {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_true_anomaly(&self) -> Option<f64> {
@@ -699,6 +702,8 @@ impl KeplerianElements {
     /// True anomaly or mean anomaly
     ///
     /// Units: deg
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -869,6 +874,8 @@ impl OpmCovarianceMatrix {
 
     /// Reference frame in which the covariance data are given. Select from the accepted set of
     /// values indicated in 3.2.4.11.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1318,22 +1325,11 @@ impl OpmData {
     }
 
     fn to_core(&self, py: Python<'_>) -> PyResult<core_opm::OpmData> {
-        let maneuver_parameters = self
-            .maneuver_parameters
-            .bind(py)
-            .iter()
-            .enumerate()
-            .map(|(index, value)| {
-                value
-                    .extract::<PyRef<'_, OpmManeuverParameters>>()
-                    .map(|value| value.inner.clone())
-                    .map_err(|_| {
-                        PyValueError::new_err(format!(
-                            "maneuver_parameters[{index}] must be OpmManeuverParameters"
-                        ))
-                    })
-            })
-            .collect::<PyResult<Vec<_>>>()?;
+        let maneuver_parameters = crate::common::extract_records(
+            self.maneuver_parameters.bind(py),
+            "maneuver_parameters",
+            |value: &OpmManeuverParameters| Ok(value.inner.clone()),
+        )?;
 
         Ok(core_opm::OpmData {
             comment: self.comment.clone(),

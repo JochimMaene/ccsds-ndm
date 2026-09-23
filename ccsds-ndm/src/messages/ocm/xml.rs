@@ -427,17 +427,25 @@ impl Ocm {
     }
 }
 
+/// Displays an OCM data line as its epoch followed by space-separated values.
+struct EpochLine<'a, T>(&'a Epoch, &'a [T]);
+
+impl<T: std::fmt::Display> std::fmt::Display for EpochLine<'_, T> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(formatter)?;
+        for value in self.1 {
+            write!(formatter, " {value}")?;
+        }
+        Ok(())
+    }
+}
+
 impl Serialize for TrajLine {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let mut s = self.epoch.to_string();
-        for v in &self.values {
-            s.push(' ');
-            s.push_str(&v.to_string());
-        }
-        serializer.serialize_str(&s)
+        serializer.collect_str(&EpochLine(&self.epoch, &self.values))
     }
 }
 
@@ -473,12 +481,7 @@ impl Serialize for CovLine {
     where
         S: serde::Serializer,
     {
-        let mut s = self.epoch.to_string();
-        for v in &self.values {
-            s.push(' ');
-            s.push_str(&v.to_string());
-        }
-        serializer.serialize_str(&s)
+        serializer.collect_str(&EpochLine(&self.epoch, &self.values))
     }
 }
 
@@ -514,12 +517,7 @@ impl Serialize for ManLine {
     where
         S: serde::Serializer,
     {
-        let mut s = self.epoch.to_string();
-        for v in &self.values {
-            s.push(' ');
-            s.push_str(v);
-        }
-        serializer.serialize_str(&s)
+        serializer.collect_str(&EpochLine(&self.epoch, &self.values))
     }
 }
 

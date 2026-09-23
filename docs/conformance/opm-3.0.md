@@ -58,8 +58,8 @@ They are not missing self-contained behavior and are not guessed; see
   model.
 - **Zero delta mass is accepted.** 3.2.4.7 describes delta mass as negative, but the XSD's
   `deltamassTypeZ` permits zero; the schema governs the wire form.
-- **`nil`/`xsi:nil` is a compatibility extension** on otherwise attribute-free optional values.
-  Attributes cannot be hidden behind a nil or empty value.
+- **`nil` and `xsi:nil` are rejected.** The OPM schema declares no nillable element, so an
+  optional value is either present with a valid value or omitted.
 - **XML source locations are omitted** where `quick-xml` does not reliably expose them, rather
   than invented.
 - **Caller context is never guessed.** MET/MRT reference events, ICD-defined time systems and

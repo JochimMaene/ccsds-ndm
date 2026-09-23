@@ -2,6 +2,22 @@ use crate::common::{assert_rejects, mutated, mutated_once, validate_xml};
 use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::{Message, Ndm};
+
+#[test]
+fn xml_degrees_outside_the_kvn_integer_range_fail_before_output() {
+    let mut message = Oem::from_xml(XML).unwrap();
+    message.body.segment[0].metadata.interpolation_degree = Some("2147483648".parse().unwrap());
+    let xml = message.to_xml().unwrap();
+    validate_xml("positiveInteger degree", &xml);
+    assert_eq!(Oem::from_xml(&xml).unwrap(), message);
+    let mut output = Vec::new();
+    assert_eq!(
+        message.to_kvn().unwrap_err().code(),
+        Some("validation.out_of_range")
+    );
+    assert!(message.write_kvn_to(&mut output).is_err());
+    assert!(output.is_empty());
+}
 #[test]
 fn every_shipped_fixture_generates_deterministic_xsd_valid_xml_and_reparseable_kvn() {
     let messages = ["kvn", "xml"].into_iter().flat_map(|extension| {
@@ -93,12 +109,12 @@ fn kvn_rounds_to_the_ccsds_digit_limit_and_rejects_partial_acceleration() {
 }
 
 #[test]
-fn kvn_rejects_an_overlong_raw_record_before_writing() {
+fn kvn_record_width_is_bounded_by_the_epoch_and_number_grammar() {
+    // ODM 7.5.10 caps epoch fractions at the 16-digit fixed-point maximum and 7.5.7 caps
+    // mantissas at 16 digits, so the widest valid record still fits a 254-character line.
     let mut message = Oem::from_xml(XML).unwrap();
     let state = &mut message.body.segment[0].data.state_vector[0];
-    state.epoch = "2019-12-18T12:00:00.1111111111111111111111111111111111111111"
-        .parse()
-        .unwrap();
+    state.epoch = "2019-12-18T12:00:00.3311111111111111Z".parse().unwrap();
     for value in [
         &mut state.x.value,
         &mut state.y.value,
@@ -110,14 +126,18 @@ fn kvn_rejects_an_overlong_raw_record_before_writing() {
         &mut state.y_ddot.as_mut().unwrap().value,
         &mut state.z_ddot.as_mut().unwrap().value,
     ] {
-        *value = 1.797_693_134_862_315e308;
+        *value = -1.797_693_134_862_315e308;
     }
+    let kvn = message.to_kvn().unwrap();
+    assert!(kvn.lines().all(|line| line.len() <= 254));
 
+    message.body.segment[0].data.state_vector[0].epoch =
+        "2019-12-18T12:00:00.33111111111111111".parse().unwrap();
     let mut output = Vec::new();
     let error = message
         .write_kvn_to(&mut output)
-        .expect_err("a record over 254 characters must fail preflight");
-    assert_eq!(error.code(), Some("validation.out_of_range"));
+        .expect_err("a 17-digit epoch fraction must fail before writing");
+    crate::common::assert_validation_field(&error, "stateVector EPOCH");
     assert!(output.is_empty());
 }
 
@@ -181,7 +201,10 @@ fn reference_frame_epoch_is_calendar_form_in_xml() {
         "<REF_FRAME_EPOCH>2000-01-01T12:00:00</REF_FRAME_EPOCH>",
         "<REF_FRAME_EPOCH>123.5</REF_FRAME_EPOCH>",
     );
-    crate::common::assert_invalid_epoch(&Oem::from_xml(&numeric).unwrap_err(), "123.5");
+    crate::common::assert_validation_field(
+        &Oem::from_xml(&numeric).unwrap_err(),
+        "REF_FRAME_EPOCH",
+    );
 }
 
 #[test]
@@ -223,7 +246,7 @@ fn oem_generation_rejects_non_finite_state_vectors() {
     oem.body.segment[0].data.covariance_matrix[0].cx_x.value = f64::INFINITY;
 
     let error = oem.to_kvn().unwrap_err();
-    assert!(error.to_string().contains("finite number"));
+    assert!(error.to_string().contains("representable CCSDS number"));
 }
 
 #[test]

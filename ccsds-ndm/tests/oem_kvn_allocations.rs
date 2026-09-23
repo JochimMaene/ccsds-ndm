@@ -44,7 +44,7 @@ fn covariance_oem(records: usize) -> Oem {
     message.body.segment[0].data.covariance_matrix = (0..records)
         .map(|index| {
             let mut covariance = covariance.clone();
-            covariance.epoch = format!("2019-12-28T21:{:02}:{:02}", 29 + index / 60, index % 60)
+            covariance.epoch = format!("2019-12-28T21:{:02}:{:02}", 30 + index / 60, index % 60)
                 .parse()
                 .unwrap();
             covariance

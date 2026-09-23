@@ -631,6 +631,8 @@ impl OcmMetadata {
     ///
     /// Examples: SPOT-7, ENVISAT, IRIDIUM NEXT-8, INTELSAT G-15, UNKNOWN
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_object_name(&self) -> Option<String> {
@@ -653,6 +655,8 @@ impl OcmMetadata {
     ///
     /// Examples: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_international_designator(&self) -> Option<String> {
@@ -672,6 +676,8 @@ impl OcmMetadata {
     ///
     /// Examples: CSPOC, RFSA, ESA, COMSPOC
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_catalog_name(&self) -> Option<String> {
@@ -689,6 +695,8 @@ impl OcmMetadata {
     ///
     /// Examples: 22444, 18SPCS 18571, 2147483648_04ae[...]d84c, UNKNOWN
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_object_designator(&self) -> Option<String> {
@@ -705,6 +713,8 @@ impl OcmMetadata {
     ///
     /// Examples: SV08, IN8
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_alternate_names(&self) -> Option<String> {
@@ -718,6 +728,8 @@ impl OcmMetadata {
     /// Free-text field containing originator or programmatic Point-of-Contact (POC) for OCM.
     ///
     /// Examples: Mr. Rodgers
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -733,6 +745,8 @@ impl OcmMetadata {
     ///
     /// Examples: Flight Dynamics, Mission Design Lead
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_originator_position(&self) -> Option<String> {
@@ -746,6 +760,8 @@ impl OcmMetadata {
     /// Free-text field containing originator PoC phone number.
     ///
     /// Examples: +12345678901
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -761,6 +777,8 @@ impl OcmMetadata {
     ///
     /// Examples: JOHN.DOE@SOMEWHERE.ORG
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_originator_email(&self) -> Option<String> {
@@ -775,6 +793,8 @@ impl OcmMetadata {
     /// (suggest comma-delimited address lines).
     ///
     /// Examples: 5040 Spaceflight Ave., Cocoa Beach, FL, USA, 12345
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -792,6 +812,8 @@ impl OcmMetadata {
     ///
     /// Examples: NASA, ESA, JAXA
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_tech_org(&self) -> Option<String> {
@@ -805,6 +827,8 @@ impl OcmMetadata {
     /// Free-text field containing technical PoC for OCM.
     ///
     /// Examples: Maxwell Smart
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -820,6 +844,8 @@ impl OcmMetadata {
     ///
     /// Examples: Flight Dynamics, Mission Design Lead
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_tech_position(&self) -> Option<String> {
@@ -833,6 +859,8 @@ impl OcmMetadata {
     /// Free-text field containing technical PoC phone number.
     ///
     /// Examples: +49615130312
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -848,6 +876,8 @@ impl OcmMetadata {
     ///
     /// Examples: JOHN.DOE@SOMEWHERE.ORG
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_tech_email(&self) -> Option<String> {
@@ -862,6 +892,8 @@ impl OcmMetadata {
     /// (suggest comma-delimited address lines).
     ///
     /// Examples: 5040 Spaceflight Ave., Cocoa Beach, FL, USA, 12345
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -898,6 +930,8 @@ impl OcmMetadata {
     ///
     /// Examples: OCM 201113719184, ABC-12_33
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_previous_message_id(&self) -> Option<String> {
@@ -915,6 +949,8 @@ impl OcmMetadata {
     ///
     /// Examples: OCM 201113719186, ABC-12_35
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_next_message_id(&self) -> Option<String> {
@@ -929,6 +965,8 @@ impl OcmMetadata {
     /// (reference `[10]`) that are linked (relevant) to this Orbit Data Message.
     ///
     /// Examples: ADM_MSG_35132.txt, ADM_ID_0572
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -945,6 +983,8 @@ impl OcmMetadata {
     ///
     /// Examples: CDM_MSG_35132.txt, CDM_ID_8257
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_cdm_msg_link(&self) -> Option<String> {
@@ -960,6 +1000,8 @@ impl OcmMetadata {
     ///
     /// Examples: PRM_MSG_35132.txt, PRM_ID_6897
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_prm_msg_link(&self) -> Option<String> {
@@ -974,6 +1016,8 @@ impl OcmMetadata {
     /// (reference `[12]`) that are linked (relevant) to this Orbit Data Message.
     ///
     /// Examples: RDM_MSG_35132.txt, RDM_ID_1839
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -991,6 +1035,8 @@ impl OcmMetadata {
     ///
     /// Examples: TDM_MSG_37.txt, TDM_835, TDM_836
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_tdm_msg_link(&self) -> Option<String> {
@@ -1006,6 +1052,8 @@ impl OcmMetadata {
     ///
     /// Examples: INTELSAT
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_operator(&self) -> Option<String> {
@@ -1019,6 +1067,8 @@ impl OcmMetadata {
     /// Free-text field containing the owner of the space object.
     ///
     /// Examples: SIRIUS
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1035,6 +1085,8 @@ impl OcmMetadata {
     ///
     /// Examples: US, SPAIN
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_country(&self) -> Option<String> {
@@ -1050,6 +1102,8 @@ impl OcmMetadata {
     ///
     /// Examples: SPIRE
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_constellation(&self) -> Option<String> {
@@ -1064,6 +1118,8 @@ impl OcmMetadata {
     /// in annex B, subsection B11.
     ///
     /// Examples: PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, OTHER
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1084,6 +1140,8 @@ impl OcmMetadata {
     ///
     /// Examples: OPERATIONAL
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_ops_status(&self) -> Option<String> {
@@ -1098,6 +1156,8 @@ impl OcmMetadata {
     /// annex B, subsection B14.
     ///
     /// Examples: GEO, LEO
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1117,6 +1177,8 @@ impl OcmMetadata {
     ///
     /// Examples: ORB, ORB, PHYS, COV, MAN, MAN, PERT, OD, USER
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_ocm_data_elements(&self) -> Option<String> {
@@ -1132,6 +1194,8 @@ impl OcmMetadata {
     /// used if the SCLK timescale is employed by the user.
     ///
     /// Units: s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1152,6 +1216,8 @@ impl OcmMetadata {
     ///
     /// Units: s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_sclk_sec_per_si_sec(&self) -> Option<f64> {
@@ -1169,6 +1235,8 @@ impl OcmMetadata {
     /// without supplying the PREVIOUS_MESSAGE_ID, and vice versa.
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1189,6 +1257,8 @@ impl OcmMetadata {
     ///
     /// Examples: 2001-11-07T11:17:33
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_next_message_epoch(&self) -> Option<String> {
@@ -1207,6 +1277,8 @@ impl OcmMetadata {
     ///
     /// Examples: 2001-11-06T00:00:00
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_start_time(&self) -> Option<String> {
@@ -1224,6 +1296,8 @@ impl OcmMetadata {
     /// time tag.
     ///
     /// Examples: 2001-11-08T00:00:00
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1244,6 +1318,8 @@ impl OcmMetadata {
     ///
     /// Units: d
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_time_span(&self) -> Option<f64> {
@@ -1262,6 +1338,8 @@ impl OcmMetadata {
     ///
     /// Units: s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_taimutc_at_tzero(&self) -> Option<f64> {
@@ -1278,6 +1356,8 @@ impl OcmMetadata {
     /// Epoch of next leap second, specified as an absolute time tag.
     ///
     /// Examples: 2016-12-31T23:59:60
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1298,6 +1378,8 @@ impl OcmMetadata {
     ///
     /// Units: s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_next_leap_taimutc(&self) -> Option<f64> {
@@ -1315,6 +1397,8 @@ impl OcmMetadata {
     /// Difference (UT1 – UTC) in seconds, as modeled by the originator at epoch 'EPOCH_TZERO'.
     ///
     /// Units: s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1335,6 +1419,8 @@ impl OcmMetadata {
     ///
     /// Examples: CELESTRAK_20201028
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_eop_source(&self) -> Option<String> {
@@ -1348,6 +1434,8 @@ impl OcmMetadata {
     /// Free-text field specifying the method used to select or interpolate sequential EOP data.
     ///
     /// Examples: PRECEDING_VALUE, NEAREST_NEIGHBOR, LINEAR, LAGRANGE_ORDER_5
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1363,6 +1451,8 @@ impl OcmMetadata {
     /// body (e.g., Sun/Earth/Planetary) ephemeris data used in the creation of this message.
     ///
     /// Examples: JPL_DE_FILES
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1433,45 +1523,26 @@ impl OcmData {
     }
 
     fn to_core(&self, py: Python<'_>) -> PyResult<core_ocm::OcmData> {
-        macro_rules! core_list {
-            ($values:expr, $wrapper:ty, $name:literal, $convert:expr) => {
-                $values
-                    .bind(py)
-                    .iter()
-                    .enumerate()
-                    .map(|(index, value)| {
-                        let value = value.extract::<PyRef<'_, $wrapper>>().map_err(|_| {
-                            PyValueError::new_err(format!(
-                                "{}[{index}] must be {}",
-                                $name,
-                                stringify!($wrapper)
-                            ))
-                        })?;
-                        $convert(&value)
-                    })
-                    .collect::<PyResult<Vec<_>>>()?
-            };
-        }
         Ok(core_ocm::OcmData {
-            traj: core_list!(self.traj, OcmTrajState, "traj", |value: &OcmTrajState| {
-                value.to_core(py)
-            }),
+            traj: crate::common::extract_records(
+                self.traj.bind(py),
+                "traj",
+                |value: &OcmTrajState| value.to_core(py),
+            )?,
             phys: self
                 .phys
                 .as_ref()
                 .map(|value| value.borrow(py).inner.clone()),
-            man: core_list!(
-                self.man,
-                OcmManeuverParameters,
+            man: crate::common::extract_records(
+                self.man.bind(py),
                 "man",
-                |value: &OcmManeuverParameters| { value.to_core(py) }
-            ),
-            cov: core_list!(
-                self.cov,
-                OcmCovarianceMatrix,
+                |value: &OcmManeuverParameters| value.to_core(py),
+            )?,
+            cov: crate::common::extract_records(
+                self.cov.bind(py),
                 "cov",
-                |value: &OcmCovarianceMatrix| { value.to_core(py) }
-            ),
+                |value: &OcmCovarianceMatrix| value.to_core(py),
+            )?,
             pert: self
                 .pert
                 .as_ref()
@@ -1660,20 +1731,11 @@ impl OcmTrajState {
     }
 
     fn to_core(&self, py: Python<'_>) -> PyResult<core_ocm::OcmTrajState> {
-        let traj_lines = self
-            .traj_lines
-            .bind(py)
-            .iter()
-            .enumerate()
-            .map(|(index, value)| {
-                value
-                    .extract::<PyRef<'_, TrajLine>>()
-                    .map(|value| value.inner.clone())
-                    .map_err(|_| {
-                        PyValueError::new_err(format!("traj_lines[{index}] must be TrajLine"))
-                    })
-            })
-            .collect::<PyResult<Vec<_>>>()?;
+        let traj_lines = crate::common::extract_records(
+            self.traj_lines.bind(py),
+            "traj_lines",
+            |value: &TrajLine| Ok(value.inner.clone()),
+        )?;
         let mut value = self.inner.clone();
         value.traj_lines = traj_lines;
         Ok(value)
@@ -1881,6 +1943,8 @@ impl OcmTrajState {
     ///
     /// Examples: TRAJ_20160402_XYZ
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_traj_id(&self) -> Option<String> {
@@ -1899,6 +1963,8 @@ impl OcmTrajState {
     ///
     /// Examples: ORB20160305A
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_traj_prev_id(&self) -> Option<String> {
@@ -1916,6 +1982,8 @@ impl OcmTrajState {
     /// TRAJ_NEXT_ID should be excluded from this message.
     ///
     /// Examples: ORB20160305C
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1937,6 +2005,8 @@ impl OcmTrajState {
     /// design studies, and optimization studies. e) 'OTHER' for other bases of this data.
     ///
     /// Examples: PREDICTED
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1960,6 +2030,8 @@ impl OcmTrajState {
     ///
     /// Examples: OD_5910
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_traj_basis_id(&self) -> Option<String> {
@@ -1978,6 +2050,8 @@ impl OcmTrajState {
     ///
     /// Examples: HERMITE, LINEAR, LAGRANGE, PROPAGATE
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_interpolation(&self) -> Option<String> {
@@ -1994,6 +2068,8 @@ impl OcmTrajState {
     ///
     /// Examples: 5, 1
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
+    ///
     /// :type: Optional[int]
     #[getter]
     fn get_interpolation_degree(&self) -> Option<u32> {
@@ -2008,6 +2084,8 @@ impl OcmTrajState {
     /// trajectory state time history.
     ///
     /// Examples: HPOP, SP, SGP4
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -2024,6 +2102,8 @@ impl OcmTrajState {
     /// reference frame. (See 7.5.10 for formatting rules.)
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -2049,6 +2129,8 @@ impl OcmTrajState {
     ///
     /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_useable_start_time(&self) -> Option<String> {
@@ -2073,6 +2155,8 @@ impl OcmTrajState {
     ///
     /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_useable_stop_time(&self) -> Option<String> {
@@ -2095,6 +2179,8 @@ impl OcmTrajState {
     ///
     /// Examples: 1500, 30007
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_orb_revnum(&self) -> Option<f64> {
@@ -2115,6 +2201,8 @@ impl OcmTrajState {
     /// provided if ORB_REVNUM is specified.
     ///
     /// Examples: 0, 1
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -2142,6 +2230,8 @@ impl OcmTrajState {
     ///
     /// Examples: OSCULATING, BROUWER, KOZAI
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_orb_averaging(&self) -> Option<String> {
@@ -2161,6 +2251,8 @@ impl OcmTrajState {
     /// TRAJ_TYPE (links to the relevant SANA registries provided in annex B, subsection B7).
     ///
     /// Examples: [km,km,km,km/s,km/s,km/s], [km,n/a,deg, deg, deg, deg]
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -2540,6 +2632,8 @@ impl OcmPhysicalDescription {
     ///
     /// Examples: BOEING
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_manufacturer(&self) -> Option<String> {
@@ -2572,6 +2666,8 @@ impl OcmPhysicalDescription {
     ///
     /// Examples: 702
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_bus_model(&self) -> Option<String> {
@@ -2586,6 +2682,8 @@ impl OcmPhysicalDescription {
     /// object is docked to.
     ///
     /// Examples: ISS
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -2604,6 +2702,8 @@ impl OcmPhysicalDescription {
     /// Examples: 2.5
     ///
     /// Units: m²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2624,6 +2724,8 @@ impl OcmPhysicalDescription {
     ///
     /// Examples: 2.2
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_drag_coeff_nom(&self) -> Option<f64> {
@@ -2642,6 +2744,8 @@ impl OcmPhysicalDescription {
     /// Examples: 10.0
     ///
     /// Units: %
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2663,6 +2767,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: m²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_srp_const_area(&self) -> Option<f64> {
@@ -2680,6 +2786,8 @@ impl OcmPhysicalDescription {
     /// Nominal Solar Radiation Pressure Coefficient (CR NOM). If the solar radiation
     /// coefficient, CR, is set to zero, no solar radiation pressure shall be considered.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_solar_rad_coeff(&self) -> Option<f64> {
@@ -2696,6 +2804,8 @@ impl OcmPhysicalDescription {
     /// while accommodating ballistic coefficient uncertainties.
     ///
     /// Units: %
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2718,6 +2828,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: kg
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_initial_wet_mass(&self) -> Option<f64> {
@@ -2738,6 +2850,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: kg
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_wet_mass(&self) -> Option<f64> {
@@ -2756,6 +2870,8 @@ impl OcmPhysicalDescription {
     /// Examples: 300
     ///
     /// Units: kg
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2779,6 +2895,8 @@ impl OcmPhysicalDescription {
     ///
     /// Examples: ITRF1997
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_oeb_parent_frame(&self) -> Option<String> {
@@ -2792,6 +2910,8 @@ impl OcmPhysicalDescription {
     /// intrinsic to the definition of the reference frame. (See 7.5.10 for formatting rules.)
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -2813,6 +2933,8 @@ impl OcmPhysicalDescription {
     ///
     /// Examples: -0.575131822
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_oeb_q1(&self) -> Option<f64> {
@@ -2828,6 +2950,8 @@ impl OcmPhysicalDescription {
     /// annex F, subsection F1). A value of '-999' denotes a tumbling space object.
     ///
     /// Examples: -0.280510532
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2845,6 +2969,8 @@ impl OcmPhysicalDescription {
     ///
     /// Examples: -0.195634856
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_oeb_q3(&self) -> Option<f64> {
@@ -2861,6 +2987,8 @@ impl OcmPhysicalDescription {
     ///
     /// Examples: 0.743144825
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_oeb_qc(&self) -> Option<f64> {
@@ -2875,6 +3003,8 @@ impl OcmPhysicalDescription {
     /// Examples: 1
     ///
     /// Units: m
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2895,6 +3025,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: m
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_oeb_int(&self) -> Option<f64> {
@@ -2914,6 +3046,8 @@ impl OcmPhysicalDescription {
     /// Examples: 0.3
     ///
     /// Units: m
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2936,6 +3070,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: m²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_area_along_oeb_max(&self) -> Option<f64> {
@@ -2956,6 +3092,8 @@ impl OcmPhysicalDescription {
     /// Examples: 0.3
     ///
     /// Units: m²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2978,6 +3116,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: m²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_area_along_oeb_min(&self) -> Option<f64> {
@@ -2999,6 +3139,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: m²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_area_min_for_pc(&self) -> Option<f64> {
@@ -3018,6 +3160,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: m²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_area_max_for_pc(&self) -> Option<f64> {
@@ -3035,6 +3179,8 @@ impl OcmPhysicalDescription {
     /// orientations for collision probability estimation purposes.
     ///
     /// Units: m²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -3055,6 +3201,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: m²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_rcs(&self) -> Option<f64> {
@@ -3072,6 +3220,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: m²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_rcs_min(&self) -> Option<f64> {
@@ -3088,6 +3238,8 @@ impl OcmPhysicalDescription {
     /// Maximum Radar Cross Section observed for this object.
     ///
     /// Units: m²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -3112,6 +3264,8 @@ impl OcmPhysicalDescription {
     ///
     /// Examples: 15.0
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_vm_absolute(&self) -> Option<f64> {
@@ -3126,6 +3280,8 @@ impl OcmPhysicalDescription {
     ///
     /// Examples: 15.0
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_vm_apparent(&self) -> Option<f64> {
@@ -3139,6 +3295,8 @@ impl OcmPhysicalDescription {
     /// Minimum apparent Visual Magnitude observed for this space object.
     ///
     /// Examples: 19.0
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -3155,6 +3313,8 @@ impl OcmPhysicalDescription {
     ///
     /// Examples: 16.0
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_vm_apparent_max(&self) -> Option<f64> {
@@ -3169,6 +3329,8 @@ impl OcmPhysicalDescription {
     /// possible viewing angles, ranging from 0 (none) to 1 (perfect reflectance).
     ///
     /// Examples: 0.7
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -3187,6 +3349,8 @@ impl OcmPhysicalDescription {
     ///
     /// Examples: SPIN
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_att_control_mode(&self) -> Option<String> {
@@ -3203,6 +3367,8 @@ impl OcmPhysicalDescription {
     ///
     /// Examples: ATT_THRUSTERS
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_att_actuator_type(&self) -> Option<String> {
@@ -3218,6 +3384,8 @@ impl OcmPhysicalDescription {
     /// Examples: 0.3
     ///
     /// Units: deg
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -3240,6 +3408,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_att_control(&self) -> Option<f64> {
@@ -3260,6 +3430,8 @@ impl OcmPhysicalDescription {
     /// Examples: 2.3
     ///
     /// Units: deg
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -3283,6 +3455,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: #/yr
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_avg_maneuver_freq(&self) -> Option<f64> {
@@ -3303,6 +3477,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: N
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_max_thrust(&self) -> Option<f64> {
@@ -3322,6 +3498,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: km/s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_dv_bol(&self) -> Option<f64> {
@@ -3340,6 +3518,8 @@ impl OcmPhysicalDescription {
     /// Examples: 0.2
     ///
     /// Units: km/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -3363,6 +3543,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: kg·m²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_ixx(&self) -> Option<f64> {
@@ -3382,6 +3564,8 @@ impl OcmPhysicalDescription {
     /// Examples: 800.0
     ///
     /// Units: kg·m²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -3403,6 +3587,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: kg·m²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_izz(&self) -> Option<f64> {
@@ -3422,6 +3608,8 @@ impl OcmPhysicalDescription {
     /// Examples: 20.0
     ///
     /// Units: kg·m²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -3443,6 +3631,8 @@ impl OcmPhysicalDescription {
     ///
     /// Units: kg·m²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_ixz(&self) -> Option<f64> {
@@ -3462,6 +3652,8 @@ impl OcmPhysicalDescription {
     /// Examples: 60.0
     ///
     /// Units: kg·m²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -3545,20 +3737,11 @@ impl OcmCovarianceMatrix {
     }
 
     fn to_core(&self, py: Python<'_>) -> PyResult<core_ocm::OcmCovarianceMatrix> {
-        let cov_lines = self
-            .cov_lines
-            .bind(py)
-            .iter()
-            .enumerate()
-            .map(|(index, value)| {
-                value
-                    .extract::<PyRef<'_, CovLine>>()
-                    .map(|value| value.inner.clone())
-                    .map_err(|_| {
-                        PyValueError::new_err(format!("cov_lines[{index}] must be CovLine"))
-                    })
-            })
-            .collect::<PyResult<Vec<_>>>()?;
+        let cov_lines = crate::common::extract_records(
+            self.cov_lines.bind(py),
+            "cov_lines",
+            |value: &CovLine| Ok(value.inner.clone()),
+        )?;
         let mut value = self.inner.clone();
         value.cov_lines = cov_lines;
         Ok(value)
@@ -3634,6 +3817,8 @@ impl OcmCovarianceMatrix {
     ///
     /// Examples: COV_20160402_XYZ
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_cov_id(&self) -> Option<String> {
@@ -3652,6 +3837,8 @@ impl OcmCovarianceMatrix {
     ///
     /// Examples: COV_20160305a
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_cov_prev_id(&self) -> Option<String> {
@@ -3669,6 +3856,8 @@ impl OcmCovarianceMatrix {
     /// COV_NEXT_ID should be excluded from this message.
     ///
     /// Examples: COV_20160305C
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3689,6 +3878,8 @@ impl OcmCovarianceMatrix {
     /// 'OTHER' for other bases of this data.
     ///
     /// Examples: PREDICTED, EMPIRICAL, DETERMINED, SIMULATED, OTHER
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3712,6 +3903,8 @@ impl OcmCovarianceMatrix {
     /// history, the COV_BASIS_ID should match the corresponding OD_ID (see table 6-11).
     ///
     /// Examples: OD_5910
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -3744,6 +3937,8 @@ impl OcmCovarianceMatrix {
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_cov_frame_epoch(&self) -> Option<String> {
@@ -3762,6 +3957,8 @@ impl OcmCovarianceMatrix {
     ///
     /// Examples: 0.5
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_cov_scale_min(&self) -> Option<f64> {
@@ -3775,6 +3972,8 @@ impl OcmCovarianceMatrix {
     /// Maximum scale factor to apply to this covariance data to achieve realism.
     ///
     /// Examples: 5.0
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -3793,6 +3992,8 @@ impl OcmCovarianceMatrix {
     /// Examples: 50
     ///
     /// Units: %
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -3856,6 +4057,8 @@ impl OcmCovarianceMatrix {
     /// subsections B7 and B8).
     ///
     /// Examples: [km,km,km,km/s,km/s,km/s]
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4028,20 +4231,11 @@ impl OcmManeuverParameters {
     }
 
     fn to_core(&self, py: Python<'_>) -> PyResult<core_ocm::OcmManeuverParameters> {
-        let man_lines = self
-            .man_lines
-            .bind(py)
-            .iter()
-            .enumerate()
-            .map(|(index, value)| {
-                value
-                    .extract::<PyRef<'_, ManLine>>()
-                    .map(|value| value.inner.clone())
-                    .map_err(|_| {
-                        PyValueError::new_err(format!("man_lines[{index}] must be ManLine"))
-                    })
-            })
-            .collect::<PyResult<Vec<_>>>()?;
+        let man_lines = crate::common::extract_records(
+            self.man_lines.bind(py),
+            "man_lines",
+            |value: &ManLine| Ok(value.inner.clone()),
+        )?;
         let mut value = self.inner.clone();
         value.man_lines = man_lines;
         Ok(value)
@@ -4247,6 +4441,8 @@ impl OcmManeuverParameters {
     /// first in a sequence of maneuvers, then MAN_PREV_ID should be excluded from this
     /// message.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_man_prev_id(&self) -> Option<String> {
@@ -4261,6 +4457,8 @@ impl OcmManeuverParameters {
     /// MAN_BASIS, contained either within this message, or presented in a future OCM. If this
     /// message is not part of a sequence of maneuver messages or if this maneuver is the last
     /// in a sequence of maneuvers, then MAN_NEXT_ID should be excluded from this message.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4283,6 +4481,8 @@ impl OcmManeuverParameters {
     /// calibration, 'SIMULATED' for generic maneuver simulations, future mission design
     /// studies, and optimization studies, 'OTHER' for other bases of this data.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_man_basis(&self) -> Option<String> {
@@ -4304,6 +4504,8 @@ impl OcmManeuverParameters {
     /// navigation solution, or simulation upon which this maneuver time history block is
     /// based. Where a matching orbit determination block accompanies this maneuver time
     /// history, the MAN_BASIS_ID should match the corresponding OD_ID (see table 6-11).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4332,6 +4534,8 @@ impl OcmManeuverParameters {
     }
     /// Identifies the completion time of the previous maneuver for this MAN_BASIS.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_man_prev_epoch(&self) -> Option<String> {
@@ -4347,6 +4551,8 @@ impl OcmManeuverParameters {
     }
 
     /// Identifies the start time of the next maneuver for this MAN_BASIS.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4365,6 +4571,8 @@ impl OcmManeuverParameters {
     /// A free-text field used to specify the intention(s) of the maneuver. Multiple maneuver
     /// purposes can be provided as a comma-delimited list.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_man_purpose(&self) -> Option<String> {
@@ -4379,6 +4587,8 @@ impl OcmManeuverParameters {
     /// which the maneuver is based. While there is no CCSDS-based restriction on the value for
     /// this free-text keyword, it is suggested to consider using TRAJ_ID and OD_ID keywords
     /// as described in tables 6-4 and 6-11, respectively, or a combination thereof.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4409,6 +4619,8 @@ impl OcmManeuverParameters {
     /// Epoch of the maneuver data reference frame, if not intrinsic to the definition of the
     /// reference frame. (See 7.5.10 for formatting rules.)
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_man_frame_epoch(&self) -> Option<String> {
@@ -4427,6 +4639,8 @@ impl OcmManeuverParameters {
     /// (planets, asteroids, comets, and natural satellites), including any planet barycenter
     /// or the solar system barycenter. (See annex B, subsection B2, for acceptable
     /// GRAV_ASSIST_NAME values and the procedure to propose new values.)
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4464,6 +4678,8 @@ impl OcmManeuverParameters {
     /// the satellite is first placed into a special duty-cycle-based maneuver mode. This
     /// keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_dc_win_open(&self) -> Option<String> {
@@ -4483,6 +4699,8 @@ impl OcmManeuverParameters {
     /// satellite is taken out of a special duty-cycle-based maneuver mode. This keyword shall
     /// be set if DC_TYPE ≠ 'CONTINUOUS'.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_dc_win_close(&self) -> Option<String> {
@@ -4500,6 +4718,8 @@ impl OcmManeuverParameters {
     /// Minimum number of 'ON' duty cycles (may override DC_EXEC_STOP). This value is optional
     /// even if DC_TYPE = 'CONTINUOUS'.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: Optional[int]
     #[getter]
     fn get_dc_min_cycles(&self) -> Option<u64> {
@@ -4512,6 +4732,8 @@ impl OcmManeuverParameters {
 
     /// Maximum number of 'ON' duty cycles (may override DC_EXEC_STOP). This value is optional
     /// even if DC_TYPE = 'CONTINUOUS'.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -4527,6 +4749,8 @@ impl OcmManeuverParameters {
     /// is defined to occur on or prior to the first maneuver 'ON' portion within the duty
     /// cycle sequence. DC_EXEC_START must be scheduled to occur coincident with or after
     /// DC_WIN_OPEN. This keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4547,6 +4771,8 @@ impl OcmManeuverParameters {
     /// cycle sequence. DC_EXEC_STOP must be scheduled to occur coincident with or prior to
     /// DC_WIN_CLOSE. This keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_dc_exec_stop(&self) -> Option<String> {
@@ -4565,6 +4791,8 @@ impl OcmManeuverParameters {
     /// to EPOCH_TZERO), or as an absolute '`<epoch>`' (see 7.5.10 for formatting rules).
     /// NOTE—Depending upon EPOCH_TZERO, DC_REF_TIME relative times may be negative. This
     /// keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4586,6 +4814,8 @@ impl OcmManeuverParameters {
     ///
     /// Units: s
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_dc_time_pulse_duration(&self) -> Option<f64> {
@@ -4605,6 +4835,8 @@ impl OcmManeuverParameters {
     /// 'CONTINUOUS'.
     ///
     /// Units: s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -4626,6 +4858,8 @@ impl OcmManeuverParameters {
     /// DC_PA_START_ANGLE for phasing). This (tripartite, or three-element vector) value shall
     /// be provided if DC_TYPE = 'TIME_AND_ANGLE'. This reference direction does not represent
     /// the duty cycle midpoint.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: Optional[list[float]]
     #[getter]
@@ -4657,6 +4891,8 @@ impl OcmManeuverParameters {
     /// set of values indicated in annex B, subsection B6. This keyword shall be set if
     /// DC_TYPE = 'TIME_AND_ANGLE'.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_dc_body_frame(&self) -> Option<String> {
@@ -4672,6 +4908,8 @@ impl OcmManeuverParameters {
     /// projection onto the spin plane crosses the corresponding projection of DC_REF_DIR onto
     /// the spin plane, this angle-based duty cycle is initiated (see DC_PA_START_ANGLE for
     /// phasing). This tripartite value shall be provided if DC_TYPE = 'TIME_AND_ANGLE'.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: Optional[list[float]]
     #[getter]
@@ -4712,6 +4950,8 @@ impl OcmManeuverParameters {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_dc_pa_start_angle(&self) -> Option<f64> {
@@ -4735,6 +4975,8 @@ impl OcmManeuverParameters {
     /// 360 degrees. This keyword shall be set if DC_TYPE = 'TIME_AND_ANGLE'.
     ///
     /// Units: deg
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -4774,6 +5016,8 @@ impl OcmManeuverParameters {
     /// non-dimensional values, and text strings shall be labelled as 'n/a'. NOTE—The listing
     /// of units via the MAN_UNITS keyword does not override the mandatory units for the
     /// selected MAN_COMPOSITION, as specified in table 6-8 or table 6-9.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -4937,6 +5181,8 @@ impl OcmPerturbations {
     ///
     /// Examples: MSISE90, NRLMSIS00, J70, J71, JROBERTS, DTM, JB2008
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_atmospheric_model(&self) -> Option<String> {
@@ -4953,6 +5199,8 @@ impl OcmPerturbations {
     ///
     /// Examples: EGM-96: 36D 36O, WGS-84: 8D 0O, GGM-01: 36D 36O, TEG-4: 36D 36O
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_gravity_model(&self) -> Option<String> {
@@ -4966,6 +5214,8 @@ impl OcmPerturbations {
     /// different from the gravity model.
     ///
     /// Units: km
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -4985,6 +5235,8 @@ impl OcmPerturbations {
     ///
     /// Units: km³/s²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_gm(&self) -> Option<f64> {
@@ -5002,6 +5254,8 @@ impl OcmPerturbations {
     ///
     /// Examples: MOON, SUN, JUPITER
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_n_body_perturbations(&self) -> Option<String> {
@@ -5017,6 +5271,8 @@ impl OcmPerturbations {
     /// frame Z-axis definition.
     ///
     /// Units: deg/s
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -5034,6 +5290,8 @@ impl OcmPerturbations {
     /// Central body's oblate spheroid oblateness for the polar-symmetric oblate central body
     /// model (e.g., for the Earth, it is approximately 1.0/298.257223563).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_oblate_flattening(&self) -> Option<f64> {
@@ -5049,6 +5307,8 @@ impl OcmPerturbations {
     ///
     /// Examples: DIURNAL, SEMI-DIURNAL
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_ocean_tides_model(&self) -> Option<String> {
@@ -5062,6 +5322,8 @@ impl OcmPerturbations {
     /// semi-diurnal, etc.).
     ///
     /// Examples: DIURNAL, SEMI-DIURNAL
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -5078,6 +5340,8 @@ impl OcmPerturbations {
     ///
     /// Examples: IAU1976/FK5, IAU2010, IERS1996
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_reduction_theory(&self) -> Option<String> {
@@ -5089,6 +5353,8 @@ impl OcmPerturbations {
     }
     /// Name of the albedo model.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_albedo_model(&self) -> Option<String> {
@@ -5099,6 +5365,8 @@ impl OcmPerturbations {
         self.inner.albedo_model = value;
     }
     /// Size of the albedo grid.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -5115,6 +5383,8 @@ impl OcmPerturbations {
     ///
     /// Examples: NONE, CYLINDRICAL, CONE, DUAL_CONE
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_shadow_model(&self) -> Option<String> {
@@ -5129,6 +5399,8 @@ impl OcmPerturbations {
     ///
     /// Examples: EARTH, MOON
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_shadow_bodies(&self) -> Option<String> {
@@ -5141,6 +5413,8 @@ impl OcmPerturbations {
     /// Name of the Solar Radiation Pressure (SRP) model.
     ///
     /// Examples: CANNONBALL, FLAT_PLATE, BOX_WING
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -5155,6 +5429,8 @@ impl OcmPerturbations {
     ///
     /// Examples: NOAA
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_sw_data_source(&self) -> Option<String> {
@@ -5165,6 +5441,8 @@ impl OcmPerturbations {
         self.inner.sw_data_source = value;
     }
     /// Epoch of the space weather data.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -5186,6 +5464,8 @@ impl OcmPerturbations {
     ///
     /// Examples: PRECEDING_VALUE, NEAREST_NEIGHBOR, LINEAR, LAGRANGE_ORDER_5
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_sw_interp_method(&self) -> Option<String> {
@@ -5196,6 +5476,8 @@ impl OcmPerturbations {
         self.inner.sw_interp_method = value;
     }
     /// Fixed geomagnetic Kp index.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -5212,6 +5494,8 @@ impl OcmPerturbations {
     }
     /// Fixed geomagnetic Ap index.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_fixed_geomag_ap(&self) -> Option<f64> {
@@ -5226,6 +5510,8 @@ impl OcmPerturbations {
         });
     }
     /// Fixed geomagnetic Dst index.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -5244,6 +5530,8 @@ impl OcmPerturbations {
     ///
     /// Units: SFU
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_fixed_f10p7(&self) -> Option<f64> {
@@ -5260,6 +5548,8 @@ impl OcmPerturbations {
     /// Fixed 81-day average F10.7 solar flux.
     ///
     /// Units: SFU
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -5278,6 +5568,8 @@ impl OcmPerturbations {
     ///
     /// Units: SFU
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_fixed_m10p7(&self) -> Option<f64> {
@@ -5294,6 +5586,8 @@ impl OcmPerturbations {
     /// Fixed 81-day average M10.7 solar flux.
     ///
     /// Units: SFU
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -5312,6 +5606,8 @@ impl OcmPerturbations {
     ///
     /// Units: SFU
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_fixed_s10p7(&self) -> Option<f64> {
@@ -5328,6 +5624,8 @@ impl OcmPerturbations {
     /// Fixed 81-day average S10.7 solar flux.
     ///
     /// Units: SFU
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -5346,6 +5644,8 @@ impl OcmPerturbations {
     ///
     /// Units: SFU
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_fixed_y10p7(&self) -> Option<f64> {
@@ -5362,6 +5662,8 @@ impl OcmPerturbations {
     /// Fixed 81-day average Y10.7 solar flux.
     ///
     /// Units: SFU
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.9.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -5496,6 +5798,8 @@ impl OcmOdParameters {
     ///
     /// Examples: 0
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_od_prev_id(&self) -> Option<String> {
@@ -5550,6 +5854,8 @@ impl OcmOdParameters {
     ///
     /// Units: d
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_days_since_first_obs(&self) -> Option<f64> {
@@ -5567,6 +5873,8 @@ impl OcmOdParameters {
     /// negative.
     ///
     /// Units: d
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -5586,6 +5894,8 @@ impl OcmOdParameters {
     ///
     /// Units: d
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_recommended_od_span(&self) -> Option<f64> {
@@ -5604,6 +5914,8 @@ impl OcmOdParameters {
     ///
     /// Units: d
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_actual_od_span(&self) -> Option<f64> {
@@ -5619,6 +5931,8 @@ impl OcmOdParameters {
     }
     /// The number of observations available within the actual OD time span.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
+    ///
     /// :type: Optional[int]
     #[getter]
     fn get_obs_available(&self) -> Option<u64> {
@@ -5629,6 +5943,8 @@ impl OcmOdParameters {
         self.inner.obs_available = value;
     }
     /// The number of observations accepted within the actual OD time span.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -5642,6 +5958,8 @@ impl OcmOdParameters {
     /// The number of sensor tracks available for the OD within the actual time span (see
     /// definition of 'tracks', 1.5.2).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
+    ///
     /// :type: Optional[int]
     #[getter]
     fn get_tracks_available(&self) -> Option<u64> {
@@ -5653,6 +5971,8 @@ impl OcmOdParameters {
     }
     /// The number of sensor tracks accepted for the OD within the actual time span (see
     /// definition of 'tracks', 1.5.2).
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -5666,6 +5986,8 @@ impl OcmOdParameters {
     /// The maximum time between observations in the OD of the object.
     ///
     /// Units: d
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -5684,6 +6006,8 @@ impl OcmOdParameters {
     ///
     /// Units: m
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_od_epoch_eigmaj(&self) -> Option<f64> {
@@ -5700,6 +6024,8 @@ impl OcmOdParameters {
     /// Positional error ellipsoid 1σ intermediate eigenvalue at the epoch of the OD.
     ///
     /// Units: m
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -5718,6 +6044,8 @@ impl OcmOdParameters {
     ///
     /// Units: m
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_od_epoch_eigmin(&self) -> Option<f64> {
@@ -5735,6 +6063,8 @@ impl OcmOdParameters {
     /// over the entire TIME_SPAN of the OCM, stemming from this OD.
     ///
     /// Units: m
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -5755,6 +6085,8 @@ impl OcmOdParameters {
     ///
     /// Units: m
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_od_min_pred_eigmin(&self) -> Option<f64> {
@@ -5773,6 +6105,8 @@ impl OcmOdParameters {
     /// participants.
     ///
     /// Units: %
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -5793,6 +6127,8 @@ impl OcmOdParameters {
     /// of the element set from the OD. Alternate GDOP formations may be used as mutually
     /// defined by message exchange participants.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_gdop(&self) -> Option<f64> {
@@ -5803,6 +6139,8 @@ impl OcmOdParameters {
         self.inner.gdop = value;
     }
     /// The number of solve-for states in the orbit determination.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -5816,6 +6154,8 @@ impl OcmOdParameters {
     /// Free-text comma-delimited description of the state elements solved for in the orbit
     /// determination.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_solve_states(&self) -> Option<String> {
@@ -5826,6 +6166,8 @@ impl OcmOdParameters {
         self.inner.solve_states = value;
     }
     /// The number of consider parameters used in the orbit determination.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -5838,6 +6180,8 @@ impl OcmOdParameters {
     }
     /// Free-text comma-delimited description of the consider parameters used in the orbit
     /// determination.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -5854,6 +6198,8 @@ impl OcmOdParameters {
     ///
     /// Units: W/kg
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_sedr(&self) -> Option<f64> {
@@ -5866,6 +6212,8 @@ impl OcmOdParameters {
     }
     /// The number of sensors used in the orbit determination.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
+    ///
     /// :type: Optional[int]
     #[getter]
     fn get_sensors_n(&self) -> Option<u64> {
@@ -5876,6 +6224,8 @@ impl OcmOdParameters {
         self.inner.sensors_n = value;
     }
     /// Free-text comma-delimited description of the sensors used in the orbit determination.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -5894,6 +6244,8 @@ impl OcmOdParameters {
     /// the most recent vector update and is used by the analyst in evaluating the OD process.
     /// A value of 1.00 is ideal.
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_weighted_rms(&self) -> Option<f64> {
@@ -5910,6 +6262,8 @@ impl OcmOdParameters {
     /// encouraged if the descriptors of table 3-5 are not sufficiently clear; for example, one
     /// could replace ANGLE_1 and ANGLE_2 with RADEC (e.g., from a telescope), AZEL (e.g., from
     /// a ground radar), RANGE (whether from radar or laser ranging), etc.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: Optional[str]
     #[getter]

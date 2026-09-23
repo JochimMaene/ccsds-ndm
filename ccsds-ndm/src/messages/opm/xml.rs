@@ -15,8 +15,6 @@ impl Serialize for Opm {
         #[derive(Serialize)]
         #[serde(rename = "opm")]
         struct XmlOpm<'a> {
-            #[serde(rename = "@xmlns:xsi")]
-            xmlns_xsi: &'static str,
             #[serde(rename = "@id")]
             id: &'a Option<String>,
             #[serde(rename = "@version")]
@@ -26,7 +24,6 @@ impl Serialize for Opm {
         }
 
         XmlOpm {
-            xmlns_xsi: "http://www.w3.org/2001/XMLSchema-instance",
             id: &self.id,
             version: &self.version,
             header: &self.header,
@@ -210,18 +207,6 @@ fn validate_xml_envelope(xml: &str, source_edition: &mut Option<String>) -> Resu
                         | b"MAN_DV_1"
                         | b"MAN_DV_2"
                         | b"MAN_DV_3"
-                ),
-                b"nil" | b"xsi:nil" => matches!(
-                    element,
-                    b"REF_FRAME_EPOCH"
-                        | b"TRUE_ANOMALY"
-                        | b"MEAN_ANOMALY"
-                        | b"MASS"
-                        | b"SOLAR_RAD_AREA"
-                        | b"SOLAR_RAD_COEFF"
-                        | b"DRAG_AREA"
-                        | b"DRAG_COEFF"
-                        | b"COV_REF_FRAME"
                 ),
                 b"parameter" => element == b"USER_DEFINED",
                 _ => false,

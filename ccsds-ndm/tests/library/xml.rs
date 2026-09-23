@@ -65,6 +65,63 @@ fn strict_xml_rejects_forbidden_xml_1_characters() {
     );
 }
 
+#[test]
+fn xml_rejects_mixed_content_and_invalid_references_without_losing_valid_text() {
+    for input in [
+        include_str!("../../data/xml/oem_g14.xml"),
+        include_str!("../../data/xml/opm_g5.xml"),
+        CDM,
+    ] {
+        for value in ["&unknown;", "&#1;", "<invalid"] {
+            let root = input.rfind(" version=").unwrap();
+            let mut invalid = input.to_owned();
+            invalid.insert_str(root, &format!(" xsi:schemaLocation=\"{value}\""));
+            assert_eq!(
+                from_str(&invalid).unwrap_err().code(),
+                Some("parse.xml.syntax")
+            );
+        }
+        for text in ["unexpected", "<![CDATA[unexpected]]>", "&#65;", "&amp;"] {
+            for marker in ["<header>", "</header>"] {
+                let invalid = mutated_once(input, marker, &format!("{text}{marker}"));
+                assert_eq!(
+                    from_str(&invalid).unwrap_err().code(),
+                    Some("parse.xml.syntax")
+                );
+            }
+        }
+        // XSD permits whitespace character information items regardless of their spelling.
+        // libxml2 rejects whitespace CDATA here, contrary to XSD 1.0 3.4.4(2.3).
+        let expected = from_str(input).unwrap();
+        for whitespace in ["&#32;", "&#x9;&#10;&#13;", "<![CDATA[ \t\n]]>"] {
+            for marker in ["<header>", "</header>", "</body>"] {
+                let valid = mutated_once(input, marker, &format!("{whitespace}{marker}"));
+                assert_eq!(from_str(&valid).unwrap(), expected);
+            }
+        }
+        for reference in ["&#1;", "&#xFFFF;", "&unknown;"] {
+            let invalid = mutated_once(input, "<ORIGINATOR>", &format!("<ORIGINATOR>{reference}"));
+            assert_eq!(
+                from_str(&invalid).unwrap_err().code(),
+                Some("parse.xml.syntax")
+            );
+        }
+        for suffix in ["&#32;", "&amp;", "\u{a0}", "<!-- invalid -- comment -->"] {
+            assert!(
+                from_str(&format!("{input}{suffix}")).is_err(),
+                "accepted {suffix}"
+            );
+        }
+        let valid = mutated_once(
+            input,
+            "<ORIGINATOR>",
+            "<ORIGINATOR><![CDATA[A & B]]>&amp;&#65;",
+        );
+        let parsed = from_str(&valid).unwrap();
+        assert!(parsed.to_xml().unwrap().contains("A &amp; B&amp;A"));
+    }
+}
+
 const XML_DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
 
 const CDM: &str = include_str!("../../data/xml/cdm_44.xml");

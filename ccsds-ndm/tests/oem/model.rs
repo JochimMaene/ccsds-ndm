@@ -1,10 +1,10 @@
-use crate::common::{assert_rejects, assert_validation_field, mutated};
+use crate::common::{assert_validation_field, mutated};
 use ccsds_ndm::messages::oem::{Oem, OemBody, OemData, OemMetadata};
 use ccsds_ndm::types::{Epoch, InterpolationDegree};
 use ccsds_ndm::{Ndm, Validate};
 use std::num::NonZeroU32;
 #[test]
-fn covariance_validation_accepts_negative_values_but_rejects_non_finite_values() {
+fn covariance_validation_accepts_negative_values_and_xsd_double_specials() {
     let negative_variance = mutated(
         include_str!("../../data/kvn/oem_g13.kvn"),
         "3.3313494e-04",
@@ -15,8 +15,19 @@ fn covariance_validation_accepts_negative_values_but_rejects_non_finite_values()
     oem.to_kvn()
         .expect("negative covariance values must generate");
 
+    // ODM 8.13.4: XML covariance values are xsd:double values; KVN numbers are finite.
     oem.body.segment[0].data.covariance_matrix[0].cx_x.value = f64::NAN;
-    assert_rejects(&oem, "CX_X");
+    oem.validate().unwrap();
+    let reparsed = Oem::from_xml(&oem.to_xml().unwrap()).unwrap();
+    assert!(reparsed.body.segment[0].data.covariance_matrix[0]
+        .cx_x
+        .value
+        .is_nan());
+    let error = oem.to_kvn().unwrap_err();
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[0].data.covariance_matrix[0].cx_x")
+    );
 }
 
 #[test]

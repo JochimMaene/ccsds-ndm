@@ -293,7 +293,8 @@ pub fn comment_line<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     } else if !input.is_empty() && !input.starts_with(['\r', '\n']) {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
-    till_line_ending.parse_next(input)
+    // ODM 7.4.7: white space immediately before the end of a line is not significant.
+    till_line_ending.map(str::trim_end).parse_next(input)
 }
 
 /// Parses a key-value pair line.
@@ -609,6 +610,23 @@ pub fn kv_epoch(input: &mut &str) -> KvnResult<Epoch> {
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
     Epoch::from_str(v.trim())
         .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+}
+
+/// Parses an optional keyword value, treating an empty value field as absent.
+///
+/// ODM 7.5.1 requires non-empty values only for mandatory keywords.
+pub fn kv_optional<'a, T>(
+    mut value: impl FnMut(&mut &'a str) -> KvnResult<T>,
+) -> impl FnMut(&mut &'a str) -> KvnResult<Option<T>> {
+    move |input: &mut &'a str| {
+        let line_end = input.find(['\r', '\n']).unwrap_or(input.len());
+        if input[..line_end].trim().is_empty() {
+            *input = &input[line_end..];
+            opt_line_ending(input)?;
+            return Ok(None);
+        }
+        value(input).map(Some)
+    }
 }
 
 /// Parses a calendar/ordinal epoch value from a KVN line.
@@ -988,7 +1006,7 @@ pub fn at_block_start(tag: &str, input: &str) -> bool {
     let s = input.trim_start_matches([' ', '\t']);
     if let Some(rest) = s.strip_prefix(tag) {
         if let Some(suffix) = rest.strip_prefix("_START") {
-            return suffix.starts_with('\r') || suffix.starts_with('\n') || suffix.is_empty();
+            return ends_line(suffix);
         }
     }
     false
@@ -1002,10 +1020,16 @@ pub fn at_block_end(tag: &str, input: &str) -> bool {
             .strip_prefix("_STOP")
             .or_else(|| rest.strip_prefix("_END"))
         {
-            return suffix.starts_with('\r') || suffix.starts_with('\n') || suffix.is_empty();
+            return ends_line(suffix);
         }
     }
     false
+}
+
+/// ODM 7.4.7: white space immediately before the end of a line is not significant.
+fn ends_line(rest: &str) -> bool {
+    let rest = rest.trim_start_matches([' ', '\t']);
+    rest.is_empty() || rest.starts_with(['\r', '\n'])
 }
 
 /// Expects a specific block start and consumes it.
@@ -1052,6 +1076,8 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
     let mut message_id = None;
 
     loop {
+        // ODM 7.3.5: blank lines may appear at any position.
+        blank_lines.parse_next(input)?;
         let checkpoint = input.checkpoint();
 
         let key = match preceded(ws, keyword).parse_next(input) {
@@ -1472,7 +1498,7 @@ mod tests {
 
         let mut input = "COMMENT    indented   \n";
         let content = comment_line.parse_next(&mut input).unwrap();
-        assert_eq!(content, "   indented   ");
+        assert_eq!(content, "   indented");
     }
 
     #[test]

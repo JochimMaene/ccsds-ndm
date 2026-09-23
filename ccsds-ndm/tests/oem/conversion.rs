@@ -39,6 +39,7 @@ fn xml_to_kvn_rejects_comments_that_cannot_keep_their_covariance_association() {
     let mut message = Oem::from_xml(XML).unwrap();
     let mut second = message.body.segment[0].data.covariance_matrix[0].clone();
     second.epoch = "2019-12-28T23:28:00.331".parse().unwrap();
+    message.body.segment[0].metadata.stop_time = second.epoch;
     second.comment = vec!["belongs to the second covariance".into()];
     message.body.segment[0].data.covariance_matrix.push(second);
     let xml = message.to_xml().unwrap();
@@ -68,11 +69,13 @@ fn xml_to_kvn_round_trip_preserves_empty_comments() {
 }
 
 #[test]
-fn kvn_round_trip_preserves_significant_comment_whitespace() {
+fn kvn_round_trip_keeps_leading_comment_blanks_only() {
+    // Leading blanks are text; trailing blanks before the end of line are not
+    // significant in KVN (ODM 7.4.7).
     let mut message = Oem::from_xml(XML).unwrap();
     message.header.comment = vec!["   indented   ".into()];
 
     let kvn = convert(&message.to_xml().unwrap(), Notation::Kvn).unwrap();
     let reparsed = Oem::from_kvn(&kvn).unwrap();
-    assert_eq!(reparsed.header.comment, message.header.comment);
+    assert_eq!(reparsed.header.comment, vec!["   indented"]);
 }

@@ -7,8 +7,8 @@
 //! This module implements KVN parsing for OEM using winnow parser combinators.
 
 use super::{
-    absolute_epoch_error, validate_within_path, Oem, OemBody, OemCovarianceMatrix, OemData,
-    OemEpochRangeCheck, OemMetadata, OemSegment,
+    validate_within_path, Oem, OemBody, OemCovarianceMatrix, OemData, OemEpochRange, OemMetadata,
+    OemSegment,
 };
 use crate::common::StateVectorAcc;
 use crate::error::{InternalParserError, Result, ValidationError};
@@ -89,18 +89,15 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
         "OBJECT_ID" => object_id: kv_string,
         "CENTER_NAME" => center_name: kv_string,
         "REF_FRAME" => ref_frame: kv_string,
-        "REF_FRAME_EPOCH" => ref_frame_epoch: kv_calendar_epoch,
+        "REF_FRAME_EPOCH" => val: kv_optional(kv_epoch) => { ref_frame_epoch = val; },
         "TIME_SYSTEM" => time_system: kv_string,
         "START_TIME" => start_time: kv_epoch,
-        "USEABLE_START_TIME" => useable_start_time: kv_epoch,
-        "USEABLE_STOP_TIME" => useable_stop_time: kv_epoch,
+        "USEABLE_START_TIME" => val: kv_optional(kv_epoch) => { useable_start_time = val; },
+        "USEABLE_STOP_TIME" => val: kv_optional(kv_epoch) => { useable_stop_time = val; },
         "STOP_TIME" => stop_time: kv_epoch,
-        "INTERPOLATION" => interpolation: kv_string,
-        "INTERPOLATION_DEGREE" => val: kv_u32 => {
-            let nz = NonZeroU32::new(val).ok_or_else(|| {
-                cut_err(input, "positive integer")
-            })?;
-            interpolation_degree = Some(InterpolationDegree(nz));
+        "INTERPOLATION" => val: kv_optional(kv_string) => { interpolation = val; },
+        "INTERPOLATION_DEGREE" => val: kv_optional(kv_interpolation_degree) => {
+            interpolation_degree = val;
         },
     }, |i| at_block_end("META", i), "Unexpected OEM Metadata key");
 
@@ -146,6 +143,20 @@ fn parse_odm_f64(input: &mut &str) -> KvnResult<f64> {
     fast_float::parse(token).map_err(|_| cut_err(input, "Invalid ODM number"))
 }
 
+/// Parses a positive KVN integer (ODM 7.5.4), reporting a failure at the value itself.
+fn kv_interpolation_degree(input: &mut &str) -> KvnResult<InterpolationDegree> {
+    let value_start = *input;
+    let value = kv_i32.parse_next(input)?;
+    u32::try_from(value)
+        .ok()
+        .and_then(NonZeroU32::new)
+        .map(InterpolationDegree)
+        .ok_or_else(|| {
+            *input = value_start.trim_start_matches([' ', '\t']);
+            cut_err(input, "positive integer")
+        })
+}
+
 /// Parses a raw state vector line.
 /// Format: EPOCH X Y Z X_DOT Y_DOT Z_DOT [X_DDOT Y_DDOT Z_DDOT]
 fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
@@ -182,21 +193,10 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
         ));
     }
 
-    let x_ddot = if count >= 7 {
-        Some(Acc::new(floats[6], Some(AccUnits::KmPerS2)))
-    } else {
-        None
-    };
-    let y_ddot = if count >= 8 {
-        Some(Acc::new(floats[7], Some(AccUnits::KmPerS2)))
-    } else {
-        None
-    };
-    let z_ddot = if count >= 9 {
-        Some(Acc::new(floats[8], Some(AccUnits::KmPerS2)))
-    } else {
-        None
-    };
+    // Only 6 or 9 components remain, so acceleration is all-or-nothing.
+    let acceleration =
+        |index: usize| (count == 9).then(|| Acc::new(floats[index], Some(AccUnits::KmPerS2)));
+    let (x_ddot, y_ddot, z_ddot) = (acceleration(6), acceleration(7), acceleration(8));
 
     // An ephemeris record occupies exactly one line, so only padding may follow its components.
     // Without this anchor, leftover tokens are re-read as another record, which both accepts
@@ -331,6 +331,7 @@ fn parse_covariance_block(input: &mut &str) -> KvnResult<Vec<OemCovarianceMatrix
     let mut matrices: Vec<OemCovarianceMatrix> = Vec::new();
 
     loop {
+        blank_lines.parse_next(input)?;
         let checkpoint = input.checkpoint();
         if at_block_end("COVARIANCE", input) {
             break;
@@ -618,6 +619,9 @@ impl Oem {
         self.header.validate()?;
         validate_within_path(self.body.validate_identity(), || "body".into())?;
         validate_within_path(self.body.validate_useable_spans(), || "body".into())?;
+        if let Some(error) = self.kvn_case_error() {
+            return Err(error.into());
+        }
 
         comments(&self.header.comment, "header.comment".into())?;
         if let Some(value) = &self.header.classification {
@@ -637,10 +641,25 @@ impl Oem {
             let base = format!("body.segment[{segment_index}]");
             let metadata = &segment.metadata;
             validate_within_path(metadata.validate(), || format!("{base}.metadata").into())?;
+            // ODM 7.5.4 bounds KVN integers; XML uses xsd:positiveInteger.
+            if let Some(degree) = metadata
+                .interpolation_degree
+                .filter(|degree| degree.0.get() > i32::MAX as u32)
+            {
+                return Err(ValidationError::OutOfRange {
+                    name: "INTERPOLATION_DEGREE".into(),
+                    value: degree.to_string(),
+                    expected: "1 through 2147483647 for OEM KVN".into(),
+                    line: None,
+                }
+                .at_path(format!("{base}.metadata.interpolation_degree"))
+                .into());
+            }
             validate_within_path(segment.data.validate_presence(), || {
                 format!("{base}.data").into()
             })?;
-            let mut epoch_range = OemEpochRangeCheck::new(metadata);
+            let epoch_range = OemEpochRange::new(metadata);
+            let mut previous_covariance = None;
             comments(&metadata.comment, format!("{base}.metadata.comment"))?;
             for (field, value, member) in [
                 ("OBJECT_NAME", metadata.object_name.as_str(), "object_name"),
@@ -665,15 +684,14 @@ impl Oem {
             writer.write_comments(&segment.data.comment);
             writer.write_empty();
             for (state_index, state) in segment.data.state_vector.iter().enumerate() {
-                // The fused generation pass below applies the stronger OEM absolute/range
-                // epoch checks and checks every numeric component through `OdmFloat`. Calling the
-                // generic state validator here would scan the same epoch and values a second time.
-                let mut epoch_error = None;
-                epoch_range.state(state_index, state, &mut |error| {
-                    epoch_error.get_or_insert(error);
-                });
-                if let Some(error) = epoch_error {
-                    return Err(error.within_path(base.clone()).into());
+                // This fused pass applies the segment epoch rules and checks every numeric
+                // component through `OdmFloat`, which also rejects non-finite values that KVN
+                // cannot represent (ODM 7.5.7).
+                if let Some(error) = epoch_range.error(&state.epoch, "stateVector EPOCH") {
+                    return Err(error
+                        .at_path(format!("data.state_vector[{state_index}].epoch"))
+                        .within_path(base.clone())
+                        .into());
                 }
                 let acceleration_count = [&state.x_ddot, &state.y_ddot, &state.z_ddot]
                     .into_iter()
@@ -765,21 +783,13 @@ impl Oem {
             }
             for (covariance_index, covariance) in segment.data.covariance_matrix.iter().enumerate()
             {
-                // Numeric finiteness is subsumed by the representability checks used for every
-                // emitted matrix value. Keep the non-numeric absolute-epoch rule explicitly.
-                if let Some(error) = absolute_epoch_error(&covariance.epoch, "EPOCH") {
+                if let Some(error) =
+                    epoch_range.covariance_error(&covariance.epoch, &mut previous_covariance)
+                {
                     return Err(error
-                        .at_path(format!(
-                            "{base}.data.covariance_matrix[{covariance_index}].epoch"
-                        ))
+                        .at_path(format!("data.covariance_matrix[{covariance_index}].epoch"))
+                        .within_path(base.clone())
                         .into());
-                }
-                let mut epoch_error = None;
-                epoch_range.covariance(covariance_index, covariance, &mut |error| {
-                    epoch_error.get_or_insert(error);
-                });
-                if let Some(error) = epoch_error {
-                    return Err(error.within_path(base.clone()).into());
                 }
                 if let Some(value) = &covariance.cov_ref_frame {
                     text(
@@ -805,16 +815,6 @@ impl Oem {
                                     field.to_ascii_lowercase()
                                 )
                             };
-                            if !value.is_finite() {
-                                return Err(ValidationError::InvalidValue {
-                                    field: (*field).into(),
-                                    value: value.to_string(),
-                                    expected: "a finite number".into(),
-                                    line: None,
-                                }
-                                .at_path(path())
-                                .into());
-                            }
                             if !OdmFloat::write_if_valid(*value, line) {
                                 return Err(crate::validation::unrepresentable_number(
                                     field,
@@ -851,6 +851,9 @@ impl Oem {
             validate_syntax(&normalized)?;
             let oem = Self::from_kvn_str(&normalized)?;
             crate::traits::Validate::validate(&oem)?;
+            if let Some(error) = oem.kvn_case_error() {
+                return Err(error.into());
+            }
             Ok(oem)
         })()
         .map_err(|error: crate::error::CcsdsNdmError| {
@@ -1050,7 +1053,8 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
                 covariance_frame_seen = false;
             }
             "COVARIANCE_STOP" => {
-                if phase != Phase::Covariance || covariance_records == 0 || covariance_row != 6 {
+                // Annex A2.5.3 marks covariance lines optional inside the covariance block.
+                if phase != Phase::Covariance || (covariance_records > 0 && covariance_row != 6) {
                     return Err(invalid(
                         line_number,
                         offset,
@@ -1136,6 +1140,14 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
                 }
                 Phase::Covariance if covariance_epoch_seen && covariance_row < 6 => {
                     covariance_row += 1;
+                    // ODM 5.2.5.4: row n of the lower triangle holds n values.
+                    if line.split_whitespace().count() != covariance_row {
+                        return Err(invalid(
+                            line_number,
+                            offset,
+                            "covariance row does not hold its lower-triangular number of values",
+                        ));
+                    }
                 }
                 _ => return Err(invalid(line_number, offset, "unexpected OEM record")),
             },
@@ -1148,6 +1160,15 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
             kvn.lines().count().max(1),
             kvn.len(),
             "incomplete OEM document",
+        ));
+    }
+    // ODM 7.3.7: every line, including the last, ends with a line terminator. Line endings
+    // are normalized to LF before this pass.
+    if !kvn.ends_with('\n') {
+        return Err(invalid(
+            kvn.lines().count(),
+            kvn.len(),
+            "the final line is not terminated",
         ));
     }
     Ok(())

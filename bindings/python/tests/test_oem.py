@@ -6,7 +6,6 @@
 Unit tests for Orbit Ephemeris Message (OEM) Python bindings.
 """
 
-import ccsds_ndm
 import numpy as np
 import pytest
 
@@ -22,51 +21,47 @@ from ccsds_ndm import (
 )
 
 
+# Each OEM data section carries two parallel histories with the same accessor
+# shape: the record list, the epochs view, and the NumPy view.
+HISTORIES = {
+    "state": ("state_vector", "state_vector_epochs", "state_vector_numpy"),
+    "cov": ("covariance_matrix", "covariance_matrix_epochs", "covariance_matrix_numpy"),
+}
+
+
 class TestOem:
     """Tests for OEM bindings."""
 
-    def test_odm_creation_date_requires_absolute_epoch(self):
-        with pytest.raises(ValueError):
-            OdmHeader("123.5", "TEST")
-
-        header = OdmHeader("2002-204T15:56:23Z", "TEST")
-        assert header.creation_date == "2002-204T15:56:23Z"
-        with pytest.raises(ValueError):
-            header.creation_date = "123.5"
-
-    def test_ref_frame_epoch_requires_calendar_form(self):
-        with pytest.raises(ValueError):
-            OemMetadata(
-                "SAT1",
-                "2023-001A",
-                "2023-01-01T00:00:00",
-                "2023-01-01T01:00:00",
-                center_name="EARTH",
-                ref_frame="EME2000",
-                time_system="UTC",
-                ref_frame_epoch="123.5",
-            )
+    def test_ref_frame_epoch_is_validated_as_a_time_tag(self):
+        # Like the other OEM epochs, the spelling parses and validation applies 7.5.10.
+        metadata = OemMetadata(
+            "SAT1",
+            "2023-001A",
+            "2023-01-01T00:00:00",
+            "2023-01-01T01:00:00",
+            center_name="EARTH",
+            ref_frame="EME2000",
+            time_system="UTC",
+            ref_frame_epoch="123.5",
+        )
+        with pytest.raises(NdmValidationError, match="REF_FRAME_EPOCH"):
+            metadata.validate()
 
         metadata = self._create_valid_oem().segments[0].metadata
         metadata.ref_frame_epoch = "2000-001T12:00:00"
         assert metadata.ref_frame_epoch == "2000-001T12:00:00"
-        with pytest.raises(ValueError):
-            metadata.ref_frame_epoch = "123.5"
+        metadata.ref_frame_epoch = "123.5"
+        with pytest.raises(NdmValidationError, match="REF_FRAME_EPOCH"):
+            metadata.validate()
 
     def test_contextual_epoch_validation_rejects_degenerate_values(self):
         metadata = self._create_valid_oem().segments[0].metadata
         metadata.start_time = "+"
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmValidationError):
             metadata.validate()
 
         oem = self._create_valid_oem()
-        segments = oem.segments
-        data = segments[0].data
-        state_vectors = data.state_vector
-        state_vectors[0].epoch = "2023-02-29T00:00:00"
-        data.state_vector = state_vectors
-        segments[0].data = data
-        oem.segments = segments
+        oem.segments[0].data.state_vector[0].epoch = "2023-02-29T00:00:00"
         with pytest.raises(NdmValidationError):
             oem.to_str(format="xml")
 
@@ -106,41 +101,6 @@ class TestOem:
         seg = OemSegment(meta, data)
         return Oem(header, [seg])
 
-    def test_roundtrip_kvn(self):
-        try:
-            oem = self._create_valid_oem()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        kvn = oem.to_str(format="kvn")
-        assert "CCSDS_OEM_VERS" in kvn
-
-        oem2 = Oem.from_str(kvn, format="kvn")
-        assert oem2.header.originator == "TEST"
-        assert len(oem2.segments) == 1
-
-    def test_roundtrip_xml(self):
-        try:
-            oem = self._create_valid_oem()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        xml = oem.to_str(format="xml")
-        assert "<oem" in xml
-
-        oem2 = Oem.from_str(xml, format="xml")
-        assert len(oem2.segments) == 1
-
-    def test_file_io(self, tmp_path):
-        oem = self._create_valid_oem()
-        path = tmp_path / "test.oem"
-
-        oem.to_file(str(path), "kvn")
-        assert path.exists()
-
-        oem2 = ccsds_ndm.from_file(str(path), format="kvn")
-        assert oem2.header.originator == "TEST"
-
     def test_oem_data_numpy_api(self):
         epochs = ["2023-01-01T00:00:00", "2023-01-01T00:01:00"]
         state = np.array(
@@ -170,48 +130,6 @@ class TestOem:
         data.state_vector_numpy = new_state
         assert np.allclose(data.state_vector_numpy, new_state)
 
-    def test_state_accessors_read_only_the_state_history(self):
-        # Both histories are exposed as plain Python lists, so either can be left
-        # holding an object of the wrong type. Reading one history used to rebuild
-        # the whole data section, which let an unrelated malformed covariance
-        # record break state-vector access.
-        data = self._numpy_data()
-        data.covariance_matrix.append("not a covariance matrix")
-        assert data.state_vector_numpy.shape == (2, 6)
-        assert len(data.state_vector_epochs) == 2
-
-        data.state_vector.append("not a state vector")
-        for accessor in ("state_vector_numpy", "state_vector_epochs"):
-            with pytest.raises(ValueError, match=r"state_vector\[2\]"):
-                getattr(data, accessor)
-
-    def test_covariance_accessors_read_only_the_covariance_history(self):
-        data = self._numpy_data()
-        data.state_vector.append("not a state vector")
-        assert data.covariance_matrix_numpy.shape == (1, 6, 6)
-        assert len(data.covariance_matrix_epochs) == 1
-
-        data.covariance_matrix.append("not a covariance matrix")
-        for accessor in ("covariance_matrix_numpy", "covariance_matrix_epochs"):
-            with pytest.raises(ValueError, match=r"covariance_matrix\[1\]"):
-                getattr(data, accessor)
-
-    def test_state_vector_epochs_reject_bad_input_without_partial_writes(self):
-        data = self._numpy_data()
-        original = data.state_vector[0].epoch
-
-        with pytest.raises(ValueError):
-            data.state_vector_epochs = ["2024-01-01T00:00:00", "not-a-timestamp"]
-        assert data.state_vector[0].epoch == original
-
-        data.state_vector[1] = "not a state vector"
-        with pytest.raises(ValueError, match=r"state_vector\[1\]"):
-            data.state_vector_epochs = [
-                "2024-01-01T00:00:00",
-                "2024-01-01T00:01:00",
-            ]
-        assert data.state_vector[0].epoch == original
-
     def test_epoch_setters_do_not_create_records(self):
         data = OemData(state_vectors=[], covariance_matrices=[], comments=[])
         with pytest.raises(ValueError, match="no state vectors"):
@@ -219,9 +137,10 @@ class TestOem:
         with pytest.raises(ValueError, match="no covariance matrices"):
             data.covariance_matrix_epochs = ["2023-01-01T00:00:00"]
 
-    def test_covariance_matrix_epochs_reject_bad_input_without_partial_writes(self):
-        data = OemData.from_numpy(
-            state_vector_epochs=["2023-01-01T00:00:00", "2023-01-01T00:01:00"],
+    def _numpy_data(self):
+        epochs = ["2023-01-01T00:00:00", "2023-01-01T00:01:00"]
+        return OemData.from_numpy(
+            state_vector_epochs=epochs,
             state_vector_numpy=np.array(
                 [
                     [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0],
@@ -229,41 +148,100 @@ class TestOem:
                 ],
                 dtype=float,
             ),
-            covariance_matrix_epochs=["2023-01-01T00:00:00", "2023-01-01T00:01:00"],
-            covariance_matrix_numpy=np.eye(6, dtype=float)
-            .reshape(1, 6, 6)
-            .repeat(2, axis=0),
+            covariance_matrix_epochs=epochs,
+            covariance_matrix_numpy=np.stack([np.eye(6), 2 * np.eye(6)]),
         )
-        original = data.covariance_matrix[0].epoch
+
+    @pytest.mark.parametrize(("history", "other"), [("state", "cov"), ("cov", "state")])
+    def test_accessors_read_only_their_own_history(self, history, other):
+        # Both histories are exposed as plain Python lists, so either can be left
+        # holding an object of the wrong type. Reading one history used to rebuild
+        # the whole data section, which let an unrelated malformed record in the
+        # other history break access.
+        records, epochs, array = HISTORIES[history]
+        data = self._numpy_data()
+        getattr(data, HISTORIES[other][0]).append("not a record")
+        assert len(getattr(data, epochs)) == 2
+        replacement = getattr(data, array) * 2
+        record = getattr(data, records)[0]
+        setattr(data, array, replacement)
+        assert getattr(data, records)[0] is record
+        np.testing.assert_array_equal(getattr(data, array), replacement)
+
+        getattr(data, records).append("not a record")
+        for accessor in (array, epochs):
+            with pytest.raises(ValueError, match=rf"{records}\[2\] must be"):
+                getattr(data, accessor)
+
+    def test_covariance_numpy_assignment_keeps_record_metadata(self):
+        data = self._numpy_data()
+        record = data.covariance_matrix[0]
+        record.cov_ref_frame = "RTN"
+        record.comment = ["retained"]
+        data.covariance_matrix_numpy = data.covariance_matrix_numpy * 2
+        assert record.cov_ref_frame == "RTN"
+        assert record.comment == ["retained"]
+        assert record.cx_x == 2.0
+
+    @pytest.mark.parametrize("history", ["state", "cov"])
+    def test_epoch_setters_reject_bad_input_without_partial_writes(self, history):
+        records, epochs, _ = HISTORIES[history]
+        data = self._numpy_data()
+        original = getattr(data, records)[0].epoch
 
         with pytest.raises(ValueError):
-            data.covariance_matrix_epochs = [
-                "2024-01-01T00:00:00",
-                "not-a-timestamp",
-            ]
-        assert data.covariance_matrix[0].epoch == original
+            setattr(data, epochs, ["2024-01-01T00:00:00", "not-a-timestamp"])
+        assert getattr(data, records)[0].epoch == original
 
-        data.covariance_matrix[1] = "not a covariance matrix"
-        with pytest.raises(ValueError, match=r"covariance_matrix\[1\]"):
-            data.covariance_matrix_epochs = [
-                "2024-01-01T00:00:00",
-                "2024-01-01T00:01:00",
-            ]
-        assert data.covariance_matrix[0].epoch == original
+        getattr(data, records)[1] = "not a record"
+        with pytest.raises(ValueError, match=rf"{records}\[1\] must be"):
+            setattr(data, epochs, ["2024-01-01T00:00:00", "2024-01-01T00:01:00"])
+        assert getattr(data, records)[0].epoch == original
 
-    def _numpy_data(self):
-        return OemData.from_numpy(
-            state_vector_epochs=["2023-01-01T00:00:00", "2023-01-01T00:01:00"],
-            state_vector_numpy=np.array(
-                [
-                    [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0],
-                    [7001.0, 0.1, 0.2, 0.0, 7.5, 0.0],
-                ],
-                dtype=float,
-            ),
+    @pytest.mark.parametrize("history", ["state", "cov"])
+    def test_numpy_setters_reject_bad_input_without_partial_writes(self, history):
+        records, _, array = HISTORIES[history]
+        data = self._numpy_data()
+        before = getattr(data, array)
+        second = getattr(data, records)[1]
+
+        getattr(data, records)[1] = "not a record"
+        with pytest.raises(ValueError, match=rf"{records}\[1\] must be"):
+            setattr(data, array, before + 1)
+        getattr(data, records)[1] = second
+        np.testing.assert_array_equal(getattr(data, array), before)
+
+    @pytest.mark.parametrize(
+        "metadata", [{"cov_ref_frames": ["RTN"]}, {"cov_comments": [["retain me"]]}]
+    )
+    def test_numpy_rejects_orphan_covariance_metadata(self, metadata):
+        with pytest.raises(ValueError, match="covariance_matrix_epochs is required"):
+            OemData.from_numpy(
+                state_vector_epochs=["2023-01-01T00:00:00"],
+                state_vector_numpy=np.zeros((1, 6)),
+                **metadata,
+            )
+
+    @pytest.mark.parametrize("shape", [(21,), (1, 21), (6, 6), (1, 6, 6)])
+    def test_numpy_covariance_layouts_preserve_every_component(self, shape):
+        lower = np.arange(1.0, 22.0)
+        expected = np.zeros((6, 6))
+        expected[np.tril_indices(6)] = lower
+        expected += np.tril(expected, -1).T
+        values = (lower if shape[-1] == 21 else expected).reshape(shape)
+        # Exercise each shape as a strided view as well.
+        padded = np.repeat(values, 2, axis=-1)
+        values = padded[..., ::2]
+        assert not values.flags.c_contiguous
+        data = OemData.from_numpy(
+            state_vector_epochs=["2023-01-01T00:00:00"],
+            state_vector_numpy=np.zeros((1, 6)),
             covariance_matrix_epochs=["2023-01-01T00:00:00"],
-            covariance_matrix_numpy=np.eye(6, dtype=float).reshape(1, 6, 6),
+            covariance_matrix_numpy=values,
         )
+        np.testing.assert_array_equal(data.covariance_matrix_numpy[0], expected)
+        data.covariance_matrix_numpy = (padded * 2)[..., ::2]
+        np.testing.assert_array_equal(data.covariance_matrix_numpy[0], expected * 2)
 
     def test_mixed_accelerations_produce_nine_columns_with_nan_gaps(self):
         # The array width is shared by the whole history, so a single record
@@ -351,7 +329,6 @@ class TestOem:
         meta.interpolation_degree = None
         assert meta.interpolation_degree is None
 
-        meta.interpolation_degree = 8
         oem = self._create_valid_oem()
         oem.segments[0].metadata.interpolation = "LINEAR"
         oem.segments[0].metadata.interpolation_degree = 8
@@ -393,6 +370,59 @@ class TestOem:
             comments=[],
         )
         assert np.allclose(data_nine.state_vector_numpy, strided_nine)
+
+    def test_section_validation_raises_ndm_validation_error(self):
+        # Section-level validate() reports rule violations the same way the
+        # message-level validate() does.
+        oem = self._create_valid_oem()
+        segment = oem.segments[0]
+        state_vector = segment.data.state_vector
+        segment.data.state_vector = []
+        for section in (segment, segment.data):
+            with pytest.raises(NdmValidationError, match="stateVector"):
+                section.validate()
+        segment.data.state_vector = state_vector
+
+        segment.metadata.start_time = "+"
+        for section in (segment, segment.metadata):
+            with pytest.raises(NdmValidationError, match="START_TIME"):
+                section.validate()
+
+    def test_ref_frame_epoch_follows_the_time_system(self):
+        # ODM 7.5.11 interprets REF_FRAME_EPOCH in TIME_SYSTEM; MET values are durations.
+        oem = self._create_valid_oem()
+        segment = oem.segments[0]
+        segment.metadata.ref_frame_epoch = "0000-000T00:00:00"
+        with pytest.raises(NdmValidationError, match="REF_FRAME_EPOCH"):
+            oem.validate()
+        segment.metadata.time_system = "MET"
+        segment.metadata.start_time = "0000-000T00:00:00"
+        segment.metadata.stop_time = "0000-000T01:00:00"
+        segment.data.state_vector[0].epoch = "0000-000T00:00:00"
+        segment.data.covariance_matrix[0].epoch = "0000-000T00:00:00"
+        oem.validate()
+        meta = OemMetadata(
+            "SAT1",
+            "2023-001A",
+            "0000-000T00:00:00",
+            "0000-000T01:00:00",
+            center_name="EARTH",
+            ref_frame="EME2000",
+            time_system="MET",
+            ref_frame_epoch="0000-000T00:00:00",
+        )
+        assert meta.ref_frame_epoch == "0000-000T00:00:00"
+        meta.validate()
+
+    def test_covariance_matrix_metadata_is_optional(self):
+        matrix = OemCovarianceMatrix("2023-01-01T00:00:00", np.ones(21))
+        assert matrix.cov_ref_frame is None
+        assert matrix.comment == []
+
+    @pytest.mark.parametrize("shape", [(1, 21), (1, 6, 6), (20,)])
+    def test_covariance_matrix_takes_exactly_one_matrix(self, shape):
+        with pytest.raises(ValueError, match=r"\(21,\) or \(6,6\)"):
+            OemCovarianceMatrix("2023-01-01T00:00:00", np.ones(shape))
 
 
 if __name__ == "__main__":

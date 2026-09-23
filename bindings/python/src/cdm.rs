@@ -457,6 +457,8 @@ impl CdmHeader {
     ///
     /// Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.2.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn message_for(&self) -> Option<String> {
@@ -534,20 +536,11 @@ impl CdmBody {
     }
 
     fn to_core(&self, py: Python<'_>) -> PyResult<core_cdm::CdmBody> {
-        let segments = self
-            .segments
-            .bind(py)
-            .iter()
-            .enumerate()
-            .map(|(index, value)| {
-                value
-                    .extract::<PyRef<'_, CdmSegment>>()
-                    .map_err(|_| {
-                        PyValueError::new_err(format!("segments[{index}] must be CdmSegment"))
-                    })?
-                    .to_core(py)
-            })
-            .collect::<PyResult<Vec<_>>>()?;
+        let segments = crate::common::extract_records(
+            self.segments.bind(py),
+            "segments",
+            |value: &CdmSegment| value.to_core(py),
+        )?;
         Ok(core_cdm::CdmBody {
             relative_metadata_data: self.relative_metadata_data.borrow(py).inner.clone(),
             segments,
@@ -784,6 +777,8 @@ impl RelativeMetadataData {
     ///
     /// Units: m/s
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn relative_speed(&self) -> Option<f64> {
@@ -796,6 +791,8 @@ impl RelativeMetadataData {
 
     /// The probability (denoted 'p' where 0.0<=p<=1.0), that Object1 and Object2 will collide.
     /// Data type = double.
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -814,6 +811,8 @@ impl RelativeMetadataData {
     /// The method that was used to calculate the collision probability. (See annex E for
     /// definition.)
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn collision_probability_method(&self) -> Option<String> {
@@ -826,6 +825,8 @@ impl RelativeMetadataData {
 
     /// The start time in UTC of the screening period for the conjunction assessment. (See
     /// 6.3.2.6 for formatting rules.)
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -844,6 +845,8 @@ impl RelativeMetadataData {
     /// The stop time in UTC of the screening period for the conjunction assessment. (See
     /// 6.3.2.6 for formatting rules.)
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn stop_screen_period(&self) -> Option<String> {
@@ -861,6 +864,8 @@ impl RelativeMetadataData {
     /// The time in UTC when Object2 enters the screening volume. (See 6.3.2.6 for formatting
     /// rules.)
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn screen_entry_time(&self) -> Option<String> {
@@ -874,6 +879,8 @@ impl RelativeMetadataData {
 
     /// The time in UTC when Object2 exits the screening volume. (See 6.3.2.6 for formatting
     /// rules.)
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -891,6 +898,8 @@ impl RelativeMetadataData {
     ///
     /// Units: m
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn screen_volume_x(&self) -> Option<f64> {
@@ -906,6 +915,8 @@ impl RelativeMetadataData {
     ///
     /// Units: m
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn screen_volume_y(&self) -> Option<f64> {
@@ -920,6 +931,8 @@ impl RelativeMetadataData {
     /// double.
     ///
     /// Units: m
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -965,6 +978,8 @@ impl RelativeMetadataData {
     /// given. Available options are RTN and Transverse, Velocity, and Normal (TVN). (See annex
     /// E for definition.)
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
+    ///
     /// :type: Optional[ScreenVolumeFrameType]
     #[getter]
     fn get_screen_volume_frame(&self) -> Option<ScreenVolumeFrameType> {
@@ -982,6 +997,8 @@ impl RelativeMetadataData {
     }
 
     /// Shape of the screening volume: ELLIPSOID or BOX.
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
     ///
     /// :type: Optional[ScreenVolumeShapeType]
     #[getter]
@@ -1502,6 +1519,8 @@ impl CdmMetadata {
     ///
     /// Examples: ORBITAL SAFETY ANALYST (OSA), NETWORK CONTROLLER
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn operator_contact_position(&self) -> Option<String> {
@@ -1515,6 +1534,8 @@ impl CdmMetadata {
     /// Contact organization of the object.
     ///
     /// Examples: EUMETSAT, ESA, INTELSAT, IRIDIUM
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1530,6 +1551,8 @@ impl CdmMetadata {
     ///
     /// Examples: +49615130312
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn operator_phone(&self) -> Option<String> {
@@ -1543,6 +1566,8 @@ impl CdmMetadata {
     /// Email address of the contact position or organization of the object.
     ///
     /// Examples: JOHN.DOE@SOMEWHERE.NET
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1559,6 +1584,8 @@ impl CdmMetadata {
     ///
     /// Examples: EARTH, SUN, MOON, MARS
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn orbit_center(&self) -> Option<String> {
@@ -1573,6 +1600,8 @@ impl CdmMetadata {
     /// definition).
     ///
     /// Examples: EGM-96: 36D 360, WGS-84_GEOID: 24D 240, JGM-2: 41D 410
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1589,6 +1618,8 @@ impl CdmMetadata {
     ///
     /// Examples: JACCHIA 70, MSIS, JACCHIA 70 DCA, NONE
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn atmospheric_model(&self) -> Option<String> {
@@ -1603,6 +1634,8 @@ impl CdmMetadata {
     /// specified, then no third-body gravitational perturbations were used.
     ///
     /// Examples: MOON, SUN, JUPITER, NONE
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1653,6 +1686,8 @@ impl CdmMetadata {
     /// The object type.
     ///
     /// Examples: PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, OTHER
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: Optional[ObjectDescription]
     #[getter]
@@ -1755,6 +1790,8 @@ impl CdmMetadata {
     ///
     /// Examples: YES, NO
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
+    ///
     /// :type: Optional[bool]
     #[getter]
     fn get_solar_rad_pressure(&self) -> Option<bool> {
@@ -1778,6 +1815,8 @@ impl CdmMetadata {
     ///
     /// Examples: YES, NO
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
+    ///
     /// :type: Optional[bool]
     #[getter]
     fn get_earth_tides(&self) -> Option<bool> {
@@ -1800,6 +1839,8 @@ impl CdmMetadata {
     /// Indication of whether in-track thrust modeling was used for the OD of the object.
     ///
     /// Examples: YES, NO
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: Optional[bool]
     #[getter]
@@ -2617,6 +2658,8 @@ impl AdditionalParameters {
     ///
     /// Units: m²
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_area_pc(&self) -> Option<f64> {
@@ -2631,6 +2674,8 @@ impl AdditionalParameters {
     /// definition.)
     ///
     /// Units: m²
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2647,6 +2692,8 @@ impl AdditionalParameters {
     ///
     /// Units: m²
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_area_srp(&self) -> Option<f64> {
@@ -2660,6 +2707,8 @@ impl AdditionalParameters {
     /// The mass of the object.
     ///
     /// Units: kg
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2676,6 +2725,8 @@ impl AdditionalParameters {
     ///
     /// Units: m²/kg
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_cd_area_over_mass(&self) -> Option<f64> {
@@ -2690,6 +2741,8 @@ impl AdditionalParameters {
     /// annex E for definition.)
     ///
     /// Units: m²/kg
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2706,6 +2759,8 @@ impl AdditionalParameters {
     ///
     /// Units: m/s²
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_thrust_acceleration(&self) -> Option<f64> {
@@ -2720,6 +2775,8 @@ impl AdditionalParameters {
     /// value is an average calculated during the OD.
     ///
     /// Units: W/kg
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
     ///
     /// :type: Optional[float]
     #[getter]

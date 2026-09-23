@@ -73,8 +73,10 @@ fn xml_fixtures_preserve_models_and_generate_deterministically() {
                 assert_kvn_generation(&label, &message, &from_str(&normalized).unwrap());
             }
             "omm_g10.xml" => {
-                // KVN assignment values omit surrounding whitespace.
+                // KVN assignment values omit surrounding whitespace, and trailing comment
+                // blanks are not significant (ODM 7.4.7).
                 let normalized = mutated(&input, "<MESSAGE_ID> OMM", "<MESSAGE_ID>OMM");
+                let normalized = mutated(&normalized, "OMM </COMMENT>", "OMM</COMMENT>");
                 assert_ne!(normalized, input, "{label} padded message ID is missing");
                 assert_kvn_generation(&label, &message, &from_str(&normalized).unwrap());
             }

@@ -47,8 +47,8 @@ fn edition_2(input: &str) -> String {
         &input
             .lines()
             .filter(|line| !line.starts_with("MESSAGE_ID"))
-            .collect::<Vec<_>>()
-            .join("\n"),
+            .map(|line| format!("{line}\n"))
+            .collect::<String>(),
         "3.0",
         "2.0",
     )

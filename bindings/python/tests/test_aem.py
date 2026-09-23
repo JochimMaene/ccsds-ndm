@@ -6,6 +6,8 @@
 Unit tests for Attitude Ephemeris Message (AEM) Python bindings.
 """
 
+from pathlib import Path
+
 import ccsds_ndm
 import numpy as np
 import pytest
@@ -19,18 +21,11 @@ from ccsds_ndm import (
     AttitudeState,
 )
 
+KVN_DIR = Path(__file__).resolve().parents[3] / "ccsds-ndm" / "data" / "kvn"
+
 
 class TestAem:
     """Tests for AEM bindings."""
-
-    def test_adm_creation_date_requires_absolute_epoch(self):
-        with pytest.raises(ValueError):
-            AdmHeader("123.5", "TEST")
-
-        header = AdmHeader("2002-204T15:56:23Z", "TEST")
-        assert header.creation_date == "2002-204T15:56:23Z"
-        with pytest.raises(ValueError):
-            header.creation_date = "123.5"
 
     def test_aem_metadata(self):
         meta = AemMetadata(
@@ -197,6 +192,52 @@ class TestAem:
                 "2024-01-01T00:01:00",
             ]
         assert data.attitude_states[0].epoch == original
+
+    def test_attitude_states_numpy_rejects_bad_record_without_partial_writes(self):
+        state1 = AttitudeState("2023-01-01T00:00:00", [0.0, 0.0, 0.0, 1.0])
+        state2 = AttitudeState("2023-01-01T00:01:00", [0.0, 0.0, 0.0, 1.0])
+        data = AemData(
+            attitude_states=[state1, state2],
+            attitude_type="QUATERNION",
+            comment=[],
+        )
+
+        # Row 0 used to be written before row 1's bad element raised.
+        data.attitude_states[1] = "not an attitude state"
+        with pytest.raises(
+            ValueError, match=r"attitude_states\[1\] must be AttitudeState"
+        ):
+            data.attitude_states_numpy = np.full((2, 4), 0.5)
+        assert state1.values == [0.0, 0.0, 0.0, 1.0]
+
+        data.attitude_states[1] = state2
+        data.attitude_states_numpy = np.full((2, 4), 0.5)
+        assert data.attitude_states[0] is state1
+        assert state1.values == [0.5] * 4
+
+    def test_section_validation_raises_ndm_validation_error(self):
+        aem = Aem.from_file(KVN_DIR / "aem_g5.kvn")
+        segment = aem.segments[0]
+        attitude_type = segment.metadata.attitude_type
+        state = segment.data.attitude_states[0]
+        state.values = [float("nan"), *state.values[1:]]
+        with pytest.raises(ccsds_ndm.NdmValidationError):
+            segment.data.validate(attitude_type)
+
+        segment.metadata.object_name = ""
+        for validate in (segment.metadata.validate, segment.validate):
+            with pytest.raises(ccsds_ndm.NdmValidationError, match="OBJECT_NAME"):
+                validate()
+
+    def test_sections_apply_the_fraction_limit(self):
+        # ADM 6.8.9 limits fractional seconds to 16 digits at every validation entry point.
+        aem = Aem.from_file(KVN_DIR / "aem_g5.kvn")
+        segment = aem.segments[0]
+        whole, _, fraction = segment.metadata.start_time.partition(".")
+        segment.metadata.start_time = f"{whole}.{fraction:0<17}"
+        for validate in (segment.metadata.validate, segment.validate, aem.validate):
+            with pytest.raises(ccsds_ndm.NdmValidationError, match="START_TIME"):
+                validate()
 
     def test_aem_set_epochs_without_states_raises(self):
         data = AemData(attitude_states=[], attitude_type="QUATERNION", comment=[])

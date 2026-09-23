@@ -126,7 +126,11 @@ def test_generic_python_conversion_dispatches_non_opm_messages(tmp_path):
 
 
 def test_combined_python_message_keeps_identity():
-    empty = ccsds_ndm.from_str("<ndm/>", format="xml")
+    empty = ccsds_ndm.from_str(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<ndm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/>',
+        format="xml",
+    )
     assert isinstance(empty, ccsds_ndm.CombinedNdm)
     assert empty.messages == []
 

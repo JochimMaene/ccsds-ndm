@@ -1296,7 +1296,8 @@ fn tdm_conditional_metadata_rules_name_the_offending_field() {
 #[test]
 fn tdm_xml_exhaustive_observations() {
     // Exercise XML deserializer for a wide range of observation types
-    let xml = r#"<tdm id="CCSDS_TDM_VERS" version="2.0">
+    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<tdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="CCSDS_TDM_VERS" version="2.0">
   <header>
     <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
     <ORIGINATOR>TEST</ORIGINATOR>
@@ -1509,7 +1510,8 @@ fn tdm_xml_exhaustive_observations() {
     }
 
     // Test duplicate EPOCH error handling
-    let xml_dup = r#"<tdm id="CCSDS_TDM_VERS" version="2.0">
+    let xml_dup = r#"<?xml version="1.0" encoding="UTF-8"?>
+<tdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="CCSDS_TDM_VERS" version="2.0">
   <header><CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE><ORIGINATOR>T</ORIGINATOR></header>
   <body><segment><metadata><TIME_SYSTEM>UTC</TIME_SYSTEM><PARTICIPANT_1>P</PARTICIPANT_1></metadata>
   <data><observation><EPOCH>2023-01-01T00:00:00</EPOCH><EPOCH>2023-01-01T00:00:01</EPOCH><RANGE>1.0</RANGE></observation></data>
@@ -1520,7 +1522,8 @@ fn tdm_xml_exhaustive_observations() {
     );
 
     // Strict parsing rejects unknown root and observation attributes.
-    let xml_unknown = r#"<tdm id="CCSDS_TDM_VERS" version="2.0" extra="val">
+    let xml_unknown = r#"<?xml version="1.0" encoding="UTF-8"?>
+<tdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="CCSDS_TDM_VERS" version="2.0" extra="val">
   <header><CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE><ORIGINATOR>T</ORIGINATOR></header>
   <body><segment><metadata><TIME_SYSTEM>UTC</TIME_SYSTEM><PARTICIPANT_1>P</PARTICIPANT_1></metadata>
   <data><observation extra="ignore"><EPOCH>2023-01-01T00:00:00</EPOCH><RANGE>1.0</RANGE></observation></data>

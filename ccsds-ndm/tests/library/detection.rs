@@ -77,7 +77,11 @@ fn kvn_header_names_inside_values_do_not_create_a_combined_message() {
 
 #[test]
 fn xml_detection_accepts_an_empty_combined_instantiation() {
-    let Message::Ndm(message) = from_str("<ndm/>").unwrap() else {
+    let Message::Ndm(message) = from_str(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+         <ndm xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'/>",
+    )
+    .unwrap() else {
         panic!("an empty combined instantiation should preserve its NDM identity");
     };
     assert!(message.messages.is_empty());

@@ -18,7 +18,7 @@ DATA_STOP
 "#;
 
 const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
-<tdm id="CCSDS_TDM_VERS" version="2.0">
+<tdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="CCSDS_TDM_VERS" version="2.0">
   <header>
     <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
     <ORIGINATOR>TEST</ORIGINATOR>

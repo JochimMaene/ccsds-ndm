@@ -309,11 +309,7 @@ pub struct AemMetadata {
     /// **Examples**: EARTH, STS-106
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub center_name: Option<String>,
     /// Name of the reference frame that defines the starting point of the transformation. The set
@@ -357,11 +353,7 @@ pub struct AemMetadata {
     /// **Examples**: 1996-12-18T14:28:15.11
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub useable_start_time: Option<CalendarEpoch>,
     /// Optional stop of USEABLE time span covered by attitude ephemeris data immediately following
     /// this metadata block. (See also USEABLE_START_TIME.)
@@ -369,11 +361,7 @@ pub struct AemMetadata {
     /// **Examples**: 1996-12-18T14:28:15.11
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub useable_stop_time: Option<CalendarEpoch>,
     /// End of TOTAL time span covered by the attitude ephemeris data immediately following this
     /// metadata block.
@@ -401,11 +389,7 @@ pub struct AemMetadata {
     /// **Examples**: ZXZ, XYZ
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub euler_rot_seq: Option<RotSeq>,
     /// The frame of reference in which angular velocity data are specified. The set of allowed
     /// values is described in annex B, subsection B3. This keyword is applicable only if
@@ -415,11 +399,7 @@ pub struct AemMetadata {
     /// **Examples**: ICRF, SC_BODY_1
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub angvel_frame: Option<String>,
     /// Recommended interpolation method for attitude ephemeris data in the block immediately
@@ -428,11 +408,7 @@ pub struct AemMetadata {
     /// **Examples**: LINEAR, HERMITE, LAGRANGE
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub interpolation_method: Option<String>,
     /// Recommended interpolation degree for attitude ephemeris data in the block immediately
@@ -442,11 +418,7 @@ pub struct AemMetadata {
     /// **Examples**: 1, 5
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interpolation_degree: Option<InterpolationDegree>,
 }
 
@@ -456,6 +428,12 @@ impl AemMetadata {
     }
 
     fn validate_inner(&self) -> Result<()> {
+        crate::validation::epoch_precision(&[
+            ("START_TIME", &self.start_time),
+            ("USEABLE_START_TIME", &self.useable_start_time),
+            ("USEABLE_STOP_TIME", &self.useable_stop_time),
+            ("STOP_TIME", &self.stop_time),
+        ])?;
         if self.object_name.trim().is_empty() {
             return Err(ValidationError::missing_required("AEM Metadata", "OBJECT_NAME").into());
         }
@@ -954,6 +932,9 @@ impl crate::traits::Validate for AemData {
 
 impl AemData {
     fn validate_structure(&self) -> Result<()> {
+        for state in &self.attitude_states {
+            crate::validation::epoch_precision(&[("EPOCH", state.epoch())])?;
+        }
         if self.attitude_states.is_empty() {
             return Err(ValidationError::missing_required(
                 "AEM Data",

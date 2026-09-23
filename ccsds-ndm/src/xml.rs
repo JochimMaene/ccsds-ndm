@@ -26,8 +26,13 @@ use std::fmt::Write as FmtWrite;
 use std::io::Write as IoWrite;
 
 /// Header for CCSDS XML messages.
-const XML_HEADER: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+pub(crate) const XML_HEADER: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
 pub(crate) const XML_DEPTH_LIMIT: usize = 16;
+
+/// Namespace of NDM/XML elements in the qualified schema set (NDM/XML 4.3.4-4.3.5).
+const NDM_NAMESPACE: &[u8] = b"urn:ccsds:schema:ndmxml";
+/// XML Schema instance namespace that every root must declare (NDM/XML 4.3.3).
+const XSI_NAMESPACE: &[u8] = b"http://www.w3.org/2001/XMLSchema-instance";
 
 pub(crate) fn validate_document_root(s: &str, root: &[u8], type_name: &str) -> Result<()> {
     let mut source_edition = None;
@@ -37,49 +42,118 @@ pub(crate) fn validate_document_root(s: &str, root: &[u8], type_name: &str) -> R
         &mut source_edition,
         DocumentRules {
             root: Some(root),
-            allow_default_namespace: true,
             child_rule: None,
             attribute_allowed: None,
         },
     )
 }
 
+/// Whether an element uses the unqualified or the qualified NDM/XML schema set.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ElementForm {
+    Unqualified,
+    Qualified,
+}
+
+fn element_form(
+    resolver: &quick_xml::name::NamespaceResolver,
+    name: quick_xml::name::QName<'_>,
+    invalid: &impl Fn(String) -> CcsdsNdmError,
+) -> Result<ElementForm> {
+    use quick_xml::name::{Namespace, ResolveResult};
+    match resolver.resolve_element(name).0 {
+        ResolveResult::Unbound => Ok(ElementForm::Unqualified),
+        ResolveResult::Bound(Namespace(NDM_NAMESPACE)) => Ok(ElementForm::Qualified),
+        _ => Err(invalid(format!(
+            "element '{}' is not in the NDM/XML namespace",
+            String::from_utf8_lossy(name.as_ref())
+        ))),
+    }
+}
+
+/// How an attribute participates in NDM/XML validation.
+enum AttributeKind<'a> {
+    /// A namespace declaration, which XML Namespaces does not treat as an attribute.
+    Declaration,
+    /// An `xsi:schemaLocation` or `xsi:noNamespaceSchemaLocation` hint, which XSD
+    /// permits on any element.
+    SchemaLocation,
+    /// An unprefixed attribute governed by the message schema.
+    Plain(&'a [u8]),
+}
+
+fn attribute_kind<'a>(
+    resolver: &quick_xml::name::NamespaceResolver,
+    attribute: &'a quick_xml::events::attributes::Attribute<'_>,
+    invalid: &impl Fn(String) -> CcsdsNdmError,
+) -> Result<AttributeKind<'a>> {
+    use quick_xml::name::{Namespace, ResolveResult};
+    if attribute.key.as_namespace_binding().is_some() {
+        return Ok(AttributeKind::Declaration);
+    }
+    let (namespace, local) = resolver.resolve_attribute(attribute.key);
+    match namespace {
+        ResolveResult::Unbound => Ok(AttributeKind::Plain(attribute.key.as_ref())),
+        ResolveResult::Bound(Namespace(XSI_NAMESPACE))
+            if matches!(
+                local.as_ref(),
+                b"schemaLocation" | b"noNamespaceSchemaLocation"
+            ) =>
+        {
+            Ok(AttributeKind::SchemaLocation)
+        }
+        _ => Err(invalid(format!(
+            "unsupported attribute '{}'",
+            String::from_utf8_lossy(attribute.key.as_ref())
+        ))),
+    }
+}
+
 fn validate_root_start(
+    resolver: &quick_xml::name::NamespaceResolver,
     start: &quick_xml::events::BytesStart<'_>,
     root: &[u8],
     type_name: &str,
-    allow_default_namespace: bool,
     source_edition: &mut Option<String>,
     invalid: &impl Fn(String) -> CcsdsNdmError,
 ) -> Result<()> {
-    if start.name().as_ref() != root {
+    if start.local_name().as_ref() != root {
         return Err(invalid(format!(
             "expected standalone {type_name} root element '{}'",
             String::from_utf8_lossy(root)
         )));
     }
+    // The books show both an unprefixed and an `ndm:`-prefixed root for the qualified set.
+    element_form(resolver, start.name(), invalid)?;
+    let mut xsi_declared = false;
     let mut unknown_attribute = None;
     for attribute in start.attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
-        if attribute.key.as_ref() == b"version" {
-            *source_edition = Some(
-                attribute
-                    .unescape_value()
-                    .map_err(|error| invalid(error.to_string()))?
-                    .into_owned(),
-            );
-        }
-        if !(matches!(
-            attribute.key.as_ref(),
-            b"id"
-                | b"version"
-                | b"xmlns:xsi"
-                | b"xmlns:ndm"
-                | b"xsi:noNamespaceSchemaLocation"
-                | b"xsi:schemaLocation"
-        ) || allow_default_namespace && attribute.key.as_ref() == b"xmlns")
-        {
-            unknown_attribute.get_or_insert_with(|| attribute.key.as_ref().to_vec());
+        validate_attribute_value(&attribute, invalid)?;
+        let kind = match attribute_kind(resolver, &attribute, invalid) {
+            Ok(kind) => kind,
+            Err(_) => {
+                unknown_attribute.get_or_insert_with(|| attribute.key.as_ref().to_vec());
+                continue;
+            }
+        };
+        match kind {
+            AttributeKind::Declaration => {
+                xsi_declared |= attribute.key.as_ref() == b"xmlns:xsi"
+                    && attribute.value.as_ref() == XSI_NAMESPACE;
+            }
+            AttributeKind::SchemaLocation | AttributeKind::Plain(b"id") => {}
+            AttributeKind::Plain(b"version") => {
+                *source_edition = Some(
+                    attribute
+                        .unescape_value()
+                        .map_err(|error| invalid(error.to_string()))?
+                        .into_owned(),
+                );
+            }
+            AttributeKind::Plain(key) => {
+                unknown_attribute.get_or_insert_with(|| key.to_vec());
+            }
         }
     }
     if let Some(attribute) = unknown_attribute {
@@ -87,6 +161,31 @@ fn validate_root_start(
             "unknown {type_name} root attribute '{}'",
             String::from_utf8_lossy(&attribute)
         )));
+    }
+    if !xsi_declared {
+        return Err(invalid(format!(
+            "the {type_name} root element must declare \
+             xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
+        )));
+    }
+    Ok(())
+}
+
+// Even ignored schema-location/namespace attributes must be well-formed XML.
+fn validate_attribute_value(
+    attribute: &quick_xml::events::attributes::Attribute<'_>,
+    invalid: &impl Fn(String) -> CcsdsNdmError,
+) -> Result<()> {
+    if attribute.value.contains(&b'<') {
+        return Err(invalid("XML attribute values must escape '<'".into()));
+    }
+    let value = attribute
+        .unescape_value()
+        .map_err(|error| invalid(error.to_string()))?;
+    if !value.chars().all(crate::validation::is_xml_1_character) {
+        return Err(invalid(
+            "XML attributes must contain only XML 1.0 characters".into(),
+        ));
     }
     Ok(())
 }
@@ -127,7 +226,6 @@ type AttributeRule<'a> = dyn Fn(&[u8], &[u8]) -> bool + 'a;
 
 struct DocumentRules<'a> {
     root: Option<&'a [u8]>,
-    allow_default_namespace: bool,
     child_rule: Option<&'a ChildRule<'a>>,
     attribute_allowed: Option<&'a AttributeRule<'a>>,
 }
@@ -163,7 +261,6 @@ where
         source_edition,
         DocumentRules {
             root: Some(root),
-            allow_default_namespace: false,
             child_rule: Some(&child_rule),
             attribute_allowed: Some(&attribute_allowed),
         },
@@ -214,6 +311,7 @@ fn validate_document(
     struct Frame {
         name: ElementName,
         last_rank: Option<u16>,
+        has_text: bool,
     }
 
     let invalid =
@@ -221,7 +319,20 @@ fn validate_document(
     let invalid_sequence =
         |message: String| invalid(format!("invalid {type_name} XML sequence: {message}"));
     let document = s.strip_prefix('\u{feff}').unwrap_or(s);
-    let mut reader = quick_xml::Reader::from_str(document);
+    // NDM/XML 4.2 and ODM 8.2: the first line of each instantiation is exactly the XML
+    // declaration.
+    if rules.root.is_some()
+        && !document
+            .strip_prefix(XML_HEADER)
+            .is_some_and(|rest| rest.starts_with(['\r', '\n']))
+    {
+        return Err(invalid(format!(
+            "the first line of an XML instantiation must be exactly {XML_HEADER}"
+        )));
+    }
+    let mut reader = quick_xml::NsReader::from_str(document);
+    reader.config_mut().check_comments = true;
+    let mut child_form = None;
     let mut stack: Vec<Frame> = Vec::new();
     let mut depth = 0usize;
     let mut root_seen = false;
@@ -238,73 +349,52 @@ fn validate_document(
                 }
                 event_seen = true;
             }
-            Ok(Event::Start(start)) => {
+            Ok(event @ (Event::Start(_) | Event::Empty(_))) => {
                 event_seen = true;
+                let self_closing = matches!(event, Event::Empty(_));
+                let (Event::Start(start) | Event::Empty(start)) = &event else {
+                    unreachable!("the match arm admits only start and empty elements")
+                };
                 if root_closed {
                     return Err(invalid(format!(
                         "trailing content after {type_name} document"
                     )));
                 }
-                let child = start.name();
+                let child = start.local_name();
                 let child = child.as_ref();
                 if !root_seen {
                     if let Some(root) = rules.root {
                         validate_root_start(
-                            &start,
+                            reader.resolver(),
+                            start,
                             root,
                             type_name,
-                            rules.allow_default_namespace,
                             source_edition,
                             &invalid,
                         )?;
                     }
                     root_seen = true;
-                } else if let (Some(parent), Some(child_rule), Some(attribute_allowed)) =
-                    (stack.last_mut(), rules.child_rule, rules.attribute_allowed)
-                {
-                    validate_attributes(&start, child, attribute_allowed, &invalid_sequence)?;
-                    apply_sequence_rule(parent, child, child_rule, &invalid_sequence)?;
-                }
-                stack.push(Frame {
-                    name: ElementName::new(child),
-                    last_rank: None,
-                });
-                depth += 1;
-                if depth > XML_DEPTH_LIMIT {
-                    return Err(CcsdsNdmError::ResourceLimitExceeded {
-                        resource: "xml_depth",
-                        limit: XML_DEPTH_LIMIT,
-                        actual: depth,
-                    });
-                }
-            }
-            Ok(Event::Empty(start)) => {
-                event_seen = true;
-                if root_closed {
-                    return Err(invalid(format!(
-                        "trailing content after {type_name} document"
-                    )));
-                }
-                let child = start.name();
-                let child = child.as_ref();
-                if !root_seen {
-                    if let Some(root) = rules.root {
-                        validate_root_start(
-                            &start,
-                            root,
-                            type_name,
-                            rules.allow_default_namespace,
-                            source_edition,
-                            &invalid,
-                        )?;
+                } else {
+                    // NDM/XML 4.3.5: a qualified instantiation prefixes every element, so the
+                    // two schema forms cannot be mixed below the root.
+                    let form = element_form(reader.resolver(), start.name(), &invalid_sequence)?;
+                    if *child_form.get_or_insert(form) != form {
+                        return Err(invalid_sequence(
+                            "qualified and unqualified NDM/XML elements cannot be mixed".into(),
+                        ));
                     }
-                    root_seen = true;
-                    root_closed = true;
-                } else if let (Some(parent), Some(child_rule), Some(attribute_allowed)) =
-                    (stack.last_mut(), rules.child_rule, rules.attribute_allowed)
-                {
-                    validate_attributes(&start, child, attribute_allowed, &invalid_sequence)?;
-                    apply_sequence_rule(parent, child, child_rule, &invalid_sequence)?;
+                    if let (Some(parent), Some(child_rule), Some(attribute_allowed)) =
+                        (stack.last_mut(), rules.child_rule, rules.attribute_allowed)
+                    {
+                        validate_attributes(
+                            reader.resolver(),
+                            start,
+                            child,
+                            attribute_allowed,
+                            &invalid_sequence,
+                        )?;
+                        apply_sequence_rule(parent, child, child_rule, &invalid_sequence)?;
+                    }
                 }
                 // A self-closing element occupies a level even though it never opens a frame,
                 // so it has to be measured against the limit the same way a start tag is.
@@ -315,6 +405,16 @@ fn validate_document(
                         limit: XML_DEPTH_LIMIT,
                         actual,
                     });
+                }
+                if !self_closing {
+                    stack.push(Frame {
+                        name: ElementName::new(child),
+                        last_rank: None,
+                        has_text: false,
+                    });
+                    depth = actual;
+                } else if depth == 0 {
+                    root_closed = true;
                 }
             }
             Ok(Event::End(_)) => {
@@ -331,18 +431,49 @@ fn validate_document(
             }
             Ok(Event::Text(text)) => {
                 event_seen = true;
-                if (root_closed || !root_seen)
-                    && !text
+                check_text(
+                    &text
                         .xml_content()
-                        .map_err(|error| invalid(error.to_string()))?
-                        .trim()
-                        .is_empty()
-                {
-                    return Err(invalid(format!("text outside {type_name} root element")));
-                }
+                        .map_err(|error| invalid(error.to_string()))?,
+                    &mut stack,
+                    &invalid,
+                )?;
             }
-            Ok(Event::CData(_)) if root_closed || !root_seen => {
-                return Err(invalid(format!("CDATA outside {type_name} root element")));
+            Ok(Event::CData(text)) => {
+                event_seen = true;
+                if stack.is_empty() {
+                    return Err(invalid(format!("CDATA outside {type_name} root element")));
+                }
+                check_text(
+                    &text.decode().map_err(|error| invalid(error.to_string()))?,
+                    &mut stack,
+                    &invalid,
+                )?;
+            }
+            Ok(Event::GeneralRef(reference)) => {
+                event_seen = true;
+                if stack.is_empty() {
+                    return Err(invalid(format!(
+                        "entity reference outside {type_name} root element"
+                    )));
+                }
+                let character = match reference.resolve_char_ref()? {
+                    Some(character) => character,
+                    None => match &*reference {
+                        b"amp" => '&',
+                        b"lt" => '<',
+                        b"gt" => '>',
+                        b"apos" => '\'',
+                        b"quot" => '"',
+                        _ => return Err(invalid("unknown XML entity reference".into())),
+                    },
+                };
+                if !crate::validation::is_xml_1_character(character) {
+                    return Err(invalid(
+                        "character references must contain only XML 1.0 characters".into(),
+                    ));
+                }
+                check_text(character.encode_utf8(&mut [0; 4]), &mut stack, &invalid)?;
             }
             Ok(Event::DocType(_)) => {
                 return Err(invalid(
@@ -354,12 +485,42 @@ fn validate_document(
             Err(error) => return Err(error.into()),
         }
     }
+    fn check_text(
+        text: &str,
+        stack: &mut [Frame],
+        invalid: &impl Fn(String) -> CcsdsNdmError,
+    ) -> Result<()> {
+        // XSD 1.0 3.4.4(2.3) tests character codes, including characters from
+        // references and CDATA (XML Infoset 2.6), rather than their source spelling.
+        if text
+            .bytes()
+            .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+        {
+            return Ok(());
+        }
+        let parent = stack
+            .last_mut()
+            .ok_or_else(|| invalid("text outside XML root element".into()))?;
+        if parent.last_rank.is_some() {
+            return Err(invalid(
+                "text is not allowed between XML child elements".into(),
+            ));
+        }
+        parent.has_text = true;
+        Ok(())
+    }
+
     fn apply_sequence_rule(
         parent: &mut Frame,
         child: &[u8],
         child_rule: &ChildRule<'_>,
         invalid: &impl Fn(String) -> CcsdsNdmError,
     ) -> Result<()> {
+        if parent.has_text {
+            return Err(invalid(
+                "text is not allowed before XML child elements".into(),
+            ));
+        }
         let rule = child_rule(parent.name.as_bytes(), child).ok_or_else(|| {
             invalid(format!(
                 "unknown child '{}' in '{}'",
@@ -383,6 +544,7 @@ fn validate_document(
     }
 
     fn validate_attributes(
+        resolver: &quick_xml::name::NamespaceResolver,
         start: &quick_xml::events::BytesStart<'_>,
         element: &[u8],
         attribute_allowed: &AttributeRule<'_>,
@@ -390,7 +552,13 @@ fn validate_document(
     ) -> Result<()> {
         for attribute in start.attributes() {
             let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
-            if !attribute_allowed(element, attribute.key.as_ref()) {
+            validate_attribute_value(&attribute, invalid)?;
+            let unknown = match attribute_kind(resolver, &attribute, invalid) {
+                Ok(AttributeKind::Declaration | AttributeKind::SchemaLocation) => false,
+                Ok(AttributeKind::Plain(key)) => !attribute_allowed(element, key),
+                Err(_) => true,
+            };
+            if unknown {
                 return Err(invalid(format!(
                     "unknown attribute '{}' on '{}'",
                     String::from_utf8_lossy(attribute.key.as_ref()),
@@ -422,7 +590,6 @@ pub(crate) fn validate_element_sequences(
         &mut source_edition,
         DocumentRules {
             root: None,
-            allow_default_namespace: true,
             child_rule: Some(&child_rule),
             attribute_allowed: Some(&attribute_allowed),
         },
@@ -453,12 +620,95 @@ pub(crate) fn from_str_with_context<T: DeserializeOwned>(s: &str, type_name: &st
             error.to_string(),
         ))));
     }
-    from_xml_str(s).map_err(|e| {
+    let document = without_namespace_attributes(s)?;
+    from_xml_str(&document).map_err(|e| {
         crate::error::CcsdsNdmError::Format(Box::new(FormatError::XmlWithContext {
             context: format!("Failed to parse {} from XML", type_name),
             source: e,
         }))
     })
+}
+
+/// Remove namespace declarations and XSI schema-location hints below the root.
+///
+/// They are not message content, but serde would otherwise see them as unknown fields. The
+/// document is copied only when it may contain such an attribute below the root.
+fn without_namespace_attributes(s: &str) -> Result<std::borrow::Cow<'_, str>> {
+    use quick_xml::name::{Namespace, ResolveResult};
+
+    let mut reader = quick_xml::NsReader::from_str(s);
+    let mut xsi_prefixes = vec!["xsi:".to_owned()];
+    loop {
+        match reader.read_event()? {
+            Event::Start(start) | Event::Empty(start) => {
+                for attribute in start.attributes().flatten() {
+                    if let Some(quick_xml::name::PrefixDeclaration::Named(prefix)) =
+                        attribute.key.as_namespace_binding()
+                    {
+                        if attribute.value.as_ref() == XSI_NAMESPACE {
+                            xsi_prefixes.push(format!("{}:", String::from_utf8_lossy(prefix)));
+                        }
+                    }
+                }
+                break;
+            }
+            Event::Eof => return Ok(std::borrow::Cow::Borrowed(s)),
+            _ => {}
+        }
+    }
+    let below_root = &s[reader.buffer_position() as usize..];
+    if !below_root.contains("xmlns")
+        && !xsi_prefixes
+            .iter()
+            .any(|prefix| below_root.contains(prefix.as_str()))
+    {
+        return Ok(std::borrow::Cow::Borrowed(s));
+    }
+
+    let mut reader = quick_xml::NsReader::from_str(s);
+    let mut writer = quick_xml::Writer::new(Vec::with_capacity(s.len()));
+    let mut depth = 0usize;
+    loop {
+        let event = reader.read_event()?;
+        let event = match event {
+            Event::Eof => break,
+            Event::Start(ref start) | Event::Empty(ref start) if depth > 0 => {
+                let mut kept = start.to_owned();
+                kept.clear_attributes();
+                for attribute in start.attributes() {
+                    let attribute = attribute.map_err(quick_xml::Error::from)?;
+                    let hint = matches!(
+                        reader.resolver().resolve_attribute(attribute.key),
+                        (ResolveResult::Bound(Namespace(XSI_NAMESPACE)), local)
+                            if matches!(
+                                local.as_ref(),
+                                b"schemaLocation" | b"noNamespaceSchemaLocation"
+                            )
+                    );
+                    if attribute.key.as_namespace_binding().is_none() && !hint {
+                        kept.push_attribute(attribute);
+                    }
+                }
+                if matches!(event, Event::Start(_)) {
+                    Event::Start(kept)
+                } else {
+                    Event::Empty(kept)
+                }
+            }
+            event => event,
+        };
+        match &event {
+            Event::Start(_) => depth += 1,
+            Event::End(_) => depth -= 1,
+            _ => {}
+        }
+        writer.write_event(event)?;
+    }
+    String::from_utf8(writer.into_inner())
+        .map(std::borrow::Cow::Owned)
+        .map_err(|error| {
+            CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(error.to_string())))
+        })
 }
 
 /// Serialize a prevalidated CCSDS NDM message to an XML string.
@@ -473,7 +723,7 @@ pub(crate) fn to_string<T: Serialize>(t: &T) -> Result<String> {
         output: &mut output,
         invalid_text: false,
     };
-    let result = quick_xml::se::to_writer(&mut writer, t);
+    let result = quick_xml::se::to_writer(RootNamespaces::new(&mut writer), t);
     if writer.invalid_text {
         return Err(invalid_xml_output());
     }
@@ -487,6 +737,56 @@ fn invalid_xml_output() -> CcsdsNdmError {
         line: None,
     }
     .into()
+}
+
+/// Namespace declarations for generated roots: NDM/XML 4.3.3-4.3.4 and ODM 8.3.3.
+const ROOT_NAMESPACES: &str = concat!(
+    r#" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance""#,
+    r#" xmlns:ndm="urn:ccsds:schema:ndmxml""#
+);
+
+/// Inserts [`ROOT_NAMESPACES`] after the root element name, whatever chunks the serializer
+/// writes it in.
+struct RootNamespaces<W> {
+    inner: W,
+    state: RootNameState,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootNameState {
+    BeforeName,
+    InName,
+    Done,
+}
+
+impl<W> RootNamespaces<W> {
+    fn new(inner: W) -> Self {
+        Self {
+            inner,
+            state: RootNameState::BeforeName,
+        }
+    }
+}
+
+impl<W: FmtWrite> FmtWrite for RootNamespaces<W> {
+    fn write_str(&mut self, value: &str) -> std::fmt::Result {
+        if self.state == RootNameState::Done {
+            return self.inner.write_str(value);
+        }
+        for (index, character) in value.char_indices() {
+            match (self.state, character) {
+                (RootNameState::BeforeName, '<') => self.state = RootNameState::InName,
+                (RootNameState::InName, ' ' | '/' | '>') => {
+                    self.state = RootNameState::Done;
+                    self.inner.write_str(&value[..index])?;
+                    self.inner.write_str(ROOT_NAMESPACES)?;
+                    return self.inner.write_str(&value[index..]);
+                }
+                _ => {}
+            }
+        }
+        self.inner.write_str(value)
+    }
 }
 
 struct XmlStringWriter<'a> {
@@ -525,7 +825,7 @@ pub(crate) fn preflight<T: Serialize>(value: &T) -> Result<usize> {
         bytes: XML_HEADER.len() + 1,
         invalid_text: false,
     };
-    let result = quick_xml::se::to_writer(&mut writer, value);
+    let result = quick_xml::se::to_writer(RootNamespaces::new(&mut writer), value);
     if writer.invalid_text {
         return Err(invalid_xml_output());
     }
@@ -561,7 +861,7 @@ pub(crate) fn to_writer<W: IoWrite, T: Serialize>(output: &mut W, value: &T) -> 
         output,
         error: None,
     };
-    let serialization = quick_xml::se::to_writer(&mut adapter, value);
+    let serialization = quick_xml::se::to_writer(RootNamespaces::new(&mut adapter), value);
     if let Some(error) = adapter.error {
         return Err(error.into());
     }
@@ -614,7 +914,7 @@ mod tests {
         };
         let xml = to_string(&w).unwrap();
         assert!(xml.starts_with(XML_HEADER));
-        assert!(xml.contains("<Wrapper>"));
+        assert!(xml.contains(&format!("<Wrapper{ROOT_NAMESPACES}>")));
         assert!(xml.contains("<val>world</val>"));
         assert!(xml.contains("</Wrapper>"));
     }
