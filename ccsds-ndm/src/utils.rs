@@ -47,22 +47,6 @@ where
 }
 
 /// Serialization helper for `Vec<f64>` that uses space separation.
-/// Displays values separated by single spaces, so serializers can stream them via
-/// `collect_str` instead of building a joined `String`.
-pub(crate) struct SpaceSeparated<'a, T>(pub(crate) &'a [T]);
-
-impl<T: std::fmt::Display> std::fmt::Display for SpaceSeparated<'_, T> {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (index, value) in self.0.iter().enumerate() {
-            if index > 0 {
-                formatter.write_str(" ")?;
-            }
-            value.fmt(formatter)?;
-        }
-        Ok(())
-    }
-}
-
 pub mod vec_f64_space_sep {
     use super::*;
 
@@ -70,7 +54,12 @@ pub mod vec_f64_space_sep {
     where
         S: Serializer,
     {
-        serializer.collect_str(&super::SpaceSeparated(values))
+        let s = values
+            .iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        serializer.serialize_str(&s)
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<f64>, D::Error>

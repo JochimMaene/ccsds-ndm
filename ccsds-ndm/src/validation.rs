@@ -117,16 +117,14 @@ pub(crate) fn epoch_precision(
     fields: &[(&'static str, &dyn crate::types::EpochText)],
 ) -> Result<()> {
     for (field, epoch) in fields {
-        if let Some(value) = epoch.epoch_text() {
-            if crate::types::fraction_digit_count(value) > 16 {
-                return Err(ValidationError::InvalidValue {
-                    field: (*field).into(),
-                    value: value.to_owned(),
-                    expected: "at most 16 fractional-second digits".into(),
-                    line: None,
-                }
-                .into());
+        if let Some(epoch) = epoch.epoch().filter(|epoch| epoch.fraction_digits() > 16) {
+            return Err(ValidationError::InvalidValue {
+                field: (*field).into(),
+                value: epoch.to_string(),
+                expected: "at most 16 fractional-second digits".into(),
+                line: None,
             }
+            .into());
         }
     }
     Ok(())

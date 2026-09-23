@@ -322,36 +322,46 @@ fn clock_is_valid(time: &str) -> bool {
     true
 }
 
-/// The spelling of an optional or required time tag, for lexical checks over mixed fields.
+/// An optional or required time tag, for lexical checks over mixed fields.
 pub(crate) trait EpochText {
-    fn epoch_text(&self) -> Option<&str>;
+    fn epoch(&self) -> Option<&Epoch>;
 }
 
 impl EpochText for Epoch {
-    fn epoch_text(&self) -> Option<&str> {
-        Some(self.as_str())
+    fn epoch(&self) -> Option<&Epoch> {
+        Some(self)
     }
 }
 
 impl EpochText for CalendarEpoch {
-    fn epoch_text(&self) -> Option<&str> {
-        Some(self.as_str())
+    fn epoch(&self) -> Option<&Epoch> {
+        Some(&self.0)
     }
 }
 
 impl<T: EpochText> EpochText for Option<T> {
-    fn epoch_text(&self) -> Option<&str> {
-        self.as_ref().and_then(EpochText::epoch_text)
+    fn epoch(&self) -> Option<&Epoch> {
+        self.as_ref().and_then(EpochText::epoch)
     }
 }
 
 /// Number of fractional-second digits of a calendar or ordinal spelling; 0 for numeric ones.
-pub(crate) fn fraction_digit_count(value: &str) -> usize {
-    let value = value.strip_suffix('Z').unwrap_or(value);
-    value
-        .split_once('T')
-        .and_then(|(_, time)| time.split_once('.'))
-        .map_or(0, |(_, fraction)| fraction.len())
+pub(crate) fn fraction_digit_count(bytes: &[u8]) -> usize {
+    // Count trailing digits back from an optional `Z`; they are a fraction only when a `.`
+    // follows the `:ss` seconds field, which numeric epochs never have.
+    let end = bytes.len() - usize::from(bytes.last() == Some(&b'Z'));
+    let digits = bytes[..end]
+        .iter()
+        .rev()
+        .take_while(|byte| byte.is_ascii_digit())
+        .count();
+    let dot = end - digits;
+    let is_fraction = dot >= 4 && bytes[dot - 1] == b'.' && bytes[dot - 4] == b':';
+    if is_fraction {
+        digits
+    } else {
+        0
+    }
 }
 
 impl Epoch {
@@ -432,7 +442,7 @@ impl Epoch {
 
     /// Returns the number of fractional-second digits of a calendar or ordinal epoch.
     pub(crate) fn fraction_digits(&self) -> usize {
-        fraction_digit_count(self.as_str())
+        fraction_digit_count(&self.bytes[..usize::from(self.len)])
     }
 
     /// Compares two validated epochs without converting through a physical-time library.
@@ -4635,7 +4645,7 @@ impl Serialize for Vec3Double {
     where
         S: serde::Serializer,
     {
-        serializer.collect_str(&crate::utils::SpaceSeparated(&[self.x, self.y, self.z]))
+        serializer.serialize_str(&format!("{} {} {}", self.x, self.y, self.z))
     }
 }
 
@@ -5293,6 +5303,22 @@ mod tests {
             calendar("2023-01-01T00:00:00Z").cmp_same_branch(&numeric("1")),
             None
         );
+    }
+
+    #[test]
+    fn fraction_digit_count_reads_only_calendar_fractions() {
+        for (value, digits) in [
+            ("2020-01-01T00:00:00", 0),
+            ("2020-01-01T00:00:00Z", 0),
+            ("2020-01-01T00:00:00.123", 3),
+            ("2020-001T00:00:00.1234567890123456Z", 16),
+            ("0000-400T00:00:00.5", 1),
+            ("123.456", 0),
+            ("", 0),
+            ("Z", 0),
+        ] {
+            assert_eq!(fraction_digit_count(value.as_bytes()), digits, "{value}");
+        }
     }
 
     #[test]

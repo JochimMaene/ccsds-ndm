@@ -48,6 +48,103 @@ pub(crate) fn validate_document_root(s: &str, root: &[u8], type_name: &str) -> R
     )
 }
 
+/// Namespace declarations in scope during a walk. NDM/XML documents declare namespaces on the
+/// root, if anywhere, so only tags whose attributes mention `xmlns` are inspected; every other
+/// element costs one short byte scan.
+#[derive(Default)]
+struct Namespaces {
+    /// Prefix (empty for the default namespace), namespace name, and declaring element depth.
+    bindings: Vec<(Vec<u8>, Vec<u8>, usize)>,
+    /// Whether a default namespace declaration is in scope.
+    has_default: bool,
+}
+
+/// Whether raw attribute bytes contain `xmlns`, without scanning byte windows where no `x`
+/// occurs.
+fn mentions_xmlns(raw: &[u8]) -> bool {
+    let mut rest = raw;
+    while let Some(index) = rest.iter().position(|&byte| byte == b'x') {
+        if rest[index..].starts_with(b"xmlns") {
+            return true;
+        }
+        rest = &rest[index + 1..];
+    }
+    false
+}
+
+enum Resolved<'a> {
+    Unbound,
+    Bound(&'a [u8]),
+    Unknown,
+}
+
+impl Namespaces {
+    fn enter(
+        &mut self,
+        start: &quick_xml::events::BytesStart<'_>,
+        depth: usize,
+        invalid: &impl Fn(String) -> CcsdsNdmError,
+    ) -> Result<()> {
+        if !mentions_xmlns(start.attributes_raw()) {
+            return Ok(());
+        }
+        for attribute in start.attributes() {
+            let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+            let prefix: &[u8] = match attribute.key.as_namespace_binding() {
+                Some(quick_xml::name::PrefixDeclaration::Default) => b"",
+                Some(quick_xml::name::PrefixDeclaration::Named(prefix)) => prefix,
+                None => continue,
+            };
+            let name = attribute
+                .unescape_value()
+                .map_err(|error| invalid(error.to_string()))?;
+            self.has_default |= prefix.is_empty();
+            self.bindings
+                .push((prefix.to_vec(), name.as_bytes().to_vec(), depth));
+        }
+        Ok(())
+    }
+
+    /// Drop the declarations of elements deeper than `depth`, which have closed.
+    fn leave(&mut self, depth: usize) {
+        let mut popped = false;
+        while self
+            .bindings
+            .last()
+            .is_some_and(|(_, _, declared)| *declared > depth)
+        {
+            self.bindings.pop();
+            popped = true;
+        }
+        if popped {
+            self.has_default = self.bindings.iter().any(|(prefix, _, _)| prefix.is_empty());
+        }
+    }
+
+    /// Resolve a prefix. Unprefixed elements take the default namespace, unprefixed
+    /// attributes never do (XML Namespaces 6.2), and `xml` is bound by definition.
+    fn resolve(&self, prefix: Option<&[u8]>, element: bool) -> Resolved<'_> {
+        const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
+        let prefix = match prefix {
+            Some(b"xml") => return Resolved::Bound(XML_NAMESPACE),
+            Some(prefix) => prefix,
+            None if element => b"",
+            None => return Resolved::Unbound,
+        };
+        match self
+            .bindings
+            .iter()
+            .rev()
+            .find(|(bound, _, _)| bound.as_slice() == prefix)
+        {
+            Some((_, name, _)) if name.is_empty() => Resolved::Unbound,
+            Some((_, name, _)) => Resolved::Bound(name),
+            None if prefix.is_empty() => Resolved::Unbound,
+            None => Resolved::Unknown,
+        }
+    }
+}
+
 /// Whether an element uses the unqualified or the qualified NDM/XML schema set.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ElementForm {
@@ -56,14 +153,16 @@ enum ElementForm {
 }
 
 fn element_form(
-    resolver: &quick_xml::name::NamespaceResolver,
+    namespaces: &Namespaces,
     name: quick_xml::name::QName<'_>,
     invalid: &impl Fn(String) -> CcsdsNdmError,
 ) -> Result<ElementForm> {
-    use quick_xml::name::{Namespace, ResolveResult};
-    match resolver.resolve_element(name).0 {
-        ResolveResult::Unbound => Ok(ElementForm::Unqualified),
-        ResolveResult::Bound(Namespace(NDM_NAMESPACE)) => Ok(ElementForm::Qualified),
+    if !namespaces.has_default && !name.as_ref().contains(&b':') {
+        return Ok(ElementForm::Unqualified);
+    }
+    match namespaces.resolve(name.prefix().map(|prefix| prefix.into_inner()), true) {
+        Resolved::Unbound => Ok(ElementForm::Unqualified),
+        Resolved::Bound(NDM_NAMESPACE) => Ok(ElementForm::Qualified),
         _ => Err(invalid(format!(
             "element '{}' is not in the NDM/XML namespace",
             String::from_utf8_lossy(name.as_ref())
@@ -83,18 +182,25 @@ enum AttributeKind<'a> {
 }
 
 fn attribute_kind<'a>(
-    resolver: &quick_xml::name::NamespaceResolver,
+    namespaces: &Namespaces,
     attribute: &'a quick_xml::events::attributes::Attribute<'_>,
     invalid: &impl Fn(String) -> CcsdsNdmError,
 ) -> Result<AttributeKind<'a>> {
-    use quick_xml::name::{Namespace, ResolveResult};
+    let key = attribute.key.as_ref();
     if attribute.key.as_namespace_binding().is_some() {
         return Ok(AttributeKind::Declaration);
     }
-    let (namespace, local) = resolver.resolve_attribute(attribute.key);
-    match namespace {
-        ResolveResult::Unbound => Ok(AttributeKind::Plain(attribute.key.as_ref())),
-        ResolveResult::Bound(Namespace(XSI_NAMESPACE))
+    // XML Namespaces 6.2: an unprefixed attribute is in no namespace, whatever the default.
+    if !key.contains(&b':') {
+        return Ok(AttributeKind::Plain(key));
+    }
+    let local = attribute.key.local_name();
+    match namespaces.resolve(
+        attribute.key.prefix().map(|prefix| prefix.into_inner()),
+        false,
+    ) {
+        Resolved::Unbound => Ok(AttributeKind::Plain(key)),
+        Resolved::Bound(XSI_NAMESPACE)
             if matches!(
                 local.as_ref(),
                 b"schemaLocation" | b"noNamespaceSchemaLocation"
@@ -110,7 +216,7 @@ fn attribute_kind<'a>(
 }
 
 fn validate_root_start(
-    resolver: &quick_xml::name::NamespaceResolver,
+    namespaces: &Namespaces,
     start: &quick_xml::events::BytesStart<'_>,
     root: &[u8],
     type_name: &str,
@@ -124,13 +230,13 @@ fn validate_root_start(
         )));
     }
     // The books show both an unprefixed and an `ndm:`-prefixed root for the qualified set.
-    element_form(resolver, start.name(), invalid)?;
+    element_form(namespaces, start.name(), invalid)?;
     let mut xsi_declared = false;
     let mut unknown_attribute = None;
     for attribute in start.attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         validate_attribute_value(&attribute, invalid)?;
-        let kind = match attribute_kind(resolver, &attribute, invalid) {
+        let kind = match attribute_kind(namespaces, &attribute, invalid) {
             Ok(kind) => kind,
             Err(_) => {
                 unknown_attribute.get_or_insert_with(|| attribute.key.as_ref().to_vec());
@@ -176,6 +282,14 @@ fn validate_attribute_value(
     attribute: &quick_xml::events::attributes::Attribute<'_>,
     invalid: &impl Fn(String) -> CcsdsNdmError,
 ) -> Result<()> {
+    // Printable ASCII without markup is valid as written, which covers `units` and most values.
+    if attribute
+        .value
+        .iter()
+        .all(|&byte| (b' '..=b'~').contains(&byte) && byte != b'<' && byte != b'&')
+    {
+        return Ok(());
+    }
     if attribute.value.contains(&b'<') {
         return Err(invalid("XML attribute values must escape '<'".into()));
     }
@@ -330,8 +444,9 @@ fn validate_document(
             "the first line of an XML instantiation must be exactly {XML_HEADER}"
         )));
     }
-    let mut reader = quick_xml::NsReader::from_str(document);
+    let mut reader = quick_xml::Reader::from_str(document);
     reader.config_mut().check_comments = true;
+    let mut namespaces = Namespaces::default();
     let mut child_form = None;
     let mut stack: Vec<Frame> = Vec::new();
     let mut depth = 0usize;
@@ -340,7 +455,9 @@ fn validate_document(
     let mut event_seen = false;
 
     loop {
-        match reader.read_event() {
+        // Matched by reference so start tags are not moved out of the event.
+        let event = reader.read_event();
+        match event {
             Ok(Event::Decl(_)) => {
                 if event_seen {
                     return Err(invalid(
@@ -349,23 +466,21 @@ fn validate_document(
                 }
                 event_seen = true;
             }
-            Ok(event @ (Event::Start(_) | Event::Empty(_))) => {
+            Ok(Event::Start(ref start) | Event::Empty(ref start)) => {
                 event_seen = true;
-                let self_closing = matches!(event, Event::Empty(_));
-                let (Event::Start(start) | Event::Empty(start)) = &event else {
-                    unreachable!("the match arm admits only start and empty elements")
-                };
+                let self_closing = matches!(event, Ok(Event::Empty(_)));
                 if root_closed {
                     return Err(invalid(format!(
                         "trailing content after {type_name} document"
                     )));
                 }
+                namespaces.enter(start, depth + 1, &invalid)?;
                 let child = start.local_name();
                 let child = child.as_ref();
                 if !root_seen {
                     if let Some(root) = rules.root {
                         validate_root_start(
-                            reader.resolver(),
+                            &namespaces,
                             start,
                             root,
                             type_name,
@@ -377,7 +492,7 @@ fn validate_document(
                 } else {
                     // NDM/XML 4.3.5: a qualified instantiation prefixes every element, so the
                     // two schema forms cannot be mixed below the root.
-                    let form = element_form(reader.resolver(), start.name(), &invalid_sequence)?;
+                    let form = element_form(&namespaces, start.name(), &invalid_sequence)?;
                     if *child_form.get_or_insert(form) != form {
                         return Err(invalid_sequence(
                             "qualified and unqualified NDM/XML elements cannot be mixed".into(),
@@ -387,7 +502,7 @@ fn validate_document(
                         (stack.last_mut(), rules.child_rule, rules.attribute_allowed)
                     {
                         validate_attributes(
-                            reader.resolver(),
+                            &namespaces,
                             start,
                             child,
                             attribute_allowed,
@@ -413,8 +528,11 @@ fn validate_document(
                         has_text: false,
                     });
                     depth = actual;
-                } else if depth == 0 {
-                    root_closed = true;
+                } else {
+                    namespaces.leave(depth);
+                    if depth == 0 {
+                        root_closed = true;
+                    }
                 }
             }
             Ok(Event::End(_)) => {
@@ -425,30 +543,23 @@ fn validate_document(
                     ))
                 })?;
                 stack.pop();
+                namespaces.leave(depth);
                 if depth == 0 {
                     root_closed = true;
                 }
             }
             Ok(Event::Text(text)) => {
                 event_seen = true;
-                check_text(
-                    &text
-                        .xml_content()
-                        .map_err(|error| invalid(error.to_string()))?,
-                    &mut stack,
-                    &invalid,
-                )?;
+                // References arrive as separate events, so the raw bytes decide whitespace
+                // without decoding every value.
+                check_text(&text, &mut stack, &invalid)?;
             }
             Ok(Event::CData(text)) => {
                 event_seen = true;
                 if stack.is_empty() {
                     return Err(invalid(format!("CDATA outside {type_name} root element")));
                 }
-                check_text(
-                    &text.decode().map_err(|error| invalid(error.to_string()))?,
-                    &mut stack,
-                    &invalid,
-                )?;
+                check_text(&text, &mut stack, &invalid)?;
             }
             Ok(Event::GeneralRef(reference)) => {
                 event_seen = true;
@@ -473,7 +584,11 @@ fn validate_document(
                         "character references must contain only XML 1.0 characters".into(),
                     ));
                 }
-                check_text(character.encode_utf8(&mut [0; 4]), &mut stack, &invalid)?;
+                check_text(
+                    character.encode_utf8(&mut [0; 4]).as_bytes(),
+                    &mut stack,
+                    &invalid,
+                )?;
             }
             Ok(Event::DocType(_)) => {
                 return Err(invalid(
@@ -486,14 +601,14 @@ fn validate_document(
         }
     }
     fn check_text(
-        text: &str,
+        text: &[u8],
         stack: &mut [Frame],
         invalid: &impl Fn(String) -> CcsdsNdmError,
     ) -> Result<()> {
         // XSD 1.0 3.4.4(2.3) tests character codes, including characters from
         // references and CDATA (XML Infoset 2.6), rather than their source spelling.
         if text
-            .bytes()
+            .iter()
             .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
         {
             return Ok(());
@@ -544,7 +659,7 @@ fn validate_document(
     }
 
     fn validate_attributes(
-        resolver: &quick_xml::name::NamespaceResolver,
+        namespaces: &Namespaces,
         start: &quick_xml::events::BytesStart<'_>,
         element: &[u8],
         attribute_allowed: &AttributeRule<'_>,
@@ -553,7 +668,7 @@ fn validate_document(
         for attribute in start.attributes() {
             let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
             validate_attribute_value(&attribute, invalid)?;
-            let unknown = match attribute_kind(resolver, &attribute, invalid) {
+            let unknown = match attribute_kind(namespaces, &attribute, invalid) {
                 Ok(AttributeKind::Declaration | AttributeKind::SchemaLocation) => false,
                 Ok(AttributeKind::Plain(key)) => !attribute_allowed(element, key),
                 Err(_) => true,
