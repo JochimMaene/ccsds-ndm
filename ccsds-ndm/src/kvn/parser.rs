@@ -1490,7 +1490,7 @@ mod tests {
             assert!(valid_ccsds_number(value), "{value}");
         }
         for value in [
-            "", "+", ".5", "1.", "12e3", "1e3", "1.0e", "1.0e+", "12.5e3",
+            "", "+", ".5", "1.", "1.e3", "12e3", "1e3", "1.0e", "1.0e+", "12.5e3",
         ] {
             assert!(!valid_ccsds_number(value), "{value}");
         }

@@ -475,6 +475,13 @@ fn xml_accepts_the_qualified_schema_form() {
             .replacen("<ndm:oem ", "<oem ", 1)
             .replacen("</ndm:oem>", "</oem>", 1);
     assert_eq!(Oem::from_xml(&unprefixed_root).unwrap(), expected);
+    let prefixed_root = mutated_once(
+        XML,
+        "<oem ",
+        "<ndm:oem xmlns:ndm=\"urn:ccsds:schema:ndmxml\" ",
+    )
+    .replacen("</oem>", "</ndm:oem>", 1);
+    assert_eq!(Oem::from_xml(&prefixed_root).unwrap(), expected);
 
     let mixed = mutated_once(&qualified, "<ndm:header>", "<header>");
     let mixed = mutated_once(&mixed, "</ndm:header>", "</header>");

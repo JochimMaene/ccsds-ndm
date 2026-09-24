@@ -83,6 +83,11 @@ and the two where reading is looser than a clear rule under
   and so is a non-zero value that would round to zero. Very small numbers that still fit are
   fine. The 16-digit limit and the 32-bit integer range are not applied when reading (see
   [More lenient than the book](#more-lenient-than-the-book)).
+- 7.5.7 doesn't say whether a mantissa may end in its decimal point. 7.5.7c calls a mantissa
+  without exponent a fixed-point value, and 7.5.6 requires a digit after the point there, so we
+  reject `1.` and `1.e3` in KVN alike.
+- An empty XML element for an optional epoch or number is rejected, not read as absent. The
+  schema's epoch pattern and `xsd:double` don't allow an empty value; omit the element instead.
 - XML numbers follow `xsd:double` (8.13.1, 8.13.4), so state and covariance values may be `INF`,
   `-INF` or `NaN`. They must be spelled exactly that way, whether written directly, as character
   references, or in CDATA. KVN numbers must be finite (7.5.5–7.5.7), so these values can't be
