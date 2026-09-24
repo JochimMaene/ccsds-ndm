@@ -118,14 +118,6 @@ fn kvn_rejects_unknown_duplicate_reordered_malformed_and_misplaced_content() {
             mutated(source, object_name, &format!("{object_name} €")),
         ),
         (
-            "lone carriage return",
-            mutated(source, "OBJECT_NAME", "OBJECT\r_NAME"),
-        ),
-        (
-            "seventeen-digit fixed number",
-            mutated_once(source, "2789.619", "1.2345678901234567"),
-        ),
-        (
             "floating point without decimal mantissa",
             mutated_once(source, "2789.619", "1e3"),
         ),
@@ -331,22 +323,36 @@ fn kvn_ephemeris_records_tolerate_padding_and_name_malformed_components() {
     let error = Oem::from_kvn(&mutated(source, record, &tabbed)).unwrap_err();
     assert_eq!(error.code(), Some("parse.kvn.syntax"), "{error}");
 
-    // ODM 7.3.7 terminates every line, including the last.
+    // ODM 7.3.7 terminates every line; parsing leniently accepts an unterminated last line.
     let no_final_newline = source.trim_end_matches('\n');
-    let error = Oem::from_kvn(no_final_newline).unwrap_err();
-    let kvn = crate::common::kvn_parse_error(&error)
-        .unwrap_or_else(|| panic!("expected a KVN parse error, got {error}"));
-    assert_eq!(kvn.message, "the final line is not terminated");
+    assert_eq!(
+        Oem::from_kvn(no_final_newline).expect("unterminated final line should parse"),
+        expected,
+    );
     let padded_final_record = format!("{no_final_newline}   \n");
     assert_eq!(
         Oem::from_kvn(&padded_final_record).expect("padded final record should parse"),
         expected,
     );
 
-    let large_decimal = mutated_once(source, "-280.045", "3000000000.0");
-    Oem::from_kvn(&large_decimal).expect("large decimal-form values should parse");
+    // Parsing drops the 16-digit cap of 7.5.6/7.5.7b and the 7.5.4 integer range for data
+    // values, so 17-digit shortest round-trip doubles and large integers still parse.
+    for (lenient, value) in [
+        ("3000000000.0", 3.0e9),
+        ("3000000000", 3.0e9),
+        ("-2757.3016318893897", -2757.3016318893897),
+        ("1.2345678901234567e+03", 1234.5678901234567),
+    ] {
+        let parsed = Oem::from_kvn(&mutated_once(source, "-280.045", lenient))
+            .unwrap_or_else(|error| panic!("{lenient} should parse: {error}"));
+        let state = &parsed.body.segment[0].data.state_vector[0];
+        assert!(
+            [state.x.value, state.y.value, state.z.value].contains(&value),
+            "{lenient}"
+        );
+    }
 
-    for malformed in ["1.2345678901234567", "2147483648", "1e3", "1.", "nan"] {
+    for malformed in ["1e3", "12.5e3", "1.", "nan"] {
         let invalid = mutated_once(source, "-280.045", malformed);
         let error = Oem::from_kvn(&invalid)
             .expect_err(&format!("accepted malformed component {malformed}"))
@@ -540,5 +546,322 @@ fn xml_explicit_units_must_be_the_fixed_oem_units() {
         );
         let error = Oem::from_xml(&wrong).unwrap_err();
         assert_eq!(error.code(), Some("parse.xml.syntax"), "{units}: {error}");
+    }
+}
+
+/// Returns the KVN syntax message behind a strict-parsing refusal.
+#[track_caller]
+fn kvn_message(input: &str) -> String {
+    let error = Oem::from_kvn(input).unwrap_err();
+    crate::common::kvn_parse_error(&error)
+        .unwrap_or_else(|| panic!("expected a KVN parse error, got {error}"))
+        .message
+        .clone()
+}
+
+#[test]
+fn kvn_record_structure_rejections_name_their_reason() {
+    // Table 5-2 and 5-3 fix the header and segment layout; 7.8.9 places comments.
+    let source = KVN_FIXTURES[0];
+    let covariance = KVN_FIXTURES[2];
+    let first_record =
+        "2019-12-18T12:00:00.331 2789.619 -280.045 -1746.755 4.73372 -2.49586 -1.04195\n";
+    let header_end = "ORIGINATOR = NASA/JPL\n";
+    for (input, message) in [
+        (
+            mutated_once(source, first_record, &format!("META_START\n{first_record}")),
+            "unexpected META_START",
+        ),
+        (
+            mutated_once(source, first_record, &format!("META_STOP\n{first_record}")),
+            "unexpected META_STOP",
+        ),
+        (
+            mutated_once(source, "META_STOP\n", "META_STOP\nCOVARIANCE_START\n"),
+            "COVARIANCE_START must follow ephemeris records",
+        ),
+        (
+            mutated_once(
+                covariance,
+                "COVARIANCE_STOP",
+                "COVARIANCE_STOP\nCOVARIANCE_START\nCOVARIANCE_STOP",
+            ),
+            "COVARIANCE_START must follow ephemeris records",
+        ),
+        (
+            mutated_once(
+                covariance,
+                "-3.0302350e-07 -4.8783858e-07 3.4302008e-07 1.7581520e-10 1.0077514e-10 \
+                 6.2244443e-10\nCOVARIANCE_STOP",
+                "COVARIANCE_STOP",
+            ),
+            "COVARIANCE_STOP must follow a complete covariance matrix",
+        ),
+        (
+            mutated_once(
+                source,
+                header_end,
+                &format!("{header_end}UNKNOWN = value\n"),
+            ),
+            "unknown OEM header keyword",
+        ),
+        (
+            mutated_once(
+                source,
+                "CREATION_DATE = 1996-11-04T17:22:31\nORIGINATOR = NASA/JPL",
+                "ORIGINATOR = NASA/JPL\nCREATION_DATE = 1996-11-04T17:22:31",
+            ),
+            "duplicate or out-of-order OEM header keyword",
+        ),
+        (
+            mutated_once(
+                source,
+                "CCSDS_OEM_VERS = 3.0\nCREATION_DATE = 1996-11-04T17:22:31",
+                "CREATION_DATE = 1996-11-04T17:22:31\nCCSDS_OEM_VERS = 3.0",
+            ),
+            "CCSDS_OEM_VERS must be the first record",
+        ),
+        (
+            mutated_once(covariance, "COV_REF_FRAME = EME2000", "REF_FRAME = EME2000"),
+            "unexpected covariance keyword",
+        ),
+        (
+            mutated_once(
+                source,
+                first_record,
+                &format!("OBJECT_NAME = X\n{first_record}"),
+            ),
+            "assignments are not allowed in OEM ephemeris records",
+        ),
+        (
+            source[..source.find("META_START").unwrap()].to_owned(),
+            "incomplete OEM document",
+        ),
+        (
+            mutated_once(source, header_end, &format!("{header_end}COMMENT late\n")),
+            "COMMENT is not at the beginning of an allowed OEM block",
+        ),
+        (
+            mutated_once(
+                source,
+                first_record,
+                &format!("{first_record}COMMENT inside\n"),
+            ),
+            "COMMENT is not at the beginning of an allowed OEM block",
+        ),
+        (
+            mutated_once(
+                covariance,
+                "EPOCH = 2019-12-29T21:00:00",
+                "COMMENT between\nEPOCH = 2019-12-29T21:00:00",
+            ),
+            "COMMENT is not at the beginning of an allowed OEM block",
+        ),
+    ] {
+        assert_eq!(kvn_message(&input), message, "{input}");
+    }
+}
+
+#[test]
+fn kvn_numbers_stay_within_the_double_range() {
+    // ODM 7.5.7e bounds floating-point values by the double range; subnormals remain valid.
+    let source = KVN_FIXTURES[2];
+    for (from, to) in [
+        ("-2432.166", "1.0E999"),
+        ("-2432.166", "-1.0E999"),
+        ("-2432.166", "1.0E-999"),
+        ("3.3313494e-04", "9.9E400"),
+    ] {
+        assert_eq!(
+            kvn_message(&mutated_once(source, from, to)),
+            "Invalid ODM number",
+            "{to}"
+        );
+    }
+    let subnormal = Oem::from_kvn(&mutated_once(source, "-2432.166", "4.9E-324")).unwrap();
+    let x = subnormal.body.segment[0].data.state_vector[0].x.value;
+    assert!(x > 0.0 && !x.is_normal(), "{x}");
+    let zero = Oem::from_kvn(&mutated_once(source, "-2432.166", "0.0E-999")).unwrap();
+    assert_eq!(zero.body.segment[0].data.state_vector[0].x.value, 0.0);
+    let padded = Oem::from_kvn(&mutated_once(source, "-2432.166", "+00000000000000000001"))
+        .expect("7.5.4 permits leading zeroes without the real-number digit cap");
+    assert_eq!(padded.body.segment[0].data.state_vector[0].x.value, 1.0);
+}
+
+#[test]
+fn kvn_covariance_section_may_hold_only_comments() {
+    // 7.8.9 admits comments right after COVARIANCE_START and A2.5.3 makes the matrices
+    // optional. With no matrix to carry them, the comments join the data comments.
+    let source = KVN_FIXTURES[2];
+    let start = source.find("COVARIANCE_START").unwrap();
+    let stop = source.find("COVARIANCE_STOP").unwrap();
+    let input = format!(
+        "{}COVARIANCE_START\nCOMMENT no covariance available\n{}",
+        &source[..start],
+        &source[stop..]
+    );
+    let data = &Oem::from_kvn(&input).unwrap().body.segment[0].data;
+    assert!(data.covariance_matrix.is_empty());
+    assert_eq!(
+        data.comment.last().map(String::as_str),
+        Some("no covariance available")
+    );
+}
+
+#[test]
+fn kvn_empty_cov_ref_frame_is_absent() {
+    // ODM 7.5.1, as for the other optional keywords.
+    let input = mutated_once(
+        KVN_FIXTURES[2],
+        "COV_REF_FRAME = EME2000",
+        "COV_REF_FRAME =",
+    );
+    let parsed = Oem::from_kvn(&input).unwrap();
+    assert_eq!(
+        parsed.body.segment[0].data.covariance_matrix[0].cov_ref_frame,
+        None
+    );
+}
+
+#[test]
+fn kvn_listed_frames_use_a_single_case() {
+    // 7.5.3 applies to the frames listed in 3.2.3.3 and, for COV_REF_FRAME, 3.2.4.11.
+    for frame in ["Eme2000", "Rsw", "Rtn", "Tnw"] {
+        let input = mutated_once(
+            KVN_FIXTURES[2],
+            "COV_REF_FRAME = EME2000",
+            &format!("COV_REF_FRAME = {frame}"),
+        );
+        crate::common::assert_validation_field(
+            &Oem::from_kvn(&input).unwrap_err(),
+            "COV_REF_FRAME",
+        );
+    }
+    for frame in ["rtn", "TNW"] {
+        let input = mutated_once(
+            KVN_FIXTURES[2],
+            "COV_REF_FRAME = EME2000",
+            &format!("COV_REF_FRAME = {frame}"),
+        );
+        Oem::from_kvn(&input).unwrap_or_else(|error| panic!("{frame}: {error}"));
+    }
+}
+
+#[test]
+fn interpolation_requires_its_degree_in_both_notations() {
+    // Table 5-3: INTERPOLATION_DEGREE must be used if INTERPOLATION is used.
+    let degree_element = "<INTERPOLATION_DEGREE>7</INTERPOLATION_DEGREE>";
+    for input in [
+        mutated_once(KVN_FIXTURES[0], "INTERPOLATION_DEGREE = 7\n", ""),
+        mutated_once(
+            KVN_FIXTURES[0],
+            "INTERPOLATION_DEGREE = 7\n",
+            "INTERPOLATION_DEGREE =\n",
+        ),
+    ] {
+        let error = Oem::from_kvn(&input).unwrap_err();
+        assert_eq!(
+            error.code(),
+            Some("validation.missing_required_field"),
+            "{error}"
+        );
+    }
+    let error = Oem::from_xml(&mutated_once(XML, degree_element, "")).unwrap_err();
+    assert_eq!(
+        error.code(),
+        Some("validation.missing_required_field"),
+        "{error}"
+    );
+}
+
+#[test]
+fn every_mandatory_keyword_is_required_in_both_notations() {
+    // Tables 5-2 and 5-3 mark these keywords mandatory.
+    let kvn = KVN_FIXTURES[2];
+    for keyword in [
+        "CREATION_DATE",
+        "ORIGINATOR",
+        "OBJECT_NAME",
+        "OBJECT_ID",
+        "CENTER_NAME",
+        "REF_FRAME",
+        "TIME_SYSTEM",
+        "START_TIME",
+        "STOP_TIME",
+    ] {
+        let line = kvn
+            .lines()
+            .find(|line| line.split('=').next().unwrap().trim() == keyword)
+            .unwrap();
+        let error = Oem::from_kvn(&mutated_once(kvn, &format!("{line}\n"), "")).unwrap_err();
+        assert_eq!(
+            error.code(),
+            Some("validation.missing_required_field"),
+            "KVN {keyword}: {error}"
+        );
+        assert!(
+            error.to_string().contains(keyword),
+            "KVN {keyword}: {error}"
+        );
+
+        let start = XML.find(&format!("<{keyword}>")).unwrap();
+        let end = start + XML[start..].find('\n').unwrap();
+        let error = Oem::from_xml(&format!("{}{}", &XML[..start], &XML[end..])).unwrap_err();
+        assert_eq!(
+            error.code(),
+            Some("parse.xml.syntax"),
+            "XML {keyword}: {error}"
+        );
+        assert!(
+            error.to_string().contains(keyword),
+            "XML {keyword}: {error}"
+        );
+    }
+}
+
+#[test]
+fn classification_is_read_between_the_version_and_creation_date() {
+    // Table 5-2 places the optional CLASSIFICATION after the header comments.
+    let kvn = mutated_once(
+        KVN_FIXTURES[2],
+        "CREATION_DATE",
+        "CLASSIFICATION = SBU\nCREATION_DATE",
+    );
+    let xml = mutated_once(
+        XML,
+        "<CREATION_DATE>",
+        "<CLASSIFICATION>SBU</CLASSIFICATION>\n<CREATION_DATE>",
+    );
+    for message in [Oem::from_kvn(&kvn).unwrap(), Oem::from_xml(&xml).unwrap()] {
+        assert_eq!(message.header.classification.as_deref(), Some("SBU"));
+        assert_eq!(Oem::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    }
+    let late = mutated_once(
+        KVN_FIXTURES[2],
+        "MESSAGE_ID",
+        "CLASSIFICATION = SBU\nMESSAGE_ID",
+    );
+    assert_eq!(
+        Oem::from_kvn(&late).unwrap_err().code(),
+        Some("parse.kvn.syntax")
+    );
+}
+
+#[test]
+fn oem_1_0_is_read_but_not_written() {
+    // ODM 7.9.1 lists OEM 1.0 (Silver Book 1.0); it is read like 2.0 but has no writer.
+    let kvn = mutated_once(
+        KVN_FIXTURES[2],
+        "CCSDS_OEM_VERS = 3.0",
+        "CCSDS_OEM_VERS = 1.0",
+    );
+    let message = Oem::from_kvn(&kvn).unwrap();
+    assert_eq!(message.version, "1.0");
+    for error in [message.to_kvn().unwrap_err(), message.to_xml().unwrap_err()] {
+        assert_eq!(
+            error.code(),
+            Some("generation.unsupported_output_version"),
+            "{error}"
+        );
     }
 }

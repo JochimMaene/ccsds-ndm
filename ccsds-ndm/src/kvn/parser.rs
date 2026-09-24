@@ -51,6 +51,12 @@ pub fn parse_f64_winnow(input: &mut &str) -> KvnResult<f64> {
 
 /// Return whether a token uses the CCSDS integer, fixed-point, or floating-point grammar.
 pub(crate) fn valid_ccsds_number(token: &str) -> bool {
+    ccsds_number_grammar(token, true)
+}
+
+/// The 7.5.4-7.5.7 number grammar. `digit_limits` applies the 16-digit mantissa cap and the
+/// signed 32-bit integer range; without it only the shape of the token is checked.
+fn ccsds_number_grammar(token: &str, digit_limits: bool) -> bool {
     let bytes = token.as_bytes();
     let mut index = usize::from(matches!(bytes.first(), Some(b'+' | b'-')));
     if index == bytes.len() {
@@ -80,11 +86,15 @@ pub(crate) fn valid_ccsds_number(token: &str) -> bool {
         }
     }
 
-    if integer_digits + fraction_digits > 16 {
+    // 7.5.4 limits integer values, not their leading zeroes; the 16-digit cap is for reals.
+    if index == bytes.len() && !has_decimal {
+        return !digit_limits || token.parse::<i32>().is_ok();
+    }
+    if digit_limits && integer_digits + fraction_digits > 16 {
         return false;
     }
     if index == bytes.len() {
-        return has_decimal || token.parse::<i32>().is_ok();
+        return true;
     }
     if !has_decimal || integer_digits != 1 || !matches!(bytes.get(index), Some(b'e' | b'E')) {
         return false;
@@ -99,6 +109,27 @@ pub(crate) fn valid_ccsds_number(token: &str) -> bool {
         index += 1;
     }
     index == bytes.len() && index > exponent_start
+}
+
+/// Parse a token in the CCSDS number grammar whose value lies within the double range of
+/// ODM 7.5.7e. Overflow to infinity and a non-zero value that underflows to zero are rejected;
+/// subnormal values are kept.
+pub(crate) fn parse_ccsds_number(token: &str) -> Option<f64> {
+    valid_ccsds_number(token).then(|| ccsds_double(token))?
+}
+
+/// Like [`parse_ccsds_number`], but without the 16-digit and 32-bit integer limits, so the
+/// 17-digit shortest round-trip spelling many producers emit for a double still parses.
+pub(crate) fn parse_lenient_ccsds_number(token: &str) -> Option<f64> {
+    ccsds_number_grammar(token, false).then(|| ccsds_double(token))?
+}
+
+/// The value of a token already in the number grammar, if it lies within the double range.
+fn ccsds_double(token: &str) -> Option<f64> {
+    let value: f64 = fast_float::parse(token).ok()?;
+    let mantissa = token.split(['e', 'E']).next().unwrap_or(token);
+    let underflow = value == 0.0 && mantissa.bytes().any(|byte| matches!(byte, b'1'..=b'9'));
+    (value.is_finite() && !underflow).then_some(value)
 }
 
 /// Parses up to the next space or line ending, skipping leading whitespace.
@@ -190,11 +221,9 @@ pub fn to_ccsds_error(
 
 /// Creates a winnow ErrMode::Cut with a static context label.
 pub fn cut_err(input: &mut &str, label: &'static str) -> ErrMode<InternalParserError> {
-    ErrMode::Cut(InternalParserError::from_input(input).add_context(
-        input,
-        &input.checkpoint(),
-        StrContext::Label(label),
-    ))
+    let mut error = InternalParserError::from_input(input);
+    error.message = std::borrow::Cow::Borrowed(label);
+    ErrMode::Cut(error.add_context(input, &input.checkpoint(), StrContext::Label(label)))
 }
 
 /// Creates a winnow ErrMode::Cut for a missing required field.
@@ -1418,6 +1447,8 @@ mod tests {
             "0",
             "-2147483648",
             "2147483647",
+            "+00000000000000000001",
+            "-00000000002147483648",
             "0.0",
             "-12.5",
             "1.234567890123456",
@@ -1431,6 +1462,7 @@ mod tests {
             "+",
             "2147483648",
             "-2147483649",
+            "00000000002147483648",
             ".5",
             "1.",
             "12e3",

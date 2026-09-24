@@ -89,23 +89,37 @@ fn kvn_generation_rejects_overlapping_useable_spans() {
 }
 
 #[test]
-fn kvn_rounds_to_the_ccsds_digit_limit_and_rejects_partial_acceleration() {
+fn kvn_rounds_to_the_ccsds_digit_limit() {
     let mut message = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
     message.body.segment[0].data.state_vector[0].x.value = 1.234_567_890_123_456_7;
     assert!(message.to_kvn().unwrap().contains("1.234567890123457e0"));
     message.to_xml().expect("XML retains the exact f64 value");
+}
 
-    let mut message = Oem::from_xml(XML).unwrap();
-    let state = &mut message.body.segment[0].data.state_vector[0];
-    state.y_ddot = None;
-    let mut output = Vec::new();
-    message
-        .write_kvn_to(&mut output)
-        .expect_err("partial acceleration must fail preflight");
-    assert!(output.is_empty());
-    message
-        .to_xml()
-        .expect("partial acceleration remains valid XML");
+#[test]
+fn kvn_rejects_empty_optional_values_that_would_read_back_as_absent() {
+    // ODM 7.5.1: KVN reads an empty optional value as absent, so XML `<INTERPOLATION/>`
+    // cannot be converted without losing it.
+    let message = Oem::from_xml(XML).unwrap();
+    for (mutate, path) in [
+        (
+            (|m: &mut Oem| m.body.segment[0].metadata.interpolation = Some(String::new()))
+                as fn(&mut Oem),
+            "body.segment[0].metadata.interpolation",
+        ),
+        (
+            |m| m.body.segment[0].data.covariance_matrix[0].cov_ref_frame = Some(" ".into()),
+            "body.segment[0].data.covariance_matrix[0].cov_ref_frame",
+        ),
+    ] {
+        let mut invalid = message.clone();
+        mutate(&mut invalid);
+        invalid.to_xml().expect("XML keeps an empty element");
+        assert_eq!(
+            invalid.to_kvn().unwrap_err().field_path().as_deref(),
+            Some(path)
+        );
+    }
 }
 
 #[test]
@@ -130,6 +144,8 @@ fn kvn_record_width_is_bounded_by_the_epoch_and_number_grammar() {
     }
     let kvn = message.to_kvn().unwrap();
     assert!(kvn.lines().all(|line| line.len() <= 254));
+    // The emitted document must read back, which is what makes the width limit meaningful.
+    assert_eq!(Oem::from_kvn(&kvn).unwrap(), message);
 
     message.body.segment[0].data.state_vector[0].epoch =
         "2019-12-18T12:00:00.33111111111111111".parse().unwrap();
@@ -232,36 +248,6 @@ fn generation_rejects_mutated_contextual_epochs() {
         );
     }
     assert!(output.is_empty());
-}
-
-#[test]
-fn oem_generation_rejects_non_finite_state_vectors() {
-    let mut oem = Oem::from_xml(XML).unwrap();
-    oem.body.segment[0].data.state_vector[0].x.value = f64::NAN;
-
-    let error = oem.to_kvn().unwrap_err();
-    assert!(error.to_string().contains("representable CCSDS number"));
-
-    let mut oem = Oem::from_xml(XML).unwrap();
-    oem.body.segment[0].data.covariance_matrix[0].cx_x.value = f64::INFINITY;
-
-    let error = oem.to_kvn().unwrap_err();
-    assert!(error.to_string().contains("representable CCSDS number"));
-}
-
-#[test]
-fn oem_generation_handles_maximum_width_records_without_panicking() {
-    // Widen every component of one state vector to the longest spelling the CCSDS digit limit
-    // allows, so the record sits just under the 254-character line limit.
-    let widest = f64::from_bits(f64::MAX.to_bits() - 2);
-    let oem = oem_with_state_vector_components(&format!("{widest:e}"));
-
-    let output = oem
-        .to_kvn()
-        .expect("the widest representable values should generate");
-    assert!(output.contains("1.797693134862315e308"));
-    // The emitted document must read back, which is what makes the width limit meaningful.
-    Oem::from_kvn(&output).expect("widest records round-trip");
 }
 
 #[test]

@@ -3,16 +3,15 @@ use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::{convert, Ndm, Notation};
 
 #[test]
-fn both_directions_preserve_the_complete_typed_model() {
+fn both_directions_reproduce_the_generated_text() {
     for source in KVN_FIXTURES {
-        let expected = Oem::from_kvn(source).unwrap();
+        let kvn = Oem::from_kvn(source).unwrap().to_kvn().unwrap();
         let xml = convert(source, Notation::Xml).unwrap();
-        assert_eq!(Oem::from_xml(&xml).unwrap(), expected);
+        assert_eq!(convert(&xml, Notation::Kvn).unwrap(), kvn);
     }
-
-    let expected = Oem::from_xml(XML).unwrap();
+    let xml = Oem::from_xml(XML).unwrap().to_xml().unwrap();
     let kvn = convert(XML, Notation::Kvn).unwrap();
-    assert_eq!(Oem::from_kvn(&kvn).unwrap(), expected);
+    assert_eq!(convert(&kvn, Notation::Xml).unwrap(), xml);
 }
 
 #[test]

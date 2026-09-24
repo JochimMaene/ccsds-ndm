@@ -1,7 +1,7 @@
 # Shared NDM family contract evidence
 
-Status: implemented shared plumbing, not blanket CCSDS conformance. The verified OPM 3.0 and
-OMM 3.0 cells remain governed by their message-specific inventories.
+Status: implemented shared plumbing, not blanket CCSDS conformance. The verified OPM 3.0,
+OMM 3.0, and OEM 3.0 cells remain governed by their message-specific inventories.
 
 This inventory records the cross-family mechanics exercised for every standalone message and the
 combined NDM envelope. It deliberately does not substitute shared tests for the message-by-message
@@ -68,8 +68,8 @@ operation × notation × surface cells.
 
 A family document should therefore state its status in one line and then record only its own
 promotion blockers — the parts that actually differ between families. Known family-specific
-blockers today are AEM's interpolation-degree/example conflict, TDM's unverified edition 1.0
-exposure, and combined NDM's XSD-valid/book-invalid conflict.
+blockers today are AEM's interpolation-degree/example conflict, TDM's unverified edition 1.0 exposure, and combined
+NDM's XSD-valid/book-invalid conflict.
 
 The shared family tests use one representative fixture per message to prove registration and
 contract routing. They do not prove complete valid-input coverage, semantic preservation of every

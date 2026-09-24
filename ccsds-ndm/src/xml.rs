@@ -98,6 +98,11 @@ impl Namespaces {
             let name = attribute
                 .unescape_value()
                 .map_err(|error| invalid(error.to_string()))?;
+            if !prefix.is_empty() && name.is_empty() {
+                return Err(invalid(
+                    "XML 1.0 namespace prefixes must be bound to non-empty names".into(),
+                ));
+            }
             self.has_default |= prefix.is_empty();
             self.bindings
                 .push((prefix.to_vec(), name.as_bytes().to_vec(), depth));
@@ -184,6 +189,7 @@ enum AttributeKind<'a> {
 fn attribute_kind<'a>(
     namespaces: &Namespaces,
     attribute: &'a quick_xml::events::attributes::Attribute<'_>,
+    schema_hints_seen: &mut [bool; 2],
     invalid: &impl Fn(String) -> CcsdsNdmError,
 ) -> Result<AttributeKind<'a>> {
     let key = attribute.key.as_ref();
@@ -206,6 +212,10 @@ fn attribute_kind<'a>(
                 b"schemaLocation" | b"noNamespaceSchemaLocation"
             ) =>
         {
+            let index = usize::from(local.as_ref() == b"noNamespaceSchemaLocation");
+            if std::mem::replace(&mut schema_hints_seen[index], true) {
+                return Err(invalid("duplicate XML schema-location attribute".into()));
+            }
             Ok(AttributeKind::SchemaLocation)
         }
         _ => Err(invalid(format!(
@@ -233,10 +243,11 @@ fn validate_root_start(
     element_form(namespaces, start.name(), invalid)?;
     let mut xsi_declared = false;
     let mut unknown_attribute = None;
+    let mut schema_hints_seen = [false; 2];
     for attribute in start.attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         validate_attribute_value(&attribute, invalid)?;
-        let kind = match attribute_kind(namespaces, &attribute, invalid) {
+        let kind = match attribute_kind(namespaces, &attribute, &mut schema_hints_seen, invalid) {
             Ok(kind) => kind,
             Err(_) => {
                 unknown_attribute.get_or_insert_with(|| attribute.key.as_ref().to_vec());
@@ -550,6 +561,10 @@ fn validate_document(
             }
             Ok(Event::Text(text)) => {
                 event_seen = true;
+                // XML 1.0 2.4 forbids the CDATA closing delimiter in literal character data.
+                if text.windows(3).any(|bytes| bytes == b"]]>") {
+                    return Err(invalid("literal ']]>' is not allowed in XML text".into()));
+                }
                 // References arrive as separate events, so the raw bytes decide whitespace
                 // without decoding every value.
                 check_text(&text, &mut stack, &invalid)?;
@@ -594,6 +609,12 @@ fn validate_document(
                 return Err(invalid(
                     "XML document type declarations are not supported".into(),
                 ));
+            }
+            Ok(Event::PI(pi)) => {
+                event_seen = true;
+                if pi.target().is_empty() || pi.target().eq_ignore_ascii_case(b"xml") {
+                    return Err(invalid("invalid XML processing-instruction target".into()));
+                }
             }
             Ok(Event::Eof) => break,
             Ok(_) => event_seen = true,
@@ -665,14 +686,16 @@ fn validate_document(
         attribute_allowed: &AttributeRule<'_>,
         invalid: &impl Fn(String) -> CcsdsNdmError,
     ) -> Result<()> {
+        let mut schema_hints_seen = [false; 2];
         for attribute in start.attributes() {
             let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
             validate_attribute_value(&attribute, invalid)?;
-            let unknown = match attribute_kind(namespaces, &attribute, invalid) {
-                Ok(AttributeKind::Declaration | AttributeKind::SchemaLocation) => false,
-                Ok(AttributeKind::Plain(key)) => !attribute_allowed(element, key),
-                Err(_) => true,
-            };
+            let unknown =
+                match attribute_kind(namespaces, &attribute, &mut schema_hints_seen, invalid) {
+                    Ok(AttributeKind::Declaration | AttributeKind::SchemaLocation) => false,
+                    Ok(AttributeKind::Plain(key)) => !attribute_allowed(element, key),
+                    Err(_) => true,
+                };
             if unknown {
                 return Err(invalid(format!(
                     "unknown attribute '{}' on '{}'",

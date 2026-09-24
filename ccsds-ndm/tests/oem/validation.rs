@@ -117,11 +117,22 @@ fn oem_time_tags_are_absolute_and_metadata_ranges_are_consistent() {
     std::mem::swap(&mut metadata.start_time, &mut metadata.stop_time);
     let error = message.validate().unwrap_err();
     assert_eq!(error.code(), Some("validation.invalid_value"));
-    assert!(error.to_string().contains("START_TIME"));
+    crate::common::assert_validation_field(&error, "START_TIME/STOP_TIME");
 
     let mut message = Oem::from_xml(XML).unwrap();
     message.body.segment[0].metadata.useable_start_time = Some(epoch("2019-12-01T00:00:00"));
     crate::common::assert_validation_field(&message.validate().unwrap_err(), "USEABLE_START_TIME");
+
+    let mut message = Oem::from_xml(XML).unwrap();
+    let metadata = &mut message.body.segment[0].metadata;
+    std::mem::swap(
+        &mut metadata.useable_start_time,
+        &mut metadata.useable_stop_time,
+    );
+    crate::common::assert_validation_field(
+        &message.validate().unwrap_err(),
+        "USEABLE_START_TIME/USEABLE_STOP_TIME",
+    );
 }
 
 #[test]
@@ -138,54 +149,22 @@ fn ephemeris_records_are_in_span_but_need_not_be_ordered() {
 }
 
 #[test]
-fn covariance_epochs_must_be_within_the_total_span() {
+fn covariance_epochs_are_not_bounded_by_the_total_span() {
+    // Table 5-3 says the total span covers the covariance data, but example G-14 (the XML
+    // fixture) has its covariance epoch after STOP_TIME. With the book in conflict, the
+    // covariance epochs are left unbounded; state epochs stay bounded.
     let valid = Oem::from_xml(XML).unwrap();
-    let kvn = valid.to_kvn().unwrap();
-    let covariance_epoch_line = kvn.lines().find(|line| line.starts_with("EPOCH")).unwrap();
-    for value in ["2019-12-18T11:59:59", "2019-12-28T22:28:01"] {
-        let mut invalid = valid.clone();
-        invalid.body.segment[0].data.covariance_matrix[0].epoch = epoch(value);
-        let xml = crate::common::mutated(
-            XML,
-            "<EPOCH>2019-12-28T22:28:00.331</EPOCH>",
-            &format!("<EPOCH>{value}</EPOCH>"),
-        );
-        let kvn = crate::common::mutated(&kvn, covariance_epoch_line, &format!("EPOCH = {value}"));
-        for error in [
-            invalid.validate().unwrap_err(),
-            invalid.to_kvn().unwrap_err(),
-            invalid.to_xml().unwrap_err(),
-            Oem::from_xml(&xml).unwrap_err(),
-            Oem::from_kvn(&kvn).unwrap_err(),
-        ] {
-            assert_eq!(error.code(), Some("validation.out_of_range"));
-            assert_eq!(
-                error.field_path().as_deref(),
-                Some("body.segment[0].data.covariance_matrix[0].epoch")
-            );
-        }
-    }
-    for boundary in [
-        valid.body.segment[0].metadata.start_time,
-        valid.body.segment[0].metadata.stop_time,
-    ] {
+    let metadata = &valid.body.segment[0].metadata;
+    let covariance = &valid.body.segment[0].data.covariance_matrix[0];
+    assert!(covariance.epoch.to_string() > metadata.stop_time.to_string());
+    for value in ["2019-12-18T11:59:59", "2019-12-29T00:00:00"] {
         let mut message = valid.clone();
-        message.body.segment[0].data.covariance_matrix[0].epoch = boundary;
-        message.validate().expect("inclusive total span");
+        message.body.segment[0].data.covariance_matrix[0].epoch = epoch(value);
+        message.validate().unwrap();
+        let kvn = message.to_kvn().unwrap();
+        assert_eq!(Oem::from_kvn(&kvn).unwrap(), message);
+        message.to_xml().unwrap();
     }
-
-    // The original, informative G-14 example ends its total span before the covariance.
-    let original = crate::common::mutated(
-        XML,
-        "<STOP_TIME>2019-12-28T22:28:00.331</STOP_TIME>",
-        "<STOP_TIME>2019-12-28T21:28:00.331</STOP_TIME>",
-    );
-    let error = Oem::from_xml(&original).unwrap_err();
-    crate::common::assert_validation_field(&error, "covarianceMatrix EPOCH");
-    assert_eq!(
-        error.field_path().as_deref(),
-        Some("body.segment[0].data.covariance_matrix[0].epoch")
-    );
 }
 
 #[test]

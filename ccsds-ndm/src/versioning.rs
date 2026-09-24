@@ -31,6 +31,8 @@ pub(crate) fn spec(kind: MessageKind) -> Option<VersionSpec> {
         }),
         MessageKind::Oem => Some(VersionSpec {
             id_keyword: "CCSDS_OEM_VERS",
+            // OEM 1.0 (ODM Silver Book 1.0, 7.9.1) is read like 2.0; no audited 1.0 book or
+            // schema backs a writer, so it is parse-only, like OPM 1.0.
             input_versions: &["1.0", "2.0", "3.0"],
             output_versions: &["2.0", "3.0"],
         }),

@@ -120,7 +120,8 @@ impl std::fmt::Display for KvnParseError {
             "KVN parsing error at line {}, column {}: {}",
             self.line, self.column, self.message
         )?;
-        if !self.contexts.is_empty() {
+        // A lone context that only repeats the message adds nothing.
+        if !self.contexts.is_empty() && self.contexts != [self.message.as_str()] {
             write!(f, "\nContext: {}", self.contexts.join(" > "))?;
         }
         Ok(())

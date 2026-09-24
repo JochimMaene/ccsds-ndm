@@ -57,6 +57,9 @@ const BOOK_REF_FRAMES: &[&str] = &[
     "EME2000", "GCRF", "GRC", "ICRF", "ITRF2000", "ITRF-93", "ITRF-97", "MCI", "TDR", "TEME", "TOD",
 ];
 
+/// Local orbital frames listed for COV_REF_FRAME in ODM 3.2.4.11, besides the 3.2.3.3 frames.
+const BOOK_LOCAL_FRAMES: &[&str] = &["RSW", "RTN", "TNW"];
+
 /// ODM 7.5.3 (KVN): normative text values are exclusively uppercase or exclusively lowercase.
 /// Only the values the book itself lists are known to be normative; ICD-defined values such as
 /// a mission frame are not, so their spelling is left alone. XML text follows xsd:string
@@ -154,7 +157,11 @@ impl Oem {
                         .enumerate()
                         .find_map(|(covariance, matrix)| {
                             let frame = matrix.cov_ref_frame.as_deref()?;
-                            normative_case_error("COV_REF_FRAME", frame, BOOK_REF_FRAMES).map(
+                            normative_case_error("COV_REF_FRAME", frame, BOOK_REF_FRAMES)
+                                .or_else(|| {
+                                    normative_case_error("COV_REF_FRAME", frame, BOOK_LOCAL_FRAMES)
+                                })
+                                .map(
                                 |error| {
                                     error.at_path(format!(
                                         "body.segment[{index}].data.covariance_matrix[{covariance}].cov_ref_frame"
@@ -279,7 +286,8 @@ impl crate::traits::Validate for OemSegment {
 }
 
 impl OemSegment {
-    /// Return the first invalid, out-of-span, or out-of-order data epoch in this segment.
+    /// Return the first invalid or out-of-span state epoch, or invalid or out-of-order covariance
+    /// epoch.
     fn first_epoch_error(&self) -> Option<ValidationError> {
         let range = OemEpochRange::new(&self.metadata);
         let states = self
@@ -325,7 +333,7 @@ impl<'a> OemEpochRange<'a> {
         }
     }
 
-    /// Table 5-3: START_TIME and STOP_TIME bound both the ephemeris and the covariance data.
+    /// Table 5-3: START_TIME and STOP_TIME bound the ephemeris data.
     fn error(&self, epoch: &Epoch, field: &'static str) -> Option<ValidationError> {
         use std::cmp::Ordering;
 
@@ -353,6 +361,10 @@ impl<'a> OemEpochRange<'a> {
 
     /// ODM 5.2.5.7: multiple covariance matrices are ordered by increasing time tag. Equal
     /// tags are not excluded.
+    ///
+    /// Table 5-3 says the total span also covers the covariance data, but the book's own
+    /// example G-14 has a covariance epoch after STOP_TIME. With the book in conflict, the
+    /// covariance epochs are not bounded by the span.
     fn covariance_error(
         &self,
         epoch: &'a Epoch,
@@ -360,7 +372,9 @@ impl<'a> OemEpochRange<'a> {
     ) -> Option<ValidationError> {
         use std::cmp::Ordering;
 
-        if let Some(error) = self.error(epoch, "covarianceMatrix EPOCH") {
+        if let Some(error) =
+            epoch_error(epoch, "covarianceMatrix EPOCH", &self.metadata.time_system)
+        {
             return Some(error);
         }
         let current = epoch.order_key();

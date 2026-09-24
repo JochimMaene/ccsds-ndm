@@ -107,8 +107,9 @@ fn xml_rejects_mixed_content_and_invalid_references_without_losing_valid_text() 
             );
         }
         for suffix in ["&#32;", "&amp;", "\u{a0}", "<!-- invalid -- comment -->"] {
-            assert!(
-                from_str(&format!("{input}{suffix}")).is_err(),
+            assert_eq!(
+                from_str(&format!("{input}{suffix}")).unwrap_err().code(),
+                Some("parse.xml.syntax"),
                 "accepted {suffix}"
             );
         }
@@ -123,6 +124,57 @@ fn xml_rejects_mixed_content_and_invalid_references_without_losing_valid_text() 
 }
 
 const XML_DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+#[test]
+fn xml_rejects_malformed_text_namespaces_and_processing_instructions() {
+    for input in [
+        include_str!("../../data/xml/oem_g14.xml"),
+        include_str!("../../data/xml/opm_g5.xml"),
+        CDM,
+    ] {
+        for (from, to) in [
+            ("<ORIGINATOR>", "<ORIGINATOR>]]>"),
+            ("<header>", "<header xmlns:p=\"\">"),
+            ("<header>", "<?XML invalid?><header>"),
+            ("<header>", "<? invalid?><header>"),
+        ] {
+            let invalid = mutated_once(input, from, to);
+            assert_eq!(
+                from_str(&invalid).unwrap_err().code(),
+                Some("parse.xml.syntax"),
+                "accepted {to}"
+            );
+        }
+        // Prefix aliases cannot disguise duplicate expanded attribute names, at any depth.
+        for hint in ["schemaLocation", "noNamespaceSchemaLocation"] {
+            for marker in ["id=", "<header>"] {
+                let attributes = format!(
+                    " xmlns:q=\"http://www.w3.org/2001/XMLSchema-instance\" \
+                     xsi:{hint}=\"urn:test\" q:{hint}=\"urn:test\""
+                );
+                let replacement = if marker == "id=" {
+                    format!("{attributes} {marker}")
+                } else {
+                    format!("<header{attributes}>")
+                };
+                let invalid = mutated_once(input, marker, &replacement);
+                assert_eq!(
+                    from_str(&invalid).unwrap_err().code(),
+                    Some("parse.xml.syntax"),
+                    "accepted duplicate {hint}"
+                );
+            }
+        }
+        let valid = mutated_once(
+            input,
+            "<header>",
+            "<?xml-stylesheet href='style.xsl'?><?π valid?><header xmlns=\"\">",
+        );
+        assert_eq!(from_str(&valid).unwrap(), from_str(input).unwrap());
+        let valid = mutated_once(input, "<ORIGINATOR>", "<ORIGINATOR>]]&gt;");
+        assert!(from_str(&valid).unwrap().to_xml().is_ok());
+    }
+}
 
 const CDM: &str = include_str!("../../data/xml/cdm_44.xml");
 

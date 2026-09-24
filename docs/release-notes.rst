@@ -29,7 +29,7 @@ Newly rejected:
 - XML documents in every family whose first line is not exactly
   ``<?xml version="1.0" encoding="UTF-8"?>``, or whose root does not declare
   ``xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"``.
-- OEM KVN without a final line terminator, covariance rows of the wrong width,
+- OEM KVN covariance rows of the wrong width,
   and mixed-case KVN spellings of the time systems and reference frames the book
   lists (for example ``Utc`` or ``Eme2000``). XML text follows ``xsd:string``,
   so such XML values are accepted and only their conversion to KVN fails;
@@ -43,6 +43,53 @@ Newly rejected:
 - XML special values spelled other than ``INF``, ``-INF`` or ``NaN`` (for
   example ``inf`` or ``+INF``), in every family.
 - OPM ``nil`` and ``xsi:nil`` attributes, which the OPM schema does not allow.
+
+OEM review follow-up:
+
+- Shared XML parsing rejects literal ``]]>`` in text, empty prefixed namespace
+  bindings, duplicate schema-location attributes hidden behind prefix aliases,
+  and empty or reserved ``xml`` processing-instruction targets.
+- OEM 3.0 is now **Verified** in the support matrix. ODM 5.2.4.7 (enough
+  records for the interpolation method) is recorded as a requirement the book
+  leaves undefined rather than a conformance gap.
+- OEM 1.0 is parse-only, like OPM 1.0: it is read with the 2.0 rules and
+  cannot be written.
+- OEM covariance epochs are no longer required to fall inside the segment's
+  ``START_TIME``/``STOP_TIME``: table 5-3 says they should, but the book's own
+  example G-14 does not, so the shipped ``oem_g14.xml`` is now the example as
+  published. State epochs are still bounded.
+- OEM and AEM KVN numbers outside the double range (ODM 7.5.7e) are rejected
+  instead of becoming infinity or zero.
+- Integer-form AEM data values accept leading zeroes without the 16-digit
+  limit for real numbers; the signed 32-bit integer range still applies.
+- OEM KVN reading accepts an unterminated last line and ephemeris and
+  covariance numbers with more than 16 digits (such as the 17-digit shortest
+  spelling of a double) or integers outside the 32-bit range. These break
+  clear book rules but are common and lose nothing; writing still follows the
+  book and rounds numbers to 16 significant digits.
+- OEM KVN generation rejects an empty ``INTERPOLATION`` or ``COV_REF_FRAME``,
+  which KVN would read back as absent; converting an XML ``<INTERPOLATION/>`` to KVN now fails
+  instead of dropping it.
+- Python: the NumPy inputs of OEM, AEM and CDM accept integer arrays and
+  nested lists, converting them to float, instead of raising a confusing
+  ``TypeError``.
+- Python (breaking): ``OemData(...)`` and ``OemData.from_numpy(...)`` take
+  ``comment=`` instead of ``comments=``, like ``OemMetadata`` and ``AemData``.
+- An OEM KVN covariance section holding only comments is accepted; its
+  comments join the data comments.
+- An empty OEM KVN ``COV_REF_FRAME`` is absent, like other empty optional
+  values.
+- Mixed-case ``RSW``, ``RTN`` and ``TNW`` (ODM 3.2.4.11) are rejected in OEM
+  KVN ``COV_REF_FRAME``.
+- KVN syntax errors in every family carry their reason as the message instead
+  of an empty message.
+- Python: assigning an empty snapshot back to an empty ``OemData`` is a no-op
+  instead of an error.
+- Python: setting ``x_ddot``, ``y_ddot`` or ``z_ddot`` on a ``StateVectorAcc``
+  keeps explicit XML units, like assigning ``state_vector_numpy``.
+- Where the CCSDS books are unclear or conflict, parsing takes the permissive
+  reading; OEM's remaining strict choices are listed in its conformance
+  document.
 
 Generated XML now declares ``xmlns:xsi`` and ``xmlns:ndm`` on the root and
 writes special values as ``INF``, ``-INF`` and ``NaN``. KVN comments drop

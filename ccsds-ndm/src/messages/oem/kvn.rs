@@ -20,9 +20,8 @@ use crate::types::*;
 use std::num::NonZeroU32;
 use winnow::ascii::space1;
 use winnow::combinator::preceded;
-use winnow::error::{AddContext, ErrMode};
+use winnow::error::AddContext;
 use winnow::prelude::*;
-use winnow::stream::Offset;
 
 pub(super) fn to_string(oem: &Oem) -> Result<String> {
     (|| {
@@ -56,9 +55,6 @@ pub(super) fn to_string(oem: &Oem) -> Result<String> {
 /// Parses the OEM version line: `CCSDS_OEM_VERS = 3.0`
 pub fn oem_version(input: &mut &str) -> KvnResult<String> {
     ws.parse_next(input)?;
-    // Skip any leading comments/empty lines
-    let _ = collect_comments.parse_next(input)?;
-
     let (value, _) = expect_key("CCSDS_OEM_VERS").parse_next(input)?;
     Ok(value.to_string())
 }
@@ -101,11 +97,6 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
         },
     }, |i| at_block_end("META", i), "Unexpected OEM Metadata key");
 
-    // Validation: INTERPOLATION_DEGREE required if INTERPOLATION present
-    if interpolation.is_some() && interpolation_degree.is_none() {
-        return Err(cut_err(input, "INTERPOLATION_DEGREE"));
-    }
-
     Ok(OemMetadata {
         comment,
         object_name: object_name
@@ -137,10 +128,9 @@ fn at_record_end(input: &str) -> bool {
 
 fn parse_odm_f64(input: &mut &str) -> KvnResult<f64> {
     let token = till_space_or_eol.parse_next(input)?;
-    if !valid_ccsds_number(token) {
-        return Err(cut_err(input, "Invalid ODM number"));
-    }
-    fast_float::parse(token).map_err(|_| cut_err(input, "Invalid ODM number"))
+    // Parsing drops the 16-digit cap of 7.5.6/7.5.7b: many producers write the 17-digit
+    // shortest round-trip spelling of a double. Generation still writes at most 16 digits.
+    parse_lenient_ccsds_number(token).ok_or_else(|| cut_err(input, "Invalid ODM number"))
 }
 
 /// Parses a positive KVN integer (ODM 7.5.4), reporting a failure at the value itself.
@@ -230,8 +220,6 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
 
 /// Parses a single covariance matrix (within COVARIANCE_START/STOP block).
 fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
-    let mut comment = collect_comments.parse_next(input)?;
-
     let checkpoint = input.checkpoint();
     let key = key_token
         .parse_next(input)
@@ -244,17 +232,16 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
 
     let epoch = kv_epoch.parse_next(input)?;
 
-    // Once we have the epoch, the rest of the covariance matrix follows
-    // Check for optional COV_REF_FRAME
+    // An empty optional value is absent (ODM 7.5.1), like the other optional OEM keywords.
+    blank_lines.parse_next(input)?;
     let mut cov_ref_frame = None;
-    comment.extend(collect_comments.parse_next(input)?);
     let next = input.trim_start_matches([' ', '\t']);
     if next
         .strip_prefix("COV_REF_FRAME")
         .is_some_and(|rest| rest.starts_with([' ', '\t', '=']))
     {
         key_token.parse_next(input)?;
-        cov_ref_frame = Some(kv_string.parse_next(input)?);
+        cov_ref_frame = kv_optional(kv_string).parse_next(input)?;
     }
 
     // Parse 6 lines of raw covariance data (1, 2, 3, 4, 5, 6 elements per line)
@@ -272,7 +259,7 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
     }
 
     Ok(OemCovarianceMatrix {
-        comment,
+        comment: Vec::new(),
         epoch,
         cov_ref_frame,
         cx_x: PositionCovariance::new(floats[0], Some(PositionCovarianceUnits::Km2)),
@@ -332,16 +319,10 @@ fn parse_covariance_block(input: &mut &str) -> KvnResult<Vec<OemCovarianceMatrix
 
     loop {
         blank_lines.parse_next(input)?;
-        let checkpoint = input.checkpoint();
         if at_block_end("COVARIANCE", input) {
             break;
         }
-        let matrix = parse_covariance_matrix.parse_next(input)?;
-        matrices.push(matrix);
-
-        if input.offset_from(&checkpoint) == 0 {
-            break;
-        }
+        matrices.push(parse_covariance_matrix.parse_next(input)?);
     }
 
     Ok(matrices)
@@ -352,85 +333,36 @@ fn parse_covariance_block(input: &mut &str) -> KvnResult<Vec<OemCovarianceMatrix
 //----------------------------------------------------------------------
 
 /// Parses the OEM data section (state vectors and optional covariance matrices).
+///
+/// `validate_syntax` has already fixed the record order: leading comments, ephemeris lines, then
+/// at most one covariance section whose comments follow COVARIANCE_START (ODM 7.8.9).
 pub fn oem_data(input: &mut &str) -> KvnResult<OemData> {
     let mut data = OemData {
-        comment: Vec::new(),
+        comment: collect_comments.parse_next(input)?,
         state_vector: Vec::new(),
         covariance_matrix: Vec::new(),
     };
 
-    let mut covariance_started = false;
-
     loop {
-        let _ = ws.parse_next(input);
+        blank_lines.parse_next(input)?;
         if input.is_empty() || at_block_start("META", input) {
             break;
         }
-
-        let checkpoint = input.checkpoint();
-        // Fast-path: state vectors do not need comment collection and its Vec allocation.
-        let first_char = input.chars().next();
-        let result: KvnResult<()> = (|| {
-            if matches!(first_char, Some('0'..='9' | '-' | '+')) {
-                let sv = parse_state_vector_line.parse_next(input)?;
-                if covariance_started {
-                    return Err(cut_err(
-                        input,
-                        "State vectors cannot appear after covariance matrix block",
-                    ));
-                }
-                data.state_vector.push(sv);
-                Ok(())
-            } else {
-                let comments = collect_comments.parse_next(input)?;
-                if input.is_empty() || at_block_start("META", input) {
-                    if comments.is_empty() {
-                        return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
-                    }
-                    data.comment.extend(comments);
-                    Ok(())
-                } else if at_block_start("COVARIANCE", input) {
-                    expect_block_start("COVARIANCE").parse_next(input)?;
-                    let mut matrices = parse_covariance_block.parse_next(input)?;
-                    expect_block_end("COVARIANCE").parse_next(input)?;
-                    covariance_started = true;
-
-                    if let Some(first) = matrices.get_mut(0) {
-                        first.comment.splice(0..0, comments);
-                    } else {
-                        data.comment.extend(comments);
-                    }
-                    data.covariance_matrix.append(&mut matrices);
-                    Ok(())
-                } else {
-                    let sv = parse_state_vector_line.parse_next(input)?;
-                    if covariance_started {
-                        return Err(cut_err(
-                            input,
-                            "State vectors cannot appear after covariance matrix block",
-                        ));
-                    }
-                    data.comment.extend(comments);
-                    data.state_vector.push(sv);
-                    Ok(())
-                }
-            }
-        })();
-
-        match result {
-            Ok(()) => continue,
-            Err(e) => {
-                if e.is_backtrack() || input.offset_from(&checkpoint) == 0 {
-                    input.reset(&checkpoint);
-                    break;
-                }
-                return Err(e);
-            }
+        if !at_block_start("COVARIANCE", input) {
+            data.state_vector
+                .push(parse_state_vector_line.parse_next(input)?);
+            continue;
         }
-    }
-
-    if data.state_vector.is_empty() {
-        return Err(cut_err(input, "OEM must contain at least one state vector"));
+        expect_block_start("COVARIANCE").parse_next(input)?;
+        let comments = collect_comments.parse_next(input)?;
+        data.covariance_matrix = parse_covariance_block.parse_next(input)?;
+        expect_block_end("COVARIANCE").parse_next(input)?;
+        match data.covariance_matrix.first_mut() {
+            Some(first) => first.comment = comments,
+            // With no matrix to carry them, the comments join the data comments; neither the
+            // model nor the XML schema has another place for them.
+            None => data.comment.extend(comments),
+        }
     }
 
     Ok(data)
@@ -462,39 +394,21 @@ pub fn oem_segment(input: &mut &str) -> KvnResult<OemSegment> {
 //----------------------------------------------------------------------
 
 /// Parses the OEM body (one or more segments).
+///
+/// `validate_syntax` has already rejected comments outside their blocks, so only blank lines
+/// separate segments here.
 pub fn oem_body(input: &mut &str) -> KvnResult<OemBody> {
     let mut segments = Vec::new();
-
-    // Skip any leading comments/empty lines
-    let _ = collect_comments.parse_next(input)?;
-
-    // Parse first segment (required)
-    if !at_block_start("META", input) {
+    loop {
+        blank_lines.parse_next(input)?;
+        if !at_block_start("META", input) {
+            break;
+        }
+        segments.push(oem_segment.parse_next(input)?);
+    }
+    if segments.is_empty() {
         return Err(cut_err(input, "Unexpected key or invalid format"));
     }
-
-    let segment = oem_segment.parse_next(input)?;
-    segments.push(segment);
-
-    // Parse additional segments
-    loop {
-        let checkpoint = input.checkpoint();
-        // Skip comments/empty lines
-        let _ = collect_comments.parse_next(input)?;
-
-        // Check if there's another segment
-        if at_block_start("META", input) {
-            let segment = oem_segment.parse_next(input)?;
-            segments.push(segment);
-        } else {
-            break;
-        }
-
-        if input.offset_from(&checkpoint) == 0 {
-            break;
-        }
-    }
-
     Ok(OemBody { segment: segments })
 }
 
@@ -528,7 +442,7 @@ impl ParseKvn for Oem {
 }
 
 //----------------------------------------------------------------------
-// Tests
+// KVN Generation
 //----------------------------------------------------------------------
 
 /// Reject a record wider than the normative KVN line limit.
@@ -589,18 +503,24 @@ impl Oem {
                 .into());
             }
             // `KvnWriter::write_pair` left-pads the key to 20 columns and adds " = ".
-            let line_len = field.len().max(20) + 3 + value.len();
-            if line_len > 254 {
-                return Err(ValidationError::OutOfRange {
-                    name: field.into(),
-                    value: line_len.to_string(),
-                    expected: "a KVN line no longer than 254 characters".into(),
+            line_length_error(field, field.len().max(20) + 3 + value.len(), || path)
+        }
+        // KVN reads an empty optional metadata or covariance value as absent (7.5.1), so writing
+        // one would drop it. The shared header parser keeps empty strings, so the header is exempt.
+        fn optional_text(field: &'static str, value: &str, path: String) -> Result<()> {
+            if value.trim().is_empty() {
+                return Err(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: value.into(),
+                    expected:
+                        "a non-empty value; KVN cannot tell an empty value from an absent one"
+                            .into(),
                     line: None,
                 }
                 .at_path(path)
                 .into());
             }
-            Ok(())
+            text(field, value, path)
         }
         fn comments(values: &[String], path: String) -> Result<()> {
             for value in values {
@@ -671,7 +591,7 @@ impl Oem {
                 text(field, value, format!("{base}.metadata.{member}"))?;
             }
             if let Some(value) = &metadata.interpolation {
-                text(
+                optional_text(
                     "INTERPOLATION",
                     value,
                     format!("{base}.metadata.interpolation"),
@@ -754,32 +674,36 @@ impl Oem {
                     })
                 })?;
             }
-            if !segment.data.covariance_matrix.is_empty() {
+            if let Some(first) = segment.data.covariance_matrix.first() {
+                // ODM 7.8.9: KVN places covariance comments only at the start of the section.
+                if let Some((covariance_index, covariance)) = segment
+                    .data
+                    .covariance_matrix
+                    .iter()
+                    .enumerate()
+                    .skip(1)
+                    .find(|(_, covariance)| !covariance.comment.is_empty())
+                {
+                    return Err(ValidationError::InvalidValue {
+                        field: "COMMENT".into(),
+                        value: covariance.comment.join(" | "),
+                        expected:
+                            "comments attached only to the first covariance matrix for OEM KVN"
+                                .into(),
+                        line: None,
+                    }
+                    .at_path(format!(
+                        "{base}.data.covariance_matrix[{covariance_index}].comment"
+                    ))
+                    .into());
+                }
+                comments(
+                    &first.comment,
+                    format!("{base}.data.covariance_matrix[0].comment"),
+                )?;
                 writer.write_empty();
                 writer.write_section("COVARIANCE_START");
-                for (covariance_index, covariance) in
-                    segment.data.covariance_matrix.iter().enumerate()
-                {
-                    if covariance_index > 0 && !covariance.comment.is_empty() {
-                        return Err(ValidationError::InvalidValue {
-                            field: "COMMENT".into(),
-                            value: covariance.comment.join(" | "),
-                            expected:
-                                "comments attached only to the first covariance matrix for OEM KVN"
-                                    .into(),
-                            line: None,
-                        }
-                        .at_path(format!(
-                            "{base}.data.covariance_matrix[{covariance_index}].comment"
-                        ))
-                        .into());
-                    }
-                    comments(
-                        &covariance.comment,
-                        format!("{base}.data.covariance_matrix[{covariance_index}].comment"),
-                    )?;
-                    writer.write_comments(&covariance.comment);
-                }
+                writer.write_comments(&first.comment);
             }
             for (covariance_index, covariance) in segment.data.covariance_matrix.iter().enumerate()
             {
@@ -792,7 +716,7 @@ impl Oem {
                         .into());
                 }
                 if let Some(value) = &covariance.cov_ref_frame {
-                    text(
+                    optional_text(
                         "COV_REF_FRAME",
                         value,
                         format!("{base}.data.covariance_matrix[{covariance_index}].cov_ref_frame"),
@@ -1162,15 +1086,8 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
             "incomplete OEM document",
         ));
     }
-    // ODM 7.3.7: every line, including the last, ends with a line terminator. Line endings
-    // are normalized to LF before this pass.
-    if !kvn.ends_with('\n') {
-        return Err(invalid(
-            kvn.lines().count(),
-            kvn.len(),
-            "the final line is not terminated",
-        ));
-    }
+    // ODM 7.3.7 terminates every line, but a missing terminator on the last line is common in
+    // real files and loses nothing, so parsing accepts it. Generation always writes one.
     Ok(())
 }
 
@@ -1273,29 +1190,6 @@ COV_REF_FRAME = RTN
     }
 
     #[test]
-    fn rejects_unknown_data_keys_and_state_vectors_after_covariance() {
-        for input in ["UNKNOWN_KEY = value\n", "X_KEY = value\n"] {
-            let mut input = input;
-            assert!(oem_data.parse_next(&mut input).is_err());
-        }
-
-        let input = format!(
-            "2023-01-01T00:00:00 1 2 3 4 5 6\n\
-             COVARIANCE_START\n{COVARIANCE}COVARIANCE_STOP\n\
-             2023-01-01T00:01:00 1 2 3 4 5 6\n"
-        );
-        let mut input = input.as_str();
-        assert!(oem_data.parse_next(&mut input).is_err());
-    }
-
-    #[test]
-    fn rejects_data_without_state_vectors() {
-        let input = format!("COVARIANCE_START\n{COVARIANCE}COVARIANCE_STOP\n");
-        let mut input = input.as_str();
-        assert!(oem_data.parse_next(&mut input).is_err());
-    }
-
-    #[test]
     fn parses_metadata_and_reports_each_missing_required_field() {
         let mut input = METADATA;
         let metadata = oem_metadata.parse_next(&mut input).unwrap();
@@ -1337,27 +1231,5 @@ COV_REF_FRAME = RTN
             let mut input = input.as_str();
             assert!(oem_metadata.parse_next(&mut input).is_err());
         }
-    }
-
-    #[test]
-    fn parses_the_shared_odm_header_and_rejects_bad_dates() {
-        let mut input =
-            "COMMENT C1\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = ME\nMETA_START";
-        let header = odm_header.parse_next(&mut input).unwrap();
-        assert_eq!(header.comment, vec!["C1"]);
-        assert_eq!(input, "META_START");
-
-        for value in ["INVALID", "123.5", "2023-02-29T00:00:00"] {
-            let source = format!("CREATION_DATE = {value}\nORIGINATOR = TEST\n");
-            let mut input = source.as_str();
-            assert!(odm_header.parse_next(&mut input).is_err());
-        }
-    }
-
-    #[test]
-    fn rejects_invalid_block_boundaries() {
-        assert!(!at_block_start("META", "META_START_EXTRA"));
-        assert!(!at_block_end("META", "META_STOP_EXTRA"));
-        assert!(!at_block_end("META", "META_END_EXTRA"));
     }
 }

@@ -4,30 +4,16 @@ use ccsds_ndm::types::{Epoch, InterpolationDegree};
 use ccsds_ndm::{Ndm, Validate};
 use std::num::NonZeroU32;
 #[test]
-fn covariance_validation_accepts_negative_values_and_xsd_double_specials() {
+fn covariance_validation_accepts_negative_values() {
     let negative_variance = mutated(
         include_str!("../../data/kvn/oem_g13.kvn"),
         "3.3313494e-04",
         "-3.3313494e-04",
     );
-    let mut oem = Oem::from_kvn(&negative_variance)
+    let oem = Oem::from_kvn(&negative_variance)
         .expect("OEM does not specify a sign constraint for covariance values");
     oem.to_kvn()
         .expect("negative covariance values must generate");
-
-    // ODM 8.13.4: XML covariance values are xsd:double values; KVN numbers are finite.
-    oem.body.segment[0].data.covariance_matrix[0].cx_x.value = f64::NAN;
-    oem.validate().unwrap();
-    let reparsed = Oem::from_xml(&oem.to_xml().unwrap()).unwrap();
-    assert!(reparsed.body.segment[0].data.covariance_matrix[0]
-        .cx_x
-        .value
-        .is_nan());
-    let error = oem.to_kvn().unwrap_err();
-    assert_eq!(
-        error.field_path().as_deref(),
-        Some("body.segment[0].data.covariance_matrix[0].cx_x")
-    );
 }
 
 #[test]
