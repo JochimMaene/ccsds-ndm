@@ -28,7 +28,7 @@ formats have different rules.
 Each family has one integration target. `parsing.rs` exercises the public readers;
 `generation.rs` covers writers, roundtrips, and validation before output;
 `model.rs` checks direct model operations. Keep specialized epoch, conversion,
-validation, and minimal-message modules where they earn their own file. Shared
+validation, diagnostics, and minimal-message modules where they earn their own file. Shared
 family fixtures belong in `main.rs`; helpers used once stay beside their test.
 Tests of private parser functions and internal mechanics stay in `src/`.
 

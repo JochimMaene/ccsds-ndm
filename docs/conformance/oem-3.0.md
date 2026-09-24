@@ -20,11 +20,11 @@ lists what the library deliberately leaves to the parties exchanging the message
 | KVN layout | ODM 5.2.4–5.2.5, 7.3–7.9, A2.5.3 | Printable ASCII only, lines of at most 254 characters, and lines terminated by LF, CR, CRLF or LFCR; reading also accepts an unterminated last line (see [More lenient than the book](#more-lenient-than-the-book)). Blank lines may appear anywhere and trailing blanks are ignored. Keywords come in the fixed order. An ephemeris line has 7 or 10 fields, and each covariance row has as many values as its row number. The covariance section may be empty. An optional keyword with no value counts as absent. Comments may only appear where the book allows them. | `oem::parsing`, `oem::generation`, `kvn::parser` unit tests |
 | XML layout | ODM 8, NDM/XML 4.2–4.3, `ndmxml-4.0.0-oem-3.0.xsd` | The document must start with exactly `<?xml version="1.0" encoding="UTF-8"?>`; a line break after it is not required, so single-line documents parse, and the root must declare `xmlns:xsi`. Elements below the root are either all unqualified or all in the `urn:ccsds:schema:ndmxml` namespace; the root itself may be prefixed or not, as the books show both. Namespace declarations and schema-location hints are allowed on any element. Elements must come in schema order. Unknown content, a DTD, or a second document is rejected. | `oem::parsing`, `library::xml` |
 | Time | ODM 3.2.3.2, 5.1.3, 5.2.3–5.2.5, 7.5.10 | Epochs use the calendar or day-of-year form with at most 16 fraction digits. MET and MRT also accept durations spelled `YYYY-DDDThh:mm:ss` with day 000 to 999. Start and stop times must be in order. Complete useable spans of consecutive segments may touch but not overlap; segments need not be in time order. State epochs must fall inside the segment's total span; covariance epochs need not (see [Where sources conflict](#where-sources-conflict)). Covariance epochs must increase, but equal epochs are allowed. | `oem::validation` |
-| Values | ODM 5.2, 7.5, 8.13 | Required fields must be present. In KVN, the time systems and frames the book lists must be all upper or all lower case. XML numbers follow `xsd:double`, so `INF`, `-INF` and `NaN` are allowed. KVN numbers must be finite and fit in a double; reading accepts more than 16 digits. Units are fixed and filled in when missing, and XML output omits the optional `units` attributes. | `oem::model`, `oem::validation`, `oem::conversion` |
+| Values | ODM 5.2, 7.5, 8.13 | Required fields must be present. In KVN, the time systems and frames the book lists must be all upper or all lower case. XML numbers follow `xsd:double` (see [Where the book is unclear](#where-the-book-is-unclear)). KVN numbers must be finite and fit in a double; reading accepts more than 16 digits (see [More lenient than the book](#more-lenient-than-the-book)). Units are fixed and filled in when missing, and XML output omits the optional `units` attributes. | `oem::parsing`, `oem::validation`, `oem::conversion` |
 | Writing KVN | ODM 5.2, 7.3–7.9 | The same message always gives the same output, and it is checked before anything is written. Numbers are rounded to at most 16 significant digits. Accelerations are written for all three axes or none. An empty `INTERPOLATION` or `COV_REF_FRAME` is rejected, because KVN would read it back as absent. | `oem::generation`, `oem_kvn_allocations` |
-| Writing XML | OEM 3.0 XSD, NDM/XML 4.2–4.3 | The same message always gives the same output, and it is checked first. The root declares `xmlns:xsi` and `xmlns:ndm`. Special values are written as `INF`, `-INF` and `NaN`. Output for every shipped OEM example passes the official schema. | `oem::generation`, `oem::validation` |
+| Writing XML | OEM 3.0 XSD, NDM/XML 4.2–4.3 | The same message always gives the same output, and it is checked first. The root declares `xmlns:xsi` and `xmlns:ndm`. Output for every shipped OEM example passes the official schema. | `oem::generation`, `oem::validation` |
 | Conversion | ODM 5 | Round trips of the example files keep the whole model and the edition. Converting to KVN fails for data KVN can't hold: partial accelerations, non-finite numbers, an empty `INTERPOLATION` or `COV_REF_FRAME`, and comments on any covariance matrix after the first. KVN also drops some whitespace (see [Conversion between notations](#conversion-between-notations)). | `oem::conversion` |
-| Resources | Project policy | XML can't nest deeper than a fixed limit. Files are replaced in one step, so a failed write never leaves half a file behind. Writing KVN doesn't use more memory as the record count grows. Reading XML doesn't use extra memory per state record, unless the input spells out `units` attributes. | `ndm::parsing`, `library::output`, `oem_kvn_allocations`, `oem_xml_allocations` |
+| Resources | Project policy | A standalone OEM can't nest beyond its schema, because unknown children are rejected; combined NDM XML has a fixed nesting limit. Files are replaced in one step, so a failed write never leaves half a file behind. Writing KVN doesn't use more memory as the record count grows. Reading XML doesn't use extra memory per state record, unless the input spells out `units` attributes. | `ndm::parsing`, `library::output`, `oem_kvn_allocations`, `oem_xml_allocations` |
 | Scale | Project policy | Benchmarks parse and write 100, 10,000 and 50,000 records in KVN, and 100 and 10,000 in XML. The timings are for information only. | `cargo bench -p ccsds-ndm --bench kvn_benches -- oem_kvn_history_scaling`, `cargo bench -p ccsds-ndm --bench xml_benches -- oem_xml_history_scaling` |
 
 ## Decisions
@@ -44,7 +44,9 @@ and the two where reading is looser than a clear rule under
   compared only when both spans are complete. Total spans may overlap.
 - The object must be the same in every segment (5.1.3). `OBJECT_NAME` and `OBJECT_ID` are
   compared ignoring case, and underscores and runs of blanks count as the same (7.5.9). So
-  `Mars Global Surveyor` and `MARS_GLOBAL_SURVEYOR` are one object. The time system comparison (5.2.4.5) also ignores case and, in XML, surrounding blanks (` UTC ` names UTC); the text is kept as written.
+  `Mars Global Surveyor` and `MARS_GLOBAL_SURVEYOR` are one object. The time system comparison
+  (5.2.4.5) also ignores case and, in XML, surrounding blanks (` UTC ` names UTC); the text is
+  kept as written.
 - 7.5.3 says every normative KVN text value, meaning anything but comments and free text, is all
   upper or all lower case. Which fields are free text is unclear: the book gives no list, and
   values such as mission frames are defined by an ICD rather than the book. We read this leniently
@@ -90,8 +92,8 @@ and the two where reading is looser than a clear rule under
   schema's epoch pattern and `xsd:double` don't allow an empty value; omit the element instead.
 - XML numbers follow `xsd:double` (8.13.1, 8.13.4), so state and covariance values may be `INF`,
   `-INF` or `NaN`. They must be spelled exactly that way, whether written directly, as character
-  references, or in CDATA. KVN numbers must be finite (7.5.5–7.5.7), so these values can't be
-  written to KVN.
+  references, or in CDATA, and XML output writes them that way. KVN numbers must be finite
+  (7.5.5–7.5.7), so these values can't be written to KVN.
 - In a combined NDM, 8.12.7 only allows `id` and `version` on each message's root tag. A
   schema-location hint is therefore rejected there, though it is fine on a standalone OEM.
   Namespace declarations are still allowed, because XML doesn't treat them as attributes.
@@ -167,7 +169,6 @@ reading accepts them. Writing still follows the book, so everything the library 
 
 - A value whose 16-digit KVN spelling would round past the largest double is rejected when
   writing KVN, because it would read back as infinity.
-- KVN numbers read with more than 16 digits are written with 16, as above.
 - XML to KVN keeps the whole model except for whitespace KVN can't hold. Trailing blanks in
   comments are dropped (7.4.7), and so are leading and trailing blanks in text values. A line
   break inside an XML comment turns it into two KVN comments.
@@ -182,8 +183,9 @@ reading accepts them. Writing still follows the book, so everything the library 
   physically sensible.
 - The Python binding adds one OEM rule of its own: in the nine-column `state_vector_numpy` form,
   a NaN acceleration means "absent". An explicit XML NaN acceleration (8.13.4) is therefore lost
-  when that array is assigned back; the `state_vector` records keep it. The binding is tested by `test_oem.py`, the shared
-  binding tests, and the packaged-wheel check in `just package-python`.
+  when that array is assigned back; the `state_vector` records keep it. The binding is tested by
+  `test_oem.py`, the shared binding tests, and the packaged-wheel check in
+  `just package-python`.
 
 ## ICS rows (annex A2.5.3)
 
@@ -203,7 +205,8 @@ before reading untrusted messages. The Rust writers stream their output, but the
 message already in memory. Python copies data between its objects and the Rust model, and NumPy
 arrays are copies. The Rust parsing, validation, generation, and file I/O run with the GIL
 released, so other Python threads keep running; building and reading Python objects still holds
-it. In a local measurement two threads processed large OEMs about 1.65 times as fast as one; this
+it. `OemData.from_numpy` holds it throughout: it reads the caller's arrays, which another thread
+could change, and at 200,000 states only about a third of its time is Rust-side conversion. In a local measurement two threads processed large OEMs about 1.65 times as fast as one; this
 is informational, not a guarantee. The allocation tests check
 how allocations grow from 10 to 1,000 records for KVN (states and covariance matrices, including
 `COV_REF_FRAME`) and from 100 to 2,000 state records for XML. They don't set a peak-memory limit.
@@ -253,3 +256,7 @@ Otherwise it is read with the 2.0 rules, which are stricter than 1.0 in a few pl
 
 1.0 also requires increasing, non-repeating ephemeris epochs and segments that don't overlap
 (4.3.5c, table 4-3). We don't check either, as for 2.0 and 3.0.
+
+Some tools read only 1.0. GMAT R2026a, for example, accepts OEM 2.0 only in its testing run mode
+and rejects 3.0 (`CCSDSOEMReader::IsValidVersion`). Since the library doesn't write 1.0, such
+tools can't read its output.

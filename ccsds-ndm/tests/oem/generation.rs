@@ -34,6 +34,7 @@ fn xml_degrees_outside_the_kvn_integer_range_fail_before_output() {
     }
     assert!(output.is_empty());
 }
+
 #[test]
 fn every_shipped_fixture_generates_deterministic_xsd_valid_xml_and_reparseable_kvn() {
     let messages = ["kvn", "xml"].into_iter().flat_map(|extension| {
