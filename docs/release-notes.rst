@@ -60,8 +60,8 @@ OEM review follow-up:
   published. State epochs are still bounded.
 - OEM and AEM KVN numbers outside the double range (ODM 7.5.7e) are rejected
   instead of becoming infinity or zero.
-- Integer-form AEM data values accept leading zeroes without the 16-digit
-  limit for real numbers; the signed 32-bit integer range still applies.
+- AEM KVN history numbers get the same reading as OEM: any number of digits
+  and integer-form values of any size.
 - OEM KVN reading accepts an unterminated last line and ephemeris and
   covariance numbers with more than 16 digits (such as the 17-digit shortest
   spelling of a double) or integers outside the 32-bit range. These break

@@ -49,14 +49,13 @@ pub fn parse_f64_winnow(input: &mut &str) -> KvnResult<f64> {
     fast_float::parse(s).map_err(|_| cut_err(input, "Invalid float"))
 }
 
-/// Return whether a token uses the CCSDS integer, fixed-point, or floating-point grammar.
+/// Return whether a token has the shape of a CCSDS integer, fixed-point, or floating-point number
+/// (ODM 7.5.4-7.5.7).
+///
+/// Reading does not apply the 16-digit cap of 7.5.6/7.5.7b or the 32-bit integer range of 7.5.4
+/// to data values: many producers write the 17-digit shortest round-trip spelling of a double,
+/// which loses nothing. Generation still writes at most 16 digits.
 pub(crate) fn valid_ccsds_number(token: &str) -> bool {
-    ccsds_number_grammar(token, true)
-}
-
-/// The 7.5.4-7.5.7 number grammar. `digit_limits` applies the 16-digit mantissa cap and the
-/// signed 32-bit integer range; without it only the shape of the token is checked.
-fn ccsds_number_grammar(token: &str, digit_limits: bool) -> bool {
     let bytes = token.as_bytes();
     let mut index = usize::from(matches!(bytes.first(), Some(b'+' | b'-')));
     if index == bytes.len() {
@@ -72,7 +71,6 @@ fn ccsds_number_grammar(token: &str, digit_limits: bool) -> bool {
         return false;
     }
 
-    let mut fraction_digits = 0;
     let has_decimal = bytes.get(index) == Some(&b'.');
     if has_decimal {
         index += 1;
@@ -80,19 +78,11 @@ fn ccsds_number_grammar(token: &str, digit_limits: bool) -> bool {
         while bytes.get(index).is_some_and(u8::is_ascii_digit) {
             index += 1;
         }
-        fraction_digits = index - fraction_start;
-        if fraction_digits == 0 {
+        if index == fraction_start {
             return false;
         }
     }
 
-    // 7.5.4 limits integer values, not their leading zeroes; the 16-digit cap is for reals.
-    if index == bytes.len() && !has_decimal {
-        return !digit_limits || token.parse::<i32>().is_ok();
-    }
-    if digit_limits && integer_digits + fraction_digits > 16 {
-        return false;
-    }
     if index == bytes.len() {
         return true;
     }
@@ -115,17 +105,9 @@ fn ccsds_number_grammar(token: &str, digit_limits: bool) -> bool {
 /// ODM 7.5.7e. Overflow to infinity and a non-zero value that underflows to zero are rejected;
 /// subnormal values are kept.
 pub(crate) fn parse_ccsds_number(token: &str) -> Option<f64> {
-    valid_ccsds_number(token).then(|| ccsds_double(token))?
-}
-
-/// Like [`parse_ccsds_number`], but without the 16-digit and 32-bit integer limits, so the
-/// 17-digit shortest round-trip spelling many producers emit for a double still parses.
-pub(crate) fn parse_lenient_ccsds_number(token: &str) -> Option<f64> {
-    ccsds_number_grammar(token, false).then(|| ccsds_double(token))?
-}
-
-/// The value of a token already in the number grammar, if it lies within the double range.
-fn ccsds_double(token: &str) -> Option<f64> {
+    if !valid_ccsds_number(token) {
+        return None;
+    }
     let value: f64 = fast_float::parse(token).ok()?;
     let mantissa = token.split(['e', 'E']).next().unwrap_or(token);
     let underflow = value == 0.0 && mantissa.bytes().any(|byte| matches!(byte, b'1'..=b'9'));
@@ -1454,22 +1436,16 @@ mod tests {
             "1.234567890123456",
             "1.0e0",
             "-1.234567890123456E+308",
+            // Beyond the book's 16-digit and 32-bit limits, which reading does not apply.
+            "2147483648",
+            "00000000002147483648",
+            "1.2345678901234567",
+            "-2757.3016318893897",
         ] {
             assert!(valid_ccsds_number(value), "{value}");
         }
         for value in [
-            "",
-            "+",
-            "2147483648",
-            "-2147483649",
-            "00000000002147483648",
-            ".5",
-            "1.",
-            "12e3",
-            "1e3",
-            "1.0e",
-            "1.0e+",
-            "1.2345678901234567",
+            "", "+", ".5", "1.", "12e3", "1e3", "1.0e", "1.0e+", "12.5e3",
         ] {
             assert!(!valid_ccsds_number(value), "{value}");
         }

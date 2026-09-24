@@ -129,9 +129,7 @@ fn at_record_end(input: &str) -> bool {
 
 fn parse_odm_f64(input: &mut &str) -> KvnResult<f64> {
     let token = till_space_or_eol.parse_next(input)?;
-    // Parsing drops the 16-digit cap of 7.5.6/7.5.7b: many producers write the 17-digit
-    // shortest round-trip spelling of a double. Generation still writes at most 16 digits.
-    parse_lenient_ccsds_number(token).ok_or_else(|| cut_err(input, "Invalid ODM number"))
+    parse_ccsds_number(token).ok_or_else(|| cut_err(input, "Invalid ODM number"))
 }
 
 /// Parses a positive KVN integer (ODM 7.5.4), reporting a failure at the value itself.

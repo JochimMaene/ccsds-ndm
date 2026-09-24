@@ -43,8 +43,8 @@ represent it. It does not alter the value to make the conversion succeed.
 
 Where the books are silent or unclear, or two sources conflict, parsing takes the more permissive
 reading; clear prohibitions are still enforced, except for the common, lossless deviations a
-family lists under "More lenient than the book" (OEM: an unterminated last KVN line and numbers
-with more than 16 digits). Generation always follows the clear rules. Generation follows the same reading, and writes a
+family lists under "More lenient than the book" (an unterminated last KVN line, and data numbers
+with more than 16 digits in OEM and AEM; the other families already read both). Generation always follows the clear rules. Generation follows the same reading, and writes a
 form satisfying both sources where that costs nothing (for example, OEM XML always declares
 `xmlns:ndm`). A family that keeps a stricter reading lists it as a deliberate exception in its
 conformance document; OEM's are under "Stricter than required" in [oem-3.0.md](../conformance/oem-3.0.md).
