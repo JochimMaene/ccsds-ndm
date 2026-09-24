@@ -444,15 +444,11 @@ fn validate_document(
     let invalid_sequence =
         |message: String| invalid(format!("invalid {type_name} XML sequence: {message}"));
     let document = s.strip_prefix('\u{feff}').unwrap_or(s);
-    // NDM/XML 4.2 and ODM 8.2: the first line of each instantiation is exactly the XML
-    // declaration.
-    if rules.root.is_some()
-        && !document
-            .strip_prefix(XML_HEADER)
-            .is_some_and(|rest| rest.starts_with(['\r', '\n']))
-    {
+    // NDM/XML 4.2 and ODM 8.2: each instantiation opens with exactly this declaration. The
+    // line break after it is not enforced, so single-line documents parse.
+    if rules.root.is_some() && !document.starts_with(XML_HEADER) {
         return Err(invalid(format!(
-            "the first line of an XML instantiation must be exactly {XML_HEADER}"
+            "an XML instantiation must start with exactly {XML_HEADER}"
         )));
     }
     let mut reader = quick_xml::Reader::from_str(document);

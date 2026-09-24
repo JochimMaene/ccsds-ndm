@@ -216,8 +216,9 @@ fn xml_rejects_wrong_envelope_unknown_duplicate_reordered_and_trailing_content()
 }
 
 #[test]
-fn xml_declaration_is_the_exact_first_line() {
+fn xml_declaration_opens_the_document() {
     // ODM 8.2 and NDM/XML 4.2: the first line is exactly the version-1.0, UTF-8 declaration.
+    // The line break after it is not enforced, so single-line documents parse.
     const DECLARATION: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
     let without = XML
         .strip_prefix(DECLARATION)
@@ -229,17 +230,19 @@ fn xml_declaration_is_the_exact_first_line() {
         Oem::from_xml(&XML.replacen('\n', "\r\n", 1)).unwrap(),
         baseline
     );
+    let one_line = format!("{}{without}", DECLARATION.trim_end());
+    assert_eq!(Oem::from_xml(&one_line).unwrap(), baseline);
 
     for input in [
         without.to_owned(),
         format!("<?xml version=\"1.0\"?>\n{without}"),
         format!("<?xml version='1.0' encoding='UTF-8'?>\n{without}"),
         format!("<!-- lead-in -->\n{XML}"),
-        format!("{}{without}", DECLARATION.trim_end()),
+        format!(" {XML}"),
     ] {
         crate::common::assert_invalid_format(
             &Oem::from_xml(&input).unwrap_err(),
-            "the first line of an XML instantiation must be exactly \
+            "an XML instantiation must start with exactly \
              <?xml version=\"1.0\" encoding=\"UTF-8\"?>",
         );
     }

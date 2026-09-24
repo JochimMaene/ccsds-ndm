@@ -61,8 +61,9 @@ listed in the OEM conformance inventory. Newly accepted:
 
 Newly rejected:
 
-- XML documents in every family whose first line is not exactly
-  ``<?xml version="1.0" encoding="UTF-8"?>``, or whose root does not declare
+- XML documents in every family that do not start with exactly
+  ``<?xml version="1.0" encoding="UTF-8"?>`` (single-line documents are
+  accepted), or whose root does not declare
   ``xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"``.
 - OEM KVN covariance rows of the wrong width,
   and mixed-case KVN spellings of the time systems and reference frames the book
