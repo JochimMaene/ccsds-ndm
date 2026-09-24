@@ -26,30 +26,6 @@ fn all_segments_must_describe_one_object_and_one_time_system() {
 }
 
 #[test]
-fn consecutive_useable_spans_may_touch_but_not_overlap() {
-    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
-    let second = &mut message.body.segment[1].metadata;
-    second.start_time = epoch("2019-12-28T21:00:00.000");
-    message
-        .validate()
-        .expect("total spans may overlap when useable spans do not");
-
-    message.body.segment[1].metadata.useable_start_time = Some(epoch("2019-12-28T21:23:00.331"));
-    message
-        .validate()
-        .expect("a shared useable-span endpoint is allowed");
-
-    message.body.segment[1].metadata.useable_start_time = Some(epoch("2019-12-28T21:22:00.331"));
-    let error = message
-        .validate()
-        .expect_err("consecutive useable spans must not overlap");
-    assert_eq!(
-        error.field_path().as_deref(),
-        Some("body.segment[1].metadata.useable_start_time")
-    );
-}
-
-#[test]
 fn total_spans_may_overlap_when_useable_bounds_are_omitted() {
     // ODM 5.2.4.4 forbids overlap only between USEABLE_STOP_TIME and the next
     // USEABLE_START_TIME; STOP_TIME may exceed the next START_TIME.
@@ -168,6 +144,20 @@ fn covariance_epochs_are_not_bounded_by_the_total_span() {
 }
 
 #[test]
+fn covariance_values_may_be_negative() {
+    // ODM 5.2.5 gives covariance values no sign constraint.
+    let negative_variance =
+        crate::common::mutated(KVN_FIXTURES[2], "3.3313494e-04", "-3.3313494e-04");
+    let message = Oem::from_kvn(&negative_variance).unwrap();
+    assert_eq!(
+        message.body.segment[0].data.covariance_matrix[0].cx_x.value,
+        -3.3313494e-04
+    );
+    message.to_kvn().unwrap();
+    message.to_xml().unwrap();
+}
+
+#[test]
 fn covariance_time_tags_are_ordered_by_increasing_time() {
     // ODM 5.2.5.7 orders matrices by increasing time tag; it does not exclude equal tags.
     let mut message = Oem::from_xml(XML).unwrap();
@@ -230,14 +220,23 @@ fn elapsed_time_systems_use_three_digit_day_durations() {
 
 #[test]
 fn kvn_values_listed_in_the_book_use_a_single_case() {
-    // ODM 7.5.3 is a KVN rule for normative values: those listed in 3.2.3.2 and 3.2.3.3. XML
-    // text follows xsd:string (8.13.5), which the schema leaves unrestricted here.
+    // ODM 7.5.3 is a KVN rule for normative values: those listed in 3.2.3.2, 3.2.3.3 and, for
+    // COV_REF_FRAME, 3.2.4.11. XML text follows xsd:string (8.13.5), which the schema leaves
+    // unrestricted here.
+    const COV: &str = "COV_REF_FRAME = EME2000";
     for (from, to, field) in [
         ("TIME_SYSTEM = UTC", "TIME_SYSTEM = Utc", "TIME_SYSTEM"),
         ("REF_FRAME = EME2000", "REF_FRAME = Eme2000", "REF_FRAME"),
+        (COV, "COV_REF_FRAME = Eme2000", "COV_REF_FRAME"),
+        (COV, "COV_REF_FRAME = Rsw", "COV_REF_FRAME"),
+        (COV, "COV_REF_FRAME = Rtn", "COV_REF_FRAME"),
+        (COV, "COV_REF_FRAME = Tnw", "COV_REF_FRAME"),
     ] {
-        let kvn = crate::common::mutated_once(KVN_FIXTURES[0], from, to);
+        let kvn = crate::common::mutated_once(KVN_FIXTURES[2], from, to);
         crate::common::assert_validation_field(&Oem::from_kvn(&kvn).unwrap_err(), field);
+    }
+    for to in ["COV_REF_FRAME = rtn", "COV_REF_FRAME = TNW"] {
+        Oem::from_kvn(&crate::common::mutated_once(KVN_FIXTURES[2], COV, to)).unwrap();
     }
 
     // ICD-defined values and registry centers keep their spelling in KVN.

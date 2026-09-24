@@ -52,7 +52,11 @@ fn kvn_interpolation_degree_obeys_signed_integer_grammar() {
         Oem::from_kvn(source).unwrap()
     );
     // The degree is positive (Table 5-3) and a KVN integer is a signed 32-bit value (7.5.4).
-    for value in ["-1", "0", "2147483648"] {
+    for (value, message) in [
+        ("-1", "positive integer"),
+        ("0", "positive integer"),
+        ("2147483648", "Invalid integer"),
+    ] {
         let invalid = mutated(
             source,
             "INTERPOLATION_DEGREE = 7",
@@ -61,12 +65,18 @@ fn kvn_interpolation_degree_obeys_signed_integer_grammar() {
         let error = Oem::from_kvn(&invalid).unwrap_err();
         let kvn = crate::common::kvn_parse_error(&error)
             .unwrap_or_else(|| panic!("{value}: expected a KVN parse error, got {error}"));
-        assert_eq!((kvn.line, kvn.column), (15, 24), "{value}: {error}");
+        assert_eq!(
+            (kvn.line, kvn.column, kvn.message.as_str()),
+            (15, 24, message),
+            "{value}"
+        );
     }
 }
 
 #[test]
-fn kvn_rejects_unknown_duplicate_reordered_malformed_and_misplaced_content() {
+fn kvn_rejects_duplicate_reordered_misplaced_trailing_and_non_ascii_content() {
+    // Unknown keywords: `diagnostics`. Malformed numbers:
+    // `kvn_ephemeris_records_tolerate_padding_and_name_malformed_components`.
     let source = KVN_FIXTURES[0];
     let object_name = source
         .lines()
@@ -76,7 +86,8 @@ fn kvn_rejects_unknown_duplicate_reordered_malformed_and_misplaced_content() {
         .lines()
         .find(|line| line.trim_start().starts_with("OBJECT_ID"))
         .unwrap();
-    for (label, invalid) in [
+    const ORDER: &str = "duplicate or out-of-order OEM metadata keyword";
+    for (label, invalid, line, message) in [
         (
             "duplicate keyword",
             mutated(
@@ -84,6 +95,8 @@ fn kvn_rejects_unknown_duplicate_reordered_malformed_and_misplaced_content() {
                 object_name,
                 &format!("{object_name}\n{object_name}"),
             ),
+            6,
+            ORDER,
         ),
         (
             "reordered keywords",
@@ -92,14 +105,8 @@ fn kvn_rejects_unknown_duplicate_reordered_malformed_and_misplaced_content() {
                 &format!("{object_name}\n{object_id}"),
                 &format!("{object_id}\n{object_name}"),
             ),
-        ),
-        (
-            "unknown keyword",
-            mutated(
-                source,
-                object_name,
-                &format!("{object_name}\nUNKNOWN = value"),
-            ),
+            6,
+            ORDER,
         ),
         (
             "misplaced comment",
@@ -108,26 +115,30 @@ fn kvn_rejects_unknown_duplicate_reordered_malformed_and_misplaced_content() {
                 object_name,
                 &format!("{object_name}\nCOMMENT misplaced"),
             ),
+            6,
+            "COMMENT is not at the beginning of an allowed OEM block",
         ),
         (
             "trailing content",
             format!("{source}\nUNKNOWN TRAILING CONTENT\n"),
+            42,
+            "invalid epoch format: 'UNKNOWN'",
         ),
         (
             "non-ASCII content",
             mutated(source, object_name, &format!("{object_name} €")),
-        ),
-        (
-            "floating point without decimal mantissa",
-            mutated_once(source, "2789.619", "1e3"),
+            5,
+            "non-printable or non-ASCII character",
         ),
     ] {
         let error = Oem::from_kvn(&invalid).unwrap_err();
-        if label == "trailing content" {
-            crate::common::assert_invalid_epoch(&error, "UNKNOWN");
-        } else {
-            assert_eq!(error.code(), Some("parse.kvn.syntax"), "{label}: {error}");
-        }
+        let located = crate::common::kvn_parse_error(&error)
+            .unwrap_or_else(|| panic!("{label}: expected a KVN parse error, got {error}"));
+        assert_eq!(
+            (located.line, located.message.as_str()),
+            (line, message),
+            "{label}"
+        );
     }
 
     let crlf = mutated(source, "\n", "\r\n");
@@ -167,34 +178,43 @@ fn xml_rejects_wrong_envelope_unknown_duplicate_reordered_and_trailing_content()
     let object_name = "<OBJECT_NAME>MARS GLOBAL SURVEYOR</OBJECT_NAME>";
     let object_id = "<OBJECT_ID>2021-028A</OBJECT_ID>";
     assert!(source.contains(&format!("{object_name}\n{object_id}")));
-    for (label, invalid) in [
+    const ORDER: &str =
+        "invalid OEM XML sequence: duplicate or out-of-order child 'OBJECT_NAME' in 'metadata'";
+    for (label, invalid, message) in [
         (
             "wrong root",
             mutated(&mutated(source, "<oem ", "<omm "), "</oem>", "</omm>"),
+            "expected standalone OEM root element 'oem'",
         ),
         (
             "unknown root attribute",
             mutated(source, "<oem ", "<oem unexpected=\"value\" "),
+            "unknown OEM root attribute 'unexpected'",
         ),
         (
             "unknown element",
             mutated(source, "<metadata>", "<metadata><UNKNOWN>value</UNKNOWN>"),
+            "invalid OEM XML sequence: unknown child 'UNKNOWN' in 'metadata'",
         ),
         (
             "unknown container attribute",
             mutated(source, "<metadata>", "<metadata unexpected=\"value\">"),
+            "invalid OEM XML sequence: unknown attribute 'unexpected' on 'metadata'",
         ),
         (
             "unknown leaf attribute",
             mutated_once(source, "<X>", "<X unexpected=\"value\">"),
+            "invalid OEM XML sequence: unknown attribute 'unexpected' on 'X'",
         ),
         (
             "units on a non-unit element",
             mutated_once(source, "<OBJECT_NAME>", "<OBJECT_NAME units=\"km\">"),
+            "invalid OEM XML sequence: unknown attribute 'units' on 'OBJECT_NAME'",
         ),
         (
             "duplicate element",
             mutated(source, object_name, &format!("{object_name}{object_name}")),
+            ORDER,
         ),
         (
             "reordered elements",
@@ -203,15 +223,22 @@ fn xml_rejects_wrong_envelope_unknown_duplicate_reordered_and_trailing_content()
                 &format!("{object_name}\n{object_id}"),
                 &format!("{object_id}\n{object_name}"),
             ),
+            ORDER,
         ),
-        ("trailing element", format!("{source}<junk/>")),
+        (
+            "trailing element",
+            format!("{source}<junk/>"),
+            "trailing content after OEM document",
+        ),
         (
             "document type",
             mutated_once(source, "<oem ", "<!DOCTYPE oem><oem "),
+            "XML document type declarations are not supported",
         ),
     ] {
         let error = Oem::from_xml(&invalid).unwrap_err();
         assert_eq!(error.code(), Some("parse.xml.syntax"), "{label}: {error}");
+        crate::common::assert_invalid_format(&error, message);
     }
 }
 
@@ -280,27 +307,53 @@ fn xml_contextual_epoch_fields_reject_invalid_values() {
 /// An ephemeris record occupies exactly one line (ODM 7.3.7), so a line holding more than one
 /// record must be rejected rather than silently re-read as several records.
 #[test]
-fn kvn_rejects_ephemeris_records_packed_onto_one_line() {
+fn kvn_ephemeris_records_are_one_line_of_7_or_10_fields() {
+    // ODM 5.2.4: an epoch and 6 components, optionally followed by 3 accelerations.
     let source = KVN_FIXTURES[0];
     let record = source
         .lines()
         .find(|line| line.starts_with("2019-12-18T12:00:00.331"))
         .unwrap();
     let acceleration = format!("{record} 1.0 2.0 3.0");
+    const WIDTH: &str = "State vector must have either 6 or 9 components";
+    const NUMBER: &str = "Invalid ODM number";
 
-    for (label, packed) in [
-        ("two six-component records", format!("{record} {record}")),
+    for (label, invalid, column, message) in [
+        (
+            "two six-component records",
+            format!("{record} {record}"),
+            102,
+            NUMBER,
+        ),
         (
             "two nine-component records",
             format!("{acceleration} {acceleration}"),
+            91,
+            WIDTH,
         ),
         (
-            "record followed by a bare epoch",
+            "record and a bare epoch",
             format!("{record} 2019-12-18T12:00:30.331"),
+            102,
+            NUMBER,
         ),
+        (
+            "five components",
+            record.rsplit_once(' ').unwrap().0.to_owned(),
+            69,
+            "State vector must have at least 6 components (X, Y, Z, X_DOT, Y_DOT, Z_DOT)",
+        ),
+        ("seven components", format!("{record} 1.0"), 82, WIDTH),
+        ("eight components", format!("{record} 1.0 2.0"), 86, WIDTH),
     ] {
-        let error = Oem::from_kvn(&mutated(source, record, &packed)).unwrap_err();
-        assert_eq!(error.code(), Some("parse.kvn.syntax"), "{label}: {error}");
+        let error = Oem::from_kvn(&mutated(source, record, &invalid)).unwrap_err();
+        let located = crate::common::kvn_parse_error(&error)
+            .unwrap_or_else(|| panic!("{label}: expected a KVN parse error, got {error}"));
+        assert_eq!(
+            (located.line, located.column, located.message.as_str()),
+            (19, column, message),
+            "{label}"
+        );
     }
 }
 
@@ -349,21 +402,12 @@ fn kvn_ephemeris_records_tolerate_padding_and_name_malformed_components() {
         let parsed = Oem::from_kvn(&mutated_once(source, "-280.045", lenient))
             .unwrap_or_else(|error| panic!("{lenient} should parse: {error}"));
         let state = &parsed.body.segment[0].data.state_vector[0];
-        assert!(
-            [state.x.value, state.y.value, state.z.value].contains(&value),
-            "{lenient}"
-        );
+        assert_eq!(state.y.value, value, "{lenient}");
     }
 
     for malformed in ["1e3", "12.5e3", "1.", "nan"] {
         let invalid = mutated_once(source, "-280.045", malformed);
-        let error = Oem::from_kvn(&invalid)
-            .expect_err(&format!("accepted malformed component {malformed}"))
-            .to_string();
-        assert!(
-            error.contains("Invalid ODM number"),
-            "component {malformed} was misdiagnosed as {error}"
-        );
+        assert_eq!(kvn_message(&invalid), "Invalid ODM number", "{malformed}");
     }
 }
 
@@ -415,6 +459,17 @@ fn kvn_empty_optional_values_are_absent() {
         "REF_FRAME = EME2000\nREF_FRAME_EPOCH =\n",
     );
     assert_eq!(Oem::from_kvn(&input).unwrap(), expected);
+
+    let input = mutated_once(
+        KVN_FIXTURES[2],
+        "COV_REF_FRAME = EME2000",
+        "COV_REF_FRAME =",
+    );
+    let parsed = Oem::from_kvn(&input).unwrap();
+    assert_eq!(
+        parsed.body.segment[0].data.covariance_matrix[0].cov_ref_frame,
+        None
+    );
 }
 
 #[test]
@@ -556,6 +611,8 @@ fn xml_explicit_units_must_be_the_fixed_oem_units() {
         );
         let error = Oem::from_xml(&wrong).unwrap_err();
         assert_eq!(error.code(), Some("parse.xml.syntax"), "{units}: {error}");
+        let expected = format!("unknown variant `{units}`, expected `km`");
+        assert!(error.to_string().ends_with(&expected), "{units}: {error}");
     }
 }
 
@@ -719,45 +776,6 @@ fn kvn_covariance_section_may_hold_only_comments() {
 }
 
 #[test]
-fn kvn_empty_cov_ref_frame_is_absent() {
-    // ODM 7.5.1, as for the other optional keywords.
-    let input = mutated_once(
-        KVN_FIXTURES[2],
-        "COV_REF_FRAME = EME2000",
-        "COV_REF_FRAME =",
-    );
-    let parsed = Oem::from_kvn(&input).unwrap();
-    assert_eq!(
-        parsed.body.segment[0].data.covariance_matrix[0].cov_ref_frame,
-        None
-    );
-}
-
-#[test]
-fn kvn_listed_frames_use_a_single_case() {
-    // 7.5.3 applies to the frames listed in 3.2.3.3 and, for COV_REF_FRAME, 3.2.4.11.
-    for frame in ["Eme2000", "Rsw", "Rtn", "Tnw"] {
-        let input = mutated_once(
-            KVN_FIXTURES[2],
-            "COV_REF_FRAME = EME2000",
-            &format!("COV_REF_FRAME = {frame}"),
-        );
-        crate::common::assert_validation_field(
-            &Oem::from_kvn(&input).unwrap_err(),
-            "COV_REF_FRAME",
-        );
-    }
-    for frame in ["rtn", "TNW"] {
-        let input = mutated_once(
-            KVN_FIXTURES[2],
-            "COV_REF_FRAME = EME2000",
-            &format!("COV_REF_FRAME = {frame}"),
-        );
-        Oem::from_kvn(&input).unwrap_or_else(|error| panic!("{frame}: {error}"));
-    }
-}
-
-#[test]
 fn interpolation_requires_its_degree_in_both_notations() {
     // Table 5-3: INTERPOLATION_DEGREE must be used if INTERPOLATION is used.
     let degree_element = "<INTERPOLATION_DEGREE>7</INTERPOLATION_DEGREE>";
@@ -851,27 +869,22 @@ fn classification_is_read_between_the_version_and_creation_date() {
         "MESSAGE_ID",
         "CLASSIFICATION = SBU\nMESSAGE_ID",
     );
+    let error = Oem::from_kvn(&late).unwrap_err();
+    let located = crate::common::kvn_parse_error(&error).unwrap();
     assert_eq!(
-        Oem::from_kvn(&late).unwrap_err().code(),
-        Some("parse.kvn.syntax")
+        (located.line, located.message.as_str()),
+        (4, "duplicate or out-of-order OEM header keyword")
     );
 }
 
 #[test]
 fn oem_1_0_is_read_as_kvn_only_without_later_content() {
     // 502.0-B-1 defines OEM 1.0 in KVN only, without the header's CLASSIFICATION and
-    // MESSAGE_ID, REF_FRAME_EPOCH, accelerations or covariance. It is read but not written.
-    let g11 = include_str!("../../data/kvn/oem_g11.kvn");
+    // MESSAGE_ID, REF_FRAME_EPOCH, accelerations or covariance. Writing it is refused in
+    // `generation::unsupported_editions_and_edition_specific_fields_are_rejected`.
+    let g11 = KVN_FIXTURES[0];
     let kvn = mutated_once(g11, "CCSDS_OEM_VERS = 3.0", "CCSDS_OEM_VERS = 1.0");
-    let message = Oem::from_kvn(&kvn).unwrap();
-    assert_eq!(message.version, "1.0");
-    for error in [message.to_kvn().unwrap_err(), message.to_xml().unwrap_err()] {
-        assert_eq!(
-            error.code(),
-            Some("generation.unsupported_output_version"),
-            "{error}"
-        );
-    }
+    assert_eq!(Oem::from_kvn(&kvn).unwrap().version, "1.0");
 
     let first_state = g11.lines().find(|line| line.starts_with("2019-")).unwrap();
     for (label, input, path) in [

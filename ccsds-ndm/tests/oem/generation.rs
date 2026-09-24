@@ -1,7 +1,7 @@
 use crate::common::{assert_rejects, mutated, mutated_once, validate_xml};
 use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::messages::oem::Oem;
-use ccsds_ndm::{Message, Ndm};
+use ccsds_ndm::Ndm;
 
 #[test]
 fn xml_preserves_carriage_returns_in_text() {
@@ -23,12 +23,15 @@ fn xml_degrees_outside_the_kvn_integer_range_fail_before_output() {
     let xml = message.to_xml().unwrap();
     validate_xml("positiveInteger degree", &xml);
     assert_eq!(Oem::from_xml(&xml).unwrap(), message);
+    let path = "body.segment[0].metadata.interpolation_degree";
     let mut output = Vec::new();
-    assert_eq!(
-        message.to_kvn().unwrap_err().code(),
-        Some("validation.out_of_range")
-    );
-    assert!(message.write_kvn_to(&mut output).is_err());
+    for error in [
+        message.to_kvn().unwrap_err(),
+        message.write_kvn_to(&mut output).unwrap_err(),
+    ] {
+        assert_eq!(error.code(), Some("validation.out_of_range"), "{error}");
+        assert_eq!(error.field_path().as_deref(), Some(path), "{error}");
+    }
     assert!(output.is_empty());
 }
 #[test]
@@ -65,15 +68,10 @@ fn every_shipped_fixture_generates_deterministic_xsd_valid_xml_and_reparseable_k
 
 #[test]
 fn generation_diagnostics_identify_the_message_and_field() {
-    let message = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
-    let mut invalid = message;
+    // `library::output` covers the typed and generic output paths; this pins the context.
+    let mut invalid = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
     invalid.body.segment[0].metadata.object_name.clear();
-    for error in [
-        invalid.to_kvn().unwrap_err(),
-        invalid.to_xml().unwrap_err(),
-        Message::Oem(invalid.clone()).to_kvn().unwrap_err(),
-        Message::Oem(invalid).to_xml().unwrap_err(),
-    ] {
+    for error in [invalid.to_kvn().unwrap_err(), invalid.to_xml().unwrap_err()] {
         assert_eq!(error.code(), Some("validation.missing_required_field"));
         assert_eq!(
             error.field_path().as_deref(),
@@ -194,26 +192,25 @@ fn unsupported_editions_and_edition_specific_fields_are_rejected() {
 #[test]
 fn notation_specific_text_rules_fail_before_output() {
     let mut message = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
+    let check = |error: ccsds_ndm::error::CcsdsNdmError, code| {
+        assert_eq!(error.code(), Some(code), "{error}");
+        assert_eq!(
+            error.field_path().as_deref(),
+            Some("body.segment[0].metadata.object_name"),
+            "{error}"
+        );
+    };
     message.body.segment[0].metadata.object_name = "MARS €".into();
     message
         .to_xml()
         .expect("Unicode text is representable in XML 1.0");
-    assert_eq!(
-        message.to_kvn().unwrap_err().code(),
-        Some("validation.invalid_value")
-    );
+    check(message.to_kvn().unwrap_err(), "validation.invalid_value");
 
     message.body.segment[0].metadata.object_name = "MARS\u{1}".into();
-    assert_eq!(
-        message.to_xml().unwrap_err().code(),
-        Some("validation.invalid_value")
-    );
+    check(message.to_xml().unwrap_err(), "validation.invalid_value");
 
     message.body.segment[0].metadata.object_name = "x".repeat(240);
-    assert_eq!(
-        message.to_kvn().unwrap_err().code(),
-        Some("validation.out_of_range")
-    );
+    check(message.to_kvn().unwrap_err(), "validation.out_of_range");
 }
 
 #[test]
@@ -273,9 +270,11 @@ fn oem_generation_rejects_values_the_ccsds_digit_limit_cannot_represent() {
     let error = oem
         .to_kvn()
         .expect_err("f64::MAX has no representable CCSDS spelling");
-    assert!(
-        error.to_string().contains("representable CCSDS number"),
-        "unexpected diagnostic: {error}"
+    assert_eq!(error.code(), Some("validation.invalid_value"), "{error}");
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[0].data.state_vector[0].x"),
+        "{error}"
     );
 }
 
@@ -291,7 +290,7 @@ fn oem_with_state_vector_components(replacement: &str) -> Oem {
 
 #[test]
 fn serializes_multiple_covariance_matrices_in_one_block() {
-    let oem = Oem::from_kvn(include_str!("../../data/kvn/oem_g13.kvn")).unwrap();
+    let oem = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
     assert_eq!(oem.body.segment[0].data.covariance_matrix.len(), 2);
 
     let output = oem.to_kvn().unwrap();

@@ -50,24 +50,20 @@ class TestOem:
         )
         with pytest.raises(NdmValidationError, match="REF_FRAME_EPOCH"):
             metadata.validate()
-
-        metadata = self._create_valid_oem().segments[0].metadata
-        metadata.ref_frame_epoch = "2000-001T12:00:00"
-        assert metadata.ref_frame_epoch == "2000-001T12:00:00"
-        metadata.ref_frame_epoch = "123.5"
-        with pytest.raises(NdmValidationError, match="REF_FRAME_EPOCH"):
-            metadata.validate()
+        # Setters: `test_ref_frame_epoch_follows_the_time_system`.
 
     def test_contextual_epoch_validation_rejects_degenerate_values(self):
         metadata = self._create_valid_oem().segments[0].metadata
         metadata.start_time = "+"
-        with pytest.raises(NdmValidationError):
+        with pytest.raises(NdmValidationError, match="'START_TIME': '\\+'") as error:
             metadata.validate()
+        assert error.value.field_path == "start_time"
 
         oem = self._create_valid_oem()
         oem.segments[0].data.state_vector[0].epoch = "2023-02-29T00:00:00"
-        with pytest.raises(NdmValidationError):
+        with pytest.raises(NdmValidationError, match="2023-02-29") as error:
             oem.to_str(format="xml")
+        assert error.value.field_path == "body.segment[0].data.state_vector[0].epoch"
 
     def _create_valid_oem(self):
         header = OdmHeader("2023-01-01T00:00:00", "TEST", "UNCLASSIFIED", "ID", None)
