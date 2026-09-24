@@ -114,13 +114,8 @@ pub(crate) fn parse_ccsds_number(token: &str) -> Option<f64> {
     (value.is_finite() && !underflow).then_some(value)
 }
 
-/// Parses up to the next space or line ending, skipping leading whitespace.
-pub fn till_space<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
-    preceded(ws, take_till(1.., (' ', '\t', '\r', '\n'))).parse_next(input)
-}
-
 /// Parses up to the next space or line ending, or end of input, skipping leading whitespace.
-pub fn till_space_or_eol<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
+pub fn till_space<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     preceded(ws, take_till(1.., (' ', '\t', '\r', '\n'))).parse_next(input)
 }
 

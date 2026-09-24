@@ -625,8 +625,7 @@ pub fn ocm_man_line(input: &mut &str) -> KvnResult<ManLine> {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
     let epoch = kv_epoch_token.parse_next(input)?;
-    let values =
-        repeat(1.., (space1, till_space_or_eol).map(|(_, v)| v.to_string())).parse_next(input)?;
+    let values = repeat(1.., (space1, till_space).map(|(_, v)| v.to_string())).parse_next(input)?;
     opt_line_ending.parse_next(input)?;
     Ok(ManLine { epoch, values })
 }

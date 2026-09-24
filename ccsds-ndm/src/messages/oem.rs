@@ -26,7 +26,6 @@ fn text_value_eq(left: &str, right: &str) -> bool {
     }) && right_words.next().is_none()
 }
 
-/// Whether `TIME_SYSTEM` denotes elapsed time rather than an absolute time scale.
 /// The value with XML whitespace around it removed. XML keeps a padded xsd:string as written
 /// (8.13.5), and KVN drops the padding (7.4.7); where the books leave its meaning open, a
 /// padded value is read as the value itself while the model keeps the original text.
@@ -34,6 +33,7 @@ fn xml_trimmed(value: &str) -> &str {
     value.trim_matches([' ', '\t', '\r', '\n'])
 }
 
+/// Whether `TIME_SYSTEM` denotes elapsed time rather than an absolute time scale.
 fn is_elapsed_time_system(time_system: &str) -> bool {
     ["MET", "MRT"]
         .iter()
@@ -50,41 +50,6 @@ fn epoch_error(epoch: &Epoch, field: &'static str, time_system: &str) -> Option<
         field: field.into(),
         value: epoch.to_string(),
         expected: "a CCSDS calendar or ordinal time tag with at most 16 fractional digits".into(),
-        line: None,
-    })
-}
-
-/// Time systems listed in ODM 3.2.3.2.
-const BOOK_TIME_SYSTEMS: &[&str] = &[
-    "GMST", "GPS", "MET", "MRT", "SCLK", "TAI", "TCB", "TDB", "TCG", "TT", "UT1", "UTC",
-];
-
-/// Reference frames listed in ODM 3.2.3.3.
-const BOOK_REF_FRAMES: &[&str] = &[
-    "EME2000", "GCRF", "GRC", "ICRF", "ITRF2000", "ITRF-93", "ITRF-97", "MCI", "TDR", "TEME", "TOD",
-];
-
-/// Local orbital frames listed for COV_REF_FRAME in ODM 3.2.4.11, besides the 3.2.3.3 frames.
-const BOOK_LOCAL_FRAMES: &[&str] = &["RSW", "RTN", "TNW"];
-
-/// ODM 7.5.3 (KVN): normative text values are exclusively uppercase or exclusively lowercase.
-/// Only the values the book itself lists are known to be normative; ICD-defined values such as
-/// a mission frame are not, so their spelling is left alone. XML text follows xsd:string
-/// (8.13.5), so this is checked at the KVN boundary only.
-fn normative_case_error(
-    field: &'static str,
-    value: &str,
-    book_values: &[&str],
-) -> Option<ValidationError> {
-    let upper = value.bytes().any(|byte| byte.is_ascii_uppercase());
-    let lower = value.bytes().any(|byte| byte.is_ascii_lowercase());
-    let listed = book_values
-        .iter()
-        .any(|listed| xml_trimmed(value).eq_ignore_ascii_case(listed));
-    (upper && lower && listed).then(|| ValidationError::InvalidValue {
-        field: field.into(),
-        value: value.to_owned(),
-        expected: "an all-uppercase or all-lowercase value".into(),
         line: None,
     })
 }
@@ -134,50 +99,6 @@ impl crate::traits::Validate for Oem {
         crate::versioning::validate_oem_edition(self)?;
         self.header.validate()?;
         validate_within_path(self.body.validate(), || "body".into())
-    }
-}
-
-impl Oem {
-    /// The first 7.5.3 case violation among the book-listed values this message would carry
-    /// in KVN.
-    pub(crate) fn kvn_case_error(&self) -> Option<ValidationError> {
-        self.body
-            .segment
-            .iter()
-            .enumerate()
-            .find_map(|(index, segment)| {
-                let metadata = &segment.metadata;
-                [
-                    ("REF_FRAME", "ref_frame", &metadata.ref_frame, BOOK_REF_FRAMES),
-                    ("TIME_SYSTEM", "time_system", &metadata.time_system, BOOK_TIME_SYSTEMS),
-                ]
-                .into_iter()
-                .find_map(|(field, member, value, listed)| {
-                    normative_case_error(field, value, listed)
-                        .map(|error| error.at_path(format!("body.segment[{index}].metadata.{member}")))
-                })
-                .or_else(|| {
-                    segment
-                        .data
-                        .covariance_matrix
-                        .iter()
-                        .enumerate()
-                        .find_map(|(covariance, matrix)| {
-                            let frame = matrix.cov_ref_frame.as_deref()?;
-                            normative_case_error("COV_REF_FRAME", frame, BOOK_REF_FRAMES)
-                                .or_else(|| {
-                                    normative_case_error("COV_REF_FRAME", frame, BOOK_LOCAL_FRAMES)
-                                })
-                                .map(
-                                |error| {
-                                    error.at_path(format!(
-                                        "body.segment[{index}].data.covariance_matrix[{covariance}].cov_ref_frame"
-                                    ))
-                                },
-                            )
-                        })
-                })
-            })
     }
 }
 

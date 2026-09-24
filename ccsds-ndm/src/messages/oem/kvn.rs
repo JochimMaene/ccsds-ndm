@@ -7,8 +7,8 @@
 //! This module implements KVN parsing for OEM using winnow parser combinators.
 
 use super::{
-    validate_within_path, Oem, OemBody, OemCovarianceMatrix, OemData, OemEpochRange, OemMetadata,
-    OemSegment,
+    validate_within_path, xml_trimmed, Oem, OemBody, OemCovarianceMatrix, OemData, OemEpochRange,
+    OemMetadata, OemSegment,
 };
 use crate::common::StateVectorAcc;
 use crate::error::{InternalParserError, Result, ValidationError};
@@ -22,6 +22,85 @@ use winnow::ascii::space1;
 use winnow::combinator::preceded;
 use winnow::error::AddContext;
 use winnow::prelude::*;
+
+/// Time systems listed in ODM 3.2.3.2.
+const BOOK_TIME_SYSTEMS: &[&str] = &[
+    "GMST", "GPS", "MET", "MRT", "SCLK", "TAI", "TCB", "TDB", "TCG", "TT", "UT1", "UTC",
+];
+
+/// Reference frames listed in ODM 3.2.3.3.
+const BOOK_REF_FRAMES: &[&str] = &[
+    "EME2000", "GCRF", "GRC", "ICRF", "ITRF2000", "ITRF-93", "ITRF-97", "MCI", "TDR", "TEME", "TOD",
+];
+
+/// Local orbital frames listed for COV_REF_FRAME in ODM 3.2.4.11, besides the 3.2.3.3 frames.
+const BOOK_LOCAL_FRAMES: &[&str] = &["RSW", "RTN", "TNW"];
+
+/// ODM 7.5.3 (KVN): normative text values are exclusively uppercase or exclusively lowercase.
+/// Only the values the book itself lists are known to be normative; ICD-defined values such as
+/// a mission frame are not, so their spelling is left alone. XML text follows xsd:string
+/// (8.13.5), so this is checked at the KVN boundary only.
+fn normative_case_error(
+    field: &'static str,
+    value: &str,
+    book_values: &[&str],
+) -> Option<ValidationError> {
+    let upper = value.bytes().any(|byte| byte.is_ascii_uppercase());
+    let lower = value.bytes().any(|byte| byte.is_ascii_lowercase());
+    let listed = book_values
+        .iter()
+        .any(|listed| xml_trimmed(value).eq_ignore_ascii_case(listed));
+    (upper && lower && listed).then(|| ValidationError::InvalidValue {
+        field: field.into(),
+        value: value.to_owned(),
+        expected: "an all-uppercase or all-lowercase value".into(),
+        line: None,
+    })
+}
+
+impl Oem {
+    /// The first 7.5.3 case violation among the book-listed values this message would carry
+    /// in KVN.
+    fn kvn_case_error(&self) -> Option<ValidationError> {
+        self.body
+            .segment
+            .iter()
+            .enumerate()
+            .find_map(|(index, segment)| {
+                let metadata = &segment.metadata;
+                [
+                    ("REF_FRAME", "ref_frame", &metadata.ref_frame, BOOK_REF_FRAMES),
+                    ("TIME_SYSTEM", "time_system", &metadata.time_system, BOOK_TIME_SYSTEMS),
+                ]
+                .into_iter()
+                .find_map(|(field, member, value, listed)| {
+                    normative_case_error(field, value, listed)
+                        .map(|error| error.at_path(format!("body.segment[{index}].metadata.{member}")))
+                })
+                .or_else(|| {
+                    segment
+                        .data
+                        .covariance_matrix
+                        .iter()
+                        .enumerate()
+                        .find_map(|(covariance, matrix)| {
+                            let frame = matrix.cov_ref_frame.as_deref()?;
+                            normative_case_error("COV_REF_FRAME", frame, BOOK_REF_FRAMES)
+                                .or_else(|| {
+                                    normative_case_error("COV_REF_FRAME", frame, BOOK_LOCAL_FRAMES)
+                                })
+                                .map(
+                                |error| {
+                                    error.at_path(format!(
+                                        "body.segment[{index}].data.covariance_matrix[{covariance}].cov_ref_frame"
+                                    ))
+                                },
+                            )
+                        })
+                })
+            })
+    }
+}
 
 pub(super) fn to_string(oem: &Oem) -> Result<String> {
     (|| {
@@ -128,7 +207,7 @@ fn at_record_end(input: &str) -> bool {
 }
 
 fn parse_odm_f64(input: &mut &str) -> KvnResult<f64> {
-    let token = till_space_or_eol.parse_next(input)?;
+    let token = till_space.parse_next(input)?;
     parse_ccsds_number(token).ok_or_else(|| cut_err(input, "Invalid ODM number"))
 }
 
@@ -188,7 +267,7 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
     let (x_ddot, y_ddot, z_ddot) = (acceleration(6), acceleration(7), acceleration(8));
 
     // An ephemeris record occupies exactly one line, so only padding may follow its components.
-    // Without this anchor, leftover tokens are re-read as another record, which both accepts
+    // Without this anchor, leftover tokens would be re-read as another record, accepting
     // several records packed onto one line.
     ws.parse_next(input)?;
     if !at_record_end(input) {
@@ -469,18 +548,6 @@ fn covariance_rows<T>(values: &[T; 21]) -> [&[T]; 6] {
 }
 
 impl Oem {
-    /// Run the generation pass against a discarding sink.
-    ///
-    /// `write_validated_kvn` is the single description of the OEM KVN layout, so validating
-    /// through it keeps the checks and the emitted bytes from drifting apart. Streaming callers
-    /// preflight here first so a rejected message never reaches the caller's sink half-written.
-    pub(crate) fn validate_kvn_generation(&self) -> Result<()> {
-        let mut sink = std::io::sink();
-        let mut writer = KvnWriter::from_io(&mut sink);
-        self.write_validated_kvn(&mut writer)?;
-        writer.finish_io()
-    }
-
     /// Write the complete OEM KVN document, validating each record as it is emitted.
     fn write_validated_kvn(&self, writer: &mut KvnWriter<'_>) -> Result<()> {
         // Paths are built only on failure: the checks run once per record at scale.
@@ -782,8 +849,16 @@ impl Oem {
 }
 
 impl ToKvn for Oem {
+    /// Run the generation pass against a discarding sink.
+    ///
+    /// `write_validated_kvn` is the single description of the OEM KVN layout, so validating
+    /// through it keeps the checks and the emitted bytes from drifting apart. Streaming callers
+    /// preflight here first so a rejected message never reaches the caller's sink half-written.
     fn validate_kvn(&self) -> Result<()> {
-        self.validate_kvn_generation()
+        let mut sink = std::io::sink();
+        let mut writer = KvnWriter::from_io(&mut sink);
+        self.write_validated_kvn(&mut writer)?;
+        writer.finish_io()
     }
 
     fn write_kvn(&self, writer: &mut KvnWriter) {
