@@ -305,14 +305,31 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
     }
 }
 
+/// Map a file operation's error, giving I/O failures the `errno` and `filename` of an
+/// `OSError` so callers can tell which file failed and why.
+pub fn file_error_to_pyerr(error: CcsdsNdmError, path: &std::path::Path) -> PyErr {
+    match error.as_io_error() {
+        Some(io) => NdmIoError::new_err((
+            io.raw_os_error().unwrap_or(0),
+            io.to_string(),
+            path.display().to_string(),
+        )),
+        None => ccsds_error_to_pyerr(error),
+    }
+}
+
 /// Add the context known by a file entry point when its bounded read fails before detection.
 pub fn file_parse_error_to_pyerr(
     error: CcsdsNdmError,
+    path: Option<&std::path::Path>,
     notation: Option<Notation>,
     message_kind: Option<MessageKind>,
 ) -> PyErr {
     if !matches!(&error, CcsdsNdmError::ResourceLimitExceeded { .. }) {
-        return ccsds_error_to_pyerr(error);
+        return match path {
+            Some(path) => file_error_to_pyerr(error, path),
+            None => ccsds_error_to_pyerr(error),
+        };
     }
 
     let code = error.code();

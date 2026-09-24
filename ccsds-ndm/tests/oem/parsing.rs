@@ -936,3 +936,42 @@ fn producer_style_kvn_parses_and_writes_back_within_the_digit_limit() {
         }
     }
 }
+
+#[test]
+fn kvn_time_tag_errors_name_their_line_and_column() {
+    // A malformed epoch in a million-record history must be findable.
+    for (from, to, line, column) in [
+        (
+            "2019-12-18T12:01:00.331 2783.419",
+            "2019-12-18T12:01:00.33X 2783.419",
+            20,
+            1,
+        ),
+        (
+            "START_TIME = 2019-12-18T12:00:00.331",
+            "START_TIME = 2019-12-18T12:00:00.33X",
+            10,
+            14,
+        ),
+    ] {
+        let error = Oem::from_kvn(&mutated_once(KVN_FIXTURES[0], from, to)).unwrap_err();
+        let kvn = crate::common::kvn_parse_error(&error)
+            .unwrap_or_else(|| panic!("expected a located KVN error, got {error}"));
+        assert_eq!((kvn.line, kvn.column), (line, column), "{error}");
+        assert!(kvn.message.contains("invalid epoch format"), "{error}");
+    }
+}
+
+#[test]
+fn kvn_covariance_epoch_cannot_repeat_before_its_matrix() {
+    let input = mutated_once(
+        KVN_FIXTURES[2],
+        "EPOCH = 2019-12-28T21:29:07.267\n",
+        "EPOCH = 2019-12-28T21:29:07.267\nEPOCH = 2019-12-28T21:29:07.267\n",
+    );
+    let error = Oem::from_kvn(&input).unwrap_err();
+    let kvn = crate::common::kvn_parse_error(&error)
+        .unwrap_or_else(|| panic!("expected a KVN parse error, got {error}"));
+    assert_eq!(kvn.line, 25, "{error}");
+    assert_eq!(kvn.message, "unexpected covariance keyword", "{error}");
+}

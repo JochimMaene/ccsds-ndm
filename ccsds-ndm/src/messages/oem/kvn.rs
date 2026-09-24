@@ -483,7 +483,8 @@ impl Oem {
 
     /// Write the complete OEM KVN document, validating each record as it is emitted.
     fn write_validated_kvn(&self, writer: &mut KvnWriter<'_>) -> Result<()> {
-        fn text(field: &'static str, value: &str, path: String) -> Result<()> {
+        // Paths are built only on failure: the checks run once per record at scale.
+        fn text(field: &'static str, value: &str, path: impl FnOnce() -> String) -> Result<()> {
             if !value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
                 return Err(ValidationError::InvalidValue {
                     field: field.into(),
@@ -491,15 +492,19 @@ impl Oem {
                     expected: "printable ASCII characters and blanks".into(),
                     line: None,
                 }
-                .at_path(path)
+                .at_path(path())
                 .into());
             }
             // `KvnWriter::write_pair` left-pads the key to 20 columns and adds " = ".
-            line_length_error(field, field.len().max(20) + 3 + value.len(), || path)
+            line_length_error(field, field.len().max(20) + 3 + value.len(), path)
         }
         // KVN reads an empty optional metadata or covariance value as absent (7.5.1), so writing
         // one would drop it. The shared header parser keeps empty strings, so the header is exempt.
-        fn optional_text(field: &'static str, value: &str, path: String) -> Result<()> {
+        fn optional_text(
+            field: &'static str,
+            value: &str,
+            path: impl FnOnce() -> String,
+        ) -> Result<()> {
             if value.trim().is_empty() {
                 return Err(ValidationError::InvalidValue {
                     field: field.into(),
@@ -509,15 +514,15 @@ impl Oem {
                             .into(),
                     line: None,
                 }
-                .at_path(path)
+                .at_path(path())
                 .into());
             }
             text(field, value, path)
         }
-        fn comments(values: &[String], path: String) -> Result<()> {
+        fn comments(values: &[String], path: impl FnOnce() -> String) -> Result<()> {
             for value in values {
                 if let Some(error) = crate::validation::kvn_comment_error(value) {
-                    return Err(error.at_path(path.clone()).into());
+                    return Err(error.at_path(path()).into());
                 }
             }
             Ok(())
@@ -535,17 +540,15 @@ impl Oem {
             return Err(error.into());
         }
 
-        comments(&self.header.comment, "header.comment".into())?;
+        comments(&self.header.comment, || "header.comment".into())?;
         if let Some(value) = &self.header.classification {
-            text("CLASSIFICATION", value, "header.classification".into())?;
+            text("CLASSIFICATION", value, || "header.classification".into())?;
         }
-        text(
-            "ORIGINATOR",
-            &self.header.originator,
-            "header.originator".into(),
-        )?;
+        text("ORIGINATOR", &self.header.originator, || {
+            "header.originator".into()
+        })?;
         if let Some(value) = &self.header.message_id {
-            text("MESSAGE_ID", value, "header.message_id".into())?;
+            text("MESSAGE_ID", value, || "header.message_id".into())?;
         }
         writer.write_pair("CCSDS_OEM_VERS", &self.version);
         self.header.write_kvn(writer);
@@ -572,7 +575,7 @@ impl Oem {
             })?;
             let epoch_range = OemEpochRange::new(metadata);
             let mut previous_covariance = None;
-            comments(&metadata.comment, format!("{base}.metadata.comment"))?;
+            comments(&metadata.comment, || format!("{base}.metadata.comment"))?;
             for (field, value, member) in [
                 ("OBJECT_NAME", metadata.object_name.as_str(), "object_name"),
                 ("OBJECT_ID", metadata.object_id.as_str(), "object_id"),
@@ -580,16 +583,14 @@ impl Oem {
                 ("REF_FRAME", metadata.ref_frame.as_str(), "ref_frame"),
                 ("TIME_SYSTEM", metadata.time_system.as_str(), "time_system"),
             ] {
-                text(field, value, format!("{base}.metadata.{member}"))?;
+                text(field, value, || format!("{base}.metadata.{member}"))?;
             }
             if let Some(value) = &metadata.interpolation {
-                optional_text(
-                    "INTERPOLATION",
-                    value,
-                    format!("{base}.metadata.interpolation"),
-                )?;
+                optional_text("INTERPOLATION", value, || {
+                    format!("{base}.metadata.interpolation")
+                })?;
             }
-            comments(&segment.data.comment, format!("{base}.data.comment"))?;
+            comments(&segment.data.comment, || format!("{base}.data.comment"))?;
             writer.write_section("META_START");
             metadata.write_kvn(writer);
             writer.write_section("META_STOP");
@@ -689,10 +690,9 @@ impl Oem {
                     ))
                     .into());
                 }
-                comments(
-                    &first.comment,
-                    format!("{base}.data.covariance_matrix[0].comment"),
-                )?;
+                comments(&first.comment, || {
+                    format!("{base}.data.covariance_matrix[0].comment")
+                })?;
                 writer.write_empty();
                 writer.write_section("COVARIANCE_START");
                 writer.write_comments(&first.comment);
@@ -708,11 +708,9 @@ impl Oem {
                         .into());
                 }
                 if let Some(value) = &covariance.cov_ref_frame {
-                    optional_text(
-                        "COV_REF_FRAME",
-                        value,
-                        format!("{base}.data.covariance_matrix[{covariance_index}].cov_ref_frame"),
-                    )?;
+                    optional_text("COV_REF_FRAME", value, || {
+                        format!("{base}.data.covariance_matrix[{covariance_index}].cov_ref_frame")
+                    })?;
                 }
                 writer.write_pair("EPOCH", covariance.epoch);
                 if let Some(value) = &covariance.cov_ref_frame {
@@ -884,7 +882,6 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
     let mut metadata_rank_seen = 0u8;
     let mut segments = 0usize;
     let mut state_records = 0usize;
-    let mut covariance_records = 0usize;
     let mut covariance_row = 0usize;
     let mut covariance_epoch_seen = false;
     let mut covariance_frame_seen = false;
@@ -945,7 +942,6 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
                 phase = Phase::Metadata;
                 metadata_rank_seen = 0;
                 state_records = 0;
-                covariance_records = 0;
                 covariance_closed = false;
                 segments += 1;
             }
@@ -970,7 +966,7 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
             }
             "COVARIANCE_STOP" => {
                 // Annex A2.5.3 marks covariance lines optional inside the covariance block.
-                if phase != Phase::Covariance || (covariance_records > 0 && covariance_row != 6) {
+                if phase != Phase::Covariance || (covariance_epoch_seen && covariance_row != 6) {
                     return Err(invalid(
                         line_number,
                         offset,
@@ -1020,11 +1016,14 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
                         metadata_rank_seen = rank;
                     }
                     Phase::Covariance => match key {
-                        "EPOCH" if covariance_row == 0 || covariance_row == 6 => {
+                        // An EPOCH opens the first matrix or follows a complete one.
+                        "EPOCH"
+                            if (!covariance_epoch_seen && covariance_row == 0)
+                                || covariance_row == 6 =>
+                        {
                             covariance_row = 0;
                             covariance_epoch_seen = true;
                             covariance_frame_seen = false;
-                            covariance_records += 1;
                         }
                         "COV_REF_FRAME"
                             if covariance_epoch_seen

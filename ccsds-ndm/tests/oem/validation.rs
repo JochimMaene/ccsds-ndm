@@ -369,3 +369,111 @@ fn padded_time_systems_denote_the_same_time_system() {
     message.body.segment[0].data.state_vector[0].epoch = epoch("0000-000T00:10:00");
     message.validate().unwrap();
 }
+
+#[test]
+fn metadata_errors_point_at_real_fields() {
+    let base = || Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    let path = |message: Oem| message.validate().unwrap_err().field_path();
+    let prefix = "body.segment[0].metadata";
+
+    let mut message = base();
+    message.body.segment[0].metadata.interpolation_degree = None;
+    assert_eq!(
+        path(message).unwrap(),
+        format!("{prefix}.interpolation_degree")
+    );
+
+    let mut message = base();
+    let metadata = &mut message.body.segment[0].metadata;
+    std::mem::swap(&mut metadata.start_time, &mut metadata.stop_time);
+    assert_eq!(path(message).unwrap(), format!("{prefix}.start_time"));
+
+    let mut message = base();
+    let metadata = &mut message.body.segment[0].metadata;
+    std::mem::swap(
+        &mut metadata.useable_start_time,
+        &mut metadata.useable_stop_time,
+    );
+    assert_eq!(
+        path(message).unwrap(),
+        format!("{prefix}.useable_start_time")
+    );
+
+    let mut message = base();
+    message.body.segment[0].metadata.useable_stop_time = Some(epoch("2030-01-01T00:00:00"));
+    assert_eq!(
+        path(message).unwrap(),
+        format!("{prefix}.useable_stop_time")
+    );
+
+    let mut message = base();
+    message.body.segment[0].metadata.center_name = " ".into();
+    assert_eq!(path(message).unwrap(), format!("{prefix}.center_name"));
+
+    let mut message = base();
+    message.body.segment[0].metadata.ref_frame_epoch = Some(epoch("123.5"));
+    assert_eq!(path(message).unwrap(), format!("{prefix}.ref_frame_epoch"));
+}
+
+#[test]
+fn useable_spans_may_not_overlap_but_need_not_be_in_time_order() {
+    // ODM 5.2.4.4 forbids overlap between consecutive useable spans, except at a shared
+    // endpoint; it does not order the segments.
+    // Total spans wide enough for both segments' states, so only the useable spans matter.
+    let set = |message: &mut Oem, index: usize, start: &str, stop: &str| {
+        let metadata = &mut message.body.segment[index].metadata;
+        metadata.start_time = epoch("2019-12-18T00:00:00");
+        metadata.stop_time = epoch("2019-12-31T00:00:00");
+        metadata.useable_start_time = Some(epoch(start));
+        metadata.useable_stop_time = Some(epoch(stop));
+    };
+    let mut reversed = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    reversed.body.segment.swap(0, 1);
+    reversed
+        .validate()
+        .expect("disjoint segments in reverse time order");
+
+    for (first, second) in [
+        (
+            ("2019-12-18T12:10:00.331", "2019-12-28T22:10:00"),
+            ("2019-12-28T22:08:02.5", "2019-12-30T01:18:02.5"),
+        ),
+        (
+            ("2019-12-28T22:08:02.5", "2019-12-30T01:18:02.5"),
+            ("2019-12-18T12:10:00.331", "2019-12-28T22:10:00"),
+        ),
+    ] {
+        let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+        if first.0 > second.0 {
+            message.body.segment.swap(0, 1);
+        }
+        set(&mut message, 0, first.0, first.1);
+        set(&mut message, 1, second.0, second.1);
+        let error = message.validate().unwrap_err();
+        crate::common::assert_validation_field(&error, "USEABLE_START_TIME");
+        assert_eq!(
+            error.field_path().as_deref(),
+            Some("body.segment[1].metadata.useable_start_time")
+        );
+    }
+
+    let mut shared = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    set(
+        &mut shared,
+        0,
+        "2019-12-18T12:10:00.331",
+        "2019-12-28T22:08:02.5",
+    );
+    shared.validate().expect("shared endpoint");
+
+    // Without both bounds a span is not known, so no overlap is claimed.
+    let mut partial = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    set(
+        &mut partial,
+        0,
+        "2019-12-18T12:10:00.331",
+        "2019-12-29T00:00:00",
+    );
+    partial.body.segment[1].metadata.useable_stop_time = None;
+    partial.validate().expect("incomplete span");
+}

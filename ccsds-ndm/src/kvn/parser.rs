@@ -166,7 +166,19 @@ pub fn to_ccsds_error(
 
     let base_err = match *inner.kind {
         crate::error::ParserErrorKind::Validation(e) => CcsdsNdmError::Validation(Box::new(e)),
-        crate::error::ParserErrorKind::Epoch(e) => CcsdsNdmError::Epoch(e),
+        // A bad KVN time tag is a value error like a bad number: report where it is.
+        crate::error::ParserErrorKind::Epoch(e) => {
+            let (line, column) = crate::error::line_column(input, offset);
+            CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(
+                crate::error::KvnParseError {
+                    line,
+                    column,
+                    message: e.to_string(),
+                    contexts: inner.contexts.to_vec(),
+                    offset,
+                },
+            ))))
+        }
         crate::error::ParserErrorKind::Enum(e) => {
             CcsdsNdmError::Format(Box::new(FormatError::Enum(e)))
         }
@@ -618,9 +630,23 @@ pub fn kv_string_opt(input: &mut &str) -> KvnResult<Option<String>> {
 
 /// Parses an Epoch value from a KVN line.
 pub fn kv_epoch(input: &mut &str) -> KvnResult<Epoch> {
+    let value_start = *input;
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    Epoch::from_str(v.trim())
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    Epoch::from_str(v.trim()).map_err(|e| external_error_at(input, value_start, e))
+}
+
+/// Build a value error positioned at the start of the value rather than after its line, so
+/// diagnostics name the line and column that hold the bad token.
+fn external_error_at<'a, E>(
+    input: &mut &'a str,
+    value_start: &'a str,
+    error: E,
+) -> ErrMode<InternalParserError>
+where
+    InternalParserError: winnow::error::FromExternalError<&'a str, E>,
+{
+    *input = value_start.trim_start_matches([' ', '\t']);
+    ErrMode::Cut(InternalParserError::from_external_error(input, error))
 }
 
 /// Parses an optional keyword value, treating an empty value field as absent.
@@ -642,13 +668,14 @@ pub fn kv_optional<'a, T>(
 
 /// Parses a calendar/ordinal epoch value from a KVN line.
 pub fn kv_calendar_epoch(input: &mut &str) -> KvnResult<CalendarEpoch> {
+    let value_start = *input;
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    CalendarEpoch::from_str(v.trim())
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    CalendarEpoch::from_str(v.trim()).map_err(|e| external_error_at(input, value_start, e))
 }
 
 /// Parses an optional calendar/ordinal epoch value from a KVN line.
 pub fn kv_calendar_epoch_opt(input: &mut &str) -> KvnResult<Option<CalendarEpoch>> {
+    let value_start = *input;
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
     let trimmed = v.trim();
     if trimmed.is_null() {
@@ -656,40 +683,41 @@ pub fn kv_calendar_epoch_opt(input: &mut &str) -> KvnResult<Option<CalendarEpoch
     } else {
         CalendarEpoch::from_str(trimmed)
             .map(Some)
-            .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+            .map_err(|e| external_error_at(input, value_start, e))
     }
 }
 
 /// Parses an Epoch value as a single token (until next space).
 pub fn kv_epoch_token(input: &mut &str) -> KvnResult<Epoch> {
+    let value_start = *input;
     let v = till_space.parse_next(input)?;
-    Epoch::from_str(v.trim())
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    Epoch::from_str(v.trim()).map_err(|e| external_error_at(input, value_start, e))
 }
 
 /// Parses a calendar/ordinal epoch value as a single KVN token (until the next space).
 pub fn kv_calendar_epoch_token(input: &mut &str) -> KvnResult<CalendarEpoch> {
+    let value_start = *input;
     let v = till_space.parse_next(input)?;
-    CalendarEpoch::from_str(v.trim())
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    CalendarEpoch::from_str(v.trim()).map_err(|e| external_error_at(input, value_start, e))
 }
 
 /// Parses a finite relative time using the ADM/ACM `relTimeType` lexical rules.
 pub fn kv_relative_time(input: &mut &str) -> KvnResult<RelativeTime> {
+    let value_start = *input;
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    RelativeTime::from_str(v.trim())
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    RelativeTime::from_str(v.trim()).map_err(|e| external_error_at(input, value_start, e))
 }
 
 /// Parses a boolean (YES/NO) from a KVN line.
 pub fn kv_yes_no(input: &mut &str) -> KvnResult<YesNo> {
+    let value_start = *input;
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    YesNo::from_str(v.trim())
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    YesNo::from_str(v.trim()).map_err(|e| external_error_at(input, value_start, e))
 }
 
 /// Parses an optional boolean (YES/NO) from a KVN line.
 pub fn kv_yes_no_opt(input: &mut &str) -> KvnResult<Option<YesNo>> {
+    let value_start = *input;
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
     let trimmed = v.trim();
     if trimmed.is_null() {
@@ -697,7 +725,7 @@ pub fn kv_yes_no_opt(input: &mut &str) -> KvnResult<Option<YesNo>> {
     } else {
         YesNo::from_str(trimmed)
             .map(Some)
-            .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+            .map_err(|e| external_error_at(input, value_start, e))
     }
 }
 
@@ -736,25 +764,26 @@ where
 
 /// Parses a value from a KVN line using the `FromKvnValue` trait.
 pub fn kv_from_kvn_value<T: FromKvnValue>(input: &mut &str) -> KvnResult<T> {
+    let value_start = *input;
     let (v, _) = kv_rest.parse_next(input)?;
-    T::from_kvn_value(v)
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    T::from_kvn_value(v).map_err(|e| external_error_at(input, value_start, e))
 }
 
 /// Parses any type that implements FromKvnFloat from a KVN line.
 pub fn kv_from_kvn<T: FromKvnFloat>(input: &mut &str) -> KvnResult<T> {
+    let value_start = *input;
     let (v, u) = kv_float_unit.parse_next(input)?;
-    T::from_kvn_float(v, u)
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    T::from_kvn_float(v, u).map_err(|e| external_error_at(input, value_start, e))
 }
 
 /// Parses any optional type that implements FromKvnFloat from a KVN line.
 pub fn kv_from_kvn_opt<T: FromKvnFloat>(input: &mut &str) -> KvnResult<Option<T>> {
+    let value_start = *input;
     let (v, u) = kv_float_unit_opt.parse_next(input)?;
     if let Some(val) = v {
         T::from_kvn_float(val, u)
             .map(Some)
-            .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+            .map_err(|e| external_error_at(input, value_start, e))
     } else {
         Ok(None)
     }

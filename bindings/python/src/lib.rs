@@ -145,7 +145,7 @@ fn from_file(
     let notation = format.map(api::notation).transpose()?;
     let message = py
         .detach(|| ccsds_ndm::from_file_with_notation(&path, notation))
-        .map_err(|error| file_parse_error_to_pyerr(error, notation, None))?;
+        .map_err(|error| file_parse_error_to_pyerr(error, Some(&path), notation, None))?;
     message_to_py(py, message)
 }
 
@@ -179,7 +179,17 @@ fn convert_file(
 ) -> PyResult<()> {
     let notation = api::notation(to_format)?;
     py.detach(|| ccsds_ndm::convert_file(&source_path, &destination_path, notation))
-        .map_err(ccsds_error_to_pyerr)
+        .map_err(|error| match error.as_io_error() {
+            // Either side can fail, so name both, as OSError's filename and filename2.
+            Some(io) => crate::errors::NdmIoError::new_err((
+                io.raw_os_error().unwrap_or(0),
+                io.to_string(),
+                source_path.display().to_string(),
+                None::<i32>,
+                destination_path.display().to_string(),
+            )),
+            None => ccsds_error_to_pyerr(error),
+        })
 }
 
 /// The Python module definition.

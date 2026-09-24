@@ -246,25 +246,35 @@ impl OemBody {
         Ok(())
     }
 
-    /// ODM 5.2.4.4: consecutive useable spans must not overlap, except at a shared endpoint.
-    /// The book constrains only the USEABLE keywords, so a pair is checked only when both are
-    /// present; total spans may overlap.
+    /// ODM 5.2.4.4: the useable spans of consecutive segments must not overlap, except at a
+    /// shared endpoint. Segments need not be in time order. A span is known only when both of
+    /// its USEABLE bounds are given, so a pair is checked only when both spans are complete;
+    /// total spans may overlap.
     fn validate_useable_spans(&self) -> Result<()> {
         use std::cmp::Ordering;
 
+        fn span(segment: &OemSegment) -> Option<(&Epoch, &Epoch)> {
+            let metadata = &segment.metadata;
+            metadata
+                .useable_start_time
+                .as_ref()
+                .zip(metadata.useable_stop_time.as_ref())
+        }
+        let before =
+            |left: &Epoch, right: &Epoch| left.cmp_same_branch(right) == Some(Ordering::Less);
         for (index, segments) in self.segment.windows(2).enumerate() {
-            let (Some(previous_stop), Some(next_start)) = (
-                &segments[0].metadata.useable_stop_time,
-                &segments[1].metadata.useable_start_time,
-            ) else {
+            let (Some((previous_start, previous_stop)), Some((next_start, next_stop))) =
+                (span(&segments[0]), span(&segments[1]))
+            else {
                 continue;
             };
-            if previous_stop.cmp_same_branch(next_start) == Some(Ordering::Greater) {
+            if before(next_start, previous_stop) && before(previous_start, next_stop) {
                 return Err(ValidationError::InvalidValue {
                     field: "USEABLE_START_TIME".into(),
                     value: next_start.to_string(),
                     expected: format!(
-                        "not earlier than the preceding segment USEABLE_STOP_TIME {previous_stop}"
+                        "a useable span not overlapping the preceding segment's \
+                         {previous_start} to {previous_stop}"
                     )
                     .into(),
                     line: None,
@@ -400,28 +410,42 @@ impl<'a> OemEpochRange<'a> {
 
 impl crate::traits::Validate for OemMetadata {
     fn validate(&self) -> Result<()> {
-        for (field, value) in [
-            ("OBJECT_NAME", &self.object_name),
-            ("OBJECT_ID", &self.object_id),
-            ("CENTER_NAME", &self.center_name),
-            ("REF_FRAME", &self.ref_frame),
-            ("TIME_SYSTEM", &self.time_system),
+        for (field, member, value) in [
+            ("OBJECT_NAME", "object_name", &self.object_name),
+            ("OBJECT_ID", "object_id", &self.object_id),
+            ("CENTER_NAME", "center_name", &self.center_name),
+            ("REF_FRAME", "ref_frame", &self.ref_frame),
+            ("TIME_SYSTEM", "time_system", &self.time_system),
         ] {
             if value.trim().is_empty() {
-                return Err(ValidationError::missing_required("OEM Metadata", field).into());
+                return Err(ValidationError::missing_required("OEM Metadata", field)
+                    .at_path(member)
+                    .into());
             }
         }
-        for (field, epoch) in [
-            ("START_TIME", Some(&self.start_time)),
-            ("STOP_TIME", Some(&self.stop_time)),
-            ("USEABLE_START_TIME", self.useable_start_time.as_ref()),
-            ("USEABLE_STOP_TIME", self.useable_stop_time.as_ref()),
-            ("REF_FRAME_EPOCH", self.ref_frame_epoch.as_ref()),
+        for (field, member, epoch) in [
+            ("START_TIME", "start_time", Some(&self.start_time)),
+            ("STOP_TIME", "stop_time", Some(&self.stop_time)),
+            (
+                "USEABLE_START_TIME",
+                "useable_start_time",
+                self.useable_start_time.as_ref(),
+            ),
+            (
+                "USEABLE_STOP_TIME",
+                "useable_stop_time",
+                self.useable_stop_time.as_ref(),
+            ),
+            (
+                "REF_FRAME_EPOCH",
+                "ref_frame_epoch",
+                self.ref_frame_epoch.as_ref(),
+            ),
         ] {
             if let Some(error) =
                 epoch.and_then(|epoch| epoch_error(epoch, field, &self.time_system))
             {
-                return Err(error.into());
+                return Err(error.at_path(member).into());
             }
         }
         if self.interpolation.is_some() && self.interpolation_degree.is_none() {
@@ -429,6 +453,7 @@ impl crate::traits::Validate for OemMetadata {
                 "OEM Metadata",
                 "INTERPOLATION_DEGREE (required when INTERPOLATION is present)",
             )
+            .at_path("interpolation_degree")
             .into());
         }
         match self.first_time_span_error() {
@@ -451,34 +476,51 @@ impl OemMetadata {
         };
 
         if out_of_order(&self.start_time, &self.stop_time) {
-            return Some(ValidationError::InvalidValue {
-                field: "START_TIME/STOP_TIME".into(),
-                value: format!("{} > {}", self.start_time, self.stop_time),
-                expected: "START_TIME no later than STOP_TIME".into(),
-                line: None,
-            });
+            return Some(
+                ValidationError::InvalidValue {
+                    field: "START_TIME/STOP_TIME".into(),
+                    value: format!("{} > {}", self.start_time, self.stop_time),
+                    expected: "START_TIME no later than STOP_TIME".into(),
+                    line: None,
+                }
+                .at_path("start_time"),
+            );
         }
-        for (name, epoch) in [
-            ("USEABLE_START_TIME", self.useable_start_time.as_ref()),
-            ("USEABLE_STOP_TIME", self.useable_stop_time.as_ref()),
+        for (name, member, epoch) in [
+            (
+                "USEABLE_START_TIME",
+                "useable_start_time",
+                self.useable_start_time.as_ref(),
+            ),
+            (
+                "USEABLE_STOP_TIME",
+                "useable_stop_time",
+                self.useable_stop_time.as_ref(),
+            ),
         ] {
             if let Some(epoch) = epoch.filter(|epoch| !within_total_span(epoch)) {
-                return Some(ValidationError::OutOfRange {
-                    name: name.into(),
-                    value: epoch.to_string(),
-                    expected: "within the total START_TIME/STOP_TIME span".into(),
-                    line: None,
-                });
+                return Some(
+                    ValidationError::OutOfRange {
+                        name: name.into(),
+                        value: epoch.to_string(),
+                        expected: "within the total START_TIME/STOP_TIME span".into(),
+                        line: None,
+                    }
+                    .at_path(member),
+                );
             }
         }
         if let (Some(start), Some(stop)) = (&self.useable_start_time, &self.useable_stop_time) {
             if out_of_order(start, stop) {
-                return Some(ValidationError::InvalidValue {
-                    field: "USEABLE_START_TIME/USEABLE_STOP_TIME".into(),
-                    value: format!("{start} > {stop}"),
-                    expected: "USEABLE_START_TIME no later than USEABLE_STOP_TIME".into(),
-                    line: None,
-                });
+                return Some(
+                    ValidationError::InvalidValue {
+                        field: "USEABLE_START_TIME/USEABLE_STOP_TIME".into(),
+                        value: format!("{start} > {stop}"),
+                        expected: "USEABLE_START_TIME no later than USEABLE_STOP_TIME".into(),
+                        line: None,
+                    }
+                    .at_path("useable_start_time"),
+                );
             }
         }
         None

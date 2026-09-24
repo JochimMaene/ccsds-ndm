@@ -78,8 +78,8 @@ Use the same generic API for every recognized message family:
 
 The input notation is detected automatically.
 
-OPM, OEM, and OMM support edition-correct ODM 2.0 and 3.0 output. Select an edition with
-``version="2.0"`` or ``version="3.0"``. The 2.0 checks use the official `SANA NDM/XML schema
+OPM, OEM, and OMM support edition-correct ODM 2.0 and 3.0 output. The message's ``version``
+attribute selects the edition, for example ``message.version = "2.0"`` before ``to_file``. The 2.0 checks use the official `SANA NDM/XML schema
 archive <https://sanaregistry.org/r/ndmxml_unqualified/>`_. OPM and OEM ODM 1.0 remain parse-only
 because they do not have an audited schema-backed serializer; attempted relabeling is rejected.
 

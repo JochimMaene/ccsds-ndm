@@ -185,7 +185,9 @@ class TestNdm:
         opm = (root / "ccsds-ndm/data/kvn/opm_g1.kvn").read_text()
 
         for format_hint in (None, "kvn"):
-            with pytest.raises(ValueError, match="expected NDM, found OPM"):
+            with pytest.raises(
+                ccsds_ndm.NdmUnsupportedMessageError, match="expected NDM, found OPM"
+            ):
                 CombinedNdm.from_str(opm, format=format_hint)
 
     def test_ndm_roundtrip_xml(self):

@@ -139,9 +139,9 @@ fn rejects_number_format_kvn() {
 fn rejects_invalid_tca_kvn() {
     let input = mutated(KVN, "TCA = 2025-01-02T12:00:00", "TCA = NOT_A_DATE");
     let error = Cdm::from_kvn(&input).unwrap_err();
-    assert!(
-        matches!(error, ccsds_ndm::error::CcsdsNdmError::Epoch(_)),
-        "{error}"
-    );
+    // A bad KVN time tag is located like any other bad value.
+    assert_eq!(error.code(), Some("parse.kvn.syntax"), "{error}");
+    let kvn = crate::common::kvn_parse_error(&error).expect("a located KVN error");
+    assert_eq!((kvn.line, kvn.column), (7, 7), "{error}");
     assert!(error.to_string().contains("NOT_A_DATE"));
 }

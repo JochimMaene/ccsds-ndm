@@ -35,7 +35,7 @@ fn wrong_record_type<T: PyTypeInfo>(py: Python<'_>, field: &str, index: usize) -
     let type_name = T::type_object(py)
         .name()
         .map_or_else(|_| "?".to_owned(), |name| name.to_string());
-    PyValueError::new_err(format!("{field}[{index}] must be {type_name}"))
+    pyo3::exceptions::PyTypeError::new_err(format!("{field}[{index}] must be {type_name}"))
 }
 
 /// Visit every record of a live Python list, in order, borrowing each as `T`.

@@ -29,9 +29,18 @@ Create an OEM from numerical data:
    message.to_file("example.oem", "kvn")
    Oem.from_file("example.oem").to_file("example.xml", "xml")
 
-Generation also validates the selected notation. For example, XML permits individual
-acceleration components and non-finite values that KVN cannot represent. NumPy arrays
-are copies; assign an edited array back to ``data.state_vector_numpy`` to update records.
+Edit a history in bulk through its NumPy copy, then assign it back:
+
+.. code-block:: python
+
+   data = message.segments[0].data
+   states = data.state_vector_numpy   # a copy: editing it alone changes nothing
+   states[:, 0] += 0.001              # for example, move X by 1 m (units are km)
+   data.state_vector_numpy = states   # updates the existing records in place
+
+``validate()`` checks the message model. Writing also checks that the chosen notation can
+represent it: XML permits individual acceleration components and non-finite values that KVN
+cannot, so a message can pass ``validate()`` and still be refused by ``to_str("kvn")``.
 Epoch strings use the metadata's time system; the library does not interpolate or convert
 frames or time scales. Parsing retains the whole history in memory.
 

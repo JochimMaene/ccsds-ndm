@@ -180,7 +180,7 @@ class TestOem:
 
         getattr(data, records).append("not a record")
         for accessor in (array, epochs):
-            with pytest.raises(ValueError, match=rf"{records}\[2\] must be"):
+            with pytest.raises(TypeError, match=rf"{records}\[2\] must be"):
                 getattr(data, accessor)
 
     def test_covariance_numpy_assignment_keeps_record_metadata(self):
@@ -204,7 +204,7 @@ class TestOem:
         assert getattr(data, records)[0].epoch == original
 
         getattr(data, records)[1] = "not a record"
-        with pytest.raises(ValueError, match=rf"{records}\[1\] must be"):
+        with pytest.raises(TypeError, match=rf"{records}\[1\] must be"):
             setattr(data, epochs, ["2024-01-01T00:00:00", "2024-01-01T00:01:00"])
         assert getattr(data, records)[0].epoch == original
 
@@ -216,7 +216,7 @@ class TestOem:
         second = getattr(data, records)[1]
 
         getattr(data, records)[1] = "not a record"
-        with pytest.raises(ValueError, match=rf"{records}\[1\] must be"):
+        with pytest.raises(TypeError, match=rf"{records}\[1\] must be"):
             setattr(data, array, before + 1)
         getattr(data, records)[1] = second
         np.testing.assert_array_equal(getattr(data, array), before)

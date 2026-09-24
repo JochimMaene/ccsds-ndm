@@ -186,7 +186,7 @@ class TestAem:
         assert data.attitude_states[0].epoch == original
 
         data.attitude_states[1] = "not an attitude state"
-        with pytest.raises(ValueError, match=r"attitude_states\[1\]"):
+        with pytest.raises(TypeError, match=r"attitude_states\[1\]"):
             data.attitude_states_epochs = [
                 "2024-01-01T00:00:00",
                 "2024-01-01T00:01:00",
@@ -205,7 +205,7 @@ class TestAem:
         # Row 0 used to be written before row 1's bad element raised.
         data.attitude_states[1] = "not an attitude state"
         with pytest.raises(
-            ValueError, match=r"attitude_states\[1\] must be AttitudeState"
+            TypeError, match=r"attitude_states\[1\] must be AttitudeState"
         ):
             data.attitude_states_numpy = np.full((2, 4), 0.5)
         assert state1.values == [0.0, 0.0, 0.0, 1.0]

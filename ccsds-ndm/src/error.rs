@@ -358,23 +358,7 @@ impl ValidationError {
                 source,
             };
         }
-        let field = match &self {
-            Self::MissingRequiredField { field, .. } | Self::InvalidValue { field, .. } => {
-                field.as_ref()
-            }
-            Self::OutOfRange { name, .. } => name.as_ref(),
-            Self::InvalidChoice { .. } => return self.at_path(parent_path),
-            Self::Conflict { .. } | Self::Generic { .. } | Self::AtPath { .. } => return self,
-        };
-        let field = field.to_ascii_lowercase();
-        let field = match field.strip_suffix(" units") {
-            Some(field) => format!("{field}.units"),
-            None => field
-                .replace([' ', '/'], "_")
-                .replace(['(', ')'], "")
-                .replace("_at_least_one_required", ""),
-        };
-        self.at_path(format!("{parent_path}.{field}"))
+        self.at_path(parent_path)
     }
 
     fn set_line_if_missing(&mut self, line: usize) {

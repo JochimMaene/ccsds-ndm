@@ -573,8 +573,16 @@ impl Oem {
         })
     }
 
-    /// Validate the message against CCSDS rules.
+    /// Validate the message model against CCSDS rules.
     ///
+    /// Writing additionally checks that the chosen notation can represent the message: XML
+    /// allows values KVN cannot, such as ``NaN`` states, so ``to_str("kvn")`` may still refuse
+    /// a message that passes this check.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     If the message breaks a CCSDS rule.
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
         crate::api::validate_message(py, &self.to_core(py)?)
     }

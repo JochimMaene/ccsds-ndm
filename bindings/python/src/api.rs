@@ -57,14 +57,15 @@ pub fn notation(format: &str) -> PyResult<Notation> {
     }
 }
 
-fn expect_typed<T: FromMessage>(message: Message) -> PyResult<T> {
+/// Reject a message of another family; `origin` names the file it was read from, if any.
+fn expect_typed<T: FromMessage>(message: Message, origin: Option<&Path>) -> PyResult<T> {
     let actual = message.kind();
     T::from_message_type(message).ok_or_else(|| {
-        PyValueError::new_err(format!(
-            "expected {}, found {}",
-            T::KIND.as_str(),
-            actual.as_str()
-        ))
+        let found = format!("expected {}, found {}", T::KIND.as_str(), actual.as_str());
+        crate::errors::NdmUnsupportedMessageError::new_err(match origin {
+            Some(path) => format!("{}: {found}", path.display()),
+            None => found,
+        })
     })
 }
 
@@ -81,7 +82,7 @@ pub fn parse_typed<T: FromMessage>(
     let message = py
         .detach(|| ccsds_ndm::from_str_with_notation(data, notation))
         .map_err(ccsds_error_to_pyerr)?;
-    expect_typed(message)
+    expect_typed(message, None)
 }
 
 pub fn parse_typed_file<T: FromMessage>(
@@ -92,8 +93,10 @@ pub fn parse_typed_file<T: FromMessage>(
     let notation = selected_notation(format)?;
     let message = py
         .detach(|| ccsds_ndm::from_file_with_notation(path, notation))
-        .map_err(ccsds_error_to_pyerr)?;
-    expect_typed(message)
+        .map_err(|error| {
+            crate::errors::file_parse_error_to_pyerr(error, Some(path), notation, Some(T::KIND))
+        })?;
+    expect_typed(message, Some(path))
 }
 
 pub fn validate_message<T: Validate + Sync>(py: Python<'_>, message: &T) -> PyResult<()> {
@@ -120,7 +123,7 @@ pub fn generate_file(py: Python<'_>, message: &Message, path: &Path, format: &st
         Notation::Kvn => message.to_kvn_file(path),
         Notation::Xml => message.to_xml_file(path),
     })
-    .map_err(ccsds_error_to_pyerr)
+    .map_err(|error| crate::errors::file_error_to_pyerr(error, path))
 }
 
 fn unsupported_format(format: &str) -> PyErr {

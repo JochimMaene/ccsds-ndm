@@ -42,3 +42,29 @@ def test_numpy_inputs_name_their_expected_dimensions():
     ):
         with pytest.raises(ValueError, match=r"must be a 2-D array; got shape"):
             call()
+
+
+def test_errors_carry_their_file_and_family(tmp_path):
+    import errno
+    from pathlib import Path
+
+    import ccsds_ndm
+    from ccsds_ndm import Oem
+
+    missing = tmp_path / "missing.oem"
+    with pytest.raises(ccsds_ndm.NdmIoError) as excinfo:
+        Oem.from_file(missing)
+    assert excinfo.value.errno == errno.ENOENT
+    assert excinfo.value.filename == str(missing)
+
+    kvn = Path(__file__).resolve().parents[3] / "ccsds-ndm" / "data" / "kvn"
+    opm = kvn / "opm_g1.kvn"
+    with pytest.raises(
+        ccsds_ndm.NdmUnsupportedMessageError, match="expected OEM, found OPM"
+    ):
+        Oem.from_file(opm)
+
+    # NdmEpochError is a ValueError, so existing handlers keep working.
+    metadata = Oem.from_file(kvn / "oem_g11.kvn").segments[0].metadata
+    with pytest.raises(ccsds_ndm.NdmEpochError):
+        metadata.start_time = "not an epoch"

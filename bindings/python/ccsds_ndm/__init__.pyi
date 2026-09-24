@@ -10319,7 +10319,16 @@ class Oem:
     def __repr__(self) -> builtins.str: ...
     def validate(self) -> None:
         r"""
-        Validate the message against CCSDS rules.
+        Validate the message model against CCSDS rules.
+
+        Writing additionally checks that the chosen notation can represent the message: XML
+        allows values KVN cannot, such as ``NaN`` states, so ``to_str("kvn")`` may still refuse
+        a message that passes this check.
+
+        Raises
+        ------
+        NdmValidationError
+            If the message breaks a CCSDS rule.
         """
     @staticmethod
     def from_str(

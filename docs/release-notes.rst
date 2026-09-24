@@ -21,6 +21,23 @@ Python threading and parsing fixes
 - Passing a NumPy array with the wrong number of dimensions now raises
   ``ValueError`` naming the input and its shape, instead of
   ``TypeError: 'ndarray' object is not an instance of 'ndarray'``.
+- A malformed KVN time tag is now a located KVN syntax error
+  (``parse.kvn.syntax`` with line and column) in every family, like a malformed
+  number, instead of an unlocated epoch error.
+- OEM metadata errors report real field paths (for example
+  ``metadata.start_time``) instead of names derived from the message text.
+- OEM useable spans are checked for real overlap: segments no longer have to be
+  in time order, and only complete spans are compared.
+- OEM KVN rejects a second covariance ``EPOCH`` before its matrix, naming that
+  line.
+- OEM KVN generation no longer allocates per covariance matrix when
+  ``COV_REF_FRAME`` is set.
+- Python: a wrong element type in a record list raises ``TypeError`` instead of
+  ``ValueError`` (breaking). Reading a file of another family raises
+  ``NdmUnsupportedMessageError`` naming the file instead of ``ValueError``
+  (breaking). Epoch strings rejected by constructors and setters raise
+  ``NdmEpochError``, still a ``ValueError``. ``NdmIoError`` carries ``errno``
+  and ``filename`` (and ``filename2`` for ``convert_file``).
 
 Book-aligned OEM and XML parsing (breaking change)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -125,8 +142,7 @@ trailing blanks, which the book makes insignificant.
 Python docstrings now carry the CCSDS book reference of every field whose core
 documentation has one.
 
-Earlier OEM corrections in this release: covariance epochs must lie within the
-total metadata span; KVN interpolation degrees accept a leading plus and must
+Earlier OEM corrections in this release: KVN interpolation degrees accept a leading plus and must
 fit a positive signed 32-bit integer; malformed optional OEM XML numbers and
 epochs raise errors instead of being treated as absent; OEM optional strings and
 shared ODM header strings retain literal content, including ``n/a``; shared XML

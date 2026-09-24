@@ -24,7 +24,7 @@ OEM KVN reading also accepts an unterminated last line and numbers with more tha
 | OEM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | **Verified** |
 | OPM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
 | OEM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | **Verified** |
-| OEM 1.0 | Parse only | Parse only | Yes | Yes | Available |
+| OEM 1.0 | Parse only | Not defined (rejected) | Yes | Yes | Available |
 | OMM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | **Verified** |
 | OMM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
 | OCM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
