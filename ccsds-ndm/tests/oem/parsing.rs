@@ -905,8 +905,9 @@ fn producer_style_kvn_parses_and_writes_back_within_the_digit_limit() {
     // Real OEM producers commonly align keywords, use CRLF, write 17-digit shortest round-trip
     // doubles and omit the final line terminator. Reading accepts all of it; see "More lenient
     // than the book" in docs/conformance/oem-3.0.md.
-    let source = include_str!("fixtures/producer_style.oem");
-    assert!(source.contains("\r\n") && !source.ends_with('\n'));
+    // The end-of-file hook terminates committed fixtures, so drop the final line ending here.
+    let source = include_str!("fixtures/producer_style.oem").trim_end_matches(['\r', '\n']);
+    assert!(source.contains("\r\n"));
     let message = Oem::from_kvn(source).unwrap();
     let data = &message.body.segment[0].data;
     assert_eq!(data.state_vector.len(), 3);

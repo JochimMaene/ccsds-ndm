@@ -2380,3 +2380,21 @@ pub fn validate_version(kind: ccsds_ndm::validation::MessageKind, value: &str) -
     }
     Ok(())
 }
+
+/// View a caller's NumPy input as a matrix, naming the input and its actual shape when it is not
+/// two-dimensional instead of failing inside NumPy's typed extraction.
+pub(crate) fn matrix_view<'a>(
+    array: &'a numpy::PyReadonlyArrayDyn<'_, f64>,
+    what: &str,
+) -> PyResult<numpy::ndarray::ArrayView2<'a, f64>> {
+    use numpy::PyUntypedArrayMethods;
+    array
+        .as_array()
+        .into_dimensionality::<numpy::ndarray::Ix2>()
+        .map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err(format!(
+                "{what} must be a 2-D array; got shape {:?}",
+                array.shape()
+            ))
+        })
+}

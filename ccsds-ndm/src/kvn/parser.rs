@@ -826,6 +826,22 @@ pub fn expect_key<'a>(
     expect_kv(expected_key, kvn_value_only)
 }
 
+/// Parses a keyword whose value never carries units, such as a `CCSDS_xxx_VERS` line or an
+/// epoch, rejecting a bracketed unit instead of silently dropping it.
+pub fn expect_unitless_key<'a>(
+    expected_key: &'static str,
+) -> impl FnMut(&mut &'a str) -> KvnResult<&'a str> {
+    move |input: &mut &'a str| {
+        let line_start = *input;
+        let (value, unit) = expect_key(expected_key).parse_next(input)?;
+        if unit.is_some() {
+            *input = line_start.trim_start_matches([' ', '\t']);
+            return Err(cut_err(input, "units are not allowed on this keyword"));
+        }
+        Ok(value)
+    }
+}
+
 fn kvn_value_only<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     take_till(0.., |c: char| c == '[' || c == '\r' || c == '\n')
         .map(|s: &str| s.trim())

@@ -4,6 +4,24 @@ Release notes
 Unreleased
 ----------
 
+Python threading and parsing fixes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Python parsing, validation, generation, conversion and file I/O now release
+  the GIL while the Rust core runs, so other Python threads keep running.
+  Building and reading Python objects still holds it.
+- KVN version lines (``CCSDS_xxx_VERS``) and APM ``EPOCH`` reject a bracketed
+  unit instead of silently dropping it, in every family.
+- OEM segments whose XML TIME_SYSTEM differs only by surrounding whitespace,
+  such as ``UTC`` padded with spaces, now count as one time system. The
+  original text is kept.
+- XML output writes unit-bearing values of very large or very small magnitude
+  in exponent form (``1e+308`` instead of 309 digits); every value still reads
+  back exactly.
+- Passing a NumPy array with the wrong number of dimensions now raises
+  ``ValueError`` naming the input and its shape, instead of
+  ``TypeError: 'ndarray' object is not an instance of 'ndarray'``.
+
 Book-aligned OEM and XML parsing (breaking change)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

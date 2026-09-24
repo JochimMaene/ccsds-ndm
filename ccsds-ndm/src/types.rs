@@ -1080,6 +1080,11 @@ where
         Some(value) if value.is_nan() => serializer.serialize_str("NaN"),
         Some(&f64::INFINITY) => serializer.serialize_str("INF"),
         Some(&f64::NEG_INFINITY) => serializer.serialize_str("-INF"),
+        // `Display` never uses an exponent, so 1e308 would span 309 digits. Beyond the range
+        // where it stays compact, write the shortest exact exponent form instead.
+        Some(&value) if value != 0.0 && !(1e-5..1e16).contains(&value.abs()) => {
+            serializer.serialize_str(zmij::Buffer::new().format_finite(value))
+        }
         _ => value.serialize(serializer),
     }
 }
@@ -5331,6 +5336,34 @@ mod tests {
             ("Z", 0),
         ] {
             assert_eq!(fraction_digit_count(value.as_bytes()), digits, "{value}");
+        }
+    }
+
+    #[test]
+    fn xml_unit_values_use_compact_exact_spellings() {
+        #[derive(Serialize)]
+        #[serde(rename = "Wrapper")]
+        struct Wrapper {
+            #[serde(rename = "X")]
+            x: Position,
+        }
+        for (value, spelling) in [
+            (1e308, "1e+308"),
+            (-1.25e-9, "-1.25e-9"),
+            (2789.6, "2789.6"),
+            (0.00033313494, "0.00033313494"),
+            (-280.0, "-280"),
+            (0.0, "0"),
+        ] {
+            let xml = crate::xml::to_string(&Wrapper {
+                x: Position::new(value, None),
+            })
+            .unwrap();
+            assert!(
+                xml.contains(&format!("<X>{spelling}</X>")),
+                "{value}: {xml}"
+            );
+            assert_eq!(parse_xml_value::<f64>(spelling).unwrap(), value);
         }
     }
 

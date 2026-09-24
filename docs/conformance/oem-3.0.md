@@ -194,8 +194,11 @@ reading accepts them. Writing still follows the book, so everything the library 
 
 Parsing reads the whole message into memory, so memory grows with message size. Limit input size
 before reading untrusted messages. The Rust writers stream their output, but they work on a
-message already in memory. Python copies data between its objects and the Rust model, NumPy
-arrays are copies, and the GIL stays held while parsing and writing. The allocation tests check
+message already in memory. Python copies data between its objects and the Rust model, and NumPy
+arrays are copies. The Rust parsing, validation, generation, and file I/O run with the GIL
+released, so other Python threads keep running; building and reading Python objects still holds
+it. In a local measurement two threads processed large OEMs about 1.65 times as fast as one; this
+is informational, not a guarantee. The allocation tests check
 how allocations grow from 100 to 2,000 state records. They don't set a peak-memory limit.
 
 ## Verification outcome

@@ -12,9 +12,7 @@ use ccsds_ndm::types::{
     Acc, Position, PositionCovariance, PositionVelocityCovariance, Velocity, VelocityCovariance,
 };
 use numpy::ndarray::ArrayViewD;
-use numpy::{
-    AllowTypeChange, PyArray, PyArrayLike2, PyArrayLikeDyn, PyArrayMethods, PyUntypedArrayMethods,
-};
+use numpy::{AllowTypeChange, PyArray, PyArrayLikeDyn, PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -578,7 +576,7 @@ impl Oem {
     /// Validate the message against CCSDS rules.
     ///
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
-        crate::api::validate_message(&self.to_core(py)?)
+        crate::api::validate_message(py, &self.to_core(py)?)
     }
 
     /// Create an OEM message from a string.
@@ -603,7 +601,7 @@ impl Oem {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(data, format)?;
+        let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
 
@@ -617,7 +615,7 @@ impl Oem {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed_file(&path, format)?;
+        let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
 
@@ -630,7 +628,12 @@ impl Oem {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<()> {
-        crate::api::generate_file(&ccsds_ndm::Message::Oem(self.to_core(py)?), &path, format)
+        crate::api::generate_file(
+            py,
+            &ccsds_ndm::Message::Oem(self.to_core(py)?),
+            &path,
+            format,
+        )
     }
 
     /// Serialize to validated KVN or XML.
@@ -640,7 +643,7 @@ impl Oem {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<String> {
-        crate::api::generate_string(&self.to_core(py)?, format)
+        crate::api::generate_string(py, &self.to_core(py)?, format)
     }
 }
 
@@ -664,7 +667,7 @@ impl OemSegment {
 
     /// Validate the segment against CCSDS rules.
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
-        crate::api::validate_message(&self.to_core(py)?)
+        crate::api::validate_message(py, &self.to_core(py)?)
     }
 }
 
@@ -727,8 +730,8 @@ impl OemMetadata {
     }
 
     /// Validate the metadata against CCSDS rules.
-    fn validate(&self) -> PyResult<()> {
-        crate::api::validate_message(&self.inner)
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
+        crate::api::validate_message(py, &self.inner)
     }
 
     /// Spacecraft name for which ephemeris data is provided. While there is no CCSDS-based
@@ -1033,7 +1036,7 @@ impl OemData {
 
     /// Validate the data section against CCSDS rules.
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
-        crate::api::validate_message(&self.to_core(py)?)
+        crate::api::validate_message(py, &self.to_core(py)?)
     }
 
     /// Create a data section from NumPy arrays.
@@ -1079,7 +1082,7 @@ impl OemData {
         py: Python<'_>,
         state_vector_epochs: Vec<String>,
         #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
-        state_vector_numpy: PyArrayLike2<'_, f64, AllowTypeChange>,
+        state_vector_numpy: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
         covariance_matrix_epochs: Option<Vec<String>>,
         #[gen_stub(override_type(type_repr = "typing.Optional[numpy.typing.ArrayLike]", imports = ("typing", "numpy.typing")))]
         covariance_matrix_numpy: Option<PyArrayLikeDyn<'_, f64, AllowTypeChange>>,
@@ -1087,7 +1090,8 @@ impl OemData {
         cov_comments: Option<Vec<Vec<String>>>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let shape = state_vector_numpy.shape();
+        let array_view = crate::common::matrix_view(&state_vector_numpy, "State vector array")?;
+        let shape = array_view.shape();
         let has_accel = state_vector_columns(shape)?;
         if state_vector_epochs.len() != shape[0] {
             return Err(PyValueError::new_err(
@@ -1095,7 +1099,6 @@ impl OemData {
             ));
         }
 
-        let array_view = state_vector_numpy.as_array();
         let mut state_vectors = Vec::with_capacity(shape[0]);
         for (i, epoch_str) in state_vector_epochs.iter().enumerate() {
             let row = array_view.row(i);
@@ -1375,10 +1378,11 @@ impl OemData {
     fn set_state_vector_numpy(
         &mut self,
         #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
-        array: PyArrayLike2<'_, f64, AllowTypeChange>,
+        array: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
     ) -> PyResult<()> {
         Python::attach(|py| {
-            let shape = array.shape();
+            let array_view = crate::common::matrix_view(&array, "State vector array")?;
+            let shape = array_view.shape();
             let has_accel = state_vector_columns(shape)?;
             let state_vectors = self.state_vector.bind(py);
             if state_vectors.len() != shape[0] {
@@ -1387,7 +1391,6 @@ impl OemData {
                 ));
             }
 
-            let array_view = array.as_array();
             update_records(
                 state_vectors,
                 "state_vector",

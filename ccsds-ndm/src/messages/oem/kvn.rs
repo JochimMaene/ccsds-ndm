@@ -55,7 +55,7 @@ pub(super) fn to_string(oem: &Oem) -> Result<String> {
 /// Parses the OEM version line: `CCSDS_OEM_VERS = 3.0`
 pub fn oem_version(input: &mut &str) -> KvnResult<String> {
     ws.parse_next(input)?;
-    let (value, _) = expect_key("CCSDS_OEM_VERS").parse_next(input)?;
+    let value = expect_unitless_key("CCSDS_OEM_VERS").parse_next(input)?;
     Ok(value.to_string())
 }
 

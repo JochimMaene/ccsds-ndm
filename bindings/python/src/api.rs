@@ -68,35 +68,58 @@ fn expect_typed<T: FromMessage>(message: Message) -> PyResult<T> {
     })
 }
 
-pub fn parse_typed<T: FromMessage>(data: &str, format: Option<&str>) -> PyResult<T> {
-    let message = ccsds_ndm::from_str_with_notation(data, selected_notation(format)?)
+// The Rust core holds no Python objects, so parsing, validation, generation, and file I/O run
+// with the GIL released; other Python threads progress meanwhile. Converting between Python
+// objects and the core model still needs the GIL and happens in the callers.
+
+pub fn parse_typed<T: FromMessage>(
+    py: Python<'_>,
+    data: &str,
+    format: Option<&str>,
+) -> PyResult<T> {
+    let notation = selected_notation(format)?;
+    let message = py
+        .detach(|| ccsds_ndm::from_str_with_notation(data, notation))
         .map_err(ccsds_error_to_pyerr)?;
     expect_typed(message)
 }
 
-pub fn parse_typed_file<T: FromMessage>(path: &Path, format: Option<&str>) -> PyResult<T> {
-    let message = ccsds_ndm::from_file_with_notation(path, selected_notation(format)?)
+pub fn parse_typed_file<T: FromMessage>(
+    py: Python<'_>,
+    path: &Path,
+    format: Option<&str>,
+) -> PyResult<T> {
+    let notation = selected_notation(format)?;
+    let message = py
+        .detach(|| ccsds_ndm::from_file_with_notation(path, notation))
         .map_err(ccsds_error_to_pyerr)?;
     expect_typed(message)
 }
 
-pub fn validate_message<T: Validate>(message: &T) -> PyResult<()> {
-    message.validate().map_err(ccsds_error_to_pyerr)
+pub fn validate_message<T: Validate + Sync>(py: Python<'_>, message: &T) -> PyResult<()> {
+    py.detach(|| message.validate())
+        .map_err(ccsds_error_to_pyerr)
 }
 
-pub fn generate_string<T: Ndm>(message: &T, format: &str) -> PyResult<String> {
-    match notation(format)? {
+pub fn generate_string<T: Ndm + Sync>(
+    py: Python<'_>,
+    message: &T,
+    format: &str,
+) -> PyResult<String> {
+    let notation = notation(format)?;
+    py.detach(|| match notation {
         Notation::Kvn => message.to_kvn(),
         Notation::Xml => message.to_xml(),
-    }
+    })
     .map_err(ccsds_error_to_pyerr)
 }
 
-pub fn generate_file(message: &Message, path: &Path, format: &str) -> PyResult<()> {
-    match notation(format)? {
+pub fn generate_file(py: Python<'_>, message: &Message, path: &Path, format: &str) -> PyResult<()> {
+    let notation = notation(format)?;
+    py.detach(|| match notation {
         Notation::Kvn => message.to_kvn_file(path),
         Notation::Xml => message.to_xml_file(path),
-    }
+    })
     .map_err(ccsds_error_to_pyerr)
 }
 

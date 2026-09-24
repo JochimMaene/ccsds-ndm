@@ -114,3 +114,31 @@ fn section_validators_apply_the_fraction_limit_themselves() {
     data.traj[0].traj_lines[0].epoch = padded("2022-12-18T14:28:15.1172", 17).parse().unwrap();
     crate::common::assert_validation_field(&Validate::validate(&*data).unwrap_err(), "EPOCH");
 }
+
+#[test]
+fn version_lines_and_epochs_carry_no_units() {
+    // ODM 7.7 and the matching ADM, CDM, RDM, and TDM rules attach units only to quantities;
+    // a `[...]` on a version line or an epoch must not be silently dropped.
+    for (fixture, line) in [
+        ("opm_g1.kvn", "CCSDS_OPM_VERS = 3.0"),
+        ("omm_g7.kvn", "CCSDS_OMM_VERS = 3.0"),
+        ("oem_g11.kvn", "CCSDS_OEM_VERS = 3.0"),
+        ("ocm_g15.kvn", "CCSDS_OCM_VERS = 3.0"),
+        ("aem_g4.kvn", "CCSDS_AEM_VERS = 2.0"),
+        ("apm_g1.kvn", "CCSDS_APM_VERS = 2.0"),
+        ("acm_g6.kvn", "CCSDS_ACM_VERS = 2.0"),
+        ("cdm_362.kvn", "CCSDS_CDM_VERS = 1.0"),
+        ("rdm_c1.kvn", "CCSDS_RDM_VERS = 1.0"),
+        ("tdm_e1.kvn", "CCSDS_TDM_VERS = 2.0"),
+        ("apm_g1.kvn", "EPOCH = 2003-09-30T14:28:15.1172"),
+    ] {
+        let input = std::fs::read_to_string(data_dir().join("kvn").join(fixture)).unwrap();
+        from_str(&input).unwrap_or_else(|error| panic!("{fixture}: {error}"));
+        let with_units = mutated_once(&input, line, &format!("{line} [km]"));
+        let error = from_str(&with_units).expect_err(&format!("{fixture}: accepted {line} [km]"));
+        assert!(
+            error.to_string().contains("units are not allowed"),
+            "{fixture}: {error}"
+        );
+    }
+}

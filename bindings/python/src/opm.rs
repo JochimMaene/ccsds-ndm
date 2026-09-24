@@ -114,7 +114,7 @@ impl Opm {
     /// Validate the message against CCSDS rules.
     ///
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
-        crate::api::validate_message(&self.to_core(py)?)
+        crate::api::validate_message(py, &self.to_core(py)?)
     }
 
     /// Create an OPM message from a string.
@@ -127,7 +127,7 @@ impl Opm {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(data, format)?;
+        let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
 
@@ -141,7 +141,7 @@ impl Opm {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed_file(&path, format)?;
+        let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
 
@@ -154,7 +154,12 @@ impl Opm {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<()> {
-        crate::api::generate_file(&ccsds_ndm::Message::Opm(self.to_core(py)?), &path, format)
+        crate::api::generate_file(
+            py,
+            &ccsds_ndm::Message::Opm(self.to_core(py)?),
+            &path,
+            format,
+        )
     }
 
     /// Serialize to KVN or XML after mandatory CCSDS validation.
@@ -164,7 +169,7 @@ impl Opm {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<String> {
-        crate::api::generate_string(&self.to_core(py)?, format)
+        crate::api::generate_string(py, &self.to_core(py)?, format)
     }
 }
 

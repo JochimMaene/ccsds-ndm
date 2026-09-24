@@ -27,10 +27,17 @@ fn text_value_eq(left: &str, right: &str) -> bool {
 }
 
 /// Whether `TIME_SYSTEM` denotes elapsed time rather than an absolute time scale.
+/// The value with XML whitespace around it removed. XML keeps a padded xsd:string as written
+/// (8.13.5), and KVN drops the padding (7.4.7); where the books leave its meaning open, a
+/// padded value is read as the value itself while the model keeps the original text.
+fn xml_trimmed(value: &str) -> &str {
+    value.trim_matches([' ', '\t', '\r', '\n'])
+}
+
 fn is_elapsed_time_system(time_system: &str) -> bool {
     ["MET", "MRT"]
         .iter()
-        .any(|elapsed| time_system.eq_ignore_ascii_case(elapsed))
+        .any(|elapsed| xml_trimmed(time_system).eq_ignore_ascii_case(elapsed))
 }
 
 /// ODM 7.5.10 time tags: calendar or ordinal layout with at most 16 fractional digits, the
@@ -73,7 +80,7 @@ fn normative_case_error(
     let lower = value.bytes().any(|byte| byte.is_ascii_lowercase());
     let listed = book_values
         .iter()
-        .any(|listed| value.trim().eq_ignore_ascii_case(listed));
+        .any(|listed| xml_trimmed(value).eq_ignore_ascii_case(listed));
     (upper && lower && listed).then(|| ValidationError::InvalidValue {
         field: field.into(),
         value: value.to_owned(),
@@ -197,11 +204,10 @@ impl OemBody {
         };
         let metadata = &first.metadata;
         for (index, segment) in self.segment.iter().enumerate().skip(1) {
-            // ODM 5.2.4.5: one time system throughout, in either permitted case (7.5.3).
-            if !segment
-                .metadata
-                .time_system
-                .eq_ignore_ascii_case(&metadata.time_system)
+            // ODM 5.2.4.5: one time system throughout, in either permitted case (7.5.3) and
+            // regardless of XML padding.
+            if !xml_trimmed(&segment.metadata.time_system)
+                .eq_ignore_ascii_case(xml_trimmed(&metadata.time_system))
             {
                 return Err(ValidationError::InvalidValue {
                     field: "TIME_SYSTEM".into(),

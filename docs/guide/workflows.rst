@@ -37,7 +37,7 @@ Rust benchmarks.
 Editing nested Python models
 ----------------------------
 
-Nested model properties and collections are live. Change them directly:
+Nested model objects and record collections are live. Change them directly:
 
 .. code-block:: python
 
@@ -48,8 +48,23 @@ Nested model properties and collections are live. Change them directly:
    message.to_file("updated.opm", "kvn")
 
 Retained child references preserve their identity, and structural changes to repeated model fields
-such as OEM state-vector lists affect the owning message. Generation always validates the complete
-message. There is no commit step and no unchecked ``validate=False`` mode.
+such as OEM segment, state-vector, and covariance lists affect the owning message. Generation always
+validates the complete message. There is no commit step and no unchecked ``validate=False`` mode.
+
+Lists of plain values are copies, not live views: ``comment`` returns a new ``list`` of strings each
+time, so appending to it changes nothing. Assign the whole list instead:
+
+.. code-block:: python
+
+   data = message.segment.data
+   data.comment = [*data.comment, "Reprocessed"]
+
+NumPy properties such as ``state_vector_numpy`` are likewise copies; assign an array to write it back.
+
+Model objects cannot be copied with :mod:`copy` or serialized with :mod:`pickle`. To duplicate a
+message, generate and parse it again, for example ``Oem.from_str(message.to_str("xml"), "xml")``.
+That round trip validates and normalizes, so it only duplicates a complete, valid message, and it
+keeps only what the chosen notation represents.
 
 Converting notation
 -------------------

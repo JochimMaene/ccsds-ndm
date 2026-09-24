@@ -7,8 +7,7 @@ use ccsds_ndm::messages::cdm as core_cdm;
 use ccsds_ndm::types::{self as core_types, *};
 use ccsds_ndm::Validate;
 use numpy::{
-    AllowTypeChange, PyArray1, PyArray2, PyArrayLike2, PyArrayLikeDyn, PyReadonlyArray2,
-    PyUntypedArrayMethods,
+    AllowTypeChange, PyArray1, PyArray2, PyArrayLikeDyn, PyReadonlyArrayDyn, PyUntypedArrayMethods,
 };
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -41,11 +40,12 @@ fn validate_unit<T: Default + std::fmt::Display + PartialEq>(
 }
 
 fn build_cdm_covariance_from_array(
-    array: &PyReadonlyArray2<f64>,
+    array: &PyReadonlyArrayDyn<f64>,
     comment: Vec<String>,
 ) -> PyResult<core_cdm::CdmCovarianceMatrix> {
-    let shape = array.shape();
-    if shape.len() != 2 || shape[0] != shape[1] {
+    let a = crate::common::matrix_view(array, "Covariance matrix")?;
+    let shape = a.shape();
+    if shape[0] != shape[1] {
         return Err(PyValueError::new_err(
             "Covariance matrix must be a square 2D array",
         ));
@@ -56,8 +56,6 @@ fn build_cdm_covariance_from_array(
             "Covariance matrix must be 6x6, 7x7, 8x8, or 9x9",
         ));
     }
-
-    let a = array.as_array();
 
     Ok(core_cdm::CdmCovarianceMatrix {
         comment,
@@ -285,7 +283,7 @@ impl Cdm {
     /// Validate the message against CCSDS rules.
     ///
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
-        crate::api::validate_message(&self.to_core(py)?)
+        crate::api::validate_message(py, &self.to_core(py)?)
     }
 
     /// Parse a CDM from a string with optional format.
@@ -309,7 +307,7 @@ impl Cdm {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(data, format)?;
+        let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
 
@@ -323,7 +321,7 @@ impl Cdm {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed_file(&path, format)?;
+        let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
 
@@ -336,7 +334,12 @@ impl Cdm {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<()> {
-        crate::api::generate_file(&ccsds_ndm::Message::Cdm(self.to_core(py)?), &path, format)
+        crate::api::generate_file(
+            py,
+            &ccsds_ndm::Message::Cdm(self.to_core(py)?),
+            &path,
+            format,
+        )
     }
 
     /// Serialize to validated KVN or XML.
@@ -346,7 +349,7 @@ impl Cdm {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<String> {
-        crate::api::generate_string(&self.to_core(py)?, format)
+        crate::api::generate_string(py, &self.to_core(py)?, format)
     }
 
     #[setter]
@@ -1988,7 +1991,7 @@ impl CdmData {
         #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
         state_vector: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
         #[gen_stub(override_type(type_repr = "typing.Optional[numpy.typing.ArrayLike]", imports = ("typing", "numpy.typing")))]
-        covariance_matrix: Option<PyArrayLike2<'_, f64, AllowTypeChange>>,
+        covariance_matrix: Option<PyArrayLikeDyn<'_, f64, AllowTypeChange>>,
         od_parameters: Option<OdParameters>,
         additional_parameters: Option<AdditionalParameters>,
         comment: Option<Vec<String>>,
@@ -2100,7 +2103,7 @@ impl CdmData {
     fn set_covariance_matrix_numpy(
         &mut self,
         #[gen_stub(override_type(type_repr = "typing.Optional[numpy.typing.ArrayLike]", imports = ("typing", "numpy.typing")))]
-        array: Option<PyArrayLike2<'_, f64, AllowTypeChange>>,
+        array: Option<PyArrayLikeDyn<'_, f64, AllowTypeChange>>,
     ) -> PyResult<()> {
         Python::attach(|py| {
             match array {
@@ -3062,7 +3065,7 @@ impl CdmCovarianceMatrix {
     #[pyo3(signature = (array, comment=None))]
     fn from_numpy(
         #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
-        array: PyArrayLike2<'_, f64, AllowTypeChange>,
+        array: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         let inner = build_cdm_covariance_from_array(&array, comment.unwrap_or_default())?;

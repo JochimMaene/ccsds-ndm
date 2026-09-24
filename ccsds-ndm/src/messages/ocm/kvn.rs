@@ -31,7 +31,7 @@ use winnow::stream::Offset;
 pub fn ocm_version(input: &mut &str) -> KvnResult<String> {
     ws.parse_next(input)?;
     let _ = collect_comments.parse_next(input)?;
-    let (value, _) = expect_key("CCSDS_OCM_VERS").parse_next(input)?;
+    let value = expect_unitless_key("CCSDS_OCM_VERS").parse_next(input)?;
     Ok(value.to_string())
 }
 

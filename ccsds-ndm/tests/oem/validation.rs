@@ -346,3 +346,26 @@ fn epoch_fractions_stop_at_the_fixed_point_maximum() {
     message.header.creation_date = "2019-11-04T17:22:31.33100000000000000".parse().unwrap();
     crate::common::assert_validation_field(&message.validate().unwrap_err(), "CREATION_DATE");
 }
+
+#[test]
+fn padded_time_systems_denote_the_same_time_system() {
+    // XML keeps a padded xsd:string as written (8.13.5); the time system it names is read
+    // without the padding, which the model preserves.
+    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    message.body.segment[1].metadata.time_system = " UTC\n".into();
+    message.validate().unwrap();
+    let reparsed = Oem::from_xml(&message.to_xml().unwrap()).unwrap();
+    assert_eq!(reparsed.body.segment[1].metadata.time_system, " UTC\n");
+
+    // A padded elapsed time system still selects duration epochs (3.2.3.2).
+    message.body.segment.truncate(1);
+    let metadata = &mut message.body.segment[0].metadata;
+    metadata.time_system = " MET ".into();
+    metadata.start_time = epoch("0000-000T00:00:00");
+    metadata.useable_start_time = None;
+    metadata.useable_stop_time = None;
+    metadata.stop_time = epoch("0000-400T00:00:00");
+    message.body.segment[0].data.state_vector.truncate(1);
+    message.body.segment[0].data.state_vector[0].epoch = epoch("0000-000T00:10:00");
+    message.validate().unwrap();
+}

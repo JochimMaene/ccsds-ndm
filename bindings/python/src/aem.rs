@@ -9,7 +9,7 @@ use crate::errors::ccsds_error_to_pyerr;
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::aem as core_aem;
 use ccsds_ndm::types::{AttitudeTypeType, RotSeq};
-use numpy::{AllowTypeChange, PyArray, PyArrayLike2, PyArrayMethods, PyUntypedArrayMethods};
+use numpy::{AllowTypeChange, PyArray, PyArrayLikeDyn, PyArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -146,7 +146,7 @@ impl Aem {
     /// Validate the message against CCSDS rules.
     ///
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
-        crate::api::validate_message(&self.to_core(py)?)
+        crate::api::validate_message(py, &self.to_core(py)?)
     }
 
     /// Serialize to validated KVN or XML.
@@ -156,7 +156,7 @@ impl Aem {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<String> {
-        crate::api::generate_string(&self.to_core(py)?, format)
+        crate::api::generate_string(py, &self.to_core(py)?, format)
     }
 
     #[staticmethod]
@@ -167,7 +167,7 @@ impl Aem {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(data, format)?;
+        let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
 
@@ -181,7 +181,7 @@ impl Aem {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed_file(&path, format)?;
+        let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
 
@@ -194,7 +194,12 @@ impl Aem {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<()> {
-        crate::api::generate_file(&ccsds_ndm::Message::Aem(self.to_core(py)?), &path, format)
+        crate::api::generate_file(
+            py,
+            &ccsds_ndm::Message::Aem(self.to_core(py)?),
+            &path,
+            format,
+        )
     }
 }
 
@@ -803,11 +808,12 @@ impl AemData {
         py: Python<'_>,
         epochs: Vec<String>,
         #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
-        array: PyArrayLike2<'_, f64, AllowTypeChange>,
+        array: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
         attitude_type: String,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let shape = array.shape();
+        let array_view = crate::common::matrix_view(&array, "Attitude state array")?;
+        let shape = array_view.shape();
         if epochs.len() != shape[0] {
             return Err(PyValueError::new_err(
                 "Number of epochs must match number of rows in NumPy array",
@@ -823,7 +829,6 @@ impl AemData {
             )));
         }
 
-        let array_view = array.as_array();
         let mut attitude_states = Vec::with_capacity(shape[0]);
 
         for (i, epoch_str) in epochs.iter().enumerate() {
@@ -957,10 +962,11 @@ impl AemData {
     fn set_attitude_states_numpy(
         &mut self,
         #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
-        array: PyArrayLike2<'_, f64, AllowTypeChange>,
+        array: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
     ) -> PyResult<()> {
         Python::attach(|py| {
-            let shape = array.shape();
+            let array_view = crate::common::matrix_view(&array, "Attitude state array")?;
+            let shape = array_view.shape();
             let states = self.attitude_states.bind(py);
             if states.is_empty() {
                 return Err(PyValueError::new_err(
@@ -980,7 +986,6 @@ impl AemData {
                     expected_cols
                 )));
             }
-            let array_view = array.as_array();
             update_records(
                 states,
                 "attitude_states",
