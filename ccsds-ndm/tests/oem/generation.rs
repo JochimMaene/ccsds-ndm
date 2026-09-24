@@ -51,6 +51,8 @@ fn every_shipped_fixture_generates_deterministic_xsd_valid_xml_and_reparseable_k
         let xml = message.to_xml().unwrap();
         assert_eq!(message.to_xml().unwrap(), xml);
         validate_xml(&name, &xml);
+        // Each OEM value has one fixed unit, and the schema makes `units` optional.
+        assert!(!xml.contains("units="), "{name}");
         assert_eq!(Oem::from_xml(&xml).unwrap(), message);
 
         let kvn = message.to_kvn().unwrap();

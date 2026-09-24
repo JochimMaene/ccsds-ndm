@@ -1089,6 +1089,35 @@ where
     }
 }
 
+/// Serialize a fixed-unit [`UnitValue`] as its value alone. Where the schema's `units`
+/// attribute is optional and allows a single unit, it restates the implied unit, and the ODM
+/// examples omit it.
+pub(crate) fn serialize_without_units<V, U, S>(
+    value: &UnitValue<V, U>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error>
+where
+    V: Serialize + 'static,
+    S: serde::Serializer,
+{
+    serialize_xml_value(&value.value, serializer)
+}
+
+/// [`serialize_without_units`] for an optional element, which the field skips when absent.
+pub(crate) fn serialize_optional_without_units<V, U, S>(
+    value: &Option<UnitValue<V, U>>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error>
+where
+    V: Serialize + 'static,
+    S: serde::Serializer,
+{
+    match value {
+        Some(value) => serialize_without_units(value, serializer),
+        None => serializer.serialize_none(),
+    }
+}
+
 /// Parse a [`UnitValue`] value from decoded XML text. Surrounding XML whitespace is collapsed;
 /// special values must use the xsd:double spellings `INF`, `-INF`, and `NaN` (ODM 8.13.4),
 /// which Rust's float parser would otherwise extend with `inf`, `+infinity`, `nan`, ...

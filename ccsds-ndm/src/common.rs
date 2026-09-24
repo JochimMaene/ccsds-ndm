@@ -472,6 +472,7 @@ pub struct StateVectorAcc {
     /// **Units**: km
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub x: Position,
 
     /// Position vector Y-component.
@@ -479,6 +480,7 @@ pub struct StateVectorAcc {
     /// **Units**: km
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub y: Position,
 
     /// Position vector Z-component.
@@ -486,6 +488,7 @@ pub struct StateVectorAcc {
     /// **Units**: km
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub z: Position,
 
     /// Velocity vector X-component.
@@ -493,6 +496,7 @@ pub struct StateVectorAcc {
     /// **Units**: km/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub x_dot: Velocity,
 
     /// Velocity vector Y-component.
@@ -500,6 +504,7 @@ pub struct StateVectorAcc {
     /// **Units**: km/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub y_dot: Velocity,
 
     /// Velocity vector Z-component.
@@ -507,6 +512,7 @@ pub struct StateVectorAcc {
     /// **Units**: km/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub z_dot: Velocity,
 
     /// Acceleration vector X-component.
@@ -514,7 +520,11 @@ pub struct StateVectorAcc {
     /// **Units**: km/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::types::serialize_optional_without_units"
+    )]
     pub x_ddot: Option<Acc>,
 
     /// Acceleration vector Y-component.
@@ -522,7 +532,11 @@ pub struct StateVectorAcc {
     /// **Units**: km/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::types::serialize_optional_without_units"
+    )]
     pub y_ddot: Option<Acc>,
 
     /// Acceleration vector Z-component.
@@ -530,7 +544,11 @@ pub struct StateVectorAcc {
     /// **Units**: km/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::types::serialize_optional_without_units"
+    )]
     pub z_ddot: Option<Acc>,
 }
 

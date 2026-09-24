@@ -820,36 +820,42 @@ pub struct OemCovarianceMatrix {
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cx_x: PositionCovariance,
     /// Covariance matrix `[2,1]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cy_x: PositionCovariance,
     /// Covariance matrix `[2,2]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cy_y: PositionCovariance,
     /// Covariance matrix `[3,1]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cz_x: PositionCovariance,
     /// Covariance matrix `[3,2]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cz_y: PositionCovariance,
     /// Covariance matrix `[3,3]`
     ///
     /// **Units**: km²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cz_z: PositionCovariance,
 
     /// Covariance matrix `[4,1]`
@@ -857,24 +863,28 @@ pub struct OemCovarianceMatrix {
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cx_dot_x: PositionVelocityCovariance,
     /// Covariance matrix `[4,2]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cx_dot_y: PositionVelocityCovariance,
     /// Covariance matrix `[4,3]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cx_dot_z: PositionVelocityCovariance,
     /// Covariance matrix `[4,4]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cx_dot_x_dot: VelocityCovariance,
 
     /// Covariance matrix `[5,1]`
@@ -882,30 +892,35 @@ pub struct OemCovarianceMatrix {
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cy_dot_x: PositionVelocityCovariance,
     /// Covariance matrix `[5,2]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cy_dot_y: PositionVelocityCovariance,
     /// Covariance matrix `[5,3]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cy_dot_z: PositionVelocityCovariance,
     /// Covariance matrix `[5,4]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cy_dot_x_dot: VelocityCovariance,
     /// Covariance matrix `[5,5]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cy_dot_y_dot: VelocityCovariance,
 
     /// Covariance matrix `[6,1]`
@@ -913,36 +928,42 @@ pub struct OemCovarianceMatrix {
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cz_dot_x: PositionVelocityCovariance,
     /// Covariance matrix `[6,2]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cz_dot_y: PositionVelocityCovariance,
     /// Covariance matrix `[6,3]`
     ///
     /// **Units**: km²/s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cz_dot_z: PositionVelocityCovariance,
     /// Covariance matrix `[6,4]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cz_dot_x_dot: VelocityCovariance,
     /// Covariance matrix `[6,5]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cz_dot_y_dot: VelocityCovariance,
     /// Covariance matrix `[6,6]`
     ///
     /// **Units**: km²/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.5.
+    #[serde(serialize_with = "crate::types::serialize_without_units")]
     pub cz_dot_z_dot: VelocityCovariance,
 }
 

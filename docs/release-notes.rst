@@ -32,6 +32,10 @@ Python threading and parsing fixes
   line.
 - OEM KVN generation no longer allocates per covariance matrix when
   ``COV_REF_FRAME`` is set.
+- OEM XML output no longer writes ``units`` attributes on state and covariance
+  values. The schema makes them optional and each value has a single fixed
+  unit, so the output is smaller and parsing it back needs no per-value
+  allocations. Input with ``units`` is still accepted and checked.
 - Python: a wrong element type in a record list raises ``TypeError`` instead of
   ``ValueError`` (breaking). Reading a file of another family raises
   ``NdmUnsupportedMessageError`` naming the file instead of ``ValueError``

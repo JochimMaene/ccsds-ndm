@@ -277,9 +277,9 @@ class TestOem:
         assert np.allclose(array[0, :6], [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
         assert np.allclose(array[1, :6], [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
 
-    def test_acceleration_setters_keep_explicit_units(self):
-        # Both edit paths update an existing acceleration in place, so explicit
-        # XML units survive; a six-column array removes the accelerations.
+    def test_acceleration_setters_edit_explicit_unit_input(self):
+        # Both edit paths update an existing acceleration read with explicit XML
+        # units; a six-column array removes the accelerations.
         xml = (DATA_DIR / "xml/oem_g14.xml").read_text()
         xml = xml.replace("<X_DDOT>", '<X_DDOT units="km/s**2">')
         oem = Oem.from_str(xml, "xml")
@@ -288,9 +288,8 @@ class TestOem:
         record.x_ddot = 0.5
         data.state_vector_numpy = data.state_vector_numpy
         assert data.state_vector[0].x_ddot == 0.5
-        assert oem.to_str("xml").count('<X_DDOT units="km/s**2">') == xml.count(
-            "<X_DDOT "
-        )
+        # Each acceleration has one fixed unit, so the output omits the attribute.
+        assert oem.to_str("xml").count("<X_DDOT>") == xml.count("<X_DDOT ")
 
         data.state_vector_numpy = data.state_vector_numpy[:, :6]
         assert all(state.x_ddot is None for state in data.state_vector)
