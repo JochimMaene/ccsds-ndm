@@ -1889,9 +1889,7 @@ class AemData:
         :type: numpy.ndarray
         """
     @attitude_states_numpy.setter
-    def attitude_states_numpy(
-        self, value: numpy.typing.NDArray[numpy.float64]
-    ) -> None: ...
+    def attitude_states_numpy(self, value: numpy.typing.ArrayLike) -> None: ...
     def __new__(
         cls,
         attitude_states: typing.Sequence[AttitudeState],
@@ -1906,7 +1904,7 @@ class AemData:
     @staticmethod
     def from_numpy(
         epochs: typing.Sequence[builtins.str],
-        array: numpy.typing.NDArray[numpy.float64],
+        array: numpy.typing.ArrayLike,
         attitude_type: builtins.str,
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> AemData: ...
@@ -3759,7 +3757,7 @@ class CdmCovarianceMatrix:
     ) -> CdmCovarianceMatrix: ...
     @staticmethod
     def from_numpy(
-        array: numpy.typing.NDArray[numpy.float64],
+        array: numpy.typing.ArrayLike,
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> CdmCovarianceMatrix: ...
     def to_numpy(self) -> numpy.typing.NDArray[numpy.float64]:
@@ -3855,9 +3853,7 @@ class CdmData:
         :type: numpy.ndarray
         """
     @state_vector_numpy.setter
-    def state_vector_numpy(
-        self, value: numpy.typing.NDArray[numpy.float64]
-    ) -> None: ...
+    def state_vector_numpy(self, value: numpy.typing.ArrayLike) -> None: ...
     @property
     def covariance_matrix_numpy(self) -> numpy.typing.NDArray[numpy.float64]:
         r"""
@@ -3870,7 +3866,7 @@ class CdmData:
         """
     @covariance_matrix_numpy.setter
     def covariance_matrix_numpy(
-        self, value: typing.Optional[numpy.typing.NDArray[numpy.float64]]
+        self, value: typing.Optional[numpy.typing.ArrayLike]
     ) -> None: ...
     def __new__(
         cls,
@@ -3882,8 +3878,8 @@ class CdmData:
     ) -> CdmData: ...
     @staticmethod
     def from_numpy(
-        state_vector: numpy.typing.NDArray[numpy.float64],
-        covariance_matrix: typing.Optional[numpy.typing.NDArray[numpy.float64]] = None,
+        state_vector: numpy.typing.ArrayLike,
+        covariance_matrix: typing.Optional[numpy.typing.ArrayLike] = None,
         od_parameters: typing.Optional[OdParameters] = None,
         additional_parameters: typing.Optional[AdditionalParameters] = None,
         comments: typing.Optional[typing.Sequence[builtins.str]] = None,
@@ -4520,7 +4516,7 @@ class CdmStateVector:
         comments: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> CdmStateVector: ...
     @staticmethod
-    def from_numpy(array: numpy.typing.NDArray[numpy.float64]) -> CdmStateVector: ...
+    def from_numpy(array: numpy.typing.ArrayLike) -> CdmStateVector: ...
     def __repr__(self) -> builtins.str: ...
     def to_numpy(self) -> numpy.typing.NDArray[numpy.float64]:
         r"""
@@ -10748,7 +10744,7 @@ class OemCovarianceMatrix:
     def __new__(
         cls,
         epoch: builtins.str,
-        values: numpy.typing.NDArray[numpy.float64],
+        values: numpy.typing.ArrayLike,
         cov_ref_frame: typing.Optional[builtins.str] = None,
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> OemCovarianceMatrix: ...
@@ -10765,7 +10761,7 @@ class OemData:
         List of state vectors.
     covariance_matrices : list[OemCovarianceMatrix], optional
         Covariance matrices.
-    comments : list[str], optional
+    comment : list[str], optional
         Comments.
     """
     @property
@@ -10807,6 +10803,8 @@ class OemData:
         r"""
         Epochs for state vectors (ISO 8601).
 
+        The list is a copy; assigning a list of the same length updates the records in place.
+
         :type: list[str]
         """
     @state_vector_epochs.setter
@@ -10836,6 +10834,8 @@ class OemData:
         r"""
         Epochs for covariance matrices (ISO 8601).
 
+        The list is a copy; assigning a list of the same length updates the records in place.
+
         :type: list[str]
         """
     @covariance_matrix_epochs.setter
@@ -10847,7 +10847,13 @@ class OemData:
         r"""
         State vectors as a NumPy array.
 
-        Use `state_vector_epochs` for the corresponding epochs.
+        Use `state_vector_epochs` for the corresponding epochs. The array is a copy: editing it
+        changes nothing until it is assigned back. Assigning updates the existing records in place
+        and needs one row per record. A six-column array removes any accelerations.
+
+        In the nine-column form a NaN acceleration means "absent", so a record whose acceleration
+        is an explicit NaN (possible in XML, ODM 8.13.4) loses that value when the array is assigned
+        back. Use the `state_vector` records to edit such values losslessly.
 
         Returns
         -------
@@ -10864,15 +10870,14 @@ class OemData:
         :type: numpy.ndarray
         """
     @state_vector_numpy.setter
-    def state_vector_numpy(
-        self, value: numpy.typing.NDArray[numpy.float64]
-    ) -> None: ...
+    def state_vector_numpy(self, value: numpy.typing.ArrayLike) -> None: ...
     @property
     def covariance_matrix_numpy(self) -> numpy.typing.NDArray[numpy.float64]:
         r"""
         Get covariance matrices as a NumPy array.
 
-        Use `covariance_matrix_epochs` for the corresponding epochs.
+        Use `covariance_matrix_epochs` for the corresponding epochs. The array is a copy: editing
+        it changes nothing until it is assigned back, which needs one matrix per record.
 
         The returned array is a 3D tensor of shape (N, 6, 6), where N is the number of covariance
         matrices. Each 6x6 matrix is symmetric and constructed from the lower-triangular CCSDS data.
@@ -10882,16 +10887,14 @@ class OemData:
         :type: numpy.ndarray
         """
     @covariance_matrix_numpy.setter
-    def covariance_matrix_numpy(
-        self, value: numpy.typing.NDArray[numpy.float64]
-    ) -> None: ...
+    def covariance_matrix_numpy(self, value: numpy.typing.ArrayLike) -> None: ...
     def __new__(
         cls,
         state_vectors: typing.Sequence[StateVectorAcc],
         covariance_matrices: typing.Optional[
             typing.Sequence[OemCovarianceMatrix]
         ] = None,
-        comments: typing.Optional[typing.Sequence[builtins.str]] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> OemData: ...
     def __repr__(self) -> builtins.str: ...
     def validate(self) -> None:
@@ -10901,18 +10904,16 @@ class OemData:
     @staticmethod
     def from_numpy(
         state_vector_epochs: typing.Sequence[builtins.str],
-        state_vector_numpy: numpy.typing.NDArray[numpy.float64],
+        state_vector_numpy: numpy.typing.ArrayLike,
         covariance_matrix_epochs: typing.Optional[typing.Sequence[builtins.str]] = None,
-        covariance_matrix_numpy: typing.Optional[
-            numpy.typing.NDArray[numpy.float64]
-        ] = None,
+        covariance_matrix_numpy: typing.Optional[numpy.typing.ArrayLike] = None,
         cov_ref_frames: typing.Optional[
             typing.Sequence[typing.Optional[builtins.str]]
         ] = None,
         cov_comments: typing.Optional[
             typing.Sequence[typing.Sequence[builtins.str]]
         ] = None,
-        comments: typing.Optional[typing.Sequence[builtins.str]] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> OemData:
         r"""
         Create a data section from NumPy arrays.
@@ -10936,7 +10937,7 @@ class OemData:
             Reference frame of each covariance matrix.
         cov_comments : list[list[str]], optional
             Comments of each covariance matrix.
-        comments : list[str], optional
+        comment : list[str], optional
             Comments for the data section.
 
         Returns
@@ -10956,16 +10957,16 @@ class OemMetadata:
         Spacecraft name for which orbit state data is provided.
     object_id : str
         Object identifier of the object for which orbit state data is provided.
+    start_time : str
+        Start time of the total time span covered by the ephemeris data (ISO 8601).
+    stop_time : str
+        Stop time of the total time span covered by the ephemeris data (ISO 8601).
     center_name : str
         Origin of the reference frame.
     ref_frame : str
         Reference frame in which state vector data is given.
     time_system : str
         Time system used for state vector, maneuver, and covariance data.
-    start_time : str
-        Start time of the total time span covered by the ephemeris data (ISO 8601).
-    stop_time : str
-        Stop time of the total time span covered by the ephemeris data (ISO 8601).
     ref_frame_epoch : str, optional
         Epoch of the reference frame, if not intrinsic to the definition (ISO 8601).
     useable_start_time : str, optional

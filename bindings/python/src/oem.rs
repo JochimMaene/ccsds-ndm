@@ -12,7 +12,9 @@ use ccsds_ndm::types::{
     Acc, Position, PositionCovariance, PositionVelocityCovariance, Velocity, VelocityCovariance,
 };
 use numpy::ndarray::ArrayViewD;
-use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
+use numpy::{
+    AllowTypeChange, PyArray, PyArrayLike2, PyArrayLikeDyn, PyArrayMethods, PyUntypedArrayMethods,
+};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -195,13 +197,12 @@ fn write_state_row(
     state.y_dot.value = value_at(4);
     state.z_dot.value = value_at(5);
     let write_accel = |slot: &mut Option<Acc>, index: usize| {
-        let value = has_accel
-            .then(|| value_at(index))
-            .filter(|value| !value.is_nan());
-        match (slot.as_mut(), value) {
-            (Some(acc), Some(value)) => acc.value = value,
-            (_, value) => *slot = value.map(|value| Acc::new(value, None)),
-        }
+        crate::common::set_acceleration(
+            slot,
+            has_accel
+                .then(|| value_at(index))
+                .filter(|value| !value.is_nan()),
+        );
     };
     write_accel(&mut state.x_ddot, 6);
     write_accel(&mut state.y_ddot, 7);
@@ -361,16 +362,16 @@ impl OemSegment {
 ///     Spacecraft name for which orbit state data is provided.
 /// object_id : str
 ///     Object identifier of the object for which orbit state data is provided.
+/// start_time : str
+///     Start time of the total time span covered by the ephemeris data (ISO 8601).
+/// stop_time : str
+///     Stop time of the total time span covered by the ephemeris data (ISO 8601).
 /// center_name : str
 ///     Origin of the reference frame.
 /// ref_frame : str
 ///     Reference frame in which state vector data is given.
 /// time_system : str
 ///     Time system used for state vector, maneuver, and covariance data.
-/// start_time : str
-///     Start time of the total time span covered by the ephemeris data (ISO 8601).
-/// stop_time : str
-///     Stop time of the total time span covered by the ephemeris data (ISO 8601).
 /// ref_frame_epoch : str, optional
 ///     Epoch of the reference frame, if not intrinsic to the definition (ISO 8601).
 /// useable_start_time : str, optional
@@ -398,7 +399,7 @@ pub struct OemMetadata {
 ///     List of state vectors.
 /// covariance_matrices : list[OemCovarianceMatrix], optional
 ///     Covariance matrices.
-/// comments : list[str], optional
+/// comment : list[str], optional
 ///     Comments.
 #[gen_stub_pyclass]
 #[pyclass]
@@ -1008,16 +1009,16 @@ impl OemMetadata {
 #[pymethods]
 impl OemData {
     #[new]
-    #[pyo3(signature = (state_vectors, covariance_matrices=None, comments=None))]
+    #[pyo3(signature = (state_vectors, covariance_matrices=None, comment=None))]
     fn new(
         py: Python<'_>,
         state_vectors: Vec<Py<StateVectorAcc>>,
         covariance_matrices: Option<Vec<Py<OemCovarianceMatrix>>>,
-        comments: Option<Vec<String>>,
+        comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         Ok(Self {
             state_vector: PyList::new(py, state_vectors)?.unbind(),
-            comment: comments.unwrap_or_default(),
+            comment: comment.unwrap_or_default(),
             covariance_matrix: PyList::new(py, covariance_matrices.unwrap_or_default())?.unbind(),
         })
     }
@@ -1056,7 +1057,7 @@ impl OemData {
     ///     Reference frame of each covariance matrix.
     /// cov_comments : list[list[str]], optional
     ///     Comments of each covariance matrix.
-    /// comments : list[str], optional
+    /// comment : list[str], optional
     ///     Comments for the data section.
     ///
     /// Returns
@@ -1071,18 +1072,20 @@ impl OemData {
         covariance_matrix_numpy=None,
         cov_ref_frames=None,
         cov_comments=None,
-        comments=None
+        comment=None
     ))]
     #[allow(clippy::too_many_arguments)]
     fn from_numpy(
         py: Python<'_>,
         state_vector_epochs: Vec<String>,
-        state_vector_numpy: PyReadonlyArray2<f64>,
+        #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
+        state_vector_numpy: PyArrayLike2<'_, f64, AllowTypeChange>,
         covariance_matrix_epochs: Option<Vec<String>>,
-        covariance_matrix_numpy: Option<PyReadonlyArrayDyn<f64>>,
+        #[gen_stub(override_type(type_repr = "typing.Optional[numpy.typing.ArrayLike]", imports = ("typing", "numpy.typing")))]
+        covariance_matrix_numpy: Option<PyArrayLikeDyn<'_, f64, AllowTypeChange>>,
         cov_ref_frames: Option<Vec<Option<String>>>,
         cov_comments: Option<Vec<Vec<String>>>,
-        comments: Option<Vec<String>>,
+        comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         let shape = state_vector_numpy.shape();
         let has_accel = state_vector_columns(shape)?;
@@ -1162,7 +1165,7 @@ impl OemData {
             py,
             core_oem::OemData {
                 state_vector: state_vectors,
-                comment: comments.unwrap_or_default(),
+                comment: comment.unwrap_or_default(),
                 covariance_matrix: covariance_matrices,
             },
         )
@@ -1194,6 +1197,8 @@ impl OemData {
 
     /// Epochs for state vectors (ISO 8601).
     ///
+    /// The list is a copy; assigning a list of the same length updates the records in place.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_state_vector_epochs(&self, py: Python<'_>) -> PyResult<Vec<String>> {
@@ -1208,11 +1213,6 @@ impl OemData {
     fn set_state_vector_epochs(&mut self, epochs: Vec<String>) -> PyResult<()> {
         Python::attach(|py| {
             let state_vectors = self.state_vector.bind(py);
-            if state_vectors.is_empty() {
-                return Err(PyValueError::new_err(
-                    "Cannot set epochs when no state vectors exist; create states first",
-                ));
-            }
             if epochs.len() != state_vectors.len() {
                 return Err(PyValueError::new_err(
                     "Number of epochs must match number of state vectors",
@@ -1262,6 +1262,8 @@ impl OemData {
 
     /// Epochs for covariance matrices (ISO 8601).
     ///
+    /// The list is a copy; assigning a list of the same length updates the records in place.
+    ///
     /// :type: list[str]
     #[getter]
     fn get_covariance_matrix_epochs(&self, py: Python<'_>) -> PyResult<Vec<String>> {
@@ -1276,11 +1278,6 @@ impl OemData {
     fn set_covariance_matrix_epochs(&mut self, epochs: Vec<String>) -> PyResult<()> {
         Python::attach(|py| {
             let covariance_matrices = self.covariance_matrix.bind(py);
-            if covariance_matrices.is_empty() {
-                return Err(PyValueError::new_err(
-                    "Cannot set epochs when no covariance matrices exist; create matrices first",
-                ));
-            }
             if epochs.len() != covariance_matrices.len() {
                 return Err(PyValueError::new_err(
                     "Number of epochs must match number of covariance matrices",
@@ -1301,7 +1298,13 @@ impl OemData {
 
     /// State vectors as a NumPy array.
     ///
-    /// Use `state_vector_epochs` for the corresponding epochs.
+    /// Use `state_vector_epochs` for the corresponding epochs. The array is a copy: editing it
+    /// changes nothing until it is assigned back. Assigning updates the existing records in place
+    /// and needs one row per record. A six-column array removes any accelerations.
+    ///
+    /// In the nine-column form a NaN acceleration means "absent", so a record whose acceleration
+    /// is an explicit NaN (possible in XML, ODM 8.13.4) loses that value when the array is assigned
+    /// back. Use the `state_vector` records to edit such values losslessly.
     ///
     /// Returns
     /// -------
@@ -1369,16 +1372,15 @@ impl OemData {
     }
 
     #[setter]
-    fn set_state_vector_numpy(&mut self, array: PyReadonlyArray2<f64>) -> PyResult<()> {
+    fn set_state_vector_numpy(
+        &mut self,
+        #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
+        array: PyArrayLike2<'_, f64, AllowTypeChange>,
+    ) -> PyResult<()> {
         Python::attach(|py| {
             let shape = array.shape();
             let has_accel = state_vector_columns(shape)?;
             let state_vectors = self.state_vector.bind(py);
-            if state_vectors.is_empty() {
-                return Err(PyValueError::new_err(
-                    "No state vectors exist; create states or use from_numpy",
-                ));
-            }
             if state_vectors.len() != shape[0] {
                 return Err(PyValueError::new_err(
                     "Number of rows must match number of state vectors",
@@ -1399,7 +1401,8 @@ impl OemData {
 
     /// Get covariance matrices as a NumPy array.
     ///
-    /// Use `covariance_matrix_epochs` for the corresponding epochs.
+    /// Use `covariance_matrix_epochs` for the corresponding epochs. The array is a copy: editing
+    /// it changes nothing until it is assigned back, which needs one matrix per record.
     ///
     /// The returned array is a 3D tensor of shape (N, 6, 6), where N is the number of covariance
     /// matrices. Each 6x6 matrix is symmetric and constructed from the lower-triangular CCSDS data.
@@ -1436,18 +1439,17 @@ impl OemData {
     }
 
     #[setter]
-    fn set_covariance_matrix_numpy(&mut self, array: PyReadonlyArrayDyn<f64>) -> PyResult<()> {
+    fn set_covariance_matrix_numpy(
+        &mut self,
+        #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
+        array: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
+    ) -> PyResult<()> {
         Python::attach(|py| {
             let (layout, num_matrices) = CovarianceLayout::of(array.shape())?;
             let covariance_matrices = self.covariance_matrix.bind(py);
-            if covariance_matrices.is_empty() {
-                return Err(PyValueError::new_err(
-                    "No covariance matrices exist; create matrices or use from_numpy",
-                ));
-            }
             if covariance_matrices.len() != num_matrices {
                 return Err(PyValueError::new_err(
-                    "Number of matrices must match number of covariance epochs",
+                    "Number of matrices in the array must match number of covariance matrices",
                 ));
             }
 
@@ -1470,7 +1472,8 @@ impl OemCovarianceMatrix {
     #[pyo3(signature = (epoch, values, cov_ref_frame=None, comment=None))]
     fn new(
         epoch: String,
-        values: PyReadonlyArrayDyn<f64>,
+        #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
+        values: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
         cov_ref_frame: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {

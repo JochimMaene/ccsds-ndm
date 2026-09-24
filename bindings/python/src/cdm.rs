@@ -6,7 +6,10 @@ use crate::common::{parse_object_description, ObjectDescription, OdParameters};
 use ccsds_ndm::messages::cdm as core_cdm;
 use ccsds_ndm::types::{self as core_types, *};
 use ccsds_ndm::Validate;
-use numpy::{PyArray1, PyArray2, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
+use numpy::{
+    AllowTypeChange, PyArray1, PyArray2, PyArrayLike2, PyArrayLikeDyn, PyReadonlyArray2,
+    PyUntypedArrayMethods,
+};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -1982,8 +1985,10 @@ impl CdmData {
     ))]
     fn from_numpy(
         py: Python<'_>,
-        state_vector: PyReadonlyArrayDyn<f64>,
-        covariance_matrix: Option<PyReadonlyArray2<f64>>,
+        #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
+        state_vector: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
+        #[gen_stub(override_type(type_repr = "typing.Optional[numpy.typing.ArrayLike]", imports = ("typing", "numpy.typing")))]
+        covariance_matrix: Option<PyArrayLike2<'_, f64, AllowTypeChange>>,
         od_parameters: Option<OdParameters>,
         additional_parameters: Option<AdditionalParameters>,
         comments: Option<Vec<String>>,
@@ -2060,7 +2065,11 @@ impl CdmData {
     }
 
     #[setter]
-    fn set_state_vector_numpy(&mut self, array: PyReadonlyArrayDyn<f64>) -> PyResult<()> {
+    fn set_state_vector_numpy(
+        &mut self,
+        #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
+        array: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
+    ) -> PyResult<()> {
         Python::attach(|py| {
             let state = CdmStateVector::from_numpy(array)?;
             self.state_vector.borrow_mut(py).inner = state.inner;
@@ -2090,7 +2099,8 @@ impl CdmData {
     #[setter]
     fn set_covariance_matrix_numpy(
         &mut self,
-        array: Option<PyReadonlyArray2<f64>>,
+        #[gen_stub(override_type(type_repr = "typing.Optional[numpy.typing.ArrayLike]", imports = ("typing", "numpy.typing")))]
+        array: Option<PyArrayLike2<'_, f64, AllowTypeChange>>,
     ) -> PyResult<()> {
         Python::attach(|py| {
             match array {
@@ -2177,7 +2187,10 @@ impl CdmStateVector {
     }
 
     #[staticmethod]
-    fn from_numpy(array: PyReadonlyArrayDyn<f64>) -> PyResult<Self> {
+    fn from_numpy(
+        #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
+        array: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
+    ) -> PyResult<Self> {
         let shape = array.shape();
         let values = if shape.len() == 1 && shape[0] == 6 {
             let v = array.as_array();
@@ -3047,7 +3060,11 @@ impl CdmCovarianceMatrix {
 
     #[staticmethod]
     #[pyo3(signature = (array, comment=None))]
-    fn from_numpy(array: PyReadonlyArray2<f64>, comment: Option<Vec<String>>) -> PyResult<Self> {
+    fn from_numpy(
+        #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
+        array: PyArrayLike2<'_, f64, AllowTypeChange>,
+        comment: Option<Vec<String>>,
+    ) -> PyResult<Self> {
         let inner = build_cdm_covariance_from_array(&array, comment.unwrap_or_default())?;
         Ok(Self { inner })
     }

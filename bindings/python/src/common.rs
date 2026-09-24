@@ -385,6 +385,14 @@ impl AdmHeader {
     }
 }
 
+/// Write an acceleration value, keeping any explicit XML units already on the record.
+pub(crate) fn set_acceleration(slot: &mut Option<Acc>, value: Option<f64>) {
+    match (slot.as_mut(), value) {
+        (Some(acc), Some(value)) => acc.value = value,
+        (_, value) => *slot = value.map(|value| Acc::new(value, None)),
+    }
+}
+
 /// State Vector Components in the Specified Coordinate System.
 ///
 /// Parameters
@@ -622,10 +630,7 @@ impl StateVectorAcc {
 
     #[setter]
     fn set_x_ddot(&mut self, value: Option<f64>) {
-        self.inner.x_ddot = value.map(|v| Acc {
-            value: v,
-            units: None,
-        });
+        set_acceleration(&mut self.inner.x_ddot, value);
     }
 
     /// Acceleration vector Y-component.
@@ -642,10 +647,7 @@ impl StateVectorAcc {
 
     #[setter]
     fn set_y_ddot(&mut self, value: Option<f64>) {
-        self.inner.y_ddot = value.map(|v| Acc {
-            value: v,
-            units: None,
-        });
+        set_acceleration(&mut self.inner.y_ddot, value);
     }
 
     /// Acceleration vector Z-component.
@@ -662,10 +664,7 @@ impl StateVectorAcc {
 
     #[setter]
     fn set_z_ddot(&mut self, value: Option<f64>) {
-        self.inner.z_ddot = value.map(|v| Acc {
-            value: v,
-            units: None,
-        });
+        set_acceleration(&mut self.inner.z_ddot, value);
     }
 }
 

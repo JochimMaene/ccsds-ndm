@@ -9,7 +9,7 @@ use crate::errors::ccsds_error_to_pyerr;
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::aem as core_aem;
 use ccsds_ndm::types::{AttitudeTypeType, RotSeq};
-use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
+use numpy::{AllowTypeChange, PyArray, PyArrayLike2, PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -802,7 +802,8 @@ impl AemData {
     fn from_numpy(
         py: Python<'_>,
         epochs: Vec<String>,
-        array: PyReadonlyArray2<f64>,
+        #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
+        array: PyArrayLike2<'_, f64, AllowTypeChange>,
         attitude_type: String,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
@@ -953,7 +954,11 @@ impl AemData {
     }
 
     #[setter]
-    fn set_attitude_states_numpy(&mut self, array: PyReadonlyArray2<f64>) -> PyResult<()> {
+    fn set_attitude_states_numpy(
+        &mut self,
+        #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
+        array: PyArrayLike2<'_, f64, AllowTypeChange>,
+    ) -> PyResult<()> {
         Python::attach(|py| {
             let shape = array.shape();
             let states = self.attitude_states.bind(py);

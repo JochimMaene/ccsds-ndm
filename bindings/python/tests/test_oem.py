@@ -6,6 +6,8 @@
 Unit tests for Orbit Ephemeris Message (OEM) Python bindings.
 """
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -19,6 +21,8 @@ from ccsds_ndm import (
     OemSegment,
     StateVectorAcc,
 )
+
+DATA_DIR = Path(__file__).resolve().parents[3] / "ccsds-ndm/data"
 
 
 # Each OEM data section carries two parallel histories with the same accessor
@@ -95,7 +99,7 @@ class TestOem:
         cov_args = np.array([1.0] * 21, dtype=float)
         cov = OemCovarianceMatrix("2023-01-01T00:00:00", cov_args, "EME2000", [])
 
-        data = OemData(state_vectors=[vec], comments=None)
+        data = OemData(state_vectors=[vec], comment=None)
         data.covariance_matrix = [cov]
 
         seg = OemSegment(meta, data)
@@ -118,7 +122,7 @@ class TestOem:
             state_vector_numpy=state,
             covariance_matrix_epochs=cov_epochs,
             covariance_matrix_numpy=cov,
-            comments=[],
+            comment=[],
         )
 
         assert data.state_vector_epochs == epochs
@@ -131,11 +135,17 @@ class TestOem:
         assert np.allclose(data.state_vector_numpy, new_state)
 
     def test_epoch_setters_do_not_create_records(self):
-        data = OemData(state_vectors=[], covariance_matrices=[], comments=[])
-        with pytest.raises(ValueError, match="no state vectors"):
+        data = OemData(state_vectors=[], covariance_matrices=[], comment=[])
+        with pytest.raises(ValueError, match="must match"):
             data.state_vector_epochs = ["2023-01-01T00:00:00"]
-        with pytest.raises(ValueError, match="no covariance matrices"):
+        with pytest.raises(ValueError, match="must match"):
             data.covariance_matrix_epochs = ["2023-01-01T00:00:00"]
+        # Assigning an empty snapshot back to empty data is a no-op, not an error.
+        data.state_vector_epochs = data.state_vector_epochs
+        data.covariance_matrix_epochs = data.covariance_matrix_epochs
+        data.state_vector_numpy = data.state_vector_numpy
+        data.covariance_matrix_numpy = data.covariance_matrix_numpy
+        assert data.state_vector == [] and data.covariance_matrix == []
 
     def _numpy_data(self):
         epochs = ["2023-01-01T00:00:00", "2023-01-01T00:01:00"]
@@ -257,7 +267,7 @@ class TestOem:
             **common,
         )
 
-        data = OemData(state_vectors=[without, with_accel], comments=None)
+        data = OemData(state_vectors=[without, with_accel], comment=None)
         array = data.state_vector_numpy
 
         assert array.shape == (2, 9)
@@ -267,8 +277,55 @@ class TestOem:
         assert np.allclose(array[0, :6], [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
         assert np.allclose(array[1, :6], [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
 
+    def test_acceleration_setters_keep_explicit_units(self):
+        # Both edit paths update an existing acceleration in place, so explicit
+        # XML units survive; a six-column array removes the accelerations.
+        xml = (DATA_DIR / "xml/oem_g14.xml").read_text()
+        xml = xml.replace("<X_DDOT>", '<X_DDOT units="km/s**2">')
+        oem = Oem.from_str(xml, "xml")
+        data = oem.segments[0].data
+        record = data.state_vector[0]
+        record.x_ddot = 0.5
+        data.state_vector_numpy = data.state_vector_numpy
+        assert data.state_vector[0].x_ddot == 0.5
+        assert oem.to_str("xml").count('<X_DDOT units="km/s**2">') == xml.count("<X_DDOT ")
+
+        data.state_vector_numpy = data.state_vector_numpy[:, :6]
+        assert all(state.x_ddot is None for state in data.state_vector)
+
+    def test_numpy_inputs_accept_integer_arrays_and_lists(self):
+        epochs = ["2023-01-01T00:00:00"]
+        rows = [[7000, 0, 0, 0, 7, 0]]
+        for state in (rows, np.array(rows)):
+            data = OemData.from_numpy(epochs, state)
+            assert data.state_vector_numpy.dtype == np.float64
+            assert np.array_equal(data.state_vector_numpy, rows)
+        data.state_vector_numpy = [[1, 2, 3, 4, 5, 6]]
+        assert data.state_vector[0].x == 1.0
+        data.covariance_matrix = [OemCovarianceMatrix(epochs[0], list(range(21)))]
+        data.covariance_matrix_numpy = np.ones((1, 21), dtype=int)
+        assert data.covariance_matrix[0].cz_dot_z_dot == 1.0
+
+    def test_covariance_fields_follow_the_kvn_row_order(self):
+        # ODM 5.2.5.4: the rows hold the lower triangle row by row. Read the raw
+        # numbers from the file so the check does not depend on the bindings.
+        kvn = (DATA_DIR / "kvn/oem_g13.kvn").read_text()
+        block = kvn.split("COVARIANCE_START")[1].splitlines()
+        rows = [line for line in block if line and "=" not in line][:6]
+        values = [float(value) for row in rows for value in row.split()]
+        matrix = Oem.from_str(kvn, "kvn").segments[0].data.covariance_matrix[0]
+        names = [
+            "cx_x", "cy_x", "cy_y", "cz_x", "cz_y", "cz_z",
+            "cx_dot_x", "cx_dot_y", "cx_dot_z", "cx_dot_x_dot",
+            "cy_dot_x", "cy_dot_y", "cy_dot_z", "cy_dot_x_dot", "cy_dot_y_dot",
+            "cz_dot_x", "cz_dot_y", "cz_dot_z", "cz_dot_x_dot", "cz_dot_y_dot", "cz_dot_z_dot",
+        ]  # fmt: skip
+        assert [getattr(matrix, name) for name in names] == values
+        full = Oem.from_str(kvn, "kvn").segments[0].data.covariance_matrix_numpy[0]
+        assert full[np.tril_indices(6)].tolist() == values
+
     def test_empty_state_history_keeps_the_six_column_shape(self):
-        data = OemData(state_vectors=[], comments=None)
+        data = OemData(state_vectors=[], comment=None)
         assert data.state_vector_numpy.shape == (0, 6)
 
     def test_full_covariance_inputs_read_the_lower_triangle(self):
@@ -346,7 +403,7 @@ class TestOem:
         data = OemData.from_numpy(
             state_vector_epochs=list(epochs),
             state_vector_numpy=strided,
-            comments=[],
+            comment=[],
         )
         assert np.allclose(data.state_vector_numpy, strided)
 
@@ -367,7 +424,7 @@ class TestOem:
         data_nine = OemData.from_numpy(
             state_vector_epochs=list(epochs),
             state_vector_numpy=strided_nine,
-            comments=[],
+            comment=[],
         )
         assert np.allclose(data_nine.state_vector_numpy, strided_nine)
 
