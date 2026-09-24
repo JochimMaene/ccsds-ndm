@@ -122,6 +122,7 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
 //----------------------------------------------------------------------
 
 /// True when only a line ending, or the end of input, remains of the current record.
+/// Normalization keeps CRLF pairs, so a carriage return can still start one.
 fn at_record_end(input: &str) -> bool {
     input.is_empty() || input.starts_with('\n') || input.starts_with('\r')
 }
@@ -220,15 +221,8 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
 
 /// Parses a single covariance matrix (within COVARIANCE_START/STOP block).
 fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
-    let checkpoint = input.checkpoint();
-    let key = key_token
-        .parse_next(input)
-        .map_err(|_| cut_err(input, "Expected EPOCH in covariance matrix"))?;
-
-    if key != "EPOCH" {
-        input.reset(&checkpoint);
-        return Err(cut_err(input, "Expected EPOCH in covariance matrix"));
-    }
+    // `validate_syntax` has already placed EPOCH first in every matrix.
+    key_token.parse_next(input)?;
 
     let epoch = kv_epoch.parse_next(input)?;
 
