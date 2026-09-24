@@ -288,7 +288,9 @@ class TestOem:
         record.x_ddot = 0.5
         data.state_vector_numpy = data.state_vector_numpy
         assert data.state_vector[0].x_ddot == 0.5
-        assert oem.to_str("xml").count('<X_DDOT units="km/s**2">') == xml.count("<X_DDOT ")
+        assert oem.to_str("xml").count('<X_DDOT units="km/s**2">') == xml.count(
+            "<X_DDOT "
+        )
 
         data.state_vector_numpy = data.state_vector_numpy[:, :6]
         assert all(state.x_ddot is None for state in data.state_vector)
