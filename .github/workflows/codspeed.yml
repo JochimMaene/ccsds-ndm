@@ -18,12 +18,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup rust toolchain, cache and cargo-codspeed binary
+      - name: Setup rust toolchain and cache
         uses: moonrepo/setup-rust@v0
         with:
           channel: 1.90.0
           cache-target: release
-          bins: cargo-codspeed
+
+      # Install from the published lockfile: unlocked builds pick up dependency releases that
+      # need a newer rustc than the pinned toolchain (cargo-platform 0.3.3 requires 1.91).
+      - name: Install cargo-codspeed
+        run: cargo install cargo-codspeed --version 5.0.2 --locked
 
       - uses: taiki-e/install-action@just
 
