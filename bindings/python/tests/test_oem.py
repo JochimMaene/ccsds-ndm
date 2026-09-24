@@ -6,6 +6,7 @@
 Unit tests for Orbit Ephemeris Message (OEM) Python bindings.
 """
 
+import re
 from pathlib import Path
 
 import numpy as np
@@ -273,6 +274,22 @@ class TestOem:
         assert np.allclose(array[0, :6], [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
         assert np.allclose(array[1, :6], [7000.0, 0.0, 0.0, 0.0, 7.5, 0.0])
 
+    def test_nan_accelerations_are_absent_in_the_numpy_form(self):
+        # An explicit XML NaN acceleration (8.13.4) survives in the records, but
+        # the nine-column array reads NaN as absent, so assigning it back drops it.
+        xml = (DATA_DIR / "xml/oem_g14.xml").read_text()
+        xml = re.sub(
+            r"<X_DDOT>0.008</X_DDOT>\s*<Y_DDOT>0.001</Y_DDOT>\s*<Z_DDOT>-0.159</Z_DDOT>",
+            "<X_DDOT>NaN</X_DDOT><Y_DDOT>NaN</Y_DDOT><Z_DDOT>NaN</Z_DDOT>",
+            xml,
+            count=1,
+        )
+        data = Oem.from_str(xml, "xml").segments[0].data
+        assert np.isnan(data.state_vector[0].x_ddot)
+        data.state_vector_numpy = data.state_vector_numpy
+        assert data.state_vector[0].x_ddot is None
+        assert data.state_vector[1].x_ddot == 0.008
+
     def test_acceleration_setters_edit_explicit_unit_input(self):
         # Both edit paths update an existing acceleration read with explicit XML
         # units; a six-column array removes the accelerations.
@@ -382,6 +399,9 @@ class TestOem:
 
         meta.interpolation_degree = None
         assert meta.interpolation_degree is None
+        # A method still requires its degree (Table 5-3).
+        with pytest.raises(NdmValidationError, match="INTERPOLATION_DEGREE"):
+            meta.validate()
 
         oem = self._create_valid_oem()
         oem.segments[0].metadata.interpolation = "LINEAR"

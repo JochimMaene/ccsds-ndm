@@ -54,6 +54,14 @@ fn every_shipped_fixture_generates_deterministic_xsd_valid_xml_and_reparseable_k
         let xml = message.to_xml().unwrap();
         assert_eq!(message.to_xml().unwrap(), xml);
         validate_xml(&name, &xml);
+        // NDM/XML 4.2-4.3: the exact declaration, then a root declaring both namespaces.
+        let root = format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<oem \
+             xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" \
+             xmlns:ndm=\"urn:ccsds:schema:ndmxml\" id=\"CCSDS_OEM_VERS\" version=\"{}\">",
+            message.version
+        );
+        assert!(xml.starts_with(&root), "{name}");
         // Each OEM value has one fixed unit, and the schema makes `units` optional.
         assert!(!xml.contains("units="), "{name}");
         assert_eq!(Oem::from_xml(&xml).unwrap(), message);

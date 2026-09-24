@@ -916,11 +916,97 @@ fn oem_1_0_is_read_as_kvn_only_without_later_content() {
         assert_eq!(error.field_path().as_deref(), Some(path), "{label}: {error}");
     }
 
+    // Valid 1.0 content that the 2.0 rules reject.
+    for (label, input, path) in [
+        (
+            "Julian Date epoch",
+            mutated_once(
+                &kvn,
+                "START_TIME = 2019-12-18T12:00:00.331",
+                "START_TIME = 2451534.29812",
+            ),
+            Some("body.segment[0].metadata.start_time"),
+        ),
+        (
+            "mixed-case time system",
+            mutated_once(&kvn, "TIME_SYSTEM = UTC", "TIME_SYSTEM = Utc"),
+            Some("body.segment[0].metadata.time_system"),
+        ),
+        (
+            "metadata comment",
+            mutated_once(&kvn, "TIME_SYSTEM = UTC", "COMMENT x\nTIME_SYSTEM = UTC"),
+            None,
+        ),
+    ] {
+        let error = Oem::from_kvn(&input).unwrap_err();
+        assert_eq!(error.field_path().as_deref(), path, "{label}: {error}");
+        if path.is_none() {
+            assert_eq!(error.code(), Some("parse.kvn.syntax"), "{label}: {error}");
+        }
+    }
+
     let xml = mutated_once(XML, "version=\"3.0\"", "version=\"1.0\"");
     assert_eq!(
         Oem::from_xml(&xml).unwrap_err().code(),
         Some("parse.unsupported_input_version")
     );
+}
+
+#[test]
+fn documented_xml_readings() {
+    // Attribute order carries no meaning in XML, so 8.3.6's "last attributes" is not checked.
+    let reordered = mutated_once(
+        XML,
+        "id=\"CCSDS_OEM_VERS\" version=\"3.0\"",
+        "version=\"3.0\" id=\"CCSDS_OEM_VERS\"",
+    );
+    assert_eq!(
+        Oem::from_xml(&reordered).unwrap(),
+        Oem::from_xml(XML).unwrap()
+    );
+
+    // Stricter than the schema: `xsi:type` is not tracked, and degrees above u32::MAX are
+    // not held.
+    let typed = mutated_once(
+        XML,
+        "<OBJECT_NAME>",
+        "<OBJECT_NAME xsi:type=\"xsd:string\">",
+    );
+    crate::common::assert_invalid_format(
+        &Oem::from_xml(&typed).unwrap_err(),
+        "invalid OEM XML sequence: unknown attribute 'xsi:type' on 'OBJECT_NAME'",
+    );
+    let degree = mutated_once(
+        XML,
+        "<INTERPOLATION_DEGREE>7<",
+        "<INTERPOLATION_DEGREE>4294967296<",
+    );
+    assert_eq!(
+        Oem::from_xml(&degree).unwrap_err().code(),
+        Some("parse.xml.syntax")
+    );
+}
+
+#[test]
+fn documented_kvn_readings() {
+    // The shared header parser keeps an empty CLASSIFICATION or MESSAGE_ID as "".
+    let source = KVN_FIXTURES[2];
+    let message_id = source
+        .lines()
+        .find(|line| line.starts_with("MESSAGE_ID"))
+        .unwrap();
+    let empty = mutated_once(source, "CREATION_DATE", "CLASSIFICATION =\nCREATION_DATE");
+    let empty = mutated_once(&empty, message_id, "MESSAGE_ID =");
+    let header = Oem::from_kvn(&empty).unwrap().header;
+    assert_eq!(header.classification.as_deref(), Some(""));
+    assert_eq!(header.message_id.as_deref(), Some(""));
+
+    // The note to ODM 2.0 6.5.5 excludes -0, but producers write it and it loses nothing.
+    let negative_zero = mutated_once(KVN_FIXTURES[0], "-280.045", "-0.000000");
+    let state = &Oem::from_kvn(&negative_zero).unwrap().body.segment[0]
+        .data
+        .state_vector[0];
+    assert!(state.y.value == 0.0 && state.y.value.is_sign_negative());
 }
 
 #[test]

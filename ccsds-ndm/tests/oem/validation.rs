@@ -81,12 +81,16 @@ fn object_identity_compares_ccsds_text_values_without_rewriting_them() {
 
 #[test]
 fn oem_time_tags_are_absolute_and_metadata_ranges_are_consistent() {
-    let mut message = Oem::from_xml(XML).unwrap();
-    message.body.segment[0].data.state_vector[0].epoch = epoch("123.5");
-    assert_eq!(
-        message.validate().unwrap_err().field_path().as_deref(),
-        Some("body.segment[0].data.state_vector[0].epoch")
-    );
+    // 7.5.10 time tags: no bare numbers and, unlike the schema's epochType, no zone offsets.
+    for value in ["123.5", "2019-12-18T12:00:00.331+01:00"] {
+        let mut message = Oem::from_xml(XML).unwrap();
+        message.body.segment[0].data.state_vector[0].epoch = epoch(value);
+        assert_eq!(
+            message.validate().unwrap_err().field_path().as_deref(),
+            Some("body.segment[0].data.state_vector[0].epoch"),
+            "{value}"
+        );
+    }
 
     let mut message = Oem::from_xml(XML).unwrap();
     let metadata = &mut message.body.segment[0].metadata;
@@ -98,6 +102,14 @@ fn oem_time_tags_are_absolute_and_metadata_ranges_are_consistent() {
     let mut message = Oem::from_xml(XML).unwrap();
     message.body.segment[0].metadata.useable_start_time = Some(epoch("2019-12-01T00:00:00"));
     crate::common::assert_validation_field(&message.validate().unwrap_err(), "USEABLE_START_TIME");
+    let mut message = Oem::from_xml(XML).unwrap();
+    message.body.segment[0].metadata.useable_stop_time = Some(epoch("2019-12-30T00:00:00"));
+    let error = message.validate().unwrap_err();
+    assert_eq!(error.code(), Some("validation.out_of_range"));
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[0].metadata.useable_stop_time")
+    );
 
     let mut message = Oem::from_xml(XML).unwrap();
     let metadata = &mut message.body.segment[0].metadata;
@@ -198,6 +210,11 @@ fn elapsed_time_systems_use_three_digit_day_durations() {
     segment.data.state_vector[1].epoch = epoch("0000-399T23:59:59.5");
     message.validate().unwrap();
     assert_eq!(Oem::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    // Three-digit days are a recommendation ("should"), so calendar times are accepted too.
+    let mut calendar = message.clone();
+    calendar.body.segment[0].metadata.time_system = "MRT".into();
+    calendar.body.segment[0].data.state_vector[0].epoch = epoch("0000-01-01T00:10:00");
+    calendar.validate().unwrap();
 
     // 7.5.11: REF_FRAME_EPOCH is also interpreted in TIME_SYSTEM.
     message.body.segment[0].metadata.ref_frame_epoch = Some(epoch("0000-000T00:00:00"));
@@ -287,6 +304,9 @@ fn xml_values_follow_xsd_double_but_kvn_needs_finite_numbers() {
     );
     let xml = message.to_xml().unwrap();
     crate::common::validate_xml("non-finite OEM values", &xml);
+    for written in ["<X>NaN</X>", "<Y_DOT>-INF</Y_DOT>", "<CX_X>INF</CX_X>"] {
+        assert!(xml.contains(written), "{written}");
+    }
     let reparsed = Oem::from_xml(&xml).unwrap();
     assert!(reparsed.body.segment[0].data.state_vector[0]
         .x
