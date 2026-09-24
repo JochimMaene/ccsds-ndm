@@ -848,13 +848,11 @@ fn classification_is_read_between_the_version_and_creation_date() {
 }
 
 #[test]
-fn oem_1_0_is_read_but_not_written() {
-    // ODM 7.9.1 lists OEM 1.0 (Silver Book 1.0); it is read like 2.0 but has no writer.
-    let kvn = mutated_once(
-        KVN_FIXTURES[2],
-        "CCSDS_OEM_VERS = 3.0",
-        "CCSDS_OEM_VERS = 1.0",
-    );
+fn oem_1_0_is_read_as_kvn_only_without_later_content() {
+    // 502.0-B-1 defines OEM 1.0 in KVN only, without the header's CLASSIFICATION and
+    // MESSAGE_ID, REF_FRAME_EPOCH, accelerations or covariance. It is read but not written.
+    let g11 = include_str!("../../data/kvn/oem_g11.kvn");
+    let kvn = mutated_once(g11, "CCSDS_OEM_VERS = 3.0", "CCSDS_OEM_VERS = 1.0");
     let message = Oem::from_kvn(&kvn).unwrap();
     assert_eq!(message.version, "1.0");
     for error in [message.to_kvn().unwrap_err(), message.to_xml().unwrap_err()] {
@@ -864,6 +862,42 @@ fn oem_1_0_is_read_but_not_written() {
             "{error}"
         );
     }
+
+    let first_state = g11.lines().find(|line| line.starts_with("2019-")).unwrap();
+    for (label, input, path) in [
+        (
+            "MESSAGE_ID",
+            mutated_once(&kvn, "ORIGINATOR = NASA/JPL\n", "ORIGINATOR = NASA/JPL\nMESSAGE_ID = X\n"),
+            "header.message_id",
+        ),
+        (
+            "REF_FRAME_EPOCH",
+            mutated_once(&kvn, "TIME_SYSTEM", "REF_FRAME_EPOCH = 2000-01-01T00:00:00\nTIME_SYSTEM"),
+            "body.segment[0].metadata.ref_frame_epoch",
+        ),
+        (
+            "acceleration",
+            mutated_once(&kvn, first_state, &format!("{first_state} 1.0 2.0 3.0")),
+            "body.segment[0].data.state_vector[0]",
+        ),
+        (
+            "covariance",
+            format!(
+                "{kvn}COVARIANCE_START\nEPOCH = {}\n1\n0 1\n0 0 1\n0 0 0 1\n0 0 0 0 1\n0 0 0 0 0 1\nCOVARIANCE_STOP\n",
+                first_state.split(' ').next().unwrap()
+            ),
+            "body.segment[1].data.covariance_matrix",
+        ),
+    ] {
+        let error = Oem::from_kvn(&input).unwrap_err();
+        assert_eq!(error.field_path().as_deref(), Some(path), "{label}: {error}");
+    }
+
+    let xml = mutated_once(XML, "version=\"3.0\"", "version=\"1.0\"");
+    assert_eq!(
+        Oem::from_xml(&xml).unwrap_err().code(),
+        Some("parse.unsupported_input_version")
+    );
 }
 
 #[test]

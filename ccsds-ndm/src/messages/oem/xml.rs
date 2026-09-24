@@ -181,6 +181,14 @@ impl Oem {
         (|| {
             validate_envelope(xml, &mut source_edition)?;
             let mut oem: Self = crate::xml::from_str_with_context(xml, "OEM")?;
+            // OEM 1.0 (502.0-B-1) is a KVN-only format; no NDM/XML schema defines it.
+            if oem.version == "1.0" {
+                return Err(crate::error::CcsdsNdmError::UnsupportedInputVersion {
+                    message_type: "OEM",
+                    version: oem.version,
+                    supported: "2.0, 3.0".into(),
+                });
+            }
             oem.normalize_implicit_units();
             crate::traits::Validate::validate(&oem)?;
             Ok(oem)

@@ -50,12 +50,16 @@ OEM review follow-up:
   bindings, duplicate schema-location attributes hidden behind prefix aliases,
   and empty or reserved ``xml`` processing-instruction targets.
 - OEM 3.0 and OEM 2.0 are now **Verified** in the support matrix. OEM 2.0 is
-  reviewed through annex J of 502.0-B-3 and the 2.0 schema, which differ from
-  3.0 only in the header; every shipped OEM example is checked as 2.0. ODM 5.2.4.7 (enough
+  reviewed against 502.0-B-2 with Corrigendum 1 and its schema; it differs
+  from 3.0 in the header, and two looser readings (text case, ``-0``/special
+  values) are documented. Every shipped OEM example is checked as 2.0. ODM 5.2.4.7 (enough
   records for the interpolation method) is recorded as a requirement the book
   leaves undefined rather than a conformance gap.
 - OEM 1.0 is parse-only, like OPM 1.0: it is read with the 2.0 rules and
-  cannot be written.
+  cannot be written. XML is rejected for 1.0, a KVN-only format, and so is
+  content that 502.0-B-1 does not have (``CLASSIFICATION``, ``MESSAGE_ID``,
+  ``REF_FRAME_EPOCH``, accelerations, covariance). Some valid 1.0 files are
+  still rejected; the OEM conformance page lists them.
 - OEM covariance epochs are no longer required to fall inside the segment's
   ``START_TIME``/``STOP_TIME``: table 5-3 says they should, but the book's own
   example G-14 does not, so the shipped ``oem_g14.xml`` is now the example as

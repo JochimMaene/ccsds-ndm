@@ -1,8 +1,8 @@
 # OEM 3.0 conformance
 
 This page explains how the library handles OEM 3.0, and which tests prove it. It covers
-parsing, validation, writing and conversion, in both KVN and XML. OEM 2.0 differs only in its
-header; see [OEM 2.0](#oem-20).
+parsing, validation, writing and conversion, in both KVN and XML. OEM 2.0 and 1.0 are covered
+at the end; see [OEM 2.0](#oem-20) and [OEM 1.0](#oem-10).
 
 The sources are CCSDS 502.0-B-3 and the NDM/XML 4.0.0 schemas. The later
 [EC2 edition](https://ccsds.org/publications/allpubs/entry/3073/) of the book doesn't change
@@ -123,9 +123,7 @@ and the two where reading is looser than a clear rule under
   more than four digits, an empty fraction, and a bare number. 7.5.10 only allows `Z`. We follow
   7.5.10 in both notations, like OPM. All message types share this rule, so relaxing it has to
   happen for all of them at once.
-- **OEM 1.0.** Read only. 7.9.1 lists it (Silver Book 1.0), and it is read with the 2.0 rules,
-  but without an OEM 1.0 book or schema to check output against, it can't be written. Set
-  `version` to 2.0 or 3.0 to write such a message.
+- **OEM 1.0** is read only, and some valid 1.0 files are rejected; see [OEM 1.0](#oem-10).
 - **`INTERPOLATION_DEGREE`.** Table 5-3 only asks for "an integer value", while the schema wants
   a positive integer. We require a positive degree in both notations, so every degree can also be
   written as valid XML. In KVN the range is 1 to `i32::MAX` (7.5.4). XML degrees up to `u32::MAX`
@@ -210,14 +208,38 @@ above. "Verified" means that review, not exhaustive mutation of every editable v
 
 ### OEM 2.0
 
-OEM 2.0 is also **Verified**. We don't have the 502.0-B-2 text, so the review works from the
-differences: annex J of 502.0-B-3 lists everything that changed in the messages, and the only OEM
-change is the new `MESSAGE_ID`. The official `ndmxml-2.0.0-oem-2.0.xsd` agrees. Its OEM body is
-the same as in 3.0, and its `ndmHeader` has neither `MESSAGE_ID` nor `CLASSIFICATION`. Annex J
-doesn't mention `CLASSIFICATION`, but the 2.0 schema shows it is new in 3.0 too, so both are
-rejected in 2.0 when reading and writing. Everything else on this page applies unchanged.
+OEM 2.0 is also **Verified**, against CCSDS 502.0-B-2 with Technical Corrigendum 1
+([Silver Book](https://ccsds.org/Pubs/502x0b2s.pdf)) and `ndmxml-2.0.0-oem-2.0.xsd`. Its OEM
+section (5.2) and syntax rules (section 6) match 3.0 except in these points:
 
-`conformance::odm2` checks every shipped OEM example as 2.0: it must be valid against the 2.0
-schema, round-trip through KVN and XML, and reject both 3.0-only header fields.
+- **Header.** Table 5-2 has no `CLASSIFICATION` or `MESSAGE_ID`, and neither has the schema's
+  `ndmHeader`. Both are rejected in 2.0, when reading and writing.
+- **Case.** 6.5.6 says every text value must be all upper or all lower case, including names
+  such as `OBJECT_NAME`. 3.0 narrowed this to normative values (7.5.3), and a mixed-case name
+  loses nothing, so we apply the 3.0 reading to 2.0 as well. This is looser than a clear 2.0 rule.
+- **Special numbers.** A note to 6.5.5 says `NaN`, `-Inf`, `+Inf` and `-0` are "not supported in
+  the ODM". KVN numbers are already finite. We still read `-0` (producers often write `-0.000000`),
+  and 2.0 XML still takes the schema's `xsd:double`, including `NaN` and `INF`. Both are looser
+  than the note.
 
-OEM 1.0 is parse-only.
+Everything else on this page applies unchanged, including the Corrigendum 1 rule that useable
+spans of consecutive segments must not overlap. `conformance::odm2` checks every shipped OEM
+example as 2.0: it must be valid against the 2.0 schema, round-trip through KVN and XML, and
+reject both 3.0-only header fields.
+
+### OEM 1.0
+
+OEM 1.0 ([502.0-B-1 Silver Book](https://ccsds.org/Pubs/502x0b1s.pdf), 2004) is read but not
+written, and it is not verified. It is a KVN-only format, so XML with `version="1.0"` is
+rejected. 1.0 has no `CLASSIFICATION`, `MESSAGE_ID`, `REF_FRAME_EPOCH`, accelerations or
+covariance (502.0-B-2 annex, items 2 and 4), so a 1.0 file carrying any of them is rejected.
+Otherwise it is read with the 2.0 rules, which are stricter than 1.0 in a few places. These valid
+1.0 files are therefore rejected:
+
+- comments anywhere except between ephemeris lines (1.0 section 4.3.1d), for example between
+  metadata keywords;
+- Julian Date epochs such as `2451534.29812` (table 4-3), which 2.0 withdrew;
+- mixed-case values of the book-listed time systems and frames, which 1.0 allows (4.3.3g).
+
+1.0 also requires increasing, non-repeating ephemeris epochs and segments that don't overlap
+(4.3.5c, table 4-3). We don't check either, as for 2.0 and 3.0.
