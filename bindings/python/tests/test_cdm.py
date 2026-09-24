@@ -101,7 +101,7 @@ class TestCdm:
         data1 = CdmData(
             state_vector=vector1,
             covariance_matrix=cov1,
-            comments=[],  # Mandatory positional
+            comment=[],  # Mandatory positional
         )
         seg1 = CdmSegment(metadata=meta1, data=data1)
 
@@ -118,7 +118,7 @@ class TestCdm:
             x=7100.0, y=0.0, z=0.0, x_dot=0.0, y_dot=7.4, z_dot=0.0
         )
         cov2 = CdmCovarianceMatrix(*cov_args)
-        data2 = CdmData(state_vector=vector2, covariance_matrix=cov2, comments=[])
+        data2 = CdmData(state_vector=vector2, covariance_matrix=cov2, comment=[])
         seg2 = CdmSegment(metadata=meta2, data=data2)
 
         body = CdmBody(relative_metadata_data=rel_meta, segments=[seg1, seg2])
@@ -169,7 +169,7 @@ class TestCdm:
         data = CdmData.from_numpy(
             state_vector=state,
             covariance_matrix=cov,
-            comments=[],
+            comment=[],
         )
 
         assert data.state_vector_numpy.shape == (6,)
@@ -201,13 +201,13 @@ class TestCdm:
             CdmData.from_numpy(
                 state_vector=np.zeros((2, 6), dtype=float),
                 covariance_matrix=None,
-                comments=[],
+                comment=[],
             )
 
         data = CdmData.from_numpy(
             state_vector=np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0], dtype=float),
             covariance_matrix=None,
-            comments=[],
+            comment=[],
         )
         with pytest.raises(ValueError, match="Covariance matrix must be"):
             data.covariance_matrix_numpy = np.zeros((5, 5), dtype=float)

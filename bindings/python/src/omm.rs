@@ -901,10 +901,10 @@ impl OmmData {
     /// mean_elements : MeanElements
     ///     Mean elements.
     #[new]
-    #[pyo3(signature = (mean_elements, comments=None))]
-    fn new(mean_elements: Py<MeanElements>, comments: Option<Vec<String>>) -> Self {
+    #[pyo3(signature = (mean_elements, comment=None))]
+    fn new(mean_elements: Py<MeanElements>, comment: Option<Vec<String>>) -> Self {
         Self {
-            comment: comments.unwrap_or_default(),
+            comment: comment.unwrap_or_default(),
             mean_elements,
             spacecraft_parameters: None,
             tle_parameters: None,

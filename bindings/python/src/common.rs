@@ -698,7 +698,7 @@ pub struct StateVector {
 impl StateVector {
     #[new]
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (epoch, x, y, z, x_dot, y_dot, z_dot, comments=None))]
+    #[pyo3(signature = (epoch, x, y, z, x_dot, y_dot, z_dot, comment=None))]
     fn new(
         epoch: String,
         x: f64,
@@ -707,11 +707,11 @@ impl StateVector {
         x_dot: f64,
         y_dot: f64,
         z_dot: f64,
-        comments: Option<Vec<String>>,
+        comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         Ok(Self {
             inner: core_common::StateVector {
-                comment: comments.unwrap_or_default(),
+                comment: comment.unwrap_or_default(),
                 epoch: parse_calendar_epoch(&epoch)?,
                 x: Position {
                     value: x,

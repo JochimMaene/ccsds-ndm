@@ -3874,7 +3874,7 @@ class CdmData:
         covariance_matrix: typing.Optional[CdmCovarianceMatrix] = None,
         od_parameters: typing.Optional[OdParameters] = None,
         additional_parameters: typing.Optional[AdditionalParameters] = None,
-        comments: typing.Optional[typing.Sequence[builtins.str]] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> CdmData: ...
     @staticmethod
     def from_numpy(
@@ -3882,7 +3882,7 @@ class CdmData:
         covariance_matrix: typing.Optional[numpy.typing.ArrayLike] = None,
         od_parameters: typing.Optional[OdParameters] = None,
         additional_parameters: typing.Optional[AdditionalParameters] = None,
-        comments: typing.Optional[typing.Sequence[builtins.str]] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> CdmData: ...
     def __repr__(self) -> builtins.str: ...
 
@@ -4513,7 +4513,7 @@ class CdmStateVector:
         x_dot: builtins.float,
         y_dot: builtins.float,
         z_dot: builtins.float,
-        comments: typing.Optional[typing.Sequence[builtins.str]] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> CdmStateVector: ...
     @staticmethod
     def from_numpy(array: numpy.typing.ArrayLike) -> CdmStateVector: ...
@@ -11468,7 +11468,7 @@ class OmmData:
     def __new__(
         cls,
         mean_elements: MeanElements,
-        comments: typing.Optional[typing.Sequence[builtins.str]] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> OmmData:
         r"""
         Create a new OMM Data object.
@@ -14566,7 +14566,7 @@ class StateVector:
         x_dot: builtins.float,
         y_dot: builtins.float,
         z_dot: builtins.float,
-        comments: typing.Optional[typing.Sequence[builtins.str]] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> StateVector: ...
     def __repr__(self) -> builtins.str: ...
 

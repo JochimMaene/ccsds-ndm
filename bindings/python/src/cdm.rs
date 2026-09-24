@@ -1957,17 +1957,17 @@ impl CdmData {
         covariance_matrix=None,
         od_parameters=None,
         additional_parameters=None,
-        comments=None
+        comment=None
     ))]
     fn new(
         state_vector: Py<CdmStateVector>,
         covariance_matrix: Option<Py<CdmCovarianceMatrix>>,
         od_parameters: Option<Py<OdParameters>>,
         additional_parameters: Option<Py<AdditionalParameters>>,
-        comments: Option<Vec<String>>,
+        comment: Option<Vec<String>>,
     ) -> Self {
         Self {
-            comment: comments.unwrap_or_default(),
+            comment: comment.unwrap_or_default(),
             od_parameters,
             additional_parameters,
             state_vector,
@@ -1981,7 +1981,7 @@ impl CdmData {
         covariance_matrix=None,
         od_parameters=None,
         additional_parameters=None,
-        comments=None
+        comment=None
     ))]
     fn from_numpy(
         py: Python<'_>,
@@ -1991,7 +1991,7 @@ impl CdmData {
         covariance_matrix: Option<PyArrayLike2<'_, f64, AllowTypeChange>>,
         od_parameters: Option<OdParameters>,
         additional_parameters: Option<AdditionalParameters>,
-        comments: Option<Vec<String>>,
+        comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         let state = CdmStateVector::from_numpy(state_vector)?;
         let cov = match covariance_matrix {
@@ -2002,7 +2002,7 @@ impl CdmData {
         Self::from_core(
             py,
             core_cdm::CdmData {
-                comment: comments.unwrap_or_default(),
+                comment: comment.unwrap_or_default(),
                 od_parameters: od_parameters.map(|o| o.inner),
                 additional_parameters: additional_parameters.map(|a| a.inner),
                 state_vector: state.inner,
@@ -2163,7 +2163,7 @@ pub struct CdmStateVector {
 #[pymethods]
 impl CdmStateVector {
     #[new]
-    #[pyo3(signature = (x, y, z, x_dot, y_dot, z_dot, comments=None))]
+    #[pyo3(signature = (x, y, z, x_dot, y_dot, z_dot, comment=None))]
     fn new(
         x: f64,
         y: f64,
@@ -2171,11 +2171,11 @@ impl CdmStateVector {
         x_dot: f64,
         y_dot: f64,
         z_dot: f64,
-        comments: Option<Vec<String>>,
+        comment: Option<Vec<String>>,
     ) -> Self {
         Self {
             inner: core_cdm::CdmStateVector {
-                comment: comments.unwrap_or_default(),
+                comment: comment.unwrap_or_default(),
                 x: PositionRequired::new(x),
                 y: PositionRequired::new(y),
                 z: PositionRequired::new(z),

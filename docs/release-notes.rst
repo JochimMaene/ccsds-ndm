@@ -73,8 +73,11 @@ OEM review follow-up:
 - Python: the NumPy inputs of OEM, AEM and CDM accept integer arrays and
   nested lists, converting them to float, instead of raising a confusing
   ``TypeError``.
-- Python (breaking): ``OemData(...)`` and ``OemData.from_numpy(...)`` take
-  ``comment=`` instead of ``comments=``, like ``OemMetadata`` and ``AemData``.
+- Python (breaking): ``OemData``, ``OemData.from_numpy``, ``OmmData``,
+  ``CdmData``, ``CdmData.from_numpy``, ``CdmStateVector`` and
+  ``StateVector`` take ``comment=`` instead of ``comments=``, matching their
+  ``comment`` attribute and the other families. ``CombinedNdm`` keeps
+  ``comments=``, the name of its attribute.
 - An OEM KVN covariance section holding only comments is accepted; its
   comments join the data comments.
 - An empty OEM KVN ``COV_REF_FRAME`` is absent, like other empty optional

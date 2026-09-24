@@ -34,7 +34,7 @@ class TestOpm:
             time_system="UTC",
         )
 
-        # StateVector signature needs comments=None explicitly
+        # StateVector signature needs comment=None explicitly
         state = StateVector(
             epoch="2023-01-01T00:00:00",
             x=7000.0,
@@ -43,7 +43,7 @@ class TestOpm:
             x_dot=0.0,
             y_dot=7.5,
             z_dot=0.0,
-            comments=None,
+            comment=None,
         )
 
         # KeplerianElements signature:
@@ -120,7 +120,7 @@ class TestOpm:
                 x_dot=0.0,
                 y_dot=7.5,
                 z_dot=0.0,
-                comments=None,
+                comment=None,
             )
 
 
