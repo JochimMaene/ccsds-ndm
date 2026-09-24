@@ -148,8 +148,9 @@ fn common_calendar_fields_are_valid(value: &str) -> bool {
     #[inline(always)]
     fn decimal(bytes: &[u8]) -> Option<u16> {
         bytes.iter().try_fold(0_u16, |value, byte| {
+            // Lazy: `*byte - b'0'` underflows for a non-digit byte.
             byte.is_ascii_digit()
-                .then_some(value * 10 + u16::from(*byte - b'0'))
+                .then(|| value * 10 + u16::from(*byte - b'0'))
         })
     }
 
@@ -5138,6 +5139,14 @@ impl std::fmt::Display for TdmPath {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn calendar_fields_with_a_non_digit_are_invalid_not_a_panic() {
+        // Found by fuzzing: a non-digit byte in a numeric field underflowed `byte - b'0'`.
+        for value in ["2008-071T17:08:*0", "2008-*1-01T00:00:00", "20*8-071T17:08:00"] {
+            assert!(!common_calendar_fields_are_valid(value), "{value}");
+        }
+    }
 
     #[test]
     fn test_non_negative_double() {
