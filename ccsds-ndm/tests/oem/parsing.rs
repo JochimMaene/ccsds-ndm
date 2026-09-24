@@ -865,3 +865,39 @@ fn oem_1_0_is_read_but_not_written() {
         );
     }
 }
+
+#[test]
+fn producer_style_kvn_parses_and_writes_back_within_the_digit_limit() {
+    // Real OEM producers commonly align keywords, use CRLF, write 17-digit shortest round-trip
+    // doubles and omit the final line terminator. Reading accepts all of it; see "More lenient
+    // than the book" in docs/conformance/oem-3.0.md.
+    let source = include_str!("fixtures/producer_style.oem");
+    assert!(source.contains("\r\n") && !source.ends_with('\n'));
+    let message = Oem::from_kvn(source).unwrap();
+    let data = &message.body.segment[0].data;
+    assert_eq!(data.state_vector.len(), 3);
+    assert_eq!(data.state_vector[0].x.value, -2757.3016318893897);
+    assert_eq!(data.covariance_matrix[0].cy_x.value, 0.0);
+    assert_eq!(Oem::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+
+    // KVN output follows the book: terminated lines and at most 16 significant digits.
+    let kvn = message.to_kvn().unwrap();
+    assert!(kvn.ends_with('\n'));
+    let reparsed = Oem::from_kvn(&kvn).unwrap();
+    for (written, read) in reparsed.body.segment[0]
+        .data
+        .state_vector
+        .iter()
+        .zip(&data.state_vector)
+    {
+        for (written, read) in [
+            (written.x.value, read.x.value),
+            (written.z_dot.value, read.z_dot.value),
+        ] {
+            assert!(
+                (written - read).abs() <= read.abs() * 1e-15,
+                "{written} vs {read}"
+            );
+        }
+    }
+}
