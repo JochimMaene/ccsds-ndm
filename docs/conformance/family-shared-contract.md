@@ -1,7 +1,7 @@
 # Shared NDM family contract evidence
 
 Status: implemented shared plumbing, not blanket CCSDS conformance. The verified OPM 3.0,
-OMM 3.0, and OEM 3.0 cells remain governed by their message-specific inventories.
+OMM 3.0, OEM 3.0, and OEM 2.0 cells remain governed by their message-specific inventories.
 
 This inventory records the cross-family mechanics exercised for every standalone message and the
 combined NDM envelope. It deliberately does not substitute shared tests for the message-by-message

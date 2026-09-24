@@ -1,7 +1,8 @@
 # OEM 3.0 conformance
 
 This page explains how the library handles OEM 3.0, and which tests prove it. It covers
-parsing, validation, writing and conversion, in both KVN and XML.
+parsing, validation, writing and conversion, in both KVN and XML. OEM 2.0 differs only in its
+header; see [OEM 2.0](#oem-20).
 
 The sources are CCSDS 502.0-B-3 and the NDM/XML 4.0.0 schemas. The later
 [EC2 edition](https://ccsds.org/publications/allpubs/entry/3073/) of the book doesn't change
@@ -207,5 +208,16 @@ have received message-level review against CCSDS 502.0-B-3 and the OEM 3.0 schem
 requirement gap remains. Where the book is unclear or conflicts, the reading taken is recorded
 above. "Verified" means that review, not exhaustive mutation of every editable value.
 
-OEM 2.0 remains **Available**: it relies on the same tests but hasn't had its own review. OEM 1.0
-is parse-only.
+### OEM 2.0
+
+OEM 2.0 is also **Verified**. We don't have the 502.0-B-2 text, so the review works from the
+differences: annex J of 502.0-B-3 lists everything that changed in the messages, and the only OEM
+change is the new `MESSAGE_ID`. The official `ndmxml-2.0.0-oem-2.0.xsd` agrees. Its OEM body is
+the same as in 3.0, and its `ndmHeader` has neither `MESSAGE_ID` nor `CLASSIFICATION`. Annex J
+doesn't mention `CLASSIFICATION`, but the 2.0 schema shows it is new in 3.0 too, so both are
+rejected in 2.0 when reading and writing. Everything else on this page applies unchanged.
+
+`conformance::odm2` checks every shipped OEM example as 2.0: it must be valid against the 2.0
+schema, round-trip through KVN and XML, and reject both 3.0-only header fields.
+
+OEM 1.0 is parse-only.

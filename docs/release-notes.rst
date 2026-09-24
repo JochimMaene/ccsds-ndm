@@ -49,7 +49,9 @@ OEM review follow-up:
 - Shared XML parsing rejects literal ``]]>`` in text, empty prefixed namespace
   bindings, duplicate schema-location attributes hidden behind prefix aliases,
   and empty or reserved ``xml`` processing-instruction targets.
-- OEM 3.0 is now **Verified** in the support matrix. ODM 5.2.4.7 (enough
+- OEM 3.0 and OEM 2.0 are now **Verified** in the support matrix. OEM 2.0 is
+  reviewed through annex J of 502.0-B-3 and the 2.0 schema, which differ from
+  3.0 only in the header; every shipped OEM example is checked as 2.0. ODM 5.2.4.7 (enough
   records for the interpolation method) is recorded as a requirement the book
   leaves undefined rather than a conformance gap.
 - OEM 1.0 is parse-only, like OPM 1.0: it is read with the 2.0 rules and
