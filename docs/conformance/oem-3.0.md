@@ -202,9 +202,9 @@ how allocations grow from 100 to 2,000 state records. They don't set a peak-memo
 
 OEM 3.0 is verified on the Rust and Python surfaces: strict parsing, self-contained validation,
 both generation notations, conversion, diagnostics, allocation budgets, and packaged artifacts
-have received message-level review against CCSDS 502.0-B-3 and the OEM 3.0 schema, and no known
-requirement gap remains. Where the book is unclear or conflicts, the reading taken is recorded
-above. "Verified" means that review, not exhaustive mutation of every editable value.
+have received message-level review against CCSDS 502.0-B-3 and the OEM 3.0 schema, subject to
+the exceptions and limits recorded above. "Verified" means that review, not unrestricted
+standards compliance, exhaustive mutation of every editable value, or a throughput guarantee.
 
 ### OEM 2.0
 

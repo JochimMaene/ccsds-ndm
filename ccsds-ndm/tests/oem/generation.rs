@@ -4,6 +4,19 @@ use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::{Message, Ndm};
 
 #[test]
+fn xml_preserves_carriage_returns_in_text() {
+    let mut message = Oem::from_xml(XML).unwrap();
+    message.header.originator = "first\rsecond\r\nthird".into();
+    message.body.segment[0].data.comment = vec!["a\rb".into()];
+    let xml = message.to_xml().unwrap();
+    assert_eq!(Oem::from_xml(&xml).unwrap(), message);
+    let mut streamed = Vec::new();
+    message.write_xml_to(&mut streamed).unwrap();
+    assert_eq!(streamed, xml.as_bytes());
+    validate_xml("carriage returns", &xml);
+}
+
+#[test]
 fn xml_degrees_outside_the_kvn_integer_range_fail_before_output() {
     let mut message = Oem::from_xml(XML).unwrap();
     message.body.segment[0].metadata.interpolation_degree = Some("2147483648".parse().unwrap());

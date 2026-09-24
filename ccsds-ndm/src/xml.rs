@@ -883,8 +883,7 @@ const ROOT_NAMESPACES: &str = concat!(
     r#" xmlns:ndm="urn:ccsds:schema:ndmxml""#
 );
 
-/// Inserts [`ROOT_NAMESPACES`] after the root element name, whatever chunks the serializer
-/// writes it in.
+/// Inserts [`ROOT_NAMESPACES`] and preserves carriage returns in serialized values.
 struct RootNamespaces<W> {
     inner: W,
     state: RootNameState,
@@ -908,6 +907,17 @@ impl<W> RootNamespaces<W> {
 
 impl<W: FmtWrite> FmtWrite for RootNamespaces<W> {
     fn write_str(&mut self, value: &str) -> std::fmt::Result {
+        // XML 1.0 normalizes literal CR and CRLF to LF. quick-xml leaves CR literal
+        // in strings, so use character references to preserve the model's text.
+        if value.contains('\r') {
+            for (index, part) in value.split('\r').enumerate() {
+                if index > 0 {
+                    self.inner.write_str("&#13;")?;
+                }
+                self.write_str(part)?;
+            }
+            return Ok(());
+        }
         if self.state == RootNameState::Done {
             return self.inner.write_str(value);
         }
