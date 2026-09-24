@@ -562,7 +562,8 @@ fn validate_document(
             Ok(Event::Text(text)) => {
                 event_seen = true;
                 // XML 1.0 2.4 forbids the CDATA closing delimiter in literal character data.
-                if text.windows(3).any(|bytes| bytes == b"]]>") {
+                // `contains` on a byte is a vectorised search, and text rarely holds `>`.
+                if text.contains(&b'>') && text.windows(3).any(|bytes| bytes == b"]]>") {
                     return Err(invalid("literal ']]>' is not allowed in XML text".into()));
                 }
                 // References arrive as separate events, so the raw bytes decide whitespace
@@ -715,8 +716,10 @@ fn validate_document(
 
 /// Enforce schema sequence order without loading an XSD at runtime. Callers provide only the
 /// message-specific parent/child registration; serde remains responsible for typed values.
+/// The root is checked in the same pass as the children, so each document is walked once.
 pub(crate) fn validate_element_sequences(
     s: &str,
+    root: &[u8],
     type_name: &str,
     child_rule: impl Fn(&[u8], &[u8]) -> Option<XmlSequenceRule>,
     attribute_allowed: impl Fn(&[u8], &[u8]) -> bool,
@@ -727,7 +730,7 @@ pub(crate) fn validate_element_sequences(
         type_name,
         &mut source_edition,
         DocumentRules {
-            root: None,
+            root: Some(root),
             child_rule: Some(&child_rule),
             attribute_allowed: Some(&attribute_allowed),
         },

@@ -72,7 +72,6 @@ impl Ndm for Cdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::validate_document_root(xml, b"cdm", "CDM")?;
         xml::validate_xml_sequences(xml)?;
         let cdm: Self = crate::xml::from_str_with_context(xml, "CDM")?;
         crate::traits::Validate::validate(&cdm)?;

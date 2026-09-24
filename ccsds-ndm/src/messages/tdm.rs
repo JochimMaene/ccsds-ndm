@@ -209,7 +209,6 @@ impl Ndm for Tdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::validate_document_root(xml, b"tdm", "TDM")?;
         xml::validate_xml_sequences(xml)?;
         let tdm: Self = crate::xml::from_str_with_context(xml, "TDM")?;
         crate::traits::Validate::validate(&tdm)?;

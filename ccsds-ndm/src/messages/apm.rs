@@ -68,7 +68,6 @@ impl Ndm for Apm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::validate_document_root(xml, b"apm", "APM")?;
         xml::validate_xml_sequences(xml)?;
         let apm: Self = crate::xml::from_str_with_context(xml, "APM")?;
         crate::traits::Validate::validate(&apm)?;

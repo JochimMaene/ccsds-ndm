@@ -73,7 +73,6 @@ impl Ndm for Rdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::validate_document_root(xml, b"rdm", "RDM")?;
         xml::validate_xml_sequences(xml)?;
         let rdm: Self = crate::xml::from_str_with_context(xml, "RDM")?;
         crate::traits::Validate::validate(&rdm)?;

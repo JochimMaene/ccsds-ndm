@@ -74,7 +74,6 @@ impl Ndm for Ocm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::validate_document_root(xml, b"ocm", "OCM")?;
         xml::validate_sequences(xml)?;
         let ocm: Self = crate::xml::from_str_with_context(xml, "OCM")?;
         crate::traits::Validate::validate(&ocm)?;

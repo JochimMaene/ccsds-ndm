@@ -74,7 +74,6 @@ impl Ndm for Acm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::validate_document_root(xml, b"acm", "ACM")?;
         xml::validate_xml_sequences(xml)?;
         let acm: Self = crate::xml::from_str_with_context(xml, "ACM")?;
         crate::traits::Validate::validate(&acm)?;
