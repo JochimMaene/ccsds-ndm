@@ -5143,7 +5143,11 @@ mod tests {
     #[test]
     fn calendar_fields_with_a_non_digit_are_invalid_not_a_panic() {
         // Found by fuzzing: a non-digit byte in a numeric field underflowed `byte - b'0'`.
-        for value in ["2008-071T17:08:*0", "2008-*1-01T00:00:00", "20*8-071T17:08:00"] {
+        for value in [
+            "2008-071T17:08:*0",
+            "2008-*1-01T00:00:00",
+            "20*8-071T17:08:00",
+        ] {
             assert!(!common_calendar_fields_are_valid(value), "{value}");
         }
     }
