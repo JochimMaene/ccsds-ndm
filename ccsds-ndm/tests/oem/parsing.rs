@@ -1084,3 +1084,64 @@ fn kvn_covariance_epoch_cannot_repeat_before_its_matrix() {
     assert_eq!(kvn.line, 25, "{error}");
     assert_eq!(kvn.message, "unexpected covariance keyword", "{error}");
 }
+
+#[test]
+fn kvn_covariance_rows_fill_the_lower_triangle_in_table_5_4_order() {
+    // ODM 5.2.5.4 and table 5-4: row n of the lower triangle holds n values, from CX_X to
+    // CZ_DOT_Z_DOT. Parsing and writing share the order, so a round trip cannot catch a swap.
+    let message = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
+    let c = &message.body.segment[0].data.covariance_matrix[0];
+    let parsed = [
+        c.cx_x.value,
+        c.cy_x.value,
+        c.cy_y.value,
+        c.cz_x.value,
+        c.cz_y.value,
+        c.cz_z.value,
+        c.cx_dot_x.value,
+        c.cx_dot_y.value,
+        c.cx_dot_z.value,
+        c.cx_dot_x_dot.value,
+        c.cy_dot_x.value,
+        c.cy_dot_y.value,
+        c.cy_dot_z.value,
+        c.cy_dot_x_dot.value,
+        c.cy_dot_y_dot.value,
+        c.cz_dot_x.value,
+        c.cz_dot_y.value,
+        c.cz_dot_z.value,
+        c.cz_dot_x_dot.value,
+        c.cz_dot_y_dot.value,
+        c.cz_dot_z_dot.value,
+    ];
+    let rows = [
+        "3.3313494e-04",
+        "4.6189273e-04 6.7824216e-04",
+        "-3.0700078e-04 -4.2212341e-04 3.2319319e-04",
+        "-3.3493650e-07 -4.6860842e-07 2.4849495e-07 4.2960228e-10",
+        "-2.2118325e-07 -2.8641868e-07 1.7980986e-07 2.6088992e-10 1.7675147e-10",
+        "-3.0413460e-07 -4.9894969e-07 3.5403109e-07 1.8692631e-10 1.0088625e-10 6.2244443e-10",
+    ];
+    let expected: Vec<f64> = rows
+        .iter()
+        .flat_map(|row| row.split(' ').map(|value| value.parse::<f64>().unwrap()))
+        .collect();
+    assert_eq!(parsed.as_slice(), expected.as_slice());
+
+    let kvn = message.to_kvn().unwrap();
+    let written: Vec<&str> = kvn
+        .lines()
+        .skip_while(|line| !line.starts_with("COV_REF_FRAME"))
+        .skip(1)
+        .take(6)
+        .collect();
+    assert_eq!(written.len(), rows.len());
+    for (line, row) in written.iter().zip(rows) {
+        let values: Vec<f64> = line
+            .split_whitespace()
+            .map(|value| value.parse().unwrap())
+            .collect();
+        let expected: Vec<f64> = row.split(' ').map(|value| value.parse().unwrap()).collect();
+        assert_eq!(values, expected, "{line}");
+    }
+}

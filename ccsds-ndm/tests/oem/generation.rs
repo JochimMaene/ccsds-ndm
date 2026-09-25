@@ -1,7 +1,7 @@
 use crate::common::{assert_rejects, mutated, mutated_once, validate_xml};
 use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::messages::oem::Oem;
-use ccsds_ndm::Ndm;
+use ccsds_ndm::{Ndm, Validate};
 
 #[test]
 fn xml_preserves_carriage_returns_in_text() {
@@ -306,4 +306,67 @@ fn serializes_multiple_covariance_matrices_in_one_block() {
     assert_eq!(output.matches("COVARIANCE_START").count(), 1);
     assert_eq!(output.matches("COVARIANCE_STOP").count(), 1);
     assert_eq!(output.matches("EPOCH").count(), 2);
+}
+
+#[test]
+fn kvn_generation_applies_the_model_rules_it_checks_while_writing() {
+    // The OEM KVN writer validates as it renders instead of calling `validate()` first, so each
+    // model rule is pinned on every output path, not only on `validate()`.
+    let base = || Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    let mut message = base();
+    message.body.segment[1].metadata.time_system = "TAI".into();
+    assert_rejects(&message, "TIME_SYSTEM");
+
+    let mut message = base();
+    message.body.segment[1].metadata.object_id = "DIFFERENT".into();
+    assert_rejects(&message, "OBJECT_NAME/OBJECT_ID");
+
+    let mut message = base();
+    message.body.segment[0].data.state_vector.clear();
+    assert_rejects(&message, "stateVector (at least one required)");
+
+    let mut message = base();
+    message.header.originator = " ".into();
+    assert_rejects(&message, "ORIGINATOR");
+
+    let mut message = Oem::from_xml(XML).unwrap();
+    let segment = &mut message.body.segment[0];
+    let mut covariance = segment.data.covariance_matrix[0].clone();
+    covariance.epoch = segment.metadata.start_time;
+    segment.data.covariance_matrix.push(covariance);
+    assert_rejects(&message, "covarianceMatrix EPOCH");
+}
+
+#[test]
+fn kvn_generation_rejects_what_only_kvn_cannot_hold() {
+    // Valid models that KVN cannot represent: text outside printable ASCII (7.3.4) and
+    // non-finite numbers (7.5.4). XML carries them, so only the KVN paths fail.
+    let check = |message: Oem, path: &str| {
+        message.validate().unwrap();
+        message.to_xml().unwrap();
+        let mut output = Vec::new();
+        for error in [
+            message.to_kvn().unwrap_err(),
+            message.write_kvn_to(&mut output).unwrap_err(),
+        ] {
+            assert_eq!(error.field_path().as_deref(), Some(path), "{error}");
+        }
+        assert!(output.is_empty(), "streaming KVN wrote bytes for {path}");
+    };
+    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    message.header.comment = vec!["caf\u{e9}".into()];
+    check(message, "header.comment");
+
+    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    message.header.originator = "caf\u{e9}".into();
+    check(message, "header.originator");
+
+    let mut message = Oem::from_kvn(KVN_FIXTURES[1]).unwrap();
+    let state = &mut message.body.segment[0].data.state_vector[0];
+    state.x_ddot.as_mut().unwrap().value = f64::NAN;
+    check(message, "body.segment[0].data.state_vector[0].x_ddot");
+
+    let mut message = Oem::from_xml(XML).unwrap();
+    message.body.segment[0].data.covariance_matrix[0].cz_x.value = f64::INFINITY;
+    check(message, "body.segment[0].data.covariance_matrix[0].cz_x");
 }
