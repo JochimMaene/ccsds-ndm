@@ -239,6 +239,8 @@ class AcmAttitudeDetermination:
         r"""
         Attitude determination block identifier.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
+
         :type: str | None
         """
     @ad_id.setter
@@ -247,6 +249,8 @@ class AcmAttitudeDetermination:
     def ad_prev_id(self) -> typing.Optional[builtins.str]:
         r"""
         Previous attitude determination block identifier.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
 
         :type: str | None
         """
@@ -257,6 +261,8 @@ class AcmAttitudeDetermination:
         r"""
         Attitude determination method.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
+
         :type: str | None
         """
     @ad_method.setter
@@ -265,6 +271,8 @@ class AcmAttitudeDetermination:
     def attitude_source(self) -> typing.Optional[builtins.str]:
         r"""
         Source of attitude estimate.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
 
         :type: str | None
         """
@@ -275,6 +283,8 @@ class AcmAttitudeDetermination:
         r"""
         Number of estimator states.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
+
         :type: int | None
         """
     @number_states.setter
@@ -283,6 +293,8 @@ class AcmAttitudeDetermination:
     def attitude_states(self) -> typing.Optional[builtins.str]:
         r"""
         Attitude state type for estimator.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
 
         :type: str | None
         """
@@ -301,6 +313,8 @@ class AcmAttitudeDetermination:
     def cov_type(self) -> typing.Optional[builtins.str]:
         r"""
         Covariance type for estimator.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.7.
 
         :type: str | None
         """
@@ -322,6 +336,8 @@ class AcmAttitudeDetermination:
         r"""
         Source reference frame.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
+
         :type: str | None
         """
     @ref_frame_a.setter
@@ -330,6 +346,8 @@ class AcmAttitudeDetermination:
     def ref_frame_b(self) -> typing.Optional[builtins.str]:
         r"""
         Destination reference frame.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
 
         :type: str | None
         """
@@ -354,6 +372,8 @@ class AcmAttitudeDetermination:
         r"""
         Rate states type.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
+
         :type: str | None
         """
     @rate_states.setter
@@ -362,6 +382,8 @@ class AcmAttitudeDetermination:
     def sigma_u(self) -> typing.Optional[builtins.float]:
         r"""
         Rate random walk sigma_u.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
 
         :type: float | None
         """
@@ -372,6 +394,8 @@ class AcmAttitudeDetermination:
         r"""
         Angle random walk sigma_v.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
+
         :type: float | None
         """
     @sigma_v.setter
@@ -380,6 +404,8 @@ class AcmAttitudeDetermination:
     def rate_process_noise_stddev(self) -> typing.Optional[builtins.float]:
         r"""
         Rate process noise standard deviation.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
 
         :type: float | None
         """
@@ -427,6 +453,8 @@ class AcmAttitudeState:
         r"""
         Attitude state block identifier.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.5.
+
         :type: str | None
         """
     @att_id.setter
@@ -435,6 +463,8 @@ class AcmAttitudeState:
     def att_prev_id(self) -> typing.Optional[builtins.str]:
         r"""
         Previous attitude state block identifier.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.5.
 
         :type: str | None
         """
@@ -445,6 +475,8 @@ class AcmAttitudeState:
         r"""
         Basis of this attitude state data.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.5.
+
         :type: str | None
         """
     @att_basis.setter
@@ -453,6 +485,8 @@ class AcmAttitudeState:
     def att_basis_id(self) -> typing.Optional[builtins.str]:
         r"""
         Basis dataset identifier.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.5.
 
         :type: str | None
         """
@@ -519,6 +553,8 @@ class AcmAttitudeState:
         r"""
         Optional rate state type.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.5.
+
         :type: str | None
         """
     @rate_type.setter
@@ -527,6 +563,8 @@ class AcmAttitudeState:
     def euler_rot_seq(self) -> typing.Optional[builtins.str]:
         r"""
         Optional Euler rotation sequence.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.5.
 
         :type: str | None
         """
@@ -578,6 +616,8 @@ class AcmCovarianceMatrix:
         r"""
         Covariance history identifier.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.7.
+
         :type: str | None
         """
     @cov_id.setter
@@ -618,6 +658,8 @@ class AcmCovarianceMatrix:
         annex B, subsection B3.
 
         Examples: SC_BODY_1
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.7.
 
         :type: str | None
         """
@@ -780,6 +822,8 @@ class AcmManeuverParameters:
         r"""
         Maneuver block identifier.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.8.
+
         :type: str | None
         """
     @man_id.setter
@@ -788,6 +832,8 @@ class AcmManeuverParameters:
     def man_prev_id(self) -> typing.Optional[builtins.str]:
         r"""
         Previous maneuver block identifier.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.8.
 
         :type: str | None
         """
@@ -798,6 +844,8 @@ class AcmManeuverParameters:
         r"""
         Maneuver purpose.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.8.
+
         :type: str | None
         """
     @man_purpose.setter
@@ -806,6 +854,8 @@ class AcmManeuverParameters:
     def man_begin_time(self) -> typing.Optional[builtins.str]:
         r"""
         Maneuver begin time in seconds relative to EPOCH_TZERO.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.8.
 
         :type: str | None
         """
@@ -816,6 +866,8 @@ class AcmManeuverParameters:
         r"""
         Maneuver end time in seconds relative to EPOCH_TZERO.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.8.
+
         :type: str | None
         """
     @man_end_time.setter
@@ -824,6 +876,8 @@ class AcmManeuverParameters:
     def man_duration(self) -> typing.Optional[builtins.float]:
         r"""
         Maneuver duration in seconds.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.8.
 
         :type: float | None
         """
@@ -834,6 +888,8 @@ class AcmManeuverParameters:
         r"""
         Actuator used for this maneuver.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.8.
+
         :type: str | None
         """
     @actuator_used.setter
@@ -842,6 +898,8 @@ class AcmManeuverParameters:
     def target_momentum(self) -> typing.Optional[builtins.list[builtins.float]]:
         r"""
         Target momentum vector [x, y, z].
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.8.
 
         :type: list[float] | None
         """
@@ -854,6 +912,8 @@ class AcmManeuverParameters:
         r"""
         Reference frame of target momentum.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.8.
+
         :type: str | None
         """
     @target_mom_frame.setter
@@ -862,6 +922,8 @@ class AcmManeuverParameters:
     def target_attitude(self) -> typing.Optional[builtins.list[builtins.float]]:
         r"""
         Target attitude quaternion-like 4-vector.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.8.
 
         :type: list[float] | None
         """
@@ -873,6 +935,8 @@ class AcmManeuverParameters:
     def target_spinrate(self) -> typing.Optional[builtins.float]:
         r"""
         Target spin rate (deg/s).
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.8.
 
         :type: float | None
         """
@@ -922,6 +986,8 @@ class AcmMetadata:
 
         Examples: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
+
         :type: str | None
         """
     @international_designator.setter
@@ -947,6 +1013,8 @@ class AcmMetadata:
         r"""
         Satellite catalog source.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
+
         :type: str | None
         """
     @catalog_name.setter
@@ -955,6 +1023,8 @@ class AcmMetadata:
     def object_designator(self) -> typing.Optional[builtins.str]:
         r"""
         Unique object designator in the source catalog.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
 
         :type: str | None
         """
@@ -965,6 +1035,8 @@ class AcmMetadata:
         r"""
         Originator point-of-contact.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
+
         :type: str | None
         """
     @originator_poc.setter
@@ -973,6 +1045,8 @@ class AcmMetadata:
     def originator_position(self) -> typing.Optional[builtins.str]:
         r"""
         Originator point-of-contact position.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
 
         :type: str | None
         """
@@ -983,6 +1057,8 @@ class AcmMetadata:
         r"""
         Originator point-of-contact phone.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
+
         :type: str | None
         """
     @originator_phone.setter
@@ -991,6 +1067,8 @@ class AcmMetadata:
     def originator_email(self) -> typing.Optional[builtins.str]:
         r"""
         Originator point-of-contact email.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
 
         :type: str | None
         """
@@ -1001,6 +1079,8 @@ class AcmMetadata:
         r"""
         Originator point-of-contact address.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
+
         :type: str | None
         """
     @originator_address.setter
@@ -1010,6 +1090,8 @@ class AcmMetadata:
         r"""
         Linked Orbit Data Message identifier.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
+
         :type: str | None
         """
     @odm_msg_link.setter
@@ -1018,6 +1100,8 @@ class AcmMetadata:
     def center_name(self) -> typing.Optional[builtins.str]:
         r"""
         Central body name.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
 
         :type: str | None
         """
@@ -1057,6 +1141,8 @@ class AcmMetadata:
         r"""
         Included ACM data block elements.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
+
         :type: str | None
         """
     @acm_data_elements.setter
@@ -1065,6 +1151,8 @@ class AcmMetadata:
     def start_time(self) -> typing.Optional[builtins.str]:
         r"""
         Earliest data time in this ACM.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
 
         :type: str | None
         """
@@ -1075,6 +1163,8 @@ class AcmMetadata:
         r"""
         Latest data time in this ACM.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
+
         :type: str | None
         """
     @stop_time.setter
@@ -1083,6 +1173,8 @@ class AcmMetadata:
     def taimutc_at_tzero(self) -> typing.Optional[builtins.float]:
         r"""
         Difference (TAI - UTC) at EPOCH_TZERO, seconds.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
 
         :type: float | None
         """
@@ -1093,6 +1185,8 @@ class AcmMetadata:
         r"""
         Epoch of the next leap second.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
+
         :type: str | None
         """
     @next_leap_epoch.setter
@@ -1101,6 +1195,8 @@ class AcmMetadata:
     def next_leap_taimutc(self) -> typing.Optional[builtins.float]:
         r"""
         Difference (TAI - UTC) at NEXT_LEAP_EPOCH, seconds.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.3.
 
         :type: float | None
         """
@@ -1142,6 +1238,8 @@ class AcmPhysicalDescription:
         r"""
         Drag coefficient.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.6.
+
         :type: float | None
         """
     @drag_coeff.setter
@@ -1150,6 +1248,8 @@ class AcmPhysicalDescription:
     def wet_mass(self) -> typing.Optional[builtins.float]:
         r"""
         Wet mass (kg).
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.6.
 
         :type: float | None
         """
@@ -1160,6 +1260,8 @@ class AcmPhysicalDescription:
         r"""
         Dry mass (kg).
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.6.
+
         :type: float | None
         """
     @dry_mass.setter
@@ -1168,6 +1270,8 @@ class AcmPhysicalDescription:
     def cp_ref_frame(self) -> typing.Optional[builtins.str]:
         r"""
         Center-of-pressure reference frame.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.6.
 
         :type: str | None
         """
@@ -1178,6 +1282,8 @@ class AcmPhysicalDescription:
         r"""
         Center-of-pressure vector [x, y, z] in meters.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.6.
+
         :type: list[float] | None
         """
     @cp.setter
@@ -1186,6 +1292,8 @@ class AcmPhysicalDescription:
     def inertia_ref_frame(self) -> typing.Optional[builtins.str]:
         r"""
         Inertia reference frame.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.6.
 
         :type: str | None
         """
@@ -1196,6 +1304,8 @@ class AcmPhysicalDescription:
         r"""
         Moment of inertia IXX.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.6.
+
         :type: float | None
         """
     @ixx.setter
@@ -1204,6 +1314,8 @@ class AcmPhysicalDescription:
     def iyy(self) -> typing.Optional[builtins.float]:
         r"""
         Moment of inertia IYY.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.6.
 
         :type: float | None
         """
@@ -1214,6 +1326,8 @@ class AcmPhysicalDescription:
         r"""
         Moment of inertia IZZ.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.6.
+
         :type: float | None
         """
     @izz.setter
@@ -1222,6 +1336,8 @@ class AcmPhysicalDescription:
     def ixy(self) -> typing.Optional[builtins.float]:
         r"""
         Product of inertia IXY.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.6.
 
         :type: float | None
         """
@@ -1232,6 +1348,8 @@ class AcmPhysicalDescription:
         r"""
         Product of inertia IXZ.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.6.
+
         :type: float | None
         """
     @ixz.setter
@@ -1240,6 +1358,8 @@ class AcmPhysicalDescription:
     def iyz(self) -> typing.Optional[builtins.float]:
         r"""
         Product of inertia IYZ.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.6.
 
         :type: float | None
         """
@@ -1311,6 +1431,8 @@ class AcmSensor:
 
         Examples: 1, 2, 3
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
+
         :type: int | None
         """
     @sensor_number.setter
@@ -1319,6 +1441,8 @@ class AcmSensor:
     def sensor_used(self) -> typing.Optional[builtins.str]:
         r"""
         Sensor type identifier.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
 
         :type: str | None
         """
@@ -1340,6 +1464,8 @@ class AcmSensor:
         r"""
         Sensor noise standard deviation values.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
+
         :type: list[float] | None
         """
     @sensor_noise_stddev.setter
@@ -1350,6 +1476,8 @@ class AcmSensor:
     def sensor_frequency(self) -> typing.Optional[builtins.float]:
         r"""
         Sensor frequency in Hz.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
 
         :type: float | None
         """
@@ -1408,6 +1536,8 @@ class AdditionalParameters:
 
         Units: m²
 
+        CCSDS Reference: 508.0-B-1, Section 3.5.2.
+
         :type: Optional[float]
         """
     @area_pc.setter
@@ -1419,6 +1549,8 @@ class AdditionalParameters:
         definition.)
 
         Units: m²
+
+        CCSDS Reference: 508.0-B-1, Section 3.5.2.
 
         :type: Optional[float]
         """
@@ -1432,6 +1564,8 @@ class AdditionalParameters:
 
         Units: m²
 
+        CCSDS Reference: 508.0-B-1, Section 3.5.2.
+
         :type: Optional[float]
         """
     @area_srp.setter
@@ -1442,6 +1576,8 @@ class AdditionalParameters:
         The mass of the object.
 
         Units: kg
+
+        CCSDS Reference: 508.0-B-1, Section 3.5.2.
 
         :type: Optional[float]
         """
@@ -1455,6 +1591,8 @@ class AdditionalParameters:
 
         Units: m²/kg
 
+        CCSDS Reference: 508.0-B-1, Section 3.5.2.
+
         :type: Optional[float]
         """
     @cd_area_over_mass.setter
@@ -1466,6 +1604,8 @@ class AdditionalParameters:
         annex E for definition.)
 
         Units: m²/kg
+
+        CCSDS Reference: 508.0-B-1, Section 3.5.2.
 
         :type: Optional[float]
         """
@@ -1479,6 +1619,8 @@ class AdditionalParameters:
 
         Units: m/s²
 
+        CCSDS Reference: 508.0-B-1, Section 3.5.2.
+
         :type: Optional[float]
         """
     @thrust_acceleration.setter
@@ -1490,6 +1632,8 @@ class AdditionalParameters:
         value is an average calculated during the OD.
 
         Units: W/kg
+
+        CCSDS Reference: 508.0-B-1, Section 3.5.2.
 
         :type: Optional[float]
         """
@@ -1550,6 +1694,8 @@ class AdmHeader:
 
         Examples: APM_201113719185, ABC-12_34
 
+        CCSDS Reference: 504.0-B-2, Section 3.2.2.
+
         :type: Optional[str]
         """
     @message_id.setter
@@ -1561,6 +1707,8 @@ class AdmHeader:
         that selected values be pre-coordinated between exchanging entities by mutual agreement.
 
         Examples: SBU, ‘Operator-proprietary data; secondary distribution not permitted’
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.2.
 
         :type: Optional[str]
         """
@@ -1741,9 +1889,7 @@ class AemData:
         :type: numpy.ndarray
         """
     @attitude_states_numpy.setter
-    def attitude_states_numpy(
-        self, value: numpy.typing.NDArray[numpy.float64]
-    ) -> None: ...
+    def attitude_states_numpy(self, value: numpy.typing.ArrayLike) -> None: ...
     def __new__(
         cls,
         attitude_states: typing.Sequence[AttitudeState],
@@ -1758,7 +1904,7 @@ class AemData:
     @staticmethod
     def from_numpy(
         epochs: typing.Sequence[builtins.str],
-        array: numpy.typing.NDArray[numpy.float64],
+        array: numpy.typing.ArrayLike,
         attitude_type: builtins.str,
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> AemData: ...
@@ -1828,6 +1974,8 @@ class AemMetadata:
         system barycenter. The set of allowed values is described in annex B, subsection B8.
 
         Examples: EARTH, STS-106
+
+        CCSDS Reference: 504.0-B-2, Section 4.2.3.
 
         :type: str | None
         """
@@ -1915,6 +2063,8 @@ class AemMetadata:
 
         Examples: 1996-12-18T14:28:15.11
 
+        CCSDS Reference: 504.0-B-2, Section 4.2.3.
+
         :type: str | None
         """
     @useable_start_time.setter
@@ -1926,6 +2076,8 @@ class AemMetadata:
         this metadata block. (See also USEABLE_START_TIME.)
 
         Examples: 1996-12-18T14:28:15.11
+
+        CCSDS Reference: 504.0-B-2, Section 4.2.3.
 
         :type: str | None
         """
@@ -1958,6 +2110,8 @@ class AemMetadata:
 
         Examples: ZXZ, XYZ
 
+        CCSDS Reference: 504.0-B-2, Section 4.2.3.
+
         :type: str | None
         """
     @euler_rot_seq.setter
@@ -1972,6 +2126,8 @@ class AemMetadata:
 
         Examples: ICRF, SC_BODY_1
 
+        CCSDS Reference: 504.0-B-2, Section 4.2.3.
+
         :type: str | None
         """
     @angvel_frame.setter
@@ -1983,6 +2139,8 @@ class AemMetadata:
         following this metadata block.
 
         Examples: LINEAR, HERMITE, LAGRANGE
+
+        CCSDS Reference: 504.0-B-2, Section 4.2.3.
 
         :type: str | None
         """
@@ -1996,6 +2154,8 @@ class AemMetadata:
         the ‘INTERPOLATION_METHOD’ keyword is used.
 
         Examples: 1, 5
+
+        CCSDS Reference: 504.0-B-2, Section 4.2.3.
 
         :type: int | None
         """
@@ -2282,6 +2442,8 @@ class ApmData:
         Attitude quaternion. All mandatory elements are to be provided if the block is present.
         (See annex F for conventions and further detail.)
 
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
+
         :type: list[QuaternionState]
         """
     @quaternion_state.setter
@@ -2292,6 +2454,8 @@ class ApmData:
         Euler angle elements. All mandatory elements of the logical block are to be provided if the
         block is present. (See annex F for conventions and further detail.)
 
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
+
         :type: list[EulerAngleState]
         """
     @euler_angle_state.setter
@@ -2300,6 +2464,8 @@ class ApmData:
     def angular_velocity(self) -> list[AngVelState]:
         r"""
         Angular velocity vector.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
 
         :type: list[AngVelState]
         """
@@ -2333,6 +2499,8 @@ class ApmData:
     def maneuver_parameters(self) -> list[ApmManeuverParameters]:
         r"""
         Maneuver Parameters.
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
 
         :type: list[ApmManeuverParameters]
         """
@@ -2458,6 +2626,8 @@ class ApmManeuverParameters:
 
         The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
 
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
+
         :type: Optional[float]
         """
     @man_delta_mass.setter
@@ -2550,6 +2720,8 @@ class ApmMetadata:
         system barycenter. The set of allowed values is described in annex B, subsection B8.
 
         Examples: EARTH, BARYCENTER, MOON
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.3.
 
         :type: str | None
         """
@@ -2664,6 +2836,8 @@ class AtmosphericReentryParameters:
 
         Units: d
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @orbit_lifetime_window_start.setter
@@ -2680,6 +2854,8 @@ class AtmosphericReentryParameters:
 
         Units: d
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @orbit_lifetime_window_end.setter
@@ -2692,6 +2868,8 @@ class AtmosphericReentryParameters:
         Predicted epoch at which the object’s altitude permanently drops below
         NOMINAL_REENTRY_ALTITUDE (formatting rules specified in 5.3.3.5).
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[str]
         """
     @nominal_reentry_epoch.setter
@@ -2702,6 +2880,8 @@ class AtmosphericReentryParameters:
         Start epoch of the predicted atmospheric re-entry window (formatting rules specified in
         5.3.3.5).
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[str]
         """
     @reentry_window_start.setter
@@ -2711,6 +2891,8 @@ class AtmosphericReentryParameters:
         r"""
         End epoch of the predicted atmospheric re-entry window (formatting rules specified in
         5.3.3.5).
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[str]
         """
@@ -2724,6 +2906,8 @@ class AtmosphericReentryParameters:
         REENTRY_WINDOW_START and REENTRY_WINDOW_END.
 
         Units: %
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -3573,7 +3757,7 @@ class CdmCovarianceMatrix:
     ) -> CdmCovarianceMatrix: ...
     @staticmethod
     def from_numpy(
-        array: numpy.typing.NDArray[numpy.float64],
+        array: numpy.typing.ArrayLike,
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> CdmCovarianceMatrix: ...
     def to_numpy(self) -> numpy.typing.NDArray[numpy.float64]:
@@ -3669,9 +3853,7 @@ class CdmData:
         :type: numpy.ndarray
         """
     @state_vector_numpy.setter
-    def state_vector_numpy(
-        self, value: numpy.typing.NDArray[numpy.float64]
-    ) -> None: ...
+    def state_vector_numpy(self, value: numpy.typing.ArrayLike) -> None: ...
     @property
     def covariance_matrix_numpy(self) -> numpy.typing.NDArray[numpy.float64]:
         r"""
@@ -3684,7 +3866,7 @@ class CdmData:
         """
     @covariance_matrix_numpy.setter
     def covariance_matrix_numpy(
-        self, value: typing.Optional[numpy.typing.NDArray[numpy.float64]]
+        self, value: typing.Optional[numpy.typing.ArrayLike]
     ) -> None: ...
     def __new__(
         cls,
@@ -3692,15 +3874,15 @@ class CdmData:
         covariance_matrix: typing.Optional[CdmCovarianceMatrix] = None,
         od_parameters: typing.Optional[OdParameters] = None,
         additional_parameters: typing.Optional[AdditionalParameters] = None,
-        comments: typing.Optional[typing.Sequence[builtins.str]] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> CdmData: ...
     @staticmethod
     def from_numpy(
-        state_vector: numpy.typing.NDArray[numpy.float64],
-        covariance_matrix: typing.Optional[numpy.typing.NDArray[numpy.float64]] = None,
+        state_vector: numpy.typing.ArrayLike,
+        covariance_matrix: typing.Optional[numpy.typing.ArrayLike] = None,
         od_parameters: typing.Optional[OdParameters] = None,
         additional_parameters: typing.Optional[AdditionalParameters] = None,
-        comments: typing.Optional[typing.Sequence[builtins.str]] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> CdmData: ...
     def __repr__(self) -> builtins.str: ...
 
@@ -3773,6 +3955,8 @@ class CdmHeader:
         Spacecraft name(s) for which the CDM is provided.
 
         Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
+
+        CCSDS Reference: 508.0-B-1, Section 3.2.
 
         :type: Optional[str]
         """
@@ -3938,6 +4122,8 @@ class CdmMetadata:
 
         Examples: ORBITAL SAFETY ANALYST (OSA), NETWORK CONTROLLER
 
+        CCSDS Reference: 508.0-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @operator_contact_position.setter
@@ -3951,6 +4137,8 @@ class CdmMetadata:
 
         Examples: EUMETSAT, ESA, INTELSAT, IRIDIUM
 
+        CCSDS Reference: 508.0-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @operator_organization.setter
@@ -3962,6 +4150,8 @@ class CdmMetadata:
 
         Examples: +49615130312
 
+        CCSDS Reference: 508.0-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @operator_phone.setter
@@ -3972,6 +4162,8 @@ class CdmMetadata:
         Email address of the contact position or organization of the object.
 
         Examples: JOHN.DOE@SOMEWHERE.NET
+
+        CCSDS Reference: 508.0-B-1, Section 3.4.
 
         :type: Optional[str]
         """
@@ -3985,6 +4177,8 @@ class CdmMetadata:
 
         Examples: EARTH, SUN, MOON, MARS
 
+        CCSDS Reference: 508.0-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @orbit_center.setter
@@ -3996,6 +4190,8 @@ class CdmMetadata:
         definition).
 
         Examples: EGM-96: 36D 360, WGS-84_GEOID: 24D 240, JGM-2: 41D 410
+
+        CCSDS Reference: 508.0-B-1, Section 3.4.
 
         :type: Optional[str]
         """
@@ -4009,6 +4205,8 @@ class CdmMetadata:
 
         Examples: JACCHIA 70, MSIS, JACCHIA 70 DCA, NONE
 
+        CCSDS Reference: 508.0-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @atmospheric_model.setter
@@ -4020,6 +4218,8 @@ class CdmMetadata:
         specified, then no third-body gravitational perturbations were used.
 
         Examples: MOON, SUN, JUPITER, NONE
+
+        CCSDS Reference: 508.0-B-1, Section 3.4.
 
         :type: Optional[str]
         """
@@ -4055,6 +4255,8 @@ class CdmMetadata:
         The object type.
 
         Examples: PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, OTHER
+
+        CCSDS Reference: 508.0-B-1, Section 3.4.
 
         :type: Optional[ObjectDescription]
         """
@@ -4111,6 +4313,8 @@ class CdmMetadata:
 
         Examples: YES, NO
 
+        CCSDS Reference: 508.0-B-1, Section 3.4.
+
         :type: Optional[bool]
         """
     @solar_rad_pressure.setter
@@ -4122,6 +4326,8 @@ class CdmMetadata:
 
         Examples: YES, NO
 
+        CCSDS Reference: 508.0-B-1, Section 3.4.
+
         :type: Optional[bool]
         """
     @earth_tides.setter
@@ -4132,6 +4338,8 @@ class CdmMetadata:
         Indication of whether in-track thrust modeling was used for the OD of the object.
 
         Examples: YES, NO
+
+        CCSDS Reference: 508.0-B-1, Section 3.4.
 
         :type: Optional[bool]
         """
@@ -4305,10 +4513,10 @@ class CdmStateVector:
         x_dot: builtins.float,
         y_dot: builtins.float,
         z_dot: builtins.float,
-        comments: typing.Optional[typing.Sequence[builtins.str]] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> CdmStateVector: ...
     @staticmethod
-    def from_numpy(array: numpy.typing.NDArray[numpy.float64]) -> CdmStateVector: ...
+    def from_numpy(array: numpy.typing.ArrayLike) -> CdmStateVector: ...
     def __repr__(self) -> builtins.str: ...
     def to_numpy(self) -> numpy.typing.NDArray[numpy.float64]:
         r"""
@@ -4543,6 +4751,8 @@ class EulerAngleState:
 
         Units: deg/s
 
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
+
         :type: Optional[float]
         """
     @angle_1_dot.setter
@@ -4554,6 +4764,8 @@ class EulerAngleState:
 
         Units: deg/s
 
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
+
         :type: Optional[float]
         """
     @angle_2_dot.setter
@@ -4564,6 +4776,8 @@ class EulerAngleState:
         Time derivative of angle of the third rotation.
 
         Units: deg/s
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
 
         :type: Optional[float]
         """
@@ -4680,6 +4894,8 @@ class GroundImpactParameters:
         r"""
         Probability that any fragment will impact the Earth (either land or sea; 0 to 1).
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @probability_of_impact.setter
@@ -4689,6 +4905,8 @@ class GroundImpactParameters:
         r"""
         Probability that the entire object and any fragments will burn up during atmospheric
         re-entry (0 to 1).
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -4701,6 +4919,8 @@ class GroundImpactParameters:
         r"""
         Probability that the object will break up during re-entry (0 to 1).
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @probability_of_break_up.setter
@@ -4711,6 +4931,8 @@ class GroundImpactParameters:
     def probability_of_land_impact(self) -> typing.Optional[builtins.float]:
         r"""
         Probability that any fragment will impact solid ground (0 to 1).
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -4724,6 +4946,8 @@ class GroundImpactParameters:
         Probability that the re-entry event will cause any casualties (severe injuries or
         deaths—0 to 1).
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @probability_of_casualty.setter
@@ -4735,6 +4959,8 @@ class GroundImpactParameters:
         r"""
         Epoch of the predicted impact (formatting rules specified in 5.3.3.5).
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[str]
         """
     @nominal_impact_epoch.setter
@@ -4744,6 +4970,8 @@ class GroundImpactParameters:
         r"""
         Start epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[str]
         """
     @impact_window_start.setter
@@ -4752,6 +4980,8 @@ class GroundImpactParameters:
     def impact_window_end(self) -> typing.Optional[builtins.str]:
         r"""
         End epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[str]
         """
@@ -4764,6 +4994,8 @@ class GroundImpactParameters:
         value name column in the SANA celestial body reference frames registry, reference `[11]`.
         Only frames with the value ‘Body-Fixed’ in the Frame Type column shall be used.
         Mandatory if NOMINAL_IMPACT_LON and NOMINAL_IMPACT_LAT are present.
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[str]
         """
@@ -4778,6 +5010,8 @@ class GroundImpactParameters:
 
         Units: deg
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @nominal_impact_lon.setter
@@ -4791,6 +5025,8 @@ class GroundImpactParameters:
 
         Units: deg
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @nominal_impact_lat.setter
@@ -4802,6 +5038,8 @@ class GroundImpactParameters:
 
         Units: m
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @nominal_impact_alt.setter
@@ -4812,6 +5050,8 @@ class GroundImpactParameters:
         First (lowest) confidence interval for the impact location.
 
         Units: %
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -4826,6 +5066,8 @@ class GroundImpactParameters:
 
         Units: deg
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @impact_1_start_lon.setter
@@ -4838,6 +5080,8 @@ class GroundImpactParameters:
         the rules specified in 3.5.12.
 
         Units: deg
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -4852,6 +5096,8 @@ class GroundImpactParameters:
 
         Units: deg
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @impact_1_stop_lon.setter
@@ -4865,6 +5111,8 @@ class GroundImpactParameters:
 
         Units: deg
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @impact_1_stop_lat.setter
@@ -4875,6 +5123,8 @@ class GroundImpactParameters:
         Cross-track size of the first confidence interval.
 
         Units: km
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -4887,6 +5137,8 @@ class GroundImpactParameters:
         present if IMPACT_2_* is used.
 
         Units: %
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -4901,6 +5153,8 @@ class GroundImpactParameters:
 
         Units: deg
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @impact_2_start_lon.setter
@@ -4913,6 +5167,8 @@ class GroundImpactParameters:
         the rules specified in 3.5.12.
 
         Units: deg
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -4927,6 +5183,8 @@ class GroundImpactParameters:
 
         Units: deg
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @impact_2_stop_lon.setter
@@ -4940,6 +5198,8 @@ class GroundImpactParameters:
 
         Units: deg
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @impact_2_stop_lat.setter
@@ -4950,6 +5210,8 @@ class GroundImpactParameters:
         Cross-track size of the second confidence interval.
 
         Units: km
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -4962,6 +5224,8 @@ class GroundImpactParameters:
         be present if IMPACT_3_* is used.
 
         Units: %
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -4976,6 +5240,8 @@ class GroundImpactParameters:
 
         Units: deg
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @impact_3_start_lon.setter
@@ -4988,6 +5254,8 @@ class GroundImpactParameters:
         the rules specified in 3.5.12.
 
         Units: deg
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -5002,6 +5270,8 @@ class GroundImpactParameters:
 
         Units: deg
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @impact_3_stop_lon.setter
@@ -5015,6 +5285,8 @@ class GroundImpactParameters:
 
         Units: deg
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @impact_3_stop_lat.setter
@@ -5025,6 +5297,8 @@ class GroundImpactParameters:
         Cross-track size of the third confidence interval.
 
         Units: km
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -5330,6 +5604,8 @@ class KeplerianElements:
 
         Units: deg
 
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
+
         :type: Optional[float]
         """
     @true_anomaly.setter
@@ -5340,6 +5616,8 @@ class KeplerianElements:
         True anomaly or mean anomaly
 
         Units: deg
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
 
         :type: Optional[float]
         """
@@ -5561,6 +5839,8 @@ class MeanElements:
         Examples: 398600.44
 
         Units: km³/s²
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
 
         :type: Optional[float]
         """
@@ -5814,6 +6094,8 @@ class OcmCovarianceMatrix:
 
         Examples: COV_20160402_XYZ
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.7.
+
         :type: Optional[str]
         """
     @cov_id.setter
@@ -5829,6 +6111,8 @@ class OcmCovarianceMatrix:
 
         Examples: COV_20160305a
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.7.
+
         :type: Optional[str]
         """
     @cov_prev_id.setter
@@ -5843,6 +6127,8 @@ class OcmCovarianceMatrix:
         COV_NEXT_ID should be excluded from this message.
 
         Examples: COV_20160305C
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.7.
 
         :type: Optional[str]
         """
@@ -5862,6 +6148,8 @@ class OcmCovarianceMatrix:
 
         Examples: PREDICTED, EMPIRICAL, DETERMINED, SIMULATED, OTHER
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.7.
+
         :type: Optional[str]
         """
     @cov_basis.setter
@@ -5875,6 +6163,8 @@ class OcmCovarianceMatrix:
         history, the COV_BASIS_ID should match the corresponding OD_ID (see table 6-11).
 
         Examples: OD_5910
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.7.
 
         :type: Optional[str]
         """
@@ -5902,6 +6192,8 @@ class OcmCovarianceMatrix:
 
         Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.7.
+
         :type: Optional[str]
         """
     @cov_frame_epoch.setter
@@ -5913,6 +6205,8 @@ class OcmCovarianceMatrix:
 
         Examples: 0.5
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.7.
+
         :type: Optional[float]
         """
     @cov_scale_min.setter
@@ -5923,6 +6217,8 @@ class OcmCovarianceMatrix:
         Maximum scale factor to apply to this covariance data to achieve realism.
 
         Examples: 5.0
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.7.
 
         :type: Optional[float]
         """
@@ -5938,6 +6234,8 @@ class OcmCovarianceMatrix:
         Examples: 50
 
         Units: %
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.7.
 
         :type: Optional[float]
         """
@@ -5987,6 +6285,8 @@ class OcmCovarianceMatrix:
         subsections B7 and B8).
 
         Examples: [km,km,km,km/s,km/s,km/s]
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.7.
 
         :type: Optional[str]
         """
@@ -6177,6 +6477,8 @@ class OcmManeuverParameters:
         first in a sequence of maneuvers, then MAN_PREV_ID should be excluded from this
         message.
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+
         :type: Optional[str]
         """
     @man_prev_id.setter
@@ -6188,6 +6490,8 @@ class OcmManeuverParameters:
         MAN_BASIS, contained either within this message, or presented in a future OCM. If this
         message is not part of a sequence of maneuver messages or if this maneuver is the last
         in a sequence of maneuvers, then MAN_NEXT_ID should be excluded from this message.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
 
         :type: Optional[str]
         """
@@ -6207,6 +6511,8 @@ class OcmManeuverParameters:
         calibration, 'SIMULATED' for generic maneuver simulations, future mission design
         studies, and optimization studies, 'OTHER' for other bases of this data.
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+
         :type: Optional[str]
         """
     @man_basis.setter
@@ -6218,6 +6524,8 @@ class OcmManeuverParameters:
         navigation solution, or simulation upon which this maneuver time history block is
         based. Where a matching orbit determination block accompanies this maneuver time
         history, the MAN_BASIS_ID should match the corresponding OD_ID (see table 6-11).
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
 
         :type: Optional[str]
         """
@@ -6241,6 +6549,8 @@ class OcmManeuverParameters:
         r"""
         Identifies the completion time of the previous maneuver for this MAN_BASIS.
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+
         :type: Optional[str]
         """
     @man_prev_epoch.setter
@@ -6249,6 +6559,8 @@ class OcmManeuverParameters:
     def man_next_epoch(self) -> typing.Optional[builtins.str]:
         r"""
         Identifies the start time of the next maneuver for this MAN_BASIS.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
 
         :type: Optional[str]
         """
@@ -6259,6 +6571,8 @@ class OcmManeuverParameters:
         r"""
         A free-text field used to specify the intention(s) of the maneuver. Multiple maneuver
         purposes can be provided as a comma-delimited list.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
 
         :type: Optional[str]
         """
@@ -6271,6 +6585,8 @@ class OcmManeuverParameters:
         which the maneuver is based. While there is no CCSDS-based restriction on the value for
         this free-text keyword, it is suggested to consider using TRAJ_ID and OD_ID keywords
         as described in tables 6-4 and 6-11, respectively, or a combination thereof.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
 
         :type: Optional[str]
         """
@@ -6296,6 +6612,8 @@ class OcmManeuverParameters:
         Epoch of the maneuver data reference frame, if not intrinsic to the definition of the
         reference frame. (See 7.5.10 for formatting rules.)
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+
         :type: Optional[str]
         """
     @man_frame_epoch.setter
@@ -6307,6 +6625,8 @@ class OcmManeuverParameters:
         (planets, asteroids, comets, and natural satellites), including any planet barycenter
         or the solar system barycenter. (See annex B, subsection B2, for acceptable
         GRAV_ASSIST_NAME values and the procedure to propose new values.)
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
 
         :type: Optional[str]
         """
@@ -6335,6 +6655,8 @@ class OcmManeuverParameters:
         the satellite is first placed into a special duty-cycle-based maneuver mode. This
         keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+
         :type: Optional[str]
         """
     @dc_win_open.setter
@@ -6347,6 +6669,8 @@ class OcmManeuverParameters:
         satellite is taken out of a special duty-cycle-based maneuver mode. This keyword shall
         be set if DC_TYPE ≠ 'CONTINUOUS'.
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+
         :type: Optional[str]
         """
     @dc_win_close.setter
@@ -6357,6 +6681,8 @@ class OcmManeuverParameters:
         Minimum number of 'ON' duty cycles (may override DC_EXEC_STOP). This value is optional
         even if DC_TYPE = 'CONTINUOUS'.
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+
         :type: Optional[int]
         """
     @dc_min_cycles.setter
@@ -6366,6 +6692,8 @@ class OcmManeuverParameters:
         r"""
         Maximum number of 'ON' duty cycles (may override DC_EXEC_STOP). This value is optional
         even if DC_TYPE = 'CONTINUOUS'.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
 
         :type: Optional[int]
         """
@@ -6379,6 +6707,8 @@ class OcmManeuverParameters:
         cycle sequence. DC_EXEC_START must be scheduled to occur coincident with or after
         DC_WIN_OPEN. This keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+
         :type: Optional[str]
         """
     @dc_exec_start.setter
@@ -6390,6 +6720,8 @@ class OcmManeuverParameters:
         typically occurs on or after the end of the final maneuver 'ON' portion within the duty
         cycle sequence. DC_EXEC_STOP must be scheduled to occur coincident with or prior to
         DC_WIN_CLOSE. This keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
 
         :type: Optional[str]
         """
@@ -6403,6 +6735,8 @@ class OcmManeuverParameters:
         NOTE—Depending upon EPOCH_TZERO, DC_REF_TIME relative times may be negative. This
         keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'.
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+
         :type: Optional[str]
         """
     @dc_ref_time.setter
@@ -6415,6 +6749,8 @@ class OcmManeuverParameters:
         shall be set if DC_TYPE ≠ 'CONTINUOUS'.
 
         Units: s
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
 
         :type: Optional[float]
         """
@@ -6431,6 +6767,8 @@ class OcmManeuverParameters:
 
         Units: s
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+
         :type: Optional[float]
         """
     @dc_time_pulse_period.setter
@@ -6444,6 +6782,8 @@ class OcmManeuverParameters:
         DC_PA_START_ANGLE for phasing). This (tripartite, or three-element vector) value shall
         be provided if DC_TYPE = 'TIME_AND_ANGLE'. This reference direction does not represent
         the duty cycle midpoint.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
 
         :type: Optional[list[float]]
         """
@@ -6459,6 +6799,8 @@ class OcmManeuverParameters:
         set of values indicated in annex B, subsection B6. This keyword shall be set if
         DC_TYPE = 'TIME_AND_ANGLE'.
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+
         :type: Optional[str]
         """
     @dc_body_frame.setter
@@ -6471,6 +6813,8 @@ class OcmManeuverParameters:
         projection onto the spin plane crosses the corresponding projection of DC_REF_DIR onto
         the spin plane, this angle-based duty cycle is initiated (see DC_PA_START_ANGLE for
         phasing). This tripartite value shall be provided if DC_TYPE = 'TIME_AND_ANGLE'.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
 
         :type: Optional[list[float]]
         """
@@ -6492,6 +6836,8 @@ class OcmManeuverParameters:
 
         Units: deg
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+
         :type: Optional[float]
         """
     @dc_pa_start_angle.setter
@@ -6508,6 +6854,8 @@ class OcmManeuverParameters:
         360 degrees. This keyword shall be set if DC_TYPE = 'TIME_AND_ANGLE'.
 
         Units: deg
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
 
         :type: Optional[float]
         """
@@ -6538,6 +6886,8 @@ class OcmManeuverParameters:
         non-dimensional values, and text strings shall be labelled as 'n/a'. NOTE—The listing
         of units via the MAN_UNITS keyword does not override the mandatory units for the
         selected MAN_COMPOSITION, as specified in table 6-8 or table 6-9.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
 
         :type: Optional[str]
         """
@@ -6766,6 +7116,8 @@ class OcmMetadata:
 
         Examples: SPOT-7, ENVISAT, IRIDIUM NEXT-8, INTELSAT G-15, UNKNOWN
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @object_name.setter
@@ -6785,6 +7137,8 @@ class OcmMetadata:
 
         Examples: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @international_designator.setter
@@ -6803,6 +7157,8 @@ class OcmMetadata:
 
         Examples: CSPOC, RFSA, ESA, COMSPOC
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @catalog_name.setter
@@ -6817,6 +7173,8 @@ class OcmMetadata:
 
         Examples: 22444, 18SPCS 18571, 2147483648_04ae[...]d84c, UNKNOWN
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @object_designator.setter
@@ -6830,6 +7188,8 @@ class OcmMetadata:
 
         Examples: SV08, IN8
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @alternate_names.setter
@@ -6840,6 +7200,8 @@ class OcmMetadata:
         Free-text field containing originator or programmatic Point-of-Contact (POC) for OCM.
 
         Examples: Mr. Rodgers
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[str]
         """
@@ -6852,6 +7214,8 @@ class OcmMetadata:
 
         Examples: Flight Dynamics, Mission Design Lead
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @originator_position.setter
@@ -6862,6 +7226,8 @@ class OcmMetadata:
         Free-text field containing originator PoC phone number.
 
         Examples: +12345678901
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[str]
         """
@@ -6874,6 +7240,8 @@ class OcmMetadata:
 
         Examples: JOHN.DOE@SOMEWHERE.ORG
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @originator_email.setter
@@ -6885,6 +7253,8 @@ class OcmMetadata:
         (suggest comma-delimited address lines).
 
         Examples: 5040 Spaceflight Ave., Cocoa Beach, FL, USA, 12345
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[str]
         """
@@ -6899,6 +7269,8 @@ class OcmMetadata:
 
         Examples: NASA, ESA, JAXA
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @tech_org.setter
@@ -6909,6 +7281,8 @@ class OcmMetadata:
         Free-text field containing technical PoC for OCM.
 
         Examples: Maxwell Smart
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[str]
         """
@@ -6921,6 +7295,8 @@ class OcmMetadata:
 
         Examples: Flight Dynamics, Mission Design Lead
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @tech_position.setter
@@ -6931,6 +7307,8 @@ class OcmMetadata:
         Free-text field containing technical PoC phone number.
 
         Examples: +49615130312
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[str]
         """
@@ -6943,6 +7321,8 @@ class OcmMetadata:
 
         Examples: JOHN.DOE@SOMEWHERE.ORG
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @tech_email.setter
@@ -6954,6 +7334,8 @@ class OcmMetadata:
         (suggest comma-delimited address lines).
 
         Examples: 5040 Spaceflight Ave., Cocoa Beach, FL, USA, 12345
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[str]
         """
@@ -6982,6 +7364,8 @@ class OcmMetadata:
 
         Examples: OCM 201113719184, ABC-12_33
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @previous_message_id.setter
@@ -6996,6 +7380,8 @@ class OcmMetadata:
 
         Examples: OCM 201113719186, ABC-12_35
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @next_message_id.setter
@@ -7007,6 +7393,8 @@ class OcmMetadata:
         (reference `[10]`) that are linked (relevant) to this Orbit Data Message.
 
         Examples: ADM_MSG_35132.txt, ADM_ID_0572
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[str]
         """
@@ -7020,6 +7408,8 @@ class OcmMetadata:
 
         Examples: CDM_MSG_35132.txt, CDM_ID_8257
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @cdm_msg_link.setter
@@ -7032,6 +7422,8 @@ class OcmMetadata:
 
         Examples: PRM_MSG_35132.txt, PRM_ID_6897
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @prm_msg_link.setter
@@ -7043,6 +7435,8 @@ class OcmMetadata:
         (reference `[12]`) that are linked (relevant) to this Orbit Data Message.
 
         Examples: RDM_MSG_35132.txt, RDM_ID_1839
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[str]
         """
@@ -7057,6 +7451,8 @@ class OcmMetadata:
 
         Examples: TDM_MSG_37.txt, TDM_835, TDM_836
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @tdm_msg_link.setter
@@ -7068,6 +7464,8 @@ class OcmMetadata:
 
         Examples: INTELSAT
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @operator.setter
@@ -7078,6 +7476,8 @@ class OcmMetadata:
         Free-text field containing the owner of the space object.
 
         Examples: SIRIUS
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[str]
         """
@@ -7091,6 +7491,8 @@ class OcmMetadata:
 
         Examples: US, SPAIN
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @country.setter
@@ -7102,6 +7504,8 @@ class OcmMetadata:
         belongs.
 
         Examples: SPIRE
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[str]
         """
@@ -7115,6 +7519,8 @@ class OcmMetadata:
 
         Examples: PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, OTHER
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @object_type.setter
@@ -7127,6 +7533,8 @@ class OcmMetadata:
 
         Examples: OPERATIONAL
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @ops_status.setter
@@ -7138,6 +7546,8 @@ class OcmMetadata:
         annex B, subsection B14.
 
         Examples: GEO, LEO
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[str]
         """
@@ -7154,6 +7564,8 @@ class OcmMetadata:
 
         Examples: ORB, ORB, PHYS, COV, MAN, MAN, PERT, OD, USER
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @ocm_data_elements.setter
@@ -7165,6 +7577,8 @@ class OcmMetadata:
         used if the SCLK timescale is employed by the user.
 
         Units: s
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[float]
         """
@@ -7179,6 +7593,8 @@ class OcmMetadata:
 
         Units: s
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[float]
         """
     @sclk_sec_per_si_sec.setter
@@ -7191,6 +7607,8 @@ class OcmMetadata:
         without supplying the PREVIOUS_MESSAGE_ID, and vice versa.
 
         Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[str]
         """
@@ -7205,6 +7623,8 @@ class OcmMetadata:
 
         Examples: 2001-11-07T11:17:33
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @next_message_epoch.setter
@@ -7217,6 +7637,8 @@ class OcmMetadata:
 
         Examples: 2001-11-06T00:00:00
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @start_time.setter
@@ -7228,6 +7650,8 @@ class OcmMetadata:
         time tag.
 
         Examples: 2001-11-08T00:00:00
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[str]
         """
@@ -7242,6 +7666,8 @@ class OcmMetadata:
 
         Units: d
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[float]
         """
     @time_span.setter
@@ -7254,6 +7680,8 @@ class OcmMetadata:
 
         Units: s
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[float]
         """
     @taimutc_at_tzero.setter
@@ -7264,6 +7692,8 @@ class OcmMetadata:
         Epoch of next leap second, specified as an absolute time tag.
 
         Examples: 2016-12-31T23:59:60
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[str]
         """
@@ -7278,6 +7708,8 @@ class OcmMetadata:
 
         Units: s
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[float]
         """
     @next_leap_taimutc.setter
@@ -7288,6 +7720,8 @@ class OcmMetadata:
         Difference (UT1 – UTC) in seconds, as modeled by the originator at epoch 'EPOCH_TZERO'.
 
         Units: s
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[float]
         """
@@ -7302,6 +7736,8 @@ class OcmMetadata:
 
         Examples: CELESTRAK_20201028
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
+
         :type: Optional[str]
         """
     @eop_source.setter
@@ -7312,6 +7748,8 @@ class OcmMetadata:
         Free-text field specifying the method used to select or interpolate sequential EOP data.
 
         Examples: PRECEDING_VALUE, NEAREST_NEIGHBOR, LINEAR, LAGRANGE_ORDER_5
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[str]
         """
@@ -7324,6 +7762,8 @@ class OcmMetadata:
         body (e.g., Sun/Earth/Planetary) ephemeris data used in the creation of this message.
 
         Examples: JPL_DE_FILES
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[str]
         """
@@ -7440,6 +7880,8 @@ class OcmOdParameters:
 
         Examples: 0
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+
         :type: Optional[str]
         """
     @od_prev_id.setter
@@ -7485,6 +7927,8 @@ class OcmOdParameters:
 
         Units: d
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
+
         :type: Optional[float]
         """
     @days_since_first_obs.setter
@@ -7496,6 +7940,8 @@ class OcmOdParameters:
         negative.
 
         Units: d
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
 
         :type: Optional[float]
         """
@@ -7509,6 +7955,8 @@ class OcmOdParameters:
 
         Units: d
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
+
         :type: Optional[float]
         """
     @recommended_od_span.setter
@@ -7521,6 +7969,8 @@ class OcmOdParameters:
 
         Units: d
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
+
         :type: Optional[float]
         """
     @actual_od_span.setter
@@ -7530,6 +7980,8 @@ class OcmOdParameters:
         r"""
         The number of observations available within the actual OD time span.
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
+
         :type: Optional[int]
         """
     @obs_available.setter
@@ -7538,6 +7990,8 @@ class OcmOdParameters:
     def obs_used(self) -> typing.Optional[builtins.int]:
         r"""
         The number of observations accepted within the actual OD time span.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
 
         :type: Optional[int]
         """
@@ -7549,6 +8003,8 @@ class OcmOdParameters:
         The number of sensor tracks available for the OD within the actual time span (see
         definition of 'tracks', 1.5.2).
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
+
         :type: Optional[int]
         """
     @tracks_available.setter
@@ -7558,6 +8014,8 @@ class OcmOdParameters:
         r"""
         The number of sensor tracks accepted for the OD within the actual time span (see
         definition of 'tracks', 1.5.2).
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
 
         :type: Optional[int]
         """
@@ -7570,6 +8028,8 @@ class OcmOdParameters:
 
         Units: d
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
+
         :type: Optional[float]
         """
     @maximum_obs_gap.setter
@@ -7580,6 +8040,8 @@ class OcmOdParameters:
         Positional error ellipsoid 1σ major eigenvalue at the epoch of the OD.
 
         Units: m
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
 
         :type: Optional[float]
         """
@@ -7592,6 +8054,8 @@ class OcmOdParameters:
 
         Units: m
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
+
         :type: Optional[float]
         """
     @od_epoch_eigint.setter
@@ -7602,6 +8066,8 @@ class OcmOdParameters:
         Positional error ellipsoid 1σ minor eigenvalue at the epoch of the OD.
 
         Units: m
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
 
         :type: Optional[float]
         """
@@ -7615,6 +8081,8 @@ class OcmOdParameters:
 
         Units: m
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
+
         :type: Optional[float]
         """
     @od_max_pred_eigmaj.setter
@@ -7626,6 +8094,8 @@ class OcmOdParameters:
         over the entire TIME_SPAN of the OCM, stemming from this OD.
 
         Units: m
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
 
         :type: Optional[float]
         """
@@ -7640,6 +8110,8 @@ class OcmOdParameters:
 
         Units: %
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
+
         :type: Optional[float]
         """
     @od_confidence.setter
@@ -7653,6 +8125,8 @@ class OcmOdParameters:
         of the element set from the OD. Alternate GDOP formations may be used as mutually
         defined by message exchange participants.
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
+
         :type: Optional[float]
         """
     @gdop.setter
@@ -7661,6 +8135,8 @@ class OcmOdParameters:
     def solve_n(self) -> typing.Optional[builtins.int]:
         r"""
         The number of solve-for states in the orbit determination.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
 
         :type: Optional[int]
         """
@@ -7672,6 +8148,8 @@ class OcmOdParameters:
         Free-text comma-delimited description of the state elements solved for in the orbit
         determination.
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
+
         :type: Optional[str]
         """
     @solve_states.setter
@@ -7680,6 +8158,8 @@ class OcmOdParameters:
     def consider_n(self) -> typing.Optional[builtins.int]:
         r"""
         The number of consider parameters used in the orbit determination.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
 
         :type: Optional[int]
         """
@@ -7690,6 +8170,8 @@ class OcmOdParameters:
         r"""
         Free-text comma-delimited description of the consider parameters used in the orbit
         determination.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
 
         :type: Optional[str]
         """
@@ -7704,6 +8186,8 @@ class OcmOdParameters:
 
         Units: W/kg
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
+
         :type: Optional[float]
         """
     @sedr.setter
@@ -7713,6 +8197,8 @@ class OcmOdParameters:
         r"""
         The number of sensors used in the orbit determination.
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
+
         :type: Optional[int]
         """
     @sensors_n.setter
@@ -7721,6 +8207,8 @@ class OcmOdParameters:
     def sensors(self) -> typing.Optional[builtins.str]:
         r"""
         Free-text comma-delimited description of the sensors used in the orbit determination.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
 
         :type: Optional[str]
         """
@@ -7737,6 +8225,8 @@ class OcmOdParameters:
         the most recent vector update and is used by the analyst in evaluating the OD process.
         A value of 1.00 is ideal.
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
+
         :type: Optional[float]
         """
     @weighted_rms.setter
@@ -7751,6 +8241,8 @@ class OcmOdParameters:
         encouraged if the descriptors of table 3-5 are not sufficiently clear; for example, one
         could replace ANGLE_1 and ANGLE_2 with RADEC (e.g., from a telescope), AZEL (e.g., from
         a ground radar), RANGE (whether from radar or laser ranging), etc.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
 
         :type: Optional[str]
         """
@@ -7799,6 +8291,8 @@ class OcmPerturbations:
 
         Examples: MSISE90, NRLMSIS00, J70, J71, JROBERTS, DTM, JB2008
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[str]
         """
     @atmospheric_model.setter
@@ -7813,6 +8307,8 @@ class OcmPerturbations:
 
         Examples: EGM-96: 36D 36O, WGS-84: 8D 0O, GGM-01: 36D 36O, TEG-4: 36D 36O
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[str]
         """
     @gravity_model.setter
@@ -7825,6 +8321,8 @@ class OcmPerturbations:
 
         Units: km
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[float]
         """
     @equatorial_radius.setter
@@ -7836,6 +8334,8 @@ class OcmPerturbations:
         if different from the gravity model.
 
         Units: km³/s²
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
 
         :type: Optional[float]
         """
@@ -7851,6 +8351,8 @@ class OcmPerturbations:
 
         Examples: MOON, SUN, JUPITER
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[str]
         """
     @n_body_perturbations.setter
@@ -7865,6 +8367,8 @@ class OcmPerturbations:
 
         Units: deg/s
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[float]
         """
     @central_body_rotation.setter
@@ -7874,6 +8378,8 @@ class OcmPerturbations:
         r"""
         Central body's oblate spheroid oblateness for the polar-symmetric oblate central body
         model (e.g., for the Earth, it is approximately 1.0/298.257223563).
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
 
         :type: Optional[float]
         """
@@ -7888,6 +8394,8 @@ class OcmPerturbations:
 
         Examples: DIURNAL, SEMI-DIURNAL
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[str]
         """
     @ocean_tides_model.setter
@@ -7899,6 +8407,8 @@ class OcmPerturbations:
         semi-diurnal, etc.).
 
         Examples: DIURNAL, SEMI-DIURNAL
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
 
         :type: Optional[str]
         """
@@ -7913,6 +8423,8 @@ class OcmPerturbations:
 
         Examples: IAU1976/FK5, IAU2010, IERS1996
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[str]
         """
     @reduction_theory.setter
@@ -7922,6 +8434,8 @@ class OcmPerturbations:
         r"""
         Name of the albedo model.
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[str]
         """
     @albedo_model.setter
@@ -7930,6 +8444,8 @@ class OcmPerturbations:
     def albedo_grid_size(self) -> typing.Optional[builtins.int]:
         r"""
         Size of the albedo grid.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
 
         :type: Optional[int]
         """
@@ -7944,6 +8460,8 @@ class OcmPerturbations:
 
         Examples: NONE, CYLINDRICAL, CONE, DUAL_CONE
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[str]
         """
     @shadow_model.setter
@@ -7956,6 +8474,8 @@ class OcmPerturbations:
 
         Examples: EARTH, MOON
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[str]
         """
     @shadow_bodies.setter
@@ -7966,6 +8486,8 @@ class OcmPerturbations:
         Name of the Solar Radiation Pressure (SRP) model.
 
         Examples: CANNONBALL, FLAT_PLATE, BOX_WING
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
 
         :type: Optional[str]
         """
@@ -7978,6 +8500,8 @@ class OcmPerturbations:
 
         Examples: NOAA
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[str]
         """
     @sw_data_source.setter
@@ -7986,6 +8510,8 @@ class OcmPerturbations:
     def sw_data_epoch(self) -> typing.Optional[builtins.str]:
         r"""
         Epoch of the space weather data.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
 
         :type: Optional[str]
         """
@@ -8001,6 +8527,8 @@ class OcmPerturbations:
 
         Examples: PRECEDING_VALUE, NEAREST_NEIGHBOR, LINEAR, LAGRANGE_ORDER_5
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[str]
         """
     @sw_interp_method.setter
@@ -8009,6 +8537,8 @@ class OcmPerturbations:
     def fixed_geomag_kp(self) -> typing.Optional[builtins.float]:
         r"""
         Fixed geomagnetic Kp index.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
 
         :type: Optional[float]
         """
@@ -8019,6 +8549,8 @@ class OcmPerturbations:
         r"""
         Fixed geomagnetic Ap index.
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[float]
         """
     @fixed_geomag_ap.setter
@@ -8027,6 +8559,8 @@ class OcmPerturbations:
     def fixed_geomag_dst(self) -> typing.Optional[builtins.float]:
         r"""
         Fixed geomagnetic Dst index.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
 
         :type: Optional[float]
         """
@@ -8039,6 +8573,8 @@ class OcmPerturbations:
 
         Units: SFU
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[float]
         """
     @fixed_f10p7.setter
@@ -8049,6 +8585,8 @@ class OcmPerturbations:
         Fixed 81-day average F10.7 solar flux.
 
         Units: SFU
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
 
         :type: Optional[float]
         """
@@ -8061,6 +8599,8 @@ class OcmPerturbations:
 
         Units: SFU
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[float]
         """
     @fixed_m10p7.setter
@@ -8071,6 +8611,8 @@ class OcmPerturbations:
         Fixed 81-day average M10.7 solar flux.
 
         Units: SFU
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
 
         :type: Optional[float]
         """
@@ -8083,6 +8625,8 @@ class OcmPerturbations:
 
         Units: SFU
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[float]
         """
     @fixed_s10p7.setter
@@ -8093,6 +8637,8 @@ class OcmPerturbations:
         Fixed 81-day average S10.7 solar flux.
 
         Units: SFU
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
 
         :type: Optional[float]
         """
@@ -8105,6 +8651,8 @@ class OcmPerturbations:
 
         Units: SFU
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
+
         :type: Optional[float]
         """
     @fixed_y10p7.setter
@@ -8115,6 +8663,8 @@ class OcmPerturbations:
         Fixed 81-day average Y10.7 solar flux.
 
         Units: SFU
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.9.
 
         :type: Optional[float]
         """
@@ -8147,6 +8697,8 @@ class OcmPhysicalDescription:
 
         Examples: BOEING
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[str]
         """
     @manufacturer.setter
@@ -8171,6 +8723,8 @@ class OcmPhysicalDescription:
 
         Examples: 702
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[str]
         """
     @bus_model.setter
@@ -8182,6 +8736,8 @@ class OcmPhysicalDescription:
         object is docked to.
 
         Examples: ISS
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[str]
         """
@@ -8197,6 +8753,8 @@ class OcmPhysicalDescription:
 
         Units: m²
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @drag_const_area.setter
@@ -8208,6 +8766,8 @@ class OcmPhysicalDescription:
         zero, no atmospheric drag shall be considered.
 
         Examples: 2.2
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8225,6 +8785,8 @@ class OcmPhysicalDescription:
 
         Units: %
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @drag_uncertainty.setter
@@ -8237,6 +8799,8 @@ class OcmPhysicalDescription:
 
         Units: m²
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @srp_const_area.setter
@@ -8246,6 +8810,8 @@ class OcmPhysicalDescription:
         r"""
         Nominal Solar Radiation Pressure Coefficient (CR NOM). If the solar radiation
         coefficient, CR, is set to zero, no solar radiation pressure shall be considered.
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8261,6 +8827,8 @@ class OcmPhysicalDescription:
 
         Units: %
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @solar_rad_uncertainty.setter
@@ -8273,6 +8841,8 @@ class OcmPhysicalDescription:
         Examples: 500
 
         Units: kg
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8288,6 +8858,8 @@ class OcmPhysicalDescription:
 
         Units: kg
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @wet_mass.setter
@@ -8300,6 +8872,8 @@ class OcmPhysicalDescription:
         Examples: 300
 
         Units: kg
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8315,6 +8889,8 @@ class OcmPhysicalDescription:
 
         Examples: ITRF1997
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[str]
         """
     @oeb_parent_frame.setter
@@ -8326,6 +8902,8 @@ class OcmPhysicalDescription:
         intrinsic to the definition of the reference frame. (See 7.5.10 for formatting rules.)
 
         Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[str]
         """
@@ -8341,6 +8919,8 @@ class OcmPhysicalDescription:
 
         Examples: -0.575131822
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @oeb_q1.setter
@@ -8354,6 +8934,8 @@ class OcmPhysicalDescription:
         annex F, subsection F1). A value of '-999' denotes a tumbling space object.
 
         Examples: -0.280510532
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8369,6 +8951,8 @@ class OcmPhysicalDescription:
 
         Examples: -0.195634856
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @oeb_q3.setter
@@ -8383,6 +8967,8 @@ class OcmPhysicalDescription:
 
         Examples: 0.743144825
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @oeb_qc.setter
@@ -8395,6 +8981,8 @@ class OcmPhysicalDescription:
         Examples: 1
 
         Units: m
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8409,6 +8997,8 @@ class OcmPhysicalDescription:
 
         Units: m
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @oeb_int.setter
@@ -8422,6 +9012,8 @@ class OcmPhysicalDescription:
         Examples: 0.3
 
         Units: m
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8438,6 +9030,8 @@ class OcmPhysicalDescription:
 
         Units: m²
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @area_along_oeb_max.setter
@@ -8452,6 +9046,8 @@ class OcmPhysicalDescription:
         Examples: 0.3
 
         Units: m²
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8468,6 +9064,8 @@ class OcmPhysicalDescription:
 
         Units: m²
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @area_along_oeb_min.setter
@@ -8480,6 +9078,8 @@ class OcmPhysicalDescription:
         Examples: 1.0
 
         Units: m²
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8494,6 +9094,8 @@ class OcmPhysicalDescription:
 
         Units: m²
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @area_max_for_pc.setter
@@ -8505,6 +9107,8 @@ class OcmPhysicalDescription:
         orientations for collision probability estimation purposes.
 
         Units: m²
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8518,6 +9122,8 @@ class OcmPhysicalDescription:
 
         Units: m²
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @rcs.setter
@@ -8529,6 +9135,8 @@ class OcmPhysicalDescription:
 
         Units: m²
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @rcs_min.setter
@@ -8539,6 +9147,8 @@ class OcmPhysicalDescription:
         Maximum Radar Cross Section observed for this object.
 
         Units: m²
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8555,6 +9165,8 @@ class OcmPhysicalDescription:
 
         Examples: 15.0
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @vm_absolute.setter
@@ -8566,6 +9178,8 @@ class OcmPhysicalDescription:
 
         Examples: 15.0
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @vm_apparent.setter
@@ -8576,6 +9190,8 @@ class OcmPhysicalDescription:
         Minimum apparent Visual Magnitude observed for this space object.
 
         Examples: 19.0
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8589,6 +9205,8 @@ class OcmPhysicalDescription:
 
         Examples: 16.0
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @vm_apparent_max.setter
@@ -8601,6 +9219,8 @@ class OcmPhysicalDescription:
 
         Examples: 0.7
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @reflectance.setter
@@ -8612,6 +9232,8 @@ class OcmPhysicalDescription:
         Suggested examples include: THREE_AXIS, SPIN, DUAL_SPIN, TUMBLING, GRAVITY_GRADIENT
 
         Examples: SPIN
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[str]
         """
@@ -8626,6 +9248,8 @@ class OcmPhysicalDescription:
 
         Examples: ATT_THRUSTERS
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[str]
         """
     @att_actuator_type.setter
@@ -8638,6 +9262,8 @@ class OcmPhysicalDescription:
         Examples: 0.3
 
         Units: deg
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8653,6 +9279,8 @@ class OcmPhysicalDescription:
 
         Units: deg
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @att_control.setter
@@ -8666,6 +9294,8 @@ class OcmPhysicalDescription:
         Examples: 2.3
 
         Units: deg
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8681,6 +9311,8 @@ class OcmPhysicalDescription:
 
         Units: #/yr
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @avg_maneuver_freq.setter
@@ -8695,6 +9327,8 @@ class OcmPhysicalDescription:
 
         Units: N
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @max_thrust.setter
@@ -8708,6 +9342,8 @@ class OcmPhysicalDescription:
 
         Units: km/s
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @dv_bol.setter
@@ -8720,6 +9356,8 @@ class OcmPhysicalDescription:
         Examples: 0.2
 
         Units: km/s
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8735,6 +9373,8 @@ class OcmPhysicalDescription:
 
         Units: kg·m²
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @ixx.setter
@@ -8747,6 +9387,8 @@ class OcmPhysicalDescription:
         Examples: 800.0
 
         Units: kg·m²
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8761,6 +9403,8 @@ class OcmPhysicalDescription:
 
         Units: kg·m²
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @izz.setter
@@ -8773,6 +9417,8 @@ class OcmPhysicalDescription:
         Examples: 20.0
 
         Units: kg·m²
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -8787,6 +9433,8 @@ class OcmPhysicalDescription:
 
         Units: kg·m²
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
+
         :type: Optional[float]
         """
     @ixz.setter
@@ -8799,6 +9447,8 @@ class OcmPhysicalDescription:
         Examples: 60.0
 
         Units: kg·m²
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[float]
         """
@@ -9043,6 +9693,8 @@ class OcmTrajState:
 
         Examples: TRAJ_20160402_XYZ
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
+
         :type: Optional[str]
         """
     @traj_id.setter
@@ -9058,6 +9710,8 @@ class OcmTrajState:
 
         Examples: ORB20160305A
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
+
         :type: Optional[str]
         """
     @traj_prev_id.setter
@@ -9072,6 +9726,8 @@ class OcmTrajState:
         TRAJ_NEXT_ID should be excluded from this message.
 
         Examples: ORB20160305C
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
 
         :type: Optional[str]
         """
@@ -9091,6 +9747,8 @@ class OcmTrajState:
 
         Examples: PREDICTED
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
+
         :type: Optional[str]
         """
     @traj_basis.setter
@@ -9106,6 +9764,8 @@ class OcmTrajState:
 
         Examples: OD_5910
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
+
         :type: Optional[str]
         """
     @traj_basis_id.setter
@@ -9120,6 +9780,8 @@ class OcmTrajState:
 
         Examples: HERMITE, LINEAR, LAGRANGE, PROPAGATE
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
+
         :type: Optional[str]
         """
     @interpolation.setter
@@ -9133,6 +9795,8 @@ class OcmTrajState:
 
         Examples: 5, 1
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
+
         :type: Optional[int]
         """
     @interpolation_degree.setter
@@ -9145,6 +9809,8 @@ class OcmTrajState:
 
         Examples: HPOP, SP, SGP4
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
+
         :type: Optional[str]
         """
     @propagator.setter
@@ -9156,6 +9822,8 @@ class OcmTrajState:
         reference frame. (See 7.5.10 for formatting rules.)
 
         Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
 
         :type: Optional[str]
         """
@@ -9174,6 +9842,8 @@ class OcmTrajState:
 
         Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
+
         :type: Optional[str]
         """
     @useable_start_time.setter
@@ -9191,6 +9861,8 @@ class OcmTrajState:
 
         Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
+
         :type: Optional[str]
         """
     @useable_stop_time.setter
@@ -9204,6 +9876,8 @@ class OcmTrajState:
         = one ('1').
 
         Examples: 1500, 30007
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
 
         :type: Optional[float]
         """
@@ -9222,6 +9896,8 @@ class OcmTrajState:
         provided if ORB_REVNUM is specified.
 
         Examples: 0, 1
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
 
         :type: Optional[str]
         """
@@ -9243,6 +9919,8 @@ class OcmTrajState:
 
         Examples: OSCULATING, BROUWER, KOZAI
 
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
+
         :type: Optional[str]
         """
     @orb_averaging.setter
@@ -9259,6 +9937,8 @@ class OcmTrajState:
         TRAJ_TYPE (links to the relevant SANA registries provided in annex B, subsection B7).
 
         Examples: [km,km,km,km/s,km/s,km/s], [km,n/a,deg, deg, deg, deg]
+
+        CCSDS Reference: 502.0-B-3, Section 6.2.5.
 
         :type: Optional[str]
         """
@@ -9341,6 +10021,8 @@ class OdParameters:
         observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
         of zero duration (i.e., same value as that of TIME_LASTOB_END).
 
+        CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
+
         :type: Optional[str]
         """
     @time_lastob_start.setter
@@ -9351,6 +10033,8 @@ class OdParameters:
         The end of a time interval (UTC) that contains the time of the last accepted
         observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
         of zero duration (i.e., same value as that of TIME_LASTOB_START).
+
+        CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
 
         :type: Optional[str]
         """
@@ -9364,6 +10048,8 @@ class OdParameters:
         Examples: 14, 20.0
 
         Units: days
+
+        CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -9379,6 +10065,8 @@ class OdParameters:
 
         Units: days
 
+        CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @actual_od_span.setter
@@ -9387,6 +10075,8 @@ class OdParameters:
     def obs_available(self) -> typing.Optional[builtins.int]:
         r"""
         The total number of observations available for orbit determination.
+
+        CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
 
         :type: Optional[int]
         """
@@ -9397,6 +10087,8 @@ class OdParameters:
         r"""
         The number of observations used in the orbit determination.
 
+        CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
+
         :type: Optional[int]
         """
     @obs_used.setter
@@ -9406,6 +10098,8 @@ class OdParameters:
         r"""
         The total number of tracks available for orbit determination.
 
+        CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
+
         :type: Optional[int]
         """
     @tracks_available.setter
@@ -9414,6 +10108,8 @@ class OdParameters:
     def tracks_used(self) -> typing.Optional[builtins.int]:
         r"""
         The number of tracks used in the orbit determination.
+
+        CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
 
         :type: Optional[int]
         """
@@ -9426,6 +10122,8 @@ class OdParameters:
 
         Units: %
 
+        CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @residuals_accepted.setter
@@ -9434,6 +10132,8 @@ class OdParameters:
     def weighted_rms(self) -> typing.Optional[builtins.float]:
         r"""
         The weighted root mean square (RMS) of the residuals.
+
+        CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -9509,6 +10209,8 @@ class OdmHeader:
 
         Examples: OPM_201113719185, ABC-12_34
 
+        CCSDS Reference: 502.0-B-3, Section 3.2.2.
+
         :type: Optional[str]
         """
     @message_id.setter
@@ -9520,6 +10222,8 @@ class OdmHeader:
         that selected values be pre-coordinated between exchanging entities by mutual agreement.
 
         Examples: SBU, ‘Operator-proprietary data; secondary distribution not permitted’
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.2.
 
         :type: Optional[str]
         """
@@ -9615,7 +10319,16 @@ class Oem:
     def __repr__(self) -> builtins.str: ...
     def validate(self) -> None:
         r"""
-        Validate the message against CCSDS rules.
+        Validate the message model against CCSDS rules.
+
+        Writing additionally checks that the chosen notation can represent the message: XML
+        allows values KVN cannot, such as ``NaN`` states, so ``to_str("kvn")`` may still refuse
+        a message that passes this check.
+
+        Raises
+        ------
+        NdmValidationError
+            If the message breaks a CCSDS rule.
         """
     @staticmethod
     def from_str(
@@ -9670,7 +10383,7 @@ class OemCovarianceMatrix:
     ----------
     epoch : str
         Epoch of the covariance matrix (ISO 8601).
-        values : numpy.ndarray
+    values : numpy.ndarray
         NumPy array of shape (21,) containing the lower-triangular values, or (6,6) for
         a full symmetric matrix. Only the lower triangle of a (6,6) input is read, so a
         matrix that is symmetric only to within rounding is accepted as-is.
@@ -9746,6 +10459,8 @@ class OemCovarianceMatrix:
         values indicated in 3.2.3.3 or 3.2.4.11.
 
         Examples: ICRF, EME2000
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
 
         :type: Optional[str]
         """
@@ -10038,9 +10753,9 @@ class OemCovarianceMatrix:
     def __new__(
         cls,
         epoch: builtins.str,
-        values: numpy.typing.NDArray[numpy.float64],
-        cov_ref_frame: typing.Optional[builtins.str],
-        comment: typing.Sequence[builtins.str],
+        values: numpy.typing.ArrayLike,
+        cov_ref_frame: typing.Optional[builtins.str] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> OemCovarianceMatrix: ...
     def __repr__(self) -> builtins.str: ...
 
@@ -10051,11 +10766,11 @@ class OemData:
 
     Parameters
     ----------
-        state_vectors : list[StateVectorAcc]
+    state_vectors : list[StateVectorAcc]
         List of state vectors.
-        covariance_matrices : list[OemCovarianceMatrix], optional
+    covariance_matrices : list[OemCovarianceMatrix], optional
         Covariance matrices.
-        comments : list[str], optional
+    comment : list[str], optional
         Comments.
     """
     @property
@@ -10097,6 +10812,8 @@ class OemData:
         r"""
         Epochs for state vectors (ISO 8601).
 
+        The list is a copy; assigning a list of the same length updates the records in place.
+
         :type: list[str]
         """
     @state_vector_epochs.setter
@@ -10113,6 +10830,8 @@ class OemData:
 
         Matrices are given in lower triangular form in the covariance reference frame.
 
+        CCSDS Reference: 502.0-B-3, Section 5.2.5.
+
         :type: list[OemCovarianceMatrix]
         """
     @covariance_matrix.setter
@@ -10123,6 +10842,8 @@ class OemData:
     def covariance_matrix_epochs(self) -> builtins.list[builtins.str]:
         r"""
         Epochs for covariance matrices (ISO 8601).
+
+        The list is a copy; assigning a list of the same length updates the records in place.
 
         :type: list[str]
         """
@@ -10135,7 +10856,13 @@ class OemData:
         r"""
         State vectors as a NumPy array.
 
-        Use `state_vector_epochs` for the corresponding epochs.
+        Use `state_vector_epochs` for the corresponding epochs. The array is a copy: editing it
+        changes nothing until it is assigned back. Assigning updates the existing records in place
+        and needs one row per record. A six-column array removes any accelerations.
+
+        In the nine-column form a NaN acceleration means "absent", so a record whose acceleration
+        is an explicit NaN (possible in XML, ODM 8.13.4) loses that value when the array is assigned
+        back. Use the `state_vector` records to edit such values losslessly.
 
         Returns
         -------
@@ -10152,15 +10879,14 @@ class OemData:
         :type: numpy.ndarray
         """
     @state_vector_numpy.setter
-    def state_vector_numpy(
-        self, value: numpy.typing.NDArray[numpy.float64]
-    ) -> None: ...
+    def state_vector_numpy(self, value: numpy.typing.ArrayLike) -> None: ...
     @property
     def covariance_matrix_numpy(self) -> numpy.typing.NDArray[numpy.float64]:
         r"""
         Get covariance matrices as a NumPy array.
 
-        Use `covariance_matrix_epochs` for the corresponding epochs.
+        Use `covariance_matrix_epochs` for the corresponding epochs. The array is a copy: editing
+        it changes nothing until it is assigned back, which needs one matrix per record.
 
         The returned array is a 3D tensor of shape (N, 6, 6), where N is the number of covariance
         matrices. Each 6x6 matrix is symmetric and constructed from the lower-triangular CCSDS data.
@@ -10170,16 +10896,14 @@ class OemData:
         :type: numpy.ndarray
         """
     @covariance_matrix_numpy.setter
-    def covariance_matrix_numpy(
-        self, value: numpy.typing.NDArray[numpy.float64]
-    ) -> None: ...
+    def covariance_matrix_numpy(self, value: numpy.typing.ArrayLike) -> None: ...
     def __new__(
         cls,
         state_vectors: typing.Sequence[StateVectorAcc],
         covariance_matrices: typing.Optional[
             typing.Sequence[OemCovarianceMatrix]
         ] = None,
-        comments: typing.Optional[typing.Sequence[builtins.str]] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> OemData: ...
     def __repr__(self) -> builtins.str: ...
     def validate(self) -> None:
@@ -10189,19 +10913,47 @@ class OemData:
     @staticmethod
     def from_numpy(
         state_vector_epochs: typing.Sequence[builtins.str],
-        state_vector_numpy: numpy.typing.NDArray[numpy.float64],
+        state_vector_numpy: numpy.typing.ArrayLike,
         covariance_matrix_epochs: typing.Optional[typing.Sequence[builtins.str]] = None,
-        covariance_matrix_numpy: typing.Optional[
-            numpy.typing.NDArray[numpy.float64]
-        ] = None,
+        covariance_matrix_numpy: typing.Optional[numpy.typing.ArrayLike] = None,
         cov_ref_frames: typing.Optional[
             typing.Sequence[typing.Optional[builtins.str]]
         ] = None,
         cov_comments: typing.Optional[
             typing.Sequence[typing.Sequence[builtins.str]]
         ] = None,
-        comments: typing.Optional[typing.Sequence[builtins.str]] = None,
-    ) -> OemData: ...
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
+    ) -> OemData:
+        r"""
+        Create a data section from NumPy arrays.
+
+        Parameters
+        ----------
+        state_vector_epochs : list[str]
+            Epoch of each state vector (ISO 8601), one per row of `state_vector_numpy`.
+        state_vector_numpy : numpy.ndarray
+            Array of shape (N, 6) with [X, Y, Z, X_DOT, Y_DOT, Z_DOT], or (N, 9) with
+            accelerations [X_DDOT, Y_DDOT, Z_DDOT] appended. A NaN acceleration omits that
+            acceleration for the row. Units: km, km/s, km/s².
+        covariance_matrix_epochs : list[str], optional
+            Epoch of each covariance matrix (ISO 8601). Required when any covariance argument
+            is given.
+        covariance_matrix_numpy : numpy.ndarray, optional
+            Covariance matrices shaped (N, 6, 6) or (N, 21), or a single matrix shaped (6, 6) or
+            (21,). Values of length 21 are the lower triangle in CCSDS order; for full matrices
+            only the lower triangle is read. Required when `covariance_matrix_epochs` is given.
+        cov_ref_frames : list[Optional[str]], optional
+            Reference frame of each covariance matrix.
+        cov_comments : list[list[str]], optional
+            Comments of each covariance matrix.
+        comment : list[str], optional
+            Comments for the data section.
+
+        Returns
+        -------
+        OemData
+            The new data section.
+        """
 
 @typing.final
 class OemMetadata:
@@ -10214,16 +10966,16 @@ class OemMetadata:
         Spacecraft name for which orbit state data is provided.
     object_id : str
         Object identifier of the object for which orbit state data is provided.
+    start_time : str
+        Start time of the total time span covered by the ephemeris data (ISO 8601).
+    stop_time : str
+        Stop time of the total time span covered by the ephemeris data (ISO 8601).
     center_name : str
         Origin of the reference frame.
     ref_frame : str
         Reference frame in which state vector data is given.
     time_system : str
         Time system used for state vector, maneuver, and covariance data.
-    start_time : str
-        Start time of the total time span covered by the ephemeris data (ISO 8601).
-    stop_time : str
-        Stop time of the total time span covered by the ephemeris data (ISO 8601).
     ref_frame_epoch : str, optional
         Epoch of the reference frame, if not intrinsic to the definition (ISO 8601).
     useable_start_time : str, optional
@@ -10361,6 +11113,8 @@ class OemMetadata:
 
         Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
 
+        CCSDS Reference: 502.0-B-3, Section 5.2.3.
+
         :type: Optional[str]
         """
     @ref_frame_epoch.setter
@@ -10376,6 +11130,8 @@ class OemMetadata:
         introduction of fictitious node points are optional and may not be necessary.
 
         Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.3.
 
         :type: Optional[str]
         """
@@ -10393,6 +11149,8 @@ class OemMetadata:
 
         Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
 
+        CCSDS Reference: 502.0-B-3, Section 5.2.3.
+
         :type: Optional[str]
         """
     @useable_stop_time.setter
@@ -10404,6 +11162,8 @@ class OemMetadata:
         data in the immediately following set of ephemeris lines.
 
         Examples: HERMITE, LINEAR, LAGRANGE
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.3.
 
         :type: Optional[str]
         """
@@ -10417,6 +11177,8 @@ class OemMetadata:
         ‘INTERPOLATION’ keyword is used.
 
         Examples: 5, 8
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.3.
 
         :type: Optional[int]
         """
@@ -10472,18 +11234,14 @@ class OemSegment:
     @property
     def metadata(self) -> OemMetadata:
         r"""
-        A single segment of the OEM.
-
-        Each segment contains metadata (context) and a list of ephemeris data points.
+        Segment metadata.
 
         :type: OemMetadata
         """
     @metadata.setter
     def metadata(self, value: OemMetadata) -> None:
         r"""
-        A single segment of the OEM.
-
-        Each segment contains metadata (context) and a list of ephemeris data points.
+        Segment metadata.
 
         :type: OemMetadata
         """
@@ -10719,7 +11477,7 @@ class OmmData:
     def __new__(
         cls,
         mean_elements: MeanElements,
-        comments: typing.Optional[typing.Sequence[builtins.str]] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> OmmData:
         r"""
         Create a new OMM Data object.
@@ -10865,6 +11623,8 @@ class OmmMetadata:
         (See 7.5.10 for formatting rules.)
 
         Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.3.
 
         :type: Optional[str]
         """
@@ -11101,6 +11861,8 @@ class OpmCovarianceMatrix:
         r"""
         Reference frame in which the covariance data are given. Select from the accepted set of
         values indicated in 3.2.4.11.
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
 
         :type: Optional[str]
         """
@@ -11767,6 +12529,8 @@ class OpmMetadata:
 
         Examples: 2001-11-06T11:17:33 2002-204T15:56:23Z
 
+        CCSDS Reference: 502.0-B-3, Section 3.2.3.
+
         :type: Optional[str]
         """
     @ref_frame_epoch.setter
@@ -11921,6 +12685,8 @@ class QuaternionState:
         Quaternion derivative components [Q1_DOT, Q2_DOT, Q3_DOT, QC_DOT].
 
         Units: 1/s
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
 
         :type: list[float] | None
         """
@@ -12364,6 +13130,8 @@ class RdmMetadata:
 
         Examples: SATCAT, ESA SST
 
+        CCSDS Reference: 508.1-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @catalog_name.setter
@@ -12376,6 +13144,8 @@ class RdmMetadata:
 
         Examples: 37451, 125387U
 
+        CCSDS Reference: 508.1-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @object_designator.setter
@@ -12386,6 +13156,8 @@ class RdmMetadata:
         The object type.
 
         Examples: PAYLOAD, ROCKET BODY, DEBRIS, OTHER, UNKNOWN
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
 
         :type: Optional[str]
         """
@@ -12400,6 +13172,8 @@ class RdmMetadata:
 
         Examples: DLR, INTELSAT, ESA, UNKNOWN
 
+        CCSDS Reference: 508.1-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @object_owner.setter
@@ -12412,6 +13186,8 @@ class RdmMetadata:
         registry, reference `[6]`.
 
         Examples: ESA, EUMETSAT
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
 
         :type: Optional[str]
         """
@@ -12486,6 +13262,8 @@ class RdmMetadata:
 
         Examples: ITRF-97, EME2000, ICRF
 
+        CCSDS Reference: 508.1-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @ref_frame.setter
@@ -12498,6 +13276,8 @@ class RdmMetadata:
 
         Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
 
+        CCSDS Reference: 508.1-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @ref_frame_epoch.setter
@@ -12508,6 +13288,8 @@ class RdmMetadata:
         Unique identifier of an external ephemeris file used or NONE.
 
         Examples: NONE, EPHEMERIS, INTELSAT2
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
 
         :type: Optional[str]
         """
@@ -12521,6 +13303,8 @@ class RdmMetadata:
 
         Examples: EGM-96: 36D 36O, JGM-2: 41D 41O
 
+        CCSDS Reference: 508.1-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @gravity_model.setter
@@ -12533,6 +13317,8 @@ class RdmMetadata:
 
         Examples: MSIS, JACCHIA 70, MSISE-90, NRLMSISE-00
 
+        CCSDS Reference: 508.1-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @atmospheric_model.setter
@@ -12543,6 +13329,8 @@ class RdmMetadata:
         The method used to predict the solar flux and geomagnetic indices.
 
         Examples: STOCHASTIC, PREDICTED: MLLRT
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
 
         :type: Optional[str]
         """
@@ -12557,6 +13345,8 @@ class RdmMetadata:
 
         Examples: MOON, SUN, JUPITER, NONE
 
+        CCSDS Reference: 508.1-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @n_body_perturbations.setter
@@ -12568,6 +13358,8 @@ class RdmMetadata:
         radiation pressure was not modelled.
 
         Examples: GSPM04, NO
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
 
         :type: Optional[str]
         """
@@ -12581,6 +13373,8 @@ class RdmMetadata:
 
         Examples: ESR, NO
 
+        CCSDS Reference: 508.1-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @earth_tides.setter
@@ -12591,6 +13385,8 @@ class RdmMetadata:
         Indicator on whether in-track thrust modeling was used in the simulation.
 
         Examples: YES, NO
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
 
         :type: Optional[str]
         """
@@ -12603,6 +13399,8 @@ class RdmMetadata:
         and/or BALLISTIC_COEFF).
 
         Examples: DESIGN, CFD: TOOL1, CFD DMSCFOAM, OD
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
 
         :type: Optional[str]
         """
@@ -12619,6 +13417,8 @@ class RdmMetadata:
 
         Units: km
 
+        CCSDS Reference: 508.1-B-1, Section 3.4.
+
         :type: Optional[float]
         """
     @drag_parameters_altitude.setter
@@ -12631,6 +13431,8 @@ class RdmMetadata:
         The method used to determine the orbit lifetime uncertainty or the re-entry windows.
 
         Examples: NONE, ANALYTICAL, STOCHASTIC, EMPIRICAL
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
 
         :type: Optional[str]
         """
@@ -12648,6 +13450,8 @@ class RdmMetadata:
 
         Examples: NONE, MASS-LOSS, BREAK-UP, MASS-LOSS + BREAK-UP
 
+        CCSDS Reference: 508.1-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @reentry_disintegration.setter
@@ -12658,6 +13462,8 @@ class RdmMetadata:
         The method used to determine the impact location confidence interval(s).
 
         Examples: NONE, ANALYTICAL, STOCHASTIC, EMPIRICAL
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
 
         :type: Optional[str]
         """
@@ -12672,6 +13478,8 @@ class RdmMetadata:
 
         Examples: ESA/2015-563892348
 
+        CCSDS Reference: 508.1-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @previous_message_id.setter
@@ -12684,6 +13492,8 @@ class RdmMetadata:
 
         Examples: 2001-11-06T11:17:33
 
+        CCSDS Reference: 508.1-B-1, Section 3.4.
+
         :type: Optional[str]
         """
     @previous_message_epoch.setter
@@ -12695,6 +13505,8 @@ class RdmMetadata:
         5.3.3.5); N/A if no other message is scheduled.
 
         Examples: 2001-11-06T11:17:33, N/A
+
+        CCSDS Reference: 508.1-B-1, Section 3.4.
 
         :type: Optional[str]
         """
@@ -12806,6 +13618,8 @@ class RdmSpacecraftParameters:
 
         Units: kg
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @wet_mass.setter
@@ -12817,6 +13631,8 @@ class RdmSpacecraftParameters:
 
         Units: kg
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @dry_mass.setter
@@ -12825,6 +13641,8 @@ class RdmSpacecraftParameters:
     def hazardous_substances(self) -> typing.Optional[builtins.str]:
         r"""
         Comma separated list of hazardous substances contained by the object.
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[str]
         """
@@ -12837,6 +13655,8 @@ class RdmSpacecraftParameters:
 
         Units: m²
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @solar_rad_area.setter
@@ -12845,6 +13665,8 @@ class RdmSpacecraftParameters:
     def solar_rad_coeff(self) -> typing.Optional[builtins.float]:
         r"""
         Object solar radiation coefficient.
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -12857,6 +13679,8 @@ class RdmSpacecraftParameters:
 
         Units: m²
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @drag_area.setter
@@ -12865,6 +13689,8 @@ class RdmSpacecraftParameters:
     def drag_coeff(self) -> typing.Optional[builtins.float]:
         r"""
         Object drag coefficient.
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -12877,6 +13703,8 @@ class RdmSpacecraftParameters:
 
         Units: m²
 
+        CCSDS Reference: 508.1-B-1, Section 3.5.
+
         :type: Optional[float]
         """
     @rcs.setter
@@ -12887,6 +13715,8 @@ class RdmSpacecraftParameters:
         Object ballistic coefficient.
 
         Units: kg/m²
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -12899,6 +13729,8 @@ class RdmSpacecraftParameters:
         covariance to NOMINAL_RENTRY_EPOCH (if a controlled re-entry).
 
         Units: m/s²
+
+        CCSDS Reference: 508.1-B-1, Section 3.5.
 
         :type: Optional[float]
         """
@@ -13003,6 +13835,8 @@ class RelativeMetadataData:
 
         Units: m/s
 
+        CCSDS Reference: 508.0-B-1, Section 3.3.
+
         :type: Optional[float]
         """
     @relative_speed.setter
@@ -13013,6 +13847,8 @@ class RelativeMetadataData:
         The probability (denoted 'p' where 0.0<=p<=1.0), that Object1 and Object2 will collide.
         Data type = double.
 
+        CCSDS Reference: 508.0-B-1, Section 3.3.
+
         :type: Optional[float]
         """
     @collision_probability.setter
@@ -13022,6 +13858,8 @@ class RelativeMetadataData:
         r"""
         The method that was used to calculate the collision probability. (See annex E for
         definition.)
+
+        CCSDS Reference: 508.0-B-1, Section 3.3.
 
         :type: Optional[str]
         """
@@ -13035,6 +13873,8 @@ class RelativeMetadataData:
         The start time in UTC of the screening period for the conjunction assessment. (See
         6.3.2.6 for formatting rules.)
 
+        CCSDS Reference: 508.0-B-1, Section 3.3.
+
         :type: Optional[str]
         """
     @start_screen_period.setter
@@ -13044,6 +13884,8 @@ class RelativeMetadataData:
         r"""
         The stop time in UTC of the screening period for the conjunction assessment. (See
         6.3.2.6 for formatting rules.)
+
+        CCSDS Reference: 508.0-B-1, Section 3.3.
 
         :type: Optional[str]
         """
@@ -13055,6 +13897,8 @@ class RelativeMetadataData:
         The time in UTC when Object2 enters the screening volume. (See 6.3.2.6 for formatting
         rules.)
 
+        CCSDS Reference: 508.0-B-1, Section 3.3.
+
         :type: Optional[str]
         """
     @screen_entry_time.setter
@@ -13064,6 +13908,8 @@ class RelativeMetadataData:
         r"""
         The time in UTC when Object2 exits the screening volume. (See 6.3.2.6 for formatting
         rules.)
+
+        CCSDS Reference: 508.0-B-1, Section 3.3.
 
         :type: Optional[str]
         """
@@ -13077,6 +13923,8 @@ class RelativeMetadataData:
 
         Units: m
 
+        CCSDS Reference: 508.0-B-1, Section 3.3.
+
         :type: Optional[float]
         """
     @screen_volume_x.setter
@@ -13089,6 +13937,8 @@ class RelativeMetadataData:
 
         Units: m
 
+        CCSDS Reference: 508.0-B-1, Section 3.3.
+
         :type: Optional[float]
         """
     @screen_volume_y.setter
@@ -13100,6 +13950,8 @@ class RelativeMetadataData:
         double.
 
         Units: m
+
+        CCSDS Reference: 508.0-B-1, Section 3.3.
 
         :type: Optional[float]
         """
@@ -13134,6 +13986,8 @@ class RelativeMetadataData:
         given. Available options are RTN and Transverse, Velocity, and Normal (TVN). (See annex
         E for definition.)
 
+        CCSDS Reference: 508.0-B-1, Section 3.3.
+
         :type: Optional[ScreenVolumeFrameType]
         """
     @screen_volume_frame.setter
@@ -13144,6 +13998,8 @@ class RelativeMetadataData:
     def screen_volume_shape(self) -> typing.Optional[ScreenVolumeShapeType]:
         r"""
         Shape of the screening volume: ELLIPSOID or BOX.
+
+        CCSDS Reference: 508.0-B-1, Section 3.3.
 
         :type: Optional[ScreenVolumeShapeType]
         """
@@ -13322,6 +14178,8 @@ class SpacecraftParameters:
 
         Units: kg
 
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
+
         :type: Optional[float]
         """
     @mass.setter
@@ -13334,6 +14192,8 @@ class SpacecraftParameters:
         Examples: 14, 20.0
 
         Units: m²
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
 
         :type: Optional[float]
         """
@@ -13348,6 +14208,8 @@ class SpacecraftParameters:
 
         Units: n/a
 
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
+
         :type: Optional[float]
         """
     @solar_rad_coeff.setter
@@ -13361,6 +14223,8 @@ class SpacecraftParameters:
 
         Units: m²
 
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
+
         :type: Optional[float]
         """
     @drag_area.setter
@@ -13373,6 +14237,8 @@ class SpacecraftParameters:
         Examples: 2, 2.1
 
         Units: n/a
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.4.
 
         :type: Optional[float]
         """
@@ -13479,6 +14345,8 @@ class SpinState:
 
         Units: deg
 
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
+
         :type: Optional[float]
         """
     @nutation.setter
@@ -13489,6 +14357,8 @@ class SpinState:
         Body nutation period of the spin axis.
 
         Units: s
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
 
         :type: Optional[float]
         """
@@ -13501,6 +14371,8 @@ class SpinState:
 
         Units: deg
 
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
+
         :type: Optional[float]
         """
     @nutation_phase.setter
@@ -13511,6 +14383,8 @@ class SpinState:
         Right ascension of angular momentum vector in frame A.
 
         Units: deg
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
 
         :type: Optional[float]
         """
@@ -13523,6 +14397,8 @@ class SpinState:
 
         Units: deg
 
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
+
         :type: Optional[float]
         """
     @momentum_delta.setter
@@ -13533,6 +14409,8 @@ class SpinState:
         Angular velocity of spin vector around the angular momentum vector.
 
         Units: deg/s
+
+        CCSDS Reference: 504.0-B-2, Section 3.2.4.
 
         :type: Optional[float]
         """
@@ -13697,7 +14575,7 @@ class StateVector:
         x_dot: builtins.float,
         y_dot: builtins.float,
         z_dot: builtins.float,
-        comments: typing.Optional[typing.Sequence[builtins.str]] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> StateVector: ...
     def __repr__(self) -> builtins.str: ...
 
@@ -13732,9 +14610,9 @@ class StateVectorAcc:
     @property
     def epoch(self) -> builtins.str:
         r"""
-        Epoch of state vector & optional Keplerian elements (see 7.5.10 for formatting rules).
+        Epoch of the ephemeris state vector (see 7.5.10 for formatting rules).
 
-        CCSDS Reference: 502.0-B-3, Section 3.2.4.
+        CCSDS Reference: 502.0-B-3, Section 5.2.4.
 
         :type: str
         """
@@ -13747,7 +14625,7 @@ class StateVectorAcc:
 
         Units: km
 
-        CCSDS Reference: 502.0-B-3, Section 5.3.3.
+        CCSDS Reference: 502.0-B-3, Section 5.2.4.
 
         :type: float
         """
@@ -13760,7 +14638,7 @@ class StateVectorAcc:
 
         Units: km
 
-        CCSDS Reference: 502.0-B-3, Section 5.3.3.
+        CCSDS Reference: 502.0-B-3, Section 5.2.4.
 
         :type: float
         """
@@ -13773,7 +14651,7 @@ class StateVectorAcc:
 
         Units: km
 
-        CCSDS Reference: 502.0-B-3, Section 5.3.3.
+        CCSDS Reference: 502.0-B-3, Section 5.2.4.
 
         :type: float
         """
@@ -13786,7 +14664,7 @@ class StateVectorAcc:
 
         Units: km/s
 
-        CCSDS Reference: 502.0-B-3, Section 5.3.3.
+        CCSDS Reference: 502.0-B-3, Section 5.2.4.
 
         :type: float
         """
@@ -13799,7 +14677,7 @@ class StateVectorAcc:
 
         Units: km/s
 
-        CCSDS Reference: 502.0-B-3, Section 5.3.3.
+        CCSDS Reference: 502.0-B-3, Section 5.2.4.
 
         :type: float
         """
@@ -13812,7 +14690,7 @@ class StateVectorAcc:
 
         Units: km/s
 
-        CCSDS Reference: 502.0-B-3, Section 5.3.3.
+        CCSDS Reference: 502.0-B-3, Section 5.2.4.
 
         :type: float
         """
@@ -13825,6 +14703,8 @@ class StateVectorAcc:
 
         Units: km/s²
 
+        CCSDS Reference: 502.0-B-3, Section 5.2.4.
+
         :type: Optional[float]
         """
     @x_ddot.setter
@@ -13836,6 +14716,8 @@ class StateVectorAcc:
 
         Units: km/s²
 
+        CCSDS Reference: 502.0-B-3, Section 5.2.4.
+
         :type: Optional[float]
         """
     @y_ddot.setter
@@ -13846,6 +14728,8 @@ class StateVectorAcc:
         Acceleration vector Z-component.
 
         Units: km/s²
+
+        CCSDS Reference: 502.0-B-3, Section 5.2.4.
 
         :type: Optional[float]
         """
@@ -14115,6 +14999,8 @@ class TdmHeader:
 
         Examples: 201113719185
 
+        CCSDS Reference: 503.0-B-2, Section 3.2.
+
         :type: Optional[str]
         """
     @message_id.setter
@@ -14182,6 +15068,8 @@ class TdmMetadata:
 
         Examples: 20190918_1200135-0001
 
+        CCSDS Reference: 503.0-B-2, Section 3.3.
+
         :type: Optional[str]
         """
     @track_id.setter
@@ -14194,6 +15082,8 @@ class TdmMetadata:
         DATA_START, DATA_STOP, and COMMENT keywords.
 
         Examples: RANGE, TRANSMIT_FREQ_n, RECEIVE_FREQ
+
+        CCSDS Reference: 503.0-B-2, Section 3.3.
 
         :type: Optional[str]
         """
@@ -14225,6 +15115,8 @@ class TdmMetadata:
 
         Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
 
+        CCSDS Reference: 503.0-B-2, Section 3.3.
+
         :type: Optional[str]
         """
     @start_time.setter
@@ -14237,6 +15129,8 @@ class TdmMetadata:
         specification, see 4.3.9.)
 
         Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
+
+        CCSDS Reference: 503.0-B-2, Section 3.3.
 
         :type: Optional[str]
         """
@@ -14304,6 +15198,8 @@ class TdmMetadata:
 
         Examples: SEQUENTIAL, SINGLE_DIFF
 
+        CCSDS Reference: 503.0-B-2, Section 3.3.
+
         :type: Optional[str]
         """
     @mode.setter
@@ -14317,6 +15213,8 @@ class TdmMetadata:
         transmit participant.
 
         Examples: PATH = 1,2,1, PATH_1 = 1,2,1, PATH_2 = 3,1
+
+        CCSDS Reference: 503.0-B-2, Section 3.3.
 
         :type: Optional[str]
         """
@@ -14404,6 +15302,8 @@ class TdmMetadata:
 
         Examples: S, X, Ka, L, UHF, GREEN
 
+        CCSDS Reference: 503.0-B-2, Section 3.3.
+
         :type: Optional[str]
         """
     @transmit_band.setter
@@ -14418,6 +15318,8 @@ class TdmMetadata:
 
         Examples: S, X, Ka, L, UHF, GREEN
 
+        CCSDS Reference: 503.0-B-2, Section 3.3.
+
         :type: Optional[str]
         """
     @receive_band.setter
@@ -14429,6 +15331,8 @@ class TdmMetadata:
         that is necessary to calculate the coherent downlink from the uplink frequency.
 
         Examples: 240, 880
+
+        CCSDS Reference: 503.0-B-2, Section 3.3.
 
         :type: Optional[int]
         """
@@ -14442,6 +15346,8 @@ class TdmMetadata:
 
         Examples: 221, 749
 
+        CCSDS Reference: 503.0-B-2, Section 3.3.
+
         :type: Optional[int]
         """
     @turnaround_denominator.setter
@@ -14454,6 +15360,8 @@ class TdmMetadata:
         time or the receive time.
 
         Examples: TRANSMIT, RECEIVE
+
+        CCSDS Reference: 503.0-B-2, Section 3.3.
 
         :type: Optional[str]
         """
@@ -14469,6 +15377,8 @@ class TdmMetadata:
 
         Units: s
 
+        CCSDS Reference: 503.0-B-2, Section 3.3.
+
         :type: Optional[float]
         """
     @integration_interval.setter
@@ -14481,6 +15391,8 @@ class TdmMetadata:
         period.
 
         Examples: START, MIDDLE, END
+
+        CCSDS Reference: 503.0-B-2, Section 3.3.
 
         :type: Optional[str]
         """
@@ -14497,6 +15409,8 @@ class TdmMetadata:
 
         Units: Hz
 
+        CCSDS Reference: 503.0-B-2, Section 3.3.
+
         :type: Optional[float]
         """
     @freq_offset.setter
@@ -14509,6 +15423,8 @@ class TdmMetadata:
         constant frequency; or ‘ONE_WAY’ (used in Delta-DOR).
 
         Examples: COHERENT, CONSTANT, ONE_WAY
+
+        CCSDS Reference: 503.0-B-2, Section 3.3.
 
         :type: Optional[str]
         """
@@ -14524,6 +15440,8 @@ class TdmMetadata:
 
         Examples: 32768.0, 2.0e+23, 0.0, 161.6484
 
+        CCSDS Reference: 503.0-B-2, Section 3.3.
+
         :type: Optional[float]
         """
     @range_modulus.setter
@@ -14538,6 +15456,8 @@ class TdmMetadata:
 
         Examples: km, s, RU
 
+        CCSDS Reference: 503.0-B-2, Section 3.3.
+
         :type: Optional[str]
         """
     @range_units.setter
@@ -14549,6 +15469,8 @@ class TdmMetadata:
         angle data (ANGLE_1 and ANGLE_2 keywords).
 
         Examples: AZEL, RADEC, XEYN, XSYE
+
+        CCSDS Reference: 503.0-B-2, Section 3.3.
 
         :type: Optional[str]
         """
@@ -14563,6 +15485,8 @@ class TdmMetadata:
 
         Examples: EME2000, ICRF, ITRF1993, ITRF2000, TOD_EARTH
 
+        CCSDS Reference: 503.0-B-2, Section 3.3.
+
         :type: Optional[str]
         """
     @reference_frame.setter
@@ -14576,6 +15500,8 @@ class TdmMetadata:
 
         Examples: HERMITE, LAGRANGE, LINEAR
 
+        CCSDS Reference: 503.0-B-2, Section 3.3.
+
         :type: Optional[str]
         """
     @interpolation.setter
@@ -14588,6 +15514,8 @@ class TdmMetadata:
         in tracking data where the uplink frequency is not constant.
 
         Examples: 3, 5, 7, 11
+
+        CCSDS Reference: 503.0-B-2, Section 3.3.
 
         :type: Optional[int]
         """
@@ -14604,6 +15532,8 @@ class TdmMetadata:
 
         Units: Hz
 
+        CCSDS Reference: 503.0-B-2, Section 3.3.
+
         :type: Optional[float]
         """
     @doppler_count_bias.setter
@@ -14617,6 +15547,8 @@ class TdmMetadata:
 
         Examples: 1000, 1
 
+        CCSDS Reference: 503.0-B-2, Section 3.3.
+
         :type: Optional[int]
         """
     @doppler_count_scale.setter
@@ -14629,6 +15561,8 @@ class TdmMetadata:
         counter rollover has occurred during the track.
 
         Examples: YES, NO
+
+        CCSDS Reference: 503.0-B-2, Section 3.3.
 
         :type: Optional[str]
         """
@@ -14644,6 +15578,8 @@ class TdmMetadata:
         Examples: 1.23, 0.0326, 0.00077
 
         Units: s
+
+        CCSDS Reference: 503.0-B-2, Section 3.3.
 
         :type: Optional[float]
         """
@@ -14708,6 +15644,8 @@ class TdmMetadata:
 
         Units: s
 
+        CCSDS Reference: 503.0-B-2, Section 3.3.
+
         :type: Optional[float]
         """
     @receive_delay_1.setter
@@ -14769,6 +15707,8 @@ class TdmMetadata:
 
         Examples: RAW, VALIDATED, DEGRADED
 
+        CCSDS Reference: 503.0-B-2, Section 3.3.
+
         :type: Optional[str]
         """
     @data_quality.setter
@@ -14781,6 +15721,8 @@ class TdmMetadata:
         calibration, etc.).
 
         Examples: -1.35, 0.23, -3.0e-1, 150000.0
+
+        CCSDS Reference: 503.0-B-2, Section 3.3.
 
         :type: Optional[float]
         """
@@ -14897,6 +15839,8 @@ class TdmMetadata:
         CORRECTION_* keywords is used.
 
         Examples: YES, NO
+
+        CCSDS Reference: 503.0-B-2, Section 3.3.
 
         :type: Optional[str]
         """
@@ -15115,6 +16059,8 @@ class TleParameters:
         r"""
         Ephemeris type. Default value = 0. (See 4.2.4.7.)
 
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
+
         :type: Optional[int]
         """
     @ephemeris_type.setter
@@ -15123,6 +16069,8 @@ class TleParameters:
     def classification_type(self) -> typing.Optional[builtins.str]:
         r"""
         Classification type. Default value = U. (See 4.2.4.7.)
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
 
         :type: Optional[str]
         """
@@ -15133,6 +16081,8 @@ class TleParameters:
         r"""
         NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword
         is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
 
         :type: Optional[int]
         """
@@ -15146,6 +16096,8 @@ class TleParameters:
         and therefore only meaningful if TLE-based data is being exchanged (i.e.,
         MEAN_ELEMENT_THEORY = SGP/SGP4).
 
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
+
         :type: Optional[int]
         """
     @element_set_no.setter
@@ -15154,6 +16106,8 @@ class TleParameters:
     def rev_at_epoch(self) -> typing.Optional[builtins.int]:
         r"""
         Revolution Number
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
 
         :type: Optional[int]
         """
@@ -15166,6 +16120,8 @@ class TleParameters:
         MEAN_ELEMENT_THEORY= SGP4 (BSTAR = drag parameter for SGP4).
 
         Units: 1/[Earth radii]
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
 
         :type: Optional[float]
         """
@@ -15181,6 +16137,8 @@ class TleParameters:
         0.0286.
 
         Units: m²/kg
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
 
         :type: Optional[float]
         """
@@ -15208,6 +16166,8 @@ class TleParameters:
 
         Units: rev/day³
 
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
+
         :type: Optional[float]
         """
     @mean_motion_ddot.setter
@@ -15221,6 +16181,8 @@ class TleParameters:
         when MEAN_ELEMENT_THEORY= SGP4-XP.
 
         Units: m²/kg
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.4.
 
         :type: Optional[float]
         """

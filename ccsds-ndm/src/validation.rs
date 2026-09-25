@@ -110,6 +110,26 @@ pub(crate) fn validate_at_field_path(
     }
 }
 
+/// ODM 7.5.10 and the matching ADM (6.8.9), CDM, and RDM rules: fractional seconds may use as
+/// many digits as a fixed-point number, which is 16. The TDM book states no limit, so TDM does
+/// not call this.
+pub(crate) fn epoch_precision(
+    fields: &[(&'static str, &dyn crate::types::EpochText)],
+) -> Result<()> {
+    for (field, epoch) in fields {
+        if let Some(epoch) = epoch.epoch().filter(|epoch| epoch.fraction_digits() > 16) {
+            return Err(ValidationError::InvalidValue {
+                field: (*field).into(),
+                value: epoch.to_string(),
+                expected: "at most 16 fractional-second digits".into(),
+                line: None,
+            }
+            .into());
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::kvn_comment_error;

@@ -2,11 +2,14 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::common::{parse_interpolation_degree, AdmHeader};
+use crate::common::{
+    extract_records, parse_interpolation_degree, update_records, visit_records, AdmHeader,
+};
+use crate::errors::ccsds_error_to_pyerr;
 use crate::types::parse_calendar_epoch;
 use ccsds_ndm::messages::aem as core_aem;
 use ccsds_ndm::types::{AttitudeTypeType, RotSeq};
-use numpy::{PyArray, PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
+use numpy::{AllowTypeChange, PyArray, PyArrayLikeDyn, PyArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -74,20 +77,11 @@ impl Aem {
     }
 
     pub(crate) fn to_core(&self, py: Python<'_>) -> PyResult<core_aem::Aem> {
-        let segment = self
-            .segments
-            .bind(py)
-            .iter()
-            .enumerate()
-            .map(|(index, value)| {
-                value
-                    .extract::<PyRef<'_, AemSegment>>()
-                    .map_err(|_| {
-                        PyValueError::new_err(format!("segments[{index}] must be AemSegment"))
-                    })?
-                    .to_core(py)
-            })
-            .collect::<PyResult<Vec<_>>>()?;
+        let segment = extract_records(
+            self.segments.bind(py),
+            "segments",
+            |segment: &AemSegment| segment.to_core(py),
+        )?;
         Ok(core_aem::Aem {
             id: self.id.clone(),
             version: self.version.clone(),
@@ -152,7 +146,7 @@ impl Aem {
     /// Validate the message against CCSDS rules.
     ///
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
-        crate::api::validate_message(&self.to_core(py)?)
+        crate::api::validate_message(py, &self.to_core(py)?)
     }
 
     /// Serialize to validated KVN or XML.
@@ -162,7 +156,7 @@ impl Aem {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<String> {
-        crate::api::generate_string(&self.to_core(py)?, format)
+        crate::api::generate_string(py, &self.to_core(py)?, format)
     }
 
     #[staticmethod]
@@ -173,7 +167,7 @@ impl Aem {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(data, format)?;
+        let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
 
@@ -187,7 +181,7 @@ impl Aem {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed_file(&path, format)?;
+        let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
 
@@ -200,7 +194,12 @@ impl Aem {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<()> {
-        crate::api::generate_file(&ccsds_ndm::Message::Aem(self.to_core(py)?), &path, format)
+        crate::api::generate_file(
+            py,
+            &ccsds_ndm::Message::Aem(self.to_core(py)?),
+            &path,
+            format,
+        )
     }
 }
 
@@ -251,9 +250,7 @@ impl AemSegment {
 
     /// Validate the segment against CCSDS rules.
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
-        self.to_core(py)?
-            .validate()
-            .map_err(|e| PyValueError::new_err(e.to_string()))
+        self.to_core(py)?.validate().map_err(ccsds_error_to_pyerr)
     }
 }
 
@@ -340,9 +337,7 @@ impl AemMetadata {
 
     /// Validate the metadata section against CCSDS rules.
     fn validate(&self) -> PyResult<()> {
-        self.inner
-            .validate()
-            .map_err(|e| PyValueError::new_err(e.to_string()))
+        self.inner.validate().map_err(ccsds_error_to_pyerr)
     }
 
     /// Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
@@ -414,6 +409,8 @@ impl AemMetadata {
     /// system barycenter. The set of allowed values is described in annex B, subsection B8.
     ///
     /// Examples: EARTH, STS-106
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
     /// :type: str | None
     #[getter]
@@ -527,6 +524,8 @@ impl AemMetadata {
     ///
     /// Examples: 1996-12-18T14:28:15.11
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
+    ///
     /// :type: str | None
     #[getter]
     fn get_useable_start_time(&self) -> Option<String> {
@@ -546,6 +545,8 @@ impl AemMetadata {
     /// this metadata block. (See also USEABLE_START_TIME.)
     ///
     /// Examples: 1996-12-18T14:28:15.11
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
     /// :type: str | None
     #[getter]
@@ -592,6 +593,8 @@ impl AemMetadata {
     ///
     /// Examples: ZXZ, XYZ
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
+    ///
     /// :type: str | None
     #[getter]
     fn get_euler_rot_seq(&self) -> Option<String> {
@@ -614,6 +617,8 @@ impl AemMetadata {
     ///
     /// Examples: ICRF, SC_BODY_1
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
+    ///
     /// :type: str | None
     #[getter]
     fn get_angvel_frame(&self) -> Option<String> {
@@ -629,6 +634,8 @@ impl AemMetadata {
     /// following this metadata block.
     ///
     /// Examples: LINEAR, HERMITE, LAGRANGE
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
     /// :type: str | None
     #[getter]
@@ -646,6 +653,8 @@ impl AemMetadata {
     /// the ‘INTERPOLATION_METHOD’ keyword is used.
     ///
     /// Examples: 1, 5
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
     /// :type: int | None
     #[getter]
@@ -712,56 +721,37 @@ impl AemData {
         })
     }
 
-    fn state_values(
-        &self,
-        py: Python<'_>,
-    ) -> PyResult<Vec<(ccsds_ndm::types::CalendarEpoch, Vec<f64>)>> {
-        self.attitude_states
-            .bind(py)
-            .iter()
-            .enumerate()
-            .map(|(index, value)| {
-                value
-                    .extract::<PyRef<'_, AttitudeState>>()
-                    .map(|state| (state.epoch, state.values.clone()))
-                    .map_err(|_| {
-                        PyValueError::new_err(format!(
-                            "attitude_states[{index}] must be AttitudeState"
-                        ))
-                    })
-            })
-            .collect()
+    /// Check that one state carries the number of values the data section's attitude type needs.
+    fn width_error(&self, values: &[f64]) -> PyErr {
+        PyValueError::new_err(format!(
+            "ATTITUDE_TYPE {} requires {} values per state, got {}",
+            self.attitude_type,
+            self.attitude_type.value_count(),
+            values.len()
+        ))
     }
 
-    fn validate_widths(
-        &self,
-        values: &[(ccsds_ndm::types::CalendarEpoch, Vec<f64>)],
-    ) -> PyResult<()> {
-        let expected = self.attitude_type.value_count();
-        if let Some((_, values)) = values.iter().find(|(_, values)| values.len() != expected) {
-            return Err(PyValueError::new_err(format!(
-                "ATTITUDE_TYPE {} requires {expected} values per state, got {}",
-                self.attitude_type,
-                values.len()
-            )));
+    fn check_width(&self, values: &[f64]) -> PyResult<()> {
+        if values.len() == self.attitude_type.value_count() {
+            Ok(())
+        } else {
+            Err(self.width_error(values))
         }
-        Ok(())
     }
 
     fn to_core(&self, py: Python<'_>) -> PyResult<core_aem::AemData> {
-        let values = self.state_values(py)?;
-        self.validate_widths(&values)?;
-        let attitude_states = values
-            .into_iter()
-            .map(|(epoch, values)| {
+        let attitude_states = extract_records(
+            self.attitude_states.bind(py),
+            "attitude_states",
+            |state: &AttitudeState| {
                 ccsds_ndm::common::AemAttitudeState::from_values(
-                    epoch,
-                    &values,
+                    state.epoch,
+                    &state.values,
                     &self.attitude_type,
                 )
-                .ok_or_else(|| PyValueError::new_err("attitude state width changed"))
-            })
-            .collect::<PyResult<Vec<_>>>()?;
+                .ok_or_else(|| self.width_error(&state.values))
+            },
+        )?;
         Ok(core_aem::AemData {
             comment: self.comment.clone(),
             attitude_states,
@@ -809,7 +799,7 @@ impl AemData {
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         self.to_core(py)?
             .validate(&attitude_type)
-            .map_err(|e| PyValueError::new_err(e.to_string()))
+            .map_err(ccsds_error_to_pyerr)
     }
 
     #[staticmethod]
@@ -817,14 +807,13 @@ impl AemData {
     fn from_numpy(
         py: Python<'_>,
         epochs: Vec<String>,
-        array: PyReadonlyArray2<f64>,
+        #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
+        array: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
         attitude_type: String,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let shape = array.shape();
-        if shape.len() != 2 {
-            return Err(PyValueError::new_err("NumPy array must be 2-dimensional"));
-        }
+        let array_view = crate::common::matrix_view(&array, "Attitude state array")?;
+        let shape = array_view.shape();
         if epochs.len() != shape[0] {
             return Err(PyValueError::new_err(
                 "Number of epochs must match number of rows in NumPy array",
@@ -840,7 +829,6 @@ impl AemData {
             )));
         }
 
-        let array_view = array.as_array();
         let mut attitude_states = Vec::with_capacity(shape[0]);
 
         for (i, epoch_str) in epochs.iter().enumerate() {
@@ -901,21 +889,11 @@ impl AemData {
     /// :type: list[str]
     #[getter]
     fn get_attitude_states_epochs(&self, py: Python<'_>) -> PyResult<Vec<String>> {
-        self.attitude_states
-            .bind(py)
-            .iter()
-            .enumerate()
-            .map(|(index, value)| {
-                value
-                    .extract::<PyRef<'_, AttitudeState>>()
-                    .map(|state| state.epoch.as_str().to_string())
-                    .map_err(|_| {
-                        PyValueError::new_err(format!(
-                            "attitude_states[{index}] must be AttitudeState"
-                        ))
-                    })
-            })
-            .collect()
+        extract_records(
+            self.attitude_states.bind(py),
+            "attitude_states",
+            |state: &AttitudeState| Ok(state.epoch.as_str().to_string()),
+        )
     }
 
     #[setter]
@@ -934,33 +912,15 @@ impl AemData {
                 ));
             }
 
-            // Validate every epoch and every element type before mutating anything, so a failure
-            // partway through the list cannot leave the earlier records already rewritten.
-            let mut parsed = Vec::with_capacity(epochs.len());
-            for (index, epoch) in epochs.iter().enumerate() {
-                let value = states.get_item(index)?;
-                value
-                    .extract::<PyRefMut<'_, AttitudeState>>()
-                    .map_err(|_| {
-                        PyValueError::new_err(format!(
-                            "attitude_states[{index}] must be AttitudeState"
-                        ))
-                    })?;
-                parsed.push(parse_calendar_epoch(epoch)?);
-            }
-
-            for (index, epoch) in parsed.into_iter().enumerate() {
-                let value = states.get_item(index)?;
-                let mut state = value
-                    .extract::<PyRefMut<'_, AttitudeState>>()
-                    .map_err(|_| {
-                        PyValueError::new_err(format!(
-                            "attitude_states[{index}] must be AttitudeState"
-                        ))
-                    })?;
-                state.epoch = epoch;
-            }
-            Ok(())
+            let parsed = epochs
+                .iter()
+                .map(|epoch| parse_calendar_epoch(epoch))
+                .collect::<PyResult<Vec<_>>>()?;
+            update_records(
+                states,
+                "attitude_states",
+                |index, state: &mut AttitudeState| state.epoch = parsed[index],
+            )
         })
     }
 
@@ -976,7 +936,7 @@ impl AemData {
         &self,
         py: Python<'py>,
     ) -> PyResult<Py<numpy::PyArray2<f64>>> {
-        let states = self.state_values(py)?;
+        let states = self.attitude_states.bind(py);
         if states.is_empty() {
             let array = PyArray::from_vec(py, Vec::<f64>::new())
                 .reshape([0, 0])
@@ -984,26 +944,29 @@ impl AemData {
             return Ok(array.into());
         }
 
-        self.validate_widths(&states)?;
         let expected_cols = self.attitude_type.value_count();
-        let data = states
-            .into_iter()
-            .flat_map(|(_, values)| values)
-            .collect::<Vec<_>>();
+        let mut data = Vec::with_capacity(states.len() * expected_cols);
+        visit_records(states, "attitude_states", |state: &AttitudeState| {
+            self.check_width(&state.values)?;
+            data.extend_from_slice(&state.values);
+            Ok(())
+        })?;
 
         let array = PyArray::from_vec(py, data)
-            .reshape([self.attitude_states.bind(py).len(), expected_cols])
+            .reshape([states.len(), expected_cols])
             .unwrap();
         Ok(array.into())
     }
 
     #[setter]
-    fn set_attitude_states_numpy(&mut self, array: PyReadonlyArray2<f64>) -> PyResult<()> {
+    fn set_attitude_states_numpy(
+        &mut self,
+        #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
+        array: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
+    ) -> PyResult<()> {
         Python::attach(|py| {
-            let shape = array.shape();
-            if shape.len() != 2 {
-                return Err(PyValueError::new_err("NumPy array must be 2-dimensional"));
-            }
+            let array_view = crate::common::matrix_view(&array, "Attitude state array")?;
+            let shape = array_view.shape();
             let states = self.attitude_states.bind(py);
             if states.is_empty() {
                 return Err(PyValueError::new_err(
@@ -1023,19 +986,14 @@ impl AemData {
                     expected_cols
                 )));
             }
-            let array_view = array.as_array();
-            for i in 0..shape[0] {
-                let row = array_view.row(i);
-                let row_values: Vec<f64> = row.iter().copied().collect();
-                let value = states.get_item(i)?;
-                let mut state = value
-                    .extract::<PyRefMut<'_, AttitudeState>>()
-                    .map_err(|_| {
-                        PyValueError::new_err(format!("attitude_states[{i}] must be AttitudeState"))
-                    })?;
-                state.values = row_values;
-            }
-            Ok(())
+            update_records(
+                states,
+                "attitude_states",
+                |index, state: &mut AttitudeState| {
+                    state.values.clear();
+                    state.values.extend(array_view.row(index).iter().copied());
+                },
+            )
         })
     }
 }

@@ -40,7 +40,7 @@ valid output. Generation validates the complete message before writing.
         state = StateVector(
             epoch="2023-01-01T00:00:00",
             x=7000.0, y=0.0, z=0.0, x_dot=0.0, y_dot=7.5, z_dot=0.0,
-            comments=None,
+            comment=None,
         )
         opm = Opm(
             header=header,

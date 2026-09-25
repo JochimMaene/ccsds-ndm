@@ -1,7 +1,7 @@
 # Shared NDM family contract evidence
 
-Status: implemented shared plumbing, not blanket CCSDS conformance. The verified OPM 3.0 and
-OMM 3.0 cells remain governed by their message-specific inventories.
+Status: implemented shared plumbing, not blanket CCSDS conformance. The verified OPM 3.0,
+OMM 3.0, OEM 3.0, and OEM 2.0 cells remain governed by their message-specific inventories.
 
 This inventory records the cross-family mechanics exercised for every standalone message and the
 combined NDM envelope. It deliberately does not substitute shared tests for the message-by-message
@@ -13,6 +13,7 @@ normative mapping required to promote a capability cell to `verified`.
 | Validated generation | String, streaming, Python, and conversion paths delegate to the Rust `Ndm` boundary. |
 | Structured diagnostics | Shared parsing and generation wrappers retain notation, message kind, edition context, stable resource codes, and bounded token excerpts. |
 | Rust/Python consistency | `library::parsing` and `library::output` and `test_parse_and_generation_options.py` exercise generic dispatch without per-message adapter semantics. |
+| Leading byte-order mark | Every family's `from_kvn` and `from_xml`, and auto-detection, skip one leading UTF-8 byte-order mark; none is written (`library::detection`). |
 | Strict XML envelope | Standalone roots, attributes, trailing documents, unknown structural fields, and the normative combined `ndm` envelope are checked without accepting arbitrary wrapper flattening. |
 | Reproducible performance workload | `kvn_message_matrix` covers KVN parse/generate for all ten standalone families; `xml_message_matrix` covers XML parse/generate for those ten plus combined NDM. The CodSpeed workflow executes both benchmark targets. Wall-clock results remain informational. |
 
@@ -68,8 +69,8 @@ operation × notation × surface cells.
 
 A family document should therefore state its status in one line and then record only its own
 promotion blockers — the parts that actually differ between families. Known family-specific
-blockers today are AEM's interpolation-degree/example conflict, TDM's unverified edition 1.0
-exposure, and combined NDM's XSD-valid/book-invalid conflict.
+blockers today are AEM's interpolation-degree/example conflict, TDM's unverified edition 1.0 exposure, and combined
+NDM's XSD-valid/book-invalid conflict.
 
 The shared family tests use one representative fixture per message to prove registration and
 contract routing. They do not prove complete valid-input coverage, semantic preservation of every

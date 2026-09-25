@@ -148,8 +148,9 @@ fn common_calendar_fields_are_valid(value: &str) -> bool {
     #[inline(always)]
     fn decimal(bytes: &[u8]) -> Option<u16> {
         bytes.iter().try_fold(0_u16, |value, byte| {
+            // Lazy: `*byte - b'0'` underflows for a non-digit byte.
             byte.is_ascii_digit()
-                .then_some(value * 10 + u16::from(*byte - b'0'))
+                .then(|| value * 10 + u16::from(*byte - b'0'))
         })
     }
 
@@ -255,9 +256,30 @@ fn calendar_fields_are_valid(value: &str) -> bool {
         ordinal != 0 && ordinal <= if leap_year { 366 } else { 365 }
     };
 
-    if !valid_date {
+    valid_date && clock_is_valid(time)
+}
+
+/// Whether `value` is an ordinal-layout elapsed time `YYYY-DDDThh:mm:ss[.d→d][Z]`.
+///
+/// ODM 3.2.3.2: MET and MRT times denote a duration and use three-digit days, so day `000` and
+/// days past the end of a calendar year are meaningful.
+fn elapsed_fields_are_valid(value: &str) -> bool {
+    let Some((date, time)) = value.split_once('T') else {
         return false;
-    }
+    };
+    let Some((year, day)) = date.split_once('-') else {
+        return false;
+    };
+    year.len() == 4
+        && day.len() == 3
+        && year
+            .bytes()
+            .chain(day.bytes())
+            .all(|byte| byte.is_ascii_digit())
+        && clock_is_valid(time)
+}
+
+fn clock_is_valid(time: &str) -> bool {
     if time.len() < 8 {
         return false;
     }
@@ -299,6 +321,48 @@ fn calendar_fields_are_valid(value: &str) -> bool {
         return false;
     }
     true
+}
+
+/// An optional or required time tag, for lexical checks over mixed fields.
+pub(crate) trait EpochText {
+    fn epoch(&self) -> Option<&Epoch>;
+}
+
+impl EpochText for Epoch {
+    fn epoch(&self) -> Option<&Epoch> {
+        Some(self)
+    }
+}
+
+impl EpochText for CalendarEpoch {
+    fn epoch(&self) -> Option<&Epoch> {
+        Some(&self.0)
+    }
+}
+
+impl<T: EpochText> EpochText for Option<T> {
+    fn epoch(&self) -> Option<&Epoch> {
+        self.as_ref().and_then(EpochText::epoch)
+    }
+}
+
+/// Number of fractional-second digits of a calendar or ordinal spelling; 0 for numeric ones.
+pub(crate) fn fraction_digit_count(bytes: &[u8]) -> usize {
+    // Count trailing digits back from an optional `Z`; they are a fraction only when a `.`
+    // follows the `:ss` seconds field, which numeric epochs never have.
+    let end = bytes.len() - usize::from(bytes.last() == Some(&b'Z'));
+    let digits = bytes[..end]
+        .iter()
+        .rev()
+        .take_while(|byte| byte.is_ascii_digit())
+        .count();
+    let dot = end - digits;
+    let is_fraction = dot >= 4 && bytes[dot - 1] == b'.' && bytes[dot - 4] == b':';
+    if is_fraction {
+        digits
+    } else {
+        0
+    }
 }
 
 impl Epoch {
@@ -372,20 +436,14 @@ impl Epoch {
         })
     }
 
-    /// Returns whether this value is usable in a contextual epoch field.
-    ///
-    /// Contextual fields may use either branch of the XSD `epochType` union, but malformed
-    /// calendar fields and degenerate numeric spellings are not useful time tags.
-    #[inline(always)]
-    pub(crate) fn is_contextually_valid(&self) -> bool {
-        match self.classification {
-            EpochClassification::CalendarValid => true,
-            EpochClassification::CalendarInvalid => false,
-            EpochClassification::Numeric => {
-                let value = self.as_str();
-                value.bytes().any(|byte| byte.is_ascii_digit()) && !value.ends_with('.')
-            }
-        }
+    /// Returns whether this is an ordinal-layout elapsed time, as MET and MRT use.
+    pub(crate) fn is_elapsed_time(&self) -> bool {
+        self.kind() == EpochKind::Calendar && elapsed_fields_are_valid(self.as_str())
+    }
+
+    /// Returns the number of fractional-second digits of a calendar or ordinal epoch.
+    pub(crate) fn fraction_digits(&self) -> usize {
+        fraction_digit_count(&self.bytes[..usize::from(self.len)])
     }
 
     /// Compares two validated epochs without converting through a physical-time library.
@@ -406,6 +464,13 @@ impl Epoch {
             EpochClassification::CalendarValid => EpochOrderKeyInner::Calendar {
                 value: self.as_str(),
             },
+            // Elapsed times share the calendar comparison: same-layout values compare
+            // lexically and cross-layout values by day count and second of day.
+            EpochClassification::CalendarInvalid if self.is_elapsed_time() => {
+                EpochOrderKeyInner::Calendar {
+                    value: self.as_str(),
+                }
+            }
             EpochClassification::CalendarInvalid => return None,
             EpochClassification::Numeric => {
                 let parts = parse_decimal(self.as_str())?;
@@ -603,58 +668,36 @@ fn numeric_digit(parts: DecimalParts<'_>, magnitude: DecimalMagnitude, index: us
         .unwrap_or(b'0')
 }
 
-#[derive(Clone, Copy)]
-struct CalendarParts {
-    day: i64,
-    seconds: i32,
-    fraction_start: u8,
-    fraction_len: u8,
-}
-
 fn compare_calendar(left: &str, right: &str) -> Option<Ordering> {
     if left == right {
         return Some(Ordering::Equal);
     }
 
-    let time_start = |value: &str| {
+    let whole_seconds_end = |value: &str| {
         if value.as_bytes().get(7) == Some(&b'-') {
-            11
+            19
         } else {
-            9
+            17
         }
     };
-    let left_time_start = time_start(left);
-    let right_time_start = time_start(right);
+    let left_end = whole_seconds_end(left);
+    let right_end = whole_seconds_end(right);
 
     // Within one CCSDS date layout, the date and whole-second fields are fixed-width and sort
-    // lexically. Fractional seconds need numeric comparison because the optional `Z` terminator
-    // and differing precision make a direct whole-string comparison incorrect.
-    if left_time_start == right_time_start {
-        let whole_seconds_end = left_time_start + 8;
-        match left[..whole_seconds_end].cmp(&right[..whole_seconds_end]) {
-            Ordering::Equal => {}
-            ordering => return Some(ordering),
-        }
-        let left_fraction = calendar_fraction(left, whole_seconds_end);
-        let right_fraction = calendar_fraction(right, whole_seconds_end);
-        let length = left_fraction.len().max(right_fraction.len());
-        return Some(
-            (0..length)
-                .map(|index| {
-                    left_fraction
-                        .get(index)
-                        .copied()
-                        .unwrap_or(b'0')
-                        .cmp(&right_fraction.get(index).copied().unwrap_or(b'0'))
-                })
-                .find(|ordering| *ordering != Ordering::Equal)
-                .unwrap_or(Ordering::Equal),
-        );
-    }
-
-    let left_parts = parse_calendar(left)?;
-    let right_parts = parse_calendar(right)?;
-    Some(compare_calendar_parts(left, left_parts, right, right_parts))
+    // lexically. Across layouts, compare an exact day count and second of day instead.
+    // Fractional seconds need numeric comparison because the optional `Z` terminator and
+    // differing precision make a direct whole-string comparison incorrect.
+    let whole = if left_end == right_end {
+        left[..left_end].cmp(&right[..right_end])
+    } else {
+        whole_seconds(left)?.cmp(&whole_seconds(right)?)
+    };
+    Some(whole.then_with(|| {
+        compare_fraction(
+            calendar_fraction(left, left_end),
+            calendar_fraction(right, right_end),
+        )
+    }))
 }
 
 fn calendar_fraction(value: &str, whole_seconds_end: usize) -> &[u8] {
@@ -667,29 +710,17 @@ fn calendar_fraction(value: &str, whole_seconds_end: usize) -> &[u8] {
         .as_bytes()
 }
 
-fn compare_calendar_parts(
-    left: &str,
-    left_parts: CalendarParts,
-    right: &str,
-    right_parts: CalendarParts,
-) -> Ordering {
-    left_parts
-        .day
-        .cmp(&right_parts.day)
-        .then_with(|| left_parts.seconds.cmp(&right_parts.seconds))
-        .then_with(|| {
-            compare_fraction(
-                left,
-                left_parts.fraction_start,
-                left_parts.fraction_len,
-                right,
-                right_parts.fraction_start,
-                right_parts.fraction_len,
-            )
-        })
+/// Compare fractional-second digits, treating missing trailing digits as zeros.
+fn compare_fraction(left: &[u8], right: &[u8]) -> Ordering {
+    let digit = |fraction: &[u8], index: usize| fraction.get(index).copied().unwrap_or(b'0');
+    (0..left.len().max(right.len()))
+        .map(|index| digit(left, index).cmp(&digit(right, index)))
+        .find(|ordering| *ordering != Ordering::Equal)
+        .unwrap_or(Ordering::Equal)
 }
 
-fn parse_calendar(value: &str) -> Option<CalendarParts> {
+/// Return the proleptic-Gregorian day number and second of day of a calendar-valid epoch.
+fn whole_seconds(value: &str) -> Option<(i64, i32)> {
     // `cmp_same_branch` admits only values classified as calendar-valid at construction.
     let (date, time) = value.split_once('T')?;
     let (year, date_part) = date.split_once('-')?;
@@ -710,26 +741,13 @@ fn parse_calendar(value: &str) -> Option<CalendarParts> {
     // gap-free key across year boundaries.
     let day = days_before_year(year)?.checked_add(i64::from(day_of_year))?;
 
-    let time_start = value.find('T')? + 1;
-    let clock = time.strip_suffix('Z').unwrap_or(time);
-    let hour = parse_two_digits(&clock[0..2])?;
-    let minute = parse_two_digits(&clock[3..5])?;
-    let second = parse_two_digits(&clock[6..8])?;
-    let fraction = clock[8..].strip_prefix('.').unwrap_or("");
-    if clock.len() > 8 && fraction.is_empty() {
-        return None;
-    }
-    let seconds = i32::from(hour) * 3600 + i32::from(minute) * 60 + i32::from(second);
-    Some(CalendarParts {
+    let hour = parse_two_digits(time.get(0..2)?)?;
+    let minute = parse_two_digits(time.get(3..5)?)?;
+    let second = parse_two_digits(time.get(6..8)?)?;
+    Some((
         day,
-        seconds,
-        fraction_start: if fraction.is_empty() {
-            0
-        } else {
-            u8::try_from(time_start + 9).ok()?
-        },
-        fraction_len: u8::try_from(fraction.len()).ok()?,
-    })
+        i32::from(hour) * 3600 + i32::from(minute) * 60 + i32::from(second),
+    ))
 }
 
 fn days_before_year(year: i64) -> Option<i64> {
@@ -749,33 +767,6 @@ fn parse_two_digits(value: &str) -> Option<u8> {
 
 fn is_leap_year(year: i64) -> bool {
     year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
-}
-
-fn compare_fraction(
-    left: &str,
-    left_start: u8,
-    left_len: u8,
-    right: &str,
-    right_start: u8,
-    right_len: u8,
-) -> Ordering {
-    let length = usize::from(left_len).max(usize::from(right_len));
-    (0..length)
-        .map(|index| {
-            left.as_bytes()
-                .get(usize::from(left_start) + index)
-                .copied()
-                .unwrap_or(b'0')
-                .cmp(
-                    &right
-                        .as_bytes()
-                        .get(usize::from(right_start) + index)
-                        .copied()
-                        .unwrap_or(b'0'),
-                )
-        })
-        .find(|ordering| *ordering != Ordering::Equal)
-        .unwrap_or(Ordering::Equal)
 }
 
 impl std::fmt::Display for Epoch {
@@ -1069,11 +1060,84 @@ pub(crate) trait FromKvn: Sized {
 /// * `V`: The type of the value (e.g., `f64`, `i32`).
 /// * `U`: The type of the unit enum (e.g., `PositionUnits`).
 #[derive(Serialize, Debug, PartialEq, Clone, Default)]
+#[serde(bound(serialize = "V: Serialize + 'static, U: Serialize"))]
 pub struct UnitValue<V, U> {
-    #[serde(rename = "$value")]
+    #[serde(rename = "$value", serialize_with = "serialize_xml_value")]
     pub value: V,
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<U>,
+}
+
+/// Serialize a [`UnitValue`] value in its XML lexical form. ODM 8.13.4 uses the xsd:double
+/// lexical space, which spells the special values `INF`, `-INF`, and `NaN` rather than Rust's
+/// `inf` and `-inf`; every other value keeps its own serialization.
+fn serialize_xml_value<V, S>(value: &V, serializer: S) -> std::result::Result<S::Ok, S::Error>
+where
+    V: Serialize + 'static,
+    S: serde::Serializer,
+{
+    match (value as &dyn std::any::Any).downcast_ref::<f64>() {
+        Some(value) if value.is_nan() => serializer.serialize_str("NaN"),
+        Some(&f64::INFINITY) => serializer.serialize_str("INF"),
+        Some(&f64::NEG_INFINITY) => serializer.serialize_str("-INF"),
+        // `Display` never uses an exponent, so 1e308 would span 309 digits. Beyond the range
+        // where it stays compact, write the shortest exact exponent form instead.
+        Some(&value) if value != 0.0 && !(1e-5..1e16).contains(&value.abs()) => {
+            serializer.serialize_str(zmij::Buffer::new().format_finite(value))
+        }
+        _ => value.serialize(serializer),
+    }
+}
+
+/// Serialize a fixed-unit [`UnitValue`] as its value alone. Where the schema's `units`
+/// attribute is optional and allows a single unit, it restates the implied unit, and the ODM
+/// examples omit it.
+pub(crate) fn serialize_without_units<V, U, S>(
+    value: &UnitValue<V, U>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error>
+where
+    V: Serialize + 'static,
+    S: serde::Serializer,
+{
+    serialize_xml_value(&value.value, serializer)
+}
+
+/// [`serialize_without_units`] for an optional element, which the field skips when absent.
+pub(crate) fn serialize_optional_without_units<V, U, S>(
+    value: &Option<UnitValue<V, U>>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error>
+where
+    V: Serialize + 'static,
+    S: serde::Serializer,
+{
+    match value {
+        Some(value) => serialize_without_units(value, serializer),
+        None => serializer.serialize_none(),
+    }
+}
+
+/// Parse a [`UnitValue`] value from decoded XML text. Surrounding XML whitespace is collapsed;
+/// special values must use the xsd:double spellings `INF`, `-INF`, and `NaN` (ODM 8.13.4),
+/// which Rust's float parser would otherwise extend with `inf`, `+infinity`, `nan`, ...
+fn parse_xml_value<V>(text: &str) -> std::result::Result<V, String>
+where
+    V: FromStr,
+    V::Err: std::fmt::Display,
+{
+    let value = text.trim_matches([' ', '\t', '\r', '\n']);
+    let special = value.trim_start_matches(['+', '-']);
+    if ["inf", "infinity", "nan"]
+        .iter()
+        .any(|name| special.eq_ignore_ascii_case(name))
+        && !matches!(value, "INF" | "-INF" | "NaN")
+    {
+        return Err(format!(
+            "'{value}' is not an xsd:double value; use INF, -INF, or NaN"
+        ));
+    }
+    value.parse::<V>().map_err(|error| error.to_string())
 }
 
 impl<V, U> FromStr for UnitValue<V, U>
@@ -1125,6 +1189,55 @@ where
             }
         }
 
+        /// Deserializes element text through [`parse_xml_value`].
+        struct XmlValueSeed<V>(std::marker::PhantomData<V>);
+
+        impl<'de, V> serde::de::DeserializeSeed<'de> for XmlValueSeed<V>
+        where
+            V: std::str::FromStr,
+            V::Err: std::fmt::Display,
+        {
+            type Value = V;
+
+            fn deserialize<D>(self, deserializer: D) -> std::result::Result<V, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                deserializer.deserialize_any(self)
+            }
+        }
+
+        /// XML supplies text, checked against the xsd:double spelling. Self-describing formats
+        /// such as JSON round-trip the numbers `UnitValue` serializes, whose `Display` form is
+        /// exact.
+        impl<V> serde::de::Visitor<'_> for XmlValueSeed<V>
+        where
+            V: std::str::FromStr,
+            V::Err: std::fmt::Display,
+        {
+            type Value = V;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a number")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<V, E> {
+                parse_xml_value::<V>(v).map_err(E::custom)
+            }
+
+            fn visit_f64<E: serde::de::Error>(self, v: f64) -> std::result::Result<V, E> {
+                v.to_string().parse::<V>().map_err(E::custom)
+            }
+
+            fn visit_i64<E: serde::de::Error>(self, v: i64) -> std::result::Result<V, E> {
+                v.to_string().parse::<V>().map_err(E::custom)
+            }
+
+            fn visit_u64<E: serde::de::Error>(self, v: u64) -> std::result::Result<V, E> {
+                v.to_string().parse::<V>().map_err(E::custom)
+            }
+        }
+
         struct UnitValueVisitor<V, U>(std::marker::PhantomData<(V, U)>);
 
         impl<'de, V, U> serde::de::Visitor<'de> for UnitValueVisitor<V, U>
@@ -1143,7 +1256,7 @@ where
             where
                 E: serde::de::Error,
             {
-                let value = v.parse::<V>().map_err(E::custom)?;
+                let value = parse_xml_value::<V>(v).map_err(E::custom)?;
                 Ok(UnitValue { value, units: None })
             }
 
@@ -1160,7 +1273,9 @@ where
                             if value.is_some() {
                                 return Err(serde::de::Error::duplicate_field("$value"));
                             }
-                            value = Some(map.next_value()?);
+                            value = Some(
+                                map.next_value_seed(XmlValueSeed::<V>(std::marker::PhantomData))?,
+                            );
                         }
                         UnitValueKey::Units => {
                             if units.is_some() {
@@ -5060,6 +5175,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn calendar_fields_with_a_non_digit_are_invalid_not_a_panic() {
+        // Found by fuzzing: a non-digit byte in a numeric field underflowed `byte - b'0'`.
+        for value in [
+            "2008-071T17:08:*0",
+            "2008-*1-01T00:00:00",
+            "20*8-071T17:08:00",
+        ] {
+            assert!(!common_calendar_fields_are_valid(value), "{value}");
+        }
+    }
+
+    #[test]
     fn test_non_negative_double() {
         assert!(NonNegativeDouble::new(0.0).is_ok());
         assert!(NonNegativeDouble::new(1.0).is_ok());
@@ -5204,10 +5331,80 @@ mod tests {
             calendar("2023-001T00:00:00.09Z").cmp_same_branch(&calendar("2023-001T00:00:00.1Z")),
             Some(Less)
         );
+        // Mixed calendar and ordinal layouts with unequal fraction precision or a `Z`.
+        for (left, right, ordering) in [
+            ("2020-001T00:00:00", "2020-01-01T00:00:00.000", Equal),
+            ("2020-01-01T00:00:00", "2020-001T00:00:00.0", Equal),
+            ("2020-001T00:00:00.5Z", "2020-01-01T00:00:00.50", Equal),
+            ("2020-001T00:00:00.000Z", "2020-01-01T00:00:00", Equal),
+            ("2020-001T00:00:00", "2020-01-01T00:00:00.1", Less),
+            ("2020-001T00:00:00.25Z", "2020-01-01T00:00:00.2", Greater),
+        ] {
+            assert_eq!(
+                calendar(left).cmp_same_branch(&calendar(right)),
+                Some(ordering),
+                "{left} vs {right}"
+            );
+        }
         assert_eq!(
             calendar("2023-01-01T00:00:00Z").cmp_same_branch(&numeric("1")),
             None
         );
+    }
+
+    #[test]
+    fn fraction_digit_count_reads_only_calendar_fractions() {
+        for (value, digits) in [
+            ("2020-01-01T00:00:00", 0),
+            ("2020-01-01T00:00:00Z", 0),
+            ("2020-01-01T00:00:00.123", 3),
+            ("2020-001T00:00:00.1234567890123456Z", 16),
+            ("0000-400T00:00:00.5", 1),
+            ("123.456", 0),
+            ("", 0),
+            ("Z", 0),
+        ] {
+            assert_eq!(fraction_digit_count(value.as_bytes()), digits, "{value}");
+        }
+    }
+
+    #[test]
+    fn xml_unit_values_use_compact_exact_spellings() {
+        #[derive(Serialize)]
+        #[serde(rename = "Wrapper")]
+        struct Wrapper {
+            #[serde(rename = "X")]
+            x: Position,
+        }
+        for (value, spelling) in [
+            (1e308, "1e+308"),
+            (-1.25e-9, "-1.25e-9"),
+            (2789.6, "2789.6"),
+            (0.00033313494, "0.00033313494"),
+            (-280.0, "-280"),
+            (0.0, "0"),
+        ] {
+            let xml = crate::xml::to_string(&Wrapper {
+                x: Position::new(value, None),
+            })
+            .unwrap();
+            assert!(
+                xml.contains(&format!("<X>{spelling}</X>")),
+                "{value}: {xml}"
+            );
+            assert_eq!(parse_xml_value::<f64>(spelling).unwrap(), value);
+        }
+    }
+
+    #[test]
+    fn unit_values_round_trip_through_self_describing_serde_formats() {
+        // UnitValue serializes finite values as numbers; reading them back must not require
+        // the XML text form.
+        let position = Position::new(1.5, Some(PositionUnits::Km));
+        let json = serde_json::to_string(&position).unwrap();
+        assert_eq!(serde_json::from_str::<Position>(&json).unwrap(), position);
+        let integral: Position = serde_json::from_str(r#"{"$value":2,"@units":"km"}"#).unwrap();
+        assert_eq!(integral.value, 2.0);
     }
 
     #[test]

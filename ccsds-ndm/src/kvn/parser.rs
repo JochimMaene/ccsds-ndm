@@ -49,7 +49,12 @@ pub fn parse_f64_winnow(input: &mut &str) -> KvnResult<f64> {
     fast_float::parse(s).map_err(|_| cut_err(input, "Invalid float"))
 }
 
-/// Return whether a token uses the CCSDS integer, fixed-point, or floating-point grammar.
+/// Return whether a token has the shape of a CCSDS integer, fixed-point, or floating-point number
+/// (ODM 7.5.4-7.5.7).
+///
+/// Reading does not apply the 16-digit cap of 7.5.6/7.5.7b or the 32-bit integer range of 7.5.4
+/// to data values: many producers write the 17-digit shortest round-trip spelling of a double,
+/// which loses nothing. Generation still writes at most 16 digits.
 pub(crate) fn valid_ccsds_number(token: &str) -> bool {
     let bytes = token.as_bytes();
     let mut index = usize::from(matches!(bytes.first(), Some(b'+' | b'-')));
@@ -66,7 +71,6 @@ pub(crate) fn valid_ccsds_number(token: &str) -> bool {
         return false;
     }
 
-    let mut fraction_digits = 0;
     let has_decimal = bytes.get(index) == Some(&b'.');
     if has_decimal {
         index += 1;
@@ -74,17 +78,13 @@ pub(crate) fn valid_ccsds_number(token: &str) -> bool {
         while bytes.get(index).is_some_and(u8::is_ascii_digit) {
             index += 1;
         }
-        fraction_digits = index - fraction_start;
-        if fraction_digits == 0 {
+        if index == fraction_start {
             return false;
         }
     }
 
-    if integer_digits + fraction_digits > 16 {
-        return false;
-    }
     if index == bytes.len() {
-        return has_decimal || token.parse::<i32>().is_ok();
+        return true;
     }
     if !has_decimal || integer_digits != 1 || !matches!(bytes.get(index), Some(b'e' | b'E')) {
         return false;
@@ -101,13 +101,21 @@ pub(crate) fn valid_ccsds_number(token: &str) -> bool {
     index == bytes.len() && index > exponent_start
 }
 
-/// Parses up to the next space or line ending, skipping leading whitespace.
-pub fn till_space<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
-    preceded(ws, take_till(1.., (' ', '\t', '\r', '\n'))).parse_next(input)
+/// Parse a token in the CCSDS number grammar whose value lies within the double range of
+/// ODM 7.5.7e. Overflow to infinity and a non-zero value that underflows to zero are rejected;
+/// subnormal values are kept.
+pub(crate) fn parse_ccsds_number(token: &str) -> Option<f64> {
+    if !valid_ccsds_number(token) {
+        return None;
+    }
+    let value: f64 = fast_float::parse(token).ok()?;
+    let mantissa = token.split(['e', 'E']).next().unwrap_or(token);
+    let underflow = value == 0.0 && mantissa.bytes().any(|byte| matches!(byte, b'1'..=b'9'));
+    (value.is_finite() && !underflow).then_some(value)
 }
 
 /// Parses up to the next space or line ending, or end of input, skipping leading whitespace.
-pub fn till_space_or_eol<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
+pub fn till_space<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     preceded(ws, take_till(1.., (' ', '\t', '\r', '\n'))).parse_next(input)
 }
 
@@ -153,7 +161,19 @@ pub fn to_ccsds_error(
 
     let base_err = match *inner.kind {
         crate::error::ParserErrorKind::Validation(e) => CcsdsNdmError::Validation(Box::new(e)),
-        crate::error::ParserErrorKind::Epoch(e) => CcsdsNdmError::Epoch(e),
+        // A bad KVN time tag is a value error like a bad number: report where it is.
+        crate::error::ParserErrorKind::Epoch(e) => {
+            let (line, column) = crate::error::line_column(input, offset);
+            CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(
+                crate::error::KvnParseError {
+                    line,
+                    column,
+                    message: e.to_string(),
+                    contexts: inner.contexts.to_vec(),
+                    offset,
+                },
+            ))))
+        }
         crate::error::ParserErrorKind::Enum(e) => {
             CcsdsNdmError::Format(Box::new(FormatError::Enum(e)))
         }
@@ -190,11 +210,9 @@ pub fn to_ccsds_error(
 
 /// Creates a winnow ErrMode::Cut with a static context label.
 pub fn cut_err(input: &mut &str, label: &'static str) -> ErrMode<InternalParserError> {
-    ErrMode::Cut(InternalParserError::from_input(input).add_context(
-        input,
-        &input.checkpoint(),
-        StrContext::Label(label),
-    ))
+    let mut error = InternalParserError::from_input(input);
+    error.message = std::borrow::Cow::Borrowed(label);
+    ErrMode::Cut(error.add_context(input, &input.checkpoint(), StrContext::Label(label)))
 }
 
 /// Creates a winnow ErrMode::Cut for a missing required field.
@@ -293,7 +311,8 @@ pub fn comment_line<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     } else if !input.is_empty() && !input.starts_with(['\r', '\n']) {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
-    till_line_ending.parse_next(input)
+    // ODM 7.4.7: white space immediately before the end of a line is not significant.
+    till_line_ending.map(str::trim_end).parse_next(input)
 }
 
 /// Parses a key-value pair line.
@@ -410,29 +429,39 @@ pub fn kv_float(input: &mut &str) -> KvnResult<f64> {
     Ok(value)
 }
 
+/// Whether only blanks remain before the end of the line or input.
+fn at_value_end(input: &str) -> bool {
+    let rest = input.trim_start_matches([' ', '\t']);
+    rest.is_empty() || rest.starts_with(['\r', '\n'])
+}
+
 /// Fast i32 parser for KVN values.
 pub fn kv_i32(input: &mut &str) -> KvnResult<i32> {
     let checkpoint = input.checkpoint();
-    let (value, unit) = terminated(
-        (
-            take_while(1.., ('0'..='9', '-', '+'))
-                .map(|s: &str| s.parse::<i32>())
-                .verify(|res| res.is_ok())
-                .map(|res| res.unwrap()),
-            kv_unit,
-        ),
-        opt_line_ending,
+    let parsed = (
+        take_while(1.., ('0'..='9', '-', '+'))
+            .map(|s: &str| s.parse::<i32>())
+            .verify(|res| res.is_ok())
+            .map(|res| res.unwrap()),
+        kv_unit,
     )
-    .parse_next(input)
-    .map_err(|e| {
-        if e.is_backtrack() {
+        .parse_next(input);
+    // A value such as `5.0` must fail as a whole, not leave `.0` for the next keyword.
+    let (value, unit) = match parsed {
+        Ok(parsed) if at_value_end(input) => parsed,
+        Err(e) if !e.is_backtrack() => return Err(e),
+        _ => {
+            input.reset(&checkpoint);
             let mut err = InternalParserError::from_input(input);
             err.message = std::borrow::Cow::Borrowed("Invalid integer");
-            ErrMode::Cut(err.add_context(input, &checkpoint, StrContext::Label("Invalid integer")))
-        } else {
-            e
+            return Err(ErrMode::Cut(err.add_context(
+                input,
+                &checkpoint,
+                StrContext::Label("Invalid integer"),
+            )));
         }
-    })?;
+    };
+    opt_line_ending(input)?;
     if unit.is_some() {
         return Err(cut_err(input, "Units are not allowed for integer fields"));
     }
@@ -442,30 +471,30 @@ pub fn kv_i32(input: &mut &str) -> KvnResult<i32> {
 /// Fast u32 parser for KVN values.
 pub fn kv_u32(input: &mut &str) -> KvnResult<u32> {
     let checkpoint = input.checkpoint();
-    let (value, unit) = terminated(
-        (
-            take_while(1.., '0'..='9')
-                .map(|s: &str| s.parse::<u32>())
-                .verify(|res| res.is_ok())
-                .map(|res| res.unwrap()),
-            kv_unit,
-        ),
-        opt_line_ending,
+    let parsed = (
+        take_while(1.., '0'..='9')
+            .map(|s: &str| s.parse::<u32>())
+            .verify(|res| res.is_ok())
+            .map(|res| res.unwrap()),
+        kv_unit,
     )
-    .parse_next(input)
-    .map_err(|e| {
-        if e.is_backtrack() {
+        .parse_next(input);
+    // A value such as `5.0` must fail as a whole, not leave `.0` for the next keyword.
+    let (value, unit) = match parsed {
+        Ok(parsed) if at_value_end(input) => parsed,
+        Err(e) if !e.is_backtrack() => return Err(e),
+        _ => {
+            input.reset(&checkpoint);
             let mut err = InternalParserError::from_input(input);
             err.message = std::borrow::Cow::Borrowed("Invalid unsigned integer");
-            ErrMode::Cut(err.add_context(
+            return Err(ErrMode::Cut(err.add_context(
                 input,
                 &checkpoint,
                 StrContext::Label("Invalid unsigned integer"),
-            ))
-        } else {
-            e
+            )));
         }
-    })?;
+    };
+    opt_line_ending(input)?;
     if unit.is_some() {
         return Err(cut_err(input, "Units are not allowed for integer fields"));
     }
@@ -606,20 +635,52 @@ pub fn kv_string_opt(input: &mut &str) -> KvnResult<Option<String>> {
 
 /// Parses an Epoch value from a KVN line.
 pub fn kv_epoch(input: &mut &str) -> KvnResult<Epoch> {
+    let value_start = *input;
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    Epoch::from_str(v.trim())
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    Epoch::from_str(v.trim()).map_err(|e| external_error_at(input, value_start, e))
+}
+
+/// Build a value error positioned at the start of the value rather than after its line, so
+/// diagnostics name the line and column that hold the bad token.
+fn external_error_at<'a, E>(
+    input: &mut &'a str,
+    value_start: &'a str,
+    error: E,
+) -> ErrMode<InternalParserError>
+where
+    InternalParserError: winnow::error::FromExternalError<&'a str, E>,
+{
+    *input = value_start.trim_start_matches([' ', '\t']);
+    ErrMode::Cut(InternalParserError::from_external_error(input, error))
+}
+
+/// Parses an optional keyword value, treating an empty value field as absent.
+///
+/// ODM 7.5.1 requires non-empty values only for mandatory keywords.
+pub fn kv_optional<'a, T>(
+    mut value: impl FnMut(&mut &'a str) -> KvnResult<T>,
+) -> impl FnMut(&mut &'a str) -> KvnResult<Option<T>> {
+    move |input: &mut &'a str| {
+        let line_end = input.find(['\r', '\n']).unwrap_or(input.len());
+        if input[..line_end].trim().is_empty() {
+            *input = &input[line_end..];
+            opt_line_ending(input)?;
+            return Ok(None);
+        }
+        value(input).map(Some)
+    }
 }
 
 /// Parses a calendar/ordinal epoch value from a KVN line.
 pub fn kv_calendar_epoch(input: &mut &str) -> KvnResult<CalendarEpoch> {
+    let value_start = *input;
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    CalendarEpoch::from_str(v.trim())
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    CalendarEpoch::from_str(v.trim()).map_err(|e| external_error_at(input, value_start, e))
 }
 
 /// Parses an optional calendar/ordinal epoch value from a KVN line.
 pub fn kv_calendar_epoch_opt(input: &mut &str) -> KvnResult<Option<CalendarEpoch>> {
+    let value_start = *input;
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
     let trimmed = v.trim();
     if trimmed.is_null() {
@@ -627,40 +688,41 @@ pub fn kv_calendar_epoch_opt(input: &mut &str) -> KvnResult<Option<CalendarEpoch
     } else {
         CalendarEpoch::from_str(trimmed)
             .map(Some)
-            .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+            .map_err(|e| external_error_at(input, value_start, e))
     }
 }
 
 /// Parses an Epoch value as a single token (until next space).
 pub fn kv_epoch_token(input: &mut &str) -> KvnResult<Epoch> {
+    let value_start = *input;
     let v = till_space.parse_next(input)?;
-    Epoch::from_str(v.trim())
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    Epoch::from_str(v.trim()).map_err(|e| external_error_at(input, value_start, e))
 }
 
 /// Parses a calendar/ordinal epoch value as a single KVN token (until the next space).
 pub fn kv_calendar_epoch_token(input: &mut &str) -> KvnResult<CalendarEpoch> {
+    let value_start = *input;
     let v = till_space.parse_next(input)?;
-    CalendarEpoch::from_str(v.trim())
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    CalendarEpoch::from_str(v.trim()).map_err(|e| external_error_at(input, value_start, e))
 }
 
 /// Parses a finite relative time using the ADM/ACM `relTimeType` lexical rules.
 pub fn kv_relative_time(input: &mut &str) -> KvnResult<RelativeTime> {
+    let value_start = *input;
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    RelativeTime::from_str(v.trim())
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    RelativeTime::from_str(v.trim()).map_err(|e| external_error_at(input, value_start, e))
 }
 
 /// Parses a boolean (YES/NO) from a KVN line.
 pub fn kv_yes_no(input: &mut &str) -> KvnResult<YesNo> {
+    let value_start = *input;
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    YesNo::from_str(v.trim())
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    YesNo::from_str(v.trim()).map_err(|e| external_error_at(input, value_start, e))
 }
 
 /// Parses an optional boolean (YES/NO) from a KVN line.
 pub fn kv_yes_no_opt(input: &mut &str) -> KvnResult<Option<YesNo>> {
+    let value_start = *input;
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
     let trimmed = v.trim();
     if trimmed.is_null() {
@@ -668,7 +730,7 @@ pub fn kv_yes_no_opt(input: &mut &str) -> KvnResult<Option<YesNo>> {
     } else {
         YesNo::from_str(trimmed)
             .map(Some)
-            .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+            .map_err(|e| external_error_at(input, value_start, e))
     }
 }
 
@@ -707,25 +769,26 @@ where
 
 /// Parses a value from a KVN line using the `FromKvnValue` trait.
 pub fn kv_from_kvn_value<T: FromKvnValue>(input: &mut &str) -> KvnResult<T> {
+    let value_start = *input;
     let (v, _) = kv_rest.parse_next(input)?;
-    T::from_kvn_value(v)
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    T::from_kvn_value(v).map_err(|e| external_error_at(input, value_start, e))
 }
 
 /// Parses any type that implements FromKvnFloat from a KVN line.
 pub fn kv_from_kvn<T: FromKvnFloat>(input: &mut &str) -> KvnResult<T> {
+    let value_start = *input;
     let (v, u) = kv_float_unit.parse_next(input)?;
-    T::from_kvn_float(v, u)
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+    T::from_kvn_float(v, u).map_err(|e| external_error_at(input, value_start, e))
 }
 
 /// Parses any optional type that implements FromKvnFloat from a KVN line.
 pub fn kv_from_kvn_opt<T: FromKvnFloat>(input: &mut &str) -> KvnResult<Option<T>> {
+    let value_start = *input;
     let (v, u) = kv_float_unit_opt.parse_next(input)?;
     if let Some(val) = v {
         T::from_kvn_float(val, u)
             .map(Some)
-            .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))
+            .map_err(|e| external_error_at(input, value_start, e))
     } else {
         Ok(None)
     }
@@ -795,6 +858,22 @@ pub fn expect_key<'a>(
     expected_key: &'static str,
 ) -> impl FnMut(&mut &'a str) -> KvnResult<(&'a str, Option<&'a str>)> {
     expect_kv(expected_key, kvn_value_only)
+}
+
+/// Parses a keyword whose value never carries units, such as a `CCSDS_xxx_VERS` line or an
+/// epoch, rejecting a bracketed unit instead of silently dropping it.
+pub fn expect_unitless_key<'a>(
+    expected_key: &'static str,
+) -> impl FnMut(&mut &'a str) -> KvnResult<&'a str> {
+    move |input: &mut &'a str| {
+        let line_start = *input;
+        let (value, unit) = expect_key(expected_key).parse_next(input)?;
+        if unit.is_some() {
+            *input = line_start.trim_start_matches([' ', '\t']);
+            return Err(cut_err(input, "units are not allowed on this keyword"));
+        }
+        Ok(value)
+    }
 }
 
 fn kvn_value_only<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
@@ -988,7 +1067,7 @@ pub fn at_block_start(tag: &str, input: &str) -> bool {
     let s = input.trim_start_matches([' ', '\t']);
     if let Some(rest) = s.strip_prefix(tag) {
         if let Some(suffix) = rest.strip_prefix("_START") {
-            return suffix.starts_with('\r') || suffix.starts_with('\n') || suffix.is_empty();
+            return ends_line(suffix);
         }
     }
     false
@@ -1002,10 +1081,16 @@ pub fn at_block_end(tag: &str, input: &str) -> bool {
             .strip_prefix("_STOP")
             .or_else(|| rest.strip_prefix("_END"))
         {
-            return suffix.starts_with('\r') || suffix.starts_with('\n') || suffix.is_empty();
+            return ends_line(suffix);
         }
     }
     false
+}
+
+/// ODM 7.4.7: white space immediately before the end of a line is not significant.
+fn ends_line(rest: &str) -> bool {
+    let rest = rest.trim_start_matches([' ', '\t']);
+    rest.is_empty() || rest.starts_with(['\r', '\n'])
 }
 
 /// Expects a specific block start and consumes it.
@@ -1052,6 +1137,8 @@ pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
     let mut message_id = None;
 
     loop {
+        // ODM 7.3.5: blank lines may appear at any position.
+        blank_lines.parse_next(input)?;
         let checkpoint = input.checkpoint();
 
         let key = match preceded(ws, keyword).parse_next(input) {
@@ -1392,26 +1479,23 @@ mod tests {
             "0",
             "-2147483648",
             "2147483647",
+            "+00000000000000000001",
+            "-00000000002147483648",
             "0.0",
             "-12.5",
             "1.234567890123456",
             "1.0e0",
             "-1.234567890123456E+308",
+            // Beyond the book's 16-digit and 32-bit limits, which reading does not apply.
+            "2147483648",
+            "00000000002147483648",
+            "1.2345678901234567",
+            "-2757.3016318893897",
         ] {
             assert!(valid_ccsds_number(value), "{value}");
         }
         for value in [
-            "",
-            "+",
-            "2147483648",
-            "-2147483649",
-            ".5",
-            "1.",
-            "12e3",
-            "1e3",
-            "1.0e",
-            "1.0e+",
-            "1.2345678901234567",
+            "", "+", ".5", "1.", "1.e3", "12e3", "1e3", "1.0e", "1.0e+", "12.5e3",
         ] {
             assert!(!valid_ccsds_number(value), "{value}");
         }
@@ -1472,7 +1556,7 @@ mod tests {
 
         let mut input = "COMMENT    indented   \n";
         let content = comment_line.parse_next(&mut input).unwrap();
-        assert_eq!(content, "   indented   ");
+        assert_eq!(content, "   indented");
     }
 
     #[test]

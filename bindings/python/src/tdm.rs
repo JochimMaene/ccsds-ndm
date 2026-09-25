@@ -116,7 +116,7 @@ impl Tdm {
     /// Validate the message against CCSDS rules.
     ///
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
-        crate::api::validate_message(&self.to_core(py)?)
+        crate::api::validate_message(py, &self.to_core(py)?)
     }
 
     fn __repr__(&self, py: Python<'_>) -> String {
@@ -158,7 +158,7 @@ impl Tdm {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(data, format)?;
+        let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
 
@@ -172,7 +172,7 @@ impl Tdm {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed_file(&path, format)?;
+        let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
 
@@ -185,7 +185,12 @@ impl Tdm {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<()> {
-        crate::api::generate_file(&ccsds_ndm::Message::Tdm(self.to_core(py)?), &path, format)
+        crate::api::generate_file(
+            py,
+            &ccsds_ndm::Message::Tdm(self.to_core(py)?),
+            &path,
+            format,
+        )
     }
 
     /// Serialize to validated KVN or XML.
@@ -195,7 +200,7 @@ impl Tdm {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<String> {
-        crate::api::generate_string(&self.to_core(py)?, format)
+        crate::api::generate_string(py, &self.to_core(py)?, format)
     }
 }
 
@@ -293,6 +298,8 @@ impl TdmHeader {
     ///
     /// Examples: 201113719185
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.2.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_message_id(&self) -> Option<String> {
@@ -352,20 +359,11 @@ impl TdmBody {
     }
 
     fn to_core(&self, py: Python<'_>) -> PyResult<core_tdm::TdmBody> {
-        let segments = self
-            .segments
-            .bind(py)
-            .iter()
-            .enumerate()
-            .map(|(index, value)| {
-                value
-                    .extract::<PyRef<'_, TdmSegment>>()
-                    .map_err(|_| {
-                        PyValueError::new_err(format!("segments[{index}] must be TdmSegment"))
-                    })?
-                    .to_core(py)
-            })
-            .collect::<PyResult<Vec<_>>>()?;
+        let segments = crate::common::extract_records(
+            self.segments.bind(py),
+            "segments",
+            |value: &TdmSegment| value.to_core(py),
+        )?;
         Ok(core_tdm::TdmBody { segments })
     }
 }
@@ -793,6 +791,8 @@ impl TdmMetadata {
     ///
     /// Examples: 20190918_1200135-0001
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_track_id(&self) -> Option<String> {
@@ -808,6 +808,8 @@ impl TdmMetadata {
     /// DATA_START, DATA_STOP, and COMMENT keywords.
     ///
     /// Examples: RANGE, TRANSMIT_FREQ_n, RECEIVE_FREQ
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -845,6 +847,8 @@ impl TdmMetadata {
     ///
     /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_start_time(&self) -> Option<String> {
@@ -864,6 +868,8 @@ impl TdmMetadata {
     /// specification, see 4.3.9.)
     ///
     /// Examples: 1996-12-18T14:28:15.1172, 1996-277T07:22:54, 2006-001T00:00:00Z
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -953,6 +959,8 @@ impl TdmMetadata {
     ///
     /// Examples: SEQUENTIAL, SINGLE_DIFF
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_mode(&self) -> Option<String> {
@@ -974,6 +982,8 @@ impl TdmMetadata {
     /// transmit participant.
     ///
     /// Examples: PATH = 1,2,1, PATH_1 = 1,2,1, PATH_2 = 3,1
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1100,6 +1110,8 @@ impl TdmMetadata {
     ///
     /// Examples: S, X, Ka, L, UHF, GREEN
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_transmit_band(&self) -> Option<String> {
@@ -1117,6 +1129,8 @@ impl TdmMetadata {
     ///
     /// Examples: S, X, Ka, L, UHF, GREEN
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_receive_band(&self) -> Option<String> {
@@ -1131,6 +1145,8 @@ impl TdmMetadata {
     /// that is necessary to calculate the coherent downlink from the uplink frequency.
     ///
     /// Examples: 240, 880
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -1147,6 +1163,8 @@ impl TdmMetadata {
     ///
     /// Examples: 221, 749
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: Optional[int]
     #[getter]
     fn get_turnaround_denominator(&self) -> Option<i32> {
@@ -1162,6 +1180,8 @@ impl TdmMetadata {
     /// time or the receive time.
     ///
     /// Examples: TRANSMIT, RECEIVE
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1185,6 +1205,8 @@ impl TdmMetadata {
     ///
     /// Units: s
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_integration_interval(&self) -> Option<f64> {
@@ -1200,6 +1222,8 @@ impl TdmMetadata {
     /// period.
     ///
     /// Examples: START, MIDDLE, END
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1226,6 +1250,8 @@ impl TdmMetadata {
     ///
     /// Units: Hz
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_freq_offset(&self) -> Option<f64> {
@@ -1241,6 +1267,8 @@ impl TdmMetadata {
     /// constant frequency; or ‘ONE_WAY’ (used in Delta-DOR).
     ///
     /// Examples: COHERENT, CONSTANT, ONE_WAY
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1264,6 +1292,8 @@ impl TdmMetadata {
     ///
     /// Examples: 32768.0, 2.0e+23, 0.0, 161.6484
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_range_modulus(&self) -> Option<f64> {
@@ -1280,6 +1310,8 @@ impl TdmMetadata {
     /// changing. The default value shall be ‘km’.
     ///
     /// Examples: km, s, RU
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1301,6 +1333,8 @@ impl TdmMetadata {
     ///
     /// Examples: AZEL, RADEC, XEYN, XSYE
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_angle_type(&self) -> Option<String> {
@@ -1321,6 +1355,8 @@ impl TdmMetadata {
     /// frame is referenced.
     ///
     /// Examples: EME2000, ICRF, ITRF1993, ITRF2000, TOD_EARTH
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1345,6 +1381,8 @@ impl TdmMetadata {
     ///
     /// Examples: HERMITE, LAGRANGE, LINEAR
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_interpolation(&self) -> Option<String> {
@@ -1360,6 +1398,8 @@ impl TdmMetadata {
     /// in tracking data where the uplink frequency is not constant.
     ///
     /// Examples: 3, 5, 7, 11
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -1379,6 +1419,8 @@ impl TdmMetadata {
     ///
     /// Units: Hz
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_doppler_count_bias(&self) -> Option<f64> {
@@ -1395,6 +1437,8 @@ impl TdmMetadata {
     ///
     /// Examples: 1000, 1
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: Optional[int]
     #[getter]
     fn get_doppler_count_scale(&self) -> Option<u64> {
@@ -1410,6 +1454,8 @@ impl TdmMetadata {
     /// counter rollover has occurred during the track.
     ///
     /// Examples: YES, NO
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1437,6 +1483,8 @@ impl TdmMetadata {
     /// Examples: 1.23, 0.0326, 0.00077
     ///
     /// Units: s
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1516,6 +1564,8 @@ impl TdmMetadata {
     ///
     /// Units: s
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_receive_delay_1(&self) -> Option<f64> {
@@ -1592,6 +1642,8 @@ impl TdmMetadata {
     ///
     /// Examples: RAW, VALIDATED, DEGRADED
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_data_quality(&self) -> Option<String> {
@@ -1612,6 +1664,8 @@ impl TdmMetadata {
     /// calibration, etc.).
     ///
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1755,6 +1809,8 @@ impl TdmMetadata {
     ///
     /// Examples: YES, NO
     ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_corrections_applied(&self) -> Option<String> {
@@ -1815,22 +1871,11 @@ impl TdmData {
     }
 
     fn to_core(&self, py: Python<'_>) -> PyResult<core_tdm::TdmData> {
-        let observations = self
-            .observations
-            .bind(py)
-            .iter()
-            .enumerate()
-            .map(|(index, value)| {
-                value
-                    .extract::<PyRef<'_, TdmObservation>>()
-                    .map(|value| value.inner.clone())
-                    .map_err(|_| {
-                        PyValueError::new_err(format!(
-                            "observations[{index}] must be TdmObservation"
-                        ))
-                    })
-            })
-            .collect::<PyResult<Vec<_>>>()?;
+        let observations = crate::common::extract_records(
+            self.observations.bind(py),
+            "observations",
+            |value: &TdmObservation| Ok(value.inner.clone()),
+        )?;
         Ok(core_tdm::TdmData {
             comment: self.comment.clone(),
             observations,

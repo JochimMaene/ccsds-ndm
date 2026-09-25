@@ -59,7 +59,7 @@ pub fn opm_version(input: &mut &str) -> KvnResult<String> {
     // Skip any leading comments/empty lines
     let _ = collect_comments.parse_next(input)?;
 
-    let (value, _) = expect_key("CCSDS_OPM_VERS").parse_next(input)?;
+    let value = expect_unitless_key("CCSDS_OPM_VERS").parse_next(input)?;
     Ok(value.to_string())
 }
 

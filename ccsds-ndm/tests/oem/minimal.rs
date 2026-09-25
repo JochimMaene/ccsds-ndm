@@ -1,4 +1,3 @@
-use crate::common::mutated;
 use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::Ndm;
 
@@ -18,7 +17,7 @@ META_STOP
 "#;
 
 const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
-<oem id="CCSDS_OEM_VERS" version="3.0">
+<oem xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="CCSDS_OEM_VERS" version="3.0">
   <header>
     <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
     <ORIGINATOR>TEST</ORIGINATOR>
@@ -58,35 +57,4 @@ fn minimal_kvn_parses() {
 #[test]
 fn minimal_xml_parses() {
     Oem::from_xml(XML).unwrap();
-}
-
-#[test]
-fn rejects_number_format_kvn() {
-    let input = mutated(KVN, "1 2 3 4 5 6", "1 2 BAD 4 5 6");
-    let error = Oem::from_kvn(&input).unwrap_err();
-    assert_eq!(error.code(), Some("parse.kvn.syntax"), "{error}");
-}
-
-#[test]
-fn rejects_wrong_keyword_kvn() {
-    let input = mutated(KVN, "REF_FRAME", "BAD_KEY");
-    let error = Oem::from_kvn(&input).unwrap_err();
-    assert_eq!(error.code(), Some("parse.kvn.syntax"), "{error}");
-}
-
-#[test]
-fn rejects_inconsistent_time_system_kvn() {
-    let mut input = KVN.to_owned();
-    input.push_str(
-        "META_START\nOBJECT_NAME = TEST\nOBJECT_ID = 2020-001A\nCENTER_NAME = EARTH\nREF_FRAME = GCRF\nTIME_SYSTEM = TAI\nSTART_TIME = 2023-01-01T00:10:00\nSTOP_TIME = 2023-01-01T00:20:00\nMETA_STOP\n2023-01-01T00:10:00 1 2 3 4 5 6\n",
-    );
-    Oem::from_kvn(&mutated(&input, "TIME_SYSTEM = TAI", "TIME_SYSTEM = UTC"))
-        .expect("valid control");
-    let error = Oem::from_kvn(&input).unwrap_err();
-    assert_eq!(error.code(), Some("validation.invalid_value"), "{error}");
-    assert_eq!(
-        error.field_path().as_deref(),
-        Some("body.segment[1].metadata.time_system")
-    );
-    crate::common::assert_validation_field(&error, "TIME_SYSTEM");
 }

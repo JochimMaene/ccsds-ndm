@@ -57,6 +57,7 @@ impl Ndm for Apm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        let kvn = crate::detect::without_utf8_bom(kvn);
         kvn::validate_kvn_syntax(kvn)?;
         let apm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&apm)?;
@@ -68,7 +69,6 @@ impl Ndm for Apm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::validate_document_root(xml, b"apm", "APM")?;
         xml::validate_xml_sequences(xml)?;
         let apm: Self = crate::xml::from_str_with_context(xml, "APM")?;
         crate::traits::Validate::validate(&apm)?;
@@ -168,11 +168,7 @@ pub struct ApmMetadata {
     /// **Examples**: EARTH, BARYCENTER, MOON
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 3.2.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub center_name: Option<String>,
     /// Time system used for attitude and maneuver data. The set of allowed values is described in
@@ -291,6 +287,10 @@ pub struct ApmData {
 
 impl crate::traits::Validate for ApmData {
     fn validate(&self) -> Result<()> {
+        crate::validation::epoch_precision(&[("EPOCH", &self.epoch)])?;
+        for maneuver in &self.maneuver_parameters {
+            crate::validation::epoch_precision(&[("MAN_EPOCH_START", &maneuver.man_epoch_start)])?;
+        }
         if self.quaternion_state.is_empty()
             && self.euler_angle_state.is_empty()
             && self.angular_velocity.is_empty()

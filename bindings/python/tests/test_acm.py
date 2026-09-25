@@ -6,6 +6,8 @@
 Unit tests for Attitude Comprehensive Message (ACM) Python bindings.
 """
 
+from pathlib import Path
+
 import ccsds_ndm
 import pytest
 
@@ -22,6 +24,8 @@ from ccsds_ndm import (
     AcmSensor,
     AdmHeader,
 )
+
+KVN_DIR = Path(__file__).resolve().parents[3] / "ccsds-ndm" / "data" / "kvn"
 
 
 class TestAcm:
@@ -377,6 +381,20 @@ class TestAcm:
 
         with pytest.raises(ccsds_ndm.NdmValidationError, match="DRAG_COEFF"):
             acm.to_str(format="xml")
+
+    def test_section_validation_raises_ndm_validation_error(self):
+        acm = Acm.from_file(KVN_DIR / "acm_g6.kvn")
+        segment = acm.segment
+        attitude = segment.data.att[0]
+        attitude.number_states = attitude.number_states + 1
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="attLine"):
+            segment.data.validate(segment.metadata)
+
+        segment.metadata.object_name = ""
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="OBJECT_NAME"):
+            segment.metadata.validate()
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="OBJECT_NAME"):
+            segment.validate(acm.header)
 
     def test_file_io(self, tmp_path):
         acm = self._create_valid_acm()

@@ -10,6 +10,7 @@ pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {
     let rule = |rank, repeatable| XmlSequenceRule::new(rank, repeatable);
     crate::xml::validate_element_sequences(
         xml,
+        b"apm",
         "APM",
         |parent, child| {
             Some(match (parent, child) {

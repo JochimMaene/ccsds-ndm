@@ -7,39 +7,65 @@ use crate::common::mutated_once;
 use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::{from_str, Message, Ndm};
 
+/// Prefix the XML declaration that NDM/XML 4.2 requires on the first line.
+fn declared(body: &str) -> String {
+    format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n{body}")
+}
+
 #[test]
 fn combined_xml_parser_enforces_the_normative_envelope() {
-    assert!(CombinedNdm::from_xml("<ndm/>").is_ok());
+    // ODM 8.12.6: the combined root carries the standard xmlns:xsi declaration.
     crate::common::assert_invalid_format(
-        &CombinedNdm::from_xml("<message></message>").unwrap_err(),
+        &CombinedNdm::from_xml(&declared("<ndm/>")).unwrap_err(),
+        "the combined NDM root element must declare \
+         xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"",
+    );
+    assert!(CombinedNdm::from_xml(&declared(
+        "<ndm xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'/>"
+    ))
+    .is_ok());
+    crate::common::assert_invalid_format(
+        &CombinedNdm::from_xml(&declared("<message></message>")).unwrap_err(),
         "expected standalone combined NDM root element 'ndm'",
     );
     crate::common::assert_invalid_format(
-        &CombinedNdm::from_xml("<ndm><UNKNOWN/></ndm>").unwrap_err(),
+        &CombinedNdm::from_xml(&declared(
+            "<ndm xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'><UNKNOWN/></ndm>",
+        ))
+        .unwrap_err(),
         "unexpected content in combined NDM envelope",
     );
     crate::common::assert_invalid_format(
-        &CombinedNdm::from_xml("<ndm><message_id>wrong case</message_id></ndm>").unwrap_err(),
+        &CombinedNdm::from_xml(&declared("<ndm xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'><message_id>wrong case</message_id></ndm>")).unwrap_err(),
         "unknown combined NDM child <message_id>",
     );
     crate::common::assert_invalid_format(
-        &CombinedNdm::from_xml("<ndm><comment>wrong case</comment></ndm>").unwrap_err(),
+        &CombinedNdm::from_xml(&declared("<ndm xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'><comment>wrong case</comment></ndm>")).unwrap_err(),
         "unknown combined NDM child <comment>",
     );
     crate::common::assert_invalid_format(
-        &CombinedNdm::from_xml("<ndm><COMMENT>first</COMMENT><MESSAGE_ID>late</MESSAGE_ID></ndm>")
+        &CombinedNdm::from_xml(&declared("<ndm xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'><COMMENT>first</COMMENT><MESSAGE_ID>late</MESSAGE_ID></ndm>"))
             .unwrap_err(),
         "MESSAGE_ID must occur at most once before comments and messages",
     );
     crate::common::assert_invalid_format(
-        &CombinedNdm::from_xml("<ndm>").unwrap_err(),
+        &CombinedNdm::from_xml(&declared(
+            "<ndm xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'>",
+        ))
+        .unwrap_err(),
         "incomplete combined NDM XML document",
     );
     crate::common::assert_invalid_format(
-        &CombinedNdm::from_xml("<ndm></ndm><ndm></ndm>").unwrap_err(),
+        &CombinedNdm::from_xml(&declared(
+            "<ndm xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'></ndm><ndm></ndm>",
+        ))
+        .unwrap_err(),
         "trailing content after combined NDM document",
     );
-    assert!(CombinedNdm::from_xml("<ndm></ndm>").is_ok());
+    assert!(CombinedNdm::from_xml(&declared(
+        "<ndm xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'></ndm>"
+    ))
+    .is_ok());
 }
 
 #[test]
@@ -100,7 +126,7 @@ META_STOP
 #[test]
 fn combined_ndm_xml() {
     let input = r#"<?xml version="1.0" encoding="UTF-8"?>
-<ndm>
+<ndm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <MESSAGE_ID>TEST_ID_123</MESSAGE_ID>
     <COMMENT>Global NDM comment</COMMENT>
     <opm id="CCSDS_OPM_VERS" version="3.0">
@@ -180,7 +206,7 @@ fn combined_ndm_xml() {
 #[test]
 fn combined_ndm_xml_attitude() {
     let input = r#"<?xml version="1.0" encoding="UTF-8"?>
-<ndm>
+<ndm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <COMMENT>Example: 1 each APM, AEM, ACM in combined instantiation</COMMENT>
     <apm id="CCSDS_APM_VERS" version="2.0">
         <header>
@@ -336,5 +362,68 @@ fn combined_kvn_is_reported_as_an_unsupported_notation() {
     assert_eq!(
         diagnostic.message_kind,
         ccsds_ndm::validation::MessageKind::Ndm
+    );
+}
+
+/// Prefix every element of an unqualified fragment with `ndm:` (NDM/XML 4.3.5).
+fn qualified(fragment: &str) -> String {
+    fragment
+        .replace("</", "\u{0}")
+        .replace('<', "<ndm:")
+        .replace('\u{0}', "</ndm:")
+        .replace("<ndm:!--", "<!--")
+}
+
+#[test]
+fn qualified_messages_reach_their_parsers_through_generic_dispatch() {
+    let oem = include_str!("../../data/xml/oem_g14.xml");
+    let expected = ccsds_ndm::messages::oem::Oem::from_xml(oem).unwrap();
+    let body_start = oem.find("<header>").unwrap();
+    let body_end = oem.rfind("</oem>").unwrap();
+    let body = qualified(&oem[body_start..body_end]);
+
+    let standalone = format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+         <ndm:oem xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" \
+         xmlns:ndm=\"urn:ccsds:schema:ndmxml\" id=\"CCSDS_OEM_VERS\" version=\"3.0\">\
+         {body}</ndm:oem>"
+    );
+    assert_eq!(
+        from_str(&standalone).unwrap(),
+        Message::Oem(expected.clone())
+    );
+
+    // Constituents inherit the root namespace scope, including a single-quoted declaration
+    // whose value contains a double quote.
+    let combined = format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+         <ndm:ndm xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" \
+         xmlns:ndm=\"urn:ccsds:schema:ndmxml\" xmlns:q='urn:example:\"quoted\"'>\
+         <ndm:oem id=\"CCSDS_OEM_VERS\" version=\"3.0\">{body}</ndm:oem></ndm:ndm>"
+    );
+    let Message::Ndm(message) = from_str(&combined).unwrap() else {
+        panic!("a qualified combined instantiation should stay combined");
+    };
+    assert_eq!(message.messages, vec![Message::Oem(expected)]);
+}
+
+#[test]
+fn constituents_carry_only_id_and_version_unlike_standalone_messages() {
+    // ODM 8.12.7 restricts constituent attributes to id and version; a standalone root may
+    // carry schema-location hints (NDM/XML 4.3.6).
+    let oem = include_str!("../../data/xml/oem_g14.xml");
+    ccsds_ndm::messages::oem::Oem::from_xml(oem).expect("standalone OEM with a schema hint");
+    let body_start = oem.find("<header>").unwrap();
+    let body_end = oem.rfind("</oem>").unwrap();
+    let combined = format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+         <ndm xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\
+         <oem xsi:noNamespaceSchemaLocation=\"oem.xsd\" id=\"CCSDS_OEM_VERS\" version=\"3.0\">\
+         {}</oem></ndm>",
+        &oem[body_start..body_end]
+    );
+    crate::common::assert_invalid_format(
+        &CombinedNdm::from_xml(&combined).unwrap_err(),
+        "attribute 'xsi:noNamespaceSchemaLocation' is not allowed on a combined NDM constituent",
     );
 }

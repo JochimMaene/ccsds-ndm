@@ -28,7 +28,7 @@ pub fn aem_version(input: &mut &str) -> KvnResult<String> {
     // Skip any leading comments/empty lines
     let _ = collect_comments.parse_next(input)?;
 
-    let (value, _) = expect_key("CCSDS_AEM_VERS").parse_next(input)?;
+    let value = expect_unitless_key("CCSDS_AEM_VERS").parse_next(input)?;
     Ok(value.to_string())
 }
 
@@ -132,20 +132,11 @@ fn attitude_state_line(
     let mut values = [0.0; 8];
     let mut value_count = 0usize;
     for s in parts {
-        if !valid_ccsds_number(s) {
-            return Err(ErrMode::Cut(
-                InternalParserError::from_input(input).add_context(
-                    input,
-                    &input.checkpoint(),
-                    winnow::error::StrContext::Label("CCSDS number in data line"),
-                ),
-            ));
-        }
-        let val = fast_float::parse(s).map_err(|_| {
+        let val = parse_ccsds_number(s).ok_or_else(|| {
             ErrMode::Cut(InternalParserError::from_input(input).add_context(
                 input,
                 &input.checkpoint(),
-                winnow::error::StrContext::Label("Float value in data line"),
+                winnow::error::StrContext::Label("CCSDS number in data line"),
             ))
         })?;
         if value_count == values.len() {

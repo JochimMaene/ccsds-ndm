@@ -41,7 +41,17 @@ governs XML structure and representability. When they conflict, the library reco
 preserves a book-valid value in the model, and rejects conversion to an XML edition that cannot
 represent it. It does not alter the value to make the conversion succeed.
 
-Known conflicts include:
+Where the books are silent or unclear, or two sources conflict, parsing takes the more permissive
+reading; clear prohibitions are still enforced, except for the common, lossless deviations a
+family lists under "More lenient than the book" (an unterminated last KVN line, and data numbers
+with more than 16 digits in OEM and AEM; the other families already read both). Generation always follows the clear rules. Generation follows the same reading, and writes a
+form satisfying both sources where that costs nothing (for example, OEM XML always declares
+`xmlns:ndm`). A family that keeps a stricter reading lists it as a deliberate exception in its
+conformance document; OEM's are under "Stricter than required" in [oem-3.0.md](../conformance/oem-3.0.md).
+
+Known conflicts include the entries below. They predate the permissive-reading rule and are each
+resolved on their own evidence; the TDM entries that keep the narrower rule are deliberate
+exceptions to it.
 
 - OCM `DC_PA_START_ANGLE` and `DC_PA_STOP_ANGLE`: ODM permits any finite magnitude; OCM 3.0 XML
   uses `angleType`, whose range is `[-360, 360)`. **Resolved** with the P3/P4 split: finiteness at

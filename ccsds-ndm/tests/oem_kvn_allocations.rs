@@ -36,15 +36,18 @@ fn parse_stats(input: &str) -> Stats {
     stats
 }
 
-fn covariance_oem(records: usize) -> Oem {
+/// Parsing a frame necessarily allocates the owned string, so only generation keeps one.
+fn covariance_oem(records: usize, frame: bool) -> Oem {
     let mut message = Oem::from_kvn(include_str!("../data/kvn/oem_g13.kvn")).unwrap();
     let mut covariance = message.body.segment[0].data.covariance_matrix[0].clone();
-    covariance.cov_ref_frame = None;
+    if !frame {
+        covariance.cov_ref_frame = None;
+    }
     covariance.comment.clear();
     message.body.segment[0].data.covariance_matrix = (0..records)
         .map(|index| {
             let mut covariance = covariance.clone();
-            covariance.epoch = format!("2019-12-28T21:{:02}:{:02}", 29 + index / 60, index % 60)
+            covariance.epoch = format!("2019-12-28T21:{:02}:{:02}", 30 + index / 60, index % 60)
                 .parse()
                 .unwrap();
             covariance
@@ -119,8 +122,17 @@ fn oem_kvn_generation_and_parsing_have_bounded_storage() {
         "small segments retained disproportionate state-vector capacity: records={records}, reserved={reserved}"
     );
 
-    let small_covariance_kvn = covariance_oem(10).to_kvn().unwrap();
-    let large_covariance_kvn = covariance_oem(1_000).to_kvn().unwrap();
+    // Covariance generation with COV_REF_FRAME set builds no per-matrix diagnostics.
+    let (small_framed, large_framed) = (covariance_oem(10, true), covariance_oem(1_000, true));
+    let small_framed_stream = streaming_stats(&small_framed, small_framed.to_kvn().unwrap().len());
+    let large_framed_stream = streaming_stats(&large_framed, large_framed.to_kvn().unwrap().len());
+    assert!(
+        large_framed_stream.allocations <= small_framed_stream.allocations + 4,
+        "covariance streaming allocated per matrix: small={small_framed_stream:?}, large={large_framed_stream:?}"
+    );
+
+    let small_covariance_kvn = covariance_oem(10, false).to_kvn().unwrap();
+    let large_covariance_kvn = covariance_oem(1_000, false).to_kvn().unwrap();
     let small_covariance_parse = parse_stats(&small_covariance_kvn);
     let large_covariance_parse = parse_stats(&large_covariance_kvn);
     assert!(

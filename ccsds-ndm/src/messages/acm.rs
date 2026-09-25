@@ -63,6 +63,7 @@ impl Ndm for Acm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        let kvn = crate::detect::without_utf8_bom(kvn);
         kvn::validate_kvn_syntax(kvn)?;
         let acm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&acm)?;
@@ -74,7 +75,6 @@ impl Ndm for Acm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::validate_document_root(xml, b"acm", "ACM")?;
         xml::validate_xml_sequences(xml)?;
         let acm: Self = crate::xml::from_str_with_context(xml, "ACM")?;
         crate::traits::Validate::validate(&acm)?;
@@ -165,11 +165,7 @@ pub struct AcmMetadata {
     /// **Examples**: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub international_designator: Option<String>,
     /// Free text field containing the satellite catalog source or the source agency or operator
@@ -178,11 +174,7 @@ pub struct AcmMetadata {
     /// **Examples**: CSPOC, RFSA, ESA, COMSPOC
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub catalog_name: Option<String>,
     /// Free text field specification of the unique satellite identification designator for the
@@ -192,11 +184,7 @@ pub struct AcmMetadata {
     /// **Examples**: 22444, 18SPCS 18571, UNKNOWN
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub object_designator: Option<String>,
     /// Free text field containing Programmatic or Technical Point-of-Contact (POC) for ACM.
@@ -204,11 +192,7 @@ pub struct AcmMetadata {
     /// **Examples**: Ms. Rodgers
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub originator_poc: Option<String>,
     /// Free text field containing contact position of the PoC.
@@ -216,11 +200,7 @@ pub struct AcmMetadata {
     /// **Examples**: GNC Engineer, ACS Design Lead
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub originator_position: Option<String>,
     /// Free text field containing PoC phone number.
@@ -228,11 +208,7 @@ pub struct AcmMetadata {
     /// **Examples**: +49615130312
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub originator_phone: Option<String>,
     /// Free-text field containing originator PoC email address.
@@ -240,11 +216,7 @@ pub struct AcmMetadata {
     /// **Examples**: JOHN.DOE@SOMEWHERE.ORG
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub originator_email: Option<String>,
     /// Free text field containing Technical PoC information for ACM creator (suggest email,
@@ -253,11 +225,7 @@ pub struct AcmMetadata {
     /// **Examples**: JANE.DOE@SOMEWHERE.NET
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub originator_address: Option<String>,
     /// Free text field containing a unique identifier of Orbit Data Message(s) that are linked
@@ -266,11 +234,7 @@ pub struct AcmMetadata {
     /// **Examples**: ODM_MSG_12345.txt, ORB_ID_0123
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub odm_msg_link: Option<String>,
     /// Celestial body orbited by the object, which may be a natural solar system body (planets,
@@ -280,11 +244,7 @@ pub struct AcmMetadata {
     /// **Examples**: EARTH BARYCENTER, MOON
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub center_name: Option<String>,
     /// Time system used for metadata, attitude data, covariance data. The set of allowed values is
@@ -312,11 +272,7 @@ pub struct AcmMetadata {
     /// **Examples**: ATT, AD, USER; ATT, ATT, PHYS; ATT, COV, AD
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub acm_data_elements: Option<String>,
     /// Time of the earliest data contained in the ACM, specified as either a relative or absolute
@@ -325,11 +281,7 @@ pub struct AcmMetadata {
     /// **Examples**: 100.0, 2016-11-10T00:00:00
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_time: Option<Epoch>,
     /// Time of the latest data contained in the ACM, specified as either a relative or absolute
     /// time tag.
@@ -337,11 +289,7 @@ pub struct AcmMetadata {
     /// **Examples**: 1500.0, 2016-11-11T00:00:00
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stop_time: Option<Epoch>,
     /// Difference (TAI – UTC) in seconds (i.e., total # leap seconds elapsed since 1958) as modeled
     /// by the message originator at epoch ‘EPOCH_TZERO’.
@@ -351,22 +299,14 @@ pub struct AcmMetadata {
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub taimutc_at_tzero: Option<TimeOffset>,
     /// Epoch of next leap second, specified as an absolute time tag.
     ///
     /// **Examples**: 2017-01-01T00:00:00
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_leap_epoch: Option<CalendarEpoch>,
     /// Difference (TAI – UTC) in seconds (i.e., total number of leap seconds elapsed since 1958)
     /// incorporated by the message originator at epoch ‘NEXT_LEAP_EPOCH’. This keyword should be
@@ -377,16 +317,18 @@ pub struct AcmMetadata {
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_leap_taimutc: Option<TimeOffset>,
 }
 
 impl AcmMetadata {
     pub fn validate(&self) -> Result<()> {
+        crate::validation::epoch_precision(&[
+            ("EPOCH_TZERO", &self.epoch_tzero),
+            ("START_TIME", &self.start_time),
+            ("STOP_TIME", &self.stop_time),
+            ("NEXT_LEAP_EPOCH", &self.next_leap_epoch),
+        ])?;
         if self.object_name.trim().is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: "ACM Metadata".into(),
@@ -519,11 +461,7 @@ pub struct AcmAttitudeState {
     /// **Examples**: ATT_20160402_XYZ
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub att_id: Option<String>,
     /// Optional alphanumeric free-text string containing the identification number for the
@@ -534,11 +472,7 @@ pub struct AcmAttitudeState {
     /// **Examples**: ATT_20160401_XYZ
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub att_prev_id: Option<String>,
     /// Basis of this attitude state time history data.
@@ -546,11 +480,7 @@ pub struct AcmAttitudeState {
     /// **Examples**: PREDICTED, DETERMINED_GND, DETERMINED_OBC, SIMULATED
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub att_basis: Option<AttBasisType>,
     /// Free-text field containing the identification number for the telemetry dataset, attitude
     /// determination, or simulation upon which this attitude state time history block is based.
@@ -560,11 +490,7 @@ pub struct AcmAttitudeState {
     /// **Examples**: AD 1985
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub att_basis_id: Option<String>,
     /// Name of the reference frame that defines the starting point of the transformation. The set
@@ -606,11 +532,7 @@ pub struct AcmAttitudeState {
     /// **Examples**: ANGVEL, GYRO_BIAS, Q_DOT, NONE
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub rate_type: Option<AttRateType>,
     /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
@@ -623,11 +545,7 @@ pub struct AcmAttitudeState {
     /// **Examples**: ZXZ, XYZ
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub euler_rot_seq: Option<RotSeq>,
     /// Data lines that consist of attitude data followed by rate data. (For the data units, see
     /// above [ATT_TYPE and RATE_TYPE keywords]).
@@ -719,11 +637,7 @@ pub struct AcmPhysicalDescription {
     /// **Examples**: 2
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.6.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drag_coeff: Option<f64>,
     /// Space object total mass at the reference epoch ‘EPOCH_TZERO’.
     ///
@@ -732,11 +646,7 @@ pub struct AcmPhysicalDescription {
     /// **Units**: kg
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.6.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wet_mass: Option<Mass>,
     /// Space object dry mass (without propellant).
     ///
@@ -745,11 +655,7 @@ pub struct AcmPhysicalDescription {
     /// **Units**: kg
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.6.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dry_mass: Option<Mass>,
     /// Coordinate system for the center of pressure vector. The set of allowed values is described
     /// in annex B, subsection B3.
@@ -757,11 +663,7 @@ pub struct AcmPhysicalDescription {
     /// **Examples**: SC_BODY_1
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.6.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub cp_ref_frame: Option<String>,
     /// CP_REF_FRAME shall be present if CP is present. Vector location of spacecraft center of
@@ -774,11 +676,7 @@ pub struct AcmPhysicalDescription {
     /// **Units**: m
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.6.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cp: Option<Vector3>,
     /// Coordinate system for the inertia tensor. The set of allowed values is described in annex B,
     /// subsection B3.
@@ -786,11 +684,7 @@ pub struct AcmPhysicalDescription {
     /// **Examples**: SC_BODY_1
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.6.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub inertia_ref_frame: Option<String>,
     /// Moment of Inertia about the X axis of the spacecraft body frame defined by
@@ -801,11 +695,7 @@ pub struct AcmPhysicalDescription {
     /// **Units**: kg*m²
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.6.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ixx: Option<Moment>,
     /// Moment of Inertia about the Y axis.
     ///
@@ -814,11 +704,7 @@ pub struct AcmPhysicalDescription {
     /// **Units**: kg*m²
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.6.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub iyy: Option<Moment>,
     /// Moment of Inertia about the Z axis.
     ///
@@ -827,11 +713,7 @@ pub struct AcmPhysicalDescription {
     /// **Units**: kg*m²
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.6.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub izz: Option<Moment>,
     /// Inertia Cross Product of the X & Y axes.
     ///
@@ -840,11 +722,7 @@ pub struct AcmPhysicalDescription {
     /// **Units**: kg*m²
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.6.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ixy: Option<Moment>,
     /// Inertia Cross Product of the X & Z axes.
     ///
@@ -853,11 +731,7 @@ pub struct AcmPhysicalDescription {
     /// **Units**: kg*m²
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.6.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ixz: Option<Moment>,
     /// Inertia Cross Product of the Y & Z axes.
     ///
@@ -866,11 +740,7 @@ pub struct AcmPhysicalDescription {
     /// **Units**: kg*m²
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.6.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub iyz: Option<Moment>,
 }
 
@@ -963,29 +833,13 @@ pub struct AcmCovarianceMatrix {
     /// **Examples**: PREDICTED, DETERMINED_GND, DETERMINED_OBC, SIMULATED
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_id: Option<String>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_prev_id: Option<String>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_basis: Option<AttBasisType>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_basis_id: Option<String>,
     /// Reference frame of the covariance time history. The full set of values is enumerated in
     /// annex B, subsection B3.
@@ -993,11 +847,7 @@ pub struct AcmCovarianceMatrix {
     /// **Examples**: SC_BODY_1
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_ref_frame: Option<String>,
     /// Indicates covariance composition. Select from annex B, subsection B6.
     ///
@@ -1068,11 +918,7 @@ pub struct AcmManeuverParameters {
     /// **Examples**: DH2018172
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub man_id: Option<String>,
     /// Optional alphanumeric free-text string containing the identification number for the
@@ -1083,11 +929,7 @@ pub struct AcmManeuverParameters {
     /// **Examples**: DH2018171
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_prev_id: Option<String>,
     /// The user may specify the intention(s) of the maneuver. Multiple maneuver purposes may be
     /// provided as a comma-delimited list. While there is no CCSDS-based restriction on the value
@@ -1098,11 +940,7 @@ pub struct AcmManeuverParameters {
     /// **Examples**: ATT_ADJUST
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_purpose: Option<String>,
     /// Start time of actual maneuver, measured as a relative time with respect to EPOCH_TZERO.
     ///
@@ -1111,11 +949,7 @@ pub struct AcmManeuverParameters {
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_begin_time: Option<RelativeTime>,
     /// End time of actual maneuver, measured as a relative time with respect to EPOCH_TZERO.
     ///
@@ -1124,71 +958,43 @@ pub struct AcmManeuverParameters {
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_end_time: Option<RelativeTime>,
     /// Maneuver duration.
     ///
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_duration: Option<Duration>,
     /// Actuator used for the maneuver.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actuator_used: Option<String>,
     /// Target angular momentum vector.
     ///
     /// **Units**: N*m*s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_momentum: Option<TargetMomentum>,
     /// Coordinate system for the target momentum vector.
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_mom_frame: Option<String>,
     /// Target attitude (e.g., quaternion).
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_attitude: Option<Vec4Double>,
     /// Target spin rate.
     ///
     /// **Units**: deg/s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_spinrate: Option<AngleRate>,
 }
 
@@ -1316,11 +1122,7 @@ pub struct AcmAttitudeDetermination {
     /// **Examples**: AD_20190101
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub ad_id: Option<String>,
     /// Optional alphanumeric free-text string containing the identification number for the
@@ -1332,11 +1134,7 @@ pub struct AcmAttitudeDetermination {
     /// **Examples**: AD_20190100
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub ad_prev_id: Option<String>,
     /// Type of attitude determination method used. (For further description, see annex B,
@@ -1345,11 +1143,7 @@ pub struct AcmAttitudeDetermination {
     /// **Examples**: EKF, TRIAD, BATCH
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub ad_method: Option<String>,
     /// Source of attitude estimate, whether from a ground based estimator or onboard estimator.
@@ -1357,11 +1151,7 @@ pub struct AcmAttitudeDetermination {
     /// **Examples**: GND, OBC
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub attitude_source: Option<String>,
     /// Number of states if EKF, BATCH, or FILTER SMOOTHER is specified.
@@ -1369,41 +1159,25 @@ pub struct AcmAttitudeDetermination {
     /// **Examples**: 3, 6, 7
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub number_states: Option<u32>,
     /// Type of attitude states if EKF, BATCH, or FILTER SMOOTHER is specified.
     ///
     /// **Examples**: QUATERNION
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub attitude_states: Option<AcmAttitudeType>,
     /// Euler rotation sequence when the estimator attitude states use Euler angles.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub euler_rot_seq: Option<RotSeq>,
     /// Indicates covariance composition. Select from annex B, subsection B6.
     ///
     /// **Examples**: ANGLE, ANGLE_GYROBIAS
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub cov_type: Option<AcmCovarianceLineType>,
     /// Epoch of the attitude determination.
@@ -1418,11 +1192,7 @@ pub struct AcmAttitudeDetermination {
     /// **Examples**: J2000
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ref_frame_a: Option<String>,
     /// Name of the reference frame that defines the ending point of the transformation described
     /// by the attitude state in the estimator. The set of allowed values is described in annex B,
@@ -1431,11 +1201,7 @@ pub struct AcmAttitudeDetermination {
     /// **Examples**: SC_BODY_1
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ref_frame_b: Option<String>,
     /// Type of attitude data, selected per annex B, subsection B4. Attitude states must always be
     /// listed before rate states.
@@ -1451,11 +1217,7 @@ pub struct AcmAttitudeDetermination {
     /// **Examples**: ANGVEL, GYRO_BIAS
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rate_states: Option<AttRateType>,
     /// Rate random walk if RATE_STATES=GYRO_BIAS.
     ///
@@ -1464,11 +1226,7 @@ pub struct AcmAttitudeDetermination {
     /// **Units**: deg/s^1.5
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sigma_u: Option<SigmaU>,
     /// Angle random walk if RATE_STATES=GYRO_BIAS.
     ///
@@ -1477,11 +1235,7 @@ pub struct AcmAttitudeDetermination {
     /// **Units**: deg/s^0.5
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sigma_v: Option<SigmaV>,
     /// Process noise standard deviation if RATE_STATES=ANG_VEL.
     ///
@@ -1490,11 +1244,7 @@ pub struct AcmAttitudeDetermination {
     /// **Units**: deg/s^1.5
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rate_process_noise_stddev: Option<SigmaU>,
     /// Sensor data blocks.
     ///
@@ -1626,29 +1376,17 @@ pub struct AcmSensor {
     /// **Examples**: 1, 2, 3
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sensor_number: Option<u32>,
     /// Type of sensor used in estimation.
     ///
     /// **Examples**: AST, DSS, GYRO
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sensor_used: Option<String>,
     /// Number of elements in the sensor-noise covariance representation.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub number_sensor_noise_covariance: Option<u32>,
     /// Standard deviation of sensor noise.
     ///
@@ -1657,11 +1395,7 @@ pub struct AcmSensor {
     /// **Units**: deg
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sensor_noise_stddev: Option<SensorNoise>,
     /// Frequency of sensor data.
     ///
@@ -1670,11 +1404,7 @@ pub struct AcmSensor {
     /// **Units**: Hz
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sensor_frequency: Option<Frequency>,
 }
 

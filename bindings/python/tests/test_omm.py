@@ -41,7 +41,7 @@ class TestOmm:
             gm=398600.44,
         )
 
-        data = OmmData(mean_elements=mean, comments=[])
+        data = OmmData(mean_elements=mean, comment=[])
 
         seg = OmmSegment(metadata=meta, data=data)
 

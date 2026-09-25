@@ -6,7 +6,9 @@ use crate::common::{parse_object_description, ObjectDescription, OdParameters};
 use ccsds_ndm::messages::cdm as core_cdm;
 use ccsds_ndm::types::{self as core_types, *};
 use ccsds_ndm::Validate;
-use numpy::{PyArray1, PyArray2, PyReadonlyArray2, PyReadonlyArrayDyn, PyUntypedArrayMethods};
+use numpy::{
+    AllowTypeChange, PyArray1, PyArray2, PyArrayLikeDyn, PyReadonlyArrayDyn, PyUntypedArrayMethods,
+};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -38,11 +40,12 @@ fn validate_unit<T: Default + std::fmt::Display + PartialEq>(
 }
 
 fn build_cdm_covariance_from_array(
-    array: &PyReadonlyArray2<f64>,
+    array: &PyReadonlyArrayDyn<f64>,
     comment: Vec<String>,
 ) -> PyResult<core_cdm::CdmCovarianceMatrix> {
-    let shape = array.shape();
-    if shape.len() != 2 || shape[0] != shape[1] {
+    let a = crate::common::matrix_view(array, "Covariance matrix")?;
+    let shape = a.shape();
+    if shape[0] != shape[1] {
         return Err(PyValueError::new_err(
             "Covariance matrix must be a square 2D array",
         ));
@@ -53,8 +56,6 @@ fn build_cdm_covariance_from_array(
             "Covariance matrix must be 6x6, 7x7, 8x8, or 9x9",
         ));
     }
-
-    let a = array.as_array();
 
     Ok(core_cdm::CdmCovarianceMatrix {
         comment,
@@ -282,7 +283,7 @@ impl Cdm {
     /// Validate the message against CCSDS rules.
     ///
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
-        crate::api::validate_message(&self.to_core(py)?)
+        crate::api::validate_message(py, &self.to_core(py)?)
     }
 
     /// Parse a CDM from a string with optional format.
@@ -306,7 +307,7 @@ impl Cdm {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(data, format)?;
+        let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
 
@@ -320,7 +321,7 @@ impl Cdm {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed_file(&path, format)?;
+        let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
 
@@ -333,7 +334,12 @@ impl Cdm {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<()> {
-        crate::api::generate_file(&ccsds_ndm::Message::Cdm(self.to_core(py)?), &path, format)
+        crate::api::generate_file(
+            py,
+            &ccsds_ndm::Message::Cdm(self.to_core(py)?),
+            &path,
+            format,
+        )
     }
 
     /// Serialize to validated KVN or XML.
@@ -343,7 +349,7 @@ impl Cdm {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<String> {
-        crate::api::generate_string(&self.to_core(py)?, format)
+        crate::api::generate_string(py, &self.to_core(py)?, format)
     }
 
     #[setter]
@@ -457,6 +463,8 @@ impl CdmHeader {
     ///
     /// Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.2.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn message_for(&self) -> Option<String> {
@@ -534,20 +542,11 @@ impl CdmBody {
     }
 
     fn to_core(&self, py: Python<'_>) -> PyResult<core_cdm::CdmBody> {
-        let segments = self
-            .segments
-            .bind(py)
-            .iter()
-            .enumerate()
-            .map(|(index, value)| {
-                value
-                    .extract::<PyRef<'_, CdmSegment>>()
-                    .map_err(|_| {
-                        PyValueError::new_err(format!("segments[{index}] must be CdmSegment"))
-                    })?
-                    .to_core(py)
-            })
-            .collect::<PyResult<Vec<_>>>()?;
+        let segments = crate::common::extract_records(
+            self.segments.bind(py),
+            "segments",
+            |value: &CdmSegment| value.to_core(py),
+        )?;
         Ok(core_cdm::CdmBody {
             relative_metadata_data: self.relative_metadata_data.borrow(py).inner.clone(),
             segments,
@@ -784,6 +783,8 @@ impl RelativeMetadataData {
     ///
     /// Units: m/s
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn relative_speed(&self) -> Option<f64> {
@@ -796,6 +797,8 @@ impl RelativeMetadataData {
 
     /// The probability (denoted 'p' where 0.0<=p<=1.0), that Object1 and Object2 will collide.
     /// Data type = double.
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -814,6 +817,8 @@ impl RelativeMetadataData {
     /// The method that was used to calculate the collision probability. (See annex E for
     /// definition.)
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn collision_probability_method(&self) -> Option<String> {
@@ -826,6 +831,8 @@ impl RelativeMetadataData {
 
     /// The start time in UTC of the screening period for the conjunction assessment. (See
     /// 6.3.2.6 for formatting rules.)
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -844,6 +851,8 @@ impl RelativeMetadataData {
     /// The stop time in UTC of the screening period for the conjunction assessment. (See
     /// 6.3.2.6 for formatting rules.)
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn stop_screen_period(&self) -> Option<String> {
@@ -861,6 +870,8 @@ impl RelativeMetadataData {
     /// The time in UTC when Object2 enters the screening volume. (See 6.3.2.6 for formatting
     /// rules.)
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn screen_entry_time(&self) -> Option<String> {
@@ -874,6 +885,8 @@ impl RelativeMetadataData {
 
     /// The time in UTC when Object2 exits the screening volume. (See 6.3.2.6 for formatting
     /// rules.)
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -891,6 +904,8 @@ impl RelativeMetadataData {
     ///
     /// Units: m
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn screen_volume_x(&self) -> Option<f64> {
@@ -906,6 +921,8 @@ impl RelativeMetadataData {
     ///
     /// Units: m
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn screen_volume_y(&self) -> Option<f64> {
@@ -920,6 +937,8 @@ impl RelativeMetadataData {
     /// double.
     ///
     /// Units: m
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -965,6 +984,8 @@ impl RelativeMetadataData {
     /// given. Available options are RTN and Transverse, Velocity, and Normal (TVN). (See annex
     /// E for definition.)
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
+    ///
     /// :type: Optional[ScreenVolumeFrameType]
     #[getter]
     fn get_screen_volume_frame(&self) -> Option<ScreenVolumeFrameType> {
@@ -982,6 +1003,8 @@ impl RelativeMetadataData {
     }
 
     /// Shape of the screening volume: ELLIPSOID or BOX.
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.3.
     ///
     /// :type: Optional[ScreenVolumeShapeType]
     #[getter]
@@ -1502,6 +1525,8 @@ impl CdmMetadata {
     ///
     /// Examples: ORBITAL SAFETY ANALYST (OSA), NETWORK CONTROLLER
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn operator_contact_position(&self) -> Option<String> {
@@ -1515,6 +1540,8 @@ impl CdmMetadata {
     /// Contact organization of the object.
     ///
     /// Examples: EUMETSAT, ESA, INTELSAT, IRIDIUM
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1530,6 +1557,8 @@ impl CdmMetadata {
     ///
     /// Examples: +49615130312
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn operator_phone(&self) -> Option<String> {
@@ -1543,6 +1572,8 @@ impl CdmMetadata {
     /// Email address of the contact position or organization of the object.
     ///
     /// Examples: JOHN.DOE@SOMEWHERE.NET
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1559,6 +1590,8 @@ impl CdmMetadata {
     ///
     /// Examples: EARTH, SUN, MOON, MARS
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn orbit_center(&self) -> Option<String> {
@@ -1573,6 +1606,8 @@ impl CdmMetadata {
     /// definition).
     ///
     /// Examples: EGM-96: 36D 360, WGS-84_GEOID: 24D 240, JGM-2: 41D 410
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1589,6 +1624,8 @@ impl CdmMetadata {
     ///
     /// Examples: JACCHIA 70, MSIS, JACCHIA 70 DCA, NONE
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn atmospheric_model(&self) -> Option<String> {
@@ -1603,6 +1640,8 @@ impl CdmMetadata {
     /// specified, then no third-body gravitational perturbations were used.
     ///
     /// Examples: MOON, SUN, JUPITER, NONE
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1653,6 +1692,8 @@ impl CdmMetadata {
     /// The object type.
     ///
     /// Examples: PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, OTHER
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: Optional[ObjectDescription]
     #[getter]
@@ -1755,6 +1796,8 @@ impl CdmMetadata {
     ///
     /// Examples: YES, NO
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
+    ///
     /// :type: Optional[bool]
     #[getter]
     fn get_solar_rad_pressure(&self) -> Option<bool> {
@@ -1778,6 +1821,8 @@ impl CdmMetadata {
     ///
     /// Examples: YES, NO
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
+    ///
     /// :type: Optional[bool]
     #[getter]
     fn get_earth_tides(&self) -> Option<bool> {
@@ -1800,6 +1845,8 @@ impl CdmMetadata {
     /// Indication of whether in-track thrust modeling was used for the OD of the object.
     ///
     /// Examples: YES, NO
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     ///
     /// :type: Optional[bool]
     #[getter]
@@ -1913,17 +1960,17 @@ impl CdmData {
         covariance_matrix=None,
         od_parameters=None,
         additional_parameters=None,
-        comments=None
+        comment=None
     ))]
     fn new(
         state_vector: Py<CdmStateVector>,
         covariance_matrix: Option<Py<CdmCovarianceMatrix>>,
         od_parameters: Option<Py<OdParameters>>,
         additional_parameters: Option<Py<AdditionalParameters>>,
-        comments: Option<Vec<String>>,
+        comment: Option<Vec<String>>,
     ) -> Self {
         Self {
-            comment: comments.unwrap_or_default(),
+            comment: comment.unwrap_or_default(),
             od_parameters,
             additional_parameters,
             state_vector,
@@ -1937,15 +1984,17 @@ impl CdmData {
         covariance_matrix=None,
         od_parameters=None,
         additional_parameters=None,
-        comments=None
+        comment=None
     ))]
     fn from_numpy(
         py: Python<'_>,
-        state_vector: PyReadonlyArrayDyn<f64>,
-        covariance_matrix: Option<PyReadonlyArray2<f64>>,
+        #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
+        state_vector: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
+        #[gen_stub(override_type(type_repr = "typing.Optional[numpy.typing.ArrayLike]", imports = ("typing", "numpy.typing")))]
+        covariance_matrix: Option<PyArrayLikeDyn<'_, f64, AllowTypeChange>>,
         od_parameters: Option<OdParameters>,
         additional_parameters: Option<AdditionalParameters>,
-        comments: Option<Vec<String>>,
+        comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         let state = CdmStateVector::from_numpy(state_vector)?;
         let cov = match covariance_matrix {
@@ -1956,7 +2005,7 @@ impl CdmData {
         Self::from_core(
             py,
             core_cdm::CdmData {
-                comment: comments.unwrap_or_default(),
+                comment: comment.unwrap_or_default(),
                 od_parameters: od_parameters.map(|o| o.inner),
                 additional_parameters: additional_parameters.map(|a| a.inner),
                 state_vector: state.inner,
@@ -2019,7 +2068,11 @@ impl CdmData {
     }
 
     #[setter]
-    fn set_state_vector_numpy(&mut self, array: PyReadonlyArrayDyn<f64>) -> PyResult<()> {
+    fn set_state_vector_numpy(
+        &mut self,
+        #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
+        array: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
+    ) -> PyResult<()> {
         Python::attach(|py| {
             let state = CdmStateVector::from_numpy(array)?;
             self.state_vector.borrow_mut(py).inner = state.inner;
@@ -2049,7 +2102,8 @@ impl CdmData {
     #[setter]
     fn set_covariance_matrix_numpy(
         &mut self,
-        array: Option<PyReadonlyArray2<f64>>,
+        #[gen_stub(override_type(type_repr = "typing.Optional[numpy.typing.ArrayLike]", imports = ("typing", "numpy.typing")))]
+        array: Option<PyArrayLikeDyn<'_, f64, AllowTypeChange>>,
     ) -> PyResult<()> {
         Python::attach(|py| {
             match array {
@@ -2112,7 +2166,7 @@ pub struct CdmStateVector {
 #[pymethods]
 impl CdmStateVector {
     #[new]
-    #[pyo3(signature = (x, y, z, x_dot, y_dot, z_dot, comments=None))]
+    #[pyo3(signature = (x, y, z, x_dot, y_dot, z_dot, comment=None))]
     fn new(
         x: f64,
         y: f64,
@@ -2120,11 +2174,11 @@ impl CdmStateVector {
         x_dot: f64,
         y_dot: f64,
         z_dot: f64,
-        comments: Option<Vec<String>>,
+        comment: Option<Vec<String>>,
     ) -> Self {
         Self {
             inner: core_cdm::CdmStateVector {
-                comment: comments.unwrap_or_default(),
+                comment: comment.unwrap_or_default(),
                 x: PositionRequired::new(x),
                 y: PositionRequired::new(y),
                 z: PositionRequired::new(z),
@@ -2136,7 +2190,10 @@ impl CdmStateVector {
     }
 
     #[staticmethod]
-    fn from_numpy(array: PyReadonlyArrayDyn<f64>) -> PyResult<Self> {
+    fn from_numpy(
+        #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
+        array: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
+    ) -> PyResult<Self> {
         let shape = array.shape();
         let values = if shape.len() == 1 && shape[0] == 6 {
             let v = array.as_array();
@@ -2617,6 +2674,8 @@ impl AdditionalParameters {
     ///
     /// Units: m²
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_area_pc(&self) -> Option<f64> {
@@ -2631,6 +2690,8 @@ impl AdditionalParameters {
     /// definition.)
     ///
     /// Units: m²
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2647,6 +2708,8 @@ impl AdditionalParameters {
     ///
     /// Units: m²
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_area_srp(&self) -> Option<f64> {
@@ -2660,6 +2723,8 @@ impl AdditionalParameters {
     /// The mass of the object.
     ///
     /// Units: kg
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2676,6 +2741,8 @@ impl AdditionalParameters {
     ///
     /// Units: m²/kg
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_cd_area_over_mass(&self) -> Option<f64> {
@@ -2690,6 +2757,8 @@ impl AdditionalParameters {
     /// annex E for definition.)
     ///
     /// Units: m²/kg
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2706,6 +2775,8 @@ impl AdditionalParameters {
     ///
     /// Units: m/s²
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_thrust_acceleration(&self) -> Option<f64> {
@@ -2720,6 +2791,8 @@ impl AdditionalParameters {
     /// value is an average calculated during the OD.
     ///
     /// Units: W/kg
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2990,7 +3063,11 @@ impl CdmCovarianceMatrix {
 
     #[staticmethod]
     #[pyo3(signature = (array, comment=None))]
-    fn from_numpy(array: PyReadonlyArray2<f64>, comment: Option<Vec<String>>) -> PyResult<Self> {
+    fn from_numpy(
+        #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
+        array: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
+        comment: Option<Vec<String>>,
+    ) -> PyResult<Self> {
         let inner = build_cdm_covariance_from_array(&array, comment.unwrap_or_default())?;
         Ok(Self { inner })
     }

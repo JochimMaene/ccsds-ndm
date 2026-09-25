@@ -2,7 +2,10 @@
 
 This is the user-facing statement of what `ccsds-ndm` supports today. Parsing is strict by
 default: unknown, duplicate, reordered, malformed, or semantically invalid content is rejected
-rather than silently discarded.
+rather than silently discarded. Where the CCSDS books are unclear or conflict, parsing takes the
+permissive reading; see the [validation contract](design/validation-contract.md#authority-and-representability).
+OEM KVN reading also accepts an unterminated last line and numbers with more than 16 digits; see
+[OEM 3.0 conformance](conformance/oem-3.0.md#more-lenient-than-the-book).
 
 ## Status
 
@@ -18,9 +21,10 @@ rather than silently discarded.
 | Message / edition | KVN | XML | Rust | Python | Status |
 | --- | --- | --- | --- | --- | --- |
 | OPM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | **Verified** |
-| OEM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
+| OEM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | **Verified** |
 | OPM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
-| OEM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
+| OEM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | **Verified** |
+| OEM 1.0 | Parse only | Not defined (rejected) | Yes | Yes | Available |
 | OMM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | **Verified** |
 | OMM 2.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
 | OCM 3.0 | Parse, write, convert | Parse, write, convert | Yes | Yes | Available |
@@ -42,8 +46,8 @@ application-level framing such as one message per file; see
 [`docs/conformance/combined-ndm.md`](conformance/combined-ndm.md).
 
 OPM, OEM, AEM, APM, ACM, and TDM edition 1.0 remain parse-only. They cannot be written back or
-converted to a newer edition; callers must supply a supported current-edition message instead. The
-library rejects unsupported output editions instead of relabeling a document. OPM, OEM, and OMM
+converted to a newer edition; callers must supply a supported current-edition message instead.
+The library rejects unsupported output editions instead of relabeling a document. OPM, OEM, and OMM
 generation supports explicit 2.0 and 3.0 targets where the typed content can be represented without
 loss.
 
