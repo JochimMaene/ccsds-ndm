@@ -45,8 +45,8 @@ and the two where reading is looser than a clear rule under
 - The object must be the same in every segment (5.1.3). `OBJECT_NAME` and `OBJECT_ID` are
   compared ignoring case, and underscores and runs of blanks count as the same (7.5.9). So
   `Mars Global Surveyor` and `MARS_GLOBAL_SURVEYOR` are one object. The time system comparison
-  (5.2.4.5) also ignores case and, in XML, surrounding blanks (` UTC ` names UTC); the text is
-  kept as written.
+  (5.2.4.5) also ignores case. Both comparisons ignore XML whitespace (blanks, tabs and line
+  breaks) around the value, so ` UTC ` names UTC; the text is kept as written.
 - 7.5.3 says every normative KVN text value, meaning anything but comments and free text, is all
   upper or all lower case. Which fields are free text is unclear: the book gives no list, and
   values such as mission frames are defined by an ICD rather than the book. We read this leniently
@@ -170,8 +170,10 @@ reading accepts them. Writing still follows the book, so everything the library 
 - A value whose 16-digit KVN spelling would round past the largest double is rejected when
   writing KVN, because it would read back as infinity.
 - XML to KVN keeps the whole model except for whitespace KVN can't hold. Trailing blanks in
-  comments are dropped (7.4.7), and so are leading and trailing blanks in text values. A line
-  break inside an XML comment turns it into two KVN comments.
+  comments are dropped (7.4.7). Leading and trailing blanks in text values are dropped too, and
+  in metadata values and `COV_REF_FRAME` so is any XML whitespace around the value, including
+  tabs and line breaks. A line break inside a value is still rejected. A line break inside an
+  XML comment turns it into two KVN comments.
 
 ### Limits
 

@@ -1,6 +1,6 @@
 use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::messages::oem::Oem;
-use ccsds_ndm::{convert, Ndm, Notation};
+use ccsds_ndm::{convert, Ndm, Notation, Validate};
 
 #[test]
 fn both_directions_reproduce_the_generated_text() {
@@ -77,4 +77,37 @@ fn kvn_round_trip_keeps_leading_comment_blanks_only() {
     let kvn = convert(&message.to_xml().unwrap(), Notation::Kvn).unwrap();
     let reparsed = Oem::from_kvn(&kvn).unwrap();
     assert_eq!(reparsed.header.comment, vec!["   indented"]);
+}
+
+#[test]
+fn xml_whitespace_around_text_values_is_padding_in_both_notations() {
+    // XML keeps a padded xsd:string as written (8.13.5) and KVN drops padding (7.4.7). The
+    // padded value names the same object and time system, and KVN output drops the padding
+    // instead of failing on a line break it cannot hold.
+    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    let object_name = message.body.segment[0].metadata.object_name.clone();
+    let metadata = &mut message.body.segment[1].metadata;
+    metadata.object_name = format!("\n  {object_name}\n\t");
+    metadata.time_system = "\r\nutc\n".into();
+    metadata.center_name = "\tEARTH ".into();
+    message.validate().expect("padding names the same object");
+
+    let xml = message.to_xml().unwrap();
+    assert_eq!(
+        Oem::from_xml(&xml).unwrap(),
+        message,
+        "XML keeps the padding"
+    );
+    let kvn = convert(&xml, Notation::Kvn).unwrap();
+    let metadata = &Oem::from_kvn(&kvn).unwrap().body.segment[1].metadata;
+    assert_eq!(metadata.object_name, object_name);
+    assert_eq!(metadata.time_system, "utc");
+    assert_eq!(metadata.center_name, "EARTH");
+
+    // A line break inside the value is not padding.
+    message.body.segment[1].metadata.center_name = "EA\nRTH".into();
+    assert_eq!(
+        message.to_kvn().unwrap_err().field_path().as_deref(),
+        Some("body.segment[1].metadata.center_name")
+    );
 }

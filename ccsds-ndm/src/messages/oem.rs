@@ -15,9 +15,11 @@ mod kvn;
 mod xml;
 
 // ODM 7.5.9: underscores and runs of blanks denote the same text value; 7.5.3 admits the
-// all-uppercase and all-lowercase spellings of one value.
+// all-uppercase and all-lowercase spellings of one value. XML whitespace around the value is
+// padding (see `xml_trimmed`).
 fn text_value_eq(left: &str, right: &str) -> bool {
-    let words = |value| str::split(value, [' ', '_']).filter(|word: &&str| !word.is_empty());
+    let words =
+        |value| str::split(xml_trimmed(value), [' ', '_']).filter(|word: &&str| !word.is_empty());
     let mut right_words = words(right);
     words(left).all(|word| {
         right_words

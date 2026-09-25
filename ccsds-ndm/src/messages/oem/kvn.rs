@@ -650,10 +650,13 @@ impl Oem {
                 ("REF_FRAME", metadata.ref_frame.as_str(), "ref_frame"),
                 ("TIME_SYSTEM", metadata.time_system.as_str(), "time_system"),
             ] {
-                text(field, value, || format!("{base}.metadata.{member}"))?;
+                // XML whitespace around a value is padding; KVN output drops it.
+                text(field, xml_trimmed(value), || {
+                    format!("{base}.metadata.{member}")
+                })?;
             }
             if let Some(value) = &metadata.interpolation {
-                optional_text("INTERPOLATION", value, || {
+                optional_text("INTERPOLATION", xml_trimmed(value), || {
                     format!("{base}.metadata.interpolation")
                 })?;
             }
@@ -775,13 +778,13 @@ impl Oem {
                         .into());
                 }
                 if let Some(value) = &covariance.cov_ref_frame {
-                    optional_text("COV_REF_FRAME", value, || {
+                    optional_text("COV_REF_FRAME", xml_trimmed(value), || {
                         format!("{base}.data.covariance_matrix[{covariance_index}].cov_ref_frame")
                     })?;
                 }
                 writer.write_pair("EPOCH", covariance.epoch);
                 if let Some(value) = &covariance.cov_ref_frame {
-                    writer.write_pair("COV_REF_FRAME", value);
+                    writer.write_pair("COV_REF_FRAME", xml_trimmed(value));
                 }
                 let values = covariance.values();
                 for (row_index, row) in covariance_rows(&values).into_iter().enumerate() {
@@ -871,14 +874,14 @@ impl ToKvn for Oem {
 impl ToKvn for OemMetadata {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
-        writer.write_pair("OBJECT_NAME", &self.object_name);
-        writer.write_pair("OBJECT_ID", &self.object_id);
-        writer.write_pair("CENTER_NAME", &self.center_name);
-        writer.write_pair("REF_FRAME", &self.ref_frame);
+        writer.write_pair("OBJECT_NAME", xml_trimmed(&self.object_name));
+        writer.write_pair("OBJECT_ID", xml_trimmed(&self.object_id));
+        writer.write_pair("CENTER_NAME", xml_trimmed(&self.center_name));
+        writer.write_pair("REF_FRAME", xml_trimmed(&self.ref_frame));
         if let Some(v) = &self.ref_frame_epoch {
             writer.write_pair("REF_FRAME_EPOCH", v);
         }
-        writer.write_pair("TIME_SYSTEM", &self.time_system);
+        writer.write_pair("TIME_SYSTEM", xml_trimmed(&self.time_system));
         writer.write_pair("START_TIME", self.start_time);
         if let Some(v) = &self.useable_start_time {
             writer.write_pair("USEABLE_START_TIME", v);
@@ -888,7 +891,7 @@ impl ToKvn for OemMetadata {
         }
         writer.write_pair("STOP_TIME", self.stop_time);
         if let Some(v) = &self.interpolation {
-            writer.write_pair("INTERPOLATION", v);
+            writer.write_pair("INTERPOLATION", xml_trimmed(v));
         }
         if let Some(v) = &self.interpolation_degree {
             writer.write_pair("INTERPOLATION_DEGREE", v);
