@@ -198,6 +198,7 @@ impl Ndm for Tdm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        let kvn = crate::detect::without_utf8_bom(kvn);
         kvn::validate_kvn_syntax(kvn)?;
         let tdm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&tdm)?;

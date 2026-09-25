@@ -33,7 +33,7 @@ Each decision below names the clause it rests on. When the book is unclear, or t
 disagree, the parser takes the lenient reading. This is the general rule in the
 [validation contract](../design/validation-contract.md#authority-and-representability). The few
 cases where we are stricter are listed under [Stricter than required](#stricter-than-required),
-and the two where reading is looser than a clear rule under
+and the three where reading is looser than a clear rule under
 [More lenient than the book](#more-lenient-than-the-book).
 
 ### Where the book is unclear
@@ -153,6 +153,11 @@ and the two where reading is looser than a clear rule under
 These rules are clear, but real OEM files commonly break them without losing information, so
 reading accepts them. Writing still follows the book, so everything the library writes is valid.
 
+- **Leading byte-order mark.** 7.3.4 allows only printable ASCII in KVN, and a UTF-8 byte-order
+  mark is not ASCII. Windows tools often write one at the start of a file. Reading skips one
+  leading mark in KVN, in every family and on every entry point, as it already did in XML and in
+  auto-detection; a second mark, or one later in the file, is still rejected. Writing never emits
+  one. Test: `library::detection`.
 - **Unterminated last line.** 7.3.7 terminates every line, including the last. Many files lack
   the final line ending, for example after editing. Reading accepts such a file; writing always
   ends with a line terminator.

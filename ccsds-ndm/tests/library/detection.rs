@@ -92,3 +92,53 @@ fn unrecognized_kvn_input_is_rejected() {
     let error = ccsds_ndm::from_str("NOT_A_CCSDS_MESSAGE").unwrap_err();
     assert!(error.to_string().contains("Could not identify KVN header"));
 }
+
+#[test]
+fn every_family_reads_kvn_after_one_leading_bom() {
+    // A leading UTF-8 byte-order mark loses nothing, so reading accepts it in every family, as
+    // auto-detection and XML already do. Only one leading mark is skipped, and none is written.
+    use ccsds_ndm::messages::{
+        acm::Acm, aem::Aem, apm::Apm, cdm::Cdm, ocm::Ocm, oem::Oem, omm::Omm, opm::Opm, rdm::Rdm,
+        tdm::Tdm,
+    };
+    use ccsds_ndm::Ndm;
+    let read = |notation: &str, fixture: &str| {
+        std::fs::read_to_string(crate::common::data_dir().join(notation).join(fixture)).unwrap()
+    };
+    fn check<M: Ndm + PartialEq + std::fmt::Debug>(source: String, xml: Option<String>) {
+        // The version line names the family in failure messages.
+        let label = source.lines().next().unwrap().to_owned();
+        let expected = M::from_kvn(&source).unwrap();
+        assert_eq!(
+            M::from_kvn(&format!("\u{feff}{source}")).unwrap(),
+            expected,
+            "{label}"
+        );
+        assert!(
+            !expected.to_kvn().unwrap().starts_with('\u{feff}'),
+            "{label}"
+        );
+        assert!(
+            M::from_kvn(&format!("\u{feff}\u{feff}{source}")).is_err(),
+            "{label}: a second mark is content"
+        );
+        if let Some(xml) = xml {
+            let expected = M::from_xml(&xml).unwrap();
+            assert_eq!(
+                M::from_xml(&format!("\u{feff}{xml}")).unwrap(),
+                expected,
+                "{label}"
+            );
+        }
+    }
+    check::<Acm>(read("kvn", "acm_g6.kvn"), None);
+    check::<Aem>(read("kvn", "aem_g4.kvn"), Some(read("xml", "aem_g11.xml")));
+    check::<Apm>(read("kvn", "apm_g1.kvn"), Some(read("xml", "apm_g10.xml")));
+    check::<Cdm>(read("kvn", "cdm_362.kvn"), Some(read("xml", "cdm_44.xml")));
+    check::<Ocm>(read("kvn", "ocm_g15.kvn"), Some(read("xml", "ocm_g20.xml")));
+    check::<Oem>(read("kvn", "oem_g11.kvn"), Some(read("xml", "oem_g14.xml")));
+    check::<Omm>(read("kvn", "omm_g7.kvn"), Some(read("xml", "omm_g10.xml")));
+    check::<Opm>(read("kvn", "opm_g1.kvn"), Some(read("xml", "opm_g5.xml")));
+    check::<Rdm>(read("kvn", "rdm_c1.kvn"), Some(read("xml", "rdm_c3.xml")));
+    check::<Tdm>(read("kvn", "tdm_e1.kvn"), Some(read("xml", "tdm_e21.xml")));
+}

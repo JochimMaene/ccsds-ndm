@@ -63,6 +63,7 @@ impl Ndm for Ocm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        let kvn = crate::detect::without_utf8_bom(kvn);
         kvn::validate_syntax(kvn)?;
         let ocm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&ocm)?;

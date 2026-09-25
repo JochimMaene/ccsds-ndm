@@ -63,6 +63,7 @@ impl Ndm for Aem {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        let kvn = crate::detect::without_utf8_bom(kvn);
         let normalized = crate::kvn::normalize_line_endings(kvn);
         kvn::validate_kvn_syntax(&normalized)?;
         let aem = Self::from_kvn_str(&normalized)?;

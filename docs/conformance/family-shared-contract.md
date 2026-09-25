@@ -13,6 +13,7 @@ normative mapping required to promote a capability cell to `verified`.
 | Validated generation | String, streaming, Python, and conversion paths delegate to the Rust `Ndm` boundary. |
 | Structured diagnostics | Shared parsing and generation wrappers retain notation, message kind, edition context, stable resource codes, and bounded token excerpts. |
 | Rust/Python consistency | `library::parsing` and `library::output` and `test_parse_and_generation_options.py` exercise generic dispatch without per-message adapter semantics. |
+| Leading byte-order mark | Every family's `from_kvn` and `from_xml`, and auto-detection, skip one leading UTF-8 byte-order mark; none is written (`library::detection`). |
 | Strict XML envelope | Standalone roots, attributes, trailing documents, unknown structural fields, and the normative combined `ndm` envelope are checked without accepting arbitrary wrapper flattening. |
 | Reproducible performance workload | `kvn_message_matrix` covers KVN parse/generate for all ten standalone families; `xml_message_matrix` covers XML parse/generate for those ten plus combined NDM. The CodSpeed workflow executes both benchmark targets. Wall-clock results remain informational. |
 

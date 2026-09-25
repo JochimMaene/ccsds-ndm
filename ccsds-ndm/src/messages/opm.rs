@@ -61,6 +61,7 @@ impl Ndm for Opm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        let kvn = crate::detect::without_utf8_bom(kvn);
         Self::from_kvn_strict(kvn)
     }
 
