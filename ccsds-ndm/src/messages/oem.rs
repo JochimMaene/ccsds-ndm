@@ -209,6 +209,38 @@ impl OemBody {
         }
         Ok(())
     }
+
+    /// 502.0-B-2 Cor. 1, table 5-3: a segment's USEABLE_START_TIME must be at or after the
+    /// previous segment's USEABLE_STOP_TIME. The rule names only those two values, so it applies
+    /// whenever both are given. 3.0 dropped it.
+    pub(crate) fn validate_odm_2_useable_order(&self) -> Result<()> {
+        for (index, segments) in self.segment.windows(2).enumerate() {
+            let (Some(previous_stop), Some(next_start)) = (
+                segments[0].metadata.useable_stop_time.as_ref(),
+                segments[1].metadata.useable_start_time.as_ref(),
+            ) else {
+                continue;
+            };
+            if next_start.cmp_same_branch(previous_stop) == Some(std::cmp::Ordering::Less) {
+                return Err(ValidationError::InvalidValue {
+                    field: "USEABLE_START_TIME".into(),
+                    value: next_start.to_string(),
+                    expected: format!(
+                        "a time at or after the preceding segment's USEABLE_STOP_TIME \
+                         {previous_stop} (CCSDS 502.0-B-2)"
+                    )
+                    .into(),
+                    line: None,
+                }
+                .at_path(format!(
+                    "body.segment[{}].metadata.useable_start_time",
+                    index + 1
+                ))
+                .into());
+            }
+        }
+        Ok(())
+    }
 }
 
 impl crate::traits::Validate for OemSegment {

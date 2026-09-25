@@ -190,14 +190,18 @@ pub(crate) fn validate_opm_edition(message: &crate::messages::opm::Opm) -> Resul
 
 pub(crate) fn validate_oem_edition(message: &crate::messages::oem::Oem) -> Result<()> {
     match message.version.as_str() {
-        "2.0" => validate_odm_2_header(&message.header),
+        "2.0" => {
+            validate_odm_2_header(&message.header)?;
+            message.body.validate_odm_2_useable_order()
+        }
         "1.0" => validate_oem_1_content(message),
         _ => Ok(()),
     }
 }
 
 /// CCSDS 502.0-B-1 predates the OEM header fields, REF_FRAME_EPOCH, accelerations and
-/// covariance (502.0-B-2 annex, items 2 and 4), so a 1.0 message must not carry them.
+/// covariance (502.0-B-2 annex E1 items 2, 4 and 11, and annex F2), so a 1.0 message must not
+/// carry them.
 fn validate_oem_1_content(message: &crate::messages::oem::Oem) -> Result<()> {
     let absent = |field: &'static str, path: String| -> CcsdsNdmError {
         ValidationError::InvalidValue {

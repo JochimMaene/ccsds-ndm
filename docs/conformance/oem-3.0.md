@@ -193,7 +193,7 @@ reading accepts them. Writing still follows the book, so everything the library 
 | --- | --- | --- |
 | 1–7 | Header | Version, creation date and originator are required. Comments, classification and message ID are optional. Order and edition rules are checked. Optional XML strings are kept exactly as written. |
 | 8–16, 23 | Metadata | Identity, frame and time fields are required. Frame epoch and comments are optional. Block markers must be exact. Object and time system must match across segments. Book-listed time systems and frames must be single-case in KVN. Frame-specific rules depend on the agreement between the parties. |
-| 17–20 | Time bounds | Total and useable times must be in order, and useable times must fall inside the total span (the table 5-3 reading of TOTAL and USEABLE). State records must fall inside the total span. Complete useable spans of consecutive segments may touch but not overlap. |
+| 17–20 | Time bounds | Total and useable times must be in order, and useable times must fall inside the total span (the table 5-3 reading of TOTAL and USEABLE). State records must fall inside the total span. Complete useable spans of consecutive segments may touch but not overlap. In 2.0, a useable start may not precede the previous segment's useable stop (see [OEM 2.0](#oem-20)). |
 | 21–22 | Interpolation | A method requires a degree, in Rust, Python and both notations. The degree must be positive (see [Stricter than required](#stricter-than-required)). Whether there are enough records is not checked, because the book doesn't define it (see [Where the book is unclear](#where-the-book-is-unclear)). |
 | 24–25 | Ephemeris | At least one state record per segment, epochs valid for the time system, position and velocity with optional acceleration, and fixed units. KVN lines must have exactly 7 or 10 fields. In XML each acceleration component is optional on its own. Unlike AEM, OEM doesn't require increasing epochs. |
 | 26–31 | Covariance | Optional section, which may be empty (row 30). Each matrix has all 21 lower-triangle values, an epoch, an optional frame and comments. KVN rows must have the right number of values. Epochs increase; they are not bounded by the total span. XML units are optional. Python accepts a full 6×6 matrix and uses its lower triangle. |
@@ -234,18 +234,25 @@ section (5.2) and syntax rules (section 6) match 3.0 except in these points:
   the ODM". KVN numbers are already finite. We still read `-0` (producers often write `-0.000000`),
   and 2.0 XML still takes the schema's `xsd:double`, including `NaN` and `INF`. Both are looser
   than the note.
+- **Useable order.** Corrigendum 1 adds to table 5-3: "The USEABLE_START_TIME time tag at a new
+  block of ephemeris data must be greater than or equal to the USEABLE_STOP_TIME time tag of the
+  previous block." 3.0 dropped the sentence. The rule names only those two values, so in 2.0 it
+  applies whenever both are given, even when the other useable bounds are absent; a shared
+  endpoint is allowed. The segments must therefore be in time order where both are given. When
+  either is missing the rule is silent, and we don't substitute `START_TIME` or `STOP_TIME`,
+  because 5.2.4.4 lets total spans overlap.
 
-Everything else on this page applies unchanged, including the Corrigendum 1 rule that complete
-useable spans of consecutive segments must not overlap. `conformance::odm2` checks every shipped OEM
+Everything else on this page applies unchanged, including the 5.2.4.4 rule that complete useable
+spans of consecutive segments must not overlap. `conformance::odm2` checks every shipped OEM
 example as 2.0: it must be valid against the 2.0 schema, round-trip through KVN and XML, and
-reject both 3.0-only header fields.
+reject both 3.0-only header fields and a useable start before the previous useable stop.
 
 ### OEM 1.0
 
 OEM 1.0 ([502.0-B-1 Silver Book](https://ccsds.org/Pubs/502x0b1s.pdf), 2004) is read but not
 written, and it is not verified. It is a KVN-only format, so XML with `version="1.0"` is
 rejected. 1.0 has no `CLASSIFICATION`, `MESSAGE_ID`, `REF_FRAME_EPOCH`, accelerations or
-covariance (502.0-B-2 annex, items 2 and 4), so a 1.0 file carrying any of them is rejected.
+covariance (502.0-B-2 annex E1, items 2, 4 and 11, and annex F2), so a 1.0 file carrying any of them is rejected.
 Otherwise it is read with the 2.0 rules, which are stricter than 1.0 in a few places. These valid
 1.0 files are therefore rejected:
 

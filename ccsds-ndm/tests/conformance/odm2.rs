@@ -5,7 +5,7 @@
 use crate::common::mutated_once;
 
 use ccsds_ndm::messages::{oem::Oem, omm::Omm, opm::Opm};
-use ccsds_ndm::Ndm;
+use ccsds_ndm::{Ndm, Validate};
 use std::path::Path;
 use std::process::Command;
 
@@ -140,6 +140,68 @@ fn oem_2_rejects_odm_3_header_fields_when_reading_and_writing() {
             Some(path),
             "XML {field}: {error}"
         );
+    }
+}
+
+#[test]
+fn oem_2_useable_start_may_not_precede_the_previous_useable_stop() {
+    // 502.0-B-2 Cor. 1, table 5-3: "The USEABLE_START_TIME time tag at a new block of ephemeris
+    // data must be greater than or equal to the USEABLE_STOP_TIME time tag of the previous
+    // block." 3.0 dropped the sentence, so the same content stays valid there.
+    let epoch = |value: &str| value.parse::<ccsds_ndm::types::Epoch>().unwrap();
+    let path = "body.segment[1].metadata.useable_start_time";
+    let assert_rejected = |message: &Oem| {
+        crate::common::assert_rejects(message, "USEABLE_START_TIME");
+        assert_eq!(
+            message.validate().unwrap_err().field_path().as_deref(),
+            Some(path)
+        );
+        let mut as_three = message.clone();
+        as_three.version = "3.0".into();
+        let kvn = as_three.to_kvn().unwrap().replace("= 3.0", "= 2.0");
+        let error = Oem::from_kvn(&kvn).unwrap_err();
+        assert_eq!(error.field_path().as_deref(), Some(path), "KVN: {error}");
+        let xml = as_three
+            .to_xml()
+            .unwrap()
+            .replace("version=\"3.0\"", "version=\"2.0\"");
+        let error = Oem::from_xml(&xml).unwrap_err();
+        assert_eq!(error.field_path().as_deref(), Some(path), "XML: {error}");
+    };
+    let base = oem_2_examples().remove(0);
+    assert_eq!(base.body.segment.len(), 2);
+
+    // Disjoint useable spans in reverse time order.
+    let mut reversed = base.clone();
+    reversed.body.segment.swap(0, 1);
+    assert_rejected(&reversed);
+
+    // The two values the rule names suffice; the other bounds may be absent.
+    let mut partial = base.clone();
+    let previous = &mut partial.body.segment[0].metadata;
+    previous.useable_start_time = None;
+    previous.stop_time = epoch("2019-12-29T00:00:00");
+    previous.useable_stop_time = Some(epoch("2019-12-29T00:00:00"));
+    partial.body.segment[1].metadata.useable_stop_time = None;
+    assert_rejected(&partial);
+
+    // A shared endpoint satisfies "greater than or equal to".
+    let mut shared = base.clone();
+    shared.body.segment[0].metadata.stop_time = epoch("2019-12-28T22:08:02.5");
+    shared.body.segment[0].metadata.useable_stop_time = Some(epoch("2019-12-28T22:08:02.5"));
+    shared.validate().expect("shared endpoint");
+
+    // Without the previous USEABLE_STOP_TIME or the new USEABLE_START_TIME the rule is silent.
+    let mut unnamed = reversed.clone();
+    unnamed.body.segment[0].metadata.useable_stop_time = None;
+    unnamed.validate().expect("no previous USEABLE_STOP_TIME");
+    let mut unnamed = reversed.clone();
+    unnamed.body.segment[1].metadata.useable_start_time = None;
+    unnamed.validate().expect("no new USEABLE_START_TIME");
+
+    for mut message in [reversed, partial] {
+        message.version = "3.0".into();
+        message.validate().expect("3.0 has no ordering rule");
     }
 }
 
