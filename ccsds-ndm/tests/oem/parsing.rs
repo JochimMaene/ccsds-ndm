@@ -56,6 +56,8 @@ fn kvn_interpolation_degree_obeys_signed_integer_grammar() {
         ("-1", "positive integer"),
         ("0", "positive integer"),
         ("2147483648", "Invalid integer"),
+        ("5.0", "Invalid integer"),
+        ("7 8", "Invalid integer"),
     ] {
         let invalid = mutated(
             source,
@@ -375,9 +377,27 @@ fn kvn_ephemeris_records_tolerate_padding_and_name_malformed_components() {
         "trailing spaces changed the parsed model"
     );
     // A tab is not a KVN blank; the strict pass rejects it as non-printable before parsing.
-    let tabbed = format!("{record}\t");
-    let error = Oem::from_kvn(&mutated(source, record, &tabbed)).unwrap_err();
-    assert_eq!(error.code(), Some("parse.kvn.syntax"), "{error}");
+    // The diagnostic points at the offending character, not the start of its line.
+    let line = source.lines().position(|line| line == record).unwrap() + 1;
+    let (epoch, rest) = record.split_once(' ').unwrap();
+    for (label, invalid, column) in [
+        ("trailing tab", format!("{record}\t"), record.len() + 1),
+        ("inner tab", format!("{epoch}\t{rest}"), epoch.len() + 1),
+        (
+            "non-ASCII",
+            format!("{epoch} \u{e9}{rest}"),
+            epoch.len() + 2,
+        ),
+    ] {
+        let error = Oem::from_kvn(&mutated(source, record, &invalid)).unwrap_err();
+        let located = crate::common::kvn_parse_error(&error)
+            .unwrap_or_else(|| panic!("{label}: expected a KVN parse error, got {error}"));
+        assert_eq!(
+            (located.line, located.column, located.message.as_str()),
+            (line, column, "non-printable or non-ASCII character"),
+            "{label}"
+        );
+    }
 
     // ODM 7.3.7 terminates every line; parsing leniently accepts an unterminated last line.
     let no_final_newline = source.trim_end_matches('\n');
@@ -586,13 +606,26 @@ fn kvn_rejects_overlong_lines_and_short_covariance_rows() {
         &format!("{comment}x\nCOMMENT This block"),
     );
     let error = Oem::from_kvn(&overlong).unwrap_err();
-    assert_eq!(error.code(), Some("parse.kvn.syntax"), "{error}");
+    let kvn = crate::common::kvn_parse_error(&error)
+        .unwrap_or_else(|| panic!("expected a KVN parse error, got {error}"));
+    assert_eq!(
+        (kvn.column, kvn.message.as_str()),
+        (255, "line exceeds the normative 254-character limit"),
+        "{error}"
+    );
 
     let short_row = mutated_once(source, "4.6189273e-04 6.7824216e-04\n", "4.6189273e-04\n");
     let error = Oem::from_kvn(&short_row).unwrap_err();
     let kvn = crate::common::kvn_parse_error(&error)
         .unwrap_or_else(|| panic!("expected a KVN parse error, got {error}"));
-    assert_eq!(kvn.line, 27, "{error}");
+    assert_eq!(
+        (kvn.line, kvn.message.as_str()),
+        (
+            27,
+            "covariance row does not hold its lower-triangular number of values"
+        ),
+        "{error}"
+    );
 }
 
 #[test]

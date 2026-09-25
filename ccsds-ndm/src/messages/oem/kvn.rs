@@ -907,13 +907,23 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
     use crate::error::{CcsdsNdmError, FormatError};
 
     fn invalid(line: usize, offset: usize, message: impl AsRef<str>) -> CcsdsNdmError {
+        invalid_at(line, offset, 0, message)
+    }
+
+    /// An error `index` bytes into the line starting at `offset`.
+    fn invalid_at(
+        line: usize,
+        offset: usize,
+        index: usize,
+        message: impl AsRef<str>,
+    ) -> CcsdsNdmError {
         CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(
             crate::error::KvnParseError {
                 line,
-                column: 1,
+                column: index + 1,
                 message: message.as_ref().to_owned(),
                 contexts: vec!["strict OEM KVN"],
-                offset,
+                offset: offset + index,
             },
         ))))
     }
@@ -970,16 +980,18 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
         let line_number = index + 1;
         let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
         if line.len() > 254 {
-            return Err(invalid(
+            return Err(invalid_at(
                 line_number,
                 offset,
+                254,
                 "line exceeds the normative 254-character limit",
             ));
         }
-        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
-            return Err(invalid(
+        if let Some(index) = line.bytes().position(|byte| !(b' '..=b'~').contains(&byte)) {
+            return Err(invalid_at(
                 line_number,
                 offset,
+                index,
                 "non-printable or non-ASCII character",
             ));
         }

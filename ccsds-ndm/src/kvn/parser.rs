@@ -429,29 +429,39 @@ pub fn kv_float(input: &mut &str) -> KvnResult<f64> {
     Ok(value)
 }
 
+/// Whether only blanks remain before the end of the line or input.
+fn at_value_end(input: &str) -> bool {
+    let rest = input.trim_start_matches([' ', '\t']);
+    rest.is_empty() || rest.starts_with(['\r', '\n'])
+}
+
 /// Fast i32 parser for KVN values.
 pub fn kv_i32(input: &mut &str) -> KvnResult<i32> {
     let checkpoint = input.checkpoint();
-    let (value, unit) = terminated(
-        (
-            take_while(1.., ('0'..='9', '-', '+'))
-                .map(|s: &str| s.parse::<i32>())
-                .verify(|res| res.is_ok())
-                .map(|res| res.unwrap()),
-            kv_unit,
-        ),
-        opt_line_ending,
+    let parsed = (
+        take_while(1.., ('0'..='9', '-', '+'))
+            .map(|s: &str| s.parse::<i32>())
+            .verify(|res| res.is_ok())
+            .map(|res| res.unwrap()),
+        kv_unit,
     )
-    .parse_next(input)
-    .map_err(|e| {
-        if e.is_backtrack() {
+        .parse_next(input);
+    // A value such as `5.0` must fail as a whole, not leave `.0` for the next keyword.
+    let (value, unit) = match parsed {
+        Ok(parsed) if at_value_end(input) => parsed,
+        Err(e) if !e.is_backtrack() => return Err(e),
+        _ => {
+            input.reset(&checkpoint);
             let mut err = InternalParserError::from_input(input);
             err.message = std::borrow::Cow::Borrowed("Invalid integer");
-            ErrMode::Cut(err.add_context(input, &checkpoint, StrContext::Label("Invalid integer")))
-        } else {
-            e
+            return Err(ErrMode::Cut(err.add_context(
+                input,
+                &checkpoint,
+                StrContext::Label("Invalid integer"),
+            )));
         }
-    })?;
+    };
+    opt_line_ending(input)?;
     if unit.is_some() {
         return Err(cut_err(input, "Units are not allowed for integer fields"));
     }
@@ -461,30 +471,30 @@ pub fn kv_i32(input: &mut &str) -> KvnResult<i32> {
 /// Fast u32 parser for KVN values.
 pub fn kv_u32(input: &mut &str) -> KvnResult<u32> {
     let checkpoint = input.checkpoint();
-    let (value, unit) = terminated(
-        (
-            take_while(1.., '0'..='9')
-                .map(|s: &str| s.parse::<u32>())
-                .verify(|res| res.is_ok())
-                .map(|res| res.unwrap()),
-            kv_unit,
-        ),
-        opt_line_ending,
+    let parsed = (
+        take_while(1.., '0'..='9')
+            .map(|s: &str| s.parse::<u32>())
+            .verify(|res| res.is_ok())
+            .map(|res| res.unwrap()),
+        kv_unit,
     )
-    .parse_next(input)
-    .map_err(|e| {
-        if e.is_backtrack() {
+        .parse_next(input);
+    // A value such as `5.0` must fail as a whole, not leave `.0` for the next keyword.
+    let (value, unit) = match parsed {
+        Ok(parsed) if at_value_end(input) => parsed,
+        Err(e) if !e.is_backtrack() => return Err(e),
+        _ => {
+            input.reset(&checkpoint);
             let mut err = InternalParserError::from_input(input);
             err.message = std::borrow::Cow::Borrowed("Invalid unsigned integer");
-            ErrMode::Cut(err.add_context(
+            return Err(ErrMode::Cut(err.add_context(
                 input,
                 &checkpoint,
                 StrContext::Label("Invalid unsigned integer"),
-            ))
-        } else {
-            e
+            )));
         }
-    })?;
+    };
+    opt_line_ending(input)?;
     if unit.is_some() {
         return Err(cut_err(input, "Units are not allowed for integer fields"));
     }
