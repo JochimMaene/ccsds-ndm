@@ -293,11 +293,11 @@ class TestCdmRealWorldCorpus:
     def test_operational_cdm_with_bare_nil_is_rejected(self):
         path = Path(__file__).resolve().parent / "test_cdm.xml"
 
-        # The operational root also omits the `xmlns:xsi` NDM/XML 4.3.3 requires.
-        with pytest.raises(ccsds_ndm.NdmFormatError, match="xmlns:xsi"):
+        # An unused xmlns:xsi is optional, but a bare nil attribute is still invalid.
+        with pytest.raises(ccsds_ndm.NdmFormatError, match="unknown attribute 'nil'"):
             ccsds_ndm.from_file(str(path), format="xml")
 
-        # With that declaration added, the bare `nil` is what remains invalid.
+        # Adding the namespace declaration does not qualify the bare attribute.
         declared = path.read_text().replace(
             "<cdm ", '<cdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ', 1
         )

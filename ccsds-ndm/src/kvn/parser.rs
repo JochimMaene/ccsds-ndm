@@ -311,7 +311,7 @@ pub fn comment_line<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     } else if !input.is_empty() && !input.starts_with(['\r', '\n']) {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
-    // ODM 7.4.7: white space immediately before the end of a line is not significant.
+    // Shared KVN readers normalize trailing spaces in comments, including fixed-width padding.
     till_line_ending.map(str::trim_end).parse_next(input)
 }
 
@@ -1127,16 +1127,26 @@ pub fn expect_block_end<'a>(
 
 /// Parses the ODM header section.
 pub fn odm_header(input: &mut &str) -> KvnResult<OdmHeader> {
-    // ODM §7.8 permits header comments only immediately after the version keyword. Comments
-    // encountered after header assignments belong to the next logical block and must not be
-    // consumed speculatively here.
-    let comment = collect_comments.parse_next(input)?;
+    odm_header_with_comments(input, false)
+}
+
+/// Optionally collect comments between header assignments for OEM producer compatibility.
+pub(crate) fn odm_header_with_comments(
+    input: &mut &str,
+    comments_anywhere: bool,
+) -> KvnResult<OdmHeader> {
+    // Strict readers collect only initial comments. OEM also collects comments between header
+    // assignments, leaving META_START for the body parser.
+    let mut comment = collect_comments.parse_next(input)?;
     let mut classification = None;
     let mut creation_date = None;
     let mut originator = None;
     let mut message_id = None;
 
     loop {
+        if comments_anywhere {
+            comment.extend(collect_comments.parse_next(input)?);
+        }
         // ODM 7.3.5: blank lines may appear at any position.
         blank_lines.parse_next(input)?;
         let checkpoint = input.checkpoint();

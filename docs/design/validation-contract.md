@@ -42,11 +42,14 @@ preserves a book-valid value in the model, and rejects conversion to an XML edit
 represent it. It does not alter the value to make the conversion succeed.
 
 Where the books are silent or unclear, or two sources conflict, parsing takes the more permissive
-reading; clear prohibitions are still enforced, except for the common, lossless deviations a
-family lists under "More lenient than the book" (an unterminated last KVN line, and data numbers
-with more than 16 digits in OEM and AEM; the other families already read both). Generation always follows the clear rules. Generation follows the same reading, and writes a
-form satisfying both sources where that costs nothing (for example, OEM XML always declares
-`xmlns:ndm`). A family that keeps a stricter reading lists it as a deliberate exception in its
+reading. Reading also accepts documented producer variations when the interpretation is unambiguous
+and preserves the values: for example, equivalent UTF-8 XML declarations, a leading byte-order
+mark, and excess trailing padding in OEM KVN. Reject input when interpreting it would require
+guessing missing values, dropping content, or accepting inconsistent message semantics. Each
+exception to a clear book rule is recorded in the shared or family conformance document and tested
+alongside nearby invalid cases; this policy is not a blanket relaxation of the grammar.
+Generation follows the clear rules and writes a form satisfying both sources where possible
+(for example, OEM XML always declares `xmlns:ndm`). A family that keeps a stricter reading lists it as a deliberate exception in its
 conformance document; OEM's are under "Stricter than required" in [oem-3.0.md](../conformance/oem-3.0.md).
 
 Known conflicts include the entries below. They predate the permissive-reading rule and are each

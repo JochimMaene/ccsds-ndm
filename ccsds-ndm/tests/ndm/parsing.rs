@@ -14,12 +14,8 @@ fn declared(body: &str) -> String {
 
 #[test]
 fn combined_xml_parser_enforces_the_normative_envelope() {
-    // ODM 8.12.6: the combined root carries the standard xmlns:xsi declaration.
-    crate::common::assert_invalid_format(
-        &CombinedNdm::from_xml(&declared("<ndm/>")).unwrap_err(),
-        "the combined NDM root element must declare \
-         xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"",
-    );
+    // An unused schema-instance namespace may be omitted, as on standalone roots.
+    assert!(CombinedNdm::from_xml(&declared("<ndm/>")).is_ok());
     assert!(CombinedNdm::from_xml(&declared(
         "<ndm xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'/>"
     ))

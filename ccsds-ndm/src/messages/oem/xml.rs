@@ -89,13 +89,15 @@ pub(super) fn validate_envelope(xml: &str, source_edition: &mut Option<String>) 
             .iter()
             .position(|candidate| *candidate == child)
             .map(|rank| {
-                XmlSequenceRule::new(
-                    rank as u16,
-                    matches!(
-                        child,
-                        b"COMMENT" | b"segment" | b"stateVector" | b"covarianceMatrix"
-                    ),
-                )
+                let repeatable = matches!(
+                    child,
+                    b"COMMENT" | b"segment" | b"stateVector" | b"covarianceMatrix"
+                );
+                if matches!(parent, b"header" | b"metadata") {
+                    XmlSequenceRule::unordered(rank as u16, repeatable)
+                } else {
+                    XmlSequenceRule::new(rank as u16, repeatable)
+                }
             })
     }
 

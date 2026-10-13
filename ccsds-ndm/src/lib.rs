@@ -436,10 +436,25 @@ impl Message {
 ///
 /// # Example
 ///
-/// ```no_run
+/// ```
 /// use ccsds_ndm::from_str;
 ///
-/// let kvn = "CCSDS_OPM_VERS = 3.0\nCREATION_DATE = 2024-01-01\n...";
+/// let kvn = "CCSDS_OPM_VERS = 3.0
+/// CREATION_DATE = 2024-01-01T00:00:00
+/// ORIGINATOR = EXAMPLE
+/// OBJECT_NAME = SATELLITE
+/// OBJECT_ID = 2024-001A
+/// CENTER_NAME = EARTH
+/// REF_FRAME = GCRF
+/// TIME_SYSTEM = UTC
+/// EPOCH = 2024-01-01T00:00:00
+/// X = 7000 [km]
+/// Y = 0 [km]
+/// Z = 0 [km]
+/// X_DOT = 0 [km/s]
+/// Y_DOT = 7.5 [km/s]
+/// Z_DOT = 0 [km/s]
+/// ";
 /// let ndm = from_str(kvn).unwrap();
 /// ```
 pub fn from_str(s: &str) -> Result<Message> {

@@ -4,6 +4,29 @@ Release notes
 Unreleased
 ----------
 
+OEM producer compatibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- OEM 1.0 accepts comments between header and metadata assignments, between
+  segments, and after the final record. Comments between ephemeris records
+  remain invalid. Comment text is retained in the corresponding model block.
+- OEM 2.0 and 3.0 accept header comments between header assignments. All OEM
+  KVN readers accept comments between metadata assignments and unique header
+  and metadata assignments in any order; duplicate keywords and a version line
+  anywhere but first remain errors. OEM XML accepts unique header and metadata
+  children in any order. OEM 1.0 accepts mixed-case book-listed text values.
+- The shared XML reader accepts equivalent UTF-8 XML 1.0 declarations and
+  omission of an unused schema-instance namespace. Used prefixes still need
+  valid declarations; generated XML keeps the standard declaration and namespaces.
+- OEM KVN ignores trailing ASCII spaces when checking the input line-length
+  limit, including on comments. Generated lines still fit the 254-character limit.
+- OEM KVN reads comments between a covariance epoch or frame and its first
+  numeric row into that matrix. XML preserves them; KVN writing still rejects
+  comments on later matrices when their association cannot be retained.
+- OEM KVN reads complete covariance matrices without section markers when an
+  ``EPOCH`` follows the state records; generated KVN writes the standard markers.
+- XML deserialization errors name a nearby source line and column.
+
 Python threading and parsing fixes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -65,13 +88,11 @@ listed in the OEM conformance inventory. Newly accepted:
 
 Newly rejected:
 
-- XML documents in every family that do not start with exactly
-  ``<?xml version="1.0" encoding="UTF-8"?>`` (single-line documents are
-  accepted), or whose root does not declare
-  ``xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"``.
-- OEM KVN covariance rows of the wrong width,
-  and mixed-case KVN spellings of the time systems and reference frames the book
-  lists (for example ``Utc`` or ``Eme2000``). XML text follows ``xsd:string``,
+- XML documents in every family without an XML 1.0 declaration, with a
+  non-UTF-8 encoding, or with an undeclared prefix used in a schema hint.
+- OEM KVN covariance rows of the wrong width, and mixed-case KVN spellings of
+  the time systems and reference frames listed by the 2.0 and 3.0 books (for
+  example ``Utc`` or ``Eme2000``). OEM 1.0 accepts these spellings. XML text follows ``xsd:string``,
   so such XML values are accepted and only their conversion to KVN fails;
   ICD-defined values keep their spelling in both notations.
 - Time tags with more than 16 fractional-second digits, in every family except
@@ -95,7 +116,7 @@ OEM review follow-up:
   values) are documented. Every shipped OEM example is checked as 2.0. ODM 5.2.4.7 (enough
   records for the interpolation method) is recorded as a requirement the book
   leaves undefined rather than a conformance gap.
-- OEM 1.0 is parse-only, like OPM 1.0: it is read with the 2.0 rules and
+- OEM 1.0 is parse-only, like OPM 1.0: it shares the 2.0 model and
   cannot be written. XML is rejected for 1.0, a KVN-only format, and so is
   content that 502.0-B-1 does not have (``CLASSIFICATION``, ``MESSAGE_ID``,
   ``REF_FRAME_EPOCH``, accelerations, covariance). Some valid 1.0 files are

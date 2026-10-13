@@ -19,6 +19,7 @@
 //! - **Validation**: While this parser checks for correct types, full XSD validation is not performed at runtime.
 
 use crate::error::{CcsdsNdmError, FormatError, Result};
+#[cfg(test)]
 use quick_xml::de::from_str as from_xml_str;
 use quick_xml::events::Event;
 use serde::{de::DeserializeOwned, Serialize};
@@ -31,7 +32,7 @@ pub(crate) const XML_DEPTH_LIMIT: usize = 16;
 
 /// Namespace of NDM/XML elements in the qualified schema set (NDM/XML 4.3.4-4.3.5).
 const NDM_NAMESPACE: &[u8] = b"urn:ccsds:schema:ndmxml";
-/// XML Schema instance namespace that every root must declare (NDM/XML 4.3.3).
+/// XML Schema instance namespace used by schema-location hints.
 const XSI_NAMESPACE: &[u8] = b"http://www.w3.org/2001/XMLSchema-instance";
 
 pub(crate) fn validate_document_root(s: &str, root: &[u8], type_name: &str) -> Result<()> {
@@ -241,7 +242,6 @@ fn validate_root_start(
     }
     // The books show both an unprefixed and an `ndm:`-prefixed root for the qualified set.
     element_form(namespaces, start.name(), invalid)?;
-    let mut xsi_declared = false;
     let mut unknown_attribute = None;
     let mut schema_hints_seen = [false; 2];
     for attribute in start.attributes() {
@@ -255,10 +255,7 @@ fn validate_root_start(
             }
         };
         match kind {
-            AttributeKind::Declaration => {
-                xsi_declared |= attribute.key.as_ref() == b"xmlns:xsi"
-                    && attribute.value.as_ref() == XSI_NAMESPACE;
-            }
+            AttributeKind::Declaration => {}
             AttributeKind::SchemaLocation | AttributeKind::Plain(b"id") => {}
             AttributeKind::Plain(b"version") => {
                 *source_edition = Some(
@@ -277,12 +274,6 @@ fn validate_root_start(
         return Err(invalid(format!(
             "unknown {type_name} root attribute '{}'",
             String::from_utf8_lossy(&attribute)
-        )));
-    }
-    if !xsi_declared {
-        return Err(invalid(format!(
-            "the {type_name} root element must declare \
-             xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
         )));
     }
     Ok(())
@@ -319,6 +310,7 @@ fn validate_attribute_value(
 pub(crate) struct XmlSequenceRule {
     pub rank: u16,
     pub repeatable: bool,
+    pub unordered: bool,
     /// The enclosing `xsd:sequence` carries `maxOccurs="unbounded"`, so this child opens a fresh
     /// iteration of the group instead of regressing within the current one. `userDefinedType` is
     /// the only such content model in the shipped schemas: it lets `COMMENT` follow
@@ -332,6 +324,17 @@ impl XmlSequenceRule {
         Self {
             rank,
             repeatable,
+            unordered: false,
+            restarts_sequence: false,
+        }
+    }
+
+    /// A named child whose position does not affect its meaning.
+    pub(crate) fn unordered(rank: u16, repeatable: bool) -> Self {
+        Self {
+            rank,
+            repeatable,
+            unordered: true,
             restarts_sequence: false,
         }
     }
@@ -341,6 +344,7 @@ impl XmlSequenceRule {
         Self {
             rank,
             repeatable,
+            unordered: false,
             restarts_sequence: true,
         }
     }
@@ -436,6 +440,7 @@ fn validate_document(
     struct Frame {
         name: ElementName,
         last_rank: Option<u16>,
+        unordered_seen: u16,
         has_text: bool,
     }
 
@@ -444,12 +449,18 @@ fn validate_document(
     let invalid_sequence =
         |message: String| invalid(format!("invalid {type_name} XML sequence: {message}"));
     let document = s.strip_prefix('\u{feff}').unwrap_or(s);
-    // NDM/XML 4.2 and ODM 8.2: each instantiation opens with exactly this declaration. The
-    // line break after it is not enforced, so single-line documents parse.
-    if rules.root.is_some() && !document.starts_with(XML_HEADER) {
-        return Err(invalid(format!(
-            "an XML instantiation must start with exactly {XML_HEADER}"
-        )));
+    // Read equivalent XML 1.0 declarations from ordinary UTF-8 producers. Writing still
+    // emits the exact declaration in NDM/XML 4.2 and ODM 8.2.
+    if rules.root.is_some()
+        && !(document.starts_with("<?xml")
+            && document
+                .as_bytes()
+                .get(5)
+                .is_some_and(|b| matches!(b, b' ' | b'\t' | b'\r' | b'\n')))
+    {
+        return Err(invalid(
+            "an XML instantiation must start with an XML 1.0 declaration".into(),
+        ));
     }
     let mut reader = quick_xml::Reader::from_str(document);
     reader.config_mut().check_comments = true;
@@ -465,11 +476,33 @@ fn validate_document(
         // Matched by reference so start tags are not moved out of the event.
         let event = reader.read_event();
         match event {
-            Ok(Event::Decl(_)) => {
+            Ok(Event::Decl(declaration)) => {
                 if event_seen {
                     return Err(invalid(
                         "an XML declaration, when present, must begin the document".into(),
                     ));
+                }
+                if declaration.version()?.as_ref() != b"1.0" {
+                    return Err(invalid("only XML version 1.0 is supported".into()));
+                }
+                let content = std::str::from_utf8(declaration.as_ref())
+                    .map_err(|error| invalid(error.to_string()))?;
+                let start = quick_xml::events::BytesStart::from_content(content, 3);
+                let mut last_rank = None;
+                for attribute in start.attributes() {
+                    let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+                    let rank = match attribute.key.as_ref() {
+                        b"version" if attribute.value.as_ref() == b"1.0" => 0,
+                        b"encoding" if attribute.value.eq_ignore_ascii_case(b"UTF-8") => 1,
+                        b"standalone" if matches!(attribute.value.as_ref(), b"yes" | b"no") => 2,
+                        _ => return Err(invalid("expected an XML 1.0 declaration with UTF-8 encoding and optional standalone='yes' or 'no'".into())),
+                    };
+                    if last_rank.is_some_and(|last| rank <= last) {
+                        return Err(invalid(
+                            "duplicate or out-of-order XML declaration attribute".into(),
+                        ));
+                    }
+                    last_rank = Some(rank);
                 }
                 event_seen = true;
             }
@@ -532,6 +565,7 @@ fn validate_document(
                     stack.push(Frame {
                         name: ElementName::new(child),
                         last_rank: None,
+                        unordered_seen: 0,
                         has_text: false,
                     });
                     depth = actual;
@@ -661,6 +695,21 @@ fn validate_document(
                 String::from_utf8_lossy(parent.name.as_bytes())
             ))
         })?;
+        if rule.unordered {
+            let bit = 1u16
+                .checked_shl(u32::from(rule.rank))
+                .ok_or_else(|| invalid("too many unordered XML children".into()))?;
+            if parent.unordered_seen & bit != 0 && !rule.repeatable {
+                return Err(invalid(format!(
+                    "duplicate child '{}' in '{}'",
+                    String::from_utf8_lossy(child),
+                    String::from_utf8_lossy(parent.name.as_bytes())
+                )));
+            }
+            parent.unordered_seen |= bit;
+            parent.last_rank = Some(rule.rank);
+            return Ok(());
+        }
         // A child of a repeating group that steps backwards is starting the next iteration of
         // that group, not breaking the order, so only a plain sequence rejects a lower rank.
         if parent.last_rank.is_some_and(|last| {
@@ -758,9 +807,34 @@ pub(crate) fn from_str_with_context<T: DeserializeOwned>(s: &str, type_name: &st
         ))));
     }
     let document = without_namespace_attributes(s)?;
-    from_xml_str(&document).map_err(|e| {
+    let mut deserializer = quick_xml::de::Deserializer::from_str(&document);
+    T::deserialize(&mut deserializer).map_err(|e| {
+        let position = deserializer.get_ref().get_ref().buffer_position() as usize;
+        // Namespace attributes may have been removed, including multiline ones. On failure
+        // only, replay the same events to locate the detection point in the original input.
+        let offset = match document {
+            std::borrow::Cow::Borrowed(_) => position,
+            std::borrow::Cow::Owned(ref normalized) => {
+                let mut original = quick_xml::Reader::from_str(s);
+                let mut normalized = quick_xml::Reader::from_str(normalized);
+                while (normalized.buffer_position() as usize) < position {
+                    if matches!(normalized.read_event(), Ok(Event::Eof) | Err(_))
+                        || matches!(original.read_event(), Ok(Event::Eof) | Err(_))
+                    {
+                        break;
+                    }
+                }
+                original.buffer_position() as usize
+            }
+        };
+        // The deserializer can read whitespace after the closing tag before discovering a
+        // missing field. Report the end of the last content rather than the following line.
+        let offset = s[..offset].trim_end_matches([' ', '\t', '\r', '\n']).len();
+        let (line, column) = crate::error::line_column(s, offset);
         crate::error::CcsdsNdmError::Format(Box::new(FormatError::XmlWithContext {
-            context: format!("Failed to parse {} from XML", type_name),
+            context: format!(
+                "Failed to parse {type_name} from XML near line {line}, column {column}"
+            ),
             source: e,
         }))
     })

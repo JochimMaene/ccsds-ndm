@@ -76,7 +76,7 @@ fn kvn_interpolation_degree_obeys_signed_integer_grammar() {
 }
 
 #[test]
-fn kvn_rejects_duplicate_reordered_misplaced_trailing_and_non_ascii_content() {
+fn kvn_rejects_duplicate_trailing_and_non_ascii_content() {
     // Unknown keywords: `diagnostics`. Malformed numbers:
     // `kvn_ephemeris_records_tolerate_padding_and_name_malformed_components`.
     let source = KVN_FIXTURES[0];
@@ -88,7 +88,7 @@ fn kvn_rejects_duplicate_reordered_misplaced_trailing_and_non_ascii_content() {
         .lines()
         .find(|line| line.trim_start().starts_with("OBJECT_ID"))
         .unwrap();
-    const ORDER: &str = "duplicate or out-of-order OEM metadata keyword";
+    const DUPLICATE: &str = "duplicate OEM metadata keyword";
     for (label, invalid, line, message) in [
         (
             "duplicate keyword",
@@ -98,27 +98,7 @@ fn kvn_rejects_duplicate_reordered_misplaced_trailing_and_non_ascii_content() {
                 &format!("{object_name}\n{object_name}"),
             ),
             6,
-            ORDER,
-        ),
-        (
-            "reordered keywords",
-            mutated(
-                source,
-                &format!("{object_name}\n{object_id}"),
-                &format!("{object_id}\n{object_name}"),
-            ),
-            6,
-            ORDER,
-        ),
-        (
-            "misplaced comment",
-            mutated(
-                source,
-                object_name,
-                &format!("{object_name}\nCOMMENT misplaced"),
-            ),
-            6,
-            "COMMENT is not at the beginning of an allowed OEM block",
+            DUPLICATE,
         ),
         (
             "trailing content",
@@ -142,6 +122,27 @@ fn kvn_rejects_duplicate_reordered_misplaced_trailing_and_non_ascii_content() {
             "{label}"
         );
     }
+
+    let reordered = mutated(
+        source,
+        &format!("{object_name}\n{object_id}"),
+        &format!("{object_id}\n{object_name}"),
+    );
+    let parsed = Oem::from_kvn(&reordered).unwrap();
+    assert_eq!(parsed, Oem::from_kvn(source).unwrap());
+    assert_eq!(Oem::from_kvn(&parsed.to_kvn().unwrap()).unwrap(), parsed);
+    let with_comments = mutated(
+        source,
+        object_name,
+        &format!("{object_name}\nCOMMENT metadata"),
+    );
+    let parsed = Oem::from_kvn(&with_comments).unwrap();
+    assert!(parsed
+        .body
+        .segment
+        .iter()
+        .all(|segment| segment.metadata.comment == ["metadata"]));
+    assert_eq!(Oem::from_kvn(&parsed.to_kvn().unwrap()).unwrap(), parsed);
 
     let crlf = mutated(source, "\n", "\r\n");
     assert_eq!(
@@ -175,13 +176,12 @@ fn kvn_comment_separator_is_not_part_of_the_value() {
 }
 
 #[test]
-fn xml_rejects_wrong_envelope_unknown_duplicate_reordered_and_trailing_content() {
+fn xml_rejects_wrong_envelope_unknown_duplicate_and_trailing_content() {
     let source = XML;
     let object_name = "<OBJECT_NAME>MARS GLOBAL SURVEYOR</OBJECT_NAME>";
     let object_id = "<OBJECT_ID>2021-028A</OBJECT_ID>";
     assert!(source.contains(&format!("{object_name}\n{object_id}")));
-    const ORDER: &str =
-        "invalid OEM XML sequence: duplicate or out-of-order child 'OBJECT_NAME' in 'metadata'";
+    const DUPLICATE: &str = "invalid OEM XML sequence: duplicate child 'OBJECT_NAME' in 'metadata'";
     for (label, invalid, message) in [
         (
             "wrong root",
@@ -216,16 +216,7 @@ fn xml_rejects_wrong_envelope_unknown_duplicate_reordered_and_trailing_content()
         (
             "duplicate element",
             mutated(source, object_name, &format!("{object_name}{object_name}")),
-            ORDER,
-        ),
-        (
-            "reordered elements",
-            mutated(
-                source,
-                &format!("{object_name}\n{object_id}"),
-                &format!("{object_id}\n{object_name}"),
-            ),
-            ORDER,
+            DUPLICATE,
         ),
         (
             "trailing element",
@@ -242,12 +233,19 @@ fn xml_rejects_wrong_envelope_unknown_duplicate_reordered_and_trailing_content()
         assert_eq!(error.code(), Some("parse.xml.syntax"), "{label}: {error}");
         crate::common::assert_invalid_format(&error, message);
     }
+    let reordered = mutated(
+        source,
+        &format!("{object_name}\n{object_id}"),
+        &format!("{object_id}\n{object_name}"),
+    );
+    let parsed = Oem::from_xml(&reordered).unwrap();
+    assert_eq!(parsed, Oem::from_xml(source).unwrap());
+    assert_eq!(Oem::from_xml(&parsed.to_xml().unwrap()).unwrap(), parsed);
 }
 
 #[test]
 fn xml_declaration_opens_the_document() {
-    // ODM 8.2 and NDM/XML 4.2: the first line is exactly the version-1.0, UTF-8 declaration.
-    // The line break after it is not enforced, so single-line documents parse.
+    // Ordinary XML producers vary quoting, encoding case and the optional standalone flag.
     const DECLARATION: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
     let without = XML
         .strip_prefix(DECLARATION)
@@ -262,17 +260,46 @@ fn xml_declaration_opens_the_document() {
     let one_line = format!("{}{without}", DECLARATION.trim_end());
     assert_eq!(Oem::from_xml(&one_line).unwrap(), baseline);
 
+    for declaration in [
+        "<?xml version=\"1.0\"?>",
+        "<?xml version='1.0' encoding='utf-8'?>",
+        "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>",
+        "<?xml version='1.0' standalone='no'?>",
+        "<?xml\tversion = '1.0'\nencoding = 'UTF-8' ?>",
+    ] {
+        let input = format!("{declaration}\n{without}");
+        assert_eq!(Oem::from_xml(&input).unwrap(), baseline, "{declaration}");
+        assert_eq!(
+            ccsds_ndm::from_str(&input).unwrap(),
+            ccsds_ndm::Message::Oem(baseline.clone())
+        );
+    }
+
     for input in [
         without.to_owned(),
-        format!("<?xml version=\"1.0\"?>\n{without}"),
-        format!("<?xml version='1.0' encoding='UTF-8'?>\n{without}"),
         format!("<!-- lead-in -->\n{XML}"),
         format!(" {XML}"),
     ] {
         crate::common::assert_invalid_format(
             &Oem::from_xml(&input).unwrap_err(),
-            "an XML instantiation must start with exactly \
-             <?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "an XML instantiation must start with an XML 1.0 declaration",
+        );
+    }
+    for declaration in [
+        "<?xml version='1.1'?>",
+        "<?xml encoding='UTF-8'?>",
+        "<?xml version='1.0' encoding='UTF-16'?>",
+        "<?xml version='1.0' encoding='ISO-8859-1'?>",
+        "<?xml version='1.0' standalone='maybe'?>",
+        "<?xml version='1.0' standalone='yes' encoding='UTF-8'?>",
+        "<?xml version='1.0' version='1.0'?>",
+        "<?xml version='1.0' encoding='UTF-8' encoding='UTF-8'?>",
+        "<?xml version='1.0' other='value'?>",
+        "<?xml version='1.0'?><?xml version='1.0'?>",
+    ] {
+        assert!(
+            Oem::from_xml(&format!("{declaration}\n{without}")).is_err(),
+            "{declaration}"
         );
     }
 }
@@ -574,18 +601,141 @@ fn xml_accepts_the_qualified_schema_form() {
 }
 
 #[test]
-fn xml_root_must_declare_the_schema_instance_namespace() {
-    // NDM/XML 4.3.3 and ODM 8.3.3.
+fn xml_schema_instance_namespace_is_needed_only_when_used() {
     let root_end = XML.find("id=\"CCSDS_OEM_VERS\"").unwrap();
     let input = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<oem {}",
         &XML[root_end..]
     );
-    crate::common::assert_invalid_format(
-        &Oem::from_xml(&input).unwrap_err(),
-        "the OEM root element must declare \
-         xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"",
+    assert_eq!(Oem::from_xml(&input).unwrap(), Oem::from_xml(XML).unwrap());
+    for attribute in [
+        "xsi:schemaLocation='urn:ccsds:schema:ndmxml local.xsd'",
+        "xsi:noNamespaceSchemaLocation='local.xsd'",
+    ] {
+        let undeclared = mutated_once(&input, "<oem ", &format!("<oem {attribute} "));
+        assert!(Oem::from_xml(&undeclared).is_err());
+        let wrong = mutated_once(&undeclared, "<oem ", "<oem xmlns:xsi='urn:wrong' ");
+        assert!(Oem::from_xml(&wrong).is_err());
+    }
+}
+
+#[test]
+fn oem_1_0_preserves_comments_in_its_permitted_positions() {
+    let original = mutated_once(
+        KVN_FIXTURES[0],
+        "CCSDS_OEM_VERS = 3.0",
+        "CCSDS_OEM_VERS = 1.0",
     );
+    let mut expected = Oem::from_kvn(&original).unwrap();
+    expected.header.comment = vec![
+        "before creation".into(),
+        "before originator".into(),
+        "before metadata".into(),
+    ];
+    for segment in &mut expected.body.segment {
+        segment.metadata.comment = vec!["inside metadata".into(), "after metadata fields".into()];
+    }
+    expected.body.segment[1]
+        .metadata
+        .comment
+        .insert(0, "between segments".into());
+    expected.body.segment[1]
+        .data
+        .comment
+        .push("file tail".into());
+    let input = original
+        .replacen("CREATION_DATE", "COMMENT before creation\nCREATION_DATE", 1)
+        .replacen("ORIGINATOR", "COMMENT before originator\nORIGINATOR", 1)
+        .replacen("META_START", "COMMENT before metadata\nMETA_START", 1)
+        .replace("TIME_SYSTEM", "COMMENT inside metadata\nTIME_SYSTEM")
+        .replace("META_STOP", "COMMENT after metadata fields\nMETA_STOP");
+    let boundary = input.rfind("META_START").unwrap();
+    let input = format!(
+        "{}COMMENT between segments\n{}COMMENT file tail\n",
+        &input[..boundary],
+        &input[boundary..]
+    );
+    for ending in ["\n", "\r\n", "\r"] {
+        assert_eq!(
+            Oem::from_kvn(&input.replace('\n', ending)).unwrap(),
+            expected
+        );
+    }
+    for version in ["2.0", "3.0"] {
+        assert!(Oem::from_kvn(&input.replacen(
+            "CCSDS_OEM_VERS = 1.0",
+            &format!("CCSDS_OEM_VERS = {version}"),
+            1
+        ))
+        .is_err());
+    }
+    let record = original
+        .lines()
+        .find(|line| line.starts_with("2019-"))
+        .unwrap();
+    for invalid in [
+        format!("COMMENT before version\n{original}"),
+        mutated_once(
+            &original,
+            record,
+            &format!("{record}\nCOMMENT between records"),
+        ),
+    ] {
+        assert_eq!(
+            Oem::from_kvn(&invalid).unwrap_err().code(),
+            Some("parse.kvn.syntax")
+        );
+    }
+}
+
+#[test]
+fn kvn_ignores_excess_trailing_padding_but_keeps_payload_limits() {
+    let original = KVN_FIXTURES[2];
+    let padded: String = original
+        .lines()
+        .map(|line| {
+            if line.starts_with("COMMENT ") {
+                format!("{line}\n")
+            } else {
+                format!("{line}{}\n", " ".repeat(300))
+            }
+        })
+        .collect();
+    let message = Oem::from_kvn(&padded).unwrap();
+    assert_eq!(message, Oem::from_kvn(original).unwrap());
+    assert!(message
+        .to_kvn()
+        .unwrap()
+        .lines()
+        .all(|line| line.len() <= 254));
+    for replacement in [
+        format!("ORIGINATOR = {}", "x".repeat(254)),
+        format!("ORIGINATOR = JPL{}\t", " ".repeat(300)),
+    ] {
+        let input = mutated_once(original, "ORIGINATOR = NASA/JPL", &replacement);
+        assert!(Oem::from_kvn(&input).is_err());
+    }
+    // Comment lines padded beyond column 254 are accepted and normalized like shorter lines.
+    let padded_comment = Oem::from_kvn(&format!(
+        "CCSDS_OEM_VERS = 3.0\nCOMMENT {}\n{}",
+        " ".repeat(254),
+        original.split_once('\n').unwrap().1
+    ))
+    .unwrap();
+    assert_eq!(padded_comment.header.comment, vec![String::new()]);
+}
+
+#[test]
+fn complete_covariance_without_section_markers_is_read() {
+    let source = KVN_FIXTURES[2];
+    let input = source
+        .replace("COVARIANCE_START\n", "")
+        .replace("COVARIANCE_STOP\n", "");
+    let parsed = Oem::from_kvn(&input).unwrap();
+    assert_eq!(parsed, Oem::from_kvn(source).unwrap());
+    assert_eq!(Oem::from_kvn(&parsed.to_kvn().unwrap()).unwrap(), parsed);
+    let incomplete = input.replace("6.2244443e-10\n", "");
+    assert!(Oem::from_kvn(&incomplete).is_err());
 }
 
 #[test]
@@ -708,10 +858,10 @@ fn kvn_record_structure_rejections_name_their_reason() {
         (
             mutated_once(
                 source,
-                "CREATION_DATE = 1996-11-04T17:22:31\nORIGINATOR = NASA/JPL",
+                "ORIGINATOR = NASA/JPL",
                 "ORIGINATOR = NASA/JPL\nCREATION_DATE = 1996-11-04T17:22:31",
             ),
-            "duplicate or out-of-order OEM header keyword",
+            "duplicate OEM header keyword",
         ),
         (
             mutated_once(
@@ -736,10 +886,6 @@ fn kvn_record_structure_rejections_name_their_reason() {
         (
             source[..source.find("META_START").unwrap()].to_owned(),
             "incomplete OEM document",
-        ),
-        (
-            mutated_once(source, header_end, &format!("{header_end}COMMENT late\n")),
-            "COMMENT is not at the beginning of an allowed OEM block",
         ),
         (
             mutated_once(
@@ -806,6 +952,22 @@ fn kvn_covariance_section_may_hold_only_comments() {
         data.comment.last().map(String::as_str),
         Some("no covariance available")
     );
+}
+
+#[test]
+fn kvn_reads_comments_before_covariance_rows_without_losing_their_matrix() {
+    let source = KVN_FIXTURES[2];
+    let input = mutated_once(
+        source,
+        "EPOCH = 2019-12-28T21:29:07.267\n",
+        "EPOCH = 2019-12-28T21:29:07.267\nCOMMENT matrix note\n",
+    );
+    let parsed = Oem::from_kvn(&input).unwrap();
+    assert_eq!(
+        parsed.body.segment[0].data.covariance_matrix[0].comment,
+        ["matrix note"]
+    );
+    assert_eq!(Oem::from_xml(&parsed.to_xml().unwrap()).unwrap(), parsed);
 }
 
 #[test]
@@ -902,12 +1064,15 @@ fn classification_is_read_between_the_version_and_creation_date() {
         "MESSAGE_ID",
         "CLASSIFICATION = SBU\nMESSAGE_ID",
     );
-    let error = Oem::from_kvn(&late).unwrap_err();
-    let located = crate::common::kvn_parse_error(&error).unwrap();
-    assert_eq!(
-        (located.line, located.message.as_str()),
-        (4, "duplicate or out-of-order OEM header keyword")
+    let late = mutated_once(
+        &late,
+        "ORIGINATOR = NASA/JPL",
+        "ORIGINATOR = NASA/JPL\nCOMMENT after originator",
     );
+    let late = Oem::from_kvn(&late).unwrap();
+    assert_eq!(late.header.classification.as_deref(), Some("SBU"));
+    assert_eq!(late.header.comment, ["after originator"]);
+    assert_eq!(Oem::from_kvn(&late.to_kvn().unwrap()).unwrap(), late);
 }
 
 #[test]
@@ -918,6 +1083,24 @@ fn oem_1_0_is_read_as_kvn_only_without_later_content() {
     let g11 = KVN_FIXTURES[0];
     let kvn = mutated_once(g11, "CCSDS_OEM_VERS = 3.0", "CCSDS_OEM_VERS = 1.0");
     assert_eq!(Oem::from_kvn(&kvn).unwrap().version, "1.0");
+    let mixed = mutated(
+        &mutated(&kvn, "TIME_SYSTEM = UTC", "TIME_SYSTEM = Utc"),
+        "REF_FRAME = EME2000",
+        "REF_FRAME = Eme2000",
+    );
+    let parsed = Oem::from_kvn(&mixed).unwrap();
+    assert_eq!(parsed.body.segment[0].metadata.time_system, "Utc");
+    assert_eq!(parsed.body.segment[0].metadata.ref_frame, "Eme2000");
+    assert_eq!(
+        Oem::from_kvn(&mutated_once(
+            &mixed,
+            "CCSDS_OEM_VERS = 1.0",
+            "CCSDS_OEM_VERS = 2.0"
+        ))
+        .unwrap_err()
+        .code(),
+        Some("validation.invalid_value")
+    );
 
     let first_state = g11.lines().find(|line| line.starts_with("2019-")).unwrap();
     for (label, input, path) in [
@@ -950,33 +1133,17 @@ fn oem_1_0_is_read_as_kvn_only_without_later_content() {
     }
 
     // Valid 1.0 content that the 2.0 rules reject.
-    for (label, input, path) in [
-        (
-            "Julian Date epoch",
-            mutated_once(
-                &kvn,
-                "START_TIME = 2019-12-18T12:00:00.331",
-                "START_TIME = 2451534.29812",
-            ),
-            Some("body.segment[0].metadata.start_time"),
-        ),
-        (
-            "mixed-case time system",
-            mutated_once(&kvn, "TIME_SYSTEM = UTC", "TIME_SYSTEM = Utc"),
-            Some("body.segment[0].metadata.time_system"),
-        ),
-        (
-            "metadata comment",
-            mutated_once(&kvn, "TIME_SYSTEM = UTC", "COMMENT x\nTIME_SYSTEM = UTC"),
-            None,
-        ),
-    ] {
-        let error = Oem::from_kvn(&input).unwrap_err();
-        assert_eq!(error.field_path().as_deref(), path, "{label}: {error}");
-        if path.is_none() {
-            assert_eq!(error.code(), Some("parse.kvn.syntax"), "{label}: {error}");
-        }
-    }
+    let input = mutated_once(
+        &kvn,
+        "START_TIME = 2019-12-18T12:00:00.331",
+        "START_TIME = 2451534.29812",
+    );
+    let error = Oem::from_kvn(&input).unwrap_err();
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[0].metadata.start_time"),
+        "{error}"
+    );
 
     let xml = mutated_once(XML, "version=\"3.0\"", "version=\"1.0\"");
     assert_eq!(

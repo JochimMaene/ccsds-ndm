@@ -305,6 +305,7 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
 
     // An empty optional value is absent (ODM 7.5.1), like the other optional OEM keywords.
     blank_lines.parse_next(input)?;
+    let mut comment = collect_comments.parse_next(input)?;
     let mut cov_ref_frame = None;
     let next = input.trim_start_matches([' ', '\t']);
     if next
@@ -314,6 +315,8 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
         key_token.parse_next(input)?;
         cov_ref_frame = kv_optional(kv_string).parse_next(input)?;
     }
+    blank_lines.parse_next(input)?;
+    comment.extend(collect_comments.parse_next(input)?);
 
     // Parse 6 lines of raw covariance data (1, 2, 3, 4, 5, 6 elements per line)
     let mut floats = [0.0; 21];
@@ -330,7 +333,7 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
     }
 
     Ok(OemCovarianceMatrix {
-        comment: Vec::new(),
+        comment,
         epoch,
         cov_ref_frame,
         cx_x: PositionCovariance::new(floats[0], Some(PositionCovarianceUnits::Km2)),
@@ -385,12 +388,14 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
 }
 
 /// Parses all covariance matrices within a COVARIANCE block.
-fn parse_covariance_block(input: &mut &str) -> KvnResult<Vec<OemCovarianceMatrix>> {
+fn parse_covariance_block(input: &mut &str, implicit: bool) -> KvnResult<Vec<OemCovarianceMatrix>> {
     let mut matrices: Vec<OemCovarianceMatrix> = Vec::new();
 
     loop {
         blank_lines.parse_next(input)?;
-        if at_block_end("COVARIANCE", input) {
+        if at_block_end("COVARIANCE", input)
+            || (implicit && (input.is_empty() || at_block_start("META", input)))
+        {
             break;
         }
         matrices.push(parse_covariance_matrix.parse_next(input)?);
@@ -407,7 +412,7 @@ fn parse_covariance_block(input: &mut &str) -> KvnResult<Vec<OemCovarianceMatrix
 ///
 /// `validate_syntax` has already fixed the record order: leading comments, ephemeris lines, then
 /// at most one covariance section whose comments follow COVARIANCE_START (ODM 7.8.9).
-pub fn oem_data(input: &mut &str) -> KvnResult<OemData> {
+fn oem_data(input: &mut &str, legacy_comments: bool) -> KvnResult<OemData> {
     let mut data = OemData {
         comment: collect_comments.parse_next(input)?,
         state_vector: Vec::new(),
@@ -419,17 +424,33 @@ pub fn oem_data(input: &mut &str) -> KvnResult<OemData> {
         if input.is_empty() || at_block_start("META", input) {
             break;
         }
-        if !at_block_start("COVARIANCE", input) {
+        // 1.0 comments after the last record belong to the next segment, or the file tail.
+        if legacy_comments && input.trim_start().starts_with("COMMENT") {
+            break;
+        }
+        let implicit_covariance = input.trim_start().starts_with("EPOCH");
+        if !at_block_start("COVARIANCE", input) && !implicit_covariance {
             data.state_vector
                 .push(parse_state_vector_line.parse_next(input)?);
             continue;
         }
-        expect_block_start("COVARIANCE").parse_next(input)?;
-        let comments = collect_comments.parse_next(input)?;
-        data.covariance_matrix = parse_covariance_block.parse_next(input)?;
-        expect_block_end("COVARIANCE").parse_next(input)?;
+        if !implicit_covariance {
+            expect_block_start("COVARIANCE").parse_next(input)?;
+        }
+        let mut comments = if implicit_covariance {
+            Vec::new()
+        } else {
+            collect_comments.parse_next(input)?
+        };
+        data.covariance_matrix = parse_covariance_block(input, implicit_covariance)?;
+        if !implicit_covariance {
+            expect_block_end("COVARIANCE").parse_next(input)?;
+        }
         match data.covariance_matrix.first_mut() {
-            Some(first) => first.comment = comments,
+            Some(first) => {
+                comments.append(&mut first.comment);
+                first.comment = comments;
+            }
             // With no matrix to carry them, the comments join the data comments; neither the
             // model nor the XML schema has another place for them.
             None => data.comment.extend(comments),
@@ -444,7 +465,7 @@ pub fn oem_data(input: &mut &str) -> KvnResult<OemData> {
 //----------------------------------------------------------------------
 
 /// Parses a single OEM segment (META_START ... META_STOP + data).
-pub fn oem_segment(input: &mut &str) -> KvnResult<OemSegment> {
+fn oem_segment(input: &mut &str, legacy_comments: bool) -> KvnResult<OemSegment> {
     // Expect META_START
     expect_block_start("META").parse_next(input)?;
 
@@ -455,7 +476,7 @@ pub fn oem_segment(input: &mut &str) -> KvnResult<OemSegment> {
     expect_block_end("META").parse_next(input)?;
 
     // Parse data
-    let data = oem_data.parse_next(input)?;
+    let data = oem_data(input, legacy_comments)?;
 
     Ok(OemSegment { metadata, data })
 }
@@ -466,16 +487,29 @@ pub fn oem_segment(input: &mut &str) -> KvnResult<OemSegment> {
 
 /// Parses the OEM body (one or more segments).
 ///
-/// `validate_syntax` has already rejected comments outside their blocks, so only blank lines
-/// separate segments here.
-pub fn oem_body(input: &mut &str) -> KvnResult<OemBody> {
-    let mut segments = Vec::new();
+/// In 1.0, comments between segments lead the next metadata block; trailing comments stay
+/// with the final segment's data. Syntax validation rejects comments between state records.
+fn oem_body(input: &mut &str, legacy_comments: bool) -> KvnResult<OemBody> {
+    let mut segments: Vec<OemSegment> = Vec::new();
     loop {
         blank_lines.parse_next(input)?;
+        let mut comments = if legacy_comments {
+            collect_comments.parse_next(input)?
+        } else {
+            Vec::new()
+        };
         if !at_block_start("META", input) {
+            if let Some(last) = segments.last_mut() {
+                last.data.comment.extend(comments);
+            }
             break;
         }
-        segments.push(oem_segment.parse_next(input)?);
+        let mut segment = oem_segment(input, legacy_comments)?;
+        if !comments.is_empty() {
+            comments.append(&mut segment.metadata.comment);
+            segment.metadata.comment = comments;
+        }
+        segments.push(segment);
     }
     if segments.is_empty() {
         return Err(cut_err(input, "Unexpected key or invalid format"));
@@ -493,10 +527,13 @@ pub fn parse_oem(input: &mut &str) -> KvnResult<Oem> {
     let version = oem_version.parse_next(input)?;
 
     // 2. Header
-    let header = odm_header.parse_next(input)?;
+    let legacy_comments = version == "1.0";
+    // Real producers place header comments between assignments. Keep them in the header; the
+    // serializer writes them immediately after CCSDS_OEM_VERS.
+    let header = odm_header_with_comments(input, true)?;
 
     // 3. Body (segments)
-    let body = oem_body.parse_next(input)?;
+    let body = oem_body(input, legacy_comments)?;
 
     Ok(Oem {
         header,
@@ -832,11 +869,14 @@ impl Oem {
         });
         (|| {
             let normalized = crate::kvn::normalize_line_endings(kvn);
-            validate_syntax(&normalized)?;
+            validate_syntax(&normalized, source_edition == Some("1.0"))?;
             let oem = Self::from_kvn_str(&normalized)?;
             crate::traits::Validate::validate(&oem)?;
-            if let Some(error) = oem.kvn_case_error() {
-                return Err(error.into());
+            // OEM 1.0 permits mixed-case text values (502.0-B-1, 4.3.3g).
+            if oem.version != "1.0" {
+                if let Some(error) = oem.kvn_case_error() {
+                    return Err(error.into());
+                }
             }
             Ok(oem)
         })()
@@ -903,7 +943,7 @@ impl ToKvn for OemMetadata {
 ///
 /// Expects `kvn` to have gone through [`crate::kvn::normalize_line_endings`], so every remaining
 /// carriage return is part of a CRLF pair.
-pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
+fn validate_syntax(kvn: &str, legacy_comments: bool) -> Result<()> {
     use crate::error::{CcsdsNdmError, FormatError};
 
     fn invalid(line: usize, offset: usize, message: impl AsRef<str>) -> CcsdsNdmError {
@@ -966,20 +1006,24 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
     }
 
     let mut phase = Phase::Header;
-    let mut header_rank_seen = None;
-    let mut metadata_rank_seen = 0u8;
+    let mut header_fields_seen = 0u8;
+    let mut metadata_fields_seen = 0u16;
     let mut segments = 0usize;
     let mut state_records = 0usize;
     let mut covariance_row = 0usize;
     let mut covariance_epoch_seen = false;
     let mut covariance_frame_seen = false;
     let mut covariance_closed = false;
+    let mut implicit_covariance = false;
+    let mut ephemeris_comments = false;
     let mut offset = 0usize;
 
     for (index, raw_line) in kvn.split('\n').enumerate() {
         let line_number = index + 1;
         let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
-        if line.len() > 254 {
+        // Some producers pad comment lines past column 254. Match the reader's existing
+        // trailing-space normalization while retaining the limit for substantive content.
+        if line.len() > 254 && line.trim_end_matches(' ').len() > 254 {
             return Err(invalid_at(
                 line_number,
                 offset,
@@ -1001,11 +1045,16 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
             continue;
         }
         if line == "COMMENT" || line.starts_with("COMMENT ") {
-            let allowed = match phase {
-                Phase::Header => header_rank_seen == Some(0),
-                Phase::Metadata => metadata_rank_seen == 0,
-                Phase::Ephemeris => state_records == 0,
-                Phase::Covariance => !covariance_epoch_seen && covariance_row == 0,
+            let allowed = if legacy_comments {
+                ephemeris_comments |= phase == Phase::Ephemeris && state_records > 0;
+                header_fields_seen & 1 != 0
+            } else {
+                match phase {
+                    Phase::Header => header_fields_seen & 1 != 0,
+                    Phase::Metadata => true,
+                    Phase::Ephemeris => state_records == 0,
+                    Phase::Covariance => covariance_row == 0,
+                }
             };
             if !allowed {
                 return Err(invalid(
@@ -1022,17 +1071,20 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
         match line {
             "META_START" => {
                 let allowed = match phase {
-                    Phase::Header => header_rank_seen.is_some(),
+                    Phase::Header => header_fields_seen != 0,
                     Phase::Ephemeris => state_records > 0,
+                    Phase::Covariance => implicit_covariance && covariance_row == 6,
                     _ => false,
                 };
                 if !allowed {
                     return Err(invalid(line_number, offset, "unexpected META_START"));
                 }
                 phase = Phase::Metadata;
-                metadata_rank_seen = 0;
+                metadata_fields_seen = 0;
                 state_records = 0;
+                ephemeris_comments = false;
                 covariance_closed = false;
+                implicit_covariance = false;
                 segments += 1;
             }
             "META_STOP" => {
@@ -1050,13 +1102,17 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
                     ));
                 }
                 phase = Phase::Covariance;
+                implicit_covariance = false;
                 covariance_row = 0;
                 covariance_epoch_seen = false;
                 covariance_frame_seen = false;
             }
             "COVARIANCE_STOP" => {
                 // Annex A2.5.3 marks covariance lines optional inside the covariance block.
-                if phase != Phase::Covariance || (covariance_epoch_seen && covariance_row != 6) {
+                if phase != Phase::Covariance
+                    || implicit_covariance
+                    || (covariance_epoch_seen && covariance_row != 6)
+                {
                     return Err(invalid(
                         line_number,
                         offset,
@@ -1065,6 +1121,7 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
                 }
                 phase = Phase::Ephemeris;
                 covariance_closed = true;
+                implicit_covariance = false;
             }
             _ if line.contains('=') => {
                 let (key, _) = line
@@ -1076,34 +1133,38 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
                         let rank = header_rank(key).ok_or_else(|| {
                             invalid(line_number, offset, "unknown OEM header keyword")
                         })?;
-                        if header_rank_seen.is_some_and(|previous| rank <= previous) {
+                        let field = 1 << rank;
+                        if header_fields_seen & field != 0 {
                             return Err(invalid(
                                 line_number,
                                 offset,
-                                "duplicate or out-of-order OEM header keyword",
+                                "duplicate OEM header keyword",
                             ));
                         }
-                        if header_rank_seen.is_none() && rank != 0 {
+                        if (header_fields_seen == 0 && rank != 0)
+                            || (rank == 0 && header_fields_seen != 0)
+                        {
                             return Err(invalid(
                                 line_number,
                                 offset,
                                 "CCSDS_OEM_VERS must be the first record",
                             ));
                         }
-                        header_rank_seen = Some(rank);
+                        header_fields_seen |= field;
                     }
                     Phase::Metadata => {
                         let rank = metadata_rank(key).ok_or_else(|| {
                             invalid(line_number, offset, "unknown OEM metadata keyword")
                         })?;
-                        if rank <= metadata_rank_seen {
+                        let field = 1 << rank;
+                        if metadata_fields_seen & field != 0 {
                             return Err(invalid(
                                 line_number,
                                 offset,
-                                "duplicate or out-of-order OEM metadata keyword",
+                                "duplicate OEM metadata keyword",
                             ));
                         }
-                        metadata_rank_seen = rank;
+                        metadata_fields_seen |= field;
                     }
                     Phase::Covariance => match key {
                         // An EPOCH opens the first matrix or follows a complete one.
@@ -1130,17 +1191,41 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
                             ));
                         }
                     },
+                    Phase::Ephemeris
+                        if key == "EPOCH" && state_records > 0 && !covariance_closed =>
+                    {
+                        phase = Phase::Covariance;
+                        implicit_covariance = true;
+                        covariance_row = 0;
+                        covariance_epoch_seen = true;
+                        covariance_frame_seen = false;
+                    }
                     Phase::Ephemeris => {
                         return Err(invalid(
                             line_number,
                             offset,
-                            "assignments are not allowed in OEM ephemeris records",
+                            if matches!(key, "EPOCH" | "COV_REF_FRAME")
+                                || key.starts_with("CX_")
+                                || key.starts_with("CY_")
+                                || key.starts_with("CZ_")
+                            {
+                                "covariance data requires COVARIANCE_START followed by EPOCH and six numeric rows"
+                            } else {
+                                "assignments are not allowed in OEM ephemeris records"
+                            },
                         ));
                     }
                 }
             }
             _ => match phase {
                 Phase::Ephemeris if !covariance_closed => {
+                    if ephemeris_comments {
+                        return Err(invalid(
+                            line_number,
+                            offset,
+                            "COMMENT cannot occur between OEM 1.0 ephemeris records",
+                        ));
+                    }
                     state_records += 1;
                 }
                 Phase::Covariance if covariance_epoch_seen && covariance_row < 6 => {
@@ -1160,7 +1245,11 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
         offset += raw_line.len() + 1;
     }
 
-    if segments == 0 || phase != Phase::Ephemeris || state_records == 0 {
+    if segments == 0
+        || state_records == 0
+        || !(phase == Phase::Ephemeris
+            || (phase == Phase::Covariance && implicit_covariance && covariance_row == 6))
+    {
         return Err(invalid(
             kvn.lines().count().max(1),
             kvn.len(),
@@ -1239,7 +1328,7 @@ COV_REF_FRAME = RTN
              COVARIANCE_START\nCOMMENT covariance comment\n{COVARIANCE}COVARIANCE_STOP\n"
         );
         let mut input = input.as_str();
-        let data = oem_data.parse_next(&mut input).unwrap();
+        let data = oem_data(&mut input, false).unwrap();
 
         assert_eq!(data.comment, vec!["data comment"]);
         assert_eq!(data.state_vector.len(), 1);

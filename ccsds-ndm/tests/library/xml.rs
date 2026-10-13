@@ -9,6 +9,32 @@ use crate::common::{mutated, mutated_once};
 use ccsds_ndm::{from_str, Ndm};
 
 #[test]
+fn xml_reading_accepts_equivalent_declarations_and_unused_namespace_omission() {
+    for fixture in [
+        include_str!("../../data/xml/oem_g14.xml"),
+        include_str!("../../data/xml/opm_g5.xml"),
+        include_str!("../../data/xml/aem_g11.xml"),
+    ] {
+        let expected = from_str(fixture).unwrap();
+        let generated = expected.to_xml().unwrap();
+        let input = generated
+            .replacen(
+                XML_DECL,
+                "<?xml version='1.0' encoding='utf-8' standalone='yes'?>",
+                1,
+            )
+            .replace(
+                " xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"",
+                "",
+            );
+        assert_eq!(from_str(&input).unwrap(), expected);
+        let output = from_str(&input).unwrap().to_xml().unwrap();
+        assert!(output.starts_with(XML_DECL));
+        assert!(output.contains("xmlns:xsi="));
+    }
+}
+
+#[test]
 fn standalone_xml_roots_reject_unknown_attributes_and_metadata() {
     let acm = from_str(include_str!("../../data/kvn/acm_g6.kvn"))
         .unwrap()

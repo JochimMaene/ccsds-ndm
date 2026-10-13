@@ -15,6 +15,7 @@ normative mapping required to promote a capability cell to `verified`.
 | Rust/Python consistency | `library::parsing` and `library::output` and `test_parse_and_generation_options.py` exercise generic dispatch without per-message adapter semantics. |
 | Leading byte-order mark | Every family's `from_kvn` and `from_xml`, and auto-detection, skip one leading UTF-8 byte-order mark; none is written (`library::detection`). |
 | Strict XML envelope | Standalone roots, attributes, trailing documents, unknown structural fields, and the normative combined `ndm` envelope are checked without accepting arbitrary wrapper flattening. |
+| XML producer compatibility | The shared envelope reader accepts equivalent XML 1.0 UTF-8 declarations (quote choice, encoding case or omission, optional `standalone`) and omission of unused `xmlns:xsi`. Used prefixes must resolve correctly. Writers emit the book's declaration and namespace attributes (`library::xml`, `ndm::parsing`). |
 | Reproducible performance workload | `kvn_message_matrix` covers KVN parse/generate for all ten standalone families; `xml_message_matrix` covers XML parse/generate for those ten plus combined NDM. The CodSpeed workflow executes both benchmark targets. Wall-clock results remain informational. |
 
 `conformance::generation` runs the shipped OMM, OCM, CDM, TDM, RDM, APM, and ACM fixtures

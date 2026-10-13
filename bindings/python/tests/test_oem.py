@@ -37,6 +37,22 @@ HISTORIES = {
 class TestOem:
     """Tests for OEM bindings."""
 
+    def test_producer_formatting_is_normalized_when_written(self):
+        message = self._create_valid_oem()
+        xml = message.to_str("xml")
+        producer_xml = xml.replace(
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            "<?xml version='1.0' encoding='utf-8' standalone='yes'?>",
+        ).replace(' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"', "")
+        assert Oem.from_str(producer_xml, "xml").to_str("xml") == xml
+
+        kvn = message.to_str("kvn")
+        padded = "\n".join(
+            line if line.startswith("COMMENT") else line + " " * 300
+            for line in kvn.splitlines()
+        )
+        assert Oem.from_str(padded, "kvn").to_str("kvn") == kvn
+
     def test_ref_frame_epoch_is_validated_as_a_time_tag(self):
         # Like the other OEM epochs, the spelling parses and validation applies 7.5.10.
         metadata = OemMetadata(
