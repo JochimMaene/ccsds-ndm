@@ -184,3 +184,37 @@ def test_native_field_accessors_are_recognised_with_their_docs(tmp_path):
     child = example.getters["child"]
     assert "CCSDS Reference: 502.0-B-3, Section 6." in child.docstring
     assert "child" in example.setters, "#[pyo3(get, set)] declares a setter"
+
+
+MULTILINE_ATTRIBUTES = """\
+pub struct Message {
+    /// A field behind a multi-line attribute.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 7.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[builder(into)]
+    pub wrapped: Option<String>,
+}
+"""
+
+
+def test_multi_line_attributes_do_not_hide_field_docs(tmp_path):
+    # Continuation lines of a multi-line attribute neither start with `#[` nor `///`. Stopping
+    # there left the field undocumented, so the audit silently skipped its reference check.
+    path = tmp_path / "sample.rs"
+    path.write_text(MULTILINE_ATTRIBUTES)
+    field = parse_rust_file(path)["Message"].fields["wrapped"]
+    assert ccsds_reference(field.docstring) == "502.0-B-3, Section 7"
+
+
+def test_getter_line_ranges_cover_their_own_doc_comment(tmp_path):
+    path = tmp_path / "binding.rs"
+    path.write_text(BINDING)
+    lines = BINDING.splitlines()
+    for getter in parse_python_binding_file(path)["Example"].getters.values():
+        doc = lines[getter.line_start : getter.line_end + 1]
+        assert all(line.strip().startswith("///") for line in doc), doc
+        assert "\n".join(line.strip()[3:].strip() for line in doc) == getter.docstring

@@ -114,7 +114,7 @@ impl Acm {
     /// Validate the message against CCSDS rules.
     ///
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
-        crate::api::validate_message(&self.to_core(py)?)
+        crate::api::validate_message(py, &self.to_core(py)?)
     }
 
     #[staticmethod]
@@ -125,7 +125,7 @@ impl Acm {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(data, format)?;
+        let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
 
@@ -139,7 +139,7 @@ impl Acm {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed_file(&path, format)?;
+        let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
 
@@ -152,7 +152,12 @@ impl Acm {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<()> {
-        crate::api::generate_file(&ccsds_ndm::Message::Acm(self.to_core(py)?), &path, format)
+        crate::api::generate_file(
+            py,
+            &ccsds_ndm::Message::Acm(self.to_core(py)?),
+            &path,
+            format,
+        )
     }
 
     /// Serialize to validated KVN or XML.
@@ -162,7 +167,7 @@ impl Acm {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<String> {
-        crate::api::generate_string(&self.to_core(py)?, format)
+        crate::api::generate_string(py, &self.to_core(py)?, format)
     }
 }
 
@@ -215,7 +220,7 @@ impl AcmSegment {
     fn validate(&self, py: Python<'_>, header: AdmHeader) -> PyResult<()> {
         self.to_core(py)?
             .validate(&header.inner)
-            .map_err(|e| PyValueError::new_err(e.to_string()))
+            .map_err(crate::errors::ccsds_error_to_pyerr)
     }
 }
 
@@ -306,6 +311,8 @@ impl AcmMetadata {
     ///
     /// Examples: 2000-052A, 1996-068A, 2000-053A, 1996-008A, UNKNOWN
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
+    ///
     /// :type: str | None
     #[getter]
     fn get_international_designator(&self) -> Option<String> {
@@ -337,6 +344,8 @@ impl AcmMetadata {
 
     /// Satellite catalog source.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
+    ///
     /// :type: str | None
     #[getter]
     fn get_catalog_name(&self) -> Option<String> {
@@ -349,6 +358,8 @@ impl AcmMetadata {
     }
 
     /// Unique object designator in the source catalog.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
     ///
     /// :type: str | None
     #[getter]
@@ -363,6 +374,8 @@ impl AcmMetadata {
 
     /// Originator point-of-contact.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
+    ///
     /// :type: str | None
     #[getter]
     fn get_originator_poc(&self) -> Option<String> {
@@ -375,6 +388,8 @@ impl AcmMetadata {
     }
 
     /// Originator point-of-contact position.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
     ///
     /// :type: str | None
     #[getter]
@@ -389,6 +404,8 @@ impl AcmMetadata {
 
     /// Originator point-of-contact phone.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
+    ///
     /// :type: str | None
     #[getter]
     fn get_originator_phone(&self) -> Option<String> {
@@ -401,6 +418,8 @@ impl AcmMetadata {
     }
 
     /// Originator point-of-contact email.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
     ///
     /// :type: str | None
     #[getter]
@@ -415,6 +434,8 @@ impl AcmMetadata {
 
     /// Originator point-of-contact address.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
+    ///
     /// :type: str | None
     #[getter]
     fn get_originator_address(&self) -> Option<String> {
@@ -428,6 +449,8 @@ impl AcmMetadata {
 
     /// Linked Orbit Data Message identifier.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
+    ///
     /// :type: str | None
     #[getter]
     fn get_odm_msg_link(&self) -> Option<String> {
@@ -440,6 +463,8 @@ impl AcmMetadata {
     }
 
     /// Central body name.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
     ///
     /// :type: str | None
     #[getter]
@@ -492,6 +517,8 @@ impl AcmMetadata {
 
     /// Included ACM data block elements.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
+    ///
     /// :type: str | None
     #[getter]
     fn get_acm_data_elements(&self) -> Option<String> {
@@ -504,6 +531,8 @@ impl AcmMetadata {
     }
 
     /// Earliest data time in this ACM.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
     ///
     /// :type: str | None
     #[getter]
@@ -522,6 +551,8 @@ impl AcmMetadata {
 
     /// Latest data time in this ACM.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
+    ///
     /// :type: str | None
     #[getter]
     fn get_stop_time(&self) -> Option<String> {
@@ -538,6 +569,8 @@ impl AcmMetadata {
     }
 
     /// Difference (TAI - UTC) at EPOCH_TZERO, seconds.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
     ///
     /// :type: float | None
     #[getter]
@@ -556,6 +589,8 @@ impl AcmMetadata {
 
     /// Epoch of the next leap second.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
+    ///
     /// :type: str | None
     #[getter]
     fn get_next_leap_epoch(&self) -> Option<String> {
@@ -572,6 +607,8 @@ impl AcmMetadata {
     }
 
     /// Difference (TAI - UTC) at NEXT_LEAP_EPOCH, seconds.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.3.
     ///
     /// :type: float | None
     #[getter]
@@ -592,7 +629,7 @@ impl AcmMetadata {
     fn validate(&self) -> PyResult<()> {
         self.inner
             .validate()
-            .map_err(|e| PyValueError::new_err(e.to_string()))
+            .map_err(crate::errors::ccsds_error_to_pyerr)
     }
 }
 
@@ -641,23 +678,9 @@ impl AcmData {
     fn to_core(&self, py: Python<'_>) -> PyResult<core_acm::AcmData> {
         macro_rules! core_list {
             ($values:expr, $wrapper:ty, $name:literal) => {
-                $values
-                    .bind(py)
-                    .iter()
-                    .enumerate()
-                    .map(|(index, value)| {
-                        value
-                            .extract::<PyRef<'_, $wrapper>>()
-                            .map(|value| value.inner.clone())
-                            .map_err(|_| {
-                                PyValueError::new_err(format!(
-                                    "{}[{index}] must be {}",
-                                    $name,
-                                    stringify!($wrapper)
-                                ))
-                            })
-                    })
-                    .collect::<PyResult<Vec<_>>>()?
+                crate::common::extract_records($values.bind(py), $name, |value: &$wrapper| {
+                    Ok(value.inner.clone())
+                })?
             };
         }
         Ok(core_acm::AcmData {
@@ -813,7 +836,7 @@ impl AcmData {
     fn validate(&self, py: Python<'_>, metadata: AcmMetadata) -> PyResult<()> {
         self.to_core(py)?
             .validate_with_metadata(&metadata.inner)
-            .map_err(|e| PyValueError::new_err(e.to_string()))
+            .map_err(crate::errors::ccsds_error_to_pyerr)
     }
 }
 
@@ -894,6 +917,8 @@ impl AcmAttitudeState {
 
     /// Attitude state block identifier.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
+    ///
     /// :type: str | None
     #[getter]
     fn get_att_id(&self) -> Option<String> {
@@ -907,6 +932,8 @@ impl AcmAttitudeState {
 
     /// Previous attitude state block identifier.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
+    ///
     /// :type: str | None
     #[getter]
     fn get_att_prev_id(&self) -> Option<String> {
@@ -919,6 +946,8 @@ impl AcmAttitudeState {
     }
 
     /// Basis of this attitude state data.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
     ///
     /// :type: str | None
     #[getter]
@@ -936,6 +965,8 @@ impl AcmAttitudeState {
     }
 
     /// Basis dataset identifier.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
     ///
     /// :type: str | None
     #[getter]
@@ -1024,6 +1055,8 @@ impl AcmAttitudeState {
 
     /// Optional rate state type.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
+    ///
     /// :type: str | None
     #[getter]
     fn get_rate_type(&self) -> Option<String> {
@@ -1040,6 +1073,8 @@ impl AcmAttitudeState {
     }
 
     /// Optional Euler rotation sequence.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
     ///
     /// :type: str | None
     #[getter]
@@ -1132,6 +1167,8 @@ impl AcmPhysicalDescription {
 
     /// Drag coefficient.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.6.
+    ///
     /// :type: float | None
     #[getter]
     fn get_drag_coeff(&self) -> Option<f64> {
@@ -1144,6 +1181,8 @@ impl AcmPhysicalDescription {
     }
 
     /// Wet mass (kg).
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.6.
     ///
     /// :type: float | None
     #[getter]
@@ -1162,6 +1201,8 @@ impl AcmPhysicalDescription {
 
     /// Dry mass (kg).
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.6.
+    ///
     /// :type: float | None
     #[getter]
     fn get_dry_mass(&self) -> Option<f64> {
@@ -1179,6 +1220,8 @@ impl AcmPhysicalDescription {
 
     /// Center-of-pressure reference frame.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.6.
+    ///
     /// :type: str | None
     #[getter]
     fn get_cp_ref_frame(&self) -> Option<String> {
@@ -1191,6 +1234,8 @@ impl AcmPhysicalDescription {
     }
 
     /// Center-of-pressure vector [x, y, z] in meters.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.6.
     ///
     /// :type: list[float] | None
     #[getter]
@@ -1213,6 +1258,8 @@ impl AcmPhysicalDescription {
 
     /// Inertia reference frame.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.6.
+    ///
     /// :type: str | None
     #[getter]
     fn get_inertia_ref_frame(&self) -> Option<String> {
@@ -1225,6 +1272,8 @@ impl AcmPhysicalDescription {
     }
 
     /// Moment of inertia IXX.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.6.
     ///
     /// :type: float | None
     #[getter]
@@ -1243,6 +1292,8 @@ impl AcmPhysicalDescription {
 
     /// Moment of inertia IYY.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.6.
+    ///
     /// :type: float | None
     #[getter]
     fn get_iyy(&self) -> Option<f64> {
@@ -1259,6 +1310,8 @@ impl AcmPhysicalDescription {
     }
 
     /// Moment of inertia IZZ.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.6.
     ///
     /// :type: float | None
     #[getter]
@@ -1277,6 +1330,8 @@ impl AcmPhysicalDescription {
 
     /// Product of inertia IXY.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.6.
+    ///
     /// :type: float | None
     #[getter]
     fn get_ixy(&self) -> Option<f64> {
@@ -1294,6 +1349,8 @@ impl AcmPhysicalDescription {
 
     /// Product of inertia IXZ.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.6.
+    ///
     /// :type: float | None
     #[getter]
     fn get_ixz(&self) -> Option<f64> {
@@ -1310,6 +1367,8 @@ impl AcmPhysicalDescription {
     }
 
     /// Product of inertia IYZ.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.6.
     ///
     /// :type: float | None
     #[getter]
@@ -1389,6 +1448,8 @@ impl AcmCovarianceMatrix {
 
     /// Covariance history identifier.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
+    ///
     /// :type: str | None
     #[getter]
     fn get_cov_id(&self) -> Option<String> {
@@ -1449,6 +1510,8 @@ impl AcmCovarianceMatrix {
     /// annex B, subsection B3.
     ///
     /// Examples: SC_BODY_1
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
     ///
     /// :type: str | None
     #[getter]
@@ -1570,6 +1633,8 @@ impl AcmManeuverParameters {
 
     /// Maneuver block identifier.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.8.
+    ///
     /// :type: str | None
     #[getter]
     fn get_man_id(&self) -> Option<String> {
@@ -1582,6 +1647,8 @@ impl AcmManeuverParameters {
     }
 
     /// Previous maneuver block identifier.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.8.
     ///
     /// :type: str | None
     #[getter]
@@ -1596,6 +1663,8 @@ impl AcmManeuverParameters {
 
     /// Maneuver purpose.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.8.
+    ///
     /// :type: str | None
     #[getter]
     fn get_man_purpose(&self) -> Option<String> {
@@ -1608,6 +1677,8 @@ impl AcmManeuverParameters {
     }
 
     /// Maneuver begin time in seconds relative to EPOCH_TZERO.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.8.
     ///
     /// :type: str | None
     #[getter]
@@ -1626,6 +1697,8 @@ impl AcmManeuverParameters {
 
     /// Maneuver end time in seconds relative to EPOCH_TZERO.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.8.
+    ///
     /// :type: str | None
     #[getter]
     fn get_man_end_time(&self) -> Option<String> {
@@ -1643,6 +1716,8 @@ impl AcmManeuverParameters {
 
     /// Maneuver duration in seconds.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.8.
+    ///
     /// :type: float | None
     #[getter]
     fn get_man_duration(&self) -> Option<f64> {
@@ -1659,6 +1734,8 @@ impl AcmManeuverParameters {
 
     /// Actuator used for this maneuver.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.8.
+    ///
     /// :type: str | None
     #[getter]
     fn get_actuator_used(&self) -> Option<String> {
@@ -1671,6 +1748,8 @@ impl AcmManeuverParameters {
     }
 
     /// Target momentum vector [x, y, z].
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.8.
     ///
     /// :type: list[float] | None
     #[getter]
@@ -1701,6 +1780,8 @@ impl AcmManeuverParameters {
 
     /// Reference frame of target momentum.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.8.
+    ///
     /// :type: str | None
     #[getter]
     fn get_target_mom_frame(&self) -> Option<String> {
@@ -1713,6 +1794,8 @@ impl AcmManeuverParameters {
     }
 
     /// Target attitude quaternion-like 4-vector.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.8.
     ///
     /// :type: list[float] | None
     #[getter]
@@ -1741,6 +1824,8 @@ impl AcmManeuverParameters {
     }
 
     /// Target spin rate (deg/s).
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.8.
     ///
     /// :type: float | None
     #[getter]
@@ -1817,6 +1902,8 @@ impl AcmSensor {
     ///
     /// Examples: 1, 2, 3
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
+    ///
     /// :type: int | None
     #[getter]
     fn get_sensor_number(&self) -> Option<u32> {
@@ -1829,6 +1916,8 @@ impl AcmSensor {
     }
 
     /// Sensor type identifier.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: str | None
     #[getter]
@@ -1856,6 +1945,8 @@ impl AcmSensor {
 
     /// Sensor noise standard deviation values.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
+    ///
     /// :type: list[float] | None
     #[getter]
     fn get_sensor_noise_stddev(&self) -> Option<Vec<f64>> {
@@ -1874,6 +1965,8 @@ impl AcmSensor {
     }
 
     /// Sensor frequency in Hz.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: float | None
     #[getter]
@@ -1912,20 +2005,11 @@ impl AcmAttitudeDetermination {
     }
 
     fn to_core(&self, py: Python<'_>) -> PyResult<core_acm::AcmAttitudeDetermination> {
-        let sensors = self
-            .sensors
-            .bind(py)
-            .iter()
-            .enumerate()
-            .map(|(index, value)| {
-                value
-                    .extract::<PyRef<'_, AcmSensor>>()
-                    .map(|value| value.inner.clone())
-                    .map_err(|_| {
-                        PyValueError::new_err(format!("sensors[{index}] must be AcmSensor"))
-                    })
-            })
-            .collect::<PyResult<Vec<_>>>()?;
+        let sensors = crate::common::extract_records(
+            self.sensors.bind(py),
+            "sensors",
+            |value: &AcmSensor| Ok(value.inner.clone()),
+        )?;
         let mut value = self.inner.clone();
         value.sensors = sensors;
         Ok(value)
@@ -1982,6 +2066,8 @@ impl AcmAttitudeDetermination {
 
     /// Attitude determination block identifier.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
+    ///
     /// :type: str | None
     #[getter]
     fn get_ad_id(&self) -> Option<String> {
@@ -1994,6 +2080,8 @@ impl AcmAttitudeDetermination {
     }
 
     /// Previous attitude determination block identifier.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: str | None
     #[getter]
@@ -2008,6 +2096,8 @@ impl AcmAttitudeDetermination {
 
     /// Attitude determination method.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
+    ///
     /// :type: str | None
     #[getter]
     fn get_ad_method(&self) -> Option<String> {
@@ -2020,6 +2110,8 @@ impl AcmAttitudeDetermination {
     }
 
     /// Source of attitude estimate.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: str | None
     #[getter]
@@ -2034,6 +2126,8 @@ impl AcmAttitudeDetermination {
 
     /// Number of estimator states.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
+    ///
     /// :type: int | None
     #[getter]
     fn get_number_states(&self) -> Option<u32> {
@@ -2046,6 +2140,8 @@ impl AcmAttitudeDetermination {
     }
 
     /// Attitude state type for estimator.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: str | None
     #[getter]
@@ -2081,6 +2177,8 @@ impl AcmAttitudeDetermination {
 
     /// Covariance type for estimator.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
+    ///
     /// :type: str | None
     #[getter]
     fn get_cov_type(&self) -> Option<String> {
@@ -2114,6 +2212,8 @@ impl AcmAttitudeDetermination {
 
     /// Source reference frame.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
+    ///
     /// :type: str | None
     #[getter]
     fn get_ref_frame_a(&self) -> Option<String> {
@@ -2126,6 +2226,8 @@ impl AcmAttitudeDetermination {
     }
 
     /// Destination reference frame.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: str | None
     #[getter]
@@ -2158,6 +2260,8 @@ impl AcmAttitudeDetermination {
 
     /// Rate states type.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
+    ///
     /// :type: str | None
     #[getter]
     fn get_rate_states(&self) -> Option<String> {
@@ -2175,6 +2279,8 @@ impl AcmAttitudeDetermination {
 
     /// Rate random walk sigma_u.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
+    ///
     /// :type: float | None
     #[getter]
     fn get_sigma_u(&self) -> Option<f64> {
@@ -2191,6 +2297,8 @@ impl AcmAttitudeDetermination {
 
     /// Angle random walk sigma_v.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
+    ///
     /// :type: float | None
     #[getter]
     fn get_sigma_v(&self) -> Option<f64> {
@@ -2206,6 +2314,8 @@ impl AcmAttitudeDetermination {
     }
 
     /// Rate process noise standard deviation.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: float | None
     #[getter]

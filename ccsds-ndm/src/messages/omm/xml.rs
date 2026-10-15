@@ -13,6 +13,7 @@ pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {
     let repeating = |rank, repeatable| XmlSequenceRule::restarting(rank, repeatable);
     crate::xml::validate_element_sequences(
         xml,
+        b"omm",
         "OMM",
         |parent, child| {
             Some(match (parent, child) {

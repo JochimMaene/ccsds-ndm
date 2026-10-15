@@ -280,7 +280,9 @@ fn detect_xml_type(s: &str) -> Result<Message> {
     loop {
         match reader.read_event() {
             Ok(Event::Start(e) | Event::Empty(e)) => {
-                let root_name = e.name();
+                // Dispatch on the local name so qualified `ndm:`-prefixed roots (NDM/XML 4.3.5)
+                // reach their parser, which validates the namespace.
+                let root_name = e.local_name();
                 let kind = NdmKind::from_xml_root(root_name.as_ref()).ok_or_else(|| {
                     CcsdsNdmError::UnsupportedMessage(format!(
                         "Unknown or unsupported XML root tag: <{}>",

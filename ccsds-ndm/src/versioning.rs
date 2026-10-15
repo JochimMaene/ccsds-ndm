@@ -31,6 +31,8 @@ pub(crate) fn spec(kind: MessageKind) -> Option<VersionSpec> {
         }),
         MessageKind::Oem => Some(VersionSpec {
             id_keyword: "CCSDS_OEM_VERS",
+            // OEM 1.0 (ODM Silver Book 1.0, 7.9.1) is read like 2.0; no audited 1.0 book or
+            // schema backs a writer, so it is parse-only, like OPM 1.0.
             input_versions: &["1.0", "2.0", "3.0"],
             output_versions: &["2.0", "3.0"],
         }),
@@ -187,8 +189,57 @@ pub(crate) fn validate_opm_edition(message: &crate::messages::opm::Opm) -> Resul
 }
 
 pub(crate) fn validate_oem_edition(message: &crate::messages::oem::Oem) -> Result<()> {
-    if message.version == "2.0" {
-        validate_odm_2_header(&message.header)?;
+    match message.version.as_str() {
+        "2.0" => {
+            validate_odm_2_header(&message.header)?;
+            message.body.validate_odm_2_useable_order()
+        }
+        "1.0" => validate_oem_1_content(message),
+        _ => Ok(()),
+    }
+}
+
+/// CCSDS 502.0-B-1 predates the OEM header fields, REF_FRAME_EPOCH, accelerations and
+/// covariance (502.0-B-2 annex E1 items 2, 4 and 11, and annex F2), so a 1.0 message must not
+/// carry them.
+fn validate_oem_1_content(message: &crate::messages::oem::Oem) -> Result<()> {
+    let absent = |field: &'static str, path: String| -> CcsdsNdmError {
+        ValidationError::InvalidValue {
+            field: field.into(),
+            value: "present".into(),
+            expected: "absent in CCSDS 502.0-B-1".into(),
+            line: None,
+        }
+        .at_path(path)
+        .into()
+    };
+    if message.header.classification.is_some() {
+        return Err(absent("CLASSIFICATION", "header.classification".into()));
+    }
+    if message.header.message_id.is_some() {
+        return Err(absent("MESSAGE_ID", "header.message_id".into()));
+    }
+    for (index, segment) in message.body.segment.iter().enumerate() {
+        if segment.metadata.ref_frame_epoch.is_some() {
+            return Err(absent(
+                "REF_FRAME_EPOCH",
+                format!("body.segment[{index}].metadata.ref_frame_epoch"),
+            ));
+        }
+        if !segment.data.covariance_matrix.is_empty() {
+            return Err(absent(
+                "covarianceMatrix",
+                format!("body.segment[{index}].data.covariance_matrix"),
+            ));
+        }
+        if let Some(state) = segment.data.state_vector.iter().position(|state| {
+            state.x_ddot.is_some() || state.y_ddot.is_some() || state.z_ddot.is_some()
+        }) {
+            return Err(absent(
+                "X_DDOT/Y_DDOT/Z_DDOT",
+                format!("body.segment[{index}].data.state_vector[{state}]"),
+            ));
+        }
     }
     Ok(())
 }

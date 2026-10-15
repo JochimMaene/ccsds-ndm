@@ -7,6 +7,8 @@ use ccsds_ndm::common as core_common;
 use ccsds_ndm::types::{Acc, InterpolationDegree, Position, Velocity};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyList;
+use pyo3::{PyClass, PyTypeInfo};
 use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pymethods};
 use std::str::FromStr;
 
@@ -24,6 +26,87 @@ pub(crate) fn parse_interpolation_degree(
                 })
         })
         .transpose()
+}
+
+/// The error for a live-list element that is not the record type the list holds.
+///
+/// The type name is looked up only on this failure path, so the success path pays nothing for it.
+fn wrong_record_type<T: PyTypeInfo>(py: Python<'_>, field: &str, index: usize) -> PyErr {
+    let type_name = T::type_object(py)
+        .name()
+        .map_or_else(|_| "?".to_owned(), |name| name.to_string());
+    pyo3::exceptions::PyTypeError::new_err(format!("{field}[{index}] must be {type_name}"))
+}
+
+/// Visit every record of a live Python list, in order, borrowing each as `T`.
+///
+/// Repeated model fields are exposed as plain Python lists, so any element can have been replaced
+/// with an object of the wrong type; `field` names the list in the resulting error, e.g.
+/// `state_vector[2] must be StateVectorAcc`.
+pub(crate) fn visit_records<T, F>(
+    list: &Bound<'_, PyList>,
+    field: &str,
+    mut visit: F,
+) -> PyResult<()>
+where
+    T: PyClass,
+    F: FnMut(&T) -> PyResult<()>,
+{
+    for (index, value) in list.iter().enumerate() {
+        let record = value
+            .cast::<T>()
+            .map_err(|_| wrong_record_type::<T>(list.py(), field, index))?;
+        visit(&*record.try_borrow()?)?;
+    }
+    Ok(())
+}
+
+/// Convert every record of a live Python list, failing on the first element that is not a `T`.
+pub(crate) fn extract_records<T, R, F>(
+    list: &Bound<'_, PyList>,
+    field: &str,
+    mut convert: F,
+) -> PyResult<Vec<R>>
+where
+    T: PyClass,
+    F: FnMut(&T) -> PyResult<R>,
+{
+    let mut records = Vec::with_capacity(list.len());
+    visit_records(list, field, |record: &T| {
+        records.push(convert(record)?);
+        Ok(())
+    })?;
+    Ok(records)
+}
+
+/// Update every record of a live Python list in place, all or nothing.
+///
+/// Every element is checked (type and borrow) before any is written, so a bad element partway
+/// through the list cannot leave the earlier records already rewritten. `update` must therefore
+/// be infallible: do any parsing or shape checking before calling this. The records are mutated
+/// rather than replaced, so Python references to them stay valid.
+pub(crate) fn update_records<T, F>(
+    list: &Bound<'_, PyList>,
+    field: &str,
+    mut update: F,
+) -> PyResult<()>
+where
+    T: PyClass<Frozen = pyo3::pyclass::boolean_struct::False>,
+    F: FnMut(usize, &mut T),
+{
+    for (index, value) in list.iter().enumerate() {
+        value
+            .cast::<T>()
+            .map_err(|_| wrong_record_type::<T>(list.py(), field, index))?
+            .try_borrow_mut()?;
+    }
+    for (index, value) in list.iter().enumerate() {
+        let record = value
+            .cast::<T>()
+            .map_err(|_| wrong_record_type::<T>(list.py(), field, index))?;
+        update(index, &mut *record.try_borrow_mut()?);
+    }
+    Ok(())
 }
 
 /// Represents the `odmHeader` complex type.
@@ -121,6 +204,8 @@ impl OdmHeader {
     ///
     /// Examples: OPM_201113719185, ABC-12_34
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.2.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_message_id(&self) -> Option<String> {
@@ -136,6 +221,8 @@ impl OdmHeader {
     /// that selected values be pre-coordinated between exchanging entities by mutual agreement.
     ///
     /// Examples: SBU, ‘Operator-proprietary data; secondary distribution not permitted’
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.2.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -249,6 +336,8 @@ impl AdmHeader {
     ///
     /// Examples: APM_201113719185, ABC-12_34
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.2.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_message_id(&self) -> Option<String> {
@@ -264,6 +353,8 @@ impl AdmHeader {
     /// that selected values be pre-coordinated between exchanging entities by mutual agreement.
     ///
     /// Examples: SBU, ‘Operator-proprietary data; secondary distribution not permitted’
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.2.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -291,6 +382,14 @@ impl AdmHeader {
     #[setter]
     fn set_comment(&mut self, value: Vec<String>) {
         self.inner.comment = value;
+    }
+}
+
+/// Write an acceleration value, keeping any explicit XML units already on the record.
+pub(crate) fn set_acceleration(slot: &mut Option<Acc>, value: Option<f64>) {
+    match (slot.as_mut(), value) {
+        (Some(acc), Some(value)) => acc.value = value,
+        (_, value) => *slot = value.map(|value| Acc::new(value, None)),
     }
 }
 
@@ -399,9 +498,9 @@ impl StateVectorAcc {
         )
     }
 
-    /// Epoch of state vector & optional Keplerian elements (see 7.5.10 for formatting rules).
+    /// Epoch of the ephemeris state vector (see 7.5.10 for formatting rules).
     ///
-    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.4.
     ///
     /// :type: str
     #[getter]
@@ -419,7 +518,7 @@ impl StateVectorAcc {
     ///
     /// Units: km
     ///
-    /// CCSDS Reference: 502.0-B-3, Section 5.3.3.
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.4.
     ///
     /// :type: float
     #[getter]
@@ -436,7 +535,7 @@ impl StateVectorAcc {
     ///
     /// Units: km
     ///
-    /// CCSDS Reference: 502.0-B-3, Section 5.3.3.
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.4.
     ///
     /// :type: float
     #[getter]
@@ -453,7 +552,7 @@ impl StateVectorAcc {
     ///
     /// Units: km
     ///
-    /// CCSDS Reference: 502.0-B-3, Section 5.3.3.
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.4.
     ///
     /// :type: float
     #[getter]
@@ -470,7 +569,7 @@ impl StateVectorAcc {
     ///
     /// Units: km/s
     ///
-    /// CCSDS Reference: 502.0-B-3, Section 5.3.3.
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.4.
     ///
     /// :type: float
     #[getter]
@@ -487,7 +586,7 @@ impl StateVectorAcc {
     ///
     /// Units: km/s
     ///
-    /// CCSDS Reference: 502.0-B-3, Section 5.3.3.
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.4.
     ///
     /// :type: float
     #[getter]
@@ -504,7 +603,7 @@ impl StateVectorAcc {
     ///
     /// Units: km/s
     ///
-    /// CCSDS Reference: 502.0-B-3, Section 5.3.3.
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.4.
     ///
     /// :type: float
     #[getter]
@@ -521,6 +620,8 @@ impl StateVectorAcc {
     ///
     /// Units: km/s²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_x_ddot(&self) -> Option<f64> {
@@ -529,15 +630,14 @@ impl StateVectorAcc {
 
     #[setter]
     fn set_x_ddot(&mut self, value: Option<f64>) {
-        self.inner.x_ddot = value.map(|v| Acc {
-            value: v,
-            units: None,
-        });
+        set_acceleration(&mut self.inner.x_ddot, value);
     }
 
     /// Acceleration vector Y-component.
     ///
     /// Units: km/s²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.4.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -547,15 +647,14 @@ impl StateVectorAcc {
 
     #[setter]
     fn set_y_ddot(&mut self, value: Option<f64>) {
-        self.inner.y_ddot = value.map(|v| Acc {
-            value: v,
-            units: None,
-        });
+        set_acceleration(&mut self.inner.y_ddot, value);
     }
 
     /// Acceleration vector Z-component.
     ///
     /// Units: km/s²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 5.2.4.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -565,10 +664,7 @@ impl StateVectorAcc {
 
     #[setter]
     fn set_z_ddot(&mut self, value: Option<f64>) {
-        self.inner.z_ddot = value.map(|v| Acc {
-            value: v,
-            units: None,
-        });
+        set_acceleration(&mut self.inner.z_ddot, value);
     }
 }
 
@@ -602,7 +698,7 @@ pub struct StateVector {
 impl StateVector {
     #[new]
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (epoch, x, y, z, x_dot, y_dot, z_dot, comments=None))]
+    #[pyo3(signature = (epoch, x, y, z, x_dot, y_dot, z_dot, comment=None))]
     fn new(
         epoch: String,
         x: f64,
@@ -611,11 +707,11 @@ impl StateVector {
         x_dot: f64,
         y_dot: f64,
         z_dot: f64,
-        comments: Option<Vec<String>>,
+        comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         Ok(Self {
             inner: core_common::StateVector {
-                comment: comments.unwrap_or_default(),
+                comment: comment.unwrap_or_default(),
                 epoch: parse_calendar_epoch(&epoch)?,
                 x: Position {
                     value: x,
@@ -875,6 +971,8 @@ impl SpacecraftParameters {
     ///
     /// Units: kg
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_mass(&self) -> Option<f64> {
@@ -895,6 +993,8 @@ impl SpacecraftParameters {
     /// Examples: 14, 20.0
     ///
     /// Units: m²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -917,6 +1017,8 @@ impl SpacecraftParameters {
     ///
     /// Units: n/a
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_solar_rad_coeff(&self) -> Option<f64> {
@@ -934,6 +1036,8 @@ impl SpacecraftParameters {
     /// Examples: 14, 20.0
     ///
     /// Units: m²
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -955,6 +1059,8 @@ impl SpacecraftParameters {
     /// Examples: 2, 2.1
     ///
     /// Units: n/a
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1084,6 +1190,8 @@ impl OdParameters {
     /// observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
     /// of zero duration (i.e., same value as that of TIME_LASTOB_END).
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_time_lastob_start(&self) -> Option<String> {
@@ -1098,6 +1206,8 @@ impl OdParameters {
     /// The end of a time interval (UTC) that contains the time of the last accepted
     /// observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
     /// of zero duration (i.e., same value as that of TIME_LASTOB_START).
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1115,6 +1225,8 @@ impl OdParameters {
     /// Examples: 14, 20.0
     ///
     /// Units: days
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1134,6 +1246,8 @@ impl OdParameters {
     ///
     /// Units: days
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_actual_od_span(&self) -> Option<f64> {
@@ -1147,6 +1261,8 @@ impl OdParameters {
 
     /// The total number of observations available for orbit determination.
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[int]
     #[getter]
     fn get_obs_available(&self) -> Option<u32> {
@@ -1158,6 +1274,8 @@ impl OdParameters {
     }
 
     /// The number of observations used in the orbit determination.
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -1171,6 +1289,8 @@ impl OdParameters {
 
     /// The total number of tracks available for orbit determination.
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[int]
     #[getter]
     fn get_tracks_available(&self) -> Option<u32> {
@@ -1182,6 +1302,8 @@ impl OdParameters {
     }
 
     /// The number of tracks used in the orbit determination.
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -1197,6 +1319,8 @@ impl OdParameters {
     ///
     /// Units: %
     ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_residuals_accepted(&self) -> Option<f64> {
@@ -1209,6 +1333,8 @@ impl OdParameters {
     }
 
     /// The weighted root mean square (RMS) of the residuals.
+    ///
+    /// CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1514,6 +1640,8 @@ impl GroundImpactParameters {
 
     /// Probability that any fragment will impact the Earth (either land or sea; 0 to 1).
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_probability_of_impact(&self) -> Option<f64> {
@@ -1527,6 +1655,8 @@ impl GroundImpactParameters {
     /// Probability that the entire object and any fragments will burn up during atmospheric
     /// re-entry (0 to 1).
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_probability_of_burn_up(&self) -> Option<f64> {
@@ -1539,6 +1669,8 @@ impl GroundImpactParameters {
 
     /// Probability that the object will break up during re-entry (0 to 1).
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_probability_of_break_up(&self) -> Option<f64> {
@@ -1550,6 +1682,8 @@ impl GroundImpactParameters {
     }
 
     /// Probability that any fragment will impact solid ground (0 to 1).
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1568,6 +1702,8 @@ impl GroundImpactParameters {
     /// Probability that the re-entry event will cause any casualties (severe injuries or
     /// deaths—0 to 1).
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_probability_of_casualty(&self) -> Option<f64> {
@@ -1579,6 +1715,8 @@ impl GroundImpactParameters {
     }
 
     /// Epoch of the predicted impact (formatting rules specified in 5.3.3.5).
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1596,6 +1734,8 @@ impl GroundImpactParameters {
 
     /// Start epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_impact_window_start(&self) -> Option<String> {
@@ -1611,6 +1751,8 @@ impl GroundImpactParameters {
     }
 
     /// End epoch of the predicted impact window (formatting rules specified in 5.3.3.5).
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1628,6 +1770,8 @@ impl GroundImpactParameters {
     /// Only frames with the value ‘Body-Fixed’ in the Frame Type column shall be used.
     /// Mandatory if NOMINAL_IMPACT_LON and NOMINAL_IMPACT_LAT are present.
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_impact_ref_frame(&self) -> Option<String> {
@@ -1643,6 +1787,8 @@ impl GroundImpactParameters {
     /// 3.5.11.
     ///
     /// Units: deg
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1663,6 +1809,8 @@ impl GroundImpactParameters {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_nominal_impact_lat(&self) -> Option<f64> {
@@ -1680,6 +1828,8 @@ impl GroundImpactParameters {
     ///
     /// Units: m
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_nominal_impact_alt(&self) -> Option<f64> {
@@ -1696,6 +1846,8 @@ impl GroundImpactParameters {
     /// First (lowest) confidence interval for the impact location.
     ///
     /// Units: %
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1716,6 +1868,8 @@ impl GroundImpactParameters {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_impact_1_start_lon(&self) -> Option<f64> {
@@ -1734,6 +1888,8 @@ impl GroundImpactParameters {
     /// the rules specified in 3.5.12.
     ///
     /// Units: deg
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1754,6 +1910,8 @@ impl GroundImpactParameters {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_impact_1_stop_lon(&self) -> Option<f64> {
@@ -1773,6 +1931,8 @@ impl GroundImpactParameters {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_impact_1_stop_lat(&self) -> Option<f64> {
@@ -1790,6 +1950,8 @@ impl GroundImpactParameters {
     ///
     /// Units: km
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_impact_1_cross_track(&self) -> Option<f64> {
@@ -1804,6 +1966,8 @@ impl GroundImpactParameters {
     /// present if IMPACT_2_* is used.
     ///
     /// Units: %
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1824,6 +1988,8 @@ impl GroundImpactParameters {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_impact_2_start_lon(&self) -> Option<f64> {
@@ -1842,6 +2008,8 @@ impl GroundImpactParameters {
     /// the rules specified in 3.5.12.
     ///
     /// Units: deg
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1862,6 +2030,8 @@ impl GroundImpactParameters {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_impact_2_stop_lon(&self) -> Option<f64> {
@@ -1881,6 +2051,8 @@ impl GroundImpactParameters {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_impact_2_stop_lat(&self) -> Option<f64> {
@@ -1898,6 +2070,8 @@ impl GroundImpactParameters {
     ///
     /// Units: km
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_impact_2_cross_track(&self) -> Option<f64> {
@@ -1912,6 +2086,8 @@ impl GroundImpactParameters {
     /// be present if IMPACT_3_* is used.
     ///
     /// Units: %
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1932,6 +2108,8 @@ impl GroundImpactParameters {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_impact_3_start_lon(&self) -> Option<f64> {
@@ -1950,6 +2128,8 @@ impl GroundImpactParameters {
     /// the rules specified in 3.5.12.
     ///
     /// Units: deg
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1970,6 +2150,8 @@ impl GroundImpactParameters {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_impact_3_stop_lon(&self) -> Option<f64> {
@@ -1989,6 +2171,8 @@ impl GroundImpactParameters {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_impact_3_stop_lat(&self) -> Option<f64> {
@@ -2005,6 +2189,8 @@ impl GroundImpactParameters {
     /// Cross-track size of the third confidence interval.
     ///
     /// Units: km
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -2193,4 +2379,22 @@ pub fn validate_version(kind: ccsds_ndm::validation::MessageKind, value: &str) -
         }
     }
     Ok(())
+}
+
+/// View a caller's NumPy input as a matrix, naming the input and its actual shape when it is not
+/// two-dimensional instead of failing inside NumPy's typed extraction.
+pub(crate) fn matrix_view<'a>(
+    array: &'a numpy::PyReadonlyArrayDyn<'_, f64>,
+    what: &str,
+) -> PyResult<numpy::ndarray::ArrayView2<'a, f64>> {
+    use numpy::PyUntypedArrayMethods;
+    array
+        .as_array()
+        .into_dimensionality::<numpy::ndarray::Ix2>()
+        .map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err(format!(
+                "{what} must be a 2-D array; got shape {:?}",
+                array.shape()
+            ))
+        })
 }

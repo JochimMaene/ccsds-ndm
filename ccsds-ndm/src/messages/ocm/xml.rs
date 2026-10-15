@@ -270,6 +270,7 @@ pub(super) fn validate_sequences(xml: &str) -> Result<()> {
     use crate::xml::XmlSequenceRule;
     crate::xml::validate_element_sequences(
         xml,
+        b"ocm",
         "OCM",
         |parent, child| {
             let children = ocm_xml_children(parent)?;

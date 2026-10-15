@@ -173,6 +173,7 @@ pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {
 
     crate::xml::validate_element_sequences(
         xml,
+        b"rdm",
         "RDM",
         |parent, child| match parent {
             b"rdm" => in_sequence(child, &[b"header", b"body"]),

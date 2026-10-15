@@ -71,12 +71,19 @@ def _docstring(block: str) -> str:
 
 def _preceding_docstring(lines: list[str], end: int) -> str:
     doc = []
+    # Walking upwards, a line ending an attribute (`)]` or `]`) opens a multi-line attribute
+    # whose continuation lines are skipped until its `#[` line.
+    in_attribute = False
     for line in reversed(lines[:end]):
         stripped = line.strip()
-        if stripped.startswith("///"):
+        if in_attribute:
+            in_attribute = not stripped.startswith("#[")
+        elif stripped.startswith("///"):
             doc.append(stripped[3:].strip())
         elif stripped.startswith("#[") or not stripped:
             continue
+        elif stripped.endswith("]"):
+            in_attribute = True
         else:
             break
     return "\n".join(reversed(doc))
@@ -215,13 +222,18 @@ def parse_python_binding_file(path: Path) -> dict[str, PythonClass]:
             continue
         for getter in getter_pattern.finditer(body):
             doc = _docstring(getter.group(1))
-            line_end = body_line + body[: getter.start()].count("\n")
+            # The doc group starts with the whitespace, including blank lines, before the first
+            # `///`; the recorded range covers the doc comment lines themselves (0-based).
+            doc_text = getter.group(1)
+            leading = len(doc_text) - len(doc_text.lstrip())
+            line_start = body_line + body[: getter.start(1) + leading].count("\n")
+            line_end = line_start + max(doc_text[leading:].count("\n") - 1, 0)
             name = getter.group(3)
             item.getters[name] = PythonGetter(
                 f"{getter.group(2) or ''}{name}",
                 name,
                 doc,
-                line_end - getter.group(1).count("\n") if doc else line_end,
+                line_start,
                 line_end,
             )
         for setter in setter_pattern.finditer(body):

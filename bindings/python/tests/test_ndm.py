@@ -72,7 +72,7 @@ class TestNdm:
             z_ddot=None,
         )
 
-        data = OemData(state_vectors=[vec], comments=None)
+        data = OemData(state_vectors=[vec], comment=None)
 
         seg = OemSegment(meta, data)
         return Oem(header, [seg])
@@ -131,7 +131,7 @@ class TestNdm:
             + [None]
         )
         cov1 = CdmCovarianceMatrix(*cov_args)
-        data1 = CdmData(vector1, cov1, comments=[])
+        data1 = CdmData(vector1, cov1, comment=[])
         seg1 = CdmSegment(meta1, data1)
 
         meta2 = CdmMetadata(
@@ -144,7 +144,7 @@ class TestNdm:
         )
         vector2 = CdmStateVector(7100.0, 0.0, 0.0, 0.0, 7.4, 0.0)
         cov2 = CdmCovarianceMatrix(*cov_args)
-        data2 = CdmData(vector2, cov2, comments=[])
+        data2 = CdmData(vector2, cov2, comment=[])
         seg2 = CdmSegment(meta2, data2)
 
         body = CdmBody(rel_meta, [seg1, seg2])
@@ -185,7 +185,9 @@ class TestNdm:
         opm = (root / "ccsds-ndm/data/kvn/opm_g1.kvn").read_text()
 
         for format_hint in (None, "kvn"):
-            with pytest.raises(ValueError, match="expected NDM, found OPM"):
+            with pytest.raises(
+                ccsds_ndm.NdmUnsupportedMessageError, match="expected NDM, found OPM"
+            ):
                 CombinedNdm.from_str(opm, format=format_hint)
 
     def test_ndm_roundtrip_xml(self):
@@ -214,21 +216,20 @@ class TestNdm:
         assert len(ndm2.messages) == 1
 
     def test_failed_file_generation_preserves_existing_file(self, tmp_path):
-        # 1.0 is readable but withdrawn as an output edition, so it can only be reached by parsing.
         source = (
             Path(__file__).parents[3] / "ccsds-ndm/data/kvn/oem_g11.kvn"
         ).read_text()
-        oem = Oem.from_str(
-            source.replace("CCSDS_OEM_VERS = 3.0", "CCSDS_OEM_VERS = 1.0"), format="kvn"
-        )
+        oem = Oem.from_str(source, format="kvn")
+        # One OEM keeps one time system throughout (ODM 5.2.4.5).
+        oem.segments[1].metadata.time_system = "TAI"
         ndm = CombinedNdm([oem])
         path = tmp_path / "test.ndm"
         path.write_text("keep me")
 
-        with pytest.raises(NdmValidationError, match="output version 1.0") as caught:
+        with pytest.raises(NdmValidationError, match="TIME_SYSTEM") as caught:
             ndm.to_file(str(path), "xml")
 
-        assert caught.value.code == "generation.unsupported_output_version"
+        assert caught.value.code == "validation.invalid_value"
         assert path.read_text() == "keep me"
 
     def test_ndm_message_and_comment_setters(self):

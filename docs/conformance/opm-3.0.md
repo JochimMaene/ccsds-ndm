@@ -16,7 +16,7 @@ They are not missing self-contained behavior and are not guessed; see
 
 | Area | Normative source | Implemented behavior | Executable evidence |
 | --- | --- | --- | --- |
-| Message identity and structure | ODM 3.1.5, 3.2.1, 8.2–8.3 | One OPM root describing one object, ordered header/metadata/data, exact XML declaration and `id="CCSDS_OPM_VERS"`/`version="3.0"` root attributes, and the supported-edition generation gate | `opm::parsing`, `opm::generation` |
+| Message identity and structure | ODM 3.1.5, 3.2.1, 8.2–8.3 | One OPM root describing one object, ordered header/metadata/data, an XML 1.0 UTF-8 declaration with the shared producer-compatible spellings, `id="CCSDS_OPM_VERS"`/`version="3.0"` root attributes, and the supported-edition generation gate | `opm::parsing`, `opm::generation`, `library::xml` |
 | KVN lexical and record structure | ODM 7.3.2–7.3.4, 7.4.3–7.4.7 | Printable ASCII, 254-character lines, all four normative terminators, one uppercase assignment per line, and the `USER_DEFINED_` suffix repertoire accepted per table 3-3 rather than Annex F's narrower informative regex | `opm::parsing`, `opm::generation` |
 | KVN keyword order and blocks | ODM 3.2.2–3.2.4, 7.4.8 | Fixed keyword order with unknown, duplicate, reordered, trailing, and incomplete content rejected; `TRUE_ANOMALY`/`MEAN_ANOMALY` share an ordering rank, so either fills the anomaly slot while a repeat is still a duplicate and both present is a choice violation | `opm::parsing`, `opm::generation` |
 | XML structure | ODM 8.4–8.7; `ndmxml-4.0.0-opm-3.0.xsd` and common schema | Exact root and attributes, ordered known elements, no DTD or trailing document, fixed nesting limit of 16, and `units`/`parameter` attributes permitted only where the schema declares them | `opm::parsing` |
@@ -58,8 +58,8 @@ They are not missing self-contained behavior and are not guessed; see
   model.
 - **Zero delta mass is accepted.** 3.2.4.7 describes delta mass as negative, but the XSD's
   `deltamassTypeZ` permits zero; the schema governs the wire form.
-- **`nil`/`xsi:nil` is a compatibility extension** on otherwise attribute-free optional values.
-  Attributes cannot be hidden behind a nil or empty value.
+- **`nil` and `xsi:nil` are rejected.** The OPM schema declares no nillable element, so an
+  optional value is either present with a valid value or omitted.
 - **XML source locations are omitted** where `quick-xml` does not reliably expose them, rather
   than invented.
 - **Caller context is never guessed.** MET/MRT reference events, ICD-defined time systems and

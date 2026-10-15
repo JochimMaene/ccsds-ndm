@@ -120,7 +120,8 @@ impl std::fmt::Display for KvnParseError {
             "KVN parsing error at line {}, column {}: {}",
             self.line, self.column, self.message
         )?;
-        if !self.contexts.is_empty() {
+        // A lone context that only repeats the message adds nothing.
+        if !self.contexts.is_empty() && self.contexts != [self.message.as_str()] {
             write!(f, "\nContext: {}", self.contexts.join(" > "))?;
         }
         Ok(())
@@ -357,23 +358,7 @@ impl ValidationError {
                 source,
             };
         }
-        let field = match &self {
-            Self::MissingRequiredField { field, .. } | Self::InvalidValue { field, .. } => {
-                field.as_ref()
-            }
-            Self::OutOfRange { name, .. } => name.as_ref(),
-            Self::InvalidChoice { .. } => return self.at_path(parent_path),
-            Self::Conflict { .. } | Self::Generic { .. } | Self::AtPath { .. } => return self,
-        };
-        let field = field.to_ascii_lowercase();
-        let field = match field.strip_suffix(" units") {
-            Some(field) => format!("{field}.units"),
-            None => field
-                .replace([' ', '/'], "_")
-                .replace(['(', ')'], "")
-                .replace("_at_least_one_required", ""),
-        };
-        self.at_path(format!("{parent_path}.{field}"))
+        self.at_path(parent_path)
     }
 
     fn set_line_if_missing(&mut self, line: usize) {

@@ -45,8 +45,9 @@ class TestRoutingShapes:
         """Root -> segment -> repeated record[1]. Index 0 is not the only reachable record."""
         oem = load("oem_g13.kvn", ccsds_ndm.Oem)
         assert len(oem.segments[0].data.state_vector) > 2
-        oem.segments[0].data.state_vector[1].x = float("nan")
-        assert_all_surfaces_reject(oem, "X")
+        # Table 5-3: state epochs lie within the segment's total span.
+        oem.segments[0].data.state_vector[1].epoch = "1900-01-01T00:00:00"
+        assert_all_surfaces_reject(oem, "stateVector EPOCH")
 
     def test_repeated_segment_then_record_then_choice_branch(self):
         """The hardest route: segment[1] -> record[1] -> attitude choice -> constrained value."""

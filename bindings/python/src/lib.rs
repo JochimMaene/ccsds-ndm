@@ -115,7 +115,9 @@ fn from_str(
     #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
     format: Option<&str>,
 ) -> PyResult<Py<PyAny>> {
-    let message = ccsds_ndm::from_str_with_notation(data, format.map(api::notation).transpose()?)
+    let notation = format.map(api::notation).transpose()?;
+    let message = py
+        .detach(|| ccsds_ndm::from_str_with_notation(data, notation))
         .map_err(ccsds_error_to_pyerr)?;
     message_to_py(py, message)
 }
@@ -141,8 +143,9 @@ fn from_file(
     format: Option<&str>,
 ) -> PyResult<Py<PyAny>> {
     let notation = format.map(api::notation).transpose()?;
-    let message = ccsds_ndm::from_file_with_notation(&path, notation)
-        .map_err(|error| file_parse_error_to_pyerr(error, notation, None))?;
+    let message = py
+        .detach(|| ccsds_ndm::from_file_with_notation(&path, notation))
+        .map_err(|error| file_parse_error_to_pyerr(error, Some(&path), notation, None))?;
     message_to_py(py, message)
 }
 
@@ -151,11 +154,14 @@ fn from_file(
 #[pyfunction]
 #[pyo3(signature = (data, to_format))]
 fn convert(
+    py: Python<'_>,
     data: &str,
     #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
     to_format: &str,
 ) -> PyResult<String> {
-    ccsds_ndm::convert(data, api::notation(to_format)?).map_err(ccsds_error_to_pyerr)
+    let notation = api::notation(to_format)?;
+    py.detach(|| ccsds_ndm::convert(data, notation))
+        .map_err(ccsds_error_to_pyerr)
 }
 
 /// Convert any recognized NDM file and atomically replace the destination on success.
@@ -163,6 +169,7 @@ fn convert(
 #[pyfunction]
 #[pyo3(signature = (source_path, destination_path, to_format))]
 fn convert_file(
+    py: Python<'_>,
     #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
     source_path: PathBuf,
     #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
@@ -170,8 +177,19 @@ fn convert_file(
     #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
     to_format: &str,
 ) -> PyResult<()> {
-    ccsds_ndm::convert_file(&source_path, &destination_path, api::notation(to_format)?)
-        .map_err(ccsds_error_to_pyerr)
+    let notation = api::notation(to_format)?;
+    py.detach(|| ccsds_ndm::convert_file(&source_path, &destination_path, notation))
+        .map_err(|error| match error.as_io_error() {
+            // Either side can fail, so name both, as OSError's filename and filename2.
+            Some(io) => crate::errors::NdmIoError::new_err((
+                io.raw_os_error().unwrap_or(0),
+                io.to_string(),
+                source_path.display().to_string(),
+                None::<i32>,
+                destination_path.display().to_string(),
+            )),
+            None => ccsds_error_to_pyerr(error),
+        })
 }
 
 /// The Python module definition.

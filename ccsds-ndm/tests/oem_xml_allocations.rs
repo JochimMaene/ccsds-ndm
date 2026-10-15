@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-//! The XML ephemeris path must not allocate once per state vector.
+//! Implicit-unit XML records require no per-record scratch allocation; explicit units have a bounded cost.
 //!
 //! `Epoch` owns a fixed-size buffer specifically so that a large ephemeris does not put one heap
 //! allocation on every record, and the XML structural walker keeps open element names in a stack
@@ -20,7 +20,7 @@ static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 fn oem_xml(records: usize) -> String {
     let mut xml = String::from(concat!(
         r#"<?xml version="1.0" encoding="UTF-8"?>"#,
-        "\n<oem id=\"CCSDS_OEM_VERS\" version=\"3.0\">\n",
+        "\n<oem xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance' id=\"CCSDS_OEM_VERS\" version=\"3.0\">\n",
         "<header><CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>",
         "<ORIGINATOR>TEST</ORIGINATOR></header>\n<body><segment><metadata>",
         "<OBJECT_NAME>SAT</OBJECT_NAME><OBJECT_ID>2023-001A</OBJECT_ID>",
@@ -56,25 +56,38 @@ fn parse_stats(xml: &str, expected_records: usize) -> Stats {
 }
 
 #[test]
-fn oem_xml_parsing_does_not_allocate_per_state_vector() {
+fn oem_xml_parsing_has_bounded_scratch_allocations() {
     let small_records = 100;
     let large_records = 2_000;
     let small_xml = oem_xml(small_records);
     let large_xml = oem_xml(large_records);
 
-    // Warm any one-time global state before measuring.
-    black_box(Oem::from_xml(&small_xml).unwrap());
-
-    let small = parse_stats(&small_xml, small_records);
-    let large = parse_stats(&large_xml, large_records);
-
-    let extra_records = large_records - small_records;
-    let extra_allocations = large.allocations.saturating_sub(small.allocations);
-    // Growing the state-vector `Vec` is a reallocation, not an allocation, so parsing a longer
-    // ephemeris must not raise the allocation count at all.
-    assert_eq!(
-        extra_allocations, 0,
-        "XML parsing allocated per state vector: {extra_allocations} extra allocations for \
-         {extra_records} extra records (small={small:?}, large={large:?})"
-    );
+    // Exercise optional acceleration elements too: their former nullable adapter allocated
+    // JSON maps per component, invisible to a six-column-only budget.
+    for (acceleration, allocations_per_record) in [
+        ("", 0),
+        (
+            "<X_DDOT>0.1</X_DDOT><Y_DDOT>0.2</Y_DDOT><Z_DDOT>0.3</Z_DDOT>",
+            0,
+        ),
+        (
+            "<X_DDOT units=\"km/s**2\">0.1</X_DDOT><Y_DDOT>0.2</Y_DDOT><Z_DDOT>0.3</Z_DDOT>",
+            3,
+        ),
+    ] {
+        let small_xml =
+            small_xml.replace("</stateVector>", &format!("{acceleration}</stateVector>"));
+        let large_xml =
+            large_xml.replace("</stateVector>", &format!("{acceleration}</stateVector>"));
+        black_box(Oem::from_xml(&small_xml).unwrap());
+        let small = parse_stats(&small_xml, small_records);
+        let large = parse_stats(&large_xml, large_records);
+        // quick-xml's attribute/nil checks allocate for explicit units. Keep that
+        // cost bounded; implicit-unit records, including accelerations, allocate no scratch.
+        assert!(
+            large.allocations
+                <= small.allocations + allocations_per_record * (large_records - small_records),
+            "XML parsing exceeded its allocation budget: small={small:?}, large={large:?}"
+        );
+    }
 }

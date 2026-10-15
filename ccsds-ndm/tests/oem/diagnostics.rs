@@ -78,3 +78,31 @@ fn xml_syntax_diagnostics_identify_the_notation_without_inventing_a_location() {
     assert_eq!(diagnostic.code, Some("parse.xml.syntax"));
     assert_eq!(diagnostic.source_location, None);
 }
+
+#[test]
+fn missing_xml_covariance_epoch_reports_where_deserialization_failed() {
+    let start = XML.find("<covarianceMatrix>").unwrap();
+    let epoch_start = start + XML[start..].find("<EPOCH>").unwrap();
+    let epoch_end = epoch_start + XML[epoch_start..].find("</EPOCH>").unwrap() + "</EPOCH>".len();
+    let missing = format!("{}{}", &XML[..epoch_start], &XML[epoch_end..]);
+    for input in [
+        missing.clone(),
+        missing.replacen(
+            "<covarianceMatrix>",
+            "<covarianceMatrix xmlns:extra=\n'urn:extra'>",
+            1,
+        ),
+    ] {
+        let end = input.find("</covarianceMatrix>").unwrap() + "</covarianceMatrix>".len();
+        let line = input[..end].bytes().filter(|&byte| byte == b'\n').count() + 1;
+        let error = Oem::from_xml(&input).unwrap_err();
+        assert!(
+            error.to_string().contains("missing field `EPOCH`"),
+            "{error}"
+        );
+        assert!(
+            error.to_string().contains(&format!("near line {line},")),
+            "{error}"
+        );
+    }
+}

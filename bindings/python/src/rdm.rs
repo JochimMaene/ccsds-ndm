@@ -118,7 +118,7 @@ impl Rdm {
     /// Validate the message against CCSDS rules.
     ///
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
-        crate::api::validate_message(&self.to_core(py)?)
+        crate::api::validate_message(py, &self.to_core(py)?)
     }
 
     fn __repr__(&self, py: Python<'_>) -> String {
@@ -155,7 +155,7 @@ impl Rdm {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(data, format)?;
+        let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
 
@@ -169,7 +169,7 @@ impl Rdm {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed_file(&path, format)?;
+        let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
 
@@ -182,7 +182,12 @@ impl Rdm {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<()> {
-        crate::api::generate_file(&ccsds_ndm::Message::Rdm(self.to_core(py)?), &path, format)
+        crate::api::generate_file(
+            py,
+            &ccsds_ndm::Message::Rdm(self.to_core(py)?),
+            &path,
+            format,
+        )
     }
 
     /// Serialize to string (generic).
@@ -201,7 +206,7 @@ impl Rdm {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<String> {
-        crate::api::generate_string(&self.to_core(py)?, format)
+        crate::api::generate_string(py, &self.to_core(py)?, format)
     }
 }
 
@@ -619,6 +624,8 @@ impl RdmMetadata {
     ///
     /// Examples: SATCAT, ESA SST
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_catalog_name(&self) -> Option<String> {
@@ -634,6 +641,8 @@ impl RdmMetadata {
     ///
     /// Examples: 37451, 125387U
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_object_designator(&self) -> Option<String> {
@@ -647,6 +656,8 @@ impl RdmMetadata {
     /// The object type.
     ///
     /// Examples: PAYLOAD, ROCKET BODY, DEBRIS, OTHER, UNKNOWN
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -672,6 +683,8 @@ impl RdmMetadata {
     ///
     /// Examples: DLR, INTELSAT, ESA, UNKNOWN
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_object_owner(&self) -> Option<String> {
@@ -687,6 +700,8 @@ impl RdmMetadata {
     /// registry, reference `[6]`.
     ///
     /// Examples: ESA, EUMETSAT
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -780,6 +795,8 @@ impl RdmMetadata {
     ///
     /// Examples: ITRF-97, EME2000, ICRF
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_ref_frame(&self) -> Option<String> {
@@ -794,6 +811,8 @@ impl RdmMetadata {
     /// (formatting rules specified in 5.3.3.5).
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -813,6 +832,8 @@ impl RdmMetadata {
     ///
     /// Examples: NONE, EPHEMERIS, INTELSAT2
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_ephemeris_name(&self) -> Option<String> {
@@ -827,6 +848,8 @@ impl RdmMetadata {
     /// harmonic coefficients applied should be given along with the name of the model.
     ///
     /// Examples: EGM-96: 36D 36O, JGM-2: 41D 41O
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -843,6 +866,8 @@ impl RdmMetadata {
     ///
     /// Examples: MSIS, JACCHIA 70, MSISE-90, NRLMSISE-00
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_atmospheric_model(&self) -> Option<String> {
@@ -856,6 +881,8 @@ impl RdmMetadata {
     /// The method used to predict the solar flux and geomagnetic indices.
     ///
     /// Examples: STOCHASTIC, PREDICTED: MLLRT
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -873,6 +900,8 @@ impl RdmMetadata {
     ///
     /// Examples: MOON, SUN, JUPITER, NONE
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_n_body_perturbations(&self) -> Option<String> {
@@ -887,6 +916,8 @@ impl RdmMetadata {
     /// radiation pressure was not modelled.
     ///
     /// Examples: GSPM04, NO
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -903,6 +934,8 @@ impl RdmMetadata {
     ///
     /// Examples: ESR, NO
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_earth_tides(&self) -> Option<String> {
@@ -916,6 +949,8 @@ impl RdmMetadata {
     /// Indicator on whether in-track thrust modeling was used in the simulation.
     ///
     /// Examples: YES, NO
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -937,6 +972,8 @@ impl RdmMetadata {
     ///
     /// Examples: DESIGN, CFD: TOOL1, CFD DMSCFOAM, OD
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_drag_parameters_source(&self) -> Option<String> {
@@ -955,6 +992,8 @@ impl RdmMetadata {
     ///
     /// Units: km
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_drag_parameters_altitude(&self) -> Option<f64> {
@@ -971,6 +1010,8 @@ impl RdmMetadata {
     /// The method used to determine the orbit lifetime uncertainty or the re-entry windows.
     ///
     /// Examples: NONE, ANALYTICAL, STOCHASTIC, EMPIRICAL
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1000,6 +1041,8 @@ impl RdmMetadata {
     ///
     /// Examples: NONE, MASS-LOSS, BREAK-UP, MASS-LOSS + BREAK-UP
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_reentry_disintegration(&self) -> Option<String> {
@@ -1024,6 +1067,8 @@ impl RdmMetadata {
     /// The method used to determine the impact location confidence interval(s).
     ///
     /// Examples: NONE, ANALYTICAL, STOCHASTIC, EMPIRICAL
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1050,6 +1095,8 @@ impl RdmMetadata {
     ///
     /// Examples: ESA/2015-563892348
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_previous_message_id(&self) -> Option<String> {
@@ -1064,6 +1111,8 @@ impl RdmMetadata {
     /// 5.3.3.5).
     ///
     /// Examples: 2001-11-06T11:17:33
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1083,6 +1132,8 @@ impl RdmMetadata {
     /// 5.3.3.5); N/A if no other message is scheduled.
     ///
     /// Examples: 2001-11-06T11:17:33, N/A
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1496,6 +1547,8 @@ impl AtmosphericReentryParameters {
     ///
     /// Units: d
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_orbit_lifetime_window_start(&self) -> Option<f64> {
@@ -1520,6 +1573,8 @@ impl AtmosphericReentryParameters {
     ///
     /// Units: d
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_orbit_lifetime_window_end(&self) -> Option<f64> {
@@ -1540,6 +1595,8 @@ impl AtmosphericReentryParameters {
     /// Predicted epoch at which the object’s altitude permanently drops below
     /// NOMINAL_REENTRY_ALTITUDE (formatting rules specified in 5.3.3.5).
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_nominal_reentry_epoch(&self) -> Option<String> {
@@ -1557,6 +1614,8 @@ impl AtmosphericReentryParameters {
     /// Start epoch of the predicted atmospheric re-entry window (formatting rules specified in
     /// 5.3.3.5).
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_reentry_window_start(&self) -> Option<String> {
@@ -1573,6 +1632,8 @@ impl AtmosphericReentryParameters {
 
     /// End epoch of the predicted atmospheric re-entry window (formatting rules specified in
     /// 5.3.3.5).
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1593,6 +1654,8 @@ impl AtmosphericReentryParameters {
     /// REENTRY_WINDOW_START and REENTRY_WINDOW_END.
     ///
     /// Units: %
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1677,6 +1740,8 @@ impl RdmSpacecraftParameters {
     ///
     /// Units: kg
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_wet_mass(&self) -> Option<f64> {
@@ -1694,6 +1759,8 @@ impl RdmSpacecraftParameters {
     ///
     /// Units: kg
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_dry_mass(&self) -> Option<f64> {
@@ -1709,6 +1776,8 @@ impl RdmSpacecraftParameters {
 
     /// Comma separated list of hazardous substances contained by the object.
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_hazardous_substances(&self) -> Option<String> {
@@ -1722,6 +1791,8 @@ impl RdmSpacecraftParameters {
     /// Object area exposed to Solar Radiation Pressure (SRP).
     ///
     /// Units: m²
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1738,6 +1809,8 @@ impl RdmSpacecraftParameters {
 
     /// Object solar radiation coefficient.
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_solar_rad_coeff(&self) -> Option<f64> {
@@ -1751,6 +1824,8 @@ impl RdmSpacecraftParameters {
     /// Object cross-sectional area.
     ///
     /// Units: m²
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1767,6 +1842,8 @@ impl RdmSpacecraftParameters {
 
     /// Object drag coefficient.
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_drag_coeff(&self) -> Option<f64> {
@@ -1780,6 +1857,8 @@ impl RdmSpacecraftParameters {
     /// Object radar cross section.
     ///
     /// Units: m²
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1798,6 +1877,8 @@ impl RdmSpacecraftParameters {
     ///
     /// Units: kg/m²
     ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_ballistic_coeff(&self) -> Option<f64> {
@@ -1812,6 +1893,8 @@ impl RdmSpacecraftParameters {
     /// covariance to NOMINAL_RENTRY_EPOCH (if a controlled re-entry).
     ///
     /// Units: m/s²
+    ///
+    /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
     /// :type: Optional[float]
     #[getter]

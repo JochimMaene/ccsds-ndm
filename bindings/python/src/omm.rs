@@ -120,7 +120,7 @@ impl Omm {
     /// Validate the message against CCSDS rules.
     ///
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
-        crate::api::validate_message(&self.to_core(py)?)
+        crate::api::validate_message(py, &self.to_core(py)?)
     }
 
     #[staticmethod]
@@ -131,7 +131,7 @@ impl Omm {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed(data, format)?;
+        let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
 
@@ -145,7 +145,7 @@ impl Omm {
         #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = crate::api::parse_typed_file(&path, format)?;
+        let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
 
@@ -158,7 +158,12 @@ impl Omm {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<()> {
-        crate::api::generate_file(&ccsds_ndm::Message::Omm(self.to_core(py)?), &path, format)
+        crate::api::generate_file(
+            py,
+            &ccsds_ndm::Message::Omm(self.to_core(py)?),
+            &path,
+            format,
+        )
     }
 
     /// Serialize to validated KVN or XML.
@@ -168,7 +173,7 @@ impl Omm {
         #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
         format: &str,
     ) -> PyResult<String> {
-        crate::api::generate_string(&self.to_core(py)?, format)
+        crate::api::generate_string(py, &self.to_core(py)?, format)
     }
 
     /// Generate canonical NORAD TLE lines (line 1 and line 2) from this OMM.
@@ -503,6 +508,8 @@ impl OmmMetadata {
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.3.
+    ///
     /// :type: Optional[str]
     #[getter]
     fn get_ref_frame_epoch(&self) -> Option<String> {
@@ -800,6 +807,8 @@ impl MeanElements {
     ///
     /// Units: km³/s²
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_gm(&self) -> Option<f64> {
@@ -897,10 +906,10 @@ impl OmmData {
     /// mean_elements : MeanElements
     ///     Mean elements.
     #[new]
-    #[pyo3(signature = (mean_elements, comments=None))]
-    fn new(mean_elements: Py<MeanElements>, comments: Option<Vec<String>>) -> Self {
+    #[pyo3(signature = (mean_elements, comment=None))]
+    fn new(mean_elements: Py<MeanElements>, comment: Option<Vec<String>>) -> Self {
         Self {
-            comment: comments.unwrap_or_default(),
+            comment: comment.unwrap_or_default(),
             mean_elements,
             spacecraft_parameters: None,
             tle_parameters: None,
@@ -1078,6 +1087,8 @@ impl TleParameters {
 
     /// Ephemeris type. Default value = 0. (See 4.2.4.7.)
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
+    ///
     /// :type: Optional[int]
     #[getter]
     fn get_ephemeris_type(&self) -> Option<i32> {
@@ -1090,6 +1101,8 @@ impl TleParameters {
     }
 
     /// Classification type. Default value = U. (See 4.2.4.7.)
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -1104,6 +1117,8 @@ impl TleParameters {
 
     /// NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword
     /// is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -1121,6 +1136,8 @@ impl TleParameters {
     /// and therefore only meaningful if TLE-based data is being exchanged (i.e.,
     /// MEAN_ELEMENT_THEORY = SGP/SGP4).
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
+    ///
     /// :type: Optional[int]
     #[getter]
     fn get_element_set_no(&self) -> Option<u32> {
@@ -1133,6 +1150,8 @@ impl TleParameters {
     }
 
     /// Revolution Number
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
     ///
     /// :type: Optional[int]
     #[getter]
@@ -1149,6 +1168,8 @@ impl TleParameters {
     /// MEAN_ELEMENT_THEORY= SGP4 (BSTAR = drag parameter for SGP4).
     ///
     /// Units: 1/[Earth radii]
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1169,6 +1190,8 @@ impl TleParameters {
     /// 0.0286.
     ///
     /// Units: m²/kg
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -1206,6 +1229,8 @@ impl TleParameters {
     ///
     /// Units: rev/day³
     ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_mean_motion_ddot(&self) -> Option<f64> {
@@ -1224,6 +1249,8 @@ impl TleParameters {
     /// when MEAN_ELEMENT_THEORY= SGP4-XP.
     ///
     /// Units: m²/kg
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
     ///
     /// :type: Optional[float]
     #[getter]

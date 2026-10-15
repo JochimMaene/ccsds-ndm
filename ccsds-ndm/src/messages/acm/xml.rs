@@ -9,6 +9,7 @@ pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {
     use crate::xml::XmlSequenceRule;
     crate::xml::validate_element_sequences(
         xml,
+        b"acm",
         "ACM",
         |parent, child| {
             let children = acm_xml_children(parent)?;

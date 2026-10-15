@@ -140,6 +140,8 @@ impl QuaternionState {
     ///
     /// Units: 1/s
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: list[float] | None
     #[getter]
     fn get_quaternion_dot(&self) -> Option<Vec<f64>> {
@@ -392,6 +394,8 @@ impl EulerAngleState {
     ///
     /// Units: deg/s
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_angle_1_dot(&self) -> Option<f64> {
@@ -409,6 +413,8 @@ impl EulerAngleState {
     ///
     /// Units: deg/s
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_angle_2_dot(&self) -> Option<f64> {
@@ -425,6 +431,8 @@ impl EulerAngleState {
     /// Time derivative of angle of the third rotation.
     ///
     /// Units: deg/s
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -780,6 +788,8 @@ impl SpinState {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_nutation(&self) -> Option<f64> {
@@ -793,6 +803,8 @@ impl SpinState {
     /// Body nutation period of the spin axis.
     ///
     /// Units: s
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -811,6 +823,8 @@ impl SpinState {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_nutation_phase(&self) -> Option<f64> {
@@ -825,6 +839,8 @@ impl SpinState {
     /// Right ascension of angular momentum vector in frame A.
     ///
     /// Units: deg
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: Optional[float]
     #[getter]
@@ -841,6 +857,8 @@ impl SpinState {
     ///
     /// Units: deg
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    ///
     /// :type: Optional[float]
     #[getter]
     fn get_momentum_delta(&self) -> Option<f64> {
@@ -855,6 +873,8 @@ impl SpinState {
     /// Angular velocity of spin vector around the angular momentum vector.
     ///
     /// Units: deg/s
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
     /// :type: Optional[float]
     #[getter]

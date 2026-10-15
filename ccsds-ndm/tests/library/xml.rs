@@ -9,6 +9,32 @@ use crate::common::{mutated, mutated_once};
 use ccsds_ndm::{from_str, Ndm};
 
 #[test]
+fn xml_reading_accepts_equivalent_declarations_and_unused_namespace_omission() {
+    for fixture in [
+        include_str!("../../data/xml/oem_g14.xml"),
+        include_str!("../../data/xml/opm_g5.xml"),
+        include_str!("../../data/xml/aem_g11.xml"),
+    ] {
+        let expected = from_str(fixture).unwrap();
+        let generated = expected.to_xml().unwrap();
+        let input = generated
+            .replacen(
+                XML_DECL,
+                "<?xml version='1.0' encoding='utf-8' standalone='yes'?>",
+                1,
+            )
+            .replace(
+                " xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"",
+                "",
+            );
+        assert_eq!(from_str(&input).unwrap(), expected);
+        let output = from_str(&input).unwrap().to_xml().unwrap();
+        assert!(output.starts_with(XML_DECL));
+        assert!(output.contains("xmlns:xsi="));
+    }
+}
+
+#[test]
 fn standalone_xml_roots_reject_unknown_attributes_and_metadata() {
     let acm = from_str(include_str!("../../data/kvn/acm_g6.kvn"))
         .unwrap()
@@ -65,7 +91,116 @@ fn strict_xml_rejects_forbidden_xml_1_characters() {
     );
 }
 
+#[test]
+fn xml_rejects_mixed_content_and_invalid_references_without_losing_valid_text() {
+    for input in [
+        include_str!("../../data/xml/oem_g14.xml"),
+        include_str!("../../data/xml/opm_g5.xml"),
+        CDM,
+    ] {
+        for value in ["&unknown;", "&#1;", "<invalid"] {
+            let root = input.rfind(" version=").unwrap();
+            let mut invalid = input.to_owned();
+            invalid.insert_str(root, &format!(" xsi:schemaLocation=\"{value}\""));
+            assert_eq!(
+                from_str(&invalid).unwrap_err().code(),
+                Some("parse.xml.syntax")
+            );
+        }
+        for text in ["unexpected", "<![CDATA[unexpected]]>", "&#65;", "&amp;"] {
+            for marker in ["<header>", "</header>"] {
+                let invalid = mutated_once(input, marker, &format!("{text}{marker}"));
+                assert_eq!(
+                    from_str(&invalid).unwrap_err().code(),
+                    Some("parse.xml.syntax")
+                );
+            }
+        }
+        // XSD permits whitespace character information items regardless of their spelling.
+        // libxml2 rejects whitespace CDATA here, contrary to XSD 1.0 3.4.4(2.3).
+        let expected = from_str(input).unwrap();
+        for whitespace in ["&#32;", "&#x9;&#10;&#13;", "<![CDATA[ \t\n]]>"] {
+            for marker in ["<header>", "</header>", "</body>"] {
+                let valid = mutated_once(input, marker, &format!("{whitespace}{marker}"));
+                assert_eq!(from_str(&valid).unwrap(), expected);
+            }
+        }
+        for reference in ["&#1;", "&#xFFFF;", "&unknown;"] {
+            let invalid = mutated_once(input, "<ORIGINATOR>", &format!("<ORIGINATOR>{reference}"));
+            assert_eq!(
+                from_str(&invalid).unwrap_err().code(),
+                Some("parse.xml.syntax")
+            );
+        }
+        for suffix in ["&#32;", "&amp;", "\u{a0}", "<!-- invalid -- comment -->"] {
+            assert_eq!(
+                from_str(&format!("{input}{suffix}")).unwrap_err().code(),
+                Some("parse.xml.syntax"),
+                "accepted {suffix}"
+            );
+        }
+        let valid = mutated_once(
+            input,
+            "<ORIGINATOR>",
+            "<ORIGINATOR><![CDATA[A & B]]>&amp;&#65;",
+        );
+        let parsed = from_str(&valid).unwrap();
+        assert!(parsed.to_xml().unwrap().contains("A &amp; B&amp;A"));
+    }
+}
+
 const XML_DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+#[test]
+fn xml_rejects_malformed_text_namespaces_and_processing_instructions() {
+    for input in [
+        include_str!("../../data/xml/oem_g14.xml"),
+        include_str!("../../data/xml/opm_g5.xml"),
+        CDM,
+    ] {
+        for (from, to) in [
+            ("<ORIGINATOR>", "<ORIGINATOR>]]>"),
+            ("<header>", "<header xmlns:p=\"\">"),
+            ("<header>", "<?XML invalid?><header>"),
+            ("<header>", "<? invalid?><header>"),
+        ] {
+            let invalid = mutated_once(input, from, to);
+            assert_eq!(
+                from_str(&invalid).unwrap_err().code(),
+                Some("parse.xml.syntax"),
+                "accepted {to}"
+            );
+        }
+        // Prefix aliases cannot disguise duplicate expanded attribute names, at any depth.
+        for hint in ["schemaLocation", "noNamespaceSchemaLocation"] {
+            for marker in ["id=", "<header>"] {
+                let attributes = format!(
+                    " xmlns:q=\"http://www.w3.org/2001/XMLSchema-instance\" \
+                     xsi:{hint}=\"urn:test\" q:{hint}=\"urn:test\""
+                );
+                let replacement = if marker == "id=" {
+                    format!("{attributes} {marker}")
+                } else {
+                    format!("<header{attributes}>")
+                };
+                let invalid = mutated_once(input, marker, &replacement);
+                assert_eq!(
+                    from_str(&invalid).unwrap_err().code(),
+                    Some("parse.xml.syntax"),
+                    "accepted duplicate {hint}"
+                );
+            }
+        }
+        let valid = mutated_once(
+            input,
+            "<header>",
+            "<?xml-stylesheet href='style.xsl'?><?π valid?><header xmlns=\"\">",
+        );
+        assert_eq!(from_str(&valid).unwrap(), from_str(input).unwrap());
+        let valid = mutated_once(input, "<ORIGINATOR>", "<ORIGINATOR>]]&gt;");
+        assert!(from_str(&valid).unwrap().to_xml().is_ok());
+    }
+}
 
 const CDM: &str = include_str!("../../data/xml/cdm_44.xml");
 

@@ -1,7 +1,40 @@
 use crate::common::{assert_rejects, mutated, mutated_once, validate_xml};
 use crate::{KVN_FIXTURES, XML};
 use ccsds_ndm::messages::oem::Oem;
-use ccsds_ndm::{Message, Ndm};
+use ccsds_ndm::{Ndm, Validate};
+
+#[test]
+fn xml_preserves_carriage_returns_in_text() {
+    let mut message = Oem::from_xml(XML).unwrap();
+    message.header.originator = "first\rsecond\r\nthird".into();
+    message.body.segment[0].data.comment = vec!["a\rb".into()];
+    let xml = message.to_xml().unwrap();
+    assert_eq!(Oem::from_xml(&xml).unwrap(), message);
+    let mut streamed = Vec::new();
+    message.write_xml_to(&mut streamed).unwrap();
+    assert_eq!(streamed, xml.as_bytes());
+    validate_xml("carriage returns", &xml);
+}
+
+#[test]
+fn xml_degrees_outside_the_kvn_integer_range_fail_before_output() {
+    let mut message = Oem::from_xml(XML).unwrap();
+    message.body.segment[0].metadata.interpolation_degree = Some("2147483648".parse().unwrap());
+    let xml = message.to_xml().unwrap();
+    validate_xml("positiveInteger degree", &xml);
+    assert_eq!(Oem::from_xml(&xml).unwrap(), message);
+    let path = "body.segment[0].metadata.interpolation_degree";
+    let mut output = Vec::new();
+    for error in [
+        message.to_kvn().unwrap_err(),
+        message.write_kvn_to(&mut output).unwrap_err(),
+    ] {
+        assert_eq!(error.code(), Some("validation.out_of_range"), "{error}");
+        assert_eq!(error.field_path().as_deref(), Some(path), "{error}");
+    }
+    assert!(output.is_empty());
+}
+
 #[test]
 fn every_shipped_fixture_generates_deterministic_xsd_valid_xml_and_reparseable_kvn() {
     let messages = ["kvn", "xml"].into_iter().flat_map(|extension| {
@@ -22,6 +55,16 @@ fn every_shipped_fixture_generates_deterministic_xsd_valid_xml_and_reparseable_k
         let xml = message.to_xml().unwrap();
         assert_eq!(message.to_xml().unwrap(), xml);
         validate_xml(&name, &xml);
+        // NDM/XML 4.2-4.3: the exact declaration, then a root declaring both namespaces.
+        let root = format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<oem \
+             xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" \
+             xmlns:ndm=\"urn:ccsds:schema:ndmxml\" id=\"CCSDS_OEM_VERS\" version=\"{}\">",
+            message.version
+        );
+        assert!(xml.starts_with(&root), "{name}");
+        // Each OEM value has one fixed unit, and the schema makes `units` optional.
+        assert!(!xml.contains("units="), "{name}");
         assert_eq!(Oem::from_xml(&xml).unwrap(), message);
 
         let kvn = message.to_kvn().unwrap();
@@ -34,15 +77,10 @@ fn every_shipped_fixture_generates_deterministic_xsd_valid_xml_and_reparseable_k
 
 #[test]
 fn generation_diagnostics_identify_the_message_and_field() {
-    let message = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
-    let mut invalid = message;
+    // `library::output` covers the typed and generic output paths; this pins the context.
+    let mut invalid = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
     invalid.body.segment[0].metadata.object_name.clear();
-    for error in [
-        invalid.to_kvn().unwrap_err(),
-        invalid.to_xml().unwrap_err(),
-        Message::Oem(invalid.clone()).to_kvn().unwrap_err(),
-        Message::Oem(invalid).to_xml().unwrap_err(),
-    ] {
+    for error in [invalid.to_kvn().unwrap_err(), invalid.to_xml().unwrap_err()] {
         assert_eq!(error.code(), Some("validation.missing_required_field"));
         assert_eq!(
             error.field_path().as_deref(),
@@ -73,32 +111,46 @@ fn kvn_generation_rejects_overlapping_useable_spans() {
 }
 
 #[test]
-fn kvn_rounds_to_the_ccsds_digit_limit_and_rejects_partial_acceleration() {
+fn kvn_rounds_to_the_ccsds_digit_limit() {
     let mut message = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
     message.body.segment[0].data.state_vector[0].x.value = 1.234_567_890_123_456_7;
     assert!(message.to_kvn().unwrap().contains("1.234567890123457e0"));
     message.to_xml().expect("XML retains the exact f64 value");
-
-    let mut message = Oem::from_xml(XML).unwrap();
-    let state = &mut message.body.segment[0].data.state_vector[0];
-    state.y_ddot = None;
-    let mut output = Vec::new();
-    message
-        .write_kvn_to(&mut output)
-        .expect_err("partial acceleration must fail preflight");
-    assert!(output.is_empty());
-    message
-        .to_xml()
-        .expect("partial acceleration remains valid XML");
 }
 
 #[test]
-fn kvn_rejects_an_overlong_raw_record_before_writing() {
+fn kvn_rejects_empty_optional_values_that_would_read_back_as_absent() {
+    // ODM 7.5.1: KVN reads an empty optional value as absent, so XML `<INTERPOLATION/>`
+    // cannot be converted without losing it.
+    let message = Oem::from_xml(XML).unwrap();
+    for (mutate, path) in [
+        (
+            (|m: &mut Oem| m.body.segment[0].metadata.interpolation = Some(String::new()))
+                as fn(&mut Oem),
+            "body.segment[0].metadata.interpolation",
+        ),
+        (
+            |m| m.body.segment[0].data.covariance_matrix[0].cov_ref_frame = Some(" ".into()),
+            "body.segment[0].data.covariance_matrix[0].cov_ref_frame",
+        ),
+    ] {
+        let mut invalid = message.clone();
+        mutate(&mut invalid);
+        invalid.to_xml().expect("XML keeps an empty element");
+        assert_eq!(
+            invalid.to_kvn().unwrap_err().field_path().as_deref(),
+            Some(path)
+        );
+    }
+}
+
+#[test]
+fn kvn_record_width_is_bounded_by_the_epoch_and_number_grammar() {
+    // ODM 7.5.10 caps epoch fractions at the 16-digit fixed-point maximum and 7.5.7 caps
+    // mantissas at 16 digits, so the widest valid record still fits a 254-character line.
     let mut message = Oem::from_xml(XML).unwrap();
     let state = &mut message.body.segment[0].data.state_vector[0];
-    state.epoch = "2019-12-18T12:00:00.1111111111111111111111111111111111111111"
-        .parse()
-        .unwrap();
+    state.epoch = "2019-12-18T12:00:00.3311111111111111Z".parse().unwrap();
     for value in [
         &mut state.x.value,
         &mut state.y.value,
@@ -110,14 +162,20 @@ fn kvn_rejects_an_overlong_raw_record_before_writing() {
         &mut state.y_ddot.as_mut().unwrap().value,
         &mut state.z_ddot.as_mut().unwrap().value,
     ] {
-        *value = 1.797_693_134_862_315e308;
+        *value = -1.797_693_134_862_315e308;
     }
+    let kvn = message.to_kvn().unwrap();
+    assert!(kvn.lines().all(|line| line.len() <= 254));
+    // The emitted document must read back, which is what makes the width limit meaningful.
+    assert_eq!(Oem::from_kvn(&kvn).unwrap(), message);
 
+    message.body.segment[0].data.state_vector[0].epoch =
+        "2019-12-18T12:00:00.33111111111111111".parse().unwrap();
     let mut output = Vec::new();
     let error = message
         .write_kvn_to(&mut output)
-        .expect_err("a record over 254 characters must fail preflight");
-    assert_eq!(error.code(), Some("validation.out_of_range"));
+        .expect_err("a 17-digit epoch fraction must fail before writing");
+    crate::common::assert_validation_field(&error, "stateVector EPOCH");
     assert!(output.is_empty());
 }
 
@@ -143,26 +201,25 @@ fn unsupported_editions_and_edition_specific_fields_are_rejected() {
 #[test]
 fn notation_specific_text_rules_fail_before_output() {
     let mut message = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
+    let check = |error: ccsds_ndm::error::CcsdsNdmError, code| {
+        assert_eq!(error.code(), Some(code), "{error}");
+        assert_eq!(
+            error.field_path().as_deref(),
+            Some("body.segment[0].metadata.object_name"),
+            "{error}"
+        );
+    };
     message.body.segment[0].metadata.object_name = "MARS €".into();
     message
         .to_xml()
         .expect("Unicode text is representable in XML 1.0");
-    assert_eq!(
-        message.to_kvn().unwrap_err().code(),
-        Some("validation.invalid_value")
-    );
+    check(message.to_kvn().unwrap_err(), "validation.invalid_value");
 
     message.body.segment[0].metadata.object_name = "MARS\u{1}".into();
-    assert_eq!(
-        message.to_xml().unwrap_err().code(),
-        Some("validation.invalid_value")
-    );
+    check(message.to_xml().unwrap_err(), "validation.invalid_value");
 
     message.body.segment[0].metadata.object_name = "x".repeat(240);
-    assert_eq!(
-        message.to_kvn().unwrap_err().code(),
-        Some("validation.out_of_range")
-    );
+    check(message.to_kvn().unwrap_err(), "validation.out_of_range");
 }
 
 #[test]
@@ -181,7 +238,10 @@ fn reference_frame_epoch_is_calendar_form_in_xml() {
         "<REF_FRAME_EPOCH>2000-01-01T12:00:00</REF_FRAME_EPOCH>",
         "<REF_FRAME_EPOCH>123.5</REF_FRAME_EPOCH>",
     );
-    crate::common::assert_invalid_epoch(&Oem::from_xml(&numeric).unwrap_err(), "123.5");
+    crate::common::assert_validation_field(
+        &Oem::from_xml(&numeric).unwrap_err(),
+        "REF_FRAME_EPOCH",
+    );
 }
 
 #[test]
@@ -212,36 +272,6 @@ fn generation_rejects_mutated_contextual_epochs() {
 }
 
 #[test]
-fn oem_generation_rejects_non_finite_state_vectors() {
-    let mut oem = Oem::from_xml(XML).unwrap();
-    oem.body.segment[0].data.state_vector[0].x.value = f64::NAN;
-
-    let error = oem.to_kvn().unwrap_err();
-    assert!(error.to_string().contains("representable CCSDS number"));
-
-    let mut oem = Oem::from_xml(XML).unwrap();
-    oem.body.segment[0].data.covariance_matrix[0].cx_x.value = f64::INFINITY;
-
-    let error = oem.to_kvn().unwrap_err();
-    assert!(error.to_string().contains("finite number"));
-}
-
-#[test]
-fn oem_generation_handles_maximum_width_records_without_panicking() {
-    // Widen every component of one state vector to the longest spelling the CCSDS digit limit
-    // allows, so the record sits just under the 254-character line limit.
-    let widest = f64::from_bits(f64::MAX.to_bits() - 2);
-    let oem = oem_with_state_vector_components(&format!("{widest:e}"));
-
-    let output = oem
-        .to_kvn()
-        .expect("the widest representable values should generate");
-    assert!(output.contains("1.797693134862315e308"));
-    // The emitted document must read back, which is what makes the width limit meaningful.
-    Oem::from_kvn(&output).expect("widest records round-trip");
-}
-
-#[test]
 fn oem_generation_rejects_values_the_ccsds_digit_limit_cannot_represent() {
     // Rounding `f64::MAX` to 16 digits overflows to infinity, so it has no CCSDS spelling.
     let oem = oem_with_state_vector_components("1.7976931348623157e308");
@@ -249,9 +279,11 @@ fn oem_generation_rejects_values_the_ccsds_digit_limit_cannot_represent() {
     let error = oem
         .to_kvn()
         .expect_err("f64::MAX has no representable CCSDS spelling");
-    assert!(
-        error.to_string().contains("representable CCSDS number"),
-        "unexpected diagnostic: {error}"
+    assert_eq!(error.code(), Some("validation.invalid_value"), "{error}");
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[0].data.state_vector[0].x"),
+        "{error}"
     );
 }
 
@@ -267,11 +299,74 @@ fn oem_with_state_vector_components(replacement: &str) -> Oem {
 
 #[test]
 fn serializes_multiple_covariance_matrices_in_one_block() {
-    let oem = Oem::from_kvn(include_str!("../../data/kvn/oem_g13.kvn")).unwrap();
+    let oem = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
     assert_eq!(oem.body.segment[0].data.covariance_matrix.len(), 2);
 
     let output = oem.to_kvn().unwrap();
     assert_eq!(output.matches("COVARIANCE_START").count(), 1);
     assert_eq!(output.matches("COVARIANCE_STOP").count(), 1);
     assert_eq!(output.matches("EPOCH").count(), 2);
+}
+
+#[test]
+fn kvn_generation_applies_the_model_rules_it_checks_while_writing() {
+    // The OEM KVN writer validates as it renders instead of calling `validate()` first, so each
+    // model rule is pinned on every output path, not only on `validate()`.
+    let base = || Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    let mut message = base();
+    message.body.segment[1].metadata.time_system = "TAI".into();
+    assert_rejects(&message, "TIME_SYSTEM");
+
+    let mut message = base();
+    message.body.segment[1].metadata.object_id = "DIFFERENT".into();
+    assert_rejects(&message, "OBJECT_NAME/OBJECT_ID");
+
+    let mut message = base();
+    message.body.segment[0].data.state_vector.clear();
+    assert_rejects(&message, "stateVector (at least one required)");
+
+    let mut message = base();
+    message.header.originator = " ".into();
+    assert_rejects(&message, "ORIGINATOR");
+
+    let mut message = Oem::from_xml(XML).unwrap();
+    let segment = &mut message.body.segment[0];
+    let mut covariance = segment.data.covariance_matrix[0].clone();
+    covariance.epoch = segment.metadata.start_time;
+    segment.data.covariance_matrix.push(covariance);
+    assert_rejects(&message, "covarianceMatrix EPOCH");
+}
+
+#[test]
+fn kvn_generation_rejects_what_only_kvn_cannot_hold() {
+    // Valid models that KVN cannot represent: text outside printable ASCII (7.3.4) and
+    // non-finite numbers (7.5.4). XML carries them, so only the KVN paths fail.
+    let check = |message: Oem, path: &str| {
+        message.validate().unwrap();
+        message.to_xml().unwrap();
+        let mut output = Vec::new();
+        for error in [
+            message.to_kvn().unwrap_err(),
+            message.write_kvn_to(&mut output).unwrap_err(),
+        ] {
+            assert_eq!(error.field_path().as_deref(), Some(path), "{error}");
+        }
+        assert!(output.is_empty(), "streaming KVN wrote bytes for {path}");
+    };
+    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    message.header.comment = vec!["caf\u{e9}".into()];
+    check(message, "header.comment");
+
+    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    message.header.originator = "caf\u{e9}".into();
+    check(message, "header.originator");
+
+    let mut message = Oem::from_kvn(KVN_FIXTURES[1]).unwrap();
+    let state = &mut message.body.segment[0].data.state_vector[0];
+    state.x_ddot.as_mut().unwrap().value = f64::NAN;
+    check(message, "body.segment[0].data.state_vector[0].x_ddot");
+
+    let mut message = Oem::from_xml(XML).unwrap();
+    message.body.segment[0].data.covariance_matrix[0].cz_x.value = f64::INFINITY;
+    check(message, "body.segment[0].data.covariance_matrix[0].cz_x");
 }

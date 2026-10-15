@@ -1,11 +1,12 @@
 use crate::error::{CcsdsNdmError, Result};
 use std::fs;
+use std::io::{BufWriter, Write};
 use std::path::Path;
 use tempfile::Builder;
 
 pub(crate) fn atomic_write(
     path: &Path,
-    write: impl FnOnce(&mut fs::File) -> Result<()>,
+    write: impl FnOnce(&mut BufWriter<&mut fs::File>) -> Result<()>,
 ) -> Result<()> {
     let parent = path
         .parent()
@@ -25,7 +26,11 @@ pub(crate) fn atomic_write(
         builder.permissions(fs::Permissions::from_mode(0o666));
     }
     let mut temporary = builder.tempfile_in(parent)?;
-    write(temporary.as_file_mut())?;
+    {
+        let mut output = BufWriter::new(temporary.as_file_mut());
+        write(&mut output)?;
+        output.flush()?;
+    }
     temporary.as_file().sync_all()?;
     if let Ok(metadata) = path.metadata() {
         temporary
@@ -40,6 +45,23 @@ pub(crate) fn atomic_write(
 mod tests {
     use super::*;
     use std::io::{ErrorKind, Write};
+
+    #[test]
+    fn successful_write_flushes_the_buffer_before_replacing_the_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("message");
+        fs::write(&destination, b"original").unwrap();
+        let expected = "new content\n".repeat(1_000);
+        atomic_write(&destination, |output| {
+            for byte in expected.bytes() {
+                output.write_all(&[byte])?;
+            }
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(fs::read_to_string(&destination).unwrap(), expected);
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+    }
 
     #[test]
     fn failed_write_discards_partial_output_and_cleans_up() {

@@ -239,45 +239,32 @@ fn strict_xml_rejects_attributes_the_schema_does_not_declare() {
         assert!(source.contains(from), "fixture should contain {from}");
         assert_xml_rejected(label, mutated(&source, from, to));
     }
-    // Nil cannot remove the required mass from a present spacecraft block.
-    crate::common::assert_validation_field(
-        &Opm::from_xml(&mutated(
-            &source,
-            "<MASS units=\"kg\">",
-            "<MASS units=\"km\" nil=\"true\">",
-        ))
-        .unwrap_err(),
-        "MASS",
-    );
 }
 
 #[test]
-fn strict_xml_keeps_schema_attributes_and_the_documented_nil_extension() {
+fn strict_xml_rejects_nil_because_no_opm_element_is_nillable() {
     let source = Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn"))
         .expect("fixture should parse")
         .to_xml()
         .expect("fixture should generate XML");
 
-    // `units` is schema-defined; `nil` on an otherwise attribute-free optional value is a
-    // documented compatibility extension.
+    // `units` is schema-defined. The OPM schema declares no nillable element, so neither the
+    // `xsi:nil` attribute nor an unprefixed `nil` is valid.
     Opm::from_xml(&source).expect("generated XML should round-trip");
-    let with_nil = mutated(
-        &source,
-        "<DRAG_COEFF>2.3</DRAG_COEFF>",
-        "<DRAG_COEFF nil=\"true\"/>",
-    );
-    assert_ne!(with_nil, source, "fixture should contain DRAG_COEFF");
-    let parsed = Opm::from_xml(&with_nil).expect("nil-marked optional value should be accepted");
-    assert!(
-        parsed
-            .body
-            .segment
-            .data
-            .spacecraft_parameters
-            .as_ref()
-            .is_some_and(|parameters| parameters.drag_coeff.is_none()),
-        "nil DRAG_COEFF should deserialize as absent"
-    );
+    for nil in ["nil=\"true\"", "xsi:nil=\"true\""] {
+        let with_nil = mutated(
+            &source,
+            "<DRAG_COEFF>2.3</DRAG_COEFF>",
+            &format!("<DRAG_COEFF {nil}/>"),
+        );
+        crate::common::assert_invalid_format(
+            &Opm::from_xml(&with_nil).unwrap_err(),
+            &format!(
+                "invalid OPM XML sequence: unknown attribute '{}' on 'DRAG_COEFF'",
+                nil.split('=').next().unwrap()
+            ),
+        );
+    }
 }
 
 #[test]
@@ -286,12 +273,13 @@ fn strict_xml_accepts_namespace_metadata_and_does_not_confuse_processing_instruc
     let source = mutated_once(
         &source,
         "?>",
-        "?><?xml-stylesheet type=\"text/xsl\" href=\"opm.xsl\"?>",
+        "?>\n<?xml-stylesheet type=\"text/xsl\" href=\"opm.xsl\"?>",
     );
     let source = mutated_once(
         &source,
         "<opm ",
-        "<opm xmlns:ndm=\"urn:ccsds:ndm\" xsi:schemaLocation=\"urn:ccsds:ndm opm.xsd\" ",
+        "<opm xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" \
+         xsi:schemaLocation=\"urn:ccsds:schema:ndmxml opm.xsd\" ",
     );
     Opm::from_xml(&source).expect("namespace metadata and xml-stylesheet PI should parse");
 
@@ -379,7 +367,7 @@ fn xml_source_edition_comes_from_the_parsed_root() {
                     .to_xml()
                     .expect("fixture should generate XML"),
                 "?>",
-                "?><!-- <opm version=\"bogus\"> -->",
+                "?>\n<!-- <opm version=\"bogus\"> -->",
             ),
             "version=\"3.0\"",
             "version='3.0'",
@@ -562,31 +550,6 @@ fn opm_xml_still_rejects_a_genuinely_out_of_order_child() {
     assert!(
         error.contains("out-of-order child 'CREATION_DATE'"),
         "unexpected error: {error}"
-    );
-}
-
-#[test]
-fn nilled_elements_may_carry_their_units_attribute() {
-    // XSD lets a nillable element keep its attributes, and `attribute_allowed` explicitly permits
-    // `units` on MASS, so the envelope validator and serde have to agree that this parses.
-    let source = include_str!("../../data/xml/opm_g5.xml");
-    let mass = source
-        .lines()
-        .find(|line| line.contains("<MASS"))
-        .expect("fixture carries MASS");
-    let nilled = mutated(source, mass.trim(), "<MASS units=\"kg\" xsi:nil=\"true\"/>");
-    let message = Opm::from_xml(&nilled).unwrap();
-    let parameters = message
-        .body
-        .segment
-        .data
-        .spacecraft_parameters
-        .as_ref()
-        .expect("fixture carries a spacecraft parameters block");
-    assert!(parameters.mass.is_none());
-    assert!(
-        parameters.drag_coeff.is_some(),
-        "the rest of the block still parses"
     );
 }
 

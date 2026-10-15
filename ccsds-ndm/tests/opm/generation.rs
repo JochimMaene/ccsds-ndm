@@ -894,16 +894,20 @@ fn opm_kvn_epoch_lines_are_bounded_by_the_epoch_type() {
         }
     ));
 
+    // ODM 7.5.10 caps the fraction at 16 digits, so the widest valid epoch is shorter.
     let mut message =
         Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).expect("fixture should parse");
-    message.header.creation_date = epoch;
     message.body.segment.metadata.ref_frame_epoch = Some(epoch);
-    message.body.segment.data.state_vector.epoch = epoch;
-    message.body.segment.data.maneuver_parameters[0].man_epoch_ignition = epoch;
-
+    crate::common::assert_validation_field(&message.to_kvn().unwrap_err(), "REF_FRAME_EPOCH");
+    let widest =
+        CalendarEpoch::from_str(&format!("2000-001T00:00:00.{}Z", "0".repeat(16))).unwrap();
+    message.header.creation_date = widest;
+    message.body.segment.metadata.ref_frame_epoch = Some(widest);
+    message.body.segment.data.state_vector.epoch = widest;
+    message.body.segment.data.maneuver_parameters[0].man_epoch_ignition = widest;
     let generated = message
         .to_kvn()
-        .expect("maximum-width epochs should generate");
+        .expect("the widest valid epochs should generate");
     assert!(generated.lines().all(|line| line.len() <= 254));
 }
 
@@ -937,6 +941,7 @@ fn invalid_opm_kvn_is_rejected_across_public_generation_entry_points() {
 
 const ROOT: &str = concat!(
     "<opm xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ",
+    "xmlns:ndm=\"urn:ccsds:schema:ndmxml\" ",
     "id=\"CCSDS_OPM_VERS\" version=\"3.0\">"
 );
 

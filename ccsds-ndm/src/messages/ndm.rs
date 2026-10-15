@@ -15,26 +15,69 @@ fn invalid_envelope(message: impl Into<String>) -> CcsdsNdmError {
     CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(message.into())))
 }
 
-fn validate_combined_root_attributes(start: &quick_xml::events::BytesStart<'_>) -> Result<()> {
+/// ODM 8.12.6: the combined root carries the standard namespace attributes, but no `id` or
+/// `version`. The shared root check has already admitted only those attribute kinds. Returns the
+/// root namespace declarations, which constituents inherit.
+fn validate_combined_root_attributes(
+    start: &quick_xml::events::BytesStart<'_>,
+) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+    let mut declarations = Vec::new();
     for attribute in start.attributes() {
         let attribute = attribute.map_err(|error| invalid_envelope(error.to_string()))?;
-        if !matches!(
-            attribute.key.as_ref(),
-            b"xmlns"
-                | b"xmlns:xsi"
-                | b"xmlns:ndm"
-                | b"xsi:noNamespaceSchemaLocation"
-                | b"xsi:schemaLocation"
-        ) {
-            return Err(invalid_envelope(format!(
-                "attribute '{}' is not allowed on the combined NDM root",
-                String::from_utf8_lossy(attribute.key.as_ref())
-            )));
+        match attribute.key.as_ref() {
+            b"id" | b"version" => {
+                return Err(invalid_envelope(format!(
+                    "attribute '{}' is not allowed on the combined NDM root",
+                    String::from_utf8_lossy(attribute.key.as_ref())
+                )));
+            }
+            _ if attribute.key.as_namespace_binding().is_some() => {
+                declarations.push((attribute.key.as_ref().to_vec(), attribute.value.to_vec()));
+            }
+            _ => {}
         }
     }
-    Ok(())
+    Ok(declarations)
 }
 
+/// Parse a constituent as a standalone message within the namespace scope of the combined root.
+fn parse_constituent(
+    element: &str,
+    start: &quick_xml::events::BytesStart<'_>,
+    root_declarations: &[(Vec<u8>, Vec<u8>)],
+) -> Result<Message> {
+    let inherited = root_declarations
+        .iter()
+        .filter(|(key, _)| {
+            !start
+                .attributes()
+                .flatten()
+                .any(|attribute| attribute.key.as_ref() == key.as_slice())
+        })
+        .fold(String::new(), |mut output, (key, value)| {
+            output.push(' ');
+            output.push_str(&String::from_utf8_lossy(key));
+            // The raw value is valid attribute content except for its original delimiter,
+            // which may have been `'`; escape `"` so it can be rewritten inside `"`.
+            output.push_str("=\"");
+            output.push_str(&String::from_utf8_lossy(value).replace('"', "&quot;"));
+            output.push('"');
+            output
+        });
+    let name_end = 1 + start.name().as_ref().len();
+    let standalone = format!(
+        "{}\n{}{inherited}{}",
+        crate::xml::XML_HEADER,
+        &element[..name_end],
+        &element[name_end..]
+    );
+    crate::from_str_with_notation(&standalone, Some(crate::detect::Notation::Xml))
+}
+
+/// ODM 8.12.7: "the only attributes that shall appear on the constituent message tags ... are
+/// the 'id' and 'version' attributes", so constituents reject the schema-location hints a
+/// standalone root may carry. Namespace declarations are still admitted: XML Namespaces does
+/// not treat them as attributes, which is this library's reading of the rule.
 fn validate_combined_child_attributes(start: &quick_xml::events::BytesStart<'_>) -> Result<()> {
     let mut id = false;
     let mut version = false;
@@ -110,11 +153,7 @@ fn validate_combined_xml_depth(xml: &str) -> Result<()> {
 #[serde(rename = "ndm")]
 pub struct CombinedNdm {
     /// Message Identifier (optional).
-    #[serde(
-        rename = "MESSAGE_ID",
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(rename = "MESSAGE_ID", skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub id: Option<String>,
 
@@ -264,6 +303,7 @@ impl CombinedNdm {
         let mut id = None;
         let mut comments = Vec::new();
         let mut messages = Vec::new();
+        let root_declarations;
 
         let invalid = |message: &str| {
             CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(message.into())))
@@ -272,11 +312,11 @@ impl CombinedNdm {
         // The first element must be the normative combined-instantiation root.
         loop {
             match reader.read_event_into(&mut buf)? {
-                Event::Start(e) if e.name().as_ref() == b"ndm" => {
-                    validate_combined_root_attributes(&e)?;
+                Event::Start(e) if e.local_name().as_ref() == b"ndm" => {
+                    root_declarations = validate_combined_root_attributes(&e)?;
                     break;
                 }
-                Event::Empty(e) if e.name().as_ref() == b"ndm" => {
+                Event::Empty(e) if e.local_name().as_ref() == b"ndm" => {
                     validate_combined_root_attributes(&e)?;
                     loop {
                         buf.clear();
@@ -322,7 +362,8 @@ impl CombinedNdm {
             match reader.read_event_into(&mut buf)? {
                 Event::Start(e) => {
                     let name_bytes = e.name();
-                    let name = name_bytes.as_ref();
+                    let local_name = e.local_name();
+                    let name = local_name.as_ref();
 
                     let actual_start_pos = xml[event_start_pos..]
                         .find('<')
@@ -356,10 +397,7 @@ impl CombinedNdm {
                             let end_pos = reader.buffer_position() as usize;
                             let full_element = &xml[actual_start_pos..end_pos];
 
-                            let msg = crate::from_str_with_notation(
-                                full_element,
-                                Some(crate::detect::Notation::Xml),
-                            )?;
+                            let msg = parse_constituent(full_element, &e, &root_declarations)?;
                             messages.push(msg);
                         }
                         _ => {
@@ -370,7 +408,7 @@ impl CombinedNdm {
                         }
                     }
                 }
-                Event::End(e) if e.name().as_ref() == b"ndm" => {
+                Event::End(e) if e.local_name().as_ref() == b"ndm" => {
                     break;
                 }
                 Event::End(e) => {

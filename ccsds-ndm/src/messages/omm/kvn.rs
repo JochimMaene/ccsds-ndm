@@ -22,7 +22,7 @@ use winnow::prelude::*;
 pub fn omm_version(input: &mut &str) -> KvnResult<String> {
     ws.parse_next(input)?;
     let _ = collect_comments.parse_next(input)?;
-    let (value, _) = expect_key("CCSDS_OMM_VERS").parse_next(input)?;
+    let value = expect_unitless_key("CCSDS_OMM_VERS").parse_next(input)?;
     Ok(value.to_string())
 }
 

@@ -192,6 +192,7 @@ impl Ndm for Omm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
+        let kvn = crate::detect::without_utf8_bom(kvn);
         kvn::validate_kvn_syntax(kvn)?;
         let omm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&omm)?;
@@ -203,7 +204,6 @@ impl Ndm for Omm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        crate::xml::validate_document_root(xml, b"omm", "OMM")?;
         xml::validate_xml_sequences(xml)?;
         let omm: Self = crate::xml::from_str_with_context(xml, "OMM")?;
         crate::traits::Validate::validate(&omm)?;
@@ -323,11 +323,7 @@ pub struct OmmMetadata {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.3.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ref_frame_epoch: Option<CalendarEpoch>,
     /// Time system used for Keplerian elements and covariance data. Use of values other than
     /// those in 3.2.3.2 should be documented in an ICD.
@@ -349,6 +345,7 @@ pub struct OmmMetadata {
 
 impl crate::traits::Validate for OmmMetadata {
     fn validate(&self) -> Result<()> {
+        crate::validation::epoch_precision(&[("REF_FRAME_EPOCH", &self.ref_frame_epoch)])?;
         if self.object_name.trim().is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: "OMM Metadata".into(),
@@ -604,11 +601,7 @@ pub struct MeanElements {
     /// **Units**: km³/s²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gm: Option<Gm>,
 }
 
@@ -632,6 +625,7 @@ fn finite(field: &'static str, value: f64) -> Result<()> {
 
 impl crate::traits::Validate for MeanElements {
     fn validate(&self) -> Result<()> {
+        crate::validation::epoch_precision(&[("EPOCH", &self.epoch)])?;
         match (self.semi_major_axis.is_some(), self.mean_motion.is_some()) {
             (true, false) | (false, true) => {}
             _ => {
@@ -747,31 +741,19 @@ pub struct TleParameters {
     /// Ephemeris type. Default value = 0. (See 4.2.4.7.)
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ephemeris_type: Option<i32>,
     /// Classification type. Default value = U. (See 4.2.4.7.)
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub classification_type: Option<String>,
     /// NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword
     /// is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub norad_cat_id: Option<u32>,
     /// Element set number for this satellite. Normally incremented sequentially but may be out
     /// of sync if it is generated from a backup source. Used to distinguish different TLEs,
@@ -779,20 +761,12 @@ pub struct TleParameters {
     /// MEAN_ELEMENT_THEORY = SGP/SGP4).
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub element_set_no: Option<ElementSetNo>,
     /// Revolution Number
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rev_at_epoch: Option<u32>,
     /// Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
     /// MEAN_ELEMENT_THEORY= SGP4 (BSTAR = drag parameter for SGP4).
@@ -800,11 +774,7 @@ pub struct TleParameters {
     /// **Units**: 1/[Earth radii]
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bstar: Option<BStar>,
     /// Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
     /// MEAN_ELEMENT_THEORY= SGP4-XP (BTERM ballistic coefficient CDA/m, where CD = drag
@@ -815,11 +785,7 @@ pub struct TleParameters {
     /// **Units**: m²/kg
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bterm: Option<M2kg>,
     /// First Time Derivative of the Mean Motion (i.e., a drag term, required when
     /// MEAN_ELEMENT_THEORY = SGP or PPT3). (See 4.2.4.7 for important details).
@@ -834,11 +800,7 @@ pub struct TleParameters {
     /// **Units**: rev/day³
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mean_motion_ddot: Option<MeanMotionDDot>,
     /// Solar radiation pressure coefficient AY/m, where y = reflectivity, A = average
     /// cross-sectional area, m = mass. Example values AGOM = 0.01 (rocket body) and 0.001
@@ -848,11 +810,7 @@ pub struct TleParameters {
     /// **Units**: m²/kg
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        with = "crate::utils::nullable"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agom: Option<M2kg>,
 }
 

@@ -29,7 +29,7 @@ pub fn apm_version(input: &mut &str) -> KvnResult<String> {
     ws.parse_next(input)?;
     let _ = collect_comments.parse_next(input)?;
 
-    let (value, _) = expect_key("CCSDS_APM_VERS").parse_next(input)?;
+    let value = expect_unitless_key("CCSDS_APM_VERS").parse_next(input)?;
     Ok(value.to_string())
 }
 
@@ -334,7 +334,7 @@ pub fn apm_data(input: &mut &str) -> KvnResult<ApmData> {
     comment.extend(collect_comments.parse_next(input)?);
 
     // EPOCH is mandatory and usually the first key in data section
-    let (epoch, _) = expect_key("EPOCH").parse_next(input)?;
+    let epoch = expect_unitless_key("EPOCH").parse_next(input)?;
     let epoch = crate::types::CalendarEpoch::from_str(epoch)
         .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
 

@@ -31,7 +31,7 @@ use winnow::stream::Offset;
 pub fn ocm_version(input: &mut &str) -> KvnResult<String> {
     ws.parse_next(input)?;
     let _ = collect_comments.parse_next(input)?;
-    let (value, _) = expect_key("CCSDS_OCM_VERS").parse_next(input)?;
+    let value = expect_unitless_key("CCSDS_OCM_VERS").parse_next(input)?;
     Ok(value.to_string())
 }
 
@@ -625,8 +625,7 @@ pub fn ocm_man_line(input: &mut &str) -> KvnResult<ManLine> {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
     let epoch = kv_epoch_token.parse_next(input)?;
-    let values =
-        repeat(1.., (space1, till_space_or_eol).map(|(_, v)| v.to_string())).parse_next(input)?;
+    let values = repeat(1.., (space1, till_space).map(|(_, v)| v.to_string())).parse_next(input)?;
     opt_line_ending.parse_next(input)?;
     Ok(ManLine { epoch, values })
 }

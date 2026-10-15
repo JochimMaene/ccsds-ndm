@@ -226,7 +226,7 @@ def test_live_lists_report_the_bad_index_at_the_generation_gate():
     message = ccsds_ndm.from_file(str(ROOT / "ccsds-ndm/data/kvn/oem_g12.kvn"))
     message.segments.append(object())
 
-    with pytest.raises(ValueError, match=r"segments\[1\] must be OemSegment"):
+    with pytest.raises(TypeError, match=r"segments\[1\] must be OemSegment"):
         message.to_str("kvn")
 
 
