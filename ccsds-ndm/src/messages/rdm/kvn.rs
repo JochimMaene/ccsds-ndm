@@ -884,7 +884,7 @@ impl ToKvn for RdmMetadata {
             writer.write_pair("DRAG_PARAMETERS_SOURCE", v);
         }
         if let Some(v) = &self.drag_parameters_altitude {
-            writer.write_pair("DRAG_PARAMETERS_ALTITUDE", v);
+            writer.write_odm_float_measure("DRAG_PARAMETERS_ALTITUDE", v);
         }
         if let Some(v) = &self.reentry_uncertainty_method {
             writer.write_pair("REENTRY_UNCERTAINTY_METHOD", v.to_string());
@@ -942,34 +942,34 @@ impl RdmData {
         if let Some(sp) = &self.spacecraft_parameters {
             writer.write_comments(&sp.comment);
             if let Some(v) = &sp.wet_mass {
-                writer.write_measure("WET_MASS", &v.to_unit_value());
+                writer.write_odm_float_measure("WET_MASS", &v.to_unit_value());
             }
             if let Some(v) = &sp.dry_mass {
-                writer.write_measure("DRY_MASS", &v.to_unit_value());
+                writer.write_odm_float_measure("DRY_MASS", &v.to_unit_value());
             }
             if let Some(v) = &sp.hazardous_substances {
                 writer.write_pair("HAZARDOUS_SUBSTANCES", v);
             }
             if let Some(v) = &sp.solar_rad_area {
-                writer.write_measure("SOLAR_RAD_AREA", &v.to_unit_value());
+                writer.write_odm_float_measure("SOLAR_RAD_AREA", &v.to_unit_value());
             }
             if let Some(v) = &sp.solar_rad_coeff {
-                writer.write_pair("SOLAR_RAD_COEFF", v);
+                writer.write_odm_float_pair("SOLAR_RAD_COEFF", v.value);
             }
             if let Some(v) = &sp.drag_area {
-                writer.write_measure("DRAG_AREA", &v.to_unit_value());
+                writer.write_odm_float_measure("DRAG_AREA", &v.to_unit_value());
             }
             if let Some(v) = &sp.drag_coeff {
-                writer.write_pair("DRAG_COEFF", v);
+                writer.write_odm_float_pair("DRAG_COEFF", v.value);
             }
             if let Some(v) = &sp.rcs {
-                writer.write_measure("RCS", &v.to_unit_value());
+                writer.write_odm_float_measure("RCS", &v.to_unit_value());
             }
             if let Some(v) = &sp.ballistic_coeff {
-                writer.write_measure("BALLISTIC_COEFF", v);
+                writer.write_odm_float_measure("BALLISTIC_COEFF", v);
             }
             if let Some(v) = &sp.thrust_acceleration {
-                writer.write_measure("THRUST_ACCELERATION", &v.to_unit_value());
+                writer.write_odm_float_measure("THRUST_ACCELERATION", &v.to_unit_value());
             }
         }
         if let Some(od) = &self.od_parameters {
@@ -981,10 +981,10 @@ impl RdmData {
                 writer.write_pair("TIME_LASTOB_END", v);
             }
             if let Some(v) = &od.recommended_od_span {
-                writer.write_measure("RECOMMENDED_OD_SPAN", &v.to_unit_value());
+                writer.write_odm_float_measure("RECOMMENDED_OD_SPAN", &v.to_unit_value());
             }
             if let Some(v) = &od.actual_od_span {
-                writer.write_measure("ACTUAL_OD_SPAN", &v.to_unit_value());
+                writer.write_odm_float_measure("ACTUAL_OD_SPAN", &v.to_unit_value());
             }
             if let Some(v) = &od.obs_available {
                 writer.write_pair("OBS_AVAILABLE", v);
@@ -999,10 +999,10 @@ impl RdmData {
                 writer.write_pair("TRACKS_USED", v);
             }
             if let Some(v) = &od.residuals_accepted {
-                writer.write_measure("RESIDUALS_ACCEPTED", &v.to_unit_value());
+                writer.write_odm_float_measure("RESIDUALS_ACCEPTED", &v.to_unit_value());
             }
             if let Some(v) = &od.weighted_rms {
-                writer.write_pair("WEIGHTED_RMS", v);
+                writer.write_odm_float_pair("WEIGHTED_RMS", v.value);
             }
         }
 

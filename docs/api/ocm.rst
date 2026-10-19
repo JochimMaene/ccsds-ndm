@@ -42,3 +42,10 @@ Orbit Comprehensive Message (OCM)
 .. autoclass:: OcmOdParameters
    :members:
    :undoc-members:
+
+.. autoclass:: OcmUserDefined
+   :members:
+   :undoc-members:
+.. autoclass:: OcmUserDefinedParameter
+   :members:
+   :undoc-members:

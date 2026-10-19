@@ -213,6 +213,7 @@ impl Ndm for Tdm {
         xml::validate_xml_sequences(xml)?;
         let tdm: Self = crate::xml::from_str_with_context(xml, "TDM")?;
         crate::traits::Validate::validate(&tdm)?;
+        tdm.validate_xml_representability()?;
         Ok(tdm)
     }
 
@@ -222,6 +223,37 @@ impl Ndm for Tdm {
 
     fn write_xml_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
         crate::generation::write_xml_to(self, output)
+    }
+}
+
+impl Tdm {
+    pub(crate) fn validate_xml_representability(&self) -> Result<()> {
+        for segment in &self.body.segments {
+            let metadata = &segment.metadata;
+            let angle = metadata
+                .angle_type
+                .as_ref()
+                .filter(|value| matches!(value, TdmAngleType::Other(_)))
+                .map(ToString::to_string);
+            let frame = metadata
+                .reference_frame
+                .as_ref()
+                .filter(|value| matches!(value, TdmReferenceFrame::Other(_)))
+                .map(ToString::to_string);
+            for (field, value) in [("ANGLE_TYPE", angle), ("REFERENCE_FRAME", frame)] {
+                if let Some(value) = value {
+                    return Err(ValidationError::InvalidValue {
+                        field: field.into(),
+                        value,
+                        expected: "a value representable by the bundled TDM 2.0 XML enumeration"
+                            .into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -842,7 +874,12 @@ impl crate::traits::Validate for TdmMetadata {
             }
             None => {}
         }
-        if self.angle_type == Some(TdmAngleType::Radec) && self.reference_frame.is_none() {
+        if self
+            .angle_type
+            .as_ref()
+            .is_some_and(|value| value.to_string() == "RADEC")
+            && self.reference_frame.is_none()
+        {
             return Err(ValidationError::MissingRequiredField {
                 block: "TDM Metadata".into(),
                 field: "REFERENCE_FRAME (required when ANGLE_TYPE=RADEC)".into(),
@@ -875,6 +912,40 @@ impl crate::traits::Validate for TdmMetadata {
                 line: None,
             }
             .into());
+        }
+        for (field, value) in [
+            (
+                "ANGLE_TYPE",
+                self.angle_type.as_ref().and_then(|value| match value {
+                    TdmAngleType::Other(value) => Some(value),
+                    _ => None,
+                }),
+            ),
+            (
+                "REFERENCE_FRAME",
+                self.reference_frame.as_ref().and_then(|value| match value {
+                    TdmReferenceFrame::Other(value) => Some(value),
+                    _ => None,
+                }),
+            ),
+        ] {
+            if value.is_some_and(|value| value.trim().is_empty()) {
+                return Err(ValidationError::missing_required("TDM Metadata", field).into());
+            }
+        }
+        if let Some(types) = &self.data_types {
+            for value in types.split(',').map(str::trim) {
+                let indexed = value.strip_suffix("_n").map(|base| format!("{base}_1"));
+                if !is_tdm_observation_key_bytes(indexed.as_deref().unwrap_or(value).as_bytes()) {
+                    return Err(ValidationError::InvalidValue {
+                        field: "DATA_TYPES".into(),
+                        value: value.into(),
+                        expected: "observation keywords from TDM table 3-5".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
         }
         for (field, value) in [
             ("INTEGRATION_INTERVAL", self.integration_interval),
@@ -1169,19 +1240,19 @@ pub enum TdmObservationData {
     ReceiveFreq5(f64),
     /// Received phase count for channel 1.
     #[serde(rename = "RECEIVE_PHASE_CT_1")]
-    ReceivePhaseCt1(f64),
+    ReceivePhaseCt1(String),
     /// Received phase count for channel 2.
     #[serde(rename = "RECEIVE_PHASE_CT_2")]
-    ReceivePhaseCt2(f64),
+    ReceivePhaseCt2(String),
     /// Received phase count for channel 3.
     #[serde(rename = "RECEIVE_PHASE_CT_3")]
-    ReceivePhaseCt3(f64),
+    ReceivePhaseCt3(String),
     /// Received phase count for channel 4.
     #[serde(rename = "RECEIVE_PHASE_CT_4")]
-    ReceivePhaseCt4(f64),
+    ReceivePhaseCt4(String),
     /// Received phase count for channel 5.
     #[serde(rename = "RECEIVE_PHASE_CT_5")]
-    ReceivePhaseCt5(f64),
+    ReceivePhaseCt5(String),
     /// Relative humidity observable.
     ///
     /// Units: %
@@ -1246,19 +1317,19 @@ pub enum TdmObservationData {
     TransmitFreqRate5(f64),
     /// Transmitted phase count for channel 1.
     #[serde(rename = "TRANSMIT_PHASE_CT_1")]
-    TransmitPhaseCt1(f64),
+    TransmitPhaseCt1(String),
     /// Transmitted phase count for channel 2.
     #[serde(rename = "TRANSMIT_PHASE_CT_2")]
-    TransmitPhaseCt2(f64),
+    TransmitPhaseCt2(String),
     /// Transmitted phase count for channel 3.
     #[serde(rename = "TRANSMIT_PHASE_CT_3")]
-    TransmitPhaseCt3(f64),
+    TransmitPhaseCt3(String),
     /// Transmitted phase count for channel 4.
     #[serde(rename = "TRANSMIT_PHASE_CT_4")]
-    TransmitPhaseCt4(f64),
+    TransmitPhaseCt4(String),
     /// Transmitted phase count for channel 5.
     #[serde(rename = "TRANSMIT_PHASE_CT_5")]
-    TransmitPhaseCt5(f64),
+    TransmitPhaseCt5(String),
     /// Dry zenith delay through the troposphere.
     ///
     /// Units: m
@@ -1273,10 +1344,60 @@ pub enum TdmObservationData {
     VlbiDelay(f64),
 }
 
+// TDM 3.5.2.11-12 permit arbitrary precision; validate syntax without conversion to f64.
+fn valid_phase_count(value: &str) -> bool {
+    let mut bytes = value.bytes().peekable();
+    if matches!(bytes.peek(), Some(b'+' | b'-')) {
+        bytes.next();
+    }
+    let mut digits = 0;
+    while bytes.peek().is_some_and(u8::is_ascii_digit) {
+        bytes.next();
+        digits += 1;
+    }
+    if bytes.peek() == Some(&b'.') {
+        bytes.next();
+        while bytes.peek().is_some_and(u8::is_ascii_digit) {
+            bytes.next();
+            digits += 1;
+        }
+    }
+    if digits == 0 {
+        return false;
+    }
+    if matches!(bytes.peek(), Some(b'e' | b'E')) {
+        bytes.next();
+        if matches!(bytes.peek(), Some(b'+' | b'-')) {
+            bytes.next();
+        }
+        let mut exponent_digits = 0;
+        while bytes.peek().is_some_and(u8::is_ascii_digit) {
+            bytes.next();
+            exponent_digits += 1;
+        }
+        if exponent_digits == 0 {
+            return false;
+        }
+    }
+    bytes.next().is_none()
+}
+
 impl TdmObservationData {
-    pub fn value(&self) -> f64 {
+    /// Numeric value, or None for an exact decimal phase count; use value_to_string for either.
+    pub fn value(&self) -> Option<f64> {
         match self {
-            Self::Rhumidity(value) => value.value,
+            Self::ReceivePhaseCt1(_) => None,
+            Self::ReceivePhaseCt2(_) => None,
+            Self::ReceivePhaseCt3(_) => None,
+            Self::ReceivePhaseCt4(_) => None,
+            Self::ReceivePhaseCt5(_) => None,
+            Self::TransmitPhaseCt1(_) => None,
+            Self::TransmitPhaseCt2(_) => None,
+            Self::TransmitPhaseCt3(_) => None,
+            Self::TransmitPhaseCt4(_) => None,
+            Self::TransmitPhaseCt5(_) => None,
+
+            Self::Rhumidity(value) => Some(value.value),
             Self::Angle1(value)
             | Self::Angle2(value)
             | Self::CarrierPower(value)
@@ -1298,11 +1419,6 @@ impl TdmObservationData {
             | Self::ReceiveFreq3(value)
             | Self::ReceiveFreq4(value)
             | Self::ReceiveFreq5(value)
-            | Self::ReceivePhaseCt1(value)
-            | Self::ReceivePhaseCt2(value)
-            | Self::ReceivePhaseCt3(value)
-            | Self::ReceivePhaseCt4(value)
-            | Self::ReceivePhaseCt5(value)
             | Self::Stec(value)
             | Self::Temperature(value)
             | Self::TransmitFreq1(value)
@@ -1315,19 +1431,43 @@ impl TdmObservationData {
             | Self::TransmitFreqRate3(value)
             | Self::TransmitFreqRate4(value)
             | Self::TransmitFreqRate5(value)
+            | Self::TropoDry(value)
+            | Self::TropoWet(value)
+            | Self::VlbiDelay(value) => Some(*value),
+        }
+    }
+
+    /// Exact phase-count text. These values must not be rounded through binary floating point.
+    pub(crate) fn phase_count(&self) -> Option<&str> {
+        match self {
+            Self::ReceivePhaseCt1(value)
+            | Self::ReceivePhaseCt2(value)
+            | Self::ReceivePhaseCt3(value)
+            | Self::ReceivePhaseCt4(value)
+            | Self::ReceivePhaseCt5(value)
             | Self::TransmitPhaseCt1(value)
             | Self::TransmitPhaseCt2(value)
             | Self::TransmitPhaseCt3(value)
             | Self::TransmitPhaseCt4(value)
-            | Self::TransmitPhaseCt5(value)
-            | Self::TropoDry(value)
-            | Self::TropoWet(value)
-            | Self::VlbiDelay(value) => *value,
+            | Self::TransmitPhaseCt5(value) => Some(value),
+            _ => None,
         }
     }
 
     fn validate(&self) -> Result<()> {
-        let value = self.value();
+        if let Some(value) = self.phase_count() {
+            if !valid_phase_count(value) {
+                return Err(ValidationError::InvalidValue {
+                    field: self.key().into(),
+                    value: value.into(),
+                    expected: "a decimal phase-count string".into(),
+                    line: None,
+                }
+                .into());
+            }
+            return Ok(());
+        }
+        let value = self.value().expect("numeric observation");
         if !value.is_finite() {
             return Err(ValidationError::InvalidValue {
                 field: self.key().into(),
@@ -1427,13 +1567,15 @@ impl TdmObservationData {
     }
 
     pub fn value_to_string(&self) -> String {
-        self.value().to_string()
+        self.phase_count()
+            .map(str::to_owned)
+            .unwrap_or_else(|| self.value().expect("numeric observation").to_string())
     }
 
     /// Builds an observation from its CCSDS keyword and numeric value.
     ///
-    /// This is the single keyword-to-variant mapping; the KVN, XML and Python paths all
-    /// route through it.
+    /// Numeric construction formats phase counts from the supplied floating-point value.
+    /// Use `from_key_val` with decimal text when all phase-count digits must be retained.
     pub fn from_key_value(key: &str, value: f64) -> Result<Self> {
         match key {
             "ANGLE_1" => Ok(Self::Angle1(value)),
@@ -1457,11 +1599,11 @@ impl TdmObservationData {
             "RECEIVE_FREQ_3" => Ok(Self::ReceiveFreq3(value)),
             "RECEIVE_FREQ_4" => Ok(Self::ReceiveFreq4(value)),
             "RECEIVE_FREQ_5" => Ok(Self::ReceiveFreq5(value)),
-            "RECEIVE_PHASE_CT_1" => Ok(Self::ReceivePhaseCt1(value)),
-            "RECEIVE_PHASE_CT_2" => Ok(Self::ReceivePhaseCt2(value)),
-            "RECEIVE_PHASE_CT_3" => Ok(Self::ReceivePhaseCt3(value)),
-            "RECEIVE_PHASE_CT_4" => Ok(Self::ReceivePhaseCt4(value)),
-            "RECEIVE_PHASE_CT_5" => Ok(Self::ReceivePhaseCt5(value)),
+            "RECEIVE_PHASE_CT_1" => Ok(Self::ReceivePhaseCt1(value.to_string())),
+            "RECEIVE_PHASE_CT_2" => Ok(Self::ReceivePhaseCt2(value.to_string())),
+            "RECEIVE_PHASE_CT_3" => Ok(Self::ReceivePhaseCt3(value.to_string())),
+            "RECEIVE_PHASE_CT_4" => Ok(Self::ReceivePhaseCt4(value.to_string())),
+            "RECEIVE_PHASE_CT_5" => Ok(Self::ReceivePhaseCt5(value.to_string())),
             "RHUMIDITY" => Ok(Self::Rhumidity(Percentage::new(value, None)?)),
             "STEC" => Ok(Self::Stec(value)),
             "TEMPERATURE" => Ok(Self::Temperature(value)),
@@ -1475,11 +1617,11 @@ impl TdmObservationData {
             "TRANSMIT_FREQ_RATE_3" => Ok(Self::TransmitFreqRate3(value)),
             "TRANSMIT_FREQ_RATE_4" => Ok(Self::TransmitFreqRate4(value)),
             "TRANSMIT_FREQ_RATE_5" => Ok(Self::TransmitFreqRate5(value)),
-            "TRANSMIT_PHASE_CT_1" => Ok(Self::TransmitPhaseCt1(value)),
-            "TRANSMIT_PHASE_CT_2" => Ok(Self::TransmitPhaseCt2(value)),
-            "TRANSMIT_PHASE_CT_3" => Ok(Self::TransmitPhaseCt3(value)),
-            "TRANSMIT_PHASE_CT_4" => Ok(Self::TransmitPhaseCt4(value)),
-            "TRANSMIT_PHASE_CT_5" => Ok(Self::TransmitPhaseCt5(value)),
+            "TRANSMIT_PHASE_CT_1" => Ok(Self::TransmitPhaseCt1(value.to_string())),
+            "TRANSMIT_PHASE_CT_2" => Ok(Self::TransmitPhaseCt2(value.to_string())),
+            "TRANSMIT_PHASE_CT_3" => Ok(Self::TransmitPhaseCt3(value.to_string())),
+            "TRANSMIT_PHASE_CT_4" => Ok(Self::TransmitPhaseCt4(value.to_string())),
+            "TRANSMIT_PHASE_CT_5" => Ok(Self::TransmitPhaseCt5(value.to_string())),
             "TROPO_DRY" => Ok(Self::TropoDry(value)),
             "TROPO_WET" => Ok(Self::TropoWet(value)),
             "VLBI_DELAY" => Ok(Self::VlbiDelay(value)),
@@ -1494,6 +1636,23 @@ impl TdmObservationData {
     }
 
     pub fn from_key_val(key: &str, val: &str) -> Result<Self> {
+        let phase = match key {
+            "RECEIVE_PHASE_CT_1" => Some(Self::ReceivePhaseCt1(val.to_owned())),
+            "RECEIVE_PHASE_CT_2" => Some(Self::ReceivePhaseCt2(val.to_owned())),
+            "RECEIVE_PHASE_CT_3" => Some(Self::ReceivePhaseCt3(val.to_owned())),
+            "RECEIVE_PHASE_CT_4" => Some(Self::ReceivePhaseCt4(val.to_owned())),
+            "RECEIVE_PHASE_CT_5" => Some(Self::ReceivePhaseCt5(val.to_owned())),
+            "TRANSMIT_PHASE_CT_1" => Some(Self::TransmitPhaseCt1(val.to_owned())),
+            "TRANSMIT_PHASE_CT_2" => Some(Self::TransmitPhaseCt2(val.to_owned())),
+            "TRANSMIT_PHASE_CT_3" => Some(Self::TransmitPhaseCt3(val.to_owned())),
+            "TRANSMIT_PHASE_CT_4" => Some(Self::TransmitPhaseCt4(val.to_owned())),
+            "TRANSMIT_PHASE_CT_5" => Some(Self::TransmitPhaseCt5(val.to_owned())),
+            _ => None,
+        };
+        if let Some(phase) = phase {
+            phase.validate()?;
+            return Ok(phase);
+        }
         let value = fast_float::parse(val).map_err(|_| {
             CcsdsNdmError::Format(Box::new(crate::error::FormatError::InvalidFormat(format!(
                 "Invalid float: {val}"

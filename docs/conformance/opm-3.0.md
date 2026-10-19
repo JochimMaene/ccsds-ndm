@@ -1,4 +1,4 @@
-# OPM 3.0 Core Conformance Inventory
+# OPM 3.0 and 2.0 conformance
 
 This inventory covers the core CCSDS OPM 3.0 behavior: strict KVN and XML parsing, typed-model
 validation, KVN and XML generation, conversion in both notation directions, and the Python
@@ -10,7 +10,7 @@ schema artifact, so its wire requirements come from ODM sections 3.2 and 7.3–7
 Checks that need information outside a self-contained OPM — an exchange-partner ICD, registry
 membership, or the physical definition of a reference frame or time system — are caller context.
 They are not missing self-contained behavior and are not guessed; see
-[externally governed values](family-shared-contract.md#externally-governed-values).
+[externally governed values](../design/validation-contract.md#registry-governed-values).
 
 ## Requirement map
 
@@ -71,9 +71,32 @@ They are not missing self-contained behavior and are not guessed; see
 OPM 3.0 is verified on the Rust and Python surfaces: strict parsing, self-contained validation,
 both generation notations, conversion, diagnostics, allocation budgets, and packaged artifacts
 have received message-level review, and no known requirement gap remains. "Verified" means that
-review, not exhaustive mutation of every editable value. OPM 2.0 remains available — explicit
-edition conversion is tested, but it has not received this edition-specific review.
+review, not exhaustive mutation of every editable value. OPM 2.0 has also received the edition-specific review below and meets the same criteria.
+
+## Edition 2.0 reconciliation
+
+The edition-specific authority is `data/odm_502x0b2s.pdf` and the official
+`ndmxml-2.0.0-opm-2.0.xsd` with its common schema. The 3.0 inventory above is shared only
+where those sources agree. ODM 3.0 annex J and a comparison of the header, metadata,
+state, Keplerian, spacecraft, covariance, maneuver, and user-defined schema sequences
+identify these model-relevant differences:
+
+| Difference | Decision and evidence |
+| --- | --- |
+| `CLASSIFICATION` and `MESSAGE_ID` are not in the 2.0 header | Reject their presence in both parsed notations and mutated models; `conformance::odm2::opm_and_omm_2_reject_new_header_fields_in_both_notations`. |
+| Maneuver delta mass uses 2.0 `negativeDouble`, while 3.0 uses `deltamassTypeZ` | Zero remains accepted only for 3.0. The 2.0 root gate rejects zero, including KVN/XML input and output; `conformance::odm2::opm_2_requires_negative_maneuver_delta_mass_in_every_route`. |
+| Unchanged logical blocks retain their typed structure | Every shipped OPM KVN fixture, with only its new header removed and edition changed, passes 2.0 KVN/XML preservation and the official 2.0 XSD; `conformance::odm2::opm_2_generation_is_schema_valid_and_round_trips`. |
+| Public adapters retain edition | Python's shared conformance matrix covers both notations and all string/file/conversion routes separately for 2.0 and 3.0. |
+
+**OPM 1.0 is not supported.** Its actual required-block and field rules differ from the
+later grammar: ODM 502.0-B-1 tables 3-1/3-3 and §3.3 require edition-specific spacecraft
+content and do not introduce the newer header. Relabelling a 3.0 fixture had accepted
+later-only fields and omissions instead of implementing those rules. Input 1.0 is now
+rejected until its own grammar and semantics are implemented and reviewed.
 
 ## Reproduction
 
 Run `just verify` for the full quality checks plus the packaged-artifact gates.
+
+Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
+artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).

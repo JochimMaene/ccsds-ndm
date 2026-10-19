@@ -31,11 +31,9 @@ pub(crate) mod strict;
 /// invariant is load-bearing: parse diagnostics carry byte offsets into the normalized text, but
 /// are rendered against the caller's original input, so the two must stay aligned.
 ///
-/// OEM and OPM enable this, which is what lets both accept all four normative terminators; see
-/// `docs/conformance/oem-3.0.md` and `docs/conformance/opm-3.0.md`. The remaining
-/// families never normalize, so [`strict::validate_odm_assignments`] still rejects a lone
-/// carriage return for them — it only ever strips a trailing one, so CRLF parses everywhere.
-/// Widening the other eight is a per-family conformance decision that has not been taken.
+/// OEM, OPM, AEM, and ACM enable this to accept all four normative terminators; their family
+/// conformance records describe the accepted lexical forms. Other family readers retain their
+/// own lexical gates; this helper does not change those readers implicitly.
 pub(crate) fn normalize_line_endings(input: &str) -> std::borrow::Cow<'_, str> {
     if !input.contains('\r') {
         return std::borrow::Cow::Borrowed(input);

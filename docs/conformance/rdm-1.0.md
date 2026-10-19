@@ -1,4 +1,4 @@
-# RDM 1.0 Focused Conformance Evidence
+# RDM 1.0 conformance
 
 This inventory records maintainer evidence for standalone RDM 1.0. The
 [support matrix](../support-matrix.md) is the user-facing statement of current support.
@@ -6,7 +6,8 @@ This inventory records maintainer evidence for standalone RDM 1.0. The
 ## Scope and authorities
 
 - Message edition: RDM 1.0.
-- Semantic and KVN authority: CCSDS 508.1-B-1, principally sections 3 and 5 and annex C.
+- Semantic and KVN authority: CCSDS 508.1-B-1 with corrigendum 1
+  (`data/rdm_508x1b1c1.pdf`), principally sections 3 and 5 and annex C.
 - XML authority: NDM/XML schema set 4.0.0 and RDM schema 1.0.
 - Profile: strict standalone parsing, self-contained validation, deterministic KVN/XML generation,
   and notation conversion through the shared Rust generation gate.
@@ -21,8 +22,9 @@ The `rdm` suite establishes:
 | XML structure | The shared XML sequence engine is registered for the complete RDM root, header, metadata, data, and seven nested logical-block families. It rejects unknown, duplicate, and reordered children and non-schema attributes. |
 | Conversion preservation | The routed-comment parser associates KVN comments with the logical block selected by the following keyword. KVN generation retains required/optional units for atmospheric, impact, state, covariance, spacecraft, and OD measures. The Annex C XML fixture survives XML-to-KVN conversion modulo the KVN COMMENT separator's non-semantic surrounding-whitespace normalization. |
 | Unrepresentable XML state | An XML `<data><COMMENT>` cannot be distinguished from the first atmospheric logical-block comment in flattened KVN. All materialized and streaming KVN gates reject that state before output instead of silently moving the comment. |
-| Valid input and generation | Both shipped KVN and both shipped XML fixtures preserve their typed model in their source notation; every generated XML document validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
-| Shared surface contract | `library::parsing` and `library::output`, `conformance::generation`, the Python API tests, and family Criterion matrices provide common parsing, generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
+| KVN numeric precision | Sections 5.3.3.2 and 5.3.3.3(b) limit ordinary KVN numbers to 16 decimal digits. Numeric fields use the shared number writer, rounding a value such as `0.30000000000000004` to `3.0e-1`; reparsing can change its stored `f64`. XML retains the original double. Values whose rounded spelling would overflow are refused before output. `rdm_kvn_rounds_scalars_to_sixteen_digits_and_xml_retains_precision` covers metadata, spacecraft and atmospheric fields, schema-valid XML preservation, and streaming/materialized output agreement. |
+| Valid input and generation | Both shipped KVN and both shipped XML fixtures preserve their typed model in their source notation; every generated XML document validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
+| Shared surface contract | `library::parsing` and `library::output`, `conformance::generation`, the Python API tests, and family Criterion matrices provide common parsing, generation, diagnostics, dispatch, and workload evidence linked from the [conformance review index](README.md). |
 
 The existing RDM unit suite separately covers required metadata and atmospheric data, controlled
 re-entry/object choices, reference epochs, ground-impact confidence intervals and bounds, state and
@@ -70,20 +72,12 @@ options matrix cover both notations, files, epochs, generic identity, diagnostic
 Strict binding audit, generated stubs/doc checks, wheel verification, and Rust artifact
 verification are the packaged gates.
 
-## Reproducible performance observation
+## Verification outcome
 
-```text
-cargo bench --manifest-path ccsds-ndm/Cargo.toml --bench kvn_benches -- 'kvn_message_matrix/(parse|generate)/rdm' --sample-size 20 --measurement-time 2 --warm-up-time 1
-cargo bench --manifest-path ccsds-ndm/Cargo.toml --bench xml_benches -- 'xml_message_matrix/(parse|generate)/rdm' --sample-size 20 --measurement-time 2 --warm-up-time 1
-```
+RDM 1.0 meets the common [verification criteria](README.md#verification-criteria) for
+self-contained format and model validation on Rust and Python. The requirement inventory,
+family tests, shared public-route tests, and packaged tests are complementary evidence;
+none alone establishes conformance or exhaustive mutation coverage.
 
-On 2026-07-18 the observed 95% intervals were 6.551-7.445 us for KVN parse,
-2.394-2.822 us for KVN generation, 29.363-43.171 us for XML parse, and 7.320-9.582 us for XML
-generation. These are observations, not unexplained release thresholds; the registered family
-benchmarks provide the CodSpeed comparison surface for subsequent changes.
-
-## Remaining verification work
-
-RDM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its ICS feature inventory and packaged
-surfaces are reconciled, and the `NOMINAL_IMPACT_ALT` book/XSD conflict recorded above is now
-resolved. No family-specific promotion blocker remains; only the exact-cell review.
+Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
+artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).

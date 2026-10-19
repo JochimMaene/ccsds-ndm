@@ -7,8 +7,7 @@ use super::*;
 impl Omm {
     /// Validates the OMM against CCSDS constraints that cannot be checked during parsing.
     pub fn validate(&self) -> Result<()> {
-        self.header.validate()?;
-        self.body.segment.validate()
+        <Self as crate::traits::Validate>::validate(self)
     }
 
     /// Generate canonical NORAD TLE line 1 and line 2 from this OMM.

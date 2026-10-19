@@ -1,6 +1,4 @@
-# Combined NDM conformance inventory
-
-Status: **Available**.
+# Combined NDM conformance
 
 The combined instantiation is the XML `ndm` envelope defined by CCSDS 505.0-B-3, section 4.11,
 and `ccsds-ndm/data/xsd/ndmxml-4.0.0-master-4.0.xsd`. It is the only representation this library
@@ -29,9 +27,13 @@ The combined-NDM suites establish:
 - refusal of combined KVN parsing and generation with an unsupported-notation diagnostic.
 
 The shipped `ndm_g22.xml` is valid against the official master XSD, but its OPM constituent has a
-maneuver without `spacecraftParameters/MASS`. The already-verified standalone OPM semantic gate
-requires mass for maneuver validation. The focused test records both facts and rejects the
-combined document; it does not weaken OPM validation or invent missing data.
+maneuver without `spacecraftParameters/MASS`. ODM §3.2.4.9 requires the conditional
+spacecraft fields, including mass, when a maneuver is present; XML §4.11 grants constituents
+no exception to their standalone semantics.
+`ndm::generation::shipped_g22_is_schema_valid_but_rejected_by_the_verified_opm_semantic_gate`
+records both facts and rejects the combined document; it does not weaken OPM validation or invent missing data. This is a resolved example
+defect: XSD validity alone does not establish the book's cross-field semantics. A combined
+envelope is verified by its own rules and the same validation gate for every constituent.
 
 ## Normative envelope reconciliation
 
@@ -54,8 +56,12 @@ Python combined construction/identity and aggregate limits are exercised by
 `bindings/python/tests/test_ndm.py` and `test_parse_and_generation_options.py`. `package-python`
 and `package-rust` are the shared built-artifact gates.
 
-## Status
+## Verification outcome
 
-Combined NDM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its family-specific blocker is the
-XSD-valid G22 versus standalone OPM maneuver/`MASS` semantic conflict, which must be resolved
-independently of the exact-cell review.
+Combined NDM meets the common [verification criteria](README.md#verification-criteria)
+on Rust and Python for XML. KVN is an explicitly unsupported notation, not a missing
+conversion implementation. The G22 example defect is resolved by rejecting its invalid
+constituent consistently with standalone OPM.
+
+Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
+artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).

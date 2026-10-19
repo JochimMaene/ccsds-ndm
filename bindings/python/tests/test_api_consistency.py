@@ -122,6 +122,89 @@ def test_public_exceptions_follow_python_error_categories():
 
 
 @pytest.mark.parametrize(
+    "error_type",
+    [
+        ccsds_ndm.NdmError,
+        ccsds_ndm.NdmFormatError,
+        ccsds_ndm.NdmKvnParseError,
+        ccsds_ndm.NdmXmlError,
+        ccsds_ndm.NdmValidationError,
+        ccsds_ndm.NdmEpochError,
+        ccsds_ndm.NdmIoError,
+        ccsds_ndm.NdmUnsupportedMessageError,
+        ccsds_ndm.NdmUnsupportedNotationError,
+    ],
+)
+def test_ndm_errors_expose_unavailable_diagnostics_as_none(error_type):
+    error = error_type("failure without context")
+    for field in (
+        "operation",
+        "notation",
+        "message_kind",
+        "source_edition",
+        "code",
+        "field_path",
+        "line",
+        "column",
+        "byte_offset",
+        "original_token",
+        "expected",
+        "requirement",
+    ):
+        assert getattr(error, field) is None
+
+
+@pytest.mark.parametrize(
+    ("cls", "args", "kwargs"),
+    [
+        (ccsds_ndm.AdditionalParameters, (), {"mass": 123.0}),
+        (ccsds_ndm.QuaternionState, ("GCRF", "SC_BODY_1", 0, 0, 0, 1), {}),
+        (ccsds_ndm.EulerAngleState, ("GCRF", "SC_BODY_1", "XYZ", 0, 0, 0), {}),
+        (ccsds_ndm.AngVelState, ("GCRF", "SC_BODY_1", "A", 0, 0, 0), {}),
+        (ccsds_ndm.SpinState, ("GCRF", "SC_BODY_1", 0, 0, 0, 0), {}),
+        (ccsds_ndm.InertiaState, ("SC_BODY_1", 1, 1, 1, 0, 0, 0), {}),
+    ],
+)
+def test_optional_constructor_fields_can_be_omitted(cls, args, kwargs):
+    value = cls(*args, **kwargs)
+    assert value.comment == []
+    if cls is ccsds_ndm.AdditionalParameters:
+        assert value.mass == 123.0
+        assert value.area_pc is None
+    elif cls is ccsds_ndm.QuaternionState:
+        assert value.quaternion_dot is None
+
+
+@pytest.mark.parametrize("format", [None, "kvn"])
+@pytest.mark.parametrize("from_file", [False, True])
+def test_wrong_family_errors_have_diagnostic_fields(format, from_file):
+    source = ROOT / "ccsds-ndm/data/kvn/opm_g1.kvn"
+    with pytest.raises(
+        ccsds_ndm.NdmUnsupportedMessageError, match="expected OEM, found OPM"
+    ) as caught:
+        if from_file:
+            Oem.from_file(source, format=format)
+        else:
+            Oem.from_str(source.read_text(), format=format)
+    error = caught.value
+    assert error.operation == "parse"
+    assert error.notation == format
+    assert error.message_kind == "oem"
+    for field in (
+        "source_edition",
+        "code",
+        "field_path",
+        "line",
+        "column",
+        "byte_offset",
+        "original_token",
+        "expected",
+        "requirement",
+    ):
+        assert getattr(error, field) is None
+
+
+@pytest.mark.parametrize(
     "name",
     ["RelativeStateVector", "SpacecraftParameters", "TleParameters"],
 )

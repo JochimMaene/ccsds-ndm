@@ -147,6 +147,23 @@ impl Cdm {
     }
 }
 
+// CDM 5.2.9 defines this closed lexical repertoire for five identifier fields.
+fn validate_identifier(field: &'static str, value: &str) -> Result<()> {
+    if !value
+        .bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    {
+        return Err(ValidationError::InvalidValue {
+            field: field.into(),
+            value: value.into(),
+            expected: "ASCII letters, digits, underscores or dashes".into(),
+            line: None,
+        }
+        .into());
+    }
+    Ok(())
+}
+
 impl crate::traits::Validate for CdmHeader {
     fn validate(&self) -> Result<()> {
         crate::validation::epoch_precision(&[("CREATION_DATE", &self.creation_date)])?;
@@ -174,6 +191,8 @@ impl crate::traits::Validate for CdmHeader {
             }
             .into());
         }
+        validate_identifier("ORIGINATOR", &self.originator)?;
+        validate_identifier("MESSAGE_ID", &self.message_id)?;
         Ok(())
     }
 }
@@ -215,6 +234,24 @@ impl crate::traits::Validate for CdmBody {
                 message: Cow::Borrowed(
                     "CDM Body segments must contain exactly one OBJECT1 and one OBJECT2",
                 ),
+                line: None,
+            }
+            .into());
+        }
+        if self.segments[0].metadata.object != CdmObjectType::Object1 {
+            return Err(ValidationError::InvalidValue {
+                field: "OBJECT".into(),
+                value: "OBJECT2 before OBJECT1".into(),
+                expected: "OBJECT1 followed by OBJECT2".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.segments[0].metadata.ref_frame != self.segments[1].metadata.ref_frame {
+            return Err(ValidationError::InvalidValue {
+                field: "REF_FRAME".into(),
+                value: "different object reference frames".into(),
+                expected: "the same reference frame for both objects (CDM table 3-3)".into(),
                 line: None,
             }
             .into());
@@ -351,14 +388,12 @@ impl crate::traits::Validate for RelativeMetadataData {
             ("SCREEN_ENTRY_TIME", &self.screen_entry_time),
             ("SCREEN_EXIT_TIME", &self.screen_exit_time),
         ])?;
-        // These are plain doubles in the CDM schema, so only finiteness constrains them. The KVN
-        // writer already refused non-finite numbers; `validate` and the XML writer did not, and
-        // an infinity reached the output as the lexical `inf`, which `xsd:double` rejects.
-        let mut numbers: Vec<(&'static str, f64)> =
-            vec![("MISS_DISTANCE", self.miss_distance.value)];
+        // Table 3-2 defines distance and speed as norms despite their unrestricted XSD doubles.
+        require_non_negative(self.miss_distance.value, "MISS_DISTANCE")?;
         if let Some(value) = &self.relative_speed {
-            numbers.push(("RELATIVE_SPEED", value.value));
+            require_non_negative(value.value, "RELATIVE_SPEED")?;
         }
+        let mut numbers: Vec<(&'static str, f64)> = Vec::new();
         if let Some(vector) = &self.relative_state_vector {
             numbers.extend([
                 ("RELATIVE_POSITION_R", vector.relative_position_r.value),
@@ -648,6 +683,9 @@ impl crate::traits::Validate for CdmMetadata {
             }
             .into());
         }
+        validate_identifier("OBJECT_DESIGNATOR", &self.object_designator)?;
+        validate_identifier("CATALOG_NAME", &self.catalog_name)?;
+        validate_identifier("INTERNATIONAL_DESIGNATOR", &self.international_designator)?;
         Ok(())
     }
 }

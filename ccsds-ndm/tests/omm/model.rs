@@ -80,3 +80,20 @@ fn omm_units_parsing() {
     assert_eq!(error.field, "unit");
     assert_eq!(error.value, "INVALID");
 }
+
+#[test]
+fn inherent_validation_and_tle_generation_use_the_root_validation_gate() {
+    use ccsds_ndm::messages::omm::Omm;
+    use ccsds_ndm::{Ndm, Validate};
+
+    let mut message = Omm::from_kvn(include_str!("../../data/kvn/omm_g7.kvn")).unwrap();
+    message.id = Some("CCSDS_OPM_VERS".into());
+    assert!(message.validate().is_err());
+    assert!(Validate::validate(&message).is_err());
+    assert!(message.to_tle_lines().is_err());
+    assert!(message.to_kvn().is_err());
+    assert!(message.to_xml().is_err());
+    let mut bytes = Vec::new();
+    assert!(message.write_kvn_to(&mut bytes).is_err());
+    assert!(bytes.is_empty());
+}

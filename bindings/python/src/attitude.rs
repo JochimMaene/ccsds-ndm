@@ -11,6 +11,7 @@ use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
+/// The four quaternion derivative components must be supplied together or all omitted.
 #[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
@@ -22,6 +23,7 @@ pub struct QuaternionState {
 #[pymethods]
 impl QuaternionState {
     #[new]
+    #[pyo3(signature = (ref_frame_a, ref_frame_b, q1, q2, q3, qc, q1_dot=None, q2_dot=None, q3_dot=None, qc_dot=None, comment=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         ref_frame_a: String,
@@ -35,37 +37,44 @@ impl QuaternionState {
         q3_dot: Option<f64>,
         qc_dot: Option<f64>,
         comment: Option<Vec<String>>,
-    ) -> Self {
+    ) -> PyResult<Self> {
         use ccsds_ndm::common::{Quaternion, QuaternionDot};
         use ccsds_ndm::types::QuaternionDotComponent;
-        Self {
+        let quaternion_dot = match (q1_dot, q2_dot, q3_dot, qc_dot) {
+            (Some(q1_dot), Some(q2_dot), Some(q3_dot), Some(qc_dot)) => Some(QuaternionDot {
+                q1_dot: QuaternionDotComponent {
+                    value: q1_dot,
+                    units: None,
+                },
+                q2_dot: QuaternionDotComponent {
+                    value: q2_dot,
+                    units: None,
+                },
+                q3_dot: QuaternionDotComponent {
+                    value: q3_dot,
+                    units: None,
+                },
+                qc_dot: QuaternionDotComponent {
+                    value: qc_dot,
+                    units: None,
+                },
+            }),
+            (None, None, None, None) => None,
+            _ => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "q1_dot, q2_dot, q3_dot and qc_dot must be supplied together",
+                ))
+            }
+        };
+        Ok(Self {
             inner: core_common::QuaternionState {
                 comment: comment.unwrap_or_default(),
                 ref_frame_a,
                 ref_frame_b,
                 quaternion: Quaternion { q1, q2, q3, qc },
-                quaternion_dot: q1_dot.and_then(|q1d| {
-                    Some(QuaternionDot {
-                        q1_dot: QuaternionDotComponent {
-                            value: q1d,
-                            units: None,
-                        },
-                        q2_dot: QuaternionDotComponent {
-                            value: q2_dot?,
-                            units: None,
-                        },
-                        q3_dot: QuaternionDotComponent {
-                            value: q3_dot?,
-                            units: None,
-                        },
-                        qc_dot: QuaternionDotComponent {
-                            value: qc_dot?,
-                            units: None,
-                        },
-                    })
-                }),
+                quaternion_dot,
             },
-        }
+        })
     }
 
     /// Quaternion components Q1, Q2, Q3, QC.
@@ -248,6 +257,7 @@ pub struct EulerAngleState {
 #[pymethods]
 impl EulerAngleState {
     #[new]
+    #[pyo3(signature = (ref_frame_a, ref_frame_b, euler_rot_seq, angle_1, angle_2, angle_3, angle_1_dot=None, angle_2_dot=None, angle_3_dot=None, comment=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         ref_frame_a: String,
@@ -477,6 +487,7 @@ pub struct AngVelState {
 #[pymethods]
 impl AngVelState {
     #[new]
+    #[pyo3(signature = (ref_frame_a, ref_frame_b, angvel_frame, angvel_x, angvel_y, angvel_z, comment=None))]
     fn new(
         ref_frame_a: String,
         ref_frame_b: String,
@@ -631,6 +642,7 @@ pub struct SpinState {
 #[pymethods]
 impl SpinState {
     #[new]
+    #[pyo3(signature = (ref_frame_a, ref_frame_b, spin_alpha, spin_delta, spin_angle, spin_angle_vel, nutation=None, nutation_per=None, nutation_phase=None, momentum_alpha=None, momentum_delta=None, nutation_vel=None, comment=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         ref_frame_a: String,
@@ -919,6 +931,7 @@ pub struct InertiaState {
 #[pymethods]
 impl InertiaState {
     #[new]
+    #[pyo3(signature = (inertia_ref_frame, ixx, iyy, izz, ixy, ixz, iyz, comment=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         inertia_ref_frame: String,

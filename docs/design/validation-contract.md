@@ -8,8 +8,8 @@ defines the complete accepted domain.
 
 - **P1 — KVN parsing:** enforce KVN syntax, the selected message edition, and self-contained
   semantic rules.
-- **P2 — XML parsing:** enforce XML syntax and structure, the selected message edition, XML value
-  domains, and self-contained semantic rules.
+- **P2 — XML parsing:** enforce the supported XML structure, the selected message edition, XML
+  value domains, and self-contained semantic rules, subject to the XML limits below.
 - **P3 — `Validate::validate`:** enforce notation-neutral, self-contained model semantics,
   including rules specific to the edition recorded on the message. P3 is notation-neutral but not
   edition-neutral: `Opm`, `Oem`, and `Omm` already resolve edition-specific value domains through
@@ -28,8 +28,9 @@ public generation path validates the complete graph before writing any caller-vi
    standards agree. Legal lexical spellings may differ when the standard says they differ.
 3. Root validation revisits every relevant child, including populated optional blocks and every
    element of repeated collections. A correct but unreachable child validator is a defect.
-4. Generation performs P3 before notation-specific checks. Rejected materialized, streaming, and
-   file output must not expose a partial document.
+4. Generation performs P3 before notation-specific checks. Validation and representability
+   failures expose no output. A caller-provided streaming sink may fail after accepting a prefix;
+   file helpers use atomic replacement to preserve the destination on failure.
 5. Unknown normative values are rejected or preserved according to their governing domain; they
    are never silently rewritten to another value.
 6. Runtime validation is offline. It does not fetch mutable registries or depend on network access.
@@ -46,54 +47,57 @@ reading. Reading also accepts documented producer variations when the interpreta
 and preserves the values: for example, equivalent UTF-8 XML declarations, a leading byte-order
 mark, and excess trailing padding in OEM KVN. Reject input when interpreting it would require
 guessing missing values, dropping content, or accepting inconsistent message semantics. Each
-exception to a clear book rule is recorded in the shared or family conformance document and tested
+exception to a clear book rule is recorded in the family conformance document and tested
 alongside nearby invalid cases; this policy is not a blanket relaxation of the grammar.
 Generation follows the clear rules and writes a form satisfying both sources where possible
 (for example, OEM XML always declares `xmlns:ndm`). A family that keeps a stricter reading lists it as a deliberate exception in its
 conformance document; OEM's are under "Stricter than required" in [oem-3.0.md](../conformance/oem-3.0.md).
 
-Known conflicts include the entries below. They predate the permissive-reading rule and are each
-resolved on their own evidence; the TDM entries that keep the narrower rule are deliberate
-exceptions to it.
-
-- OCM `DC_PA_START_ANGLE` and `DC_PA_STOP_ANGLE`: ODM permits any finite magnitude; OCM 3.0 XML
-  uses `angleType`, whose range is `[-360, 360)`. **Resolved** with the P3/P4 split: finiteness at
-  P3, refused by `Ocm::validate_xml_representability` at XML generation.
-- OPM `MAN_DELTA_MASS`: the authorities do differ, and the resolution is per edition rather than a
-  general rule.
-
-  | Authority | Says | Applies to |
-  | --- | --- | --- |
-  | 502.0-B-3 §3.2.4.7 | "MAN_DELTA_MASS may be used for both finite and impulsive maneuvers; the value must be a negative number" | prose, both editions |
-  | `ndmxml-2.0.0-common-2.0.xsd` `deltamassType` → `negativeDouble` (`maxExclusive 0.0`) | strictly negative | OPM 2.0 XML |
-  | `ndmxml-4.0.0-common-4.0.xsd` `deltamassTypeZ` → `nonPositiveDouble` (`maxInclusive 0.0`) | zero permitted | OPM 3.0 XML |
-
-  The 3.0 schema states its own reason inline: "Type Z for deltamass that allows value of zero
-  (attitude maneuvers)". That annotated widening is the later and more specific statement for the
-  3.0 edition, so zero is accepted there and rejected in 2.0, which is what
-  `versioning::validate_opm_edition` implements. Positive values are rejected in both.
-
-  This resolution is scoped to this field and these two editions. It is **not** a rule that a
-  schema beats prose, any more than the earlier draft's "the narrower semantic rule applies" was a
-  rule that prose beats a schema. Each conflict is resolved on its own evidence and recorded here
-  with citations, so a reader can check the reasoning rather than apply a slogan.
-
-- OCM `DAYS_SINCE_FIRST_OBS` and `DAYS_SINCE_LAST_OBS`: ODM permits signed values; the OCM 3.0 XSD
-  uses a non-negative day interval. **Resolved** with the P3/P4 split: finiteness at P3, negative
-  values refused at XML generation.
-- RDM `NOMINAL_IMPACT_ALT`: RDM provides no numeric range and permits non-Earth body-fixed frames;
-  the common 4.0 XSD applies an Earth-derived altitude range. **Resolved** as the worked example of
-  the policy above: the model preserves any finite altitude, P3 enforces finiteness only, KVN
-  writes it, and XML generation refuses a value outside `[-430.5, 8848]` rather than altering it.
-- TDM `ANGLE_1` and `ANGLE_2`: TDM 2.0 §§3.5.4.2–3.5.4.3 require `[-180, 360)`; the shared
-  `angleRange` type is the wider `[-360, 360)`. The narrower semantic rule applies.
-- TDM `TEMPERATURE`, `RCS`, and `STEC`: TDM 2.0 §§3.5.8.3, 3.5.5.2, and 3.5.7.1 require positive
-  values; the TDM 2.0 XSD uses `nonNegativeDouble` for `TEMPERATURE` and unconstrained `xsd:double`
-  for `RCS` and `STEC`. The narrower semantic rule applies.
+A conflict is resolved for the specific field and edition, with both authorities recorded in
+its family document. There is no blanket rule that a schema always overrides prose or that the
+narrower domain always wins. Some conflicts require a notation-specific refusal; others reflect an
+explicit edition change. See the [family decision records](../conformance/README.md#family-records).
 
 An XSD-only facet is sufficient evidence for P2 and XML P4. It is not automatically a semantic
 rule for P1 or P3. For example, positivity of `gmType` and `frequencyType` is established by the
 XSD but not by corresponding book text.
+
+## Preservation and normalization
+
+Parsing and conversion preserve the supported model with the documented normalizations below;
+they are not byte-preserving archival operations or a guarantee of exact model equality across
+notations. Whitespace, numeric spelling, and optional fixed-unit annotations may change.
+
+- Floating-point fields use `f64`. Ordinary KVN numbers must fit their family's 16-digit format;
+  most writers round values requiring 17 significant digits to at most 16. CDM's exact-model
+  preflight instead refuses a value when that rounding would change its typed content. XML can
+  retain the full double representation. KVN rejects non-finite values and magnitudes whose
+  rounded spelling would overflow. TDM phase counts follow the book's specific arbitrary-precision
+  rule instead and retain exact decimal strings, subject to KVN's line-length limit.
+  Floating-point negative zero is accepted on input and written as `0.0` in KVN; XML retains
+  the double's sign. Opaque text and retained epoch spellings have their own family rules.
+- Fixed-unit annotations may be omitted or canonicalized without changing the measurement's
+  unit or applying a conversion. Optional XML annotations cannot always survive unitless KVN.
+- Comment text and order are retained subject to documented whitespace normalization. Where KVN
+  has fewer comment positions, a family either documents a canonical merge (OPM data/state-vector
+  comments) or refuses conversion (for example, CDM and RDM associations).
+- Documented aliases normalize to the same model meaning; for example, ACM KVN `RATE_TYPE=NONE`
+  means no rate columns and generates as an omitted `RATE_TYPE`.
+
+Other populated information that the target notation cannot represent causes generation to fail;
+it is not silently dropped. Each family's record identifies its specific normalization and refusal
+rules. `validate()` checks model semantics; a successful call does not promise that every notation
+can represent the model or that its physical interpretation is correct.
+
+## XML parser limits
+
+XML input uses the shared structural validator and typed deserializer, not a general-purpose XSD
+validation engine. Known elements, attributes, namespaces, ordering, choices, and value domains
+are checked. DTDs and unsupported content are rejected; processing instructions and unused
+namespace declarations are ignored after limited lexical checks. In particular, malformed names
+in those ignored constructs can still be accepted. This limit applies to every message family,
+not only OEM. Applications requiring full XML well-formedness or independent schema validation
+must validate the original document separately. Generation does not reproduce ignored constructs.
 
 ## Registry-governed values
 
@@ -104,6 +108,15 @@ token losslessly and validates offline syntax rather than current registry membe
 constants or a pinned registry snapshot may improve discoverability and conformance tests, but are
 not an acceptance boundary. KVN generation emits the preserved token; XML generation rejects a
 token absent from the selected bundled XSD.
+
+## Attitude quaternion precision
+
+ADM 504.0-B-2 annex F defines quaternion components from a rotation axis and angle, implying unit
+magnitude. The shared quaternion validator used by APM, AEM and known quaternion ACM histories
+checks each component in `[-1, 1]` and squared norm in `[0.999, 1.001]`. The book specifies no
+numeric tolerance; this is an explicit implementation choice accommodating rounded examples,
+not a new adjustable parser option. Data outside the interval is rejected rather than normalized.
+The common constructor checks component domains; complete-message validation checks magnitude.
 
 ## Evidence required for a constraint
 
@@ -140,7 +153,7 @@ field paths, so it is not the default design.
 Static field-name searches are useful for triage only. Same-name fields, parent-validates-child
 patterns, helper functions, and notation-specific preflights make them unsound as coverage proof.
 
-Per-family evidence lives in [the conformance set](../conformance/). Open conformance
+Per-family evidence and the common verification criteria live in [the conformance index](../conformance/README.md). Open conformance
 decisions are recorded beside the rule they govern in the applicable family document and
 summarized in [the support matrix](../support-matrix.md). Deliberate alias behavior (accepted
 versus advertised spellings) is documented beside its `FromStr` implementation in

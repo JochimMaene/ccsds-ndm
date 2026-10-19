@@ -376,6 +376,61 @@ pub(super) fn validate_sequences(xml: &str) -> Result<()> {
 impl Ocm {
     pub(crate) fn validate_xml_representability(&self) -> Result<()> {
         let data = &self.body.segment.data;
+        let metadata = &self.body.segment.metadata;
+        for (field, value) in [
+            ("OPERATOR_URL", &metadata.operator_url),
+            ("OPERATOR_EMAIL", &metadata.operator_email),
+            ("OPERATOR_PHONE", &metadata.operator_phone),
+            ("OPERATOR_AUTOMATED_URL", &metadata.operator_automated_url),
+            ("EMERGENCY_EMAIL", &metadata.emergency_email),
+            ("EMERGENCY_PHONE", &metadata.emergency_phone),
+            ("EMERGENCY_AVAILABILITY", &metadata.emergency_availability),
+            ("SSA_EMAIL", &metadata.ssa_email),
+            ("SSA_PHONE", &metadata.ssa_phone),
+            ("OWNER_URL", &metadata.owner_url),
+        ] {
+            if value.is_some() {
+                return Err(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: "present".into(),
+                    expected: "absent: NDM/XML 4.0.0 predates the June 2026 OCM corrigendum".into(),
+                    line: None,
+                }
+                .at_path("body.segment.metadata")
+                .into());
+            }
+        }
+        for covariance in &data.cov {
+            if covariance.traj_id.is_some() {
+                return Err(ValidationError::InvalidValue {
+                    field: "TRAJ_ID".into(),
+                    value: "present".into(),
+                    expected:
+                        "absent in covariance: NDM/XML 4.0.0 predates the June 2026 OCM corrigendum"
+                            .into(),
+                    line: None,
+                }
+                .at_path("body.segment.data.cov")
+                .into());
+            }
+        }
+        if data.user.as_ref().is_some_and(|user| {
+            user.user_defined
+                .iter()
+                .any(|parameter| parameter.parameter.starts_with("COMPOSITION_"))
+        }) {
+            return Err(ValidationError::InvalidValue {
+                field: "USER_DEFINED_COMPOSITION".into(),
+                value: "present".into(),
+                expected:
+                    "scalar parameters only: NDM/XML 4.0.0 has no sequence-row representation"
+                        .into(),
+                line: None,
+            }
+            .at_path("body.segment.data.user")
+            .into());
+        }
+
         if let Some(value) = data.phys.as_ref().and_then(|phys| phys.drag_coeff_nom) {
             if value <= 0.0 {
                 return Err(ValidationError::OutOfRange {

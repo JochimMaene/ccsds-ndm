@@ -12,7 +12,7 @@ use crate::common::{
 };
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
-use crate::traits::Ndm;
+use crate::traits::{Ndm, Validate};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 
@@ -828,9 +828,9 @@ impl AemAttitudeState {
         };
 
         match self {
-            Self::QuaternionEphemeris(value) => value.quaternion.validate_components(),
+            Self::QuaternionEphemeris(value) => value.quaternion.validate(),
             Self::QuaternionDerivative(value) => {
-                value.quaternion.validate_components()?;
+                value.quaternion.validate()?;
                 finite(&[
                     ("Q1_DOT", value.quaternion_dot.q1_dot.value),
                     ("Q2_DOT", value.quaternion_dot.q2_dot.value),
@@ -839,7 +839,7 @@ impl AemAttitudeState {
                 ])
             }
             Self::QuaternionAngVel(value) => {
-                value.quaternion.validate_components()?;
+                value.quaternion.validate()?;
                 finite(&[
                     ("ANGVEL_X", value.ang_vel.angvel_x.value),
                     ("ANGVEL_Y", value.ang_vel.angvel_y.value),

@@ -108,6 +108,113 @@ impl crate::traits::Validate for OcmData {
         for traj in &self.traj {
             traj.validate()?;
         }
+        let multiple_trajectories = self.traj.len() > 1;
+        let linked_covariances = multiple_trajectories || self.cov.len() > 1;
+        if multiple_trajectories && !self.cov.is_empty() {
+            let mut ids = std::collections::HashSet::new();
+            for trajectory in &self.traj {
+                let id = trajectory
+                    .traj_id
+                    .as_deref()
+                    .filter(|id| !id.trim().is_empty())
+                    .ok_or_else(|| ValidationError::MissingRequiredField {
+                        block: "OCM trajectory/covariance linkage".into(),
+                        field: "TRAJ_ID".into(),
+                        line: None,
+                    })?;
+                if !ids.insert(id) {
+                    return Err(ValidationError::InvalidValue {
+                        field: "TRAJ_ID".into(),
+                        value: id.into(),
+                        expected:
+                            "unique trajectory identifiers when covariance linkage is required"
+                                .into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+        for covariance in &self.cov {
+            if linked_covariances
+                && covariance
+                    .traj_id
+                    .as_deref()
+                    .is_none_or(|id| id.trim().is_empty())
+            {
+                return Err(ValidationError::MissingRequiredField {
+                    block: "OCM trajectory/covariance linkage".into(),
+                    field: "TRAJ_ID".into(),
+                    line: None,
+                }
+                .into());
+            }
+            if let Some(id) = &covariance.traj_id {
+                if !self
+                    .traj
+                    .iter()
+                    .any(|trajectory| trajectory.traj_id.as_ref() == Some(id))
+                {
+                    return Err(ValidationError::InvalidValue {
+                        field: "TRAJ_ID".into(),
+                        value: id.clone(),
+                        expected: "identifier of a trajectory in this OCM".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+        if let Some(user) = &self.user {
+            for parameter in &user.user_defined {
+                let sequence = parameter.parameter.strip_prefix("COMPOSITION_");
+                if sequence.is_some_and(str::is_empty)
+                    || (!parameter.records.is_empty() && sequence.is_none())
+                {
+                    return Err(ValidationError::InvalidValue {
+                        field: "USER_DEFINED_COMPOSITION".into(),
+                        value: parameter.parameter.clone(),
+                        expected: "COMPOSITION_<sequence ID> for sequence records".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+                if sequence.is_some()
+                    && (parameter
+                        .value
+                        .split(',')
+                        .any(|column| column.trim().is_empty())
+                        || parameter.records.is_empty())
+                {
+                    return Err(ValidationError::InvalidValue {
+                        field: "USER_DEFINED_COMPOSITION".into(),
+                        value: parameter.value.clone(),
+                        expected: "nonempty comma-delimited composition and sequence records"
+                            .into(),
+                        line: None,
+                    }
+                    .into());
+                }
+                for record in &parameter.records {
+                    if record.trim().is_empty()
+                        || record.contains(['\n', '\r'])
+                        || record.trim() == "USER_STOP"
+                        || record
+                            .split_once('=')
+                            .is_some_and(|(key, _)| key.trim().starts_with("USER_DEFINED_"))
+                        || !record.bytes().all(|byte| (b' '..=b'~').contains(&byte))
+                    {
+                        return Err(ValidationError::InvalidValue {
+                            field: "USER_DEFINED sequence record".into(),
+                            value: record.clone(),
+                            expected: "one printable ASCII ICD-defined data row".into(),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+            }
+        }
         if let Some(phys) = &self.phys {
             phys.validate()?;
         }
@@ -303,35 +410,39 @@ impl OcmTrajState {
             "trajLine",
             self.traj_lines.iter().map(|l| &l.values),
         )?;
+        if let Some(dimension) = orbital_dimension(&self.traj_type) {
+            for line in &self.traj_lines {
+                if line.values.len() != dimension {
+                    return Err(ValidationError::invalid_value(
+                        "trajLine",
+                        line.values.len().to_string(),
+                        format!("{dimension} values for TRAJ_TYPE {}", self.traj_type),
+                    )
+                    .into());
+                }
+            }
+        }
 
         let traj_type = self.traj_type.trim().to_uppercase();
 
         if let Some(units) = &self.traj_units {
             let unit_list = parse_units_list(units);
             if let Some(expected_units) = expected_traj_units(&traj_type) {
-                if unit_list.len() == expected_units.len() {
-                    for (unit, expected) in unit_list.iter().zip(expected_units.iter()) {
-                        if !unit_matches_expected(unit, expected) {
-                            return Err(ValidationError::InvalidValue {
-                                field: Cow::Borrowed("TRAJ_UNITS"),
-                                value: units.clone(),
-                                expected: format!("expected {} units", traj_type).into(),
-                                line: None,
-                            }
-                            .into());
-                        }
-                    }
-                }
-            } else if traj_type == "DELAUNAY" {
-                let has_angle_unit = unit_list.iter().any(|u| {
-                    let u = u.to_ascii_lowercase();
-                    u.contains("rad") || u.contains("deg") || u.contains("rev")
-                });
-                if !has_angle_unit {
+                if unit_list.len() != expected_units.len()
+                    || unit_list
+                        .iter()
+                        .zip(expected_units.iter())
+                        .any(|(unit, expected)| !unit_matches_expected(unit, expected))
+                {
                     return Err(ValidationError::InvalidValue {
                         field: Cow::Borrowed("TRAJ_UNITS"),
                         value: units.clone(),
-                        expected: "expected angular units for DELAUNAY".into(),
+                        expected: format!(
+                            "expected {} units: {}",
+                            traj_type,
+                            expected_units.join(", ")
+                        )
+                        .into(),
                         line: None,
                     }
                     .into());
@@ -470,6 +581,98 @@ impl OcmCovarianceMatrix {
             "COV",
         )?;
         validate_ocm_line_values("COV", "covLine", self.cov_lines.iter().map(|l| &l.values))?;
+        for (field, value) in [
+            ("COV_SCALE_MIN", self.cov_scale_min),
+            ("COV_SCALE_MAX", self.cov_scale_max),
+        ] {
+            if let Some(value) = value {
+                require_finite(field, value)?;
+            }
+        }
+        if let Some(confidence) = &self.cov_confidence {
+            Percentage::validate_value(confidence.value, "COV_CONFIDENCE")?;
+        }
+        if matches!(self.cov_type.as_str(), "SIG3EIGVEC3" | "TSIG3EIGVEC3") {
+            let offset = usize::from(self.cov_type.starts_with('T'));
+            for line in &self.cov_lines {
+                let values = &line.values;
+                if values.len() != 12 + offset {
+                    return Err(ValidationError::invalid_value(
+                        "covLine",
+                        values.len().to_string(),
+                        format!("{} values for {}", 12 + offset, self.cov_type),
+                    )
+                    .into());
+                }
+                if values[..3 + offset].iter().any(|value| *value <= 0.0) {
+                    return Err(ValidationError::invalid_value(
+                        "covLine",
+                        "nonpositive dispersion",
+                        "positive one-sigma dispersions",
+                    )
+                    .into());
+                }
+                for i in 0..3 {
+                    for j in 0..=i {
+                        let dot: f64 = (0..3)
+                            .map(|k| {
+                                values[offset + 3 + 3 * i + k] * values[offset + 3 + 3 * j + k]
+                            })
+                            .sum();
+                        let expected = if i == j { 1.0 } else { 0.0 };
+                        if (dot - expected).abs() > 1e-12 {
+                            return Err(ValidationError::invalid_value(
+                                "covLine",
+                                "nonorthonormal eigenvectors",
+                                "orthonormal eigenvectors (absolute tolerance 1e-12)",
+                            )
+                            .into());
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(dimension) = covariance_dimension(&self.cov_type) {
+            if let Some(units) = &self.cov_units {
+                let listed = parse_units_list(units);
+                let expected = expected_traj_units(&self.cov_type).or_else(|| {
+                    self.cov_type
+                        .strip_prefix('T')
+                        .and_then(expected_traj_units)
+                        .map(|mut units| {
+                            units.insert(0, "s");
+                            units
+                        })
+                });
+                if let Some(expected) = expected {
+                    if listed.len() != expected.len()
+                        || listed
+                            .iter()
+                            .zip(expected.iter())
+                            .any(|(actual, expected)| !unit_matches_expected(actual, expected))
+                    {
+                        return Err(ValidationError::invalid_value(
+                            "COV_UNITS",
+                            units,
+                            format!("diagonal-element units {}", expected.join(", ")),
+                        )
+                        .into());
+                    }
+                }
+                if listed.len() != dimension {
+                    return Err(ValidationError::invalid_value(
+                        "COV_UNITS",
+                        units,
+                        format!("{dimension} diagonal-element units"),
+                    )
+                    .into());
+                }
+            }
+            for line in &self.cov_lines {
+                validate_covariance_record(&line.values, dimension, &self.cov_ordering)?;
+            }
+        }
+
         Ok(())
     }
 }
@@ -598,11 +801,7 @@ impl OcmManeuverParameters {
         let numeric_columns: Vec<bool> = tokens
             .iter()
             .skip(1)
-            .map(|token| {
-                !NON_NUMERIC_MAN_COLUMNS
-                    .iter()
-                    .any(|known| known.eq_ignore_ascii_case(token.trim()))
-            })
+            .map(|token| is_numeric_man_column(token))
             .collect();
         let mut previous_key: Option<crate::types::EpochOrderKey<'_>> = None;
         for line in &self.man_lines {
@@ -637,7 +836,7 @@ impl OcmManeuverParameters {
                 }
             }
             previous_key = Some(key);
-            if line.values.len() < expected {
+            if line.values.len() != expected {
                 return Err(ValidationError::InvalidValue {
                     field: Cow::Borrowed("MAN_COMPOSITION"),
                     value: format!("{} ({} values)", self.man_composition, line.values.len()),
@@ -646,7 +845,7 @@ impl OcmManeuverParameters {
                 }
                 .into());
             }
-            validate_man_line_numbers(&numeric_columns, &tokens, line)?;
+            validate_man_line_values(&numeric_columns, &tokens, line)?;
         }
         Ok(())
     }
@@ -665,18 +864,33 @@ const NON_NUMERIC_MAN_COLUMNS: [&str; 5] = [
     "TIME_RELATIVE",
 ];
 
-/// Requires every declared-numeric maneuver column to hold a finite number.
+fn is_numeric_man_column(token: &str) -> bool {
+    !NON_NUMERIC_MAN_COLUMNS
+        .iter()
+        .any(|known| known.eq_ignore_ascii_case(token.trim()))
+}
+
+/// Requires one token per maneuver column and a finite number in declared-numeric columns.
 ///
 /// `ManLine::values` is `Vec<String>` because the columns are heterogeneous, so nothing else stops
-/// text reaching a numeric column: the XSD types the line as a string list, so the schema oracle
+/// text reaching a numeric column: the XSD types `manLine` as `xsd:string`, so the schema oracle
 /// accepts it. This matches Orekit, whose `ManeuverFieldType` parses each declared-numeric column
 /// as a double and likewise enforces no per-column domain.
-fn validate_man_line_numbers(
+fn validate_man_line_values(
     numeric_columns: &[bool],
     tokens: &[String],
     line: &ManLine,
 ) -> Result<()> {
     for (index, value) in line.values.iter().enumerate() {
+        if value.is_empty() || value.chars().any(char::is_whitespace) {
+            return Err(ValidationError::InvalidValue {
+                field: format!("manLine {}", tokens[index + 1].trim()).into(),
+                value: value.clone(),
+                expected: Cow::Borrowed("one nonempty token without whitespace"),
+                line: None,
+            }
+            .into());
+        }
         // `values` excludes the time tag, so column `index` is composition token `index + 1`.
         if numeric_columns.get(index) != Some(&true) {
             continue;
@@ -898,12 +1112,162 @@ fn validate_man_duty_cycle(man: &OcmManeuverParameters) -> Result<()> {
     Ok(())
 }
 
+// SANA Orbital Elements and Covariance Matrix Types, reviewed 2026-10-15.
+// Unknown registry extensions stay opaque; never infer a dimension from their spelling.
+fn orbital_dimension(kind: &str) -> Option<usize> {
+    match kind {
+        "CARTP" => Some(3),
+        "CARTPV" | "ADBARV" | "LDBARV" | "DELAUNAY" | "DELAUNAYMOD" | "GEODETIC" | "KEPLERIAN"
+        | "KEPLERIANMEAN" | "ONSTATION" | "POINCARE" => Some(6),
+        "EQUINOCTIAL" | "EQUINOCTIALMOD" | "KEPLERIANMEANSGP-4" => Some(7),
+        "CARTPVA" => Some(9),
+        _ => None,
+    }
+}
+
+fn covariance_dimension(kind: &str) -> Option<usize> {
+    match kind {
+        "TCARTP" => Some(4),
+        "TCARTPVA" => Some(10),
+        "TADBARV" | "TCARTPV" | "TDELAUNAY" | "TDELAUNAYMOD" | "TGEODETIC" | "TKEPLERIAN"
+        | "TKEPLERIANMEAN" | "TLDBARV" | "TPOINCARE" | "TEQUINOCTIAL_P" | "TEQUINOCTIAL_N"
+        | "TEQUINOCTIALMOD_P" | "TEQUINOCTIALMOD_N" => Some(7),
+        _ => orbital_dimension(kind),
+    }
+}
+
+fn validate_covariance_record(values: &[f64], dimension: usize, ordering: &CovOrder) -> Result<()> {
+    let expected = match ordering {
+        CovOrder::Ltm | CovOrder::Utm => dimension * (dimension + 1) / 2,
+        _ => dimension * dimension,
+    };
+    if values.len() != expected {
+        return Err(ValidationError::invalid_value(
+            "covLine",
+            values.len().to_string(),
+            format!("{expected} values for the selected COV_TYPE and COV_ORDERING"),
+        )
+        .into());
+    }
+    let mut matrix = [[0.0; 10]; 10];
+    let mut index = 0;
+    for (row, matrix_row) in matrix.iter_mut().enumerate().take(dimension) {
+        for (column, entry) in matrix_row.iter_mut().enumerate().take(dimension) {
+            let selected = match ordering {
+                CovOrder::Ltm => column <= row,
+                CovOrder::Utm => column >= row,
+                _ => true,
+            };
+            if selected {
+                *entry = values[index];
+                index += 1;
+            }
+        }
+    }
+    for row in 0..dimension {
+        for column in 0..row {
+            match ordering {
+                CovOrder::Ltm | CovOrder::LtmWcc => matrix[column][row] = matrix[row][column],
+                CovOrder::Utm | CovOrder::UtmWcc => matrix[row][column] = matrix[column][row],
+                CovOrder::Full => {
+                    if matrix[row][column] != matrix[column][row] {
+                        return Err(ValidationError::invalid_value(
+                            "covLine",
+                            "asymmetric",
+                            "a symmetric full covariance matrix",
+                        )
+                        .into());
+                    }
+                }
+            }
+        }
+    }
+    // Normalize to correlation scale before Cholesky: coordinates may use disparate units.
+    let mut scales = [0.0; 10];
+    for row in 0..dimension {
+        if matrix[row][row] <= 0.0 {
+            return Err(ValidationError::invalid_value(
+                "covLine",
+                "nonpositive variance",
+                "a positive-definite covariance matrix (ODM 6.2.7.10)",
+            )
+            .into());
+        }
+        scales[row] = matrix[row][row].sqrt();
+    }
+    for row in 0..dimension {
+        for column in 0..row {
+            let correlation = matrix[row][column] / scales[row] / scales[column];
+            if matches!(ordering, CovOrder::LtmWcc | CovOrder::UtmWcc) {
+                let offset = if matches!(ordering, CovOrder::LtmWcc) {
+                    column * dimension + row
+                } else {
+                    row * dimension + column
+                };
+                if (values[offset] - correlation).abs() > 1e-12 {
+                    return Err(ValidationError::invalid_value("covLine", values[offset].to_string(), "cross-correlations consistent with covariance entries (absolute tolerance 1e-12)").into());
+                }
+            }
+            matrix[row][column] = correlation;
+        }
+        matrix[row][row] = 1.0;
+    }
+    for row in 0..dimension {
+        for column in 0..=row {
+            let mut residual = matrix[row][column];
+            for k in 0..column {
+                residual -= matrix[row][k] * matrix[column][k];
+            }
+            if row == column {
+                if residual <= 0.0 || !residual.is_finite() {
+                    return Err(ValidationError::invalid_value(
+                        "covLine",
+                        "nonpositive Cholesky pivot",
+                        "a positive-definite covariance matrix (ODM 6.2.7.10)",
+                    )
+                    .into());
+                }
+                matrix[row][column] = residual.sqrt();
+            } else {
+                matrix[row][column] = residual / matrix[column][column];
+            }
+        }
+    }
+    Ok(())
+}
+
 fn expected_traj_units(traj_type: &str) -> Option<Vec<&'static str>> {
     match traj_type {
+        "TDELAUNAY" => Some(vec![
+            "s", "deg", "deg", "deg", "km**2/s", "km**2/s", "km**2/s",
+        ]),
+        "TDELAUNAYMOD" => Some(vec![
+            "s", "deg", "deg", "deg", "km**0.5", "km**0.5", "km**0.5",
+        ]),
+        "TEQUINOCTIAL_P" | "TEQUINOCTIAL_N" | "TEQUINOCTIALMOD_P" | "TEQUINOCTIALMOD_N" => {
+            Some(vec!["s", "km", "n/a", "n/a", "n/a", "n/a", "deg"])
+        }
         "CARTP" => Some(vec!["km", "km", "km"]),
         "CARTPV" => Some(vec!["km", "km", "km", "km/s", "km/s", "km/s"]),
         "CARTPVA" => Some(vec![
             "km", "km", "km", "km/s", "km/s", "km/s", "km/s**2", "km/s**2", "km/s**2",
+        ]),
+        "ADBARV" | "LDBARV" | "GEODETIC" => Some(vec!["deg", "deg", "deg", "deg", "km", "km/s"]),
+        "KEPLERIAN" | "KEPLERIANMEAN" => Some(vec!["km", "n/a", "deg", "deg", "deg", "deg"]),
+        "KEPLERIANMEANSGP-4" => Some(vec!["km", "n/a", "deg", "deg", "deg", "deg", "m**2/kg"]),
+        "EQUINOCTIAL" | "EQUINOCTIALMOD" => {
+            Some(vec!["km", "n/a", "n/a", "deg", "n/a", "n/a", "n/a"])
+        }
+        "ONSTATION" => Some(vec!["km", "n/a", "n/a", "n/a", "n/a", "deg"]),
+        "DELAUNAY" => Some(vec!["km**2/s", "km**2/s", "km**2/s", "deg", "deg", "deg"]),
+        "DELAUNAYMOD" => Some(vec!["km**0.5", "km**0.5", "km**0.5", "deg", "deg", "deg"]),
+        "POINCARE" => Some(vec![
+            "deg",
+            "km/s**0.5",
+            "km/s**0.5",
+            "km**2/s",
+            "km/s**0.5",
+            "km/s**0.5",
         ]),
         _ => None,
     }
@@ -915,7 +1279,8 @@ fn unit_matches_expected(unit: &str, expected: &str) -> bool {
         "km" => u == "km",
         "km/s" => u == "km/s",
         "km/s**2" => u == "km/s**2" || u == "km/s^2",
-        _ => false,
+        "s" => u == "s",
+        _ => u.replace('^', "**") == expected,
     }
 }
 
@@ -1217,6 +1582,66 @@ pub struct OcmMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub operator: Option<String>,
+    /// URL of the space object operator.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub operator_url: Option<String>,
+    /// Operator email address for non-emergencies.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub operator_email: Option<String>,
+    /// Operator phone number for non-emergencies.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub operator_phone: Option<String>,
+    /// URL of the operator automated coordination service.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub operator_automated_url: Option<String>,
+    /// Email address for emergency coordination.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub emergency_email: Option<String>,
+    /// Phone number for emergency coordination.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub emergency_phone: Option<String>,
+    /// Hours of availability of the emergency contact.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub emergency_availability: Option<String>,
+    /// Email address of the primary external SSA service provider.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub ssa_email: Option<String>,
+    /// Emergency phone number of the primary external SSA service provider.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub ssa_phone: Option<String>,
+    /// URL of the space object owner.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub owner_url: Option<String>,
     /// Free-text field containing the owner of the space object.
     ///
     /// **Examples**: SIRIUS
@@ -1463,6 +1888,51 @@ fn validate_ocm_metadata(metadata: &OcmMetadata) -> Result<()> {
         ("STOP_TIME", &metadata.stop_time),
         ("NEXT_LEAP_EPOCH", &metadata.next_leap_epoch),
     ])?;
+    if let Some(span) = &metadata.time_span {
+        DayInterval::validate_value(span.value, "TIME_SPAN")?;
+    }
+    if let (Some(start), Some(stop)) = (&metadata.start_time, &metadata.stop_time) {
+        if start.cmp_same_branch(stop) == Some(std::cmp::Ordering::Greater) {
+            return Err(ValidationError::invalid_value(
+                "STOP_TIME",
+                stop.as_str(),
+                "a time at or after START_TIME",
+            )
+            .into());
+        }
+        if start.kind() == EpochKind::Numeric && stop.kind() == EpochKind::Numeric {
+            let seconds = |field, epoch: &Epoch| {
+                epoch
+                    .as_str()
+                    .parse::<f64>()
+                    .ok()
+                    .filter(|value| value.is_finite())
+                    .ok_or_else(|| {
+                        ValidationError::invalid_value(
+                            field,
+                            epoch.as_str(),
+                            "a finite relative time in SI seconds",
+                        )
+                    })
+            };
+            let start = seconds("START_TIME", start)?;
+            let stop = seconds("STOP_TIME", stop)?;
+            if let Some(span) = &metadata.time_span {
+                let expected = (stop - start) / 86_400.0;
+                // Allow rounded day spans and cancellation when large relative tags are subtracted.
+                let tolerance =
+                    (1e-6_f64).max(8.0 * f64::EPSILON * start.abs().max(stop.abs()) / 86_400.0);
+                if (span.value - expected).abs() > tolerance {
+                    return Err(ValidationError::invalid_value(
+                        "TIME_SPAN",
+                        span.value.to_string(),
+                        "(STOP_TIME - START_TIME) / 86400 within the documented rounding tolerance",
+                    )
+                    .into());
+                }
+            }
+        }
+    }
     for (field, missing) in [
         ("TIME_SYSTEM", metadata.time_system.trim().is_empty()),
         ("EPOCH_TZERO", metadata.epoch_tzero.is_empty()),
@@ -1545,7 +2015,60 @@ pub struct OcmData {
     pub od: Option<OcmOdParameters>,
     /// User-defined parameters.
     #[serde(rename = "user", default, skip_serializing_if = "Option::is_none")]
-    pub user: Option<UserDefined>,
+    pub user: Option<OcmUserDefined>,
+}
+
+/// OCM user-defined parameters, including ICD-defined time or event sequences.
+///
+/// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.11.
+#[derive(Serialize, Debug, PartialEq, Clone, Default)]
+pub struct OcmUserDefined {
+    /// Leading comments.
+    #[serde(rename = "COMMENT", default, skip_serializing_if = "Vec::is_empty")]
+    pub comment: Vec<String>,
+    /// Ordered parameters; composition parameters own their following sequence rows.
+    #[serde(
+        rename = "USER_DEFINED",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub user_defined: Vec<OcmUserDefinedParameter>,
+}
+
+impl<'de> Deserialize<'de> for OcmUserDefined {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let block = UserDefined::deserialize(deserializer)?;
+        Ok(Self {
+            comment: block.comment,
+            user_defined: block
+                .user_defined
+                .into_iter()
+                .map(|parameter| OcmUserDefinedParameter {
+                    parameter: parameter.parameter,
+                    value: parameter.value,
+                    records: Vec::new(),
+                })
+                .collect(),
+        })
+    }
+}
+
+/// A scalar OCM user-defined parameter or an ICD-defined sequence composition and its rows.
+///
+/// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.11.
+#[derive(Serialize, Debug, PartialEq, Clone)]
+pub struct OcmUserDefinedParameter {
+    /// Parameter name without the USER_DEFINED_ prefix.
+    #[serde(rename = "@parameter")]
+    pub parameter: String,
+    /// Scalar value, or comma-delimited composition for `COMPOSITION_<sequence ID>`.
+    #[serde(rename = "$value")]
+    pub value: String,
+    /// Opaque ICD-defined sequence rows, in producer order. Empty for scalar parameters.
+    #[serde(skip)]
+    pub records: Vec<String>,
 }
 
 //----------------------------------------------------------------------
@@ -2260,6 +2783,13 @@ pub struct OcmPhysicalDescription {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmCovarianceMatrix {
+    /// Corresponding trajectory identifier; required when multiple trajectory or covariance
+    /// blocks are supplied.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.7.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub traj_id: Option<String>,
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
     /// covariance time history section only immediately after the COV_START keyword; see 7.8
     /// for comment formatting rules).
@@ -3450,11 +3980,11 @@ mod tests {
             .traj_lines(vec![
                 TrajLine {
                     epoch: "1".parse().unwrap(),
-                    values: vec![1.0],
+                    values: vec![1.0; 6],
                 },
                 TrajLine {
                     epoch: "+1.0".parse().unwrap(),
-                    values: vec![2.0],
+                    values: vec![2.0; 6],
                 },
             ])
             .build();
@@ -3497,11 +4027,11 @@ mod tests {
             .traj_lines(vec![
                 TrajLine {
                     epoch: "2000-01-01T00:00:00".parse().unwrap(),
-                    values: vec![1.0],
+                    values: vec![1.0; 6],
                 },
                 TrajLine {
                     epoch: "1.0".parse().unwrap(),
-                    values: vec![2.0],
+                    values: vec![2.0; 6],
                 },
             ])
             .build();
@@ -3516,11 +4046,17 @@ mod tests {
             .cov_lines(vec![
                 CovLine {
                     epoch: "1.0".parse().unwrap(),
-                    values: vec![1.0],
+                    values: vec![
+                        1., 0., 1., 0., 0., 1., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0.,
+                        0., 1.,
+                    ],
                 },
                 CovLine {
                     epoch: "2000-01-01T00:00:01".parse().unwrap(),
-                    values: vec![2.0],
+                    values: vec![
+                        1., 0., 1., 0., 0., 1., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0.,
+                        0., 1.,
+                    ],
                 },
             ])
             .build();
@@ -3537,7 +4073,10 @@ mod tests {
             .cov_type("CARTPV")
             .cov_lines(vec![CovLine {
                 epoch: "2000-01-01T00:00:00".parse().unwrap(),
-                values: vec![1.0],
+                values: vec![
+                    1., 0., 1., 0., 0., 1., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0.,
+                    1.,
+                ],
             }])
             .build();
         assert!(cov.validate().is_ok());
@@ -3710,7 +4249,7 @@ mod tests {
             .build();
         traj.traj_lines.push(TrajLine {
             epoch: "2000-01-01T00:00:00".parse().unwrap(),
-            values: vec![1.0],
+            values: vec![1.0; 6],
         });
         traj.orb_revnum = Some(-1.0);
 

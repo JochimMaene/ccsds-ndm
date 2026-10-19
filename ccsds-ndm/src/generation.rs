@@ -234,7 +234,22 @@ impl GenerationMetadata for crate::messages::ocm::Ocm {
         self.validate_xml_representability()
     }
 }
-impl_generation_metadata!(crate::messages::tdm::Tdm, Tdm, kvn_representability);
+impl GenerationMetadata for crate::messages::tdm::Tdm {
+    const KIND: MessageKind = MessageKind::Tdm;
+
+    fn version(&self) -> &str {
+        &self.version
+    }
+
+    fn validate_kvn_model(&self) -> Result<()> {
+        self.validate()?;
+        self.validate_kvn_representability()
+    }
+
+    fn validate_xml_model(&self) -> Result<()> {
+        self.validate_xml_representability()
+    }
+}
 impl GenerationMetadata for crate::messages::rdm::Rdm {
     const KIND: MessageKind = MessageKind::Rdm;
 

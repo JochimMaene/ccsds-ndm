@@ -582,7 +582,9 @@ impl TdmMetadata {
         participant_3: Option<String>,
         participant_4: Option<String>,
         participant_5: Option<String>,
+        #[gen_stub(override_type(type_repr = "TdmMode | builtins.str | None", imports = ("builtins")))]
         mode: Option<Bound<'_, PyAny>>,
+        #[gen_stub(override_type(type_repr = "TdmPath | builtins.str | None", imports = ("builtins")))]
         path: Option<Bound<'_, PyAny>>,
 
         path_1: Option<String>,
@@ -626,6 +628,7 @@ impl TdmMetadata {
         correction_transmit: Option<f64>,
         correction_aberration_yearly: Option<f64>,
         correction_aberration_diurnal: Option<f64>,
+        #[gen_stub(override_type(type_repr = "YesNo | builtins.str | None", imports = ("builtins")))]
         corrections_applied: Option<Bound<'_, PyAny>>,
         ephemeris_name_1: Option<String>,
         ephemeris_name_2: Option<String>,
@@ -1933,10 +1936,8 @@ impl TdmData {
 ///     Time associated with the tracking observable.
 /// keyword : str
 ///     Data type keyword (e.g., "RANGE", "RECEIVE_FREQ").
-/// value : float
-///     Tracking observable value. Note: For phase counts that require full precision strings,
-///     use internal representation handling (this constructor takes float for simplicity,
-///     but the object can hold string representations internally).
+/// value : float | str
+///     Measurement value. Pass decimal text for phase counts to retain all digits.
 #[gen_stub_pyclass]
 #[pyclass(from_py_object)]
 #[derive(Clone)]
@@ -1949,9 +1950,18 @@ pub struct TdmObservation {
 impl TdmObservation {
     #[new]
     #[pyo3(signature = (*, epoch, keyword, value))]
-    fn new(epoch: String, keyword: String, value: f64) -> PyResult<Self> {
-        let data = core_tdm::TdmObservationData::from_key_value(&keyword, value)
-            .map_err(crate::errors::ccsds_error_to_pyerr)?;
+    fn new(
+        epoch: String,
+        keyword: String,
+        #[gen_stub(override_type(type_repr = "builtins.float | builtins.str", imports=("builtins")))]
+        value: Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        let data = if let Ok(value) = value.extract::<String>() {
+            core_tdm::TdmObservationData::from_key_val(&keyword, &value)
+        } else {
+            core_tdm::TdmObservationData::from_key_value(&keyword, value.extract::<f64>()?)
+        }
+        .map_err(crate::errors::ccsds_error_to_pyerr)?;
 
         Ok(Self {
             inner: core_tdm::TdmObservation {
@@ -1966,7 +1976,10 @@ impl TdmObservation {
             "TdmObservation(epoch='{}', keyword='{}', value={})",
             self.inner.epoch,
             self.inner.data.key(),
-            self.inner.data.value_to_string()
+            self.inner.data.value().map_or_else(
+                || format!("{:?}", self.inner.data.value_to_string()),
+                |value| value.to_string(),
+            )
         )
     }
 
@@ -1992,14 +2005,23 @@ impl TdmObservation {
         self.inner.data.key().to_string()
     }
 
-    /// Measurement value as float.
+    /// Exact decimal text for phase counts, otherwise a numeric measurement.
     ///
-    /// Returns None if the value is not representable as a float (unlikely for TDM).
-    ///
-    /// :type: Optional[float]
+    /// :type: float | str
     #[getter]
-    fn get_value(&self) -> Option<f64> {
-        Some(self.inner.data.value())
+    #[gen_stub(override_return_type(type_repr = "builtins.float | builtins.str", imports=("builtins")))]
+    fn get_value(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        if let Some(value) = self.inner.data.value() {
+            Ok(value.into_pyobject(py)?.into_any().unbind())
+        } else {
+            Ok(self
+                .inner
+                .data
+                .value_to_string()
+                .into_pyobject(py)?
+                .into_any()
+                .unbind())
+        }
     }
 
     /// Measurement value as string.

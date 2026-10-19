@@ -414,6 +414,17 @@ impl OcmMetadata {
         rdm_msg_link=None,
         tdm_msg_link=None,
         operator=None,
+        operator_url=None,
+        operator_email=None,
+        operator_phone=None,
+        operator_automated_url=None,
+        emergency_email=None,
+        emergency_phone=None,
+        emergency_availability=None,
+        ssa_email=None,
+        ssa_phone=None,
+        owner_url=None,
+
         owner=None,
         country=None,
         constellation=None,
@@ -466,9 +477,21 @@ impl OcmMetadata {
         rdm_msg_link: Option<String>,
         tdm_msg_link: Option<String>,
         operator: Option<String>,
+        operator_url: Option<String>,
+        operator_email: Option<String>,
+        operator_phone: Option<String>,
+        operator_automated_url: Option<String>,
+        emergency_email: Option<String>,
+        emergency_phone: Option<String>,
+        emergency_availability: Option<String>,
+        ssa_email: Option<String>,
+        ssa_phone: Option<String>,
+        owner_url: Option<String>,
+
         owner: Option<String>,
         country: Option<String>,
         constellation: Option<String>,
+        #[gen_stub(override_type(type_repr = "ObjectDescription | builtins.str | None", imports = ("builtins")))]
         object_type: Option<Bound<'_, PyAny>>,
         ops_status: Option<String>,
         orbit_category: Option<String>,
@@ -523,6 +546,16 @@ impl OcmMetadata {
                 rdm_msg_link,
                 tdm_msg_link,
                 operator,
+                operator_url,
+                operator_email,
+                operator_phone,
+                operator_automated_url,
+                emergency_email,
+                emergency_phone,
+                emergency_availability,
+                ssa_email,
+                ssa_phone,
+                owner_url,
                 owner,
                 country,
                 constellation,
@@ -1053,6 +1086,146 @@ impl OcmMetadata {
     }
 
     // === Object Information Fields ===
+    /// URL of the space object operator.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_operator_url(&self) -> Option<String> {
+        self.inner.operator_url.clone()
+    }
+    #[setter]
+    fn set_operator_url(&mut self, value: Option<String>) {
+        self.inner.operator_url = value;
+    }
+
+    /// Operator email address for non-emergencies.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_operator_email(&self) -> Option<String> {
+        self.inner.operator_email.clone()
+    }
+    #[setter]
+    fn set_operator_email(&mut self, value: Option<String>) {
+        self.inner.operator_email = value;
+    }
+
+    /// Operator phone number for non-emergencies.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_operator_phone(&self) -> Option<String> {
+        self.inner.operator_phone.clone()
+    }
+    #[setter]
+    fn set_operator_phone(&mut self, value: Option<String>) {
+        self.inner.operator_phone = value;
+    }
+
+    /// URL of the operator automated coordination service.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_operator_automated_url(&self) -> Option<String> {
+        self.inner.operator_automated_url.clone()
+    }
+    #[setter]
+    fn set_operator_automated_url(&mut self, value: Option<String>) {
+        self.inner.operator_automated_url = value;
+    }
+
+    /// Email address for emergency coordination.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_emergency_email(&self) -> Option<String> {
+        self.inner.emergency_email.clone()
+    }
+    #[setter]
+    fn set_emergency_email(&mut self, value: Option<String>) {
+        self.inner.emergency_email = value;
+    }
+
+    /// Phone number for emergency coordination.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_emergency_phone(&self) -> Option<String> {
+        self.inner.emergency_phone.clone()
+    }
+    #[setter]
+    fn set_emergency_phone(&mut self, value: Option<String>) {
+        self.inner.emergency_phone = value;
+    }
+
+    /// Hours of availability of the emergency contact.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_emergency_availability(&self) -> Option<String> {
+        self.inner.emergency_availability.clone()
+    }
+    #[setter]
+    fn set_emergency_availability(&mut self, value: Option<String>) {
+        self.inner.emergency_availability = value;
+    }
+
+    /// Email address of the primary external SSA service provider.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_ssa_email(&self) -> Option<String> {
+        self.inner.ssa_email.clone()
+    }
+    #[setter]
+    fn set_ssa_email(&mut self, value: Option<String>) {
+        self.inner.ssa_email = value;
+    }
+
+    /// Emergency phone number of the primary external SSA service provider.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_ssa_phone(&self) -> Option<String> {
+        self.inner.ssa_phone.clone()
+    }
+    #[setter]
+    fn set_ssa_phone(&mut self, value: Option<String>) {
+        self.inner.ssa_phone = value;
+    }
+
+    /// URL of the space object owner.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_owner_url(&self) -> Option<String> {
+        self.inner.owner_url.clone()
+    }
+    #[setter]
+    fn set_owner_url(&mut self, value: Option<String>) {
+        self.inner.owner_url = value;
+    }
+
     /// Free-text field containing the operator of the space object.
     ///
     /// Examples: INTELSAT
@@ -1484,7 +1657,7 @@ pub struct OcmData {
     cov: Py<PyList>,
     pert: Option<Py<OcmPerturbations>>,
     od: Option<Py<OcmOdParameters>>,
-    user: Option<Py<crate::types::UserDefined>>,
+    user: Option<Py<OcmUserDefined>>,
 }
 
 impl OcmData {
@@ -1522,7 +1695,7 @@ impl OcmData {
                 .transpose()?,
             user: value
                 .user
-                .map(|inner| Py::new(py, crate::types::UserDefined { inner }))
+                .map(|inner| Py::new(py, OcmUserDefined::from_core(py, inner)?))
                 .transpose()?,
         })
     }
@@ -1556,7 +1729,8 @@ impl OcmData {
             user: self
                 .user
                 .as_ref()
-                .map(|value| value.borrow(py).inner.clone()),
+                .map(|value| value.borrow(py).to_core(py))
+                .transpose()?,
         })
     }
 }
@@ -1661,13 +1835,13 @@ impl OcmData {
 
     /// User-defined parameters.
     ///
-    /// :type: UserDefined | None
+    /// :type: OcmUserDefined | None
     #[getter]
-    fn get_user(&self, py: Python<'_>) -> Option<Py<crate::types::UserDefined>> {
+    fn get_user(&self, py: Python<'_>) -> Option<Py<OcmUserDefined>> {
         self.user.as_ref().map(|value| value.clone_ref(py))
     }
     #[setter]
-    fn set_user(&mut self, value: Option<Py<crate::types::UserDefined>>) {
+    fn set_user(&mut self, value: Option<Py<OcmUserDefined>>) {
         self.user = value;
     }
 }
@@ -3757,7 +3931,7 @@ impl OcmCovarianceMatrix {
 #[pymethods]
 impl OcmCovarianceMatrix {
     #[new]
-    #[pyo3(signature = (*, cov_ref_frame, cov_type, cov_ordering, cov_lines, cov_id=None, cov_prev_id=None, cov_next_id=None, cov_basis=None, cov_basis_id=None, cov_frame_epoch=None, cov_scale_min=None, cov_scale_max=None, cov_confidence=None, cov_units=None, comment=None))]
+    #[pyo3(signature = (*, cov_ref_frame, cov_type, cov_ordering, cov_lines, traj_id=None, cov_id=None, cov_prev_id=None, cov_next_id=None, cov_basis=None, cov_basis_id=None, cov_frame_epoch=None, cov_scale_min=None, cov_scale_max=None, cov_confidence=None, cov_units=None, comment=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         py: Python<'_>,
@@ -3765,6 +3939,7 @@ impl OcmCovarianceMatrix {
         cov_type: String,
         cov_ordering: String,
         cov_lines: Vec<Py<CovLine>>,
+        traj_id: Option<String>,
         cov_id: Option<String>,
         cov_prev_id: Option<String>,
         cov_next_id: Option<String>,
@@ -3780,6 +3955,7 @@ impl OcmCovarianceMatrix {
         use ccsds_ndm::types::Percentage;
         Ok(Self {
             inner: core_ocm::OcmCovarianceMatrix {
+                traj_id,
                 comment: comment.unwrap_or_default(),
                 cov_id,
                 cov_prev_id,
@@ -3815,6 +3991,20 @@ impl OcmCovarianceMatrix {
             self.inner.cov_type,
             self.cov_lines.bind(py).len()
         )
+    }
+
+    /// Corresponding trajectory identifier, required for multiple trajectory or covariance blocks.
+    ///
+    /// CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.7.
+    ///
+    /// :type: Optional[str]
+    #[getter]
+    fn get_traj_id(&self) -> Option<String> {
+        self.inner.traj_id.clone()
+    }
+    #[setter]
+    fn set_traj_id(&mut self, value: Option<String>) {
+        self.inner.traj_id = value;
     }
 
     /// Free-text field containing the identification number for this covariance time history
@@ -6278,5 +6468,146 @@ impl OcmOdParameters {
     #[setter]
     fn set_data_types(&mut self, value: Option<String>) {
         self.inner.data_types = value;
+    }
+}
+
+/// OCM user-defined parameter or sequence composition with its opaque ICD-defined rows.
+///
+/// CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.11.
+#[gen_stub_pyclass]
+#[pyclass(from_py_object)]
+#[derive(Clone)]
+pub struct OcmUserDefinedParameter {
+    inner: core_ocm::OcmUserDefinedParameter,
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl OcmUserDefinedParameter {
+    #[new]
+    #[pyo3(signature = (*, parameter, value, records=None))]
+    fn new(parameter: String, value: String, records: Option<Vec<String>>) -> Self {
+        Self {
+            inner: core_ocm::OcmUserDefinedParameter {
+                parameter,
+                value,
+                records: records.unwrap_or_default(),
+            },
+        }
+    }
+
+    /// Parameter name without ``USER_DEFINED_``.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_parameter(&self) -> String {
+        self.inner.parameter.clone()
+    }
+    #[setter]
+    fn set_parameter(&mut self, value: String) {
+        self.inner.parameter = value;
+    }
+
+    /// Scalar value, or comma-delimited composition for COMPOSITION_<sequence ID>.
+    ///
+    /// :type: str
+    #[getter]
+    fn get_value(&self) -> String {
+        self.inner.value.clone()
+    }
+    #[setter]
+    fn set_value(&mut self, value: String) {
+        self.inner.value = value;
+    }
+
+    /// Snapshot of opaque ICD-defined sequence rows; assign to write changes back.
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_records(&self) -> Vec<String> {
+        self.inner.records.clone()
+    }
+    #[setter]
+    fn set_records(&mut self, value: Vec<String>) {
+        self.inner.records = value;
+    }
+}
+
+/// Ordered OCM user-defined parameters and optional ICD-defined sequences.
+///
+/// CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.11.
+#[gen_stub_pyclass]
+#[pyclass]
+pub struct OcmUserDefined {
+    comment: Vec<String>,
+    user_defined: Py<PyList>,
+}
+
+impl OcmUserDefined {
+    fn from_core(py: Python<'_>, value: core_ocm::OcmUserDefined) -> PyResult<Self> {
+        let parameters = value
+            .user_defined
+            .into_iter()
+            .map(|inner| Py::new(py, OcmUserDefinedParameter { inner }))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(Self {
+            comment: value.comment,
+            user_defined: PyList::new(py, parameters)?.unbind(),
+        })
+    }
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_ocm::OcmUserDefined> {
+        Ok(core_ocm::OcmUserDefined {
+            comment: self.comment.clone(),
+            user_defined: crate::common::extract_records(
+                self.user_defined.bind(py),
+                "user_defined",
+                |value: &OcmUserDefinedParameter| Ok(value.inner.clone()),
+            )?,
+        })
+    }
+}
+
+#[gen_stub_pymethods]
+#[pymethods]
+impl OcmUserDefined {
+    #[new]
+    #[pyo3(signature = (*, user_defined=None, comment=None))]
+    fn new(
+        py: Python<'_>,
+        user_defined: Option<Vec<Py<OcmUserDefinedParameter>>>,
+        comment: Option<Vec<String>>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            comment: comment.unwrap_or_default(),
+            user_defined: PyList::new(py, user_defined.unwrap_or_default())?.unbind(),
+        })
+    }
+
+    /// Leading comments.
+    ///
+    /// :type: list[str]
+    #[getter]
+    fn get_comment(&self) -> Vec<String> {
+        self.comment.clone()
+    }
+    #[setter]
+    fn set_comment(&mut self, value: Vec<String>) {
+        self.comment = value;
+    }
+
+    /// Live ordered list of scalar parameters and sequence compositions.
+    ///
+    /// :type: list[OcmUserDefinedParameter]
+    #[gen_stub(override_return_type(type_repr = "list[OcmUserDefinedParameter]"))]
+    #[getter]
+    fn get_user_defined(&self, py: Python<'_>) -> Py<PyList> {
+        self.user_defined.clone_ref(py)
+    }
+    #[setter]
+    fn set_user_defined(&mut self, value: Vec<Py<OcmUserDefinedParameter>>) -> PyResult<()> {
+        Python::attach(|py| {
+            self.user_defined = PyList::new(py, value)?.unbind();
+            Ok(())
+        })
     }
 }

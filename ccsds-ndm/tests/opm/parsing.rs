@@ -1111,3 +1111,23 @@ MAN_DV_3 = 0.0 [km/s]
     let man = &opm.body.segment.data.maneuver_parameters[0];
     assert_eq!(man.man_delta_mass.value, -100.0);
 }
+
+#[test]
+fn opm_1_0_requires_an_edition_specific_reader() {
+    // B1 tables 3-1 through 3-3 define a KVN-only message without covariance or
+    // later metadata, with obligatory spacecraft parameters. Relabeling 3.0 is not support.
+    let legacy_kvn = mutated_once(KVN, "CCSDS_OPM_VERS = 3.0", "CCSDS_OPM_VERS = 1.0");
+    let legacy_xml = mutated_once(
+        &Opm::from_kvn(KVN).unwrap().to_xml().unwrap(),
+        "version=\"3.0\"",
+        "version=\"1.0\"",
+    );
+    for input in [legacy_kvn, legacy_xml] {
+        let error = ccsds_ndm::from_str(&input).unwrap_err();
+        assert_eq!(error.code(), Some("parse.unsupported_input_version"));
+    }
+    assert_eq!(
+        ccsds_ndm::versioning::supported_input_versions(MessageKind::Opm),
+        Some(&["2.0", "3.0"][..])
+    );
+}

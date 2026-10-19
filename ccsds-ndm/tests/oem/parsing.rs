@@ -1345,3 +1345,39 @@ fn kvn_covariance_rows_fill_the_lower_triangle_in_table_5_4_order() {
         assert_eq!(values, expected, "{line}");
     }
 }
+
+#[test]
+fn oem_1_0_enforces_epoch_order_and_disjoint_total_spans() {
+    use ccsds_ndm::Validate;
+
+    let input = mutated_once(
+        KVN_FIXTURES[0],
+        "CCSDS_OEM_VERS = 3.0",
+        "CCSDS_OEM_VERS = 1.0",
+    );
+    let original = Oem::from_kvn(&input).unwrap();
+    let mut duplicate = original.clone();
+    duplicate.body.segment[0].data.state_vector[1].epoch =
+        duplicate.body.segment[0].data.state_vector[0].epoch;
+    assert_eq!(
+        duplicate.validate().unwrap_err().field_path().as_deref(),
+        Some("body.segment[0].data.state_vector[1].epoch")
+    );
+    let mut decreasing = original.clone();
+    decreasing.body.segment[0].data.state_vector.swap(0, 1);
+    assert_eq!(
+        decreasing.validate().unwrap_err().field_path().as_deref(),
+        Some("body.segment[0].data.state_vector[1].epoch")
+    );
+    let mut overlapping = original.clone();
+    overlapping.body.segment[1].metadata.start_time =
+        overlapping.body.segment[0].metadata.start_time;
+    assert_eq!(
+        overlapping.validate().unwrap_err().field_path().as_deref(),
+        Some("body.segment[1].metadata.start_time")
+    );
+    let mut shared_endpoint = original;
+    shared_endpoint.body.segment[1].metadata.start_time =
+        shared_endpoint.body.segment[0].metadata.stop_time;
+    shared_endpoint.validate().unwrap();
+}

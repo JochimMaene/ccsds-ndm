@@ -1395,8 +1395,8 @@ pub(crate) fn require_positive(value: f64, name: &'static str) -> Result<()> {
     Ok(())
 }
 
-/// Rejects NaN, both infinities, and negative values for a field whose XSD type resolves to
-/// `nonNegativeDouble`.
+/// Rejects NaN, both infinities, and negative values for a nonnegative field, whether its domain
+/// comes from book semantics or an XSD `nonNegativeDouble` facet.
 ///
 /// The finiteness and sign failures stay distinct because they mean different things to a caller:
 /// a non-finite value is not a number the standard can express at all, while a negative one is a
@@ -4793,6 +4793,7 @@ impl std::fmt::Display for Vec4Double {
 
 /// TDM angle type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(try_from = "String", into = "String")]
 pub enum TdmAngleType {
     /// Azimuth, elevation (local horizontal).
     #[serde(rename = "AZEL")]
@@ -4807,6 +4808,8 @@ pub enum TdmAngleType {
     /// x-south, y-east.
     #[serde(rename = "XSYE")]
     Xsye,
+    /// A book-valid ICD or registry value outside the bundled XML enumeration.
+    Other(String),
 }
 
 impl std::str::FromStr for TdmAngleType {
@@ -4817,6 +4820,7 @@ impl std::str::FromStr for TdmAngleType {
             "RADEC" => Ok(Self::Radec),
             "XEYN" => Ok(Self::Xeyn),
             "XSYE" => Ok(Self::Xsye),
+            _ if !s.trim().is_empty() => Ok(Self::Other(s.to_owned())),
             _ => Err(crate::error::EnumParseError {
                 field: "ANGLE_TYPE",
                 value: s.to_string(),
@@ -4829,11 +4833,31 @@ impl std::str::FromStr for TdmAngleType {
 impl std::fmt::Display for TdmAngleType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Azel => write!(f, "AZEL"),
-            Self::Radec => write!(f, "RADEC"),
-            Self::Xeyn => write!(f, "XEYN"),
-            Self::Xsye => write!(f, "XSYE"),
+            Self::Other(value) => f.write_str(value),
+            Self::Azel => f.write_str("AZEL"),
+            Self::Radec => f.write_str("RADEC"),
+            Self::Xeyn => f.write_str("XEYN"),
+            Self::Xsye => f.write_str("XSYE"),
         }
+    }
+}
+
+impl TryFrom<String> for TdmAngleType {
+    type Error = crate::error::EnumParseError;
+
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+        // XML enumerations are case-sensitive; KVN FromStr also accepts case aliases.
+        if value.bytes().any(|byte| byte.is_ascii_lowercase()) {
+            Ok(Self::Other(value))
+        } else {
+            value.parse()
+        }
+    }
+}
+
+impl From<TdmAngleType> for String {
+    fn from(value: TdmAngleType) -> Self {
+        value.to_string()
     }
 }
 
@@ -5036,6 +5060,7 @@ impl std::fmt::Display for TdmRangeUnits {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(try_from = "String", into = "String")]
 pub enum TdmReferenceFrame {
     #[serde(rename = "EME2000")]
     Eme2000,
@@ -5049,6 +5074,8 @@ pub enum TdmReferenceFrame {
     Itrf97,
     #[serde(rename = "TOD")]
     Tod,
+    /// A book-valid ICD or registry value outside the bundled XML enumeration.
+    Other(String),
 }
 
 impl std::str::FromStr for TdmReferenceFrame {
@@ -5065,6 +5092,7 @@ impl std::str::FromStr for TdmReferenceFrame {
             // same frames `ITRF1993` and `TOD_EARTH`. Both authorities are accepted, so both
             // spellings are advertised — listing only one set sends a reader of the other
             // authority looking for a mistake that is not there.
+            _ if !s.trim().is_empty() => Ok(Self::Other(s.to_owned())),
             _ => Err(crate::error::EnumParseError {
                 field: "REFERENCE_FRAME",
                 value: s.to_string(),
@@ -5078,13 +5106,33 @@ impl std::str::FromStr for TdmReferenceFrame {
 impl std::fmt::Display for TdmReferenceFrame {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Eme2000 => write!(f, "EME2000"),
-            Self::Icrf => write!(f, "ICRF"),
-            Self::Itrf2000 => write!(f, "ITRF2000"),
-            Self::Itrf93 => write!(f, "ITRF-93"),
-            Self::Itrf97 => write!(f, "ITRF-97"),
-            Self::Tod => write!(f, "TOD"),
+            Self::Other(value) => f.write_str(value),
+            Self::Eme2000 => f.write_str("EME2000"),
+            Self::Icrf => f.write_str("ICRF"),
+            Self::Itrf2000 => f.write_str("ITRF2000"),
+            Self::Itrf93 => f.write_str("ITRF-93"),
+            Self::Itrf97 => f.write_str("ITRF-97"),
+            Self::Tod => f.write_str("TOD"),
         }
+    }
+}
+
+impl TryFrom<String> for TdmReferenceFrame {
+    type Error = crate::error::EnumParseError;
+
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+        // XML enumerations are case-sensitive; KVN FromStr also accepts case aliases.
+        if value.bytes().any(|byte| byte.is_ascii_lowercase()) {
+            Ok(Self::Other(value))
+        } else {
+            value.parse()
+        }
+    }
+}
+
+impl From<TdmReferenceFrame> for String {
+    fn from(value: TdmReferenceFrame) -> Self {
+        value.to_string()
     }
 }
 
@@ -5530,13 +5578,13 @@ mod extra_tests {
         test_enum_from_str!(ReferenceFrameType, "GCRF", "INVALID");
         test_enum_from_str!(CovarianceMethodType, "CALCULATED", "INVALID");
         test_enum_from_str!(ManeuverableType, "YES", "INVALID");
-        test_enum_from_str!(TdmAngleType, "AZEL", "INVALID");
+        test_enum_from_str!(TdmAngleType, "AZEL", "");
         test_enum_from_str!(TdmDataQuality, "RAW", "INVALID");
         test_enum_from_str!(TdmIntegrationRef, "START", "INVALID");
         test_enum_from_str!(TdmMode, "SEQUENTIAL", "INVALID");
         test_enum_from_str!(TdmRangeMode, "COHERENT", "INVALID");
         test_enum_from_str!(TdmRangeUnits, "km", "INVALID");
-        test_enum_from_str!(TdmReferenceFrame, "EME2000", "INVALID");
+        test_enum_from_str!(TdmReferenceFrame, "EME2000", "");
         test_enum_from_str!(TdmTimetagRef, "TRANSMIT", "INVALID");
     }
 

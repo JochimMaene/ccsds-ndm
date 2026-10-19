@@ -1,4 +1,4 @@
-# APM 2.0 Focused Conformance Evidence
+# APM 2.0 conformance
 
 This inventory records maintainer evidence for standalone APM 2.0. The
 [support matrix](../support-matrix.md) is the user-facing statement of current support.
@@ -21,8 +21,8 @@ The `apm` suite establishes:
 | KVN lexical and structural strictness | The APM marked-block scanner rejects non-ASCII/control input, overlong lines, malformed assignments, unknown and duplicate keywords, fixed-order violations within logical blocks, misplaced comments, unknown/nested blocks, and mismatched block ends. It accepts both the optional metadata delimiters and repeated attitude block families represented by the standard fixtures. |
 | XML structure | The shared XML sequence engine is registered for the complete APM root, header, metadata, data, and six attitude logical-block families, including nested quaternion components. It rejects unknown, duplicate, and reordered children and non-schema attributes. |
 | Valid input and preservation | All three shipped KVN fixtures and the shipped XML fixture parse through the public strict API. Generated KVN and XML reparse to the same typed model. |
-| XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
-| Shared surface contract | `library::parsing` and `library::output`, `conformance::generation`, the Python API tests, and family Criterion matrices provide common parsing, generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
+| XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
+| Shared surface contract | `library::parsing` and `library::output`, `conformance::generation`, the Python API tests, and family Criterion matrices provide common parsing, generation, diagnostics, dispatch, and workload evidence linked from the [conformance review index](README.md). |
 
 The existing APM unit suite separately covers each attitude logical-block family, optional
 quaternion/Euler derivatives, maneuver delta mass, the spin nutation choice and the values inside
@@ -47,7 +47,7 @@ executable evidence:
 | 73-82 | Maneuver block | `ApmManeuverParameters`, required torque/duration and optional mass tests |
 
 No annex-A APM keyword or block is absent. APM's frame and time values are SANA-governed and so
-remain caller-provided under the shared policy on [externally governed values](family-shared-contract.md#externally-governed-values).
+remain caller-provided under the shared policy on [externally governed values](../design/validation-contract.md#registry-governed-values).
 
 ## Allocation and packaged-surface evidence
 
@@ -57,21 +57,19 @@ preflighted streaming generation at 48 allocations/2,000 bytes for the shipped A
 notations, files, and epochs. Strict binding audit, stubs/doc checks, wheel
 verification, and Rust artifact verification are the packaged gates.
 
-## Reproducible performance observation
+## Verification outcome
 
-The following commands measure the same public parse and generation paths used by consumers:
+APM 2.0 meets the common [verification criteria](README.md#verification-criteria) for
+self-contained format and model validation on Rust and Python. The requirement inventory,
+family tests, shared public-route tests, and packaged tests are complementary evidence;
+none alone establishes conformance or exhaustive mutation coverage.
 
-```text
-cargo bench --manifest-path ccsds-ndm/Cargo.toml --bench kvn_benches -- 'kvn_message_matrix/(parse|generate)/apm' --sample-size 20 --measurement-time 2 --warm-up-time 1
-cargo bench --manifest-path ccsds-ndm/Cargo.toml --bench xml_benches -- 'xml_message_matrix/(parse|generate)/apm' --sample-size 20 --measurement-time 2 --warm-up-time 1
-```
+## Decisions and limits
 
-On 2026-07-18 the observed 95% intervals were 10.188-11.472 us for KVN parse,
-4.205-5.051 us for KVN generation, 33.382-40.183 us for XML parse, and 5.888-7.064 us for XML
-generation. These are observations, not unexplained release thresholds; the registered family
-benchmarks provide the CodSpeed comparison surface for subsequent changes.
+ADM annex J lists incompatible APM 1.0 differences: quaternion frame/direction keywords,
+Euler sequence and inertia names, and the addition of repeatable logical-block delimiters.
+A 2.0 message with a changed version header is not proof of legacy support. Input edition
+1.0 is rejected until those actual grammar and semantic differences are implemented and reviewed.
 
-## Remaining verification work
-
-APM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its ICS feature inventory and packaged
-surfaces are reconciled, and no family-specific promotion blocker is known.
+Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
+artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).

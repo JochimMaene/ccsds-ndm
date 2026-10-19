@@ -3,6 +3,33 @@ use crate::{ATT_KVN, COV_KVN};
 use ccsds_ndm::messages::acm::Acm;
 use ccsds_ndm::types::{AngleRate, Vec4Double};
 use ccsds_ndm::Ndm;
+
+#[test]
+fn kvn_rounding_must_not_collapse_distinct_history_times() {
+    let mut attitude = Acm::from_kvn(include_str!("../../data/kvn/acm_g6.kvn")).unwrap();
+    attitude.body.segment.data.att[0].att_lines.truncate(2);
+    attitude.body.segment.data.att[0].att_lines[0].values[0] = 1.234_567_890_123_456_7;
+    attitude.body.segment.data.att[0].att_lines[1].values[0] = 1.234_567_890_123_457;
+    let mut covariance = Acm::from_kvn(COV_KVN).unwrap();
+    covariance.body.segment.data.cov[0].cov_lines.truncate(2);
+    covariance.body.segment.data.cov[0].cov_lines[0].values[0] = 1.234_567_890_123_456_7;
+    covariance.body.segment.data.cov[0].cov_lines[1].values[0] = 1.234_567_890_123_457;
+    for value in [attitude, covariance] {
+        ccsds_ndm::Validate::validate(&value).unwrap();
+        assert_eq!(Acm::from_xml(&value.to_xml().unwrap()).unwrap(), value);
+        assert!(value.to_kvn().is_err());
+        let mut output = Vec::new();
+        assert!(value.write_kvn_to(&mut output).is_err());
+        assert!(output.is_empty());
+        let mut distinct = value.clone();
+        if let Some(attitude) = distinct.body.segment.data.att.first_mut() {
+            attitude.att_lines[1].values[0] = 2.234_567_890_123_457;
+        } else {
+            distinct.body.segment.data.cov[0].cov_lines[1].values[0] = 2.234_567_890_123_457;
+        }
+        Acm::from_kvn(&distinct.to_kvn().unwrap()).unwrap();
+    }
+}
 #[test]
 fn acm_vectors_and_units_survive_both_notations() {
     let physical = Acm::from_kvn(include_str!("../../data/kvn/acm_g8.kvn")).unwrap();
@@ -163,7 +190,7 @@ fn acm_mass_and_duration_zero_boundaries_generate_valid_xml() {
 #[test]
 fn kvn_generation_rounds_history_numbers_to_the_ccsds_digit_limit() {
     let mut message = Acm::from_kvn(ATT_KVN).unwrap();
-    message.body.segment.data.att[0].att_lines[0].values[1] = 1.234_567_890_123_456_7;
+    message.body.segment.data.att[0].att_lines[0].values[5] = 1.234_567_890_123_456_7;
     assert!(message.to_kvn().unwrap().contains("1.234567890123457e0"));
 
     let mut physical = Acm::from_kvn(include_str!("../../data/kvn/acm_g8.kvn")).unwrap();
@@ -238,4 +265,100 @@ AD_STOP
         parsed.body.segment.data.ad.as_ref().unwrap().sensors[0].sensor_number,
         Some(1)
     );
+}
+
+#[test]
+fn declared_history_compositions_are_revalidated_before_output() {
+    use ccsds_ndm::types::{AcmAttitudeType, AcmCovarianceLineType, RotSeq};
+
+    let attitude = Acm::from_kvn(ATT_KVN).unwrap();
+    let mut changed = attitude.clone();
+    changed.body.segment.data.att[0].number_states = 6;
+    for row in &mut changed.body.segment.data.att[0].att_lines {
+        row.values.pop();
+    }
+    assert_rejects(&changed, "NUMBER_STATES");
+
+    let mut changed = attitude.clone();
+    changed.body.segment.data.att[0].att_type = AcmAttitudeType::EulerAngles;
+    changed.body.segment.data.att[0].number_states = 6;
+    for row in &mut changed.body.segment.data.att[0].att_lines {
+        row.values.pop();
+    }
+    assert_rejects(&changed, "EULER_ROT_SEQ");
+    changed.body.segment.data.att[0].euler_rot_seq = Some(RotSeq::XYZ);
+    ccsds_ndm::Validate::validate(&changed).unwrap();
+
+    let mut changed = attitude;
+    changed.body.segment.data.att[0].att_lines[1].values[5] = f64::NAN;
+    assert_rejects(&changed, "attLine");
+
+    let covariance = Acm::from_kvn(COV_KVN).unwrap();
+    for cov_type in [
+        AcmCovarianceLineType::Angle,
+        AcmCovarianceLineType::Quaternion,
+        AcmCovarianceLineType::QuaternionGyroBias,
+    ] {
+        let mut changed = covariance.clone();
+        changed.body.segment.data.cov[0].cov_type = cov_type;
+        assert_rejects(&changed, "covLine");
+    }
+    let mut changed = covariance;
+    changed.body.segment.data.cov[0].cov_lines[1].values[1] = f64::INFINITY;
+    assert_rejects(&changed, "covLine");
+}
+
+#[test]
+fn sensor_noise_dimensions_and_estimator_conditionals_are_revalidated() {
+    use ccsds_ndm::types::{AcmAttitudeType, AngleUnits, SensorNoise};
+
+    let original = Acm::from_kvn(COV_KVN).unwrap();
+    let mut changed = original.clone();
+    let sensor = &mut changed.body.segment.data.ad.as_mut().unwrap().sensors[0];
+    sensor.number_sensor_noise_covariance = Some(2);
+    sensor.sensor_noise_stddev = Some(SensorNoise {
+        values: vec![0.01],
+        units: Some(AngleUnits::Deg),
+    });
+    assert_rejects(&changed, "SENSOR_NOISE_STDDEV");
+    changed.body.segment.data.ad.as_mut().unwrap().sensors[0]
+        .sensor_noise_stddev
+        .as_mut()
+        .unwrap()
+        .values
+        .push(0.02);
+    ccsds_ndm::Validate::validate(&changed).unwrap();
+    changed.body.segment.data.ad.as_mut().unwrap().sensors[0]
+        .sensor_noise_stddev
+        .as_mut()
+        .unwrap()
+        .values[1] = f64::NAN;
+    assert_rejects(&changed, "SENSOR_NOISE_STDDEV");
+
+    let mut changed = original.clone();
+    changed.body.segment.data.ad.as_mut().unwrap().sigma_u =
+        Some(ccsds_ndm::types::SigmaU::new(f64::NAN, None));
+    assert_rejects(&changed, "SIGMA_U");
+    let mut changed = original.clone();
+    changed.body.segment.data.ad.as_mut().unwrap().number_states = Some(3);
+    assert_rejects(&changed, "NUMBER_STATES");
+    let mut changed = original;
+    changed
+        .body
+        .segment
+        .data
+        .ad
+        .as_mut()
+        .unwrap()
+        .attitude_states = Some(AcmAttitudeType::EulerAngles);
+    assert_rejects(&changed, "EULER_ROT_SEQ");
+}
+
+#[test]
+fn quaternion_histories_reject_nonunit_magnitude_after_mutation() {
+    let mut message = Acm::from_kvn(ATT_KVN).unwrap();
+    for value in &mut message.body.segment.data.att[0].att_lines[1].values[1..5] {
+        *value = 0.0;
+    }
+    assert_rejects(&message, "Quaternion not normalized");
 }

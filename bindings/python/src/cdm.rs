@@ -533,9 +533,7 @@ impl CdmBody {
         Ok(Self {
             relative_metadata_data: Py::new(
                 py,
-                RelativeMetadataData {
-                    inner: value.relative_metadata_data,
-                },
+                RelativeMetadataData::from_core(py, value.relative_metadata_data)?,
             )?,
             segments: PyList::new(py, segments)?.unbind(),
         })
@@ -548,7 +546,7 @@ impl CdmBody {
             |value: &CdmSegment| value.to_core(py),
         )?;
         Ok(core_cdm::CdmBody {
-            relative_metadata_data: self.relative_metadata_data.borrow(py).inner.clone(),
+            relative_metadata_data: self.relative_metadata_data.borrow(py).to_core(py)?,
             segments,
         })
     }
@@ -602,8 +600,10 @@ impl CdmBody {
 ///     The norm of the relative velocity vector at TCA. Units: m/s.
 /// relative_position : list of float, optional
 ///     The [R, T, N] components of Object2's position relative to Object1. Units: m.
+///     Must be supplied together with relative_velocity.
 /// relative_velocity : list of float, optional
 ///     The [R, T, N] components of Object2's velocity relative to Object1. Units: m/s.
+///     Must be supplied together with relative_position.
 /// start_screen_period : str, optional
 ///     The start time in UTC of the screening period.
 /// stop_screen_period : str, optional
@@ -631,10 +631,34 @@ impl CdmBody {
 /// miss_distance_unit : str, optional
 ///     Optional unit string for validation (must be 'm').
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
-#[derive(Clone)]
+#[pyclass]
 pub struct RelativeMetadataData {
     pub inner: core_cdm::RelativeMetadataData,
+    relative_state_vector: Option<Py<RelativeStateVector>>,
+}
+
+impl RelativeMetadataData {
+    fn from_core(py: Python<'_>, mut inner: core_cdm::RelativeMetadataData) -> PyResult<Self> {
+        let relative_state_vector = inner
+            .relative_state_vector
+            .take()
+            .map(|inner| Py::new(py, RelativeStateVector { inner }))
+            .transpose()?;
+        Ok(Self {
+            inner,
+            relative_state_vector,
+        })
+    }
+
+    fn to_core(&self, py: Python<'_>) -> PyResult<core_cdm::RelativeMetadataData> {
+        let mut value = self.inner.clone();
+        value.relative_state_vector = self
+            .relative_state_vector
+            .as_ref()
+            .map(|state| state.try_borrow(py).map(|state| state.inner.clone()))
+            .transpose()?;
+        Ok(value)
+    }
 }
 
 #[gen_stub_pymethods]
@@ -664,6 +688,7 @@ impl RelativeMetadataData {
         miss_distance_unit=None
     ))]
     fn new(
+        py: Python<'_>,
         tca: String,
         miss_distance: f64,
         relative_speed: Option<f64>,
@@ -671,7 +696,9 @@ impl RelativeMetadataData {
         relative_velocity: Option<[f64; 3]>, // [R, T, N]
         start_screen_period: Option<String>,
         stop_screen_period: Option<String>,
+        #[gen_stub(override_type(type_repr = "ScreenVolumeFrameType | builtins.str | None", imports = ("builtins")))]
         screen_volume_frame: Option<Bound<'_, PyAny>>,
+        #[gen_stub(override_type(type_repr = "ScreenVolumeShapeType | builtins.str | None", imports = ("builtins")))]
         screen_volume_shape: Option<Bound<'_, PyAny>>,
         screen_volume_x: Option<f64>,
         screen_volume_y: Option<f64>,
@@ -685,17 +712,21 @@ impl RelativeMetadataData {
     ) -> PyResult<Self> {
         validate_unit::<LengthUnits>(miss_distance_unit)?;
 
-        let rel_state = if let (Some(p), Some(v)) = (relative_position, relative_velocity) {
-            Some(core_cdm::RelativeStateVector {
+        let rel_state = match (relative_position, relative_velocity) {
+            (Some(p), Some(v)) => Some(core_cdm::RelativeStateVector {
                 relative_position_r: Length::new(p[0], None),
                 relative_position_t: Length::new(p[1], None),
                 relative_position_n: Length::new(p[2], None),
                 relative_velocity_r: Dv::new(v[0]),
                 relative_velocity_t: Dv::new(v[1]),
                 relative_velocity_n: Dv::new(v[2]),
-            })
-        } else {
-            None
+            }),
+            (None, None) => None,
+            _ => {
+                return Err(PyValueError::new_err(
+                    "relative_position and relative_velocity must be supplied together",
+                ))
+            }
         };
 
         let screen_volume_frame = match screen_volume_frame {
@@ -718,8 +749,9 @@ impl RelativeMetadataData {
             ScreenVolumeFrameType::Tvn => core_types::ScreenVolumeFrameType::Tvn,
         };
 
-        Ok(Self {
-            inner: core_cdm::RelativeMetadataData {
+        Self::from_core(
+            py,
+            core_cdm::RelativeMetadataData {
                 comment,
                 tca: parse_epoch_str(&tca)?,
                 miss_distance: Length::new(miss_distance, None),
@@ -744,7 +776,7 @@ impl RelativeMetadataData {
                     .map_err(|e| PyValueError::new_err(e.to_string()))?,
                 collision_probability_method,
             },
-        })
+        )
     }
 
     /// The date and time in UTC of the closest approach. (See 6.3.2.6 for formatting rules.)
@@ -966,18 +998,19 @@ impl RelativeMetadataData {
 
     /// Relative state vector [R, T, N, VR, VT, VN] (combined position and velocity).
     ///
+    /// This is a live child: edits and assigned child references affect the parent.
+    ///
     /// :type: Optional[RelativeStateVector]
     #[getter]
-    fn relative_state_vector(&self) -> Option<RelativeStateVector> {
-        self.inner
-            .relative_state_vector
+    fn relative_state_vector(&self, py: Python<'_>) -> Option<Py<RelativeStateVector>> {
+        self.relative_state_vector
             .as_ref()
-            .map(|s| RelativeStateVector { inner: s.clone() })
+            .map(|state| state.clone_ref(py))
     }
 
     #[setter]
-    fn set_relative_state_vector(&mut self, value: Option<RelativeStateVector>) {
-        self.inner.relative_state_vector = value.map(|v| v.inner);
+    fn set_relative_state_vector(&mut self, value: Option<Py<RelativeStateVector>>) {
+        self.relative_state_vector = value;
     }
 
     /// Name of the Object1 centered reference frame in which the screening volume data are
@@ -1310,6 +1343,8 @@ pub struct CdmMetadata {
 #[gen_stub_pymethods]
 #[pymethods]
 impl CdmMetadata {
+    /// Construct metadata with explicit covariance provenance and maneuverability.
+    /// Neither required operational fact is inferred from other arguments.
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
@@ -1319,9 +1354,9 @@ impl CdmMetadata {
         object_name,
         international_designator,
         ref_frame,
+        covariance_method,
+        maneuverable,
         ephemeris_name=String::from("NONE"),
-        covariance_method=None,
-        maneuverable=None,
         object_type=None,
         operator_contact_position=None,
         operator_organization=None,
@@ -1337,15 +1372,20 @@ impl CdmMetadata {
         comment=vec![]
     ))]
     fn new(
+        #[gen_stub(override_type(type_repr = "CdmObjectType | builtins.str", imports = ("builtins")))]
         object: Bound<'_, PyAny>,
         object_designator: String,
         catalog_name: String,
         object_name: String,
         international_designator: String,
+        #[gen_stub(override_type(type_repr = "ReferenceFrameType | builtins.str", imports = ("builtins")))]
         ref_frame: Bound<'_, PyAny>,
+        #[gen_stub(override_type(type_repr = "CovarianceMethodType | builtins.str", imports = ("builtins")))]
+        covariance_method: Bound<'_, PyAny>,
+        #[gen_stub(override_type(type_repr = "ManeuverableType | builtins.str", imports = ("builtins")))]
+        maneuverable: Bound<'_, PyAny>,
         ephemeris_name: String,
-        covariance_method: Option<Bound<'_, PyAny>>,
-        maneuverable: Option<Bound<'_, PyAny>>,
+        #[gen_stub(override_type(type_repr = "ObjectDescription | builtins.str | None", imports = ("builtins")))]
         object_type: Option<Bound<'_, PyAny>>,
         operator_contact_position: Option<String>,
         operator_organization: Option<String>,
@@ -1362,14 +1402,8 @@ impl CdmMetadata {
     ) -> PyResult<Self> {
         // Parse enum-like arguments (accept str or Enum)
         let object = parse_cdm_object_type(&object)?;
-        let covariance_method = match covariance_method {
-            Some(m) => parse_covariance_method_type(&m)?,
-            None => CovarianceMethodType::Calculated,
-        };
-        let maneuverable = match maneuverable {
-            Some(m) => parse_maneuverable_type(&m)?,
-            None => ManeuverableType::Yes,
-        };
+        let covariance_method = parse_covariance_method_type(&covariance_method)?;
+        let maneuverable = parse_maneuverable_type(&maneuverable)?;
         let ref_frame = parse_reference_frame_type(&ref_frame)?;
         let object_type = object_type
             .map(|ob| parse_object_description(&ob))
@@ -1992,8 +2026,8 @@ impl CdmData {
         state_vector: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
         #[gen_stub(override_type(type_repr = "typing.Optional[numpy.typing.ArrayLike]", imports = ("typing", "numpy.typing")))]
         covariance_matrix: Option<PyArrayLikeDyn<'_, f64, AllowTypeChange>>,
-        od_parameters: Option<OdParameters>,
-        additional_parameters: Option<AdditionalParameters>,
+        od_parameters: Option<Py<OdParameters>>,
+        additional_parameters: Option<Py<AdditionalParameters>>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         let state = CdmStateVector::from_numpy(state_vector)?;
@@ -2002,16 +2036,14 @@ impl CdmData {
             None => None,
         };
 
-        Self::from_core(
-            py,
-            core_cdm::CdmData {
-                comment: comment.unwrap_or_default(),
-                od_parameters: od_parameters.map(|o| o.inner),
-                additional_parameters: additional_parameters.map(|a| a.inner),
-                state_vector: state.inner,
-                covariance_matrix: cov,
-            },
-        )
+        Ok(Self::new(
+            Py::new(py, state)?,
+            cov.map(|inner| Py::new(py, CdmCovarianceMatrix { inner }))
+                .transpose()?,
+            od_parameters,
+            additional_parameters,
+            comment,
+        ))
     }
 
     /// Covariance Matrix.
@@ -2057,6 +2089,8 @@ impl CdmData {
 
     /// State vector as a NumPy array (convenience method).
     ///
+    /// The array is a copy. Assigning it back updates numeric values and preserves comments.
+    ///
     /// Returns:
     ///     numpy.ndarray: 1D array of shape (6,) containing [X, Y, Z, X_DOT, Y_DOT, Z_DOT].
     ///     Units: [km, km, km, km/s, km/s, km/s]
@@ -2074,7 +2108,8 @@ impl CdmData {
         array: PyArrayLikeDyn<'_, f64, AllowTypeChange>,
     ) -> PyResult<()> {
         Python::attach(|py| {
-            let state = CdmStateVector::from_numpy(array)?;
+            let mut state = CdmStateVector::from_numpy(array)?;
+            state.inner.comment = self.state_vector.borrow(py).inner.comment.clone();
             self.state_vector.borrow_mut(py).inner = state.inner;
             Ok(())
         })
@@ -2629,6 +2664,7 @@ pub struct AdditionalParameters {
 #[pymethods]
 impl AdditionalParameters {
     #[new]
+    #[pyo3(signature = (area_pc=None, area_drg=None, area_srp=None, mass=None, cd_area_over_mass=None, cr_area_over_mass=None, thrust_acceleration=None, sedr=None, comment=vec![]))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         area_pc: Option<f64>,

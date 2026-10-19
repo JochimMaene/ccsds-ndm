@@ -113,10 +113,10 @@ fn every_kvn_generation_gate_rejects_loss_or_ambiguity_before_output() {
                 .comment
                 .push("nested".to_owned());
         }),
-        ("non-printable or non-ASCII character", |message| {
+        ("only printable ASCII records", |message| {
             message.body.segments[0].metadata.object_name = "SATELLITE €".to_owned();
         }),
-        ("without changing typed content", |message| {
+        ("only printable ASCII records", |message| {
             message.body.segments[0].metadata.object_name = "SATELLITE\nA".to_owned();
         }),
     ];
@@ -129,6 +129,56 @@ fn every_kvn_generation_gate_rejects_loss_or_ambiguity_before_output() {
         let streamed = message.write_kvn_to(&mut output).unwrap_err();
         assert_eq!(streamed.to_string(), error.to_string(), "{label}");
         assert!(output.is_empty(), "streaming wrote bytes for {label}");
+    }
+}
+
+#[test]
+fn cdm_kvn_refuses_numeric_rounding_while_xml_retains_the_value() {
+    let mut control = Cdm::from_kvn(KVN).unwrap();
+    control.body.relative_metadata_data.miss_distance.value = 0.123_456_789_012_345_6;
+    assert_eq!(Cdm::from_kvn(&control.to_kvn().unwrap()).unwrap(), control);
+
+    for field in ["MISS_DISTANCE", "COLLISION_PROBABILITY", "X", "CR_R"] {
+        let mut message = Cdm::from_kvn(KVN).unwrap();
+        let value = 0.300_000_000_000_000_04;
+        match field {
+            "MISS_DISTANCE" => message.body.relative_metadata_data.miss_distance.value = value,
+            "COLLISION_PROBABILITY" => {
+                message
+                    .body
+                    .relative_metadata_data
+                    .collision_probability
+                    .as_mut()
+                    .unwrap()
+                    .value = value
+            }
+            "X" => message.body.segments[1].data.state_vector.x.value = value,
+            _ => {
+                message.body.segments[1]
+                    .data
+                    .covariance_matrix
+                    .as_mut()
+                    .unwrap()
+                    .cr_r
+                    .value = value
+            }
+        }
+        message.validate().unwrap();
+        let xml = message.to_xml().unwrap();
+        assert_eq!(Cdm::from_xml(&xml).unwrap(), message);
+        validate_xml("CDM full-precision double", &xml);
+        let error = message.to_kvn().unwrap_err();
+        assert!(
+            error.to_string().contains("without changing typed content"),
+            "{field}: {error}"
+        );
+        let mut output = Vec::new();
+        let error = message.write_kvn_to(&mut output).unwrap_err();
+        assert!(
+            error.to_string().contains("without changing typed content"),
+            "{field}: {error}"
+        );
+        assert!(output.is_empty(), "{field}");
     }
 }
 
@@ -149,7 +199,7 @@ fn generation_rejects_partial_optional_covariance_rows() {
     assert!(error.to_string().contains("CDRG_T"));
 }
 
-/// The relative metadata numbers are plain doubles, so only finiteness constrains them. Before
+/// Every relative metadata number must be finite. Before
 /// this was routed, `validate` and the XML writer accepted a non-finite value while the KVN
 /// writer rejected it, and an infinity reached the document as the lexical `inf`, which `xmllint`
 /// rejects as "not a valid value of the atomic type 'xs:double'".

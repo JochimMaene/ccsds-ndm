@@ -80,8 +80,9 @@ The input notation is detected automatically.
 
 OPM, OEM, and OMM support edition-correct ODM 2.0 and 3.0 output. The message's ``version``
 attribute selects the edition, for example ``message.version = "2.0"`` before ``to_file``. The 2.0 checks use the official `SANA NDM/XML schema
-archive <https://sanaregistry.org/r/ndmxml_unqualified/>`_. OPM and OEM ODM 1.0 remain parse-only
-because they do not have an audited schema-backed serializer; attempted relabeling is rejected.
+archive <https://sanaregistry.org/r/ndmxml_unqualified/>`_. OEM 1.0 has a restricted KVN input-only compatibility reader; stored 1.0 messages cannot be
+generated. OPM, APM, AEM, and TDM 1.0 input is rejected because their older syntax and requirements
+are not implemented as separate editions. See the project support matrix for the precise scope.
 
 CCSDS units
 -----------
@@ -101,13 +102,26 @@ Generation always validates the complete message before writing any caller-visib
 preserves the edition stored on the message. In Python, use ``to_str(format)`` for a string and
 ``to_file(path, format)`` for atomic file replacement. Rust exposes ``to_kvn``, ``to_xml``, and
 the ``write_*_to`` streaming methods; streaming can leave partial output if the caller's sink
-fails mid-write. ``convert_file`` also replaces its destination atomically. Finite XML values
-are rounded when necessary to the 16-digit KVN representation required by CCSDS.
+fails mid-write. ``convert_file`` also replaces its destination atomically. Ordinary numeric
+values use double precision. Most KVN writers round them when necessary to the
+16-significant-digit representation; CDM refuses values when that rounding would change
+its typed model. TDM phase counts retain exact decimal strings instead, subject to KVN's line
+limit. Optional fixed-unit annotations and some comment positions are normalized during
+conversion, so a notation round trip need not produce an identical model. Other information
+that cannot be represented causes conversion to fail. The support matrix and family records
+describe the specific normalizations and refusals.
+
+The shared XML parser checks supported message structure and field values without running an
+XSD engine. Ignored processing instructions and unused namespace declarations receive limited
+lexical checks; malformed names there can be accepted. Independently validate the source XML
+when full XML well-formedness or independent schema validation is required. This limit and the common
+preservation policy are recorded in the validation contract linked from the support matrix.
 
 Errors expose stable ``code()``, ``field_path()``, and ``diagnostic()`` accessors; diagnostic
 wording may improve before 1.0 while codes, enum meanings, and canonical paths are the machine
 interface. Python NDM exceptions additionally expose ``operation``, ``notation``,
 ``message_kind``, source edition, and available source location/token fields.
+Unavailable diagnostic fields are ``None``.
 
 Migrating metadata construction
 -------------------------------
@@ -115,4 +129,6 @@ Migrating metadata construction
 Metadata constructors now require CCSDS-significant interpretation fields such as
 ``time_system``, reference frames, centers, and required interval epochs instead of silently
 supplying defaults. Pass those values explicitly. ``interpolation_degree=0`` is now rejected;
-omit it with ``None`` when no interpolation degree is present.
+omit it with ``None`` when no interpolation degree is present. CDM metadata likewise requires
+explicit ``covariance_method`` and ``maneuverable`` values; it no longer assumes calculated
+covariance or maneuver capability.

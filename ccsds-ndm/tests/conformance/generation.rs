@@ -34,7 +34,19 @@ fn kvn_fixtures_preserve_models_and_generate_deterministically() {
             let message = from_str(&input)
                 .unwrap_or_else(|error| panic!("{label} strict parse failed: {error}"));
             assert_kvn_generation(&label, &message, &message);
-            assert_xml_generation(&label, &message);
+            if label == "ocm_g19.kvn" {
+                // Current covariance linkage cannot be represented by the older XML schema.
+                assert!(message
+                    .to_xml()
+                    .unwrap_err()
+                    .to_string()
+                    .contains("TRAJ_ID"));
+                let mut output = Vec::new();
+                assert!(message.write_xml_to(&mut output).is_err());
+                assert!(output.is_empty());
+            } else {
+                assert_xml_generation(&label, &message);
+            }
         }
     }
 }

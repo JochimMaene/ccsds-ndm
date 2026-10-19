@@ -116,6 +116,7 @@ impl CombinedNdm {
     #[new]
     #[pyo3(signature = (messages, id=None, comments=vec![]))]
     fn new(
+        #[gen_stub(override_type(type_repr = "typing.Sequence[typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm]]", imports = ("typing")))]
         messages: Vec<Py<PyAny>>,
         id: Option<String>,
         comments: Vec<String>,
@@ -190,15 +191,19 @@ impl CombinedNdm {
 
     /// List of contained navigation messages.
     ///
-    /// :type: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]]
-    #[gen_stub(override_return_type(imports=("typing"), type_repr="list[typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]]"))]
+    /// :type: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm]]
+    #[gen_stub(override_return_type(imports=("typing"), type_repr="list[typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm]]"))]
     #[getter]
     fn messages(&self, py: Python<'_>) -> Py<PyList> {
         self.messages.clone_ref(py)
     }
 
     #[setter]
-    fn set_messages(&mut self, messages: Vec<Py<PyAny>>) -> PyResult<()> {
+    fn set_messages(
+        &mut self,
+        #[gen_stub(override_type(type_repr = "typing.Sequence[typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm]]", imports = ("typing")))]
+        messages: Vec<Py<PyAny>>,
+    ) -> PyResult<()> {
         Python::attach(|py| {
             py_messages_to_core(py, &messages)?;
             self.messages = PyList::new(py, messages)?.unbind();

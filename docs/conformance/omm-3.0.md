@@ -1,4 +1,4 @@
-# OMM 3.0 Focused Conformance Evidence
+# OMM 3.0 and 2.0 conformance
 
 This inventory records maintainer evidence for standalone OMM 3.0. The
 [support matrix](../support-matrix.md) is the user-facing statement of current support.
@@ -21,10 +21,10 @@ The `omm` suite establishes:
 | KVN lexical and structural strictness | The shared ODM assignment scanner rejects non-ASCII/control input, overlong lines, malformed assignments, unknown and duplicate keywords, fixed-order violations, and comments outside the beginning of a logical block. OMM registers only its standard-derived keyword ranks and choice/repetition transitions. Members of a keyword choice share a rank, so the scanner compares keys as well as ranks: the other alternative may follow, a repeat of the same keyword may not. |
 | XML structure | The OMM sequence registration rejects unknown, duplicate, and reordered children throughout the root, header, metadata, data, mean-elements, spacecraft, TLE, covariance, and user-defined structures. It rejects non-schema attributes while allowing only the fixed unit and user-defined parameter attributes at their applicable leaves. |
 | Valid input and preservation | All three shipped KVN fixtures and the shipped XML fixture parse through the public strict API. Generated KVN and XML reparse to the same typed model. |
-| XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
+| XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
 | Numeric values in every block | Validation rejects non-finite values in the mean-elements, spacecraft, TLE, and covariance blocks before either notation is generated, and restates the `inclinationType` and `elementSetNoType` ranges that the typed wrappers enforce only in their constructors. Schema range facets are comparisons, which NaN passes, so finiteness is checked in its own right. |
-| KVN number spelling | Every OMM floating-point field — mean elements, spacecraft parameters, TLE parameters, and the shared covariance block — is written through the ODM 7.7.1 number writer, so generated KVN reparses instead of carrying `Display` spellings such as `0.30000000000000004`. Values whose shortest round-tripping spelling would not fit are rejected before generation rather than emitted. |
-| Shared surface contract | `library::parsing` and `library::output`, `conformance::generation`, the Python API tests, and family Criterion matrices provide common parsing, generation, diagnostics, dispatch, and workload evidence linked from `family-shared-contract.md`. |
+| KVN number spelling | Every OMM floating-point field — mean elements, spacecraft parameters, TLE parameters, and the shared covariance block — uses the shared ODM number writer. It writes at most 16 significant decimal digits, rounding values whose shortest round-trip spelling needs 17 digits: `0.30000000000000004` becomes `3.0e-1`, and `1.2345678901234567` becomes `1.234567890123457e0`. This can change the stored `f64` when reparsed; it is not lossless binary-value preservation. Values whose rounded spelling would overflow `f64` are rejected before generation. `omm_kvn_generation_spells_numbers_as_ccsds_numbers` and the shared `OdmFloat` tests cover rounding and representability. |
+| Shared surface contract | `library::parsing` and `library::output`, `conformance::generation`, the Python API tests, and family Criterion matrices provide common parsing, generation, diagnostics, dispatch, and workload evidence linked from the [conformance review index](README.md). |
 
 The existing OMM unit suite separately covers the mean-elements choice, TLE theory-dependent
 requirements and mutually exclusive choices, numeric constraints, reference-frame epochs, TLE
@@ -47,7 +47,7 @@ annex A2.5.2, has 70 numbered items. The repository copy
 | 69-70 | User-defined logical block | typed user-defined parameters, strict keyword scanner and roundtrips |
 
 The item inventory exposes no omitted OMM keyword or logical block. OMM has no exception to the
-shared policy on [externally governed values](family-shared-contract.md#externally-governed-values).
+shared policy on [externally governed values](../design/validation-contract.md#registry-governed-values).
 
 ## Allocation and packaged-surface evidence
 
@@ -61,12 +61,28 @@ artifact check are the reproducible packaged gates.
 
 ## Verification outcome
 
-The complete ICS inventory, strict core behavior, Python delegation, allocation budgets, and
-packaged artifacts have received message-level review. OMM 3.0 is verified on the Rust and Python
-surfaces, where "verified" means that review — not exhaustive mutation of every editable value.
-Root-mutation probing carried out after that review found one hole it had not covered:
-`ELEMENT_SET_NO` could be set outside `elementSetNoType`'s `[0, 9999]` and was accepted by
-`validate`, KVN, and XML, emitting a document the reference schema rejects on `maxInclusive`. The
-range is now restated at the root and regression-tested at both the rejected and accepted
-boundaries. OMM 2.0 remains available: explicit edition conversion is tested, but it
-has not received this complete edition-specific review.
+OMM 3.0 and 2.0 meet the same [verification criteria](README.md#verification-criteria)
+on Rust and Python: complete feature inventory, strict core validation, explicit
+representation limits, reviewed public routes, and packaged-artifact tests. This is not
+exhaustive mutation of every editable value. Root validation restates numeric ranges such
+as `ELEMENT_SET_NO` after mutation; the inherent Rust validator, TLE writer, and ordinary
+generation all delegate to that same gate.
+
+## Edition 2.0 reconciliation
+
+The edition-specific authority is `data/odm_502x0b2s.pdf` and the official
+`ndmxml-2.0.0-omm-2.0.xsd` with its common schema. ODM 3.0 annex J identifies the header
+and propagator-coefficient changes. Direct schema comparison additionally establishes
+which formerly required TLE fields became optional:
+
+| Difference | Decision and evidence |
+| --- | --- |
+| No `CLASSIFICATION` or `MESSAGE_ID` in the 2.0 header | Both parse notations and mutated models reject these fields; `conformance::odm2::opm_and_omm_2_reject_new_header_fields_in_both_notations`. |
+| A present 2.0 TLE block requires `NORAD_CAT_ID`, `ELEMENT_SET_NO`, `REV_AT_EPOCH`, `BSTAR`, and `MEAN_MOTION_DDOT` in addition to `MEAN_MOTION_DOT` | The root edition gate enforces the complete old shape independently of theory; `conformance::odm2::omm_2_tle_shape_is_checked_after_mutation_and_at_both_input_boundaries`. |
+| `BTERM` and `AGOM` were introduced in 3.0 | Reject them in 2.0; do not substitute a coefficient with different physical meaning. The same TLE-shape regression covers both input and output notations. |
+| `EPHEMERIS_TYPE` numbering was updated in 3.0 | Both schemas use an integer rather than a closed enumeration. Preserve the supplied integer; do not infer the actual propagator from it or certify the generated ephemeris. |
+| Mean elements, spacecraft, covariance, and user-defined blocks retain the same shape | Every shipped OMM KVN fixture, with its newer header removed and edition changed, preserves its model through both notations and passes the official 2.0 XSD; `conformance::odm2::omm_2_generation_is_schema_valid_and_round_trips`. |
+| Public adapters retain edition | The Python conformance matrix exercises both editions through every ordinary string, file, and conversion route. |
+
+Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
+artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).

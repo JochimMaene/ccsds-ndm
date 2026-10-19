@@ -1,11 +1,12 @@
-# TDM 2.0 Focused Conformance Evidence
+# TDM 2.0 conformance
 
 This inventory records maintainer evidence for standalone TDM 2.0. The
 [support matrix](../support-matrix.md) is the user-facing statement of current support.
 
 ## Scope and authorities
 
-- Message edition: TDM 2.0; semantic and KVN authority: CCSDS 503.0-B-2.
+- Message edition: TDM 2.0; semantic and KVN authority: CCSDS 503.0-B-2 with
+  corrigendum 1 (`data/tdm_503x0b2c1.pdf`).
 - XML authority: NDM/XML schema set 4.0.0 and TDM schema 2.0.
 - Profile: strict standalone parsing, validation, deterministic KVN/XML generation, and notation
   conversion through the shared Rust generation gate.
@@ -16,9 +17,9 @@ The TDM suites establish:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN structure | A local state scanner enforces printable ASCII, the 254-character line limit, header and `META`/`DATA` section sequencing, metadata uniqueness and the `PATH` choice, known observation keywords, and section-scoped comments. It deliberately does not impose XML metadata ordering on order-independent TDM KVN. |
+| KVN structure | A local state scanner enforces printable ASCII, the 254-character line limit, header and `META`/`DATA` section sequencing, metadata uniqueness and the `PATH` choice, known observation keywords, and section-scoped comments. Metadata assignments are accepted out of order as a producer-compatibility decision; TDM §3.3.1.8 prescribes table order, which the writer emits. Duplicate assignments and misplaced comments remain errors. |
 | XML structure | The shared XML sequence engine covers the root, repeated segments, metadata, data, and the complete observation choice; it rejects unknown, duplicate, reordered, and non-schema nested content while accepting the schema's optional angle/percentage units. |
-| Preservation and generation | All 21 shipped KVN fixtures and both shipped XML fixtures preserve their typed source-notation model. Generated XML validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). Fixed optional XML units are semantically normalized when crossing unitless KVN. Bare `COMMENT` records are preserved by the shared KVN writer. |
+| Preservation and generation | All 21 shipped KVN fixtures and both shipped XML fixtures preserve their typed source-notation model. Generated XML validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). Fixed optional XML units are semantically normalized when crossing unitless KVN. Bare `COMMENT` records are preserved by the shared KVN writer. |
 | History allocation | `tdm_kvn_allocations` compares 10 and 1,000 observations. Parsing allocations grow with vector capacity rather than per record; validated streaming generation has fixed temporary-allocation overhead; materialized storage remains output-proportional. |
 | Shared surfaces | `library::parsing` and `library::output`, `conformance::generation`, Python API tests, and the family benchmark matrices exercise shared parsing, generation, diagnostics, and dispatch. |
 
@@ -41,7 +42,7 @@ All 53 numbered features in CCSDS 503.0-B-2 corrigendum 1 annex A2.1.5 were reco
 | 42-52 | Every angle, carrier, clock, Doppler, media, meteorological, optical/radar, range, receive, transmit, and VLBI observation family | exhaustive typed observation-choice tests plus all 23 shipped fixtures, and observation value domains enforced through every segment: universal finiteness, `RHUMIDITY` in `[0, 100]`, positive transmit frequencies, non-negative tropospheric delays, `ANGLE_1`/`ANGLE_2` in `[-180, 360)`, and positive `RCS`, `STEC`, and `TEMPERATURE` |
 | 53 | Data delimiter | local KVN state scanner and repeated XML segment sequence |
 
-No annex-A TDM feature is absent. TDM's exception to the shared policy on [externally governed values](family-shared-contract.md#externally-governed-values) is that normative
+No annex-A TDM feature is absent. TDM's exception to the shared policy on [externally governed values](../design/validation-contract.md#registry-governed-values) is that normative
 annex B places time-system and reference-frame registry membership outside the message, so those
 values remain caller supplied while local syntax and conditional semantics are enforced.
 Concretely, every populated `PATH`, `PATH_1`, and `PATH_2` is re-parsed at
@@ -58,41 +59,57 @@ notations, file IO, epoch rules, generic identity, and diagnostics. Strict bindi
 audit, generated stubs/doc checks, wheel verification, and Rust artifact verification are the
 packaged gates.
 
-## Recorded Criterion observations
+## Metadata vocabularies and exact phase counts
 
-The registered history workloads were run on 2026-07-18 with 20 samples, a 0.5 s warm-up, and a
-1 s target measurement time:
+Table 3-3 permits ICD-defined `ANGLE_TYPE` values and delegates `REFERENCE_FRAME` to a living
+SANA registry. KVN preserves nonempty caller-supplied values in those domains, including frames
+outside the older XML enumeration. XML input/output remains constrained to the bundled schema;
+conversion refuses an unrepresentable value before output instead of substituting a frame or
+angle convention. Known XML enumeration values remain case-sensitive; the KVN reader retains
+its documented case aliases. `DATA_TYPES`, when supplied, must contain observation keywords from table 3-5;
+indexed families may use the table's `_n` notation. The library does not invent participant
+identities, calibration truth, or an ICD for a custom angle convention.
 
-```text
-cargo bench --manifest-path ccsds-ndm/Cargo.toml --bench kvn_benches -- 'tdm_kvn_history_scaling' --sample-size 20 --measurement-time 1 --warm-up-time 0.5
-cargo bench --manifest-path ccsds-ndm/Cargo.toml --bench xml_benches -- 'tdm_xml_history_scaling' --sample-size 20 --measurement-time 1 --warm-up-time 0.5
-```
+Sections 3.5.2.11–3.5.2.12 define phase counts as real-number strings with any required number of
+digits. All ten receive/transmit phase-count variants retain their decimal/exponent text through
+KVN, XML, Python, and conversion. They are not parsed through `f64`. Lexical validation rejects
+malformed numbers and non-finite spellings without limiting the number of digits. Other
+observations use doubles and the ordinary-number generation rules below. The allocation-growth
+budget uses ordinary numeric observations; retaining each exact phase count requires storage
+proportional to its text.
+`tdm::model` tests exact counts above `2**53`, long fractional parts, very large exponents, invalid
+lexemes, metadata vocabularies, and zero-byte XML refusals; Python tests exercise all ten variants.
+The exact decimal model and XML do not impose a precision limit. KVN still applies its separate
+254-character line limit: a phase-count record that exceeds it is refused, never truncated.
 
-The observed Criterion 95% time intervals were:
+For ordinary numeric observations and metadata, TDM sections 4.3.4–4.3.5 limit fixed-point
+digits and floating-point mantissas to 16 digits. KVN generation uses the shared numeric
+formatter to round when necessary; values whose rounded spelling would overflow a double
+are refused before output. XML retains the original double value. The bundled TDM XSD
+types ordinary observations and phase counts as doubles, but the more specific book
+sections 3.5.2.11–3.5.2.12 require arbitrary-precision phase-count strings. Those counts keep
+their validated decimal text rather than passing through the ordinary-number formatter.
+`tdm::generation::kvn_numbers_follow_the_digit_limit_without_rounding_phase_counts` and
+`kvn_refuses_numbers_whose_rounded_spelling_overflows_before_output` cover both boundaries.
 
-| Notation/path | 100 records | 10,000 records | 50,000 records |
-| --- | --- | --- | --- |
-| KVN parse | 45.373-52.422 us | 4.0251-4.4088 ms | 20.266-21.816 ms |
-| KVN generate | 14.725-16.980 us | 1.2416-1.3050 ms | 6.5180-7.2676 ms |
-| XML parse | 131.83-148.38 us | 12.481-13.709 ms | not registered |
-| XML generate | 40.812-45.052 us | 4.5055-5.1199 ms | not registered |
+## Verification outcome
 
-These observations show approximately record-proportional scaling over the registered ranges.
-They are reproducible comparison evidence, not release thresholds or cross-machine performance
-claims.
+TDM 2.0 meets the common [verification criteria](README.md#verification-criteria) for
+self-contained format and model validation on Rust and Python. The requirement inventory,
+family tests, shared public-route tests, and packaged tests are complementary evidence;
+none alone establishes conformance or exhaustive mutation coverage.
 
-## Remaining verification work
+## Decisions and limits
 
-TDM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). Its ICS feature inventory and packaged
-surfaces are reconciled, and the recorded timing observations below remain informational.
+The current implementation and evidence cover edition 2.0. Previous acceptance of 1.0
+merely reused the 2.0 grammar; tests changed version labels without providing actual 1.0
+wire-syntax and metadata fixtures. Agreement of several numeric domains across editions
+does not establish edition support. Input 1.0 is rejected until a complete edition-specific
+review and implementation is available.
 
-Both accepted input editions are covered for value domains. The observation value domains above are enforced
-regardless of edition, and 503.0-B-1 was checked directly to confirm that is correct: it specifies
-the same `-180.0 <= ANGLE_1 < 360.0` bound and the same positive `TEMPERATURE` and `STEC`, and it
-has no `RCS` keyword at all, so that rule is vacuous rather than conflicting for 1.0 input. No
-edition-conditional rule is required.
+Time-system and frame registry membership, calibration truth, and the correctness of an
+exchange-partner path are outside the message. Local participant-index existence, path/mode
+choices, observation domains, and conditional metadata remain library checks.
 
-That check is not full 1.0 edition support. What remains unverified for 1.0 is wire-syntax and
-metadata parsing specifically: no shipped 1.0 fixture exercises 1.0-only KVN/XML syntax or metadata
-paths through the Rust and Python parsers. Value-domain agreement is verified; 1.0 syntax/metadata
-coverage is the remaining named proof before any 1.0 support claim.
+Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
+artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).

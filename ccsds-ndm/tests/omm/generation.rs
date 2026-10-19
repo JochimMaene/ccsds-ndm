@@ -347,8 +347,7 @@ fn kvn_preserves_sgp4_xp_drag_and_solar_radiation_terms() {
 
 #[test]
 fn omm_rejects_kvn_numbers_it_could_not_spell_back() {
-    // The schema types these fields as plain doubles, so finiteness and range checks let through
-    // magnitudes whose shortest round-tripping spelling blows past the 254-character line limit.
+    // Rounding the largest finite double to 16 significant digits would overflow when reparsed.
     let mut message = Omm::from_kvn(include_str!("../../data/kvn/omm_g7.kvn")).unwrap();
     message.body.segment.data.mean_elements.eccentricity.value = f64::MAX;
 

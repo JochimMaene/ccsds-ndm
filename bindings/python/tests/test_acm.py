@@ -28,6 +28,41 @@ from ccsds_ndm import (
 KVN_DIR = Path(__file__).resolve().parents[3] / "ccsds-ndm" / "data" / "kvn"
 
 
+@pytest.mark.parametrize(
+    "fixture, block, row, time, field",
+    [
+        ("acm_g6.kvn", "att", 2, 0.0, "attLine time"),
+        ("acm_g9.kvn", "cov", 1, 0.0, "covLine time"),
+        ("acm_g9.kvn", "cov", 1, -1.0, "covLine time"),
+    ],
+)
+def test_history_time_edits_reach_validation_and_generation(
+    fixture, block, row, time, field
+):
+    message = Acm.from_file(str(KVN_DIR / fixture))
+    history = getattr(message.segment.data, block)[0]
+    records = getattr(history, f"{block}_lines")
+    records[row][0] = time
+    setattr(history, f"{block}_lines", records)
+    with pytest.raises(ccsds_ndm.NdmValidationError, match=field):
+        message.validate()
+    for notation in ("kvn", "xml"):
+        with pytest.raises(ccsds_ndm.NdmValidationError, match=field):
+            message.to_str(format=notation)
+
+
+def test_kvn_none_rate_type_is_normalized_to_omission():
+    source = (KVN_DIR / "acm_g6.kvn").read_text()
+    source = source.replace(
+        "ATT_TYPE = QUATERNION", "ATT_TYPE = QUATERNION\nRATE_TYPE = NONE"
+    )
+    message = Acm.from_str(source, format="kvn")
+    assert message.segment.data.att[0].rate_type is None
+    assert "RATE_TYPE" not in message.to_str(format="kvn")
+    xml = message.to_str(format="xml")
+    assert Acm.from_str(xml, format="xml").segment.data.att[0].rate_type is None
+
+
 class TestAcm:
     """Tests for ACM bindings."""
 
@@ -387,7 +422,7 @@ class TestAcm:
         segment = acm.segment
         attitude = segment.data.att[0]
         attitude.number_states = attitude.number_states + 1
-        with pytest.raises(ccsds_ndm.NdmValidationError, match="attLine"):
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="NUMBER_STATES"):
             segment.data.validate(segment.metadata)
 
         segment.metadata.object_name = ""

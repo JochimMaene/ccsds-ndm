@@ -1,6 +1,6 @@
 use crate::common::mutated;
 use ccsds_ndm::messages::acm::Acm;
-use ccsds_ndm::Ndm;
+use ccsds_ndm::{Ndm, Validate};
 
 const ACM_KVN: &str = include_str!("../../data/kvn/acm_g7.kvn");
 
@@ -83,4 +83,135 @@ fn acm_maneuver_times_use_relative_numeric_form() {
             replacement.1.split_once(" = ").unwrap().1,
         );
     }
+}
+
+#[test]
+fn covariance_times_are_strictly_increasing_on_input_and_after_edits() {
+    let source = crate::COV_KVN;
+    let original = Acm::from_kvn(source).unwrap();
+    for time in [0.0, -1.0] {
+        let mut value = original.clone();
+        value.body.segment.data.cov[0].cov_lines[1].values[0] = time;
+        crate::common::assert_rejects(&value, "covLine time");
+        assert!(
+            Acm::from_kvn(&mutated(source, "1.096694 6.74", &format!("{time} 6.74"),)).is_err()
+        );
+        let xml = mutated(
+            &original.to_xml().unwrap(),
+            "<covLine>1.096694 ",
+            &format!("<covLine>{time} "),
+        );
+        assert!(Acm::from_xml(&xml).is_err());
+    }
+}
+
+#[test]
+fn attitude_times_must_be_unique_but_need_not_increase() {
+    let original = Acm::from_kvn(include_str!("../../data/kvn/acm_g6.kvn")).unwrap();
+    for times in [[0.5, 0.25, 0.0], [0.25, 0.0, 0.5]] {
+        let mut value = original.clone();
+        for (line, time) in value.body.segment.data.att[0]
+            .att_lines
+            .iter_mut()
+            .zip(times)
+        {
+            line.values[0] = time;
+        }
+        value.validate().unwrap();
+        assert_eq!(Acm::from_kvn(&value.to_kvn().unwrap()).unwrap(), value);
+        assert_eq!(Acm::from_xml(&value.to_xml().unwrap()).unwrap(), value);
+    }
+    for time in [0.0, -0.0, 0.25] {
+        let mut value = original.clone();
+        value.body.segment.data.att[0].att_lines[2].values[0] = time;
+        crate::common::assert_rejects(&value, "attLine time");
+    }
+    let kvn = mutated(
+        include_str!("../../data/kvn/acm_g6.kvn"),
+        "0.50 0.73492",
+        "0.0 0.73492",
+    );
+    assert!(Acm::from_kvn(&kvn).is_err());
+    let xml = mutated(&original.to_xml().unwrap(), "0.5 0.73492", "0.0 0.73492");
+    assert!(Acm::from_xml(&xml).is_err());
+}
+
+#[test]
+fn history_epochs_support_relative_numbers_only() {
+    for (source, token, element) in [
+        (
+            include_str!("../../data/kvn/acm_g6.kvn"),
+            "0.0 0.73566",
+            "attLine",
+        ),
+        (crate::COV_KVN, "0.0 6.74", "covLine"),
+    ] {
+        let original = Acm::from_kvn(source).unwrap();
+        let absolute = "2017-12-30T00:00:00.0";
+        let replacement = token.replacen("0.0", absolute, 1);
+        assert!(Acm::from_kvn(&mutated(source, token, &replacement)).is_err());
+        assert!(Acm::from_xml(&mutated(
+            &original.to_xml().unwrap(),
+            &format!("<{element}>0 "),
+            &format!("<{element}>{absolute} "),
+        ))
+        .is_err());
+    }
+}
+
+#[test]
+fn kvn_none_rate_type_normalizes_to_omission_while_xml_token_is_refused() {
+    let source = include_str!("../../data/kvn/acm_g6.kvn");
+    let original = Acm::from_kvn(source).unwrap();
+    assert!(original.body.segment.data.att[0].rate_type.is_none());
+    assert!(Acm::from_xml(&original.to_xml().unwrap())
+        .unwrap()
+        .body
+        .segment
+        .data
+        .att[0]
+        .rate_type
+        .is_none());
+    let kvn = mutated(
+        source,
+        "ATT_TYPE = QUATERNION",
+        "ATT_TYPE = QUATERNION\nRATE_TYPE = NONE",
+    );
+    let normalized = Acm::from_kvn(&kvn).unwrap();
+    assert_eq!(normalized, original);
+    assert!(!normalized.to_kvn().unwrap().contains("RATE_TYPE"));
+    assert!(!normalized.to_xml().unwrap().contains("RATE_TYPE"));
+    for ending in ["\n", "\r", "\r\n", "\n\r"] {
+        for token in ["NONE", "none"] {
+            let source = kvn.replace("RATE_TYPE = NONE", &format!("RATE_TYPE = {token}"));
+            assert_eq!(
+                Acm::from_kvn(&source.replace('\n', ending)).unwrap(),
+                original
+            );
+        }
+    }
+    assert_eq!(
+        Acm::from_kvn(&mutated(&kvn, "RATE_TYPE = NONE", "RATE_TYPE = none")).unwrap(),
+        original
+    );
+    for token in ["UNKNOWN", "None", "N/A"] {
+        assert!(Acm::from_kvn(&mutated(
+            &kvn,
+            "RATE_TYPE = NONE",
+            &format!("RATE_TYPE = {token}")
+        ))
+        .is_err());
+    }
+    let extra_rate_column = mutated(
+        &kvn,
+        "0.0 0.73566 -0.50547 0.41309 0.180707",
+        "0.0 0.73566 -0.50547 0.41309 0.180707 0.1",
+    );
+    assert!(Acm::from_kvn(&extra_rate_column).is_err());
+    let xml = mutated(
+        &original.to_xml().unwrap(),
+        "</ATT_TYPE>",
+        "</ATT_TYPE><RATE_TYPE>NONE</RATE_TYPE>",
+    );
+    assert!(Acm::from_xml(&xml).is_err());
 }

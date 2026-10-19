@@ -7,6 +7,54 @@ use ccsds_ndm::types::{
     NonNegativeDouble, Percentage, PercentageRequired, PositionUnits, PositiveInteger, Probability,
 };
 use ccsds_ndm::{Ndm, Validate};
+
+#[test]
+fn rdm_kvn_rounds_scalars_to_sixteen_digits_and_xml_retains_precision() {
+    let mut message = Rdm::from_kvn(KVN).unwrap();
+    let value = 0.300_000_000_000_000_04;
+    message.body.segment.metadata.drag_parameters_altitude =
+        Some(Distance::new(value, Some(PositionUnits::Km)));
+    message
+        .body
+        .segment
+        .data
+        .spacecraft_parameters
+        .as_mut()
+        .unwrap()
+        .drag_coeff = Some(NonNegativeDouble { value });
+    message
+        .body
+        .segment
+        .data
+        .atmospheric_reentry_parameters
+        .orbit_lifetime
+        .value = value;
+    let xml = message.to_xml().unwrap();
+    assert_eq!(Rdm::from_xml(&xml).unwrap(), message);
+    validate_xml("RDM full-precision doubles", &xml);
+
+    let kvn = message.to_kvn().unwrap();
+    for field in ["DRAG_PARAMETERS_ALTITUDE", "DRAG_COEFF", "ORBIT_LIFETIME"] {
+        let line = kvn.lines().find(|line| line.starts_with(field)).unwrap();
+        assert!(line.contains("3.0e-1"), "{line}");
+        assert!(!line.contains("30000000000000004"), "{line}");
+    }
+    let reparsed = Rdm::from_kvn(&kvn).unwrap();
+    assert_eq!(
+        reparsed
+            .body
+            .segment
+            .metadata
+            .drag_parameters_altitude
+            .unwrap()
+            .value,
+        0.3
+    );
+    let mut streamed = Vec::new();
+    message.write_kvn_to(&mut streamed).unwrap();
+    assert_eq!(streamed, kvn.as_bytes());
+}
+
 #[test]
 fn rdm_kvn_preserves_each_logical_blocks_comments() {
     let mut message = Rdm::from_xml(XML).unwrap();
@@ -744,16 +792,8 @@ NEXT_MESSAGE_EPOCH = 2023-01-08T00:00:00
 ORBIT_LIFETIME = 10 [d]
 REENTRY_ALTITUDE = 120 [km]
 "#;
-    let mut rdm = Rdm::from_kvn(kvn).unwrap();
+    let rdm = Rdm::from_kvn(kvn).unwrap();
     let kvn2 = rdm.to_kvn().unwrap();
-    // KVN emits this altitude in its mandated kilometers without the optional unit label.
-    rdm.body
-        .segment
-        .metadata
-        .drag_parameters_altitude
-        .as_mut()
-        .unwrap()
-        .units = None;
     assert_eq!(Rdm::from_kvn(&kvn2).unwrap(), rdm);
 }
 

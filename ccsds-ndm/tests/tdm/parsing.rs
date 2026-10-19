@@ -103,7 +103,7 @@ DATA_STOP
     let tdm = Tdm::from_kvn(kvn).unwrap();
     let seg = &tdm.body.segments[0];
     match &seg.data.observations[0].data {
-        TdmObservationData::TransmitPhaseCt1(s) => assert_eq!(*s, 7175173383.615373),
+        TdmObservationData::TransmitPhaseCt1(s) => assert_eq!(s, "7175173383.615373"),
         _ => panic!("Wrong type"),
     }
 }
@@ -637,13 +637,13 @@ DATA_STOP
     let tdm = Tdm::from_kvn(kvn).unwrap();
     match &tdm.body.segments[0].data.observations[0].data {
         TdmObservationData::TransmitPhaseCt1(s) => {
-            assert_eq!(*s, 7175173383.615373);
+            assert_eq!(s, "7175173383.615373");
         }
         _ => panic!("Wrong type"),
     }
     match &tdm.body.segments[0].data.observations[1].data {
         TdmObservationData::ReceivePhaseCt1(s) => {
-            assert_eq!(*s, 8429753135.986102);
+            assert_eq!(s, "8429753135.986102");
         }
         _ => panic!("Wrong type"),
     }

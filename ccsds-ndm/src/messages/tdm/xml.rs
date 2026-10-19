@@ -82,9 +82,9 @@ impl<'de> Deserialize<'de> for TdmObservation {
                             data = Some(TdmObservationData::Rhumidity(map.next_value()?));
                         }
                         key => {
-                            let value: f64 = map.next_value()?;
+                            let value: String = map.next_value()?;
                             data = Some(
-                                TdmObservationData::from_key_value(key, value)
+                                TdmObservationData::from_key_val(key, &value)
                                     .map_err(serde::de::Error::custom)?,
                             );
                         }

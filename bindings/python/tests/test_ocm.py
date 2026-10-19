@@ -27,6 +27,28 @@ from ccsds_ndm import (
 )
 
 
+@pytest.mark.parametrize(
+    "stop, span, field",
+    [("-1", 1.0, "STOP_TIME"), ("3600", 99.0, "TIME_SPAN")],
+)
+def test_relative_metadata_edits_reach_validation_and_generation(stop, span, field):
+    message = TestOcm()._create_valid_ocm()
+    metadata = message.segment.metadata
+    metadata.start_time = "0"
+    metadata.stop_time = "3600"
+    metadata.time_span = 0.041667
+    message.validate()
+    for notation in ("kvn", "xml"):
+        Ocm.from_str(message.to_str(format=notation), format=notation)
+    metadata.stop_time = stop
+    metadata.time_span = span
+    with pytest.raises(NdmValidationError, match=field):
+        message.validate()
+    for notation in ("kvn", "xml"):
+        with pytest.raises(NdmValidationError, match=field):
+            message.to_str(format=notation)
+
+
 class TestOcm:
     """Tests for OCM bindings."""
 
@@ -60,6 +82,40 @@ class TestOcm:
 
         seg = OcmSegment(meta, data)
         return Ocm(header, seg)
+
+    @pytest.mark.parametrize("values", [["1", "extra"], [], ["child one"], [""]])
+    def test_maneuver_column_edits_are_rejected_before_generation(self, values):
+        message = self._create_valid_ocm()
+        maneuver = OcmManeuverParameters(
+            man_id="DEPLOY-1",
+            man_device_id="DEPLOYER",
+            man_ref_frame="EME2000",
+            man_composition="TIME_RELATIVE, DEPLOY_ID",
+            man_lines=[ManLine(epoch="0", values=["child"])],
+        )
+        message.segment.data.man = [maneuver]
+        message.validate()
+        maneuver.man_lines[0].values = values
+        with pytest.raises(NdmValidationError):
+            message.validate()
+        for notation in ("kvn", "xml"):
+            with pytest.raises(NdmValidationError):
+                message.to_str(format=notation)
+
+    def test_maneuver_signed_zero_normalizes_only_numeric_kvn_columns(self):
+        message = self._create_valid_ocm()
+        message.segment.data.man = [
+            OcmManeuverParameters(
+                man_id="DEPLOY-1",
+                man_device_id="DEPLOYER",
+                man_ref_frame="EME2000",
+                man_composition="TIME_RELATIVE, DEPLOY_ID, DEPLOY_MASS",
+                man_lines=[ManLine(epoch="0", values=["-0.0", "-0.0"])],
+            )
+        ]
+        for notation, expected in [("kvn", ["-0.0", "0.0"]), ("xml", ["-0.0", "-0.0"])]:
+            parsed = Ocm.from_str(message.to_str(format=notation), format=notation)
+            assert parsed.segment.data.man[0].man_lines[0].values == expected
 
     def test_roundtrip_kvn(self):
         try:
@@ -356,3 +412,67 @@ class TestOcm:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestOcmCorrigendum:
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "operator_url",
+            "operator_email",
+            "operator_phone",
+            "operator_automated_url",
+            "emergency_email",
+            "emergency_phone",
+            "emergency_availability",
+            "ssa_email",
+            "ssa_phone",
+            "owner_url",
+        ],
+    )
+    def test_contacts_survive_parse_and_edit(self, field):
+        message = TestOcm()._create_valid_ocm()
+        setattr(message.segment.metadata, field, "contact")
+        text = message.to_str(format="kvn")
+        parsed = Ocm.from_str(text)
+        assert getattr(parsed.segment.metadata, field) == "contact"
+        with pytest.raises(NdmValidationError, match=field.upper()):
+            parsed.to_str(format="xml")
+
+    def test_sequence_records_and_parameters_are_editable(self):
+        message = TestOcm()._create_valid_ocm()
+        sequence = ccsds_ndm.OcmUserDefinedParameter(
+            parameter="COMPOSITION_EVENTS",
+            value="EVENT, VALUE",
+            records=["1 12", "2 13"],
+        )
+        block = ccsds_ndm.OcmUserDefined(user_defined=[sequence])
+        message.segment.data.user = block
+        assert message.segment.data.user is block
+        assert block.user_defined[0] is sequence
+        sequence.records = ["1 14", "2 15"]
+        block.user_defined.append(
+            ccsds_ndm.OcmUserDefinedParameter(parameter="AFTER", value="scalar")
+        )
+        parsed = Ocm.from_str(message.to_str(format="kvn"))
+        assert parsed.segment.data.user.user_defined[0].records == ["1 14", "2 15"]
+        assert parsed.segment.data.user.user_defined[1].parameter == "AFTER"
+        with pytest.raises(NdmValidationError, match="USER_DEFINED_COMPOSITION"):
+            message.to_str(format="xml")
+
+    def test_covariance_links_use_live_setters(self):
+        message = TestOcm()._create_valid_ocm()
+        message.segment.data.traj[0].traj_id = "trajectory"
+        covariance = OcmCovarianceMatrix(
+            cov_ref_frame="GCRF",
+            cov_type="CARTP",
+            cov_ordering="LTM",
+            cov_lines=[CovLine(epoch="0", values=[1, 0, 1, 0, 0, 1])],
+            traj_id="trajectory",
+        )
+        message.segment.data.cov = [covariance]
+        parsed = Ocm.from_str(message.to_str(format="kvn"))
+        assert parsed.segment.data.cov[0].traj_id == "trajectory"
+        covariance.traj_id = "missing"
+        with pytest.raises(NdmValidationError, match="TRAJ_ID"):
+            message.validate()

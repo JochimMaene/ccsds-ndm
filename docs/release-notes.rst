@@ -4,6 +4,109 @@ Release notes
 Unreleased
 ----------
 
+Conformance review and compatibility changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ACM rejects duplicate attitude-history timestamps and non-increasing covariance
+  timestamps. KVN also refuses distinct timestamps that its numeric precision
+  would merge. OCM checks same-representation start/stop ordering and numeric
+  relative bounds against their declared span, allowing a documented rounding
+  tolerance. These checks also apply after model edits and before generation.
+- ACM KVN accepts the book's ``RATE_TYPE=NONE`` as an alias for omitted rates;
+  canonical output omits the keyword. XML still rejects ``NONE`` because the
+  bundled schema excludes that spelling. ACM also accepts all four book-defined
+  line terminators, including standalone carriage returns.
+- CDM miss distance and relative speed must be nonnegative, following their
+  book-defined norm meanings even though the schema uses unrestricted doubles.
+  Exact vector-norm equality is not enforced: the published example itself uses
+  scalar and vector values that do not agree exactly. This boundary is documented
+  alongside the remaining physical-validation limits.
+- Typed floating-point KVN fields now consistently use the existing CCSDS 16-digit
+  formatter, including shared model blocks and TDM metadata/observations.
+  TDM phase counts retain their exact decimal strings. CDM's exact-model gate
+  refuses rounding that would change a value; XML retains full double precision.
+  KVN writes floating-point signed zero as ``0.0`` while readers remain permissive.
+- OCM maneuver rows require exactly one token per declared column. Extra values
+  are rejected before output rather than silently dropped, and embedded whitespace
+  cannot change the column count. Numeric maneuver signed zero also writes as
+  ``0.0``; text identifiers and XML row spellings are retained.
+- The shared preservation contract now states numeric rounding, fixed-unit
+  normalization, comment-position merging, and streaming sink failure behavior
+  explicitly. ACM's relative-only history support and rate-type book/schema
+  conflict, CDM's physical-validation boundary, and the shared XML parser's
+  lexical limits are documented without adding API options.
+- Every current message family now uses the same verification criteria and
+  public workflow matrix. Family records cite the publication baseline,
+  requirements, decisions, notation limits, and regression evidence. The
+  former shared contract is replaced by a conformance index; validation policy
+  lives in the existing validation contract.
+- OPM, APM, AEM, TDM, and ACM 1.0 input is rejected. Earlier acceptance reused
+  newer-format grammars and did not establish those editions' requirements;
+  ACM was introduced in ADM issue 2. OEM 1.0 keeps its explicitly restricted
+  KVN reader, now checking increasing epochs and nonoverlapping segment spans.
+- CDM metadata requires explicit ``covariance_method`` and ``maneuverable``;
+  omitted values no longer imply calculated covariance or maneuver capability.
+  Both objects must use the same frame and appear in OBJECT1/OBJECT2 order;
+  the five restricted identifier fields enforce CDM section 5.2.9.
+- OMM's inherent Rust validator now delegates to the complete root validator,
+  closing an edition-check bypass in validation and KVN/TLE generation.
+- APM root validation reaches all attitude blocks and maneuvers. ACM validates
+  history widths against declared attitude/rate/covariance types, conditional
+  Euler sequences, sensor noise counts, and edited numeric values. APM, AEM,
+  and quaternion ACM histories share the documented quaternion magnitude gate.
+- TDM phase counts preserve exact decimal strings through parsing, construction,
+  generation and conversion. Python observation ``value`` returns ``str`` for
+  phase counts and ``float`` otherwise; pass text when constructing an exact
+  count. Rust phase-count variants hold ``String`` and ``value()`` returns
+  ``Option<f64>`` (``None`` for phase counts); ``value_to_string()`` works for
+  either representation. ``ANGLE_TYPE`` and ``REFERENCE_FRAME`` retain book-valid
+  ICD/registry values in KVN and refuse values outside the XML enumeration at
+  XML boundaries. ``DATA_TYPES`` validates the declared observation keywords.
+- Generated Python annotations describe enum/string inputs and standalone
+  combined constituents precisely. Generic Rust ``Message`` now implements
+  ``Validate``. Installed wheel and source-distribution checks run the same
+  Python behavioral suite as the checkout.
+
+Python API consistency
+~~~~~~~~~~~~~~~~~~~~~~
+
+- CDM ``relative_state_vector`` is now a live child object. Nested edits and
+  assigned child references reach validation and generation, as in the other
+  model blocks. Assigning ``state_vector_numpy`` preserves the state's comments.
+- ``CdmData.from_numpy`` retains supplied ``od_parameters`` and
+  ``additional_parameters`` objects, matching the regular constructor's live
+  reference behavior.
+- Quaternion constructors reject incomplete derivative groups, and CDM relative
+  metadata constructors reject position without velocity or velocity without
+  position. These inputs now raise ``ValueError`` instead of silently losing
+  the supplied values.
+- Optional arguments can be omitted from ``AdditionalParameters``,
+  ``QuaternionState``, ``EulerAngleState``, ``AngVelState``, ``SpinState``, and
+  ``InertiaState`` constructors.
+- All NDM exception classes expose diagnostic fields, with ``None`` when context
+  is unavailable. Generated type annotations include these fields on the base
+  exception classes, and subclasses inherit them. Wrong-family parsing errors
+  identify the parse operation, expected family, and explicitly selected notation.
+- The generated type annotations for generic ``from_str`` and ``from_file``
+  return the union of supported message classes instead of ``Any``.
+
+OCM current standard and numerical validation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- OCM supports the June 2026 ODM technical corrigendum's contact metadata,
+  covariance-to-trajectory identifiers, and ICD-defined user sequences in KVN.
+  XML generation refuses these additions because NDM/XML 4.0.0 cannot express
+  them; streaming output fails before emitting bytes.
+- ``OcmData.user`` now uses ``OcmUserDefined`` with an ordered live list of
+  ``OcmUserDefinedParameter`` objects. Sequence compositions retain their raw
+  ``records``; ordinary message families keep the shared ``UserDefined`` type.
+- Known OCM trajectory and covariance compositions enforce record dimensions
+  and units. Covariance matrices enforce positive definiteness and their
+  declared ordering, including covariance/correlation consistency. Malformed
+  records that previously passed validation are now rejected.
+- Published G15 and G19 examples are retained as negative fixtures; annotated
+  positive adaptations correct G15's composition and G19's covariance linkage.
+
 OEM producer compatibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -14,7 +117,9 @@ OEM producer compatibility
   KVN readers accept comments between metadata assignments and unique header
   and metadata assignments in any order; duplicate keywords and a version line
   anywhere but first remain errors. OEM XML accepts unique header and metadata
-  children in any order. OEM 1.0 accepts mixed-case book-listed text values.
+  children in any order. XML comments must still form one contiguous group per
+  header or metadata block; separated groups remain unsupported. OEM 1.0 accepts
+  mixed-case book-listed text values.
 - The shared XML reader accepts equivalent UTF-8 XML 1.0 declarations and
   omission of an unused schema-instance namespace. Used prefixes still need
   valid declarations; generated XML keeps the standard declaration and namespaces.
@@ -116,7 +221,7 @@ OEM review follow-up:
   values) are documented. Every shipped OEM example is checked as 2.0. ODM 5.2.4.7 (enough
   records for the interpolation method) is recorded as a requirement the book
   leaves undefined rather than a conformance gap.
-- OEM 1.0 is parse-only, like OPM 1.0: it shares the 2.0 model and
+- OEM 1.0 retains restricted input-only compatibility: it uses the shared model and
   cannot be written. XML is rejected for 1.0, a KVN-only format, and so is
   content that 502.0-B-1 does not have (``CLASSIFICATION``, ``MESSAGE_ID``,
   ``REF_FRAME_EPOCH``, accelerations, covariance). Some valid 1.0 files are

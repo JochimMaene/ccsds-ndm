@@ -2,6 +2,31 @@ use crate::common::{assert_rejects, validate_xml};
 use crate::SPIN_KVN;
 use ccsds_ndm::messages::apm::Apm;
 use ccsds_ndm::Ndm;
+
+#[test]
+fn apm_shared_measures_use_kvn_precision_without_changing_xml() {
+    let mut message = Apm::from_kvn(SPIN_KVN).unwrap();
+    message.body.segment.data.spin[0].spin_angle_vel.value = 0.300_000_000_000_000_04;
+    let xml = message.to_xml().unwrap();
+    assert_eq!(Apm::from_xml(&xml).unwrap(), message);
+    validate_xml("APM full-precision double", &xml);
+    let kvn = message.to_kvn().unwrap();
+    assert_eq!(
+        Apm::from_kvn(&kvn).unwrap().body.segment.data.spin[0]
+            .spin_angle_vel
+            .value,
+        0.3
+    );
+
+    message.body.segment.data.spin[0].spin_angle_vel.value = f64::MAX;
+    ccsds_ndm::Validate::validate(&message).unwrap();
+    assert_eq!(Apm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    assert!(message.to_kvn().is_err());
+    let mut output = Vec::new();
+    assert!(message.write_kvn_to(&mut output).is_err());
+    assert!(output.is_empty());
+}
+
 #[test]
 fn apm_spin_revalidates_edited_numeric_values() {
     let base = Apm::from_kvn(SPIN_KVN).unwrap();

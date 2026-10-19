@@ -207,6 +207,10 @@ impl OdmFloat {
     }
 
     fn write_finite<W: FmtWrite>(value: f64, output: &mut W) -> std::fmt::Result {
+        // Books exclude negative zero; readers retain it, while KVN uses the same zero value.
+        if value == 0.0 {
+            return output.write_str("0.0");
+        }
         let mut buffer = zmij::Buffer::new();
         let shortest = buffer.format_finite(value);
         // The overwhelmingly common case already satisfies the ODM lexical constraints. Avoid
@@ -323,7 +327,12 @@ impl<'a> KvnWriter<'a> {
         let _ = OdmFloat(value).write_to(line);
     }
 
-    fn build_tdm_observation<E: Display>(line: &mut String, key: &str, epoch: &E, value: f64) {
+    fn build_tdm_observation<E: Display, V: Display>(
+        line: &mut String,
+        key: &str,
+        epoch: &E,
+        value: V,
+    ) {
         line.push_str(key);
         line.extend(std::iter::repeat_n(' ', 20usize.saturating_sub(key.len())));
         let _ = write!(line, " = {epoch} {value}");
@@ -430,18 +439,9 @@ impl<'a> KvnWriter<'a> {
         self.line_buffer = line;
     }
 
-    /// Writes `KEY = value [unit]`.
-    /// Falls back to `write_pair` if no unit is provided.
-    pub fn write_measure<V: Display, U: Display>(&mut self, key: &str, measure: &UnitValue<V, U>) {
-        if let Some(ref u) = measure.units {
-            let _ = writeln!(self, "{:<20} = {} [{}]", key, measure.value, u);
-        } else {
-            self.write_pair(key, &measure.value);
-        }
-    }
-
     /// Writes a CCSDS-compatible ODM number without allocating a value string.
     pub(crate) fn write_odm_float_pair(&mut self, key: &str, value: f64) {
+        self.unrepresentable_number |= !OdmFloat::is_valid(value);
         self.write_built_line(|line| Self::build_odm_float_pair(line, key, value));
     }
 
@@ -451,6 +451,7 @@ impl<'a> KvnWriter<'a> {
         key: &str,
         measure: &UnitValue<f64, U>,
     ) {
+        self.unrepresentable_number |= !OdmFloat::is_valid(measure.value);
         let build = |line: &mut String| {
             Self::build_odm_float_pair(line, key, measure.value);
             if let Some(unit) = &measure.units {
@@ -463,12 +464,31 @@ impl<'a> KvnWriter<'a> {
     }
 
     /// Writes one TDM observation without allocating intermediate epoch/value strings.
-    pub(crate) fn write_tdm_observation<E: Display>(&mut self, key: &str, epoch: &E, value: f64) {
+    pub(crate) fn write_tdm_observation<E: Display, V: Display>(
+        &mut self,
+        key: &str,
+        epoch: &E,
+        value: V,
+    ) {
         self.write_built_line(|line| Self::build_tdm_observation(line, key, epoch, value));
+    }
+
+    /// Write an ordinary TDM number; exact phase-count strings use `write_tdm_observation`.
+    pub(crate) fn write_tdm_numeric_observation<E: Display>(
+        &mut self,
+        key: &str,
+        epoch: &E,
+        value: f64,
+    ) {
+        self.unrepresentable_number |= !OdmFloat::is_valid(value);
+        self.write_built_line(|line| {
+            Self::build_tdm_observation(line, key, epoch, OdmFloat(value))
+        });
     }
 
     /// Writes an OCM numeric history record without per-value or per-record temporary strings.
     pub(crate) fn write_ocm_numeric_history<E: Display>(&mut self, epoch: &E, values: &[f64]) {
+        self.unrepresentable_number |= values.iter().any(|value| !OdmFloat::is_valid(*value));
         let build = |line: &mut String| {
             let _ = write!(line, "{epoch}");
             for value in values {
@@ -494,6 +514,7 @@ impl<'a> KvnWriter<'a> {
 
     /// Write a numeric history record without allocating intermediate value strings.
     pub(crate) fn write_numeric_record(&mut self, values: &[f64]) {
+        self.unrepresentable_number |= values.iter().any(|value| !OdmFloat::is_valid(*value));
         let build = |line: &mut String| {
             for (index, value) in values.iter().enumerate() {
                 if index > 0 {
@@ -512,6 +533,7 @@ impl<'a> KvnWriter<'a> {
         values: &[f64],
         unit: Option<&U>,
     ) {
+        self.unrepresentable_number |= values.iter().any(|value| !OdmFloat::is_valid(*value));
         let build = |line: &mut String| {
             let _ = write!(line, "{key:<20} = ");
             for (index, value) in values.iter().enumerate() {
@@ -527,16 +549,48 @@ impl<'a> KvnWriter<'a> {
         self.write_built_line(build);
     }
 
-    /// Writes an OCM maneuver history record without joining or formatting temporary strings.
-    pub(crate) fn write_ocm_text_history<E: Display>(&mut self, epoch: &E, values: &[String]) {
-        for value in values {
+    /// Preserve maneuver text columns and numeric spellings that fit; round excess numeric digits.
+    pub(crate) fn write_ocm_text_history<E: Display>(
+        &mut self,
+        epoch: &E,
+        values: &[String],
+        numeric_columns: &[bool],
+    ) {
+        for (value, numeric) in values.iter().zip(numeric_columns) {
             self.check_text(value);
+            if *numeric {
+                self.unrepresentable_number |= value.trim().parse::<f64>().map_or(true, |number| {
+                    !OdmFloat::is_valid(number)
+                        || (number == 0.0
+                            && value
+                                .split(['e', 'E'])
+                                .next()
+                                .unwrap_or("")
+                                .bytes()
+                                .any(|byte| matches!(byte, b'1'..=b'9')))
+                });
+            }
         }
         let build = |line: &mut String| {
             let _ = write!(line, "{epoch}");
-            for value in values {
+            for (value, numeric) in values.iter().zip(numeric_columns) {
                 line.push(' ');
-                line.push_str(value);
+                let digits = value
+                    .split(['e', 'E'])
+                    .next()
+                    .unwrap_or("")
+                    .bytes()
+                    .filter(u8::is_ascii_digit)
+                    .count();
+                let negative_zero =
+                    *numeric && value.starts_with('-') && value.parse::<f64>() == Ok(0.0);
+                if *numeric && (digits > 16 || negative_zero) {
+                    if let Ok(number) = value.trim().parse::<f64>() {
+                        let _ = OdmFloat(number).write_to(line);
+                    }
+                } else {
+                    line.push_str(value);
+                }
             }
         };
         self.write_built_line(build);
@@ -672,7 +726,7 @@ mod tests {
     #[test]
     fn lexical_barrier_checks_units_written_without_write_pair() {
         let mut writer = KvnWriter::new();
-        writer.write_measure("X", &crate::types::UnitValue::new(1.0, Some("km\u{1}")));
+        writer.write_odm_float_measure("X", &crate::types::UnitValue::new(1.0, Some("km\u{1}")));
         assert!(writer.finish_checked().is_err());
     }
 
@@ -683,6 +737,13 @@ mod tests {
             let spelling = OdmFloat(value).to_string();
             assert!(spelling.contains('.'));
             assert!(OdmFloat::significant_digits(&spelling) <= 16);
+        }
+    }
+
+    #[test]
+    fn kvn_normalizes_signed_zero_without_changing_its_numeric_value() {
+        for value in [0.0, -0.0] {
+            assert_eq!(OdmFloat(value).to_string(), "0.0");
         }
     }
 

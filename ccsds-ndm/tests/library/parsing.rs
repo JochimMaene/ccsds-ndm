@@ -8,7 +8,7 @@ use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::{from_str, Ndm};
 
 #[test]
-fn legacy_adm_and_tdm_editions_remain_parse_only() {
+fn unaudited_adm_and_tdm_editions_are_not_advertised_as_supported() {
     let cases = [
         ("AEM", include_str!("../../data/kvn/aem_g4.kvn")),
         ("APM", include_str!("../../data/kvn/apm_g1.kvn")),
@@ -27,18 +27,18 @@ fn legacy_adm_and_tdm_editions_remain_parse_only() {
         ];
 
         for legacy in legacy_inputs {
-            let message = from_str(&legacy)
-                .unwrap_or_else(|error| panic!("{message_type} 1.0 should parse: {error}"));
-            assert_eq!(message.kind().as_str(), message_type);
-
-            for error in [message.to_kvn().unwrap_err(), message.to_xml().unwrap_err()] {
-                assert_eq!(
-                    error.code(),
-                    Some("generation.unsupported_output_version"),
-                    "{message_type} returned the wrong error: {error}"
-                );
-            }
+            let error = from_str(&legacy).unwrap_err();
+            assert!(error.to_string().contains("1.0"), "{message_type}: {error}");
+            assert!(
+                error.to_string().contains("Unsupported"),
+                "{message_type}: {error}"
+            );
         }
+        let kind = from_str(input).unwrap().kind();
+        assert_eq!(
+            ccsds_ndm::versioning::supported_input_versions(kind),
+            Some(&["2.0"][..])
+        );
     }
 }
 
@@ -142,8 +142,8 @@ fn supported_editions_separate_input_from_output() {
         );
     }
 
-    // OPM 1.0 is readable but was withdrawn as an output edition.
-    assert!(supported_input_versions(MessageKind::Opm)
+    // OPM 1.0 is not advertised without an edition-specific implementation.
+    assert!(!supported_input_versions(MessageKind::Opm)
         .unwrap()
         .contains(&"1.0"));
     assert!(!supported_output_versions(MessageKind::Opm)

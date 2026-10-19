@@ -154,7 +154,7 @@ fn parse_att_block(input: &mut &str) -> KvnResult<AcmAttitudeState> {
         "REF_FRAME_B" => val: kv_string => { ref_frame_b = Some(val); },
         "NUMBER_STATES" => val: kv_u32 => { number_states = Some(val); },
         "ATT_TYPE" => val: kv_enum => { att_type = Some(val); },
-        "RATE_TYPE" => val: kv_enum => { rate_type = Some(val); },
+        "RATE_TYPE" => val: kv_att_rate => { rate_type = val; },
         "EULER_ROT_SEQ" => val: kv_enum => { euler_rot_seq = Some(val); },
     }, |i: &mut &str| matches!(i.trim_start().chars().next(), Some('0'..='9' | '-' | '+')) || at_block_end("ATT", i));
 
@@ -185,6 +185,20 @@ fn parse_att_block(input: &mut &str) -> KvnResult<AcmAttitudeState> {
         euler_rot_seq,
         att_lines,
     })
+}
+
+fn kv_att_rate(input: &mut &str) -> KvnResult<Option<crate::types::AttRateType>> {
+    // ADM table 5-4 permits NONE; the XML enum represents no rates by omission.
+    if input
+        .split(['\r', '\n'])
+        .next()
+        .is_some_and(|line| matches!(line.trim(), "NONE" | "none"))
+    {
+        kv_string(input)?;
+        Ok(None)
+    } else {
+        kv_enum(input).map(Some)
+    }
 }
 
 fn parse_phys_block(input: &mut &str) -> KvnResult<AcmPhysicalDescription> {
@@ -1334,6 +1348,16 @@ impl Acm {
         }
 
         let data = &self.body.segment.data;
+        let mut time_spelling = String::with_capacity(32);
+        let mut rounded_time = |time: f64| {
+            time_spelling.clear();
+            let represented = crate::kvn::ser::OdmFloat::write_if_valid(time, &mut time_spelling);
+            debug_assert!(
+                represented,
+                "history numbers were checked before time comparison"
+            );
+            time_spelling.parse::<f64>().expect("valid CCSDS number")
+        };
         for attitude in &data.att {
             for value in attitude.comment.iter().chain(
                 [
@@ -1351,6 +1375,7 @@ impl Acm {
             for line in &attitude.att_lines {
                 check_values(&line.values)?;
             }
+            attitude.validate_time_tags(&mut rounded_time)?;
         }
         if let Some(physical) = &data.phys {
             for value in physical.comment.iter().chain(
@@ -1398,6 +1423,23 @@ impl Acm {
             }
             for line in &covariance.cov_lines {
                 check_values(&line.values)?;
+            }
+            let mut previous = None;
+            for (index, line) in covariance.cov_lines.iter().enumerate() {
+                let time = rounded_time(line.values[0]);
+                if previous.is_some_and(|previous| previous >= time) {
+                    return Err(ValidationError::InvalidValue {
+                        field: "covLine time".into(),
+                        value: line.values[0].to_string(),
+                        expected:
+                            "distinct, increasing covariance time tags after KVN 16-digit rounding"
+                                .into(),
+                        line: None,
+                    }
+                    .at_path(format!("cov_lines[{index}].time"))
+                    .into());
+                }
+                previous = Some(time);
             }
         }
         for maneuver in &data.man {

@@ -459,12 +459,14 @@ impl RdmMetadata {
         object_name: String,
         international_designator: String,
         epoch_tzero: String,
+        #[gen_stub(override_type(type_repr = "ControlledType | builtins.str | None", imports = ("builtins")))]
         controlled_reentry: Option<Bound<'_, PyAny>>,
         center_name: String,
         time_system: String,
 
         catalog_name: Option<String>,
         object_designator: Option<String>,
+        #[gen_stub(override_type(type_repr = "ObjectDescription | builtins.str | None", imports = ("builtins")))]
         object_type: Option<Bound<'_, PyAny>>,
         object_owner: Option<String>,
         object_operator: Option<String>,

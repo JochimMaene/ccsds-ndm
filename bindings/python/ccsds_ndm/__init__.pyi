@@ -73,6 +73,8 @@ __all__ = [
     "OcmPhysicalDescription",
     "OcmSegment",
     "OcmTrajState",
+    "OcmUserDefined",
+    "OcmUserDefinedParameter",
     "OdParameters",
     "OdmHeader",
     "Oem",
@@ -1641,15 +1643,15 @@ class AdditionalParameters:
     def sedr(self, value: typing.Optional[builtins.float]) -> None: ...
     def __new__(
         cls,
-        area_pc: typing.Optional[builtins.float],
-        area_drg: typing.Optional[builtins.float],
-        area_srp: typing.Optional[builtins.float],
-        mass: typing.Optional[builtins.float],
-        cd_area_over_mass: typing.Optional[builtins.float],
-        cr_area_over_mass: typing.Optional[builtins.float],
-        thrust_acceleration: typing.Optional[builtins.float],
-        sedr: typing.Optional[builtins.float],
-        comment: typing.Sequence[builtins.str],
+        area_pc: typing.Optional[builtins.float] = None,
+        area_drg: typing.Optional[builtins.float] = None,
+        area_srp: typing.Optional[builtins.float] = None,
+        mass: typing.Optional[builtins.float] = None,
+        cd_area_over_mass: typing.Optional[builtins.float] = None,
+        cr_area_over_mass: typing.Optional[builtins.float] = None,
+        thrust_acceleration: typing.Optional[builtins.float] = None,
+        sedr: typing.Optional[builtins.float] = None,
+        comment: typing.Sequence[builtins.str] = [],
     ) -> AdditionalParameters: ...
 
 @typing.final
@@ -2323,7 +2325,7 @@ class AngVelState:
         angvel_x: builtins.float,
         angvel_y: builtins.float,
         angvel_z: builtins.float,
-        comment: typing.Optional[typing.Sequence[builtins.str]],
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> AngVelState: ...
 
 @typing.final
@@ -3846,6 +3848,8 @@ class CdmData:
         r"""
         State vector as a NumPy array (convenience method).
 
+        The array is a copy. Assigning it back updates numeric values and preserves comments.
+
         Returns:
             numpy.ndarray: 1D array of shape (6,) containing [X, Y, Z, X_DOT, Y_DOT, Z_DOT].
             Units: [km, km, km, km/s, km/s, km/s]
@@ -4347,16 +4351,16 @@ class CdmMetadata:
     def intrack_thrust(self, value: typing.Optional[builtins.bool]) -> None: ...
     def __new__(
         cls,
-        object: typing.Any,
+        object: CdmObjectType | builtins.str,
         object_designator: builtins.str,
         catalog_name: builtins.str,
         object_name: builtins.str,
         international_designator: builtins.str,
-        ref_frame: typing.Any,
+        ref_frame: ReferenceFrameType | builtins.str,
+        covariance_method: CovarianceMethodType | builtins.str,
+        maneuverable: ManeuverableType | builtins.str,
         ephemeris_name: builtins.str = "NONE",
-        covariance_method: typing.Optional[typing.Any] = None,
-        maneuverable: typing.Optional[typing.Any] = None,
-        object_type: typing.Optional[typing.Any] = None,
+        object_type: ObjectDescription | builtins.str | None = None,
         operator_contact_position: typing.Optional[builtins.str] = None,
         operator_organization: typing.Optional[builtins.str] = None,
         operator_phone: typing.Optional[builtins.str] = None,
@@ -4369,7 +4373,11 @@ class CdmMetadata:
         earth_tides: typing.Optional[builtins.bool] = None,
         intrack_thrust: typing.Optional[builtins.bool] = None,
         comment: typing.Sequence[builtins.str] = [],
-    ) -> CdmMetadata: ...
+    ) -> CdmMetadata:
+        r"""
+        Construct metadata with explicit covariance provenance and maneuverability.
+        Neither required operational fact is inferred from other arguments.
+        """
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
@@ -4566,19 +4574,24 @@ class CombinedNdm:
     @property
     def messages(
         self,
-    ) -> list[
-        typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]
-    ]:
+    ) -> list[typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm]]:
         r"""
         List of contained navigation messages.
 
-        :type: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]]
+        :type: list[Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm]]
         """
     @messages.setter
-    def messages(self, value: typing.Sequence[typing.Any]) -> None: ...
+    def messages(
+        self,
+        value: typing.Sequence[
+            typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm]
+        ],
+    ) -> None: ...
     def __new__(
         cls,
-        messages: typing.Sequence[typing.Any],
+        messages: typing.Sequence[
+            typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm]
+        ],
         id: typing.Optional[builtins.str] = None,
         comments: typing.Sequence[builtins.str] = [],
     ) -> CombinedNdm: ...
@@ -4802,10 +4815,10 @@ class EulerAngleState:
         angle_1: builtins.float,
         angle_2: builtins.float,
         angle_3: builtins.float,
-        angle_1_dot: typing.Optional[builtins.float],
-        angle_2_dot: typing.Optional[builtins.float],
-        angle_3_dot: typing.Optional[builtins.float],
-        comment: typing.Optional[typing.Sequence[builtins.str]],
+        angle_1_dot: typing.Optional[builtins.float] = None,
+        angle_2_dot: typing.Optional[builtins.float] = None,
+        angle_3_dot: typing.Optional[builtins.float] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> EulerAngleState: ...
 
 @typing.final
@@ -5458,7 +5471,7 @@ class InertiaState:
         ixy: builtins.float,
         ixz: builtins.float,
         iyz: builtins.float,
-        comment: typing.Optional[typing.Sequence[builtins.str]],
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> InertiaState: ...
 
 @typing.final
@@ -5865,28 +5878,72 @@ class NdmEpochError(builtins.ValueError):
     Error parsing a CCSDS epoch string.
     """
 
-    ...
+    operation: typing.Optional[builtins.str]
+    notation: typing.Optional[builtins.str]
+    message_kind: typing.Optional[builtins.str]
+    source_edition: typing.Optional[builtins.str]
+    code: typing.Optional[builtins.str]
+    field_path: typing.Optional[builtins.str]
+    line: typing.Optional[builtins.int]
+    column: typing.Optional[builtins.int]
+    byte_offset: typing.Optional[builtins.int]
+    original_token: typing.Optional[builtins.str]
+    expected: typing.Optional[builtins.str]
+    requirement: typing.Optional[builtins.str]
 
 class NdmError(builtins.Exception):
     r"""
     Generic CCSDS NDM error.
     """
 
-    ...
+    operation: typing.Optional[builtins.str]
+    notation: typing.Optional[builtins.str]
+    message_kind: typing.Optional[builtins.str]
+    source_edition: typing.Optional[builtins.str]
+    code: typing.Optional[builtins.str]
+    field_path: typing.Optional[builtins.str]
+    line: typing.Optional[builtins.int]
+    column: typing.Optional[builtins.int]
+    byte_offset: typing.Optional[builtins.int]
+    original_token: typing.Optional[builtins.str]
+    expected: typing.Optional[builtins.str]
+    requirement: typing.Optional[builtins.str]
 
 class NdmFormatError(builtins.ValueError):
     r"""
     Error during parsing of NDM data (KVN or XML).
     """
 
-    ...
+    operation: typing.Optional[builtins.str]
+    notation: typing.Optional[builtins.str]
+    message_kind: typing.Optional[builtins.str]
+    source_edition: typing.Optional[builtins.str]
+    code: typing.Optional[builtins.str]
+    field_path: typing.Optional[builtins.str]
+    line: typing.Optional[builtins.int]
+    column: typing.Optional[builtins.int]
+    byte_offset: typing.Optional[builtins.int]
+    original_token: typing.Optional[builtins.str]
+    expected: typing.Optional[builtins.str]
+    requirement: typing.Optional[builtins.str]
 
 class NdmIoError(builtins.OSError):
     r"""
     I/O error during file operations.
     """
 
-    ...
+    operation: typing.Optional[builtins.str]
+    notation: typing.Optional[builtins.str]
+    message_kind: typing.Optional[builtins.str]
+    source_edition: typing.Optional[builtins.str]
+    code: typing.Optional[builtins.str]
+    field_path: typing.Optional[builtins.str]
+    line: typing.Optional[builtins.int]
+    column: typing.Optional[builtins.int]
+    byte_offset: typing.Optional[builtins.int]
+    original_token: typing.Optional[builtins.str]
+    expected: typing.Optional[builtins.str]
+    requirement: typing.Optional[builtins.str]
 
 class NdmKvnParseError(NdmFormatError):
     r"""
@@ -6086,6 +6143,17 @@ class OcmCovarianceMatrix:
         Comments.
         (Optional)
     """
+    @property
+    def traj_id(self) -> typing.Optional[builtins.str]:
+        r"""
+        Corresponding trajectory identifier, required for multiple trajectory or covariance blocks.
+
+        CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.7.
+
+        :type: Optional[str]
+        """
+    @traj_id.setter
+    def traj_id(self, value: typing.Optional[builtins.str]) -> None: ...
     @property
     def cov_id(self) -> typing.Optional[builtins.str]:
         r"""
@@ -6321,6 +6389,7 @@ class OcmCovarianceMatrix:
         cov_type: builtins.str,
         cov_ordering: builtins.str,
         cov_lines: typing.Sequence[CovLine],
+        traj_id: typing.Optional[builtins.str] = None,
         cov_id: typing.Optional[builtins.str] = None,
         cov_prev_id: typing.Optional[builtins.str] = None,
         cov_next_id: typing.Optional[builtins.str] = None,
@@ -6399,14 +6468,14 @@ class OcmData:
     @od.setter
     def od(self, value: typing.Optional[OcmOdParameters]) -> None: ...
     @property
-    def user(self) -> typing.Optional[UserDefined]:
+    def user(self) -> typing.Optional[OcmUserDefined]:
         r"""
         User-defined parameters.
 
-        :type: UserDefined | None
+        :type: OcmUserDefined | None
         """
     @user.setter
-    def user(self, value: typing.Optional[UserDefined]) -> None: ...
+    def user(self, value: typing.Optional[OcmUserDefined]) -> None: ...
     def __new__(cls) -> OcmData: ...
     def __repr__(self) -> builtins.str: ...
 
@@ -7458,6 +7527,116 @@ class OcmMetadata:
     @tdm_msg_link.setter
     def tdm_msg_link(self, value: typing.Optional[builtins.str]) -> None: ...
     @property
+    def operator_url(self) -> typing.Optional[builtins.str]:
+        r"""
+        URL of the space object operator.
+
+        CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+
+        :type: Optional[str]
+        """
+    @operator_url.setter
+    def operator_url(self, value: typing.Optional[builtins.str]) -> None: ...
+    @property
+    def operator_email(self) -> typing.Optional[builtins.str]:
+        r"""
+        Operator email address for non-emergencies.
+
+        CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+
+        :type: Optional[str]
+        """
+    @operator_email.setter
+    def operator_email(self, value: typing.Optional[builtins.str]) -> None: ...
+    @property
+    def operator_phone(self) -> typing.Optional[builtins.str]:
+        r"""
+        Operator phone number for non-emergencies.
+
+        CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+
+        :type: Optional[str]
+        """
+    @operator_phone.setter
+    def operator_phone(self, value: typing.Optional[builtins.str]) -> None: ...
+    @property
+    def operator_automated_url(self) -> typing.Optional[builtins.str]:
+        r"""
+        URL of the operator automated coordination service.
+
+        CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+
+        :type: Optional[str]
+        """
+    @operator_automated_url.setter
+    def operator_automated_url(self, value: typing.Optional[builtins.str]) -> None: ...
+    @property
+    def emergency_email(self) -> typing.Optional[builtins.str]:
+        r"""
+        Email address for emergency coordination.
+
+        CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+
+        :type: Optional[str]
+        """
+    @emergency_email.setter
+    def emergency_email(self, value: typing.Optional[builtins.str]) -> None: ...
+    @property
+    def emergency_phone(self) -> typing.Optional[builtins.str]:
+        r"""
+        Phone number for emergency coordination.
+
+        CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+
+        :type: Optional[str]
+        """
+    @emergency_phone.setter
+    def emergency_phone(self, value: typing.Optional[builtins.str]) -> None: ...
+    @property
+    def emergency_availability(self) -> typing.Optional[builtins.str]:
+        r"""
+        Hours of availability of the emergency contact.
+
+        CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+
+        :type: Optional[str]
+        """
+    @emergency_availability.setter
+    def emergency_availability(self, value: typing.Optional[builtins.str]) -> None: ...
+    @property
+    def ssa_email(self) -> typing.Optional[builtins.str]:
+        r"""
+        Email address of the primary external SSA service provider.
+
+        CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+
+        :type: Optional[str]
+        """
+    @ssa_email.setter
+    def ssa_email(self, value: typing.Optional[builtins.str]) -> None: ...
+    @property
+    def ssa_phone(self) -> typing.Optional[builtins.str]:
+        r"""
+        Emergency phone number of the primary external SSA service provider.
+
+        CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+
+        :type: Optional[str]
+        """
+    @ssa_phone.setter
+    def ssa_phone(self, value: typing.Optional[builtins.str]) -> None: ...
+    @property
+    def owner_url(self) -> typing.Optional[builtins.str]:
+        r"""
+        URL of the space object owner.
+
+        CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+
+        :type: Optional[str]
+        """
+    @owner_url.setter
+    def owner_url(self, value: typing.Optional[builtins.str]) -> None: ...
+    @property
     def operator(self) -> typing.Optional[builtins.str]:
         r"""
         Free-text field containing the operator of the space object.
@@ -7798,10 +7977,20 @@ class OcmMetadata:
         rdm_msg_link: typing.Optional[builtins.str] = None,
         tdm_msg_link: typing.Optional[builtins.str] = None,
         operator: typing.Optional[builtins.str] = None,
+        operator_url: typing.Optional[builtins.str] = None,
+        operator_email: typing.Optional[builtins.str] = None,
+        operator_phone: typing.Optional[builtins.str] = None,
+        operator_automated_url: typing.Optional[builtins.str] = None,
+        emergency_email: typing.Optional[builtins.str] = None,
+        emergency_phone: typing.Optional[builtins.str] = None,
+        emergency_availability: typing.Optional[builtins.str] = None,
+        ssa_email: typing.Optional[builtins.str] = None,
+        ssa_phone: typing.Optional[builtins.str] = None,
+        owner_url: typing.Optional[builtins.str] = None,
         owner: typing.Optional[builtins.str] = None,
         country: typing.Optional[builtins.str] = None,
         constellation: typing.Optional[builtins.str] = None,
-        object_type: typing.Optional[typing.Any] = None,
+        object_type: ObjectDescription | builtins.str | None = None,
         ops_status: typing.Optional[builtins.str] = None,
         orbit_category: typing.Optional[builtins.str] = None,
         ocm_data_elements: typing.Optional[builtins.str] = None,
@@ -9972,6 +10161,80 @@ class OcmTrajState:
         Create a new OcmTrajState object.
         """
     def __repr__(self) -> builtins.str: ...
+
+@typing.final
+class OcmUserDefined:
+    r"""
+    Ordered OCM user-defined parameters and optional ICD-defined sequences.
+
+    CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.11.
+    """
+    @property
+    def comment(self) -> builtins.list[builtins.str]:
+        r"""
+        Leading comments.
+
+        :type: list[str]
+        """
+    @comment.setter
+    def comment(self, value: typing.Sequence[builtins.str]) -> None: ...
+    @property
+    def user_defined(self) -> list[OcmUserDefinedParameter]:
+        r"""
+        Live ordered list of scalar parameters and sequence compositions.
+
+        :type: list[OcmUserDefinedParameter]
+        """
+    @user_defined.setter
+    def user_defined(self, value: typing.Sequence[OcmUserDefinedParameter]) -> None: ...
+    def __new__(
+        cls,
+        *,
+        user_defined: typing.Optional[typing.Sequence[OcmUserDefinedParameter]] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
+    ) -> OcmUserDefined: ...
+
+@typing.final
+class OcmUserDefinedParameter:
+    r"""
+    OCM user-defined parameter or sequence composition with its opaque ICD-defined rows.
+
+    CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.11.
+    """
+    @property
+    def parameter(self) -> builtins.str:
+        r"""
+        Parameter name without ``USER_DEFINED_``.
+
+        :type: str
+        """
+    @parameter.setter
+    def parameter(self, value: builtins.str) -> None: ...
+    @property
+    def value(self) -> builtins.str:
+        r"""
+        Scalar value, or comma-delimited composition for COMPOSITION_<sequence ID>.
+
+        :type: str
+        """
+    @value.setter
+    def value(self, value: builtins.str) -> None: ...
+    @property
+    def records(self) -> builtins.list[builtins.str]:
+        r"""
+        Snapshot of opaque ICD-defined sequence rows; assign to write changes back.
+
+        :type: list[str]
+        """
+    @records.setter
+    def records(self, value: typing.Sequence[builtins.str]) -> None: ...
+    def __new__(
+        cls,
+        *,
+        parameter: builtins.str,
+        value: builtins.str,
+        records: typing.Optional[typing.Sequence[builtins.str]] = None,
+    ) -> OcmUserDefinedParameter: ...
 
 @typing.final
 class OdParameters:
@@ -12626,6 +12889,7 @@ class QuaternionState:
 
     All mandatory elements are to be provided if the block is present.
     (See annex F for conventions and further detail.)
+    The four quaternion derivative components must be supplied together or all omitted.
     """
     @property
     def q1(self) -> builtins.float:
@@ -12737,11 +13001,11 @@ class QuaternionState:
         q2: builtins.float,
         q3: builtins.float,
         qc: builtins.float,
-        q1_dot: typing.Optional[builtins.float],
-        q2_dot: typing.Optional[builtins.float],
-        q3_dot: typing.Optional[builtins.float],
-        qc_dot: typing.Optional[builtins.float],
-        comment: typing.Optional[typing.Sequence[builtins.str]],
+        q1_dot: typing.Optional[builtins.float] = None,
+        q2_dot: typing.Optional[builtins.float] = None,
+        q3_dot: typing.Optional[builtins.float] = None,
+        qc_dot: typing.Optional[builtins.float] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> QuaternionState: ...
 
 @typing.final
@@ -13529,12 +13793,12 @@ class RdmMetadata:
         object_name: builtins.str,
         international_designator: builtins.str,
         epoch_tzero: builtins.str,
-        controlled_reentry: typing.Optional[typing.Any] = None,
+        controlled_reentry: ControlledType | builtins.str | None = None,
         center_name: builtins.str,
         time_system: builtins.str,
         catalog_name: typing.Optional[builtins.str] = None,
         object_designator: typing.Optional[builtins.str] = None,
-        object_type: typing.Optional[typing.Any] = None,
+        object_type: ObjectDescription | builtins.str | None = None,
         object_owner: typing.Optional[builtins.str] = None,
         object_operator: typing.Optional[builtins.str] = None,
         ref_frame: typing.Optional[builtins.str] = None,
@@ -13773,8 +14037,10 @@ class RelativeMetadataData:
         The norm of the relative velocity vector at TCA. Units: m/s.
     relative_position : list of float, optional
         The [R, T, N] components of Object2's position relative to Object1. Units: m.
+        Must be supplied together with relative_velocity.
     relative_velocity : list of float, optional
         The [R, T, N] components of Object2's velocity relative to Object1. Units: m/s.
+        Must be supplied together with relative_position.
     start_screen_period : str, optional
         The start time in UTC of the screening period.
     stop_screen_period : str, optional
@@ -13973,6 +14239,8 @@ class RelativeMetadataData:
         r"""
         Relative state vector [R, T, N, VR, VT, VN] (combined position and velocity).
 
+        This is a live child: edits and assigned child references affect the parent.
+
         :type: Optional[RelativeStateVector]
         """
     @relative_state_vector.setter
@@ -14016,8 +14284,8 @@ class RelativeMetadataData:
         relative_velocity: typing.Optional[typing.Sequence[builtins.float]] = None,
         start_screen_period: typing.Optional[builtins.str] = None,
         stop_screen_period: typing.Optional[builtins.str] = None,
-        screen_volume_frame: typing.Optional[typing.Any] = None,
-        screen_volume_shape: typing.Optional[typing.Any] = None,
+        screen_volume_frame: ScreenVolumeFrameType | builtins.str | None = None,
+        screen_volume_shape: ScreenVolumeShapeType | builtins.str | None = None,
         screen_volume_x: typing.Optional[builtins.float] = None,
         screen_volume_y: typing.Optional[builtins.float] = None,
         screen_volume_z: typing.Optional[builtins.float] = None,
@@ -14435,13 +14703,13 @@ class SpinState:
         spin_delta: builtins.float,
         spin_angle: builtins.float,
         spin_angle_vel: builtins.float,
-        nutation: typing.Optional[builtins.float],
-        nutation_per: typing.Optional[builtins.float],
-        nutation_phase: typing.Optional[builtins.float],
-        momentum_alpha: typing.Optional[builtins.float],
-        momentum_delta: typing.Optional[builtins.float],
-        nutation_vel: typing.Optional[builtins.float],
-        comment: typing.Optional[typing.Sequence[builtins.str]],
+        nutation: typing.Optional[builtins.float] = None,
+        nutation_per: typing.Optional[builtins.float] = None,
+        nutation_phase: typing.Optional[builtins.float] = None,
+        momentum_alpha: typing.Optional[builtins.float] = None,
+        momentum_delta: typing.Optional[builtins.float] = None,
+        nutation_vel: typing.Optional[builtins.float] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> SpinState: ...
 
 @typing.final
@@ -15859,8 +16127,8 @@ class TdmMetadata:
         participant_3: typing.Optional[builtins.str] = None,
         participant_4: typing.Optional[builtins.str] = None,
         participant_5: typing.Optional[builtins.str] = None,
-        mode: typing.Optional[typing.Any] = None,
-        path: typing.Optional[typing.Any] = None,
+        mode: TdmMode | builtins.str | None = None,
+        path: TdmPath | builtins.str | None = None,
         path_1: typing.Optional[builtins.str] = None,
         path_2: typing.Optional[builtins.str] = None,
         transmit_band: typing.Optional[builtins.str] = None,
@@ -15902,7 +16170,7 @@ class TdmMetadata:
         correction_transmit: typing.Optional[builtins.float] = None,
         correction_aberration_yearly: typing.Optional[builtins.float] = None,
         correction_aberration_diurnal: typing.Optional[builtins.float] = None,
-        corrections_applied: typing.Optional[typing.Any] = None,
+        corrections_applied: YesNo | builtins.str | None = None,
         ephemeris_name_1: typing.Optional[builtins.str] = None,
         ephemeris_name_2: typing.Optional[builtins.str] = None,
         ephemeris_name_3: typing.Optional[builtins.str] = None,
@@ -15923,10 +16191,8 @@ class TdmObservation:
         Time associated with the tracking observable.
     keyword : str
         Data type keyword (e.g., "RANGE", "RECEIVE_FREQ").
-    value : float
-        Tracking observable value. Note: For phase counts that require full precision strings,
-        use internal representation handling (this constructor takes float for simplicity,
-        but the object can hold string representations internally).
+    value : float | str
+        Measurement value. Pass decimal text for phase counts to retain all digits.
     """
     @property
     def epoch(self) -> builtins.str:
@@ -15945,13 +16211,11 @@ class TdmObservation:
         :type: str
         """
     @property
-    def value(self) -> typing.Optional[builtins.float]:
+    def value(self) -> builtins.float | builtins.str:
         r"""
-        Measurement value as float.
+        Exact decimal text for phase counts, otherwise a numeric measurement.
 
-        Returns None if the value is not representable as a float (unlikely for TDM).
-
-        :type: Optional[float]
+        :type: float | str
         """
     @property
     def value_str(self) -> builtins.str:
@@ -15963,7 +16227,11 @@ class TdmObservation:
         :type: str
         """
     def __new__(
-        cls, *, epoch: builtins.str, keyword: builtins.str, value: builtins.float
+        cls,
+        *,
+        epoch: builtins.str,
+        keyword: builtins.str,
+        value: builtins.float | builtins.str,
     ) -> TdmObservation: ...
     def __repr__(self) -> builtins.str: ...
 
@@ -16412,7 +16680,7 @@ def convert_file(
 def from_file(
     path: builtins.str | os.PathLike[builtins.str],
     format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
-) -> typing.Any:
+) -> typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]:
     r"""
     Parse from a file path (KVN or XML).
 
@@ -16428,7 +16696,7 @@ def from_file(
 
 def from_str(
     data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
-) -> typing.Any:
+) -> typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]:
     r"""
     Parse a string containing KVN or XML.
 
@@ -16446,6 +16714,12 @@ def from_str(
 
     Raises
     ------
+    NdmFormatError
+        If the input is malformed.
+    NdmValidationError
+        If the message fails validation or uses an unsupported edition.
+    NdmUnsupportedMessageError
+        If the message family cannot be detected or is unsupported.
     ValueError
-        If the input is invalid or unsupported.
+        If the requested format is unsupported.
     """

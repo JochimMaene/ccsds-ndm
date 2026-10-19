@@ -4,9 +4,188 @@
 
 use crate::common::mutated;
 use ccsds_ndm::messages::ocm::Ocm;
-use ccsds_ndm::Ndm;
+use ccsds_ndm::{Ndm, Validate};
 
 const OCM_XML: &str = include_str!("../../data/xml/ocm_g20.xml");
+
+fn relative_metadata_message() -> Ocm {
+    let source = include_str!("../../data/kvn/ocm_g15.kvn").replace(
+        "META_STOP",
+        "START_TIME = 0\nSTOP_TIME = 86400\nTIME_SPAN = 1 [d]\nMETA_STOP",
+    );
+    Ocm::from_kvn(&source).unwrap()
+}
+
+#[test]
+fn relative_metadata_bounds_and_span_are_checked_in_all_routes() {
+    let valid = relative_metadata_message();
+    let kvn = valid.to_kvn().unwrap();
+    let xml = valid.to_xml().unwrap();
+    for (field, kvn_value, xml_value) in [("STOP_TIME", "-1", "-1"), ("TIME_SPAN", "99", "99")] {
+        let old = if field == "STOP_TIME" { "86400" } else { "1" };
+        let invalid_kvn = kvn
+            .lines()
+            .map(|line| {
+                if line.starts_with(field) {
+                    format!("{field} = {kvn_value}")
+                } else {
+                    line.to_owned()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let invalid_xml = xml.replace(
+            &format!(">{old}</{field}>"),
+            &format!(">{xml_value}</{field}>"),
+        );
+        assert_ne!(invalid_xml, xml);
+        crate::common::assert_validation_field(&Ocm::from_kvn(&invalid_kvn).unwrap_err(), field);
+        crate::common::assert_validation_field(&Ocm::from_xml(&invalid_xml).unwrap_err(), field);
+
+        let mut edited = valid.clone();
+        if field == "STOP_TIME" {
+            edited.body.segment.metadata.stop_time = Some("-1".parse().unwrap());
+        } else {
+            edited
+                .body
+                .segment
+                .metadata
+                .time_span
+                .as_mut()
+                .unwrap()
+                .value = 99.0;
+        }
+        crate::common::assert_rejects(&edited, field);
+    }
+
+    for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0] {
+        let mut edited = valid.clone();
+        edited
+            .body
+            .segment
+            .metadata
+            .time_span
+            .as_mut()
+            .unwrap()
+            .value = invalid;
+        crate::common::assert_rejects(&edited, "TIME_SPAN");
+    }
+}
+
+#[test]
+fn relative_metadata_span_allows_rounding_and_optional_or_external_context() {
+    let mut message = relative_metadata_message();
+    let metadata = &mut message.body.segment.metadata;
+    metadata.stop_time = Some("1".parse().unwrap());
+    metadata.time_span.as_mut().unwrap().value = 0.000_011_574_074;
+    message.validate().unwrap();
+    for output in [message.to_kvn().unwrap(), message.to_xml().unwrap()] {
+        if output.starts_with("<?xml") {
+            Ocm::from_xml(&output).unwrap();
+        } else {
+            Ocm::from_kvn(&output).unwrap();
+        }
+    }
+
+    message.body.segment.metadata.stop_time = Some("3600".parse().unwrap());
+    message
+        .body
+        .segment
+        .metadata
+        .time_span
+        .as_mut()
+        .unwrap()
+        .value = 0.041_667;
+    message.validate().unwrap();
+
+    message.body.segment.metadata.stop_time = Some("86400".parse().unwrap());
+    message
+        .body
+        .segment
+        .metadata
+        .time_span
+        .as_mut()
+        .unwrap()
+        .value = 1.0 + 0.5e-6;
+    message.validate().unwrap();
+    message
+        .body
+        .segment
+        .metadata
+        .time_span
+        .as_mut()
+        .unwrap()
+        .value = 1.0 + 2e-6;
+    crate::common::assert_rejects(&message, "TIME_SPAN");
+
+    // Numeric relative tags are SI seconds even when TIME_SYSTEM selects SCLK.
+    let mut sclk = relative_metadata_message();
+    sclk.body.segment.metadata.time_system = "SCLK".into();
+    sclk.body.segment.metadata.sclk_offset_at_epoch = Some("0".parse().unwrap());
+    sclk.body.segment.metadata.sclk_sec_per_si_sec =
+        Some(ccsds_ndm::types::Duration::new(2.0, None).unwrap());
+    sclk.validate().unwrap();
+
+    for (start, stop) in [
+        (Some("0"), None),
+        (None, Some("86400")),
+        (None, None),
+        (Some("0"), Some("2022-12-19T14:28:15.1172")),
+        (Some("2022-12-18T14:28:15.1172"), Some("86400")),
+        (
+            Some("2022-12-18T14:28:15.1172"),
+            Some("2022-12-19T14:28:15.1172"),
+        ),
+    ] {
+        let mut incomplete = relative_metadata_message();
+        let metadata = &mut incomplete.body.segment.metadata;
+        metadata.start_time = start.map(|value| value.parse().unwrap());
+        metadata.stop_time = stop.map(|value| value.parse().unwrap());
+        metadata.time_span.as_mut().unwrap().value = 99.0;
+        incomplete.validate().unwrap();
+    }
+
+    let mut no_span = relative_metadata_message();
+    no_span.body.segment.metadata.time_span = None;
+    no_span.validate().unwrap();
+    no_span.body.segment.metadata.start_time = Some("86400.000000000000001".parse().unwrap());
+    crate::common::assert_rejects(&no_span, "STOP_TIME");
+}
+
+#[test]
+fn calendar_metadata_bounds_are_ordered_without_subtracting_time_scales() {
+    let mut message = relative_metadata_message();
+    let metadata = &mut message.body.segment.metadata;
+    metadata.start_time = Some("2022-12-18T14:28:15.1172".parse().unwrap());
+    metadata.stop_time = metadata.start_time;
+    // Equal endpoints are legal; calendar span consistency is deliberately not inferred.
+    metadata.time_span.as_mut().unwrap().value = 99.0;
+    message.validate().unwrap();
+    let xml = message.to_xml().unwrap();
+    let kvn = message.to_kvn().unwrap();
+
+    let invalid_xml = xml.replace(
+        "<STOP_TIME>2022-12-18T14:28:15.1172</STOP_TIME>",
+        "<STOP_TIME>2022-12-17T14:28:15.1172</STOP_TIME>",
+    );
+    let invalid_kvn = kvn
+        .lines()
+        .map(|line| {
+            if line.starts_with("STOP_TIME") {
+                "STOP_TIME = 2022-12-17T14:28:15.1172"
+            } else {
+                line
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert_ne!(invalid_xml, xml);
+    crate::common::assert_validation_field(&Ocm::from_xml(&invalid_xml).unwrap_err(), "STOP_TIME");
+    crate::common::assert_validation_field(&Ocm::from_kvn(&invalid_kvn).unwrap_err(), "STOP_TIME");
+
+    message.body.segment.metadata.stop_time = Some("2022-12-17T14:28:15.1172".parse().unwrap());
+    crate::common::assert_rejects(&message, "STOP_TIME");
+}
 
 const OCM_FRAME_EPOCH_KVN: &str = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -30,7 +209,7 @@ COV_REF_FRAME = GCRF
 COV_FRAME_EPOCH = 2023-01-01T00:00:00
 COV_TYPE = CARTPV
 COV_ORDERING = LTM
-2023-01-01T00:00:00 1 0 0 0 0 1
+2023-01-01T00:00:00 0.000001 0 0.000001 0 0 0.000001 0 0 0 0.000001 0 0 0 0 0.000001 0 0 0 0 0 0.000001
 COV_STOP
 MAN_START
 MAN_ID = MAN-1
@@ -289,7 +468,7 @@ COV_REF_FRAME = GCRF
 COV_FRAME_EPOCH = 2023-01-01T00:00:00
 COV_TYPE = CARTPV
 COV_ORDERING = LTM
-2023-01-01T00:00:00 1 0 0 0 0 1
+2023-01-01T00:00:00 0.000001 0 0.000001 0 0 0.000001 0 0 0 0.000001 0 0 0 0 0.000001 0 0 0 0 0 0.000001
 COV_STOP
 MAN_START
 MAN_ID = MAN-1

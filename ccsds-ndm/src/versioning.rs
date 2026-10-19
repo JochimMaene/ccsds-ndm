@@ -21,7 +21,7 @@ pub(crate) fn spec(kind: MessageKind) -> Option<VersionSpec> {
     match kind {
         MessageKind::Opm => Some(VersionSpec {
             id_keyword: "CCSDS_OPM_VERS",
-            input_versions: &["1.0", "2.0", "3.0"],
+            input_versions: &["2.0", "3.0"],
             output_versions: &["2.0", "3.0"],
         }),
         MessageKind::Omm => Some(VersionSpec {
@@ -43,17 +43,17 @@ pub(crate) fn spec(kind: MessageKind) -> Option<VersionSpec> {
         }),
         MessageKind::Aem => Some(VersionSpec {
             id_keyword: "CCSDS_AEM_VERS",
-            input_versions: &["1.0", "2.0"],
+            input_versions: &["2.0"],
             output_versions: &["2.0"],
         }),
         MessageKind::Apm => Some(VersionSpec {
             id_keyword: "CCSDS_APM_VERS",
-            input_versions: &["1.0", "2.0"],
+            input_versions: &["2.0"],
             output_versions: &["2.0"],
         }),
         MessageKind::Acm => Some(VersionSpec {
             id_keyword: "CCSDS_ACM_VERS",
-            input_versions: &["1.0", "2.0"],
+            input_versions: &["2.0"],
             output_versions: &["2.0"],
         }),
         MessageKind::Cdm => Some(VersionSpec {
@@ -63,7 +63,7 @@ pub(crate) fn spec(kind: MessageKind) -> Option<VersionSpec> {
         }),
         MessageKind::Tdm => Some(VersionSpec {
             id_keyword: "CCSDS_TDM_VERS",
-            input_versions: &["1.0", "2.0"],
+            input_versions: &["2.0"],
             output_versions: &["2.0"],
         }),
         MessageKind::Rdm => Some(VersionSpec {
@@ -239,6 +239,40 @@ fn validate_oem_1_content(message: &crate::messages::oem::Oem) -> Result<()> {
                 "X_DDOT/Y_DDOT/Z_DDOT",
                 format!("body.segment[{index}].data.state_vector[{state}]"),
             ));
+        }
+        // 502.0-B-1, 4.3.5c requires strictly increasing epochs within each segment.
+        for (state, pair) in segment.data.state_vector.windows(2).enumerate() {
+            if pair[0].epoch.cmp_same_branch(&pair[1].epoch) != Some(std::cmp::Ordering::Less) {
+                return Err(ValidationError::InvalidValue {
+                    field: "EPOCH".into(),
+                    value: pair[1].epoch.to_string(),
+                    expected: "strictly after the preceding ephemeris epoch (CCSDS 502.0-B-1)"
+                        .into(),
+                    line: None,
+                }
+                .at_path(format!(
+                    "body.segment[{index}].data.state_vector[{}].epoch",
+                    state + 1
+                ))
+                .into());
+            }
+        }
+        // 502.0-B-1, table 4-3 permits a shared endpoint, but no overlapping total spans.
+        if index > 0
+            && segment
+                .metadata
+                .start_time
+                .cmp_same_branch(&message.body.segment[index - 1].metadata.stop_time)
+                == Some(std::cmp::Ordering::Less)
+        {
+            return Err(ValidationError::InvalidValue {
+                field: "START_TIME".into(),
+                value: segment.metadata.start_time.to_string(),
+                expected: "at or after the preceding segment's STOP_TIME (CCSDS 502.0-B-1)".into(),
+                line: None,
+            }
+            .at_path(format!("body.segment[{index}].metadata.start_time"))
+            .into());
         }
     }
     Ok(())

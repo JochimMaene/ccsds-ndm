@@ -214,6 +214,24 @@ pub enum Message {
     Ndm(messages::ndm::CombinedNdm),
 }
 
+impl traits::Validate for Message {
+    fn validate(&self) -> Result<()> {
+        match self {
+            Self::Opm(message) => message.validate(),
+            Self::Omm(message) => message.validate(),
+            Self::Oem(message) => message.validate(),
+            Self::Ocm(message) => message.validate(),
+            Self::Acm(message) => message.validate(),
+            Self::Aem(message) => message.validate(),
+            Self::Apm(message) => message.validate(),
+            Self::Cdm(message) => message.validate(),
+            Self::Tdm(message) => message.validate(),
+            Self::Rdm(message) => message.validate(),
+            Self::Ndm(message) => message.validate(),
+        }
+    }
+}
+
 impl Message {
     /// Return the CCSDS message family represented by this value.
     pub const fn kind(&self) -> validation::MessageKind {

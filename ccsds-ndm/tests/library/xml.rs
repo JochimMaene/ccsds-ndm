@@ -141,8 +141,8 @@ fn xml_rejects_mixed_content_and_invalid_references_without_losing_valid_text() 
         }
         let valid = mutated_once(
             input,
-            "<ORIGINATOR>",
-            "<ORIGINATOR><![CDATA[A & B]]>&amp;&#65;",
+            "<OBJECT_NAME>",
+            "<OBJECT_NAME><![CDATA[A & B]]>&amp;&#65;",
         );
         let parsed = from_str(&valid).unwrap();
         assert!(parsed.to_xml().unwrap().contains("A &amp; B&amp;A"));
@@ -197,7 +197,7 @@ fn xml_rejects_malformed_text_namespaces_and_processing_instructions() {
             "<?xml-stylesheet href='style.xsl'?><?π valid?><header xmlns=\"\">",
         );
         assert_eq!(from_str(&valid).unwrap(), from_str(input).unwrap());
-        let valid = mutated_once(input, "<ORIGINATOR>", "<ORIGINATOR>]]&gt;");
+        let valid = mutated_once(input, "<OBJECT_NAME>", "<OBJECT_NAME>]]&gt;");
         assert!(from_str(&valid).unwrap().to_xml().is_ok());
     }
 }

@@ -770,6 +770,31 @@ pub struct QuaternionState {
     pub quaternion_dot: Option<QuaternionDot>,
 }
 
+impl crate::traits::Validate for QuaternionState {
+    fn validate(&self) -> Result<()> {
+        for (field, value) in [
+            ("REF_FRAME_A", &self.ref_frame_a),
+            ("REF_FRAME_B", &self.ref_frame_b),
+        ] {
+            if value.trim().is_empty() {
+                return Err(ValidationError::missing_required("Quaternion", field).into());
+            }
+        }
+        self.quaternion.validate()?;
+        if let Some(dot) = &self.quaternion_dot {
+            for (field, value) in [
+                ("Q1_DOT", dot.q1_dot.value),
+                ("Q2_DOT", dot.q2_dot.value),
+                ("Q3_DOT", dot.q3_dot.value),
+                ("QC_DOT", dot.qc_dot.value),
+            ] {
+                require_finite(field, value)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Euler angle elements.
 ///
 /// All mandatory elements of the logical block are to be provided if the block is present.
@@ -1203,17 +1228,56 @@ pub struct AttManeuverState {
     pub man_delta_mass: Option<DeltaMassZ>,
 }
 
+impl crate::traits::Validate for AttManeuverState {
+    fn validate(&self) -> Result<()> {
+        crate::validation::epoch_precision(&[("MAN_EPOCH_START", &self.man_epoch_start)])?;
+        Duration::validate_value(self.man_duration.value, "MAN_DURATION")?;
+        if matches!(self.man_duration.units, Some(TimeUnits::Day)) {
+            return Err(ValidationError::InvalidValue {
+                field: "MAN_DURATION units".into(),
+                value: "d".into(),
+                expected: "s".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.man_ref_frame.trim().is_empty() {
+            return Err(ValidationError::missing_required("Maneuver", "MAN_REF_FRAME").into());
+        }
+        for (field, value) in [
+            ("MAN_TOR_X", self.man_tor_x.value),
+            ("MAN_TOR_Y", self.man_tor_y.value),
+            ("MAN_TOR_Z", self.man_tor_z.value),
+        ] {
+            require_finite(field, value)?;
+        }
+        if let Some(mass) = &self.man_delta_mass {
+            require_finite("MAN_DELTA_MASS", mass.value)?;
+            if mass.value > 0.0 {
+                return Err(ValidationError::OutOfRange {
+                    name: "MAN_DELTA_MASS".into(),
+                    value: mass.value.to_string(),
+                    expected: "<= 0".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+}
+
 impl ToKvn for AttManeuverState {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         writer.write_pair("MAN_EPOCH_START", self.man_epoch_start);
-        writer.write_measure("MAN_DURATION", &self.man_duration.to_unit_value());
+        writer.write_odm_float_measure("MAN_DURATION", &self.man_duration.to_unit_value());
         writer.write_pair("MAN_REF_FRAME", &self.man_ref_frame);
-        writer.write_measure("MAN_TOR_X", &self.man_tor_x);
-        writer.write_measure("MAN_TOR_Y", &self.man_tor_y);
-        writer.write_measure("MAN_TOR_Z", &self.man_tor_z);
+        writer.write_odm_float_measure("MAN_TOR_X", &self.man_tor_x);
+        writer.write_odm_float_measure("MAN_TOR_Y", &self.man_tor_y);
+        writer.write_odm_float_measure("MAN_TOR_Z", &self.man_tor_z);
         if let Some(m) = &self.man_delta_mass {
-            writer.write_measure("MAN_DELTA_MASS", &m.to_unit_value());
+            writer.write_odm_float_measure("MAN_DELTA_MASS", &m.to_unit_value());
         }
     }
 }
@@ -1584,21 +1648,28 @@ impl ToKvn for QuaternionState {
         writer.write_comments(&self.comment);
         writer.write_pair("REF_FRAME_A", &self.ref_frame_a);
         writer.write_pair("REF_FRAME_B", &self.ref_frame_b);
-        writer.write_pair("Q1", self.quaternion.q1);
-        writer.write_pair("Q2", self.quaternion.q2);
-        writer.write_pair("Q3", self.quaternion.q3);
-        writer.write_pair("QC", self.quaternion.qc);
+        writer.write_odm_float_pair("Q1", self.quaternion.q1);
+        writer.write_odm_float_pair("Q2", self.quaternion.q2);
+        writer.write_odm_float_pair("Q3", self.quaternion.q3);
+        writer.write_odm_float_pair("QC", self.quaternion.qc);
         if let Some(dot) = &self.quaternion_dot {
-            writer.write_pair("Q1_DOT", dot.q1_dot.value);
-            writer.write_pair("Q2_DOT", dot.q2_dot.value);
-            writer.write_pair("Q3_DOT", dot.q3_dot.value);
-            writer.write_pair("QC_DOT", dot.qc_dot.value);
+            writer.write_odm_float_pair("Q1_DOT", dot.q1_dot.value);
+            writer.write_odm_float_pair("Q2_DOT", dot.q2_dot.value);
+            writer.write_odm_float_pair("Q3_DOT", dot.q3_dot.value);
+            writer.write_odm_float_pair("QC_DOT", dot.qc_dot.value);
         }
     }
 }
 
 impl crate::traits::Validate for EulerAngleState {
     fn validate(&self) -> Result<()> {
+        if self.ref_frame_a.trim().is_empty() {
+            return Err(ValidationError::missing_required("Euler angles", "REF_FRAME_A").into());
+        }
+        if self.ref_frame_b.trim().is_empty() {
+            return Err(ValidationError::missing_required("Euler angles", "REF_FRAME_B").into());
+        }
+
         for (field, angle) in [
             ("EULER_ANGLE_1", &self.angle_1),
             ("EULER_ANGLE_2", &self.angle_2),
@@ -1621,6 +1692,22 @@ impl crate::traits::Validate for EulerAngleState {
 
 impl crate::traits::Validate for AngVelState {
     fn validate(&self) -> Result<()> {
+        if self.ref_frame_a.trim().is_empty() {
+            return Err(
+                ValidationError::missing_required("Angular velocity", "REF_FRAME_A").into(),
+            );
+        }
+        if self.ref_frame_b.trim().is_empty() {
+            return Err(
+                ValidationError::missing_required("Angular velocity", "REF_FRAME_B").into(),
+            );
+        }
+        if self.angvel_frame.0.trim().is_empty() {
+            return Err(
+                ValidationError::missing_required("Angular velocity", "ANGVEL_FRAME").into(),
+            );
+        }
+
         for (field, rate) in [
             ("ANGVEL_X", &self.angvel_x),
             ("ANGVEL_Y", &self.angvel_y),
@@ -1634,6 +1721,10 @@ impl crate::traits::Validate for AngVelState {
 
 impl crate::traits::Validate for InertiaState {
     fn validate(&self) -> Result<()> {
+        if self.inertia_ref_frame.trim().is_empty() {
+            return Err(ValidationError::missing_required("Inertia", "INERTIA_REF_FRAME").into());
+        }
+
         for (field, moment) in [
             ("IXX", &self.ixx),
             ("IYY", &self.iyy),
@@ -1654,21 +1745,21 @@ impl ToKvn for EulerAngleState {
         writer.write_pair("REF_FRAME_A", &self.ref_frame_a);
         writer.write_pair("REF_FRAME_B", &self.ref_frame_b);
         writer.write_pair("EULER_ROT_SEQ", &self.euler_rot_seq);
-        writer.write_measure(
+        writer.write_odm_float_measure(
             "ANGLE_1",
             &UnitValue {
                 value: self.angle_1.value,
                 units: self.angle_1.units.clone(),
             },
         );
-        writer.write_measure(
+        writer.write_odm_float_measure(
             "ANGLE_2",
             &UnitValue {
                 value: self.angle_2.value,
                 units: self.angle_2.units.clone(),
             },
         );
-        writer.write_measure(
+        writer.write_odm_float_measure(
             "ANGLE_3",
             &UnitValue {
                 value: self.angle_3.value,
@@ -1676,7 +1767,7 @@ impl ToKvn for EulerAngleState {
             },
         );
         if let Some(v) = &self.angle_1_dot {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "ANGLE_1_DOT",
                 &UnitValue {
                     value: v.value,
@@ -1685,7 +1776,7 @@ impl ToKvn for EulerAngleState {
             );
         }
         if let Some(v) = &self.angle_2_dot {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "ANGLE_2_DOT",
                 &UnitValue {
                     value: v.value,
@@ -1694,7 +1785,7 @@ impl ToKvn for EulerAngleState {
             );
         }
         if let Some(v) = &self.angle_3_dot {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "ANGLE_3_DOT",
                 &UnitValue {
                     value: v.value,
@@ -1711,9 +1802,9 @@ impl ToKvn for AngVelState {
         writer.write_pair("REF_FRAME_A", &self.ref_frame_a);
         writer.write_pair("REF_FRAME_B", &self.ref_frame_b);
         writer.write_pair("ANGVEL_FRAME", &self.angvel_frame.0);
-        writer.write_measure("ANGVEL_X", &self.angvel_x);
-        writer.write_measure("ANGVEL_Y", &self.angvel_y);
-        writer.write_measure("ANGVEL_Z", &self.angvel_z);
+        writer.write_odm_float_measure("ANGVEL_X", &self.angvel_x);
+        writer.write_odm_float_measure("ANGVEL_Y", &self.angvel_y);
+        writer.write_odm_float_measure("ANGVEL_Z", &self.angvel_z);
     }
 }
 
@@ -1722,28 +1813,28 @@ impl ToKvn for SpinState {
         writer.write_comments(&self.comment);
         writer.write_pair("REF_FRAME_A", &self.ref_frame_a);
         writer.write_pair("REF_FRAME_B", &self.ref_frame_b);
-        writer.write_measure(
+        writer.write_odm_float_measure(
             "SPIN_ALPHA",
             &UnitValue {
                 value: self.spin_alpha.value,
                 units: self.spin_alpha.units.clone(),
             },
         );
-        writer.write_measure(
+        writer.write_odm_float_measure(
             "SPIN_DELTA",
             &UnitValue {
                 value: self.spin_delta.value,
                 units: self.spin_delta.units.clone(),
             },
         );
-        writer.write_measure(
+        writer.write_odm_float_measure(
             "SPIN_ANGLE",
             &UnitValue {
                 value: self.spin_angle.value,
                 units: self.spin_angle.units.clone(),
             },
         );
-        writer.write_measure(
+        writer.write_odm_float_measure(
             "SPIN_ANGLE_VEL",
             &UnitValue {
                 value: self.spin_angle_vel.value,
@@ -1752,7 +1843,7 @@ impl ToKvn for SpinState {
         );
 
         if let Some(v) = &self.nutation {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "NUTATION",
                 &UnitValue {
                     value: v.value,
@@ -1761,7 +1852,7 @@ impl ToKvn for SpinState {
             );
         }
         if let Some(v) = &self.nutation_per {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "NUTATION_PER",
                 &UnitValue {
                     value: v.value,
@@ -1770,7 +1861,7 @@ impl ToKvn for SpinState {
             );
         }
         if let Some(v) = &self.nutation_phase {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "NUTATION_PHASE",
                 &UnitValue {
                     value: v.value,
@@ -1779,7 +1870,7 @@ impl ToKvn for SpinState {
             );
         }
         if let Some(v) = &self.momentum_alpha {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "MOMENTUM_ALPHA",
                 &UnitValue {
                     value: v.value,
@@ -1788,7 +1879,7 @@ impl ToKvn for SpinState {
             );
         }
         if let Some(v) = &self.momentum_delta {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "MOMENTUM_DELTA",
                 &UnitValue {
                     value: v.value,
@@ -1797,7 +1888,7 @@ impl ToKvn for SpinState {
             );
         }
         if let Some(v) = &self.nutation_vel {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "NUTATION_VEL",
                 &UnitValue {
                     value: v.value,
@@ -1812,12 +1903,12 @@ impl ToKvn for InertiaState {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         writer.write_pair("INERTIA_REF_FRAME", &self.inertia_ref_frame);
-        writer.write_measure("IXX", &self.ixx);
-        writer.write_measure("IYY", &self.iyy);
-        writer.write_measure("IZZ", &self.izz);
-        writer.write_measure("IXY", &self.ixy);
-        writer.write_measure("IXZ", &self.ixz);
-        writer.write_measure("IYZ", &self.iyz);
+        writer.write_odm_float_measure("IXX", &self.ixx);
+        writer.write_odm_float_measure("IYY", &self.iyy);
+        writer.write_odm_float_measure("IZZ", &self.izz);
+        writer.write_odm_float_measure("IXY", &self.ixy);
+        writer.write_odm_float_measure("IXZ", &self.ixz);
+        writer.write_odm_float_measure("IYZ", &self.iyz);
     }
 }
 
@@ -2272,13 +2363,13 @@ impl crate::traits::Validate for AtmosphericReentryParameters {
 impl ToKvn for AtmosphericReentryParameters {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
-        writer.write_measure("ORBIT_LIFETIME", &self.orbit_lifetime.to_unit_value());
-        writer.write_measure("REENTRY_ALTITUDE", &self.reentry_altitude.to_unit_value());
+        writer.write_odm_float_measure("ORBIT_LIFETIME", &self.orbit_lifetime.to_unit_value());
+        writer.write_odm_float_measure("REENTRY_ALTITUDE", &self.reentry_altitude.to_unit_value());
         if let Some(v) = &self.orbit_lifetime_window_start {
-            writer.write_measure("ORBIT_LIFETIME_WINDOW_START", &v.to_unit_value());
+            writer.write_odm_float_measure("ORBIT_LIFETIME_WINDOW_START", &v.to_unit_value());
         }
         if let Some(v) = &self.orbit_lifetime_window_end {
-            writer.write_measure("ORBIT_LIFETIME_WINDOW_END", &v.to_unit_value());
+            writer.write_odm_float_measure("ORBIT_LIFETIME_WINDOW_END", &v.to_unit_value());
         }
         if let Some(v) = &self.nominal_reentry_epoch {
             writer.write_pair("NOMINAL_REENTRY_EPOCH", v);
@@ -2290,7 +2381,7 @@ impl ToKvn for AtmosphericReentryParameters {
             writer.write_pair("REENTRY_WINDOW_END", v);
         }
         if let Some(v) = &self.orbit_lifetime_confidence_level {
-            writer.write_measure("ORBIT_LIFETIME_CONFIDENCE_LEVEL", &v.to_unit_value());
+            writer.write_odm_float_measure("ORBIT_LIFETIME_CONFIDENCE_LEVEL", &v.to_unit_value());
         }
     }
 }
@@ -2718,19 +2809,19 @@ impl ToKvn for GroundImpactParameters {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         if let Some(v) = &self.probability_of_impact {
-            writer.write_pair("PROBABILITY_OF_IMPACT", v.value);
+            writer.write_odm_float_pair("PROBABILITY_OF_IMPACT", v.value);
         }
         if let Some(v) = &self.probability_of_burn_up {
-            writer.write_pair("PROBABILITY_OF_BURN_UP", v.value);
+            writer.write_odm_float_pair("PROBABILITY_OF_BURN_UP", v.value);
         }
         if let Some(v) = &self.probability_of_break_up {
-            writer.write_pair("PROBABILITY_OF_BREAK_UP", v.value);
+            writer.write_odm_float_pair("PROBABILITY_OF_BREAK_UP", v.value);
         }
         if let Some(v) = &self.probability_of_land_impact {
-            writer.write_pair("PROBABILITY_OF_LAND_IMPACT", v.value);
+            writer.write_odm_float_pair("PROBABILITY_OF_LAND_IMPACT", v.value);
         }
         if let Some(v) = &self.probability_of_casualty {
-            writer.write_pair("PROBABILITY_OF_CASUALTY", v.value);
+            writer.write_odm_float_pair("PROBABILITY_OF_CASUALTY", v.value);
         }
         if let Some(v) = &self.nominal_impact_epoch {
             writer.write_pair("NOMINAL_IMPACT_EPOCH", v);
@@ -2745,70 +2836,70 @@ impl ToKvn for GroundImpactParameters {
             writer.write_pair("IMPACT_REF_FRAME", v);
         }
         if let Some(v) = &self.nominal_impact_lon {
-            writer.write_measure("NOMINAL_IMPACT_LON", &v.to_unit_value());
+            writer.write_odm_float_measure("NOMINAL_IMPACT_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.nominal_impact_lat {
-            writer.write_measure("NOMINAL_IMPACT_LAT", &v.to_unit_value());
+            writer.write_odm_float_measure("NOMINAL_IMPACT_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.nominal_impact_alt {
-            writer.write_measure("NOMINAL_IMPACT_ALT", &v.to_unit_value());
+            writer.write_odm_float_measure("NOMINAL_IMPACT_ALT", &v.to_unit_value());
         }
 
         if let Some(v) = &self.impact_1_confidence {
-            writer.write_measure("IMPACT_1_CONFIDENCE", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_1_CONFIDENCE", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_start_lon {
-            writer.write_measure("IMPACT_1_START_LON", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_1_START_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_start_lat {
-            writer.write_measure("IMPACT_1_START_LAT", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_1_START_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_stop_lon {
-            writer.write_measure("IMPACT_1_STOP_LON", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_1_STOP_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_stop_lat {
-            writer.write_measure("IMPACT_1_STOP_LAT", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_1_STOP_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_cross_track {
-            writer.write_measure("IMPACT_1_CROSS_TRACK", v);
+            writer.write_odm_float_measure("IMPACT_1_CROSS_TRACK", v);
         }
 
         if let Some(v) = &self.impact_2_confidence {
-            writer.write_measure("IMPACT_2_CONFIDENCE", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_2_CONFIDENCE", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_start_lon {
-            writer.write_measure("IMPACT_2_START_LON", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_2_START_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_start_lat {
-            writer.write_measure("IMPACT_2_START_LAT", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_2_START_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_stop_lon {
-            writer.write_measure("IMPACT_2_STOP_LON", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_2_STOP_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_stop_lat {
-            writer.write_measure("IMPACT_2_STOP_LAT", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_2_STOP_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_cross_track {
-            writer.write_measure("IMPACT_2_CROSS_TRACK", v);
+            writer.write_odm_float_measure("IMPACT_2_CROSS_TRACK", v);
         }
 
         if let Some(v) = &self.impact_3_confidence {
-            writer.write_measure("IMPACT_3_CONFIDENCE", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_3_CONFIDENCE", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_start_lon {
-            writer.write_measure("IMPACT_3_START_LON", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_3_START_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_start_lat {
-            writer.write_measure("IMPACT_3_START_LAT", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_3_START_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_stop_lon {
-            writer.write_measure("IMPACT_3_STOP_LON", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_3_STOP_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_stop_lat {
-            writer.write_measure("IMPACT_3_STOP_LAT", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_3_STOP_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_cross_track {
-            writer.write_measure("IMPACT_3_CROSS_TRACK", v);
+            writer.write_odm_float_measure("IMPACT_3_CROSS_TRACK", v);
         }
     }
 }

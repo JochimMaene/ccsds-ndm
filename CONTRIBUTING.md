@@ -19,6 +19,9 @@ just check
   The local schemas and extracted books are in `ccsds-ndm/data/xsd/` and `docs/ccsds-books/`.
 - Add the smallest test that distinguishes the required behavior. Use official examples and XSD
   validation where they provide independent evidence.
+- Apply the same [verification criteria](docs/conformance/README.md#verification-criteria) to every
+  message family. Update its decision record with the rule, authority, limitation, and regression;
+  shared dispatch tests alone do not establish conformance.
 - Run `just stubs` after changing the Python API and `just audit` after changing exposed model
   fields. Commit the updated stub.
 - Run `just check` before opening a pull request. Use `just verify` when changing packaging.
@@ -28,5 +31,6 @@ replacement in the release notes.
 
 ## Test data
 
-Keep fixtures in `ccsds-ndm/data/kvn/` or `ccsds-ndm/data/xml/`. Record their source and avoid
-sensitive operational data.
+Keep valid fixtures in `ccsds-ndm/data/kvn/` or `ccsds-ndm/data/xml/`, and named negative examples
+in `ccsds-ndm/data/invalid/`. Record their source, distinguish corrections from the published
+example, and avoid sensitive operational data.

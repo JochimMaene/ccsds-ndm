@@ -104,11 +104,18 @@ pub(crate) fn message_to_py(py: Python<'_>, message: Message) -> PyResult<Py<PyA
 ///
 /// Raises
 /// ------
+/// NdmFormatError
+///     If the input is malformed.
+/// NdmValidationError
+///     If the message fails validation or uses an unsupported edition.
+/// NdmUnsupportedMessageError
+///     If the message family cannot be detected or is unsupported.
 /// ValueError
-///     If the input is invalid or unsupported.
+///     If the requested format is unsupported.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (data, format=None))]
+#[gen_stub(override_return_type(type_repr="typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]", imports=("typing")))]
 fn from_str(
     py: Python,
     data: &str,
@@ -135,6 +142,7 @@ fn from_str(
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (path, format=None))]
+#[gen_stub(override_return_type(type_repr="typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]", imports=("typing")))]
 fn from_file(
     py: Python,
     #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
@@ -241,6 +249,8 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ocm::OcmSegment>()?;
     m.add_class::<ocm::OcmMetadata>()?;
     m.add_class::<ocm::OcmData>()?;
+    m.add_class::<ocm::OcmUserDefined>()?;
+    m.add_class::<ocm::OcmUserDefinedParameter>()?;
     m.add_class::<ocm::OcmTrajState>()?;
     m.add_class::<ocm::TrajLine>()?;
     m.add_class::<ocm::OcmPhysicalDescription>()?;

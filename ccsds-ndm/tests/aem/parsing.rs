@@ -439,7 +439,7 @@ fn test_parse_aem_attitude_types() {
 fn test_parse_aem_quaternion_angvel_requires_angvel_frame() {
     let qr_meta = sample_aem_meta().replace("QUATERNION", "QUATERNION/ANGVEL");
     let input = format!(
-        "{}{}\nDATA_START\n2002-11-04T17:22:31 0.1 0.2 0.3 0.4 0.01 0.02 0.03\nDATA_STOP\n",
+        "{}{}\nDATA_START\n2002-11-04T17:22:31 0 0 0 1 0.01 0.02 0.03\nDATA_STOP\n",
         sample_aem_header(),
         qr_meta
     );

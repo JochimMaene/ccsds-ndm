@@ -301,6 +301,12 @@ pub fn create_test_aem(records: usize) -> Aem {
 pub fn create_test_acm(records: usize) -> Acm {
     let mut message = Acm::from_kvn(include_str!("../../data/kvn/acm_g7.kvn")).unwrap();
     let line = message.body.segment.data.att[0].att_lines[0].clone();
-    message.body.segment.data.att[0].att_lines = vec![line; records];
+    message.body.segment.data.att[0].att_lines = (0..records)
+        .map(|index| {
+            let mut line = line.clone();
+            line.values[0] = index as f64;
+            line
+        })
+        .collect();
     message
 }

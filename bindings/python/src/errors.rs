@@ -11,6 +11,33 @@
 use ccsds_ndm::error::{CcsdsNdmError, DiagnosticNotation, FormatError};
 use ccsds_ndm::validation::MessageKind;
 use ccsds_ndm::Notation;
+use pyo3_stub_gen::{type_info::MemberInfo, PyStubType};
+
+const fn diagnostic_field<T: PyStubType>(name: &'static str) -> MemberInfo {
+    MemberInfo {
+        name,
+        r#type: T::type_output,
+        doc: "",
+        default: None,
+        deprecated: None,
+    }
+}
+
+const DIAGNOSTIC_FIELDS: &[MemberInfo] = &[
+    diagnostic_field::<Option<String>>("operation"),
+    diagnostic_field::<Option<String>>("notation"),
+    diagnostic_field::<Option<String>>("message_kind"),
+    diagnostic_field::<Option<String>>("source_edition"),
+    diagnostic_field::<Option<String>>("code"),
+    diagnostic_field::<Option<String>>("field_path"),
+    diagnostic_field::<Option<usize>>("line"),
+    diagnostic_field::<Option<usize>>("column"),
+    diagnostic_field::<Option<usize>>("byte_offset"),
+    diagnostic_field::<Option<String>>("original_token"),
+    diagnostic_field::<Option<String>>("expected"),
+    diagnostic_field::<Option<String>>("requirement"),
+];
+
 /// Declares a custom exception with stub metadata.
 ///
 /// `pyo3_stub_gen::create_exception!` renders a custom exception's `PyStubType` as
@@ -18,10 +45,13 @@ use ccsds_ndm::Notation;
 /// and fails type checking. Same expansion, but the name is unqualified.
 ///
 /// Tracked upstream as Jij-Inc/pyo3-stub-gen#384, "create_exception! treats non-builtin
-/// base exceptions as builtins in stubs" (open against 0.23.0). Drop this macro and go
-/// back to `pyo3_stub_gen::create_exception!` once that is released.
+/// base exceptions as builtins in stubs" (open against 0.23.0). Replace the naming workaround
+/// with the upstream macro once fixed, retaining the diagnostic member metadata.
 macro_rules! create_exception {
     ($module:expr, $name:ident, $base:ty, $doc:expr) => {
+        create_exception!($module, $name, $base, $doc, &[]);
+    };
+    ($module:expr, $name:ident, $base:ty, $doc:expr, $fields:expr) => {
         ::pyo3::create_exception!($module, $name, $base, $doc);
 
         impl ::pyo3_stub_gen::PyStubType for $name {
@@ -48,20 +78,40 @@ macro_rules! create_exception {
                 subclass: true,
             }
         }
+
+        ::pyo3_stub_gen::inventory::submit! {
+            ::pyo3_stub_gen::type_info::PyMethodsInfo {
+                struct_id: std::any::TypeId::of::<$name>,
+                attrs: $fields,
+                getters: &[],
+                setters: &[],
+                methods: &[],
+                file: file!(),
+                line: line!(),
+                column: column!(),
+            }
+        }
     };
 }
 use pyo3::exceptions::{PyException, PyOSError, PyValueError};
 use pyo3::prelude::*;
 
 // Generic library error for failures without a more useful built-in category.
-create_exception!(ccsds_ndm, NdmError, PyException, "Generic CCSDS NDM error.");
+create_exception!(
+    ccsds_ndm,
+    NdmError,
+    PyException,
+    "Generic CCSDS NDM error.",
+    DIAGNOSTIC_FIELDS
+);
 
 // Format/parsing errors.
 create_exception!(
     ccsds_ndm,
     NdmFormatError,
     PyValueError,
-    "Error during parsing of NDM data (KVN or XML)."
+    "Error during parsing of NDM data (KVN or XML).",
+    DIAGNOSTIC_FIELDS
 );
 create_exception!(
     ccsds_ndm,
@@ -89,7 +139,8 @@ create_exception!(
     ccsds_ndm,
     NdmEpochError,
     PyValueError,
-    "Error parsing a CCSDS epoch string."
+    "Error parsing a CCSDS epoch string.",
+    DIAGNOSTIC_FIELDS
 );
 
 // I/O errors.
@@ -97,7 +148,8 @@ create_exception!(
     ccsds_ndm,
     NdmIoError,
     PyOSError,
-    "I/O error during file operations."
+    "I/O error during file operations.",
+    DIAGNOSTIC_FIELDS
 );
 
 // Unsupported message type.
@@ -353,7 +405,7 @@ pub fn file_parse_error_to_pyerr(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn enrich_exception(
+pub(crate) fn enrich_exception(
     error: PyErr,
     operation: &'static str,
     notation: Option<DiagnosticNotation>,
@@ -394,6 +446,17 @@ fn enrich_exception(
 
 /// Registers the exception classes with the Python module.
 pub fn register_exceptions(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    // Defaults also cover failures raised before parsing or field validation can add context.
+    for exception in [
+        m.py().get_type::<NdmError>(),
+        m.py().get_type::<NdmFormatError>(),
+        m.py().get_type::<NdmEpochError>(),
+        m.py().get_type::<NdmIoError>(),
+    ] {
+        for field in DIAGNOSTIC_FIELDS {
+            exception.setattr(field.name, m.py().None())?;
+        }
+    }
     m.add("NdmError", m.py().get_type::<NdmError>())?;
     m.add("NdmFormatError", m.py().get_type::<NdmFormatError>())?;
     m.add("NdmKvnParseError", m.py().get_type::<NdmKvnParseError>())?;

@@ -25,8 +25,10 @@ the corresponding Rust value and always pass it through the Rust core's existing
 The Python layer does not duplicate CCSDS parsing, validation, or generation rules.
 
 Python object assignment follows normal Python reference semantics. Assigning the same child to two
-places creates an intentional shared reference; users who want an independent object can copy it.
-This is simpler and more familiar than introducing a custom ownership rule solely for the binding.
+places creates an intentional shared reference. Python `copy` and `pickle` are not supported;
+duplicating a complete message requires generation and parsing, which validates and normalizes
+the data and retains only what that notation represents. See the
+[editing workflow](../guide/workflows.rst) for the public contract.
 
 ## Why this design
 

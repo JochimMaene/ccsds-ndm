@@ -144,7 +144,7 @@ fn test_acm_cov_block() {
 COV_BASIS = DETERMINED_OBC
 COV_REF_FRAME = EME2000
 COV_TYPE = ANGLE
-0.0 1.0e-6
+0.0 1.0e-6 2.0e-6 3.0e-6
 COV_STOP
 "#;
     let input = format!("{}{}{}", sample_acm_header(), sample_acm_meta(), cov_block);
@@ -214,14 +214,14 @@ REF_FRAME_A = A
 REF_FRAME_B = B
 NUMBER_STATES = 4
 ATT_TYPE = QUATERNION
-0 0 0 0 0
+0 0 0 0 1
 ATT_STOP
 ATT_START
 REF_FRAME_A = A
 REF_FRAME_B = B
 NUMBER_STATES = 4
 ATT_TYPE = QUATERNION
-10 0 0 0 0
+10 0 0 0 1
 ATT_STOP
 PHYS_START
 DRAG_COEFF = 1.0

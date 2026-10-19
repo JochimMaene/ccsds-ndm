@@ -1007,9 +1007,9 @@ impl ToKvn for RelativeMetadataData {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         writer.write_pair("TCA", self.tca);
-        writer.write_measure("MISS_DISTANCE", &self.miss_distance);
+        writer.write_odm_float_measure("MISS_DISTANCE", &self.miss_distance);
         if let Some(v) = &self.relative_speed {
-            writer.write_measure("RELATIVE_SPEED", &v.to_unit_value());
+            writer.write_odm_float_measure("RELATIVE_SPEED", &v.to_unit_value());
         }
         if let Some(v) = &self.relative_state_vector {
             v.write_kvn(writer);
@@ -1028,13 +1028,13 @@ impl ToKvn for RelativeMetadataData {
         }
 
         if let Some(v) = &self.screen_volume_x {
-            writer.write_measure("SCREEN_VOLUME_X", v);
+            writer.write_odm_float_measure("SCREEN_VOLUME_X", v);
         }
         if let Some(v) = &self.screen_volume_y {
-            writer.write_measure("SCREEN_VOLUME_Y", v);
+            writer.write_odm_float_measure("SCREEN_VOLUME_Y", v);
         }
         if let Some(v) = &self.screen_volume_z {
-            writer.write_measure("SCREEN_VOLUME_Z", v);
+            writer.write_odm_float_measure("SCREEN_VOLUME_Z", v);
         }
         if let Some(v) = &self.screen_entry_time {
             writer.write_pair("SCREEN_ENTRY_TIME", v);
@@ -1043,7 +1043,7 @@ impl ToKvn for RelativeMetadataData {
             writer.write_pair("SCREEN_EXIT_TIME", v);
         }
         if let Some(v) = &self.collision_probability {
-            writer.write_pair("COLLISION_PROBABILITY", v.value);
+            writer.write_odm_float_pair("COLLISION_PROBABILITY", v.value);
         }
         if let Some(v) = &self.collision_probability_method {
             writer.write_pair("COLLISION_PROBABILITY_METHOD", v);
@@ -1053,18 +1053,18 @@ impl ToKvn for RelativeMetadataData {
 
 impl ToKvn for RelativeStateVector {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_measure("RELATIVE_POSITION_R", &self.relative_position_r);
-        writer.write_measure("RELATIVE_POSITION_T", &self.relative_position_t);
-        writer.write_measure("RELATIVE_POSITION_N", &self.relative_position_n);
-        writer.write_measure(
+        writer.write_odm_float_measure("RELATIVE_POSITION_R", &self.relative_position_r);
+        writer.write_odm_float_measure("RELATIVE_POSITION_T", &self.relative_position_t);
+        writer.write_odm_float_measure("RELATIVE_POSITION_N", &self.relative_position_n);
+        writer.write_odm_float_measure(
             "RELATIVE_VELOCITY_R",
             &self.relative_velocity_r.to_unit_value(),
         );
-        writer.write_measure(
+        writer.write_odm_float_measure(
             "RELATIVE_VELOCITY_T",
             &self.relative_velocity_t.to_unit_value(),
         );
-        writer.write_measure(
+        writer.write_odm_float_measure(
             "RELATIVE_VELOCITY_N",
             &self.relative_velocity_n.to_unit_value(),
         );
@@ -1148,10 +1148,10 @@ impl ToKvn for CdmData {
                 writer.write_pair("TIME_LASTOB_END", v);
             }
             if let Some(v) = &od.recommended_od_span {
-                writer.write_measure("RECOMMENDED_OD_SPAN", &v.to_unit_value());
+                writer.write_odm_float_measure("RECOMMENDED_OD_SPAN", &v.to_unit_value());
             }
             if let Some(v) = &od.actual_od_span {
-                writer.write_measure("ACTUAL_OD_SPAN", &v.to_unit_value());
+                writer.write_odm_float_measure("ACTUAL_OD_SPAN", &v.to_unit_value());
             }
             if let Some(v) = &od.obs_available {
                 writer.write_pair("OBS_AVAILABLE", v);
@@ -1166,38 +1166,38 @@ impl ToKvn for CdmData {
                 writer.write_pair("TRACKS_USED", v);
             }
             if let Some(v) = &od.residuals_accepted {
-                writer.write_measure("RESIDUALS_ACCEPTED", &v.to_unit_value());
+                writer.write_odm_float_measure("RESIDUALS_ACCEPTED", &v.to_unit_value());
             }
             if let Some(v) = &od.weighted_rms {
-                writer.write_pair("WEIGHTED_RMS", v);
+                writer.write_odm_float_pair("WEIGHTED_RMS", v.value);
             }
         }
         // Additional Parameters
         if let Some(ap) = &self.additional_parameters {
             writer.write_comments(&ap.comment);
             if let Some(v) = &ap.area_pc {
-                writer.write_measure("AREA_PC", &v.to_unit_value());
+                writer.write_odm_float_measure("AREA_PC", &v.to_unit_value());
             }
             if let Some(v) = &ap.area_drg {
-                writer.write_measure("AREA_DRG", &v.to_unit_value());
+                writer.write_odm_float_measure("AREA_DRG", &v.to_unit_value());
             }
             if let Some(v) = &ap.area_srp {
-                writer.write_measure("AREA_SRP", &v.to_unit_value());
+                writer.write_odm_float_measure("AREA_SRP", &v.to_unit_value());
             }
             if let Some(v) = &ap.mass {
-                writer.write_measure("MASS", &v.to_unit_value());
+                writer.write_odm_float_measure("MASS", &v.to_unit_value());
             }
             if let Some(v) = &ap.cd_area_over_mass {
-                writer.write_measure("CD_AREA_OVER_MASS", &v.to_unit_value());
+                writer.write_odm_float_measure("CD_AREA_OVER_MASS", &v.to_unit_value());
             }
             if let Some(v) = &ap.cr_area_over_mass {
-                writer.write_measure("CR_AREA_OVER_MASS", &v.to_unit_value());
+                writer.write_odm_float_measure("CR_AREA_OVER_MASS", &v.to_unit_value());
             }
             if let Some(v) = &ap.thrust_acceleration {
-                writer.write_measure("THRUST_ACCELERATION", &v.to_unit_value());
+                writer.write_odm_float_measure("THRUST_ACCELERATION", &v.to_unit_value());
             }
             if let Some(v) = &ap.sedr {
-                writer.write_measure("SEDR", &v.to_unit_value());
+                writer.write_odm_float_measure("SEDR", &v.to_unit_value());
             }
         }
         // State Vector
@@ -1212,12 +1212,12 @@ impl ToKvn for CdmData {
 impl ToKvn for CdmStateVector {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
-        writer.write_measure("X", &self.x.to_unit_value());
-        writer.write_measure("Y", &self.y.to_unit_value());
-        writer.write_measure("Z", &self.z.to_unit_value());
-        writer.write_measure("X_DOT", &self.x_dot.to_unit_value());
-        writer.write_measure("Y_DOT", &self.y_dot.to_unit_value());
-        writer.write_measure("Z_DOT", &self.z_dot.to_unit_value());
+        writer.write_odm_float_measure("X", &self.x.to_unit_value());
+        writer.write_odm_float_measure("Y", &self.y.to_unit_value());
+        writer.write_odm_float_measure("Z", &self.z.to_unit_value());
+        writer.write_odm_float_measure("X_DOT", &self.x_dot.to_unit_value());
+        writer.write_odm_float_measure("Y_DOT", &self.y_dot.to_unit_value());
+        writer.write_odm_float_measure("Z_DOT", &self.z_dot.to_unit_value());
     }
 }
 
@@ -1225,102 +1225,102 @@ impl ToKvn for CdmCovarianceMatrix {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         // Required
-        writer.write_measure("CR_R", &self.cr_r.to_unit_value());
-        writer.write_measure("CT_R", &self.ct_r.to_unit_value());
-        writer.write_measure("CT_T", &self.ct_t.to_unit_value());
-        writer.write_measure("CN_R", &self.cn_r.to_unit_value());
-        writer.write_measure("CN_T", &self.cn_t.to_unit_value());
-        writer.write_measure("CN_N", &self.cn_n.to_unit_value());
-        writer.write_measure("CRDOT_R", &self.crdot_r.to_unit_value());
-        writer.write_measure("CRDOT_T", &self.crdot_t.to_unit_value());
-        writer.write_measure("CRDOT_N", &self.crdot_n.to_unit_value());
-        writer.write_measure("CRDOT_RDOT", &self.crdot_rdot.to_unit_value());
-        writer.write_measure("CTDOT_R", &self.ctdot_r.to_unit_value());
-        writer.write_measure("CTDOT_T", &self.ctdot_t.to_unit_value());
-        writer.write_measure("CTDOT_N", &self.ctdot_n.to_unit_value());
-        writer.write_measure("CTDOT_RDOT", &self.ctdot_rdot.to_unit_value());
-        writer.write_measure("CTDOT_TDOT", &self.ctdot_tdot.to_unit_value());
-        writer.write_measure("CNDOT_R", &self.cndot_r.to_unit_value());
-        writer.write_measure("CNDOT_T", &self.cndot_t.to_unit_value());
-        writer.write_measure("CNDOT_N", &self.cndot_n.to_unit_value());
-        writer.write_measure("CNDOT_RDOT", &self.cndot_rdot.to_unit_value());
-        writer.write_measure("CNDOT_TDOT", &self.cndot_tdot.to_unit_value());
-        writer.write_measure("CNDOT_NDOT", &self.cndot_ndot.to_unit_value());
+        writer.write_odm_float_measure("CR_R", &self.cr_r.to_unit_value());
+        writer.write_odm_float_measure("CT_R", &self.ct_r.to_unit_value());
+        writer.write_odm_float_measure("CT_T", &self.ct_t.to_unit_value());
+        writer.write_odm_float_measure("CN_R", &self.cn_r.to_unit_value());
+        writer.write_odm_float_measure("CN_T", &self.cn_t.to_unit_value());
+        writer.write_odm_float_measure("CN_N", &self.cn_n.to_unit_value());
+        writer.write_odm_float_measure("CRDOT_R", &self.crdot_r.to_unit_value());
+        writer.write_odm_float_measure("CRDOT_T", &self.crdot_t.to_unit_value());
+        writer.write_odm_float_measure("CRDOT_N", &self.crdot_n.to_unit_value());
+        writer.write_odm_float_measure("CRDOT_RDOT", &self.crdot_rdot.to_unit_value());
+        writer.write_odm_float_measure("CTDOT_R", &self.ctdot_r.to_unit_value());
+        writer.write_odm_float_measure("CTDOT_T", &self.ctdot_t.to_unit_value());
+        writer.write_odm_float_measure("CTDOT_N", &self.ctdot_n.to_unit_value());
+        writer.write_odm_float_measure("CTDOT_RDOT", &self.ctdot_rdot.to_unit_value());
+        writer.write_odm_float_measure("CTDOT_TDOT", &self.ctdot_tdot.to_unit_value());
+        writer.write_odm_float_measure("CNDOT_R", &self.cndot_r.to_unit_value());
+        writer.write_odm_float_measure("CNDOT_T", &self.cndot_t.to_unit_value());
+        writer.write_odm_float_measure("CNDOT_N", &self.cndot_n.to_unit_value());
+        writer.write_odm_float_measure("CNDOT_RDOT", &self.cndot_rdot.to_unit_value());
+        writer.write_odm_float_measure("CNDOT_TDOT", &self.cndot_tdot.to_unit_value());
+        writer.write_odm_float_measure("CNDOT_NDOT", &self.cndot_ndot.to_unit_value());
 
         // Optionals
         if let Some(v) = &self.cdrg_r {
-            writer.write_measure("CDRG_R", &v.to_unit_value());
+            writer.write_odm_float_measure("CDRG_R", &v.to_unit_value());
         }
         if let Some(v) = &self.cdrg_t {
-            writer.write_measure("CDRG_T", &v.to_unit_value());
+            writer.write_odm_float_measure("CDRG_T", &v.to_unit_value());
         }
         if let Some(v) = &self.cdrg_n {
-            writer.write_measure("CDRG_N", &v.to_unit_value());
+            writer.write_odm_float_measure("CDRG_N", &v.to_unit_value());
         }
         if let Some(v) = &self.cdrg_rdot {
-            writer.write_measure("CDRG_RDOT", &v.to_unit_value());
+            writer.write_odm_float_measure("CDRG_RDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.cdrg_tdot {
-            writer.write_measure("CDRG_TDOT", &v.to_unit_value());
+            writer.write_odm_float_measure("CDRG_TDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.cdrg_ndot {
-            writer.write_measure("CDRG_NDOT", &v.to_unit_value());
+            writer.write_odm_float_measure("CDRG_NDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.cdrg_drg {
-            writer.write_measure("CDRG_DRG", &v.to_unit_value());
+            writer.write_odm_float_measure("CDRG_DRG", &v.to_unit_value());
         }
 
         if let Some(v) = &self.csrp_r {
-            writer.write_measure("CSRP_R", &v.to_unit_value());
+            writer.write_odm_float_measure("CSRP_R", &v.to_unit_value());
         }
         if let Some(v) = &self.csrp_t {
-            writer.write_measure("CSRP_T", &v.to_unit_value());
+            writer.write_odm_float_measure("CSRP_T", &v.to_unit_value());
         }
         if let Some(v) = &self.csrp_n {
-            writer.write_measure("CSRP_N", &v.to_unit_value());
+            writer.write_odm_float_measure("CSRP_N", &v.to_unit_value());
         }
         if let Some(v) = &self.csrp_rdot {
-            writer.write_measure("CSRP_RDOT", &v.to_unit_value());
+            writer.write_odm_float_measure("CSRP_RDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.csrp_tdot {
-            writer.write_measure("CSRP_TDOT", &v.to_unit_value());
+            writer.write_odm_float_measure("CSRP_TDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.csrp_ndot {
-            writer.write_measure("CSRP_NDOT", &v.to_unit_value());
+            writer.write_odm_float_measure("CSRP_NDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.csrp_drg {
-            writer.write_measure("CSRP_DRG", &v.to_unit_value());
+            writer.write_odm_float_measure("CSRP_DRG", &v.to_unit_value());
         }
         if let Some(v) = &self.csrp_srp {
-            writer.write_measure("CSRP_SRP", &v.to_unit_value());
+            writer.write_odm_float_measure("CSRP_SRP", &v.to_unit_value());
         }
 
         if let Some(v) = &self.cthr_r {
-            writer.write_measure("CTHR_R", &v.to_unit_value());
+            writer.write_odm_float_measure("CTHR_R", &v.to_unit_value());
         }
         if let Some(v) = &self.cthr_t {
-            writer.write_measure("CTHR_T", &v.to_unit_value());
+            writer.write_odm_float_measure("CTHR_T", &v.to_unit_value());
         }
         if let Some(v) = &self.cthr_n {
-            writer.write_measure("CTHR_N", &v.to_unit_value());
+            writer.write_odm_float_measure("CTHR_N", &v.to_unit_value());
         }
         if let Some(v) = &self.cthr_rdot {
-            writer.write_measure("CTHR_RDOT", &v.to_unit_value());
+            writer.write_odm_float_measure("CTHR_RDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.cthr_tdot {
-            writer.write_measure("CTHR_TDOT", &v.to_unit_value());
+            writer.write_odm_float_measure("CTHR_TDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.cthr_ndot {
-            writer.write_measure("CTHR_NDOT", &v.to_unit_value());
+            writer.write_odm_float_measure("CTHR_NDOT", &v.to_unit_value());
         }
         if let Some(v) = &self.cthr_drg {
-            writer.write_measure("CTHR_DRG", &v.to_unit_value());
+            writer.write_odm_float_measure("CTHR_DRG", &v.to_unit_value());
         }
         if let Some(v) = &self.cthr_srp {
-            writer.write_measure("CTHR_SRP", &v.to_unit_value());
+            writer.write_odm_float_measure("CTHR_SRP", &v.to_unit_value());
         }
         if let Some(v) = &self.cthr_thr {
-            writer.write_measure("CTHR_THR", &v.to_unit_value());
+            writer.write_odm_float_measure("CTHR_THR", &v.to_unit_value());
         }
     }
 }
@@ -1351,7 +1351,7 @@ impl Cdm {
         // unbounded history-sized allocation or emitting caller-visible bytes.
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
-        let output = writer.finish();
+        let output = writer.finish_checked()?;
         validate_kvn_syntax(&output)?;
         let reparsed = Self::from_kvn_str(&output)?;
         crate::traits::Validate::validate(&reparsed)?;

@@ -9,7 +9,7 @@ use crate::common::AdmHeader;
 
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
-use crate::traits::Ndm;
+use crate::traits::{Ndm, Validate};
 use crate::types::SensorNoise;
 use crate::types::*;
 use serde::{Deserialize, Serialize};
@@ -64,8 +64,9 @@ impl Ndm for Acm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let kvn = crate::detect::without_utf8_bom(kvn);
-        kvn::validate_kvn_syntax(kvn)?;
-        let acm = Self::from_kvn_str(kvn)?;
+        let normalized = crate::kvn::normalize_line_endings(kvn);
+        kvn::validate_kvn_syntax(&normalized)?;
+        let acm = Self::from_kvn_str(&normalized)?;
         crate::traits::Validate::validate(&acm)?;
         Ok(acm)
     }
@@ -591,7 +592,47 @@ impl AcmAttitudeState {
             }
             .into());
         }
-        let expected = self.number_states as usize + 1;
+        let attitude_width = match self.att_type {
+            AcmAttitudeType::Quaternion => 4,
+            AcmAttitudeType::EulerAngles => 3,
+            AcmAttitudeType::Dcm => 9,
+            _ => {
+                return Err(ValidationError::InvalidValue {
+                    field: "ATT_TYPE".into(),
+                    value: self.att_type.to_string(),
+                    expected: "QUATERNION, EULER_ANGLES, or DCM (ADM table 5-4)".into(),
+                    line: None,
+                }
+                .into());
+            }
+        };
+        let rate_width = match self.rate_type {
+            Some(AttRateType::QDot) => 4,
+            Some(_) => 3,
+            None => 0,
+        };
+        if self.number_states as usize != attitude_width + rate_width {
+            return Err(ValidationError::InvalidValue {
+                field: "NUMBER_STATES".into(),
+                value: self.number_states.to_string(),
+                expected: format!(
+                    "{} elements for ATT_TYPE and RATE_TYPE",
+                    attitude_width + rate_width
+                )
+                .into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.att_type == AcmAttitudeType::EulerAngles && self.euler_rot_seq.is_none() {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Attitude State".into(),
+                field: "EULER_ROT_SEQ".into(),
+                line: None,
+            }
+            .into());
+        }
+        let expected = attitude_width + rate_width + 1;
         if let Some(line) = self
             .att_lines
             .iter()
@@ -605,6 +646,52 @@ impl AcmAttitudeState {
                 line: None,
             }
             .into());
+        }
+        for line in &self.att_lines {
+            if self.att_type == AcmAttitudeType::Quaternion {
+                crate::common::Quaternion {
+                    q1: line.values[1],
+                    q2: line.values[2],
+                    q3: line.values[3],
+                    qc: line.values[4],
+                }
+                .validate()?;
+            }
+            for value in &line.values {
+                validate_finite_acm_value("attLine", *value)?;
+            }
+        }
+        self.validate_time_tags(|value| value)
+    }
+
+    fn validate_time_tags(&self, mut time: impl FnMut(f64) -> f64) -> Result<()> {
+        // ADM 5.3.4.4 forbids duplicate tags without requiring attitude histories to increase.
+        if !self
+            .att_lines
+            .windows(2)
+            .all(|pair| time(pair[0].values[0]) < time(pair[1].values[0]))
+            && !self
+                .att_lines
+                .windows(2)
+                .all(|pair| time(pair[0].values[0]) > time(pair[1].values[0]))
+        {
+            let mut times: Vec<_> = self
+                .att_lines
+                .iter()
+                .enumerate()
+                .map(|(index, line)| (time(line.values[0]), index))
+                .collect();
+            times.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
+            if let Some(pair) = times.windows(2).find(|pair| pair[0].0 == pair[1].0) {
+                return Err(ValidationError::InvalidValue {
+                    field: "attLine time".into(),
+                    value: pair[1].0.to_string(),
+                    expected: "non-repeated attitude time tags (ADM 5.3.4.4)".into(),
+                    line: None,
+                }
+                .at_path(format!("att_lines[{}].time", pair[1].1))
+                .into());
+            }
         }
         Ok(())
     }
@@ -885,6 +972,46 @@ impl AcmCovarianceMatrix {
                 field: "covLine".into(),
                 line: None,
             }
+            .into());
+        }
+        let diagonal_width = match self.cov_type {
+            AcmCovarianceLineType::Angle => 3,
+            AcmCovarianceLineType::Quaternion => 4,
+            AcmCovarianceLineType::AngleGyroBias | AcmCovarianceLineType::AngleAngVel => 6,
+            AcmCovarianceLineType::QuaternionGyroBias | AcmCovarianceLineType::QuaternionAngVel => {
+                7
+            }
+        };
+        for line in &self.cov_lines {
+            if line.values.len() != diagonal_width + 1 {
+                return Err(ValidationError::InvalidValue {
+                    field: "covLine".into(),
+                    value: line.values.len().to_string(),
+                    expected: format!(
+                        "relative time plus {diagonal_width} diagonal covariance elements"
+                    )
+                    .into(),
+                    line: None,
+                }
+                .into());
+            }
+            for value in &line.values {
+                validate_finite_acm_value("covLine", *value)?;
+            }
+        }
+        if let Some((index, pair)) = self
+            .cov_lines
+            .windows(2)
+            .enumerate()
+            .find(|(_, pair)| pair[0].values[0] >= pair[1].values[0])
+        {
+            return Err(ValidationError::InvalidValue {
+                field: "covLine time".into(),
+                value: pair[1].values[0].to_string(),
+                expected: "strictly increasing, non-repeated covariance time tags (ADM 5.3.4.4 and 5.3.7.5)".into(),
+                line: None,
+            }
+            .at_path(format!("cov_lines[{}].time", index + 1))
             .into());
         }
         Ok(())
@@ -1281,6 +1408,25 @@ impl AcmAttitudeDetermination {
             }
             .into());
         }
+        if self.attitude_states == Some(AcmAttitudeType::EulerAngles)
+            && self.euler_rot_seq.is_none()
+        {
+            return Err(ValidationError::MissingRequiredField {
+                block: "ACM Attitude Determination".into(),
+                field: "EULER_ROT_SEQ".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.rate_states.is_some() && self.number_states.is_some_and(|count| count < 6) {
+            return Err(ValidationError::InvalidValue {
+                field: "NUMBER_STATES".into(),
+                value: self.number_states.unwrap().to_string(),
+                expected: "at least 6 when RATE_STATES is present (ADM table 5-8)".into(),
+                line: None,
+            }
+            .into());
+        }
         if self.ref_frame_a.as_deref().unwrap_or("").trim().is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: "ACM Attitude Determination".into(),
@@ -1306,6 +1452,20 @@ impl AcmAttitudeDetermination {
             }
             .into());
         }
+        for (field, value) in [
+            ("SIGMA_U", self.sigma_u.as_ref().map(|value| value.value)),
+            ("SIGMA_V", self.sigma_v.as_ref().map(|value| value.value)),
+            (
+                "RATE_PROCESS_NOISE_STDDEV",
+                self.rate_process_noise_stddev
+                    .as_ref()
+                    .map(|value| value.value),
+            ),
+        ] {
+            if let Some(value) = value {
+                validate_finite_acm_value(field, value)?;
+            }
+        }
         if self.sensors.is_empty() {
             return Ok(());
         }
@@ -1328,6 +1488,25 @@ impl AcmAttitudeDetermination {
                     line: None,
                 }
                 .into());
+            }
+            if let Some(noise) = &sensor.sensor_noise_stddev {
+                if let Some(count) = sensor.number_sensor_noise_covariance {
+                    if noise.values.len() != count as usize {
+                        return Err(ValidationError::InvalidValue {
+                            field: "SENSOR_NOISE_STDDEV".into(),
+                            value: noise.values.len().to_string(),
+                            expected: format!(
+                                "{count} elements per NUMBER_SENSOR_NOISE_COVARIANCE"
+                            )
+                            .into(),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+                for value in &noise.values {
+                    validate_finite_acm_value("SENSOR_NOISE_STDDEV", *value)?;
+                }
             }
             if let Some(frequency) = &sensor.sensor_frequency {
                 require_positive(frequency.value, "SENSOR_FREQUENCY")?;

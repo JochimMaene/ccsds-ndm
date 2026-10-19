@@ -16,6 +16,7 @@ use crate::kvn::parser::*;
 use crate::kvn::ser::KvnWriter;
 use crate::parse_block;
 use crate::traits::ToKvn;
+use winnow::ascii::till_line_ending;
 use winnow::combinator::preceded;
 use winnow::error::{AddContext, ErrMode, FromExternalError, StrContext};
 use winnow::prelude::*;
@@ -310,11 +311,11 @@ pub fn tdm_observation(input: &mut &str) -> KvnResult<TdmObservation> {
     let (_, epoch, value) = (
         kv_sep,
         kv_calendar_epoch_token,
-        preceded(ws, parse_f64_winnow),
+        preceded(ws, till_line_ending),
     )
         .parse_next(input)?;
 
-    let data = TdmObservationData::from_key_value(key, value).map_err(|error| {
+    let data = TdmObservationData::from_key_val(key, value.trim()).map_err(|error| {
         input.reset(&checkpoint);
         ErrMode::Cut(InternalParserError::from_external_error(input, error))
     })?;
@@ -714,19 +715,19 @@ impl ToKvn for TdmMetadata {
             writer.write_pair("TIMETAG_REF", v.to_string());
         }
         if let Some(v) = self.integration_interval {
-            writer.write_pair("INTEGRATION_INTERVAL", v);
+            writer.write_odm_float_pair("INTEGRATION_INTERVAL", v);
         }
         if let Some(v) = &self.integration_ref {
             writer.write_pair("INTEGRATION_REF", v.to_string());
         }
         if let Some(v) = self.freq_offset {
-            writer.write_pair("FREQ_OFFSET", v);
+            writer.write_odm_float_pair("FREQ_OFFSET", v);
         }
         if let Some(v) = &self.range_mode {
             writer.write_pair("RANGE_MODE", v.to_string());
         }
         if let Some(v) = self.range_modulus {
-            writer.write_pair("RANGE_MODULUS", v);
+            writer.write_odm_float_pair("RANGE_MODULUS", v);
         }
         if let Some(v) = &self.range_units {
             writer.write_pair("RANGE_UNITS", v.to_string());
@@ -744,7 +745,7 @@ impl ToKvn for TdmMetadata {
             writer.write_pair("INTERPOLATION_DEGREE", v);
         }
         if let Some(v) = self.doppler_count_bias {
-            writer.write_pair("DOPPLER_COUNT_BIAS", v);
+            writer.write_odm_float_pair("DOPPLER_COUNT_BIAS", v);
         }
         if let Some(v) = self.doppler_count_scale {
             writer.write_pair("DOPPLER_COUNT_SCALE", v);
@@ -753,67 +754,67 @@ impl ToKvn for TdmMetadata {
             writer.write_pair("DOPPLER_COUNT_ROLLOVER", format!("{}", v));
         }
         if let Some(v) = self.transmit_delay_1 {
-            writer.write_pair("TRANSMIT_DELAY_1", v);
+            writer.write_odm_float_pair("TRANSMIT_DELAY_1", v);
         }
         if let Some(v) = self.transmit_delay_2 {
-            writer.write_pair("TRANSMIT_DELAY_2", v);
+            writer.write_odm_float_pair("TRANSMIT_DELAY_2", v);
         }
         if let Some(v) = self.transmit_delay_3 {
-            writer.write_pair("TRANSMIT_DELAY_3", v);
+            writer.write_odm_float_pair("TRANSMIT_DELAY_3", v);
         }
         if let Some(v) = self.transmit_delay_4 {
-            writer.write_pair("TRANSMIT_DELAY_4", v);
+            writer.write_odm_float_pair("TRANSMIT_DELAY_4", v);
         }
         if let Some(v) = self.transmit_delay_5 {
-            writer.write_pair("TRANSMIT_DELAY_5", v);
+            writer.write_odm_float_pair("TRANSMIT_DELAY_5", v);
         }
         if let Some(v) = self.receive_delay_1 {
-            writer.write_pair("RECEIVE_DELAY_1", v);
+            writer.write_odm_float_pair("RECEIVE_DELAY_1", v);
         }
         if let Some(v) = self.receive_delay_2 {
-            writer.write_pair("RECEIVE_DELAY_2", v);
+            writer.write_odm_float_pair("RECEIVE_DELAY_2", v);
         }
         if let Some(v) = self.receive_delay_3 {
-            writer.write_pair("RECEIVE_DELAY_3", v);
+            writer.write_odm_float_pair("RECEIVE_DELAY_3", v);
         }
         if let Some(v) = self.receive_delay_4 {
-            writer.write_pair("RECEIVE_DELAY_4", v);
+            writer.write_odm_float_pair("RECEIVE_DELAY_4", v);
         }
         if let Some(v) = self.receive_delay_5 {
-            writer.write_pair("RECEIVE_DELAY_5", v);
+            writer.write_odm_float_pair("RECEIVE_DELAY_5", v);
         }
         if let Some(v) = &self.data_quality {
             writer.write_pair("DATA_QUALITY", v.to_string());
         }
         if let Some(v) = self.correction_angle_1 {
-            writer.write_pair("CORRECTION_ANGLE_1", v);
+            writer.write_odm_float_pair("CORRECTION_ANGLE_1", v);
         }
         if let Some(v) = self.correction_angle_2 {
-            writer.write_pair("CORRECTION_ANGLE_2", v);
+            writer.write_odm_float_pair("CORRECTION_ANGLE_2", v);
         }
         if let Some(v) = self.correction_doppler {
-            writer.write_pair("CORRECTION_DOPPLER", v);
+            writer.write_odm_float_pair("CORRECTION_DOPPLER", v);
         }
         if let Some(v) = self.correction_mag {
-            writer.write_pair("CORRECTION_MAG", v);
+            writer.write_odm_float_pair("CORRECTION_MAG", v);
         }
         if let Some(v) = self.correction_range {
-            writer.write_pair("CORRECTION_RANGE", v);
+            writer.write_odm_float_pair("CORRECTION_RANGE", v);
         }
         if let Some(v) = self.correction_rcs {
-            writer.write_pair("CORRECTION_RCS", v);
+            writer.write_odm_float_pair("CORRECTION_RCS", v);
         }
         if let Some(v) = self.correction_receive {
-            writer.write_pair("CORRECTION_RECEIVE", v);
+            writer.write_odm_float_pair("CORRECTION_RECEIVE", v);
         }
         if let Some(v) = self.correction_transmit {
-            writer.write_pair("CORRECTION_TRANSMIT", v);
+            writer.write_odm_float_pair("CORRECTION_TRANSMIT", v);
         }
         if let Some(v) = self.correction_aberration_yearly {
-            writer.write_pair("CORRECTION_ABERRATION_YEARLY", v);
+            writer.write_odm_float_pair("CORRECTION_ABERRATION_YEARLY", v);
         }
         if let Some(v) = self.correction_aberration_diurnal {
-            writer.write_pair("CORRECTION_ABERRATION_DIURNAL", v);
+            writer.write_odm_float_pair("CORRECTION_ABERRATION_DIURNAL", v);
         }
         if let Some(v) = &self.corrections_applied {
             writer.write_pair("CORRECTIONS_APPLIED", format!("{}", v));
@@ -827,7 +828,15 @@ impl ToKvn for TdmData {
         writer.write_section("DATA_START");
         writer.write_comments(&self.comment);
         for obs in &self.observations {
-            writer.write_tdm_observation(obs.data.key(), &obs.epoch, obs.data.value());
+            if let Some(value) = obs.data.phase_count() {
+                writer.write_tdm_observation(obs.data.key(), &obs.epoch, value);
+            } else {
+                writer.write_tdm_numeric_observation(
+                    obs.data.key(),
+                    &obs.epoch,
+                    obs.data.value().expect("numeric observation"),
+                );
+            }
         }
         writer.write_section("DATA_STOP");
     }

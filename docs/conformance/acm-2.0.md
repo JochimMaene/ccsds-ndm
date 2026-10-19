@@ -1,4 +1,4 @@
-# ACM 2.0 Focused Conformance Evidence
+# ACM 2.0 conformance
 
 This inventory records maintainer evidence for standalone ACM 2.0. The
 [support matrix](../support-matrix.md) is the user-facing statement of current support.
@@ -20,9 +20,9 @@ The `acm` and `acm_kvn_allocations` suites establish:
 | KVN structure | The family-local scanner rejects non-ASCII/control input, malformed/unknown/duplicate/reordered assignments, misplaced comments, assignments after history data, unknown/nested/mismatched blocks, invalid outer-block order/repetition, invalid SENSOR nesting, and trailing content. ACM lines may have arbitrary length under CCSDS 504.0-B-2 section 6.6.2. |
 | XML structure | The shared sequence engine covers root/header/body/segment, metadata, all six data block types, nested sensor data, history records, user-defined parameters, and their legal attributes. Unknown, duplicate, reordered, and illegal-attribute content is rejected. |
 | Schema-model fidelity | ACM 2.0 covariance identifiers and basis identifiers, AD Euler sequence, sensor covariance count, frequency units, CP vector units, and target-momentum vector units are modeled. Non-schema `COV_CONFIDENCE`, `AD_EPOCH`, split CP/momentum aliases, and AD `ATTITUDE_TYPE` are rejected rather than emitted or silently lost. |
-| Fixture preservation | All four shipped KVN fixtures preserve their complete typed model through KVN and XML. Generated XML validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
-| Generation boundary | Materialized and streaming KVN generation reject non-ASCII text and numbers exceeding the CCSDS significant-digit representation before writing bytes while preserving ACM's arbitrary line lengths. Fixed-shape CP, momentum, target-attitude, and attitude-history records are validated. |
-| Resource behaviour | Attitude and covariance rows allocate exact numeric capacity. History generation uses allocation-free numeric-record/vector writers; streaming validation and generation use record-independent temporary storage. |
+| Fixture preservation | All four shipped KVN fixtures preserve their complete typed model through KVN and XML. Generated XML validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
+| Generation boundary | Materialized and streaming KVN generation reject non-ASCII text and unrepresentable numbers before writing bytes while preserving ACM's arbitrary line lengths. The shared writer rounds representable values to the CCSDS 16-significant-digit format. Fixed-shape CP, momentum, target-attitude, and attitude-history records are validated. |
+| Resource behaviour | Attitude and covariance rows allocate exact numeric capacity. History generation uses allocation-free numeric-record/vector writers. Strictly increasing or decreasing attitude histories need no temporary storage for duplicate checks; mixed-order attitude histories use a temporary time/index vector and sorting to check uniqueness without quadratic work. |
 | Reproducible workloads | `acm_kvn_history_scaling` registers 100, 10,000 and 50,000-record parse/generate workloads and `acm_xml_history_scaling` the first two, the sizes every history-carrying family shares. |
 
 ## Normative inventory reconciliation
@@ -41,7 +41,7 @@ Annex A, section A2.2.3 contains 110 ACM implementation-conformance statement ro
 | 106–110 | User defined | Block placement, leading comments, names/values, order, and XML/KVN preservation. |
 
 The typed validators enforce required fields and locally decidable record/cardinality,
-choice-dependent, frame, and fixed-shape rules. ACM's exception to the shared policy on [externally governed values](family-shared-contract.md#externally-governed-values) is
+choice-dependent, frame, and fixed-shape rules. ACM's exception to the shared policy on [externally governed values](../design/validation-contract.md#registry-governed-values) is
 sensor-model truth, which no self-contained message rule can establish.
 
 ## Public-surface and artifact evidence
@@ -51,7 +51,66 @@ sensor-model truth, which no self-contained message rule can establish.
 KVN/XML parsing and generation, generic identity, and limits. `package-python` and `package-rust`
 are the common built-artifact gates.
 
-## Status
+## Verification outcome
 
-ACM remains **Available** under the [shared promotion policy](family-shared-contract.md#promotion-policy). No family-specific promotion blocker is
-known; only the exact-cell review remains.
+ACM 2.0 meets the common [verification criteria](README.md#verification-criteria) for
+self-contained format and model validation on Rust and Python. The requirement inventory,
+family tests, shared public-route tests, and packaged tests are complementary evidence;
+none alone establishes conformance or exhaustive mutation coverage.
+
+## Decisions and limits
+
+**History time rules.** ADM §5.3.4.4 forbids duplicate time tags; §5.3.7.5 additionally
+requires covariance histories to increase monotonically. Covariance time tags are therefore
+strictly increasing; attitude history tags must be unique, but the library does not impose
+an additional increasing-order requirement absent an explicit rule. Negative relative times
+are allowed, and `0.0` and `-0.0` are the same time. The `acm::epochs` chronology tests cover
+both readers, edited models, and zero-output generation failures.
+ADM §6.8.5 excludes negative zero. Reading nevertheless accepts signed zero as a deliberate
+producer-compatibility choice: its numeric zero value is preserved, and a sign cannot make
+an otherwise duplicate time tag unique. This acceptance is not a claim that negative zero
+is a normative spelling. Floating-point KVN output canonicalizes either signed zero to `0.0`.
+KVN's 16-significant-digit rounding must also preserve timestamp uniqueness and covariance
+order: generation refuses a history whose distinct model times collapse to the same output
+time. XML can still represent those distinct `f64` times. The
+`acm::generation::kvn_rounding_must_not_collapse_distinct_history_times` regression checks
+that refusal before KVN output without banning other 17-digit input values.
+
+**Relative history times only.** ADM §5.3.4.3 permits either absolute or relative history
+time tags, with one representation throughout a block (§5.3.4.5). The bundled ACM schema
+declares both `attLine` and `covLine` as `xsd:string`; it does not limit these tags to
+relative numbers. The library's shared typed rows currently support only relative seconds
+from `EPOCH_TZERO` in both notations. This is a library model limitation, not a book/schema
+conflict. Absolute
+history epochs are rejected rather than converted or guessed. This is a supported-profile
+limitation, not a claim that the book forbids them.
+`acm::epochs::history_epochs_support_relative_numbers_only` fixes that boundary.
+
+**Maneuver times are relative.** The general absolute-or-relative wording in ADM §5.3.4.3
+conflicts with the more specific table 5-7 descriptions of `MAN_BEGIN_TIME` and
+`MAN_END_TIME`, which require seconds relative to `EPOCH_TZERO`. The ACM schema agrees
+with that table by declaring both fields as `ndm:relTimeType`. The library follows the
+specific table and schema in both notations; absolute maneuver times are rejected.
+`acm::epochs::acm_maneuver_times_use_relative_numeric_form` covers this decision.
+
+**No-rate spelling.** ADM table 5-4 lists `NONE` among `RATE_TYPE` examples, while the
+bundled schema's `attRateType` does not permit that token. KVN reading accepts
+`RATE_TYPE = NONE` or `none` as an alias for omission, following the uppercase/lowercase
+rule in ADM §6.8.6; both mean attitude-only records. Mixed-case `None` is rejected.
+The typed model stores no rate type, and canonical KVN/XML output omits `RATE_TYPE`.
+Unexpected rate columns and unknown rate tokens still fail. XML reading rejects explicit
+`NONE` because it is outside the schema enumeration.
+`acm::epochs::kvn_none_rate_type_normalizes_to_omission_while_xml_token_is_refused`
+records the normalization, canonical output, and refusals.
+
+**Line endings.** ADM §6.6.6 permits CR, LF, CRLF, and LFCR terminators. ACM reading
+accepts all four through the shared byte-length-preserving normalization, so error offsets
+remain aligned with the original input. The no-rate regression exercises every terminator.
+
+ADM annex J states that ACM was introduced in this edition. There is no ACM 1.0 edition
+established by that source, so `CCSDS_ACM_VERS = 1.0` is rejected rather than interpreted
+using 2.0 grammar. Sensor-model truth and the physical meaning of supplied frames remain
+caller context; fixed shapes, declared counts, and numeric domains remain library checks.
+
+Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
+artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).

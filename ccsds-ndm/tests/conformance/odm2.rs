@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use crate::common::mutated_once;
+use crate::common::{fixtures, mutated_once};
 
 use ccsds_ndm::messages::{oem::Oem, omm::Omm, opm::Opm};
 use ccsds_ndm::{Ndm, Validate};
@@ -56,12 +56,17 @@ fn edition_2(input: &str) -> String {
 
 #[test]
 fn opm_2_generation_is_schema_valid_and_round_trips() {
-    let opm = Opm::from_kvn(&edition_2(include_str!("../../data/kvn/opm_g1.kvn"))).unwrap();
-    let xml = opm.to_xml().unwrap();
-    validate_with_odm_2_xsd("opm", &xml);
-    let parsed = Opm::from_xml(&xml).unwrap();
-    assert_eq!(parsed.version, "2.0");
-    assert_eq!(parsed, opm);
+    for (name, source) in fixtures("opm_", "kvn") {
+        let opm = Opm::from_kvn(&edition_2(&source)).unwrap();
+        let xml = opm.to_xml().unwrap();
+        validate_with_odm_2_xsd("opm", &xml);
+        assert_eq!(Opm::from_xml(&xml).unwrap(), opm, "{name} XML");
+        assert_eq!(
+            Opm::from_kvn(&opm.to_kvn().unwrap()).unwrap(),
+            opm,
+            "{name} KVN"
+        );
+    }
 }
 
 /// Every shipped OEM example as OEM 2.0. Annex J of 502.0-B-3 and the 2.0 schema differ from
@@ -207,12 +212,17 @@ fn oem_2_useable_start_may_not_precede_the_previous_useable_stop() {
 
 #[test]
 fn omm_2_generation_is_schema_valid_and_round_trips() {
-    let omm = Omm::from_kvn(&edition_2(include_str!("../../data/kvn/omm_g7.kvn"))).unwrap();
-    let xml = omm.to_xml().unwrap();
-    validate_with_odm_2_xsd("omm", &xml);
-    let parsed = Omm::from_xml(&xml).unwrap();
-    assert_eq!(parsed.version, "2.0");
-    assert_eq!(parsed, omm);
+    for (name, source) in fixtures("omm_", "kvn") {
+        let omm = Omm::from_kvn(&edition_2(&source)).unwrap();
+        let xml = omm.to_xml().unwrap();
+        validate_with_odm_2_xsd("omm", &xml);
+        assert_eq!(Omm::from_xml(&xml).unwrap(), omm, "{name} XML");
+        assert_eq!(
+            Omm::from_kvn(&omm.to_kvn().unwrap()).unwrap(),
+            omm,
+            "{name} KVN"
+        );
+    }
 }
 
 #[test]
@@ -221,4 +231,124 @@ fn odm_2_generation_rejects_odm_3_only_fields() {
     opm.header.message_id = Some("OPM-3-ONLY".into());
     let error = opm.to_xml().unwrap_err();
     assert_eq!(error.field_path().as_deref(), Some("header.message_id"));
+}
+
+#[test]
+fn opm_and_omm_2_reject_new_header_fields_in_both_notations() {
+    for source in [
+        include_str!("../../data/kvn/opm_g1.kvn"),
+        include_str!("../../data/kvn/omm_g7.kvn"),
+    ] {
+        for (keyword, path) in [
+            ("CLASSIFICATION", "header.classification"),
+            ("MESSAGE_ID", "header.message_id"),
+        ] {
+            let mut message = ccsds_ndm::from_str(&edition_2(source)).unwrap();
+            let header = match &mut message {
+                ccsds_ndm::Message::Opm(message) => &mut message.header,
+                ccsds_ndm::Message::Omm(message) => &mut message.header,
+                _ => unreachable!(),
+            };
+            match keyword {
+                "CLASSIFICATION" => header.classification = Some("U".into()),
+                _ => header.message_id = Some("new-only".into()),
+            }
+            for error in [message.to_kvn().unwrap_err(), message.to_xml().unwrap_err()] {
+                assert_eq!(error.field_path().as_deref(), Some(path));
+            }
+            match &mut message {
+                ccsds_ndm::Message::Opm(message) => message.version = "3.0".into(),
+                ccsds_ndm::Message::Omm(message) => message.version = "3.0".into(),
+                _ => unreachable!(),
+            }
+            for source in [
+                message.to_kvn().unwrap().replacen("= 3.0", "= 2.0", 1),
+                message
+                    .to_xml()
+                    .unwrap()
+                    .replace("version=\"3.0\"", "version=\"2.0\""),
+            ] {
+                let error = ccsds_ndm::from_str(&source).unwrap_err();
+                assert_eq!(error.field_path().as_deref(), Some(path));
+            }
+        }
+    }
+}
+
+#[test]
+fn omm_2_tle_shape_is_checked_after_mutation_and_at_both_input_boundaries() {
+    let base = Omm::from_kvn(&edition_2(include_str!("../../data/kvn/omm_g7.kvn"))).unwrap();
+    type Edit = fn(&mut ccsds_ndm::messages::omm::TleParameters);
+    let mutations: &[(&str, Edit)] = &[
+        ("norad_cat_id", |tle| tle.norad_cat_id = None),
+        ("element_set_no", |tle| tle.element_set_no = None),
+        ("rev_at_epoch", |tle| tle.rev_at_epoch = None),
+        ("bstar", |tle| tle.bstar = None),
+        ("mean_motion_ddot", |tle| tle.mean_motion_ddot = None),
+        ("bterm", |tle| {
+            tle.bstar = None;
+            tle.bterm = Some(ccsds_ndm::types::M2kg::new(0.01, None));
+        }),
+        ("agom", |tle| {
+            tle.mean_motion_ddot = None;
+            tle.agom = Some(ccsds_ndm::types::M2kg::new(0.01, None));
+        }),
+    ];
+    for (field, mutate) in mutations {
+        let mut message = base.clone();
+        mutate(message.body.segment.data.tle_parameters.as_mut().unwrap());
+        assert!(message.validate().is_err(), "{field}");
+        assert!(message.to_kvn().is_err(), "{field}");
+        assert!(message.to_xml().is_err(), "{field}");
+        // A neutral theory permits omission of the 3.0 conditional coefficients while the
+        // 2.0 XSD requires them whenever the TLE block is present.
+        message.version = "3.0".into();
+        message.body.segment.metadata.mean_element_theory = "ICD_THEORY".into();
+        for source in [
+            message.to_kvn().unwrap().replacen("= 3.0", "= 2.0", 1),
+            message
+                .to_xml()
+                .unwrap()
+                .replace("version=\"3.0\"", "version=\"2.0\""),
+        ] {
+            assert!(ccsds_ndm::from_str(&source).is_err(), "{field}");
+        }
+    }
+}
+
+#[test]
+fn opm_2_requires_negative_maneuver_delta_mass_in_every_route() {
+    let mut message = Opm::from_kvn(&edition_2(include_str!("../../data/kvn/opm_g2.kvn"))).unwrap();
+    message.body.segment.data.maneuver_parameters[0]
+        .man_delta_mass
+        .value = 0.0;
+    let path = "body.segment.data.maneuver_parameters[0].man_delta_mass";
+    assert_eq!(
+        message.validate().unwrap_err().field_path().as_deref(),
+        Some(path)
+    );
+    assert_eq!(
+        message.to_kvn().unwrap_err().field_path().as_deref(),
+        Some(path)
+    );
+    assert_eq!(
+        message.to_xml().unwrap_err().field_path().as_deref(),
+        Some(path)
+    );
+    message.version = "3.0".into();
+    for source in [
+        message.to_kvn().unwrap().replacen("= 3.0", "= 2.0", 1),
+        message
+            .to_xml()
+            .unwrap()
+            .replace("version=\"3.0\"", "version=\"2.0\""),
+    ] {
+        assert_eq!(
+            ccsds_ndm::from_str(&source)
+                .unwrap_err()
+                .field_path()
+                .as_deref(),
+            Some(path)
+        );
+    }
 }

@@ -6,7 +6,7 @@ use ccsds_ndm::messages::omm::Omm;
 use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::messages::tdm::Tdm;
 use ccsds_ndm::messages::{aem::Aem, oem::Oem, opm::Opm};
-use ccsds_ndm::{convert, convert_file, Message, Ndm, Notation};
+use ccsds_ndm::{convert, convert_file, Message, Ndm, Notation, Validate};
 
 use crate::common::assert_rejects;
 
@@ -28,6 +28,7 @@ fn assert_output_contract<M: Ndm + Clone>(
     valid.write_xml_to(&mut output).unwrap();
     assert_eq!(output, xml.as_bytes());
     let erased = wrap(valid.clone());
+    erased.validate().unwrap();
     assert_eq!(erased.to_kvn().unwrap(), kvn);
     assert_eq!(erased.to_xml().unwrap(), xml);
     output.clear();
@@ -38,6 +39,10 @@ fn assert_output_contract<M: Ndm + Clone>(
     assert_eq!(output, xml.as_bytes());
     let expected = invalid.validate().unwrap_err();
     let invalid_erased = wrap(invalid.clone());
+    assert_eq!(
+        invalid_erased.validate().unwrap_err().as_validation_error(),
+        expected.as_validation_error()
+    );
     output.clear();
     for error in [
         invalid_erased.to_kvn().unwrap_err(),
@@ -289,8 +294,12 @@ fn file_conversion_replaces_destinations_and_preserves_permissions() {
 #[test]
 fn failed_file_conversion_preserves_existing_and_absent_destinations() {
     let legacy = crate::common::mutated_once(
-        include_str!("../../data/kvn/aem_g4.kvn"),
-        "_VERS = 2.0",
+        &include_str!("../../data/kvn/oem_g11.kvn")
+            .lines()
+            .filter(|line| !line.starts_with("MESSAGE_ID"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        "_VERS = 3.0",
         "_VERS = 1.0",
     );
     // A legacy message parses successfully but cannot be generated in either notation.
@@ -347,7 +356,7 @@ fn file_conversion_can_replace_its_own_source() {
 #[test]
 fn xml_generation_rejects_forbidden_xml_1_characters_before_streaming() {
     let mut cdm = Cdm::from_kvn(include_str!("../../data/kvn/cdm_362.kvn")).unwrap();
-    cdm.header.originator = "JS\u{1}POC".into();
+    cdm.body.segments[0].metadata.object_name = "JS\u{1}POC".into();
     let error = cdm.to_xml().expect_err("U+0001 reached XML generation");
     assert!(
         error.to_string().contains("only XML 1.0 characters"),

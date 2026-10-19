@@ -43,23 +43,23 @@ fn exhaustive_observation_data() {
         ("RECEIVE_FREQ_5", TdmObservationData::ReceiveFreq5(21.0)),
         (
             "RECEIVE_PHASE_CT_1",
-            TdmObservationData::ReceivePhaseCt1(22.0),
+            TdmObservationData::ReceivePhaseCt1("22.0".into()),
         ),
         (
             "RECEIVE_PHASE_CT_2",
-            TdmObservationData::ReceivePhaseCt2(23.0),
+            TdmObservationData::ReceivePhaseCt2("23.0".into()),
         ),
         (
             "RECEIVE_PHASE_CT_3",
-            TdmObservationData::ReceivePhaseCt3(24.0),
+            TdmObservationData::ReceivePhaseCt3("24.0".into()),
         ),
         (
             "RECEIVE_PHASE_CT_4",
-            TdmObservationData::ReceivePhaseCt4(25.0),
+            TdmObservationData::ReceivePhaseCt4("25.0".into()),
         ),
         (
             "RECEIVE_PHASE_CT_5",
-            TdmObservationData::ReceivePhaseCt5(26.0),
+            TdmObservationData::ReceivePhaseCt5("26.0".into()),
         ),
         (
             "RHUMIDITY",
@@ -94,23 +94,23 @@ fn exhaustive_observation_data() {
         ),
         (
             "TRANSMIT_PHASE_CT_1",
-            TdmObservationData::TransmitPhaseCt1(39.0),
+            TdmObservationData::TransmitPhaseCt1("39.0".into()),
         ),
         (
             "TRANSMIT_PHASE_CT_2",
-            TdmObservationData::TransmitPhaseCt2(40.0),
+            TdmObservationData::TransmitPhaseCt2("40.0".into()),
         ),
         (
             "TRANSMIT_PHASE_CT_3",
-            TdmObservationData::TransmitPhaseCt3(41.0),
+            TdmObservationData::TransmitPhaseCt3("41.0".into()),
         ),
         (
             "TRANSMIT_PHASE_CT_4",
-            TdmObservationData::TransmitPhaseCt4(42.0),
+            TdmObservationData::TransmitPhaseCt4("42.0".into()),
         ),
         (
             "TRANSMIT_PHASE_CT_5",
-            TdmObservationData::TransmitPhaseCt5(43.0),
+            TdmObservationData::TransmitPhaseCt5("43.0".into()),
         ),
         ("TROPO_DRY", TdmObservationData::TropoDry(44.0)),
         ("TROPO_WET", TdmObservationData::TropoWet(45.0)),
@@ -137,4 +137,97 @@ fn tdm_observation_data_errors() {
         &TdmObservationData::from_key_val("UNKNOWN", "1.0").unwrap_err(),
         "UNKNOWN",
     );
+}
+
+#[test]
+fn exact_phase_counts_survive_both_notations_without_floating_point() {
+    use ccsds_ndm::messages::tdm::Tdm;
+    use ccsds_ndm::{convert, Ndm};
+    let baseline = include_str!("../../data/kvn/tdm_e1.kvn");
+    for direction in ["RECEIVE", "TRANSMIT"] {
+        for index in 1..=5 {
+            let key = format!("{direction}_PHASE_CT_{index}");
+            for value in [
+                "9007199254740993.12345678901234567890",
+                "1.234567890123456789e999",
+            ] {
+                let mut message = Tdm::from_kvn(baseline).unwrap();
+                message.body.segments[0].data.observations[0].data =
+                    TdmObservationData::from_key_val(&key, value).unwrap();
+                let kvn = message.to_kvn().unwrap();
+                let xml = message.to_xml().unwrap();
+                assert!(kvn.contains(value));
+                assert!(xml.contains(value));
+                assert_eq!(Tdm::from_kvn(&kvn).unwrap(), message);
+                assert_eq!(Tdm::from_xml(&xml).unwrap(), message);
+                assert!(convert(&xml, ccsds_ndm::Notation::Kvn)
+                    .unwrap()
+                    .contains(value));
+                assert_eq!(
+                    message.body.segments[0].data.observations[0].data.value(),
+                    None
+                );
+            }
+            for invalid in ["NaN", "inf", "", ".", "1e", "1 2", "1\n2"] {
+                assert!(
+                    TdmObservationData::from_key_val(&key, invalid).is_err(),
+                    "{invalid}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn tdm_open_metadata_domains_refuse_only_unrepresentable_xml() {
+    use ccsds_ndm::messages::tdm::Tdm;
+    use ccsds_ndm::{Ndm, Validate};
+    let baseline = include_str!("../../data/kvn/tdm_e1.kvn");
+    for (field, value) in [("ANGLE_TYPE", "ICD_CUSTOM"), ("REFERENCE_FRAME", "GCRF")] {
+        let mut message = Tdm::from_kvn(baseline).unwrap();
+        let metadata = &mut message.body.segments[0].metadata;
+        if field == "ANGLE_TYPE" {
+            metadata.angle_type = Some(value.parse().unwrap());
+        } else {
+            metadata.reference_frame = Some(value.parse().unwrap());
+        }
+        message.validate().unwrap();
+        let kvn = message.to_kvn().unwrap();
+        assert!(kvn.contains(value));
+        assert_eq!(Tdm::from_kvn(&kvn).unwrap(), message);
+        assert!(message.to_xml().unwrap_err().to_string().contains(field));
+        let mut output = Vec::new();
+        assert!(message.write_xml_to(&mut output).is_err());
+        assert!(output.is_empty());
+    }
+    let mut message = Tdm::from_kvn(baseline).unwrap();
+    for invalid in ["UNKNOWN", "RANGE,", "COMMENT"] {
+        message.body.segments[0].metadata.data_types = Some(invalid.into());
+        assert!(message.validate().is_err());
+    }
+    message.body.segments[0].metadata.data_types = Some("RANGE, TRANSMIT_FREQ_n".into());
+    message.validate().unwrap();
+}
+
+#[test]
+fn xml_metadata_enumerations_keep_their_case_sensitive_domain() {
+    use ccsds_ndm::messages::tdm::Tdm;
+    use ccsds_ndm::Ndm;
+    let baseline = include_str!("../../data/kvn/tdm_e1.kvn");
+    for (field, value) in [("ANGLE_TYPE", "AZEL"), ("REFERENCE_FRAME", "EME2000")] {
+        let mut message = Tdm::from_kvn(baseline).unwrap();
+        let metadata = &mut message.body.segments[0].metadata;
+        if field == "ANGLE_TYPE" {
+            metadata.angle_type = Some(value.parse().unwrap());
+        } else {
+            metadata.reference_frame = Some(value.parse().unwrap());
+        }
+        let xml = message.to_xml().unwrap();
+        let lower = xml.replace(
+            &format!("<{field}>{value}"),
+            &format!("<{field}>{}", value.to_ascii_lowercase()),
+        );
+        assert_ne!(xml, lower);
+        assert!(Tdm::from_xml(&lower).is_err());
+    }
 }

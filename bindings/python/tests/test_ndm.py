@@ -101,6 +101,8 @@ class TestNdm:
             object_name="SAT1",
             international_designator="2023-001A",
             ref_frame="EME2000",
+            covariance_method="CALCULATED",
+            maneuverable="YES",
         )
         vector1 = CdmStateVector(7000.0, 0.0, 0.0, 0.0, 7.5, 0.0)
         cov_args = (
@@ -141,6 +143,8 @@ class TestNdm:
             object_name="DEBRIS",
             international_designator="UNKNOWN",
             ref_frame="EME2000",
+            covariance_method="CALCULATED",
+            maneuverable="YES",
         )
         vector2 = CdmStateVector(7100.0, 0.0, 0.0, 0.0, 7.4, 0.0)
         cov2 = CdmCovarianceMatrix(*cov_args)

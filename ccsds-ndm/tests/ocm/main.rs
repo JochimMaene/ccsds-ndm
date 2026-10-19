@@ -1,5 +1,6 @@
 #[path = "../common/mod.rs"]
 mod common;
+mod corrigendum;
 mod epochs;
 mod generation;
 mod minimal;

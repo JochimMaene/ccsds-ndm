@@ -289,7 +289,7 @@ impl crate::traits::Validate for ApmData {
     fn validate(&self) -> Result<()> {
         crate::validation::epoch_precision(&[("EPOCH", &self.epoch)])?;
         for maneuver in &self.maneuver_parameters {
-            crate::validation::epoch_precision(&[("MAN_EPOCH_START", &maneuver.man_epoch_start)])?;
+            crate::traits::Validate::validate(maneuver)?;
         }
         if self.quaternion_state.is_empty()
             && self.euler_angle_state.is_empty()
@@ -306,7 +306,7 @@ impl crate::traits::Validate for ApmData {
             .into());
         }
         for block in &self.quaternion_state {
-            block.quaternion.validate()?;
+            crate::traits::Validate::validate(block)?;
         }
         for block in &self.spin {
             block.validate()?;
