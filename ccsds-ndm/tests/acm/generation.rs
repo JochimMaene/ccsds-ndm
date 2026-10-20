@@ -5,6 +5,21 @@ use ccsds_ndm::types::{AngleRate, Vec4Double};
 use ccsds_ndm::Ndm;
 
 #[test]
+fn user_defined_punctuation_survives_generated_kvn() {
+    use ccsds_ndm::types::{UserDefined, UserDefinedEntry, UserDefinedParameter};
+    let mut message = Acm::from_kvn(include_str!("../../data/kvn/acm_g6.kvn")).unwrap();
+    let block = UserDefined {
+        entries: vec![UserDefinedEntry::Parameter(UserDefinedParameter {
+            parameter: "USER_DEFINED_FOO-BAR.X".into(),
+            value: "1".into(),
+        })],
+    };
+    message.body.segment.data.user = Some(block.clone());
+    let parsed = Acm::from_kvn(&message.to_kvn().unwrap()).unwrap();
+    assert_eq!(parsed.body.segment.data.user, Some(block));
+}
+
+#[test]
 fn kvn_rounding_must_not_collapse_distinct_history_times() {
     let mut attitude = Acm::from_kvn(include_str!("../../data/kvn/acm_g6.kvn")).unwrap();
     attitude.body.segment.data.att[0].att_lines.truncate(2);
@@ -518,4 +533,19 @@ fn acm_supplied_sensor_numbers_are_in_ascending_order_and_may_be_omitted() {
     let sensors = &mut message.body.segment.data.ad.as_mut().unwrap().sensors;
     sensors[0].sensor_number = Some(8);
     assert_rejects(&message, "SENSOR_NUMBER");
+}
+
+#[test]
+fn sensor_frequency_schema_bound_is_xml_only() {
+    use ccsds_ndm::{types::Frequency, Validate};
+    let mut message = Acm::from_kvn(COV_KVN).unwrap();
+    let sensor = &mut message.body.segment.data.ad.as_mut().unwrap().sensors[0];
+    sensor.sensor_frequency = Some(Frequency::new(0.0, None).unwrap());
+    message.validate().unwrap();
+    let kvn = message.to_kvn().unwrap();
+    Acm::from_kvn(&kvn).unwrap();
+    assert!(message.to_xml().is_err());
+    let mut output = Vec::new();
+    assert!(message.write_xml_to(&mut output).is_err());
+    assert!(output.is_empty());
 }

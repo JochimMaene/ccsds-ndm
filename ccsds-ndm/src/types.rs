@@ -922,73 +922,9 @@ impl RelativeTime {
 }
 
 fn relative_time_is_valid(value: &str) -> bool {
-    if value.is_empty() || value.len() > MAX_EPOCH_LEN || !value.is_ascii() {
-        return false;
-    }
-
-    let bytes = value.as_bytes();
-    let mut index = 0;
-    if matches!(bytes.first(), Some(b'+' | b'-')) {
-        index = 1;
-    }
-
-    let integer_start = index;
-    while bytes.get(index).is_some_and(u8::is_ascii_digit) {
-        index += 1;
-    }
-    let integer_digits = index - integer_start;
-
-    let mut fraction_digits = 0;
-    let has_decimal = bytes.get(index) == Some(&b'.');
-    if has_decimal {
-        index += 1;
-        let fraction_start = index;
-        while bytes.get(index).is_some_and(u8::is_ascii_digit) {
-            index += 1;
-        }
-        fraction_digits = index - fraction_start;
-    }
-
-    // ADM §6.8.4 requires a digit on both sides of the decimal point for fixed/scientific
-    // values. A plain integer is also valid under §6.8.3.
-    if integer_digits == 0 || (has_decimal && fraction_digits == 0) {
-        return false;
-    }
-
-    let has_exponent = matches!(bytes.get(index), Some(b'e' | b'E'));
-    if has_exponent {
-        // The ADM floating-point form uses a one-digit mantissa before the decimal point.
-        if !has_decimal || integer_digits != 1 {
-            return false;
-        }
-        index += 1;
-        if matches!(bytes.get(index), Some(b'+' | b'-')) {
-            index += 1;
-        }
-        let exponent_start = index;
-        while bytes.get(index).is_some_and(u8::is_ascii_digit) {
-            index += 1;
-        }
-        if index == exponent_start {
-            return false;
-        }
-    }
-
-    if index != bytes.len() {
-        return false;
-    }
-
-    // The Blue Book limits the mantissa to 16 significant decimal digits and excludes NaN,
-    // infinities, and negative zero. Parsing once here is construction-time work only; the
-    // serializer writes the retained spelling without reparsing.
-    if has_decimal && integer_digits + fraction_digits > 16 {
-        return false;
-    }
-    let parsed = value.parse::<f64>().ok();
-    let Some(parsed) = parsed else {
-        return false;
-    };
-    parsed.is_finite() && !(value.starts_with('-') && parsed == 0.0)
+    !value.is_empty()
+        && value.len() <= MAX_EPOCH_LEN
+        && crate::kvn::parser::parse_ccsds_number(value).is_some()
 }
 
 impl std::fmt::Display for RelativeTime {
@@ -1960,7 +1896,7 @@ impl std::fmt::Display for Percentage {
         write!(f, "{}", self.value)
     }
 }
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct DayIntervalRequired {
     #[serde(rename = "$value")]
     pub value: f64,
@@ -1968,7 +1904,7 @@ pub struct DayIntervalRequired {
     pub units: DayIntervalUnits,
 }
 impl DayIntervalRequired {
-    /// dayIntervalTypeUR: positiveDouble (>0, units required)
+    /// A finite day interval; XML additionally requires positivity and day units.
     pub fn new(value: f64) -> Result<Self> {
         Self::validate_value(value, "DayIntervalRequired")?;
         Ok(Self {
@@ -1978,6 +1914,10 @@ impl DayIntervalRequired {
     }
 
     pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
+        require_finite(name, value)
+    }
+
+    pub(crate) fn validate_xml_value(value: f64, name: &'static str) -> Result<()> {
         require_positive(value, name)
     }
     pub fn to_unit_value(&self) -> UnitValue<f64, DayIntervalUnits> {
@@ -1985,6 +1925,26 @@ impl DayIntervalRequired {
             value: self.value,
             units: Some(self.units.clone()),
         }
+    }
+}
+impl<'de> Deserialize<'de> for DayIntervalRequired {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct XmlValue {
+            #[serde(rename = "$value")]
+            value: f64,
+            #[serde(rename = "@units")]
+            units: DayIntervalUnits,
+        }
+        let value = XmlValue::deserialize(deserializer)?;
+        Self::validate_xml_value(value.value, "DayIntervalRequired")
+            .map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            value: value.value,
+            units: value.units,
+        })
     }
 }
 impl FromKvnFloat for DayIntervalRequired {
@@ -2003,7 +1963,7 @@ impl std::fmt::Display for DayIntervalRequired {
 
 define_unit_enum!(FrequencyUnits, Hz, { Hz => "Hz" });
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct Frequency {
     #[serde(rename = "$value")]
     pub value: f64,
@@ -2011,24 +1971,32 @@ pub struct Frequency {
     pub units: Option<FrequencyUnits>,
 }
 impl Frequency {
-    /// frequencyType: positiveDouble (>0)
+    /// Construct a finite frequency; XML additionally requires a positive value.
     pub fn new(value: f64, units: Option<FrequencyUnits>) -> Result<Self> {
-        if value <= 0.0 {
-            return Err(crate::error::ValidationError::OutOfRange {
-                name: "Frequency".into(),
-                value: value.to_string(),
-                expected: "> 0".into(),
-                line: None,
-            }
-            .into());
-        }
+        require_finite("Frequency", value)?;
         Ok(Self { value, units })
+    }
+
+    pub(crate) fn validate_xml_value(value: f64, name: &'static str) -> Result<()> {
+        require_positive(value, name)
     }
     pub fn to_unit_value(&self) -> UnitValue<f64, FrequencyUnits> {
         UnitValue {
             value: self.value,
             units: self.units.clone(),
         }
+    }
+}
+impl<'de> Deserialize<'de> for Frequency {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let value = UnitValue::<f64, FrequencyUnits>::deserialize(deserializer)?;
+        Self::validate_xml_value(value.value, "Frequency").map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            value: value.value,
+            units: value.units,
+        })
     }
 }
 impl FromKvnFloat for Frequency {
@@ -2083,7 +2051,9 @@ impl<'de> serde::Deserialize<'de> for Gm {
             where
                 E: serde::de::Error,
             {
-                v.parse::<Gm>().map_err(E::custom)
+                let value = v.parse::<Gm>().map_err(E::custom)?;
+                Gm::validate_xml_value(value.value, "GM").map_err(E::custom)?;
+                Ok(value)
             }
 
             fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
@@ -2104,6 +2074,7 @@ impl<'de> serde::Deserialize<'de> for Gm {
                 }
 
                 let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
+                Gm::validate_xml_value(value, "GM").map_err(serde::de::Error::custom)?;
                 Gm::new(value, units).map_err(serde::de::Error::custom)
             }
         }
@@ -2113,13 +2084,17 @@ impl<'de> serde::Deserialize<'de> for Gm {
 }
 
 impl Gm {
-    /// gmType: positiveDouble (>0)
+    /// Construct a finite GM; XML additionally requires a positive value.
     pub fn new(value: f64, units: Option<GmUnits>) -> Result<Self> {
         Self::validate_value(value, "GM")?;
         Ok(Self { value, units })
     }
 
     pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
+        require_finite(name, value)
+    }
+
+    pub(crate) fn validate_xml_value(value: f64, name: &'static str) -> Result<()> {
         require_positive(value, name)
     }
     pub fn to_unit_value(&self) -> UnitValue<f64, GmUnits> {
@@ -3211,6 +3186,17 @@ impl TargetMomentum {
     }
 }
 
+/// Closed KVN enum aliases permit upper- or lowercase tokens, never arbitrary mixed case.
+fn enum_token(value: &str) -> std::borrow::Cow<'_, str> {
+    if value.bytes().any(|byte| byte.is_ascii_lowercase())
+        && !value.bytes().any(|byte| byte.is_ascii_uppercase())
+    {
+        std::borrow::Cow::Owned(value.to_ascii_uppercase())
+    } else {
+        std::borrow::Cow::Borrowed(value)
+    }
+}
+
 // Categorical Enums
 //----------------------------------------------------------------------
 
@@ -3231,13 +3217,17 @@ pub enum ObjectDescription {
 impl std::str::FromStr for ObjectDescription {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "PAYLOAD" => Ok(Self::Payload),
             "ROCKET BODY" => Ok(Self::RocketBody),
             "DEBRIS" => Ok(Self::Debris),
             "UNKNOWN" => Ok(Self::Unknown),
             "OTHER" => Ok(Self::Other),
-            _ => Ok(Self::Other),
+            _ => Err(crate::error::EnumParseError {
+                field: "OBJECT_TYPE",
+                value: s.to_string(),
+                expected: "PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, or OTHER",
+            }),
         }
     }
 }
@@ -3428,7 +3418,7 @@ impl std::fmt::Display for TrajBasis {
 impl std::str::FromStr for TrajBasis {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "PREDICTED" => Ok(Self::Predicted),
             "DETERMINED" => Ok(Self::Determined),
             "TELEMETRY" => Ok(Self::Telemetry),
@@ -3516,7 +3506,7 @@ impl std::fmt::Display for CovBasis {
 impl std::str::FromStr for CovBasis {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "PREDICTED" => Ok(Self::Predicted),
             "DETERMINED" => Ok(Self::Determined),
             "EMPIRICAL" => Ok(Self::Empirical),
@@ -3583,7 +3573,7 @@ impl std::fmt::Display for ManBasis {
 impl std::str::FromStr for ManBasis {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "CANDIDATE" => Ok(Self::Candidate),
             "PLANNED" => Ok(Self::Planned),
             "ANTICIPATED" => Ok(Self::Anticipated),
@@ -3631,7 +3621,7 @@ impl std::fmt::Display for ManDc {
 impl std::str::FromStr for ManDc {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "CONTINUOUS" => Ok(Self::Continuous),
             "TIME" => Ok(Self::Time),
             "TIME_AND_ANGLE" => Ok(Self::TimeAndAngle),
@@ -3682,7 +3672,7 @@ impl std::fmt::Display for CovOrder {
 impl std::str::FromStr for CovOrder {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "LTM" => Ok(Self::Ltm),
             "UTM" => Ok(Self::Utm),
             "FULL" => Ok(Self::Full),
@@ -4389,64 +4379,89 @@ impl std::fmt::Display for AngVelFrameType {
 ///
 /// **CCSDS Reference**: 502.0-B-3, Sections 3.2.4 (OPM) and 4.2.4 (OMM).
 /// OCM 3.0 uses its separate ordered `OcmUserDefined` model.
-#[derive(Serialize, Debug, PartialEq, Clone, Default)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[serde(deny_unknown_fields)]
 pub struct UserDefined {
-    /// Comments (see 7.8 for formatting rules), emitted before all parameters.
-    /// Comment order and parameter order are retained separately; their original interleaving
-    /// is not represented by this model.
-    ///
-    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
-    #[serde(rename = "COMMENT", default, skip_serializing_if = "Vec::is_empty")]
-    pub comment: Vec<String>,
-    /// List of user-defined parameters.
-    #[serde(
-        rename = "USER_DEFINED",
-        default,
-        skip_serializing_if = "Vec::is_empty"
-    )]
-    pub user_defined: Vec<UserDefinedParameter>,
+    /// Comments and parameters in their original XML order.
+    #[serde(rename = "$value", default)]
+    pub entries: Vec<UserDefinedEntry>,
 }
 
-/// `userDefinedType` wraps its children in an unbounded `xsd:sequence`, so COMMENT and
-/// USER_DEFINED may alternate and each keyword can reappear after the other. The derived
-/// implementation treats the second run of a keyword as a duplicate field, so the two runs are
-/// accumulated by hand instead. Ordering between the two lists is not part of the model.
-impl<'de> Deserialize<'de> for UserDefined {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        const FIELDS: &[&str] = &["COMMENT", "USER_DEFINED"];
+/// An ordered entry in a user-defined block.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum UserDefinedEntry {
+    #[serde(rename = "COMMENT")]
+    Comment(String),
+    #[serde(rename = "USER_DEFINED")]
+    Parameter(UserDefinedParameter),
+}
 
-        struct UserDefinedVisitor;
+impl UserDefined {
+    pub fn comments(&self) -> impl Iterator<Item = &String> {
+        self.entries.iter().filter_map(|entry| match entry {
+            UserDefinedEntry::Comment(value) => Some(value),
+            _ => None,
+        })
+    }
 
-        impl<'de> serde::de::Visitor<'de> for UserDefinedVisitor {
-            type Value = UserDefined;
+    pub fn parameters(&self) -> impl Iterator<Item = &UserDefinedParameter> {
+        self.entries.iter().filter_map(|entry| match entry {
+            UserDefinedEntry::Parameter(value) => Some(value),
+            _ => None,
+        })
+    }
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("a USER DEFINED PARAMETERS block")
-            }
+    pub fn parameters_mut(&mut self) -> impl Iterator<Item = &mut UserDefinedParameter> {
+        self.entries.iter_mut().filter_map(|entry| match entry {
+            UserDefinedEntry::Parameter(value) => Some(value),
+            _ => None,
+        })
+    }
 
-            fn visit_map<A>(self, mut map: A) -> std::result::Result<UserDefined, A::Error>
-            where
-                A: serde::de::MapAccess<'de>,
-            {
-                let mut block = UserDefined::default();
-                while let Some(key) = map.next_key::<String>()? {
-                    match key.as_str() {
-                        "COMMENT" => block.comment.extend(map.next_value::<Vec<String>>()?),
-                        "USER_DEFINED" => block
-                            .user_defined
-                            .extend(map.next_value::<Vec<UserDefinedParameter>>()?),
-                        other => return Err(serde::de::Error::unknown_field(other, FIELDS)),
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        let mut parameter_seen = false;
+        for entry in &self.entries {
+            match entry {
+                UserDefinedEntry::Parameter(value) => {
+                    if value.parameter.is_empty()
+                        || !value.parameter.bytes().all(|byte| {
+                            byte.is_ascii_graphic() && !byte.is_ascii_lowercase() && byte != b'='
+                        })
+                    {
+                        return Err(crate::error::ValidationError::InvalidValue {
+                            field: "USER_DEFINED parameter".into(),
+                            value: value.parameter.clone(),
+                            expected: "a nonempty uppercase printable ASCII suffix without whitespace or =".into(),
+                            line: None,
+                        }.into());
                     }
+                    parameter_seen = true;
                 }
-                Ok(block)
+                UserDefinedEntry::Comment(_) if parameter_seen => {
+                    return Err(crate::error::ValidationError::Generic {
+                        message: "KVN user-defined comments must precede parameters; XML entry order cannot be preserved".into(),
+                        line: None,
+                    }.into());
+                }
+                _ => {}
             }
         }
+        Ok(())
+    }
+}
 
-        deserializer.deserialize_map(UserDefinedVisitor)
+impl crate::traits::ToKvn for UserDefined {
+    fn write_kvn(&self, writer: &mut crate::kvn::ser::KvnWriter) {
+        for entry in &self.entries {
+            match entry {
+                UserDefinedEntry::Comment(value) => {
+                    writer.write_comments(std::slice::from_ref(value))
+                }
+                UserDefinedEntry::Parameter(value) => {
+                    writer.write_user_defined(&value.parameter, &value.value)
+                }
+            }
+        }
     }
 }
 
@@ -4515,7 +4530,7 @@ pub enum CdmObjectType {
 impl std::str::FromStr for CdmObjectType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "OBJECT1" => Ok(Self::Object1),
             "OBJECT2" => Ok(Self::Object2),
             _ => Err(crate::error::EnumParseError {
@@ -4550,7 +4565,7 @@ impl std::fmt::Display for ScreenVolumeFrameType {
 impl std::str::FromStr for ScreenVolumeFrameType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "RTN" => Ok(Self::Rtn),
             "TVN" => Ok(Self::Tvn),
             _ => Err(crate::error::EnumParseError {
@@ -4585,7 +4600,7 @@ impl std::fmt::Display for ScreenVolumeShapeType {
 impl std::str::FromStr for ScreenVolumeShapeType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "ELLIPSOID" => Ok(Self::Ellipsoid),
             "BOX" => Ok(Self::Box),
             _ => Err(crate::error::EnumParseError {
@@ -4624,7 +4639,7 @@ impl std::fmt::Display for ReferenceFrameType {
 impl std::str::FromStr for ReferenceFrameType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "GCRF" => Ok(Self::Gcrf),
             "EME2000" => Ok(Self::Eme2000),
             "ITRF" => Ok(Self::Itrf),
@@ -4660,7 +4675,7 @@ impl std::fmt::Display for CovarianceMethodType {
 impl std::str::FromStr for CovarianceMethodType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "CALCULATED" => Ok(Self::Calculated),
             "DEFAULT" => Ok(Self::Default),
             _ => Err(crate::error::EnumParseError {
@@ -4699,7 +4714,7 @@ impl std::fmt::Display for ManeuverableType {
 impl std::str::FromStr for ManeuverableType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "YES" => Ok(Self::Yes),
             "NO" => Ok(Self::No),
             "N/A" => Ok(Self::NA),
@@ -4870,7 +4885,7 @@ pub enum TdmAngleType {
 impl std::str::FromStr for TdmAngleType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "AZEL" => Ok(Self::Azel),
             "RADEC" => Ok(Self::Radec),
             "XEYN" => Ok(Self::Xeyn),
@@ -4933,7 +4948,7 @@ pub enum TdmDataQuality {
 impl std::str::FromStr for TdmDataQuality {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "RAW" => Ok(Self::Raw),
             "VALIDATED" => Ok(Self::Validated),
             "DEGRADED" => Ok(Self::Degraded),
@@ -4973,7 +4988,7 @@ pub enum TdmIntegrationRef {
 impl std::str::FromStr for TdmIntegrationRef {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "START" => Ok(Self::Start),
             "MIDDLE" => Ok(Self::Middle),
             "END" => Ok(Self::End),
@@ -5013,7 +5028,7 @@ pub enum TdmMode {
 impl std::str::FromStr for TdmMode {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "SEQUENTIAL" => Ok(Self::Sequential),
             "SINGLE_DIFF" => Ok(Self::SingleDiff),
             _ => Err(crate::error::EnumParseError {
@@ -5051,7 +5066,7 @@ pub enum TdmRangeMode {
 impl std::str::FromStr for TdmRangeMode {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "COHERENT" => Ok(Self::Coherent),
             "CONSTANT" => Ok(Self::Constant),
             "ONE_WAY" => Ok(Self::OneWay),
@@ -5136,7 +5151,7 @@ pub enum TdmReferenceFrame {
 impl std::str::FromStr for TdmReferenceFrame {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "EME2000" => Ok(Self::Eme2000),
             "ICRF" => Ok(Self::Icrf),
             "ITRF2000" | "ITRF-2000" => Ok(Self::Itrf2000),
@@ -5205,7 +5220,7 @@ pub enum TdmTimetagRef {
 impl std::str::FromStr for TdmTimetagRef {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
+        match enum_token(s).as_ref() {
             "TRANSMIT" => Ok(Self::Transmit),
             "RECEIVE" => Ok(Self::Receive),
             _ => Err(crate::error::EnumParseError {
@@ -5276,6 +5291,36 @@ impl std::fmt::Display for TdmPath {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn closed_enums_reject_unknown_values_and_mixed_case() {
+        assert!("PAYLOAD".parse::<ObjectDescription>().is_ok());
+        assert!("payload".parse::<ObjectDescription>().is_ok());
+        assert!("Payload".parse::<ObjectDescription>().is_err());
+        assert!("NEW_OBJECT_TYPE".parse::<ObjectDescription>().is_err());
+    }
+
+    #[test]
+    fn user_defined_xml_retains_interleaved_comments_and_exact_names() {
+        let input = "<userDefinedParameters><USER_DEFINED parameter=\"USER_DEFINED_X\">1</USER_DEFINED><COMMENT>after</COMMENT><USER_DEFINED parameter=\"X\">2</USER_DEFINED></userDefinedParameters>";
+        let block: UserDefined = quick_xml::de::from_str(input).unwrap();
+        assert!(matches!(&block.entries[1], UserDefinedEntry::Comment(value) if value == "after"));
+        let xml = quick_xml::se::to_string(&block).unwrap();
+        let reparsed: UserDefined = quick_xml::de::from_str(&xml).unwrap();
+        assert_eq!(block, reparsed);
+        assert!(block.validate_kvn_representability().is_err());
+        let mut block = block;
+        block.entries.remove(1);
+        block.validate_kvn_representability().unwrap();
+        let mut writer = crate::kvn::ser::KvnWriter::new();
+        crate::traits::ToKvn::write_kvn(&block, &mut writer);
+        let kvn = writer.finish_checked().unwrap();
+        assert!(kvn.contains("USER_DEFINED_USER_DEFINED_X"));
+        assert_eq!(
+            crate::kvn::parser::user_defined_parameters(&mut kvn.as_str()).unwrap(),
+            Some(block)
+        );
+    }
 
     #[test]
     fn calendar_fields_with_a_non_digit_are_invalid_not_a_panic() {
@@ -5543,7 +5588,19 @@ mod tests {
 
     #[test]
     fn relative_time_preserves_supported_numeric_spelling() {
-        for value in ["100", "+100.0", "-1.25", "2.587e-06", "-2.5E+3"] {
+        for value in [
+            "100",
+            "+100.0",
+            "-1.25",
+            "2.587e-06",
+            "-2.5E+3",
+            ".5",
+            "100.",
+            "1e2",
+            "1.2345678901234567",
+            "-0",
+            "-0.0",
+        ] {
             let relative: RelativeTime = value.parse().unwrap();
             assert_eq!(relative.as_str(), value);
             assert_eq!(relative.to_string(), value);
@@ -5554,18 +5611,12 @@ mod tests {
     fn relative_time_rejects_non_numeric_and_unsupported_values() {
         for value in [
             "",
-            ".5",
-            "100.",
-            "1e2",
             "1.0e",
             "1.0e+",
-            "1.2345678901234567",
             "2023-01-01T00:00:00",
             "NaN",
             "INF",
             "-INF",
-            "-0",
-            "-0.0",
             "1e400",
         ] {
             assert!(RelativeTime::new(value).is_err(), "accepted {value:?}");
@@ -5674,7 +5725,8 @@ mod extra_tests {
         assert!(DayInterval::new(10.0, None).is_ok());
         assert!(DayInterval::new(-0.1, None).is_err());
         assert!(DayIntervalRequired::new(0.1).is_ok());
-        assert!(DayIntervalRequired::new(0.0).is_err());
+        assert!(DayIntervalRequired::new(0.0).is_ok());
+        assert!(DayIntervalRequired::validate_xml_value(0.0, "day interval").is_err());
         assert!(DayIntervalRequired::new(f64::NAN).is_err());
         assert!(DayIntervalRequired::new(f64::INFINITY).is_err());
         assert!(DayIntervalRequired::new(f64::NEG_INFINITY).is_err());
@@ -5683,13 +5735,15 @@ mod extra_tests {
     #[test]
     fn test_frequency_validation() {
         assert!(Frequency::new(1.0, None).is_ok());
-        assert!(Frequency::new(0.0, None).is_err());
+        assert!(Frequency::new(0.0, None).is_ok());
+        assert!(Frequency::validate_xml_value(0.0, "Frequency").is_err());
     }
 
     #[test]
     fn test_gm_validation() {
         assert!(Gm::new(1.0, None).is_ok());
-        assert!(Gm::new(0.0, None).is_err());
+        assert!(Gm::new(0.0, None).is_ok());
+        assert!(Gm::validate_xml_value(0.0, "GM").is_err());
         assert!("KM**3/S**2".parse::<GmUnits>().is_ok());
     }
 

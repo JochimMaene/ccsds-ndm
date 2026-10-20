@@ -722,52 +722,52 @@ impl KeplerianElements {
     }
 }
 
-/// Position/Velocity Covariance Matrix (6x6 Lower Triangular Form. None or all parameters of the
-/// matrix must be given. COV_REF_FRAME may be omitted if it is the same as REF_FRAME.)
+/// Position/Velocity Covariance Matrix (6x6 Lower Triangular Form. All 21 parameters of the
+/// matrix must be supplied explicitly. COV_REF_FRAME may be omitted if it is the same as REF_FRAME.)
 ///
 /// Parameters
 /// ----------
-/// cx_x : float, optional
+/// cx_x : float
 ///     Position X covariance [1,1]. Units: km².
-/// cy_x : float, optional
+/// cy_x : float
 ///     Position X-Y covariance [2,1]. Units: km².
-/// cy_y : float, optional
+/// cy_y : float
 ///     Position Y covariance [2,2]. Units: km².
-/// cz_x : float, optional
+/// cz_x : float
 ///     Position X-Z covariance [3,1]. Units: km².
-/// cz_y : float, optional
+/// cz_y : float
 ///     Position Y-Z covariance [3,2]. Units: km².
-/// cz_z : float, optional
+/// cz_z : float
 ///     Position Z covariance [3,3]. Units: km².
-/// cx_dot_x : float, optional
+/// cx_dot_x : float
 ///     Velocity X / Position X covariance [4,1]. Units: km²/s.
-/// cx_dot_y : float, optional
+/// cx_dot_y : float
 ///     Velocity X / Position Y covariance [4,2]. Units: km²/s.
-/// cx_dot_z : float, optional
+/// cx_dot_z : float
 ///     Velocity X / Position Z covariance [4,3]. Units: km²/s.
-/// cx_dot_x_dot : float, optional
+/// cx_dot_x_dot : float
 ///     Velocity X covariance [4,4]. Units: km²/s².
-/// cy_dot_x : float, optional
+/// cy_dot_x : float
 ///     Velocity Y / Position X covariance [5,1]. Units: km²/s.
-/// cy_dot_y : float, optional
+/// cy_dot_y : float
 ///     Velocity Y / Position Y covariance [5,2]. Units: km²/s.
-/// cy_dot_z : float, optional
+/// cy_dot_z : float
 ///     Velocity Y / Position Z covariance [5,3]. Units: km²/s.
-/// cy_dot_x_dot : float, optional
+/// cy_dot_x_dot : float
 ///     Velocity Y / Velocity X covariance [5,4]. Units: km²/s².
-/// cy_dot_y_dot : float, optional
+/// cy_dot_y_dot : float
 ///     Velocity Y covariance [5,5]. Units: km²/s².
-/// cz_dot_x : float, optional
+/// cz_dot_x : float
 ///     Velocity Z / Position X covariance [6,1]. Units: km²/s.
-/// cz_dot_y : float, optional
+/// cz_dot_y : float
 ///     Velocity Z / Position Y covariance [6,2]. Units: km²/s.
-/// cz_dot_z : float, optional
+/// cz_dot_z : float
 ///     Velocity Z / Position Z covariance [6,3]. Units: km²/s.
-/// cz_dot_x_dot : float, optional
+/// cz_dot_x_dot : float
 ///     Velocity Z / Velocity X covariance [6,4]. Units: km²/s².
-/// cz_dot_y_dot : float, optional
+/// cz_dot_y_dot : float
 ///     Velocity Z / Velocity Y covariance [6,5]. Units: km²/s².
-/// cz_dot_z_dot : float, optional
+/// cz_dot_z_dot : float
 ///     Velocity Z covariance [6,6]. Units: km²/s².
 /// cov_ref_frame : str, optional
 ///     Reference frame for the covariance matrix.
@@ -792,52 +792,52 @@ impl OpmCovarianceMatrix {
     #[new]
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
-        cx_x=None,
-        cy_x=None,
-        cy_y=None,
-        cz_x=None,
-        cz_y=None,
-        cz_z=None,
-        cx_dot_x=None,
-        cx_dot_y=None,
-        cx_dot_z=None,
-        cy_dot_x=None,
-        cy_dot_y=None,
-        cy_dot_z=None,
-        cz_dot_x=None,
-        cz_dot_y=None,
-        cz_dot_z=None,
-        cx_dot_x_dot=None,
-        cy_dot_x_dot=None,
-        cy_dot_y_dot=None,
-        cz_dot_x_dot=None,
-        cz_dot_y_dot=None,
-        cz_dot_z_dot=None,
+        cx_x,
+        cy_x,
+        cy_y,
+        cz_x,
+        cz_y,
+        cz_z,
+        cx_dot_x,
+        cx_dot_y,
+        cx_dot_z,
+        cy_dot_x,
+        cy_dot_y,
+        cy_dot_z,
+        cz_dot_x,
+        cz_dot_y,
+        cz_dot_z,
+        cx_dot_x_dot,
+        cy_dot_x_dot,
+        cy_dot_y_dot,
+        cz_dot_x_dot,
+        cz_dot_y_dot,
+        cz_dot_z_dot,
         cov_ref_frame=None,
         comments=None
     ))]
     fn new(
-        cx_x: Option<f64>,
-        cy_x: Option<f64>,
-        cy_y: Option<f64>,
-        cz_x: Option<f64>,
-        cz_y: Option<f64>,
-        cz_z: Option<f64>,
-        cx_dot_x: Option<f64>,
-        cx_dot_y: Option<f64>,
-        cx_dot_z: Option<f64>,
-        cy_dot_x: Option<f64>,
-        cy_dot_y: Option<f64>,
-        cy_dot_z: Option<f64>,
-        cz_dot_x: Option<f64>,
-        cz_dot_y: Option<f64>,
-        cz_dot_z: Option<f64>,
-        cx_dot_x_dot: Option<f64>,
-        cy_dot_x_dot: Option<f64>,
-        cy_dot_y_dot: Option<f64>,
-        cz_dot_x_dot: Option<f64>,
-        cz_dot_y_dot: Option<f64>,
-        cz_dot_z_dot: Option<f64>,
+        cx_x: f64,
+        cy_x: f64,
+        cy_y: f64,
+        cz_x: f64,
+        cz_y: f64,
+        cz_z: f64,
+        cx_dot_x: f64,
+        cx_dot_y: f64,
+        cx_dot_z: f64,
+        cy_dot_x: f64,
+        cy_dot_y: f64,
+        cy_dot_z: f64,
+        cz_dot_x: f64,
+        cz_dot_y: f64,
+        cz_dot_z: f64,
+        cx_dot_x_dot: f64,
+        cy_dot_x_dot: f64,
+        cy_dot_y_dot: f64,
+        cz_dot_x_dot: f64,
+        cz_dot_y_dot: f64,
+        cz_dot_z_dot: f64,
         cov_ref_frame: Option<String>,
         comments: Option<Vec<String>>,
     ) -> Self {
@@ -848,27 +848,27 @@ impl OpmCovarianceMatrix {
             inner: ccsds_ndm::common::OpmCovarianceMatrix {
                 comment: comments.unwrap_or_default(),
                 cov_ref_frame,
-                cx_x: PositionCovariance::new(cx_x.unwrap_or(0.0), None),
-                cy_x: PositionCovariance::new(cy_x.unwrap_or(0.0), None),
-                cy_y: PositionCovariance::new(cy_y.unwrap_or(0.0), None),
-                cz_x: PositionCovariance::new(cz_x.unwrap_or(0.0), None),
-                cz_y: PositionCovariance::new(cz_y.unwrap_or(0.0), None),
-                cz_z: PositionCovariance::new(cz_z.unwrap_or(0.0), None),
-                cx_dot_x: PositionVelocityCovariance::new(cx_dot_x.unwrap_or(0.0), None),
-                cx_dot_y: PositionVelocityCovariance::new(cx_dot_y.unwrap_or(0.0), None),
-                cx_dot_z: PositionVelocityCovariance::new(cx_dot_z.unwrap_or(0.0), None),
-                cy_dot_x: PositionVelocityCovariance::new(cy_dot_x.unwrap_or(0.0), None),
-                cy_dot_y: PositionVelocityCovariance::new(cy_dot_y.unwrap_or(0.0), None),
-                cy_dot_z: PositionVelocityCovariance::new(cy_dot_z.unwrap_or(0.0), None),
-                cz_dot_x: PositionVelocityCovariance::new(cz_dot_x.unwrap_or(0.0), None),
-                cz_dot_y: PositionVelocityCovariance::new(cz_dot_y.unwrap_or(0.0), None),
-                cz_dot_z: PositionVelocityCovariance::new(cz_dot_z.unwrap_or(0.0), None),
-                cx_dot_x_dot: VelocityCovariance::new(cx_dot_x_dot.unwrap_or(0.0), None),
-                cy_dot_x_dot: VelocityCovariance::new(cy_dot_x_dot.unwrap_or(0.0), None),
-                cy_dot_y_dot: VelocityCovariance::new(cy_dot_y_dot.unwrap_or(0.0), None),
-                cz_dot_x_dot: VelocityCovariance::new(cz_dot_x_dot.unwrap_or(0.0), None),
-                cz_dot_y_dot: VelocityCovariance::new(cz_dot_y_dot.unwrap_or(0.0), None),
-                cz_dot_z_dot: VelocityCovariance::new(cz_dot_z_dot.unwrap_or(0.0), None),
+                cx_x: PositionCovariance::new(cx_x, None),
+                cy_x: PositionCovariance::new(cy_x, None),
+                cy_y: PositionCovariance::new(cy_y, None),
+                cz_x: PositionCovariance::new(cz_x, None),
+                cz_y: PositionCovariance::new(cz_y, None),
+                cz_z: PositionCovariance::new(cz_z, None),
+                cx_dot_x: PositionVelocityCovariance::new(cx_dot_x, None),
+                cx_dot_y: PositionVelocityCovariance::new(cx_dot_y, None),
+                cx_dot_z: PositionVelocityCovariance::new(cx_dot_z, None),
+                cy_dot_x: PositionVelocityCovariance::new(cy_dot_x, None),
+                cy_dot_y: PositionVelocityCovariance::new(cy_dot_y, None),
+                cy_dot_z: PositionVelocityCovariance::new(cy_dot_z, None),
+                cz_dot_x: PositionVelocityCovariance::new(cz_dot_x, None),
+                cz_dot_y: PositionVelocityCovariance::new(cz_dot_y, None),
+                cz_dot_z: PositionVelocityCovariance::new(cz_dot_z, None),
+                cx_dot_x_dot: VelocityCovariance::new(cx_dot_x_dot, None),
+                cy_dot_x_dot: VelocityCovariance::new(cy_dot_x_dot, None),
+                cy_dot_y_dot: VelocityCovariance::new(cy_dot_y_dot, None),
+                cz_dot_x_dot: VelocityCovariance::new(cz_dot_x_dot, None),
+                cz_dot_y_dot: VelocityCovariance::new(cz_dot_y_dot, None),
+                cz_dot_z_dot: VelocityCovariance::new(cz_dot_z_dot, None),
             },
         }
     }

@@ -103,6 +103,28 @@ fn validate_combined_child_attributes(start: &quick_xml::events::BytesStart<'_>)
     Ok(())
 }
 
+/// The bundled combined schema fixes its ODM constituent types to edition 3.0.
+fn validate_combined_constituent_edition(message: &Message) -> Result<()> {
+    let version = match message {
+        Message::Opm(value) => &value.version,
+        Message::Omm(value) => &value.version,
+        Message::Oem(value) => &value.version,
+        _ => return Ok(()),
+    };
+    if version != "3.0" {
+        return Err(crate::error::ValidationError::InvalidValue {
+            field: "constituent version".into(),
+            value: version.clone(),
+            expected:
+                "ODM 3.0 in the NDM/XML 4.0.0 combined envelope; use standalone XML for ODM 2.0"
+                    .into(),
+            line: None,
+        }
+        .into());
+    }
+    Ok(())
+}
+
 fn read_envelope_text(
     reader: &mut quick_xml::Reader<&[u8]>,
     start: &quick_xml::events::BytesStart<'_>,
@@ -333,6 +355,7 @@ impl CombinedNdm {
         crate::traits::Validate::validate(self)?;
         for message in &self.messages {
             message.validate_for_generation(format)?;
+            validate_combined_constituent_edition(message)?;
         }
         Ok(())
     }
@@ -450,6 +473,7 @@ impl CombinedNdm {
                             let full_element = &xml[actual_start_pos..end_pos];
 
                             let msg = parse_constituent(full_element, &e, &root_declarations)?;
+                            validate_combined_constituent_edition(&msg)?;
                             messages.push(msg);
                         }
                         _ => {

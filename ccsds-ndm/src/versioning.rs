@@ -286,6 +286,33 @@ pub(crate) fn validate_omm_edition(message: &crate::messages::omm::Omm) -> Resul
     let Some(tle) = &message.body.segment.data.tle_parameters else {
         return Ok(());
     };
+    if tle.bterm.is_some() {
+        return Err(invalid_edition_value(
+            "BTERM",
+            "present",
+            "absent in CCSDS 502.0-B-2",
+            "body.segment.data.tle_parameters.bterm",
+        ));
+    }
+    if tle.agom.is_some() {
+        return Err(invalid_edition_value(
+            "AGOM",
+            "present",
+            "absent in CCSDS 502.0-B-2",
+            "body.segment.data.tle_parameters.agom",
+        ));
+    }
+    Ok(())
+}
+
+// The 2.0 XSD requires a complete TLE block even where the book makes fields conditional.
+pub(crate) fn validate_omm_xml_edition(message: &crate::messages::omm::Omm) -> Result<()> {
+    if message.version != "2.0" {
+        return Ok(());
+    }
+    let Some(tle) = &message.body.segment.data.tle_parameters else {
+        return Ok(());
+    };
     for (field, missing, path) in [
         (
             "NORAD_CAT_ID",
@@ -322,22 +349,6 @@ pub(crate) fn validate_omm_edition(message: &crate::messages::omm::Omm) -> Resul
             .at_path(path)
             .into());
         }
-    }
-    if tle.bterm.is_some() {
-        return Err(invalid_edition_value(
-            "BTERM",
-            "present",
-            "absent in CCSDS 502.0-B-2",
-            "body.segment.data.tle_parameters.bterm",
-        ));
-    }
-    if tle.agom.is_some() {
-        return Err(invalid_edition_value(
-            "AGOM",
-            "present",
-            "absent in CCSDS 502.0-B-2",
-            "body.segment.data.tle_parameters.agom",
-        ));
     }
     Ok(())
 }

@@ -72,3 +72,22 @@ on this workload before earning its complexity.
 
 Parsing exposes no resource-policy knobs. Callers that accept untrusted input should enforce size
 limits at their system boundary; XML nesting retains a fixed internal safety limit.
+
+`UserDefined.entries` is an ordered snapshot of strings (comments) and `(name, value)`
+tuples (parameters). Assign the list after editing it. `comment` and `user_defined` remain
+compatibility snapshots. Replacing parameters preserves existing comment positions;
+assigning `comment` places all supplied comments before parameters and keeps parameter order.
+Dictionary construction and replacement follow Python insertion order. XML preserves comment
+interleaving; KVN generation refuses interleaving that its grammar cannot represent.
+The dictionary view keeps the last value for repeated names; use `entries` to preserve duplicates.
+
+`OcmUserDefined.entries` is a live ordered list of comment strings and
+`OcmUserDefinedParameter` objects. The `user_defined` compatibility list is a snapshot with
+live parameter objects: assign it after adding/removing items, or edit `entries` directly.
+Opaque sequence records remain attached to their parameter.
+
+Python constructors require the message's mandatory interpretation fields; they do not infer
+AEM attitude type, OMM mean-element theory, CDM ephemeris name, or missing covariance entries.
+`OpmCovarianceMatrix` requires all 21 lower-triangle values, including explicit zeroes.
+The exposed PyO3 categorical classes have named members but are not Python `enum.Enum`
+subclasses; the generated stubs describe their actual class/member surface.

@@ -16,6 +16,7 @@ from ccsds_ndm import (
 
 def construct(oem: Oem) -> None:
     CdmMetadata(
+        ephemeris_name="NONE",
         object=CdmObjectType.Object1,
         object_designator="12345",
         catalog_name="SATCAT",
@@ -26,6 +27,7 @@ def construct(oem: Oem) -> None:
         maneuverable=ManeuverableType.No,
     )
     CdmMetadata(
+        ephemeris_name="NONE",
         object=42,  # type: ignore[arg-type]
         object_designator="12345",
         catalog_name="SATCAT",

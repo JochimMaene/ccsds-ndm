@@ -61,7 +61,8 @@ impl Ndm for Cdm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::detect::without_utf8_bom(kvn);
+        let kvn = crate::kvn::normalize_line_endings(crate::detect::without_utf8_bom(kvn));
+        let kvn = kvn.as_ref();
         kvn::validate_kvn_syntax(kvn)?;
         let cdm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&cdm)?;
@@ -73,6 +74,8 @@ impl Ndm for Cdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
+        let xml = xml::normalize_missing_values(xml)?;
+        let xml = xml.as_ref();
         xml::validate_xml_sequences(xml)?;
         let cdm: Self = crate::xml::from_str_with_context(xml, "CDM")?;
         crate::traits::Validate::validate(&cdm)?;

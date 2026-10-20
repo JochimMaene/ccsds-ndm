@@ -428,10 +428,7 @@ impl ToKvn for OmmData {
 
         // User Defined
         if let Some(ud) = &self.user_defined_parameters {
-            writer.write_comments(&ud.comment);
-            for p in &ud.user_defined {
-                writer.write_user_defined(&p.parameter, &p.value);
-            }
+            ud.write_kvn(writer);
         }
     }
 }
@@ -510,6 +507,18 @@ impl Omm {
         }
 
         let data = &self.body.segment.data;
+        if let Some(user_defined) = &data.user_defined_parameters {
+            if user_defined.parameters().next().is_none() {
+                return Err(crate::error::ValidationError::invalid_value(
+                    "userDefinedParameters",
+                    "no parameters",
+                    "at least one parameter to preserve the block in KVN",
+                )
+                .at_path("body.segment.data.user_defined_parameters")
+                .into());
+            }
+            user_defined.validate_kvn_representability()?;
+        }
         let elements = &data.mean_elements;
         check(
             "ECCENTRICITY",
@@ -938,7 +947,16 @@ AGOM = 0.0001 [m**2/kg]
         let mut input = "EPOCH = 2000-06-28T11:59:28\nSEMI_MAJOR_AXIS = 42164\nECCENTRICITY = 0.1\nINCLINATION = 0\nRA_OF_ASC_NODE = 0\nARG_OF_PERICENTER = 0\nMEAN_ANOMALY = 0\nGM = 398600 [INVALID]\n";
         assert!(mean_elements.parse_next(&mut input).is_err());
         let mut input = "EPOCH = 2000-06-28T11:59:28\nSEMI_MAJOR_AXIS = 42164\nECCENTRICITY = 0.1\nINCLINATION = 0\nRA_OF_ASC_NODE = 0\nARG_OF_PERICENTER = 0\nMEAN_ANOMALY = 0\nGM = -1\n";
-        assert!(mean_elements.parse_next(&mut input).is_err());
+        assert_eq!(
+            mean_elements
+                .parse_next(&mut input)
+                .unwrap()
+                .1
+                .gm
+                .unwrap()
+                .value,
+            -1.0
+        );
 
         // TLE invalid formats
         let mut input = "EPHEMERIS_TYPE = INVALID\n";

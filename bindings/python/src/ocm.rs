@@ -6539,31 +6539,43 @@ impl OcmUserDefinedParameter {
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct OcmUserDefined {
-    comment: Vec<String>,
-    user_defined: Py<PyList>,
+    entries: Py<PyList>,
 }
 
 impl OcmUserDefined {
     fn from_core(py: Python<'_>, value: core_ocm::OcmUserDefined) -> PyResult<Self> {
-        let parameters = value
-            .user_defined
-            .into_iter()
-            .map(|inner| Py::new(py, OcmUserDefinedParameter { inner }))
-            .collect::<PyResult<Vec<_>>>()?;
+        let entries = PyList::empty(py);
+        for entry in value.entries {
+            match entry {
+                core_ocm::OcmUserDefinedEntry::Comment(value) => entries.append(value)?,
+                core_ocm::OcmUserDefinedEntry::Parameter(inner) => {
+                    entries.append(Py::new(py, OcmUserDefinedParameter { inner })?)?
+                }
+            }
+        }
         Ok(Self {
-            comment: value.comment,
-            user_defined: PyList::new(py, parameters)?.unbind(),
+            entries: entries.unbind(),
         })
     }
     fn to_core(&self, py: Python<'_>) -> PyResult<core_ocm::OcmUserDefined> {
-        Ok(core_ocm::OcmUserDefined {
-            comment: self.comment.clone(),
-            user_defined: crate::common::extract_records(
-                self.user_defined.bind(py),
-                "user_defined",
-                |value: &OcmUserDefinedParameter| Ok(value.inner.clone()),
-            )?,
-        })
+        let entries = self
+            .entries
+            .bind(py)
+            .iter()
+            .map(|entry| {
+                if let Ok(comment) = entry.extract::<String>() {
+                    Ok(core_ocm::OcmUserDefinedEntry::Comment(comment))
+                } else {
+                    Ok(core_ocm::OcmUserDefinedEntry::Parameter(
+                        entry
+                            .extract::<PyRef<OcmUserDefinedParameter>>()?
+                            .inner
+                            .clone(),
+                    ))
+                }
+            })
+            .collect::<PyResult<_>>()?;
+        Ok(core_ocm::OcmUserDefined { entries })
     }
 }
 
@@ -6577,37 +6589,93 @@ impl OcmUserDefined {
         user_defined: Option<Vec<Py<OcmUserDefinedParameter>>>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
+        let entries = PyList::new(py, comment.unwrap_or_default())?;
+        for parameter in user_defined.unwrap_or_default() {
+            entries.append(parameter)?;
+        }
         Ok(Self {
-            comment: comment.unwrap_or_default(),
-            user_defined: PyList::new(py, user_defined.unwrap_or_default())?.unbind(),
+            entries: entries.unbind(),
         })
     }
 
-    /// Leading comments.
-    ///
-    /// :type: list[str]
+    /// Comment snapshot; assignment places all supplied comments before parameters.
     #[getter]
-    fn get_comment(&self) -> Vec<String> {
-        self.comment.clone()
+    fn get_comment(&self, py: Python<'_>) -> Vec<String> {
+        self.entries
+            .bind(py)
+            .iter()
+            .filter_map(|value| value.extract().ok())
+            .collect()
     }
     #[setter]
-    fn set_comment(&mut self, value: Vec<String>) {
-        self.comment = value;
+    fn set_comment(&mut self, value: Vec<String>) -> PyResult<()> {
+        Python::attach(|py| {
+            let entries = PyList::new(py, value)?;
+            for entry in self.entries.bind(py).iter() {
+                if entry.extract::<String>().is_err() {
+                    entries.append(entry)?;
+                }
+            }
+            self.entries = entries.unbind();
+            Ok(())
+        })
     }
 
-    /// Live ordered list of scalar parameters and sequence compositions.
-    ///
-    /// :type: list[OcmUserDefinedParameter]
+    /// Parameter list snapshot with live parameter objects; assign after list edits.
     #[gen_stub(override_return_type(type_repr = "list[OcmUserDefinedParameter]"))]
     #[getter]
-    fn get_user_defined(&self, py: Python<'_>) -> Py<PyList> {
-        self.user_defined.clone_ref(py)
+    fn get_user_defined(&self, py: Python<'_>) -> PyResult<Py<PyList>> {
+        let result = PyList::empty(py);
+        for entry in self.entries.bind(py).iter() {
+            if entry.extract::<String>().is_err() {
+                result.append(entry)?;
+            }
+        }
+        Ok(result.unbind())
     }
     #[setter]
     fn set_user_defined(&mut self, value: Vec<Py<OcmUserDefinedParameter>>) -> PyResult<()> {
         Python::attach(|py| {
-            self.user_defined = PyList::new(py, value)?.unbind();
+            let mut parameters = value.into_iter();
+            let entries = PyList::empty(py);
+            for entry in self.entries.bind(py).iter() {
+                if entry.extract::<String>().is_ok() {
+                    entries.append(entry)?;
+                } else if let Some(parameter) = parameters.next() {
+                    entries.append(parameter)?;
+                }
+            }
+            for parameter in parameters {
+                entries.append(parameter)?;
+            }
+            self.entries = entries.unbind();
             Ok(())
         })
+    }
+
+    /// Live ordered list: strings are comments, objects are parameters or compositions.
+    ///
+    /// :type: list[str | OcmUserDefinedParameter]
+    #[gen_stub(override_return_type(type_repr = "list[str | OcmUserDefinedParameter]"))]
+    #[getter]
+    fn get_entries(&self, py: Python<'_>) -> Py<PyList> {
+        self.entries.clone_ref(py)
+    }
+    #[setter]
+    fn set_entries(
+        &mut self,
+        #[gen_stub(override_type(type_repr = "list[str | OcmUserDefinedParameter]"))] value: Bound<
+            '_,
+            PyList,
+        >,
+    ) -> PyResult<()> {
+        let py = value.py();
+        for entry in value.iter() {
+            if entry.extract::<String>().is_err() {
+                entry.extract::<PyRef<OcmUserDefinedParameter>>()?;
+            }
+        }
+        self.entries = PyList::new(py, value.iter())?.unbind();
+        Ok(())
     }
 }

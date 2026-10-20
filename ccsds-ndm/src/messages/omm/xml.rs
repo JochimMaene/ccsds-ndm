@@ -6,7 +6,19 @@ use crate::error::Result;
 
 impl super::Omm {
     pub(crate) fn validate_xml_representability(&self) -> Result<()> {
-        if let Some(tle) = &self.body.segment.data.tle_parameters {
+        let data = &self.body.segment.data;
+        crate::messages::opm::validate_xml_spacecraft_parameters(
+            &self.version,
+            data.spacecraft_parameters.as_ref(),
+        )?;
+        if let Some(gm) = &data.mean_elements.gm {
+            crate::validation::validate_at_field_path(
+                crate::types::Gm::validate_xml_value(gm.value, "GM"),
+                "body.segment.data.mean_elements",
+            )?;
+        }
+        crate::versioning::validate_omm_xml_edition(self)?;
+        if let Some(tle) = &data.tle_parameters {
             for (present, field) in [
                 (tle.bstar.is_some() || tle.bterm.is_some(), "BSTAR or BTERM"),
                 (

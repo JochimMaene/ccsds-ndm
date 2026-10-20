@@ -163,3 +163,12 @@ caller context; fixed shapes, declared counts, and numeric domains remain librar
 
 Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
+
+**Sensor frequency and XML domains.** A supplied sensor frequency must be finite. The
+book specifies Hz but no positive bound, so KVN preserves zero and negative producer values;
+XML input and output enforce the schema's strictly positive `frequencyType`. Generation
+refuses an XML-incompatible value before writing bytes.
+
+**Relative-number spelling.** Maneuver time reading accepts finite producer forms such as
+`.5`, `5.`, and exponent notation. XML retains the stored spelling. KVN writes the shared
+canonical numeric form with at most 16 significant digits, as for other numeric fields.

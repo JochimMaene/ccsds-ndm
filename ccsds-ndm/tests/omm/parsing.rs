@@ -443,8 +443,11 @@ fn omm_xml_allows_a_comment_to_reopen_the_user_defined_group() {
         .user_defined_parameters
         .as_ref()
         .unwrap();
-    assert_eq!(user_defined.comment, ["first", "second"]);
-    assert_eq!(user_defined.user_defined.len(), 2);
+    assert_eq!(
+        user_defined.comments().cloned().collect::<Vec<_>>(),
+        ["first", "second"]
+    );
+    assert_eq!(user_defined.parameters().count(), 2);
 }
 
 #[test]

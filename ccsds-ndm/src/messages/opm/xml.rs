@@ -216,12 +216,28 @@ fn validate_xml_envelope(xml: &str, source_edition: &mut Option<String>) -> Resu
 }
 
 impl Opm {
+    pub(crate) fn validate_xml_representability(&self) -> Result<()> {
+        let data = &self.body.segment.data;
+        super::validate_xml_spacecraft_parameters(
+            &self.version,
+            data.spacecraft_parameters.as_ref(),
+        )?;
+        if let Some(elements) = &data.keplerian_elements {
+            crate::validation::validate_at_field_path(
+                crate::types::Gm::validate_xml_value(elements.gm.value, "GM"),
+                "body.segment.data.keplerian_elements",
+            )?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn from_xml_strict(xml: &str) -> Result<Self> {
         let mut source_edition = None;
         (|| {
             validate_xml_envelope(xml, &mut source_edition)?;
             let opm: Self = crate::xml::from_str_with_context(xml, "OPM")?;
             crate::traits::Validate::validate(&opm)?;
+            opm.validate_xml_representability()?;
             Ok(opm)
         })()
         .map_err(|error: crate::error::CcsdsNdmError| {
@@ -370,12 +386,15 @@ impl Opm {
             );
         }
         if let Some(user_defined) = &data.user_defined_parameters {
-            check_comments(
-                &mut errors,
-                &user_defined.comment,
-                "body.segment.data.user_defined_parameters.comment",
-            );
-            for parameter in &user_defined.user_defined {
+            for comment in user_defined.comments() {
+                check(
+                    &mut errors,
+                    "COMMENT",
+                    comment,
+                    "body.segment.data.user_defined_parameters.comment",
+                );
+            }
+            for parameter in user_defined.parameters() {
                 check(
                     &mut errors,
                     "USER_DEFINED parameter",

@@ -25,7 +25,7 @@ lists what the library deliberately leaves to the parties exchanging the message
 | Values | ODM 5.2, 7.5, 8.13 | Required fields must be present. In KVN, the time systems and frames the book lists must be all upper or all lower case. XML numbers follow `xsd:double` (see [Where the book is unclear](#where-the-book-is-unclear)). KVN numbers must be finite and fit in a double; reading accepts more than 16 digits (see [More lenient than the book](#more-lenient-than-the-book)). Units are fixed and filled in when missing, and XML output omits the optional `units` attributes. | `oem::parsing`, `oem::validation`, `oem::conversion` |
 | Writing KVN | ODM 5.2, 7.3–7.9 | The same message always gives the same output, and it is checked before anything is written. Numbers are rounded to at most 16 significant digits. Accelerations are written for all three axes or none. An empty `INTERPOLATION` or `COV_REF_FRAME` is rejected, because KVN would read it back as absent. | `oem::generation`, `oem_kvn_allocations` |
 | Writing XML | OEM 3.0 XSD, NDM/XML 4.2–4.3 | The same message always gives the same output, and it is checked first. The root declares `xmlns:xsi` and `xmlns:ndm`. Output for every shipped OEM example passes the official schema. | `oem::generation`, `oem::validation` |
-| Conversion | ODM 5 | Round trips of the example files keep the whole model and the edition. Converting to KVN fails for data KVN can't hold: partial accelerations, non-finite numbers, an empty `INTERPOLATION` or `COV_REF_FRAME`, and comments on any covariance matrix after the first. KVN also drops some whitespace (see [Conversion between notations](#conversion-between-notations)). | `oem::conversion` |
+| Conversion | ODM 5 | Round trips of the example files keep the whole model and the edition. Converting to KVN fails for data KVN can't hold: partial accelerations, non-finite numbers, an empty `INTERPOLATION` or `COV_REF_FRAME`. KVN also drops some whitespace (see [Conversion between notations](#conversion-between-notations)). | `oem::conversion` |
 | Resources | Project policy | A standalone OEM can't nest beyond its schema, because unknown children are rejected; combined NDM XML has a fixed nesting limit. Files are replaced in one step, so a failed write never leaves half a file behind. Writing KVN doesn't use more memory as the record count grows. Reading XML doesn't use extra memory per state record, unless the input spells out `units` attributes. | `ndm::parsing`, `library::output`, `oem_kvn_allocations`, `oem_xml_allocations` |
 | Scale | Project policy | Benchmarks parse and write 100, 10,000 and 50,000 records in KVN, and 100 and 10,000 in XML. The timings are for information only. | `cargo bench -p ccsds-ndm --bench kvn_benches -- oem_kvn_history_scaling`, `cargo bench -p ccsds-ndm --bench xml_benches -- oem_xml_history_scaling` |
 
@@ -89,7 +89,8 @@ and the cases where reading is looser than a clear rule under
   [More lenient than the book](#more-lenient-than-the-book)).
 - 7.5.7 doesn't say whether a mantissa may end in its decimal point. 7.5.7c calls a mantissa
   without exponent a fixed-point value, and 7.5.6 requires a digit after the point there, so we
-  reject `1.` and `1.e3` in KVN alike.
+  accept `1.` and `1.e3` as unambiguous producer spellings in KVN; writing uses a conforming
+  canonical spelling.
 - An empty XML element for an optional epoch or number is rejected, not read as absent. The
   schema's epoch pattern and `xsd:double` don't allow an empty value; omit the element instead.
 - XML numbers follow `xsd:double` (8.13.1, 8.13.4), so state and covariance values may be `INF`,
@@ -124,8 +125,9 @@ and the cases where reading is looser than a clear rule under
 - The schema lets `X_DDOT`, `Y_DDOT` and `Z_DDOT` appear independently, and it gives every
   covariance matrix its own comments. ODM 8.10.8 says XML follows the same rules as KVN, where
   accelerations are all or nothing (7.4.1.2) and covariance comments only open the section
-  (7.8.9). We follow the schema for XML. Writing such data to KVN fails, because KVN can't
-  represent it.
+  (7.8.9). We follow the schema for XML. Partial acceleration triples cannot cross to KVN.
+  Covariance comments are also accepted and written at the beginning of their associated matrix,
+  including later matrices, as the explicit producer-compatible extension below.
 
 ### Stricter than required
 
@@ -202,10 +204,18 @@ follows the book, so everything the library writes is valid.
   limits integers to the signed 32-bit range. Many producers write the shortest spelling that
   reproduces a double exactly, which often has 17 digits (for example `-2757.3016318893897`).
   Reading accepts any number of digits, and integer-form values of any size, in ephemeris and
-  covariance lines. The rest of the number grammar still applies: `1e3` and `12.5e3` are still
-  rejected. Writing rounds to 16 significant digits, so the last digit of such a value can change
+  covariance lines. Reading also accepts unambiguous decimal/exponent spellings such as `1e3`,
+  `12.5e3`, `.5`, and `1.`. Writing rounds to 16 significant digits, so the last digit of such a value can change
   when it is written back to KVN. `INTERPOLATION_DEGREE` keeps the 32-bit range, and epochs keep
   the 16-digit fraction cap.
+
+- **Covariance matrix comment associations.** Reading and writing KVN permit comments immediately
+  before a matrix's `EPOCH` and between that epoch/frame and its first numeric row. This extends
+  ODM 7.8.9's section-leading comment rule so real producer input and XML matrix comments can
+  preserve their association, including on later matrices. Comments within numeric rows remain
+  invalid. `oem::conversion::xml_to_kvn_preserves_comments_on_later_covariance_matrices` checks
+  both materialized and streaming output and reparsing.
+
 
 ### Conversion between notations
 

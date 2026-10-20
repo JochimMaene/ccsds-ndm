@@ -451,7 +451,7 @@ class TestOcmCorrigendum:
         assert message.segment.data.user is block
         assert block.user_defined[0] is sequence
         sequence.records = ["1 14", "2 15"]
-        block.user_defined.append(
+        block.entries.append(
             ccsds_ndm.OcmUserDefinedParameter(parameter="AFTER", value="scalar")
         )
         parsed = Ocm.from_str(message.to_str(format="kvn"))

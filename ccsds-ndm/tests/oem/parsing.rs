@@ -441,6 +441,10 @@ fn kvn_ephemeris_records_tolerate_padding_and_name_malformed_components() {
     // Parsing drops the 16-digit cap of 7.5.6/7.5.7b and the 7.5.4 integer range for data
     // values, so 17-digit shortest round-trip doubles and large integers still parse.
     for (lenient, value) in [
+        ("1e3", 1000.0),
+        ("12.5e3", 12500.0),
+        ("1.", 1.0),
+        (".5", 0.5),
         ("3000000000.0", 3.0e9),
         ("3000000000", 3.0e9),
         ("-2757.3016318893897", -2757.3016318893897),
@@ -452,7 +456,7 @@ fn kvn_ephemeris_records_tolerate_padding_and_name_malformed_components() {
         assert_eq!(state.y.value, value, "{lenient}");
     }
 
-    for malformed in ["1e3", "12.5e3", "1.", "nan"] {
+    for malformed in ["1e", ".", "1e-9999", "nan"] {
         let invalid = mutated_once(source, "-280.045", malformed);
         assert_eq!(kvn_message(&invalid), "Invalid ODM number", "{malformed}");
     }
@@ -895,17 +899,20 @@ fn kvn_record_structure_rejections_name_their_reason() {
             ),
             "COMMENT is not at the beginning of an allowed OEM block",
         ),
-        (
-            mutated_once(
-                covariance,
-                "EPOCH = 2019-12-29T21:00:00",
-                "COMMENT between\nEPOCH = 2019-12-29T21:00:00",
-            ),
-            "COMMENT is not at the beginning of an allowed OEM block",
-        ),
     ] {
         assert_eq!(kvn_message(&input), message, "{input}");
     }
+}
+
+#[test]
+fn covariance_comments_before_a_later_epoch_keep_their_association() {
+    let source = mutated_once(
+        KVN_FIXTURES[2],
+        "EPOCH = 2019-12-29T21:00:00",
+        "COMMENT between\nEPOCH = 2019-12-29T21:00:00",
+    );
+    let message = Oem::from_kvn(&source).unwrap();
+    assert_eq!(Oem::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
 }
 
 #[test]

@@ -551,14 +551,9 @@ fn metadata_object_types() {
         Some(ObjectDescription::Other)
     );
 
-    // Test fallback to OTHER for unknown values
-    let mut kvn = sample_cdm_kvn();
-    kvn = kvn.replace("OBJECT_TYPE = PAYLOAD", "OBJECT_TYPE = SATELLITE");
-    let cdm = Cdm::from_kvn(&kvn).expect("parse");
-    assert_eq!(
-        cdm.body.segments[0].metadata.object_type,
-        Some(ObjectDescription::Other)
-    );
+    // A closed vocabulary must not erase an unknown token by substituting OTHER.
+    let kvn = sample_cdm_kvn().replace("OBJECT_TYPE = PAYLOAD", "OBJECT_TYPE = SATELLITE");
+    assert!(Cdm::from_kvn(&kvn).is_err());
 }
 
 #[test]
@@ -1055,4 +1050,13 @@ fn xml_required_unit_attributes_are_not_inferred() {
         diagnostic.contains("missing") && diagnostic.contains("units"),
         "{error}"
     );
+}
+
+#[test]
+fn all_normative_line_endings_preserve_the_message() {
+    let expected = Cdm::from_kvn(crate::KVN).unwrap();
+    for ending in ["\n", "\r", "\r\n", "\n\r"] {
+        let input = crate::KVN.replace('\n', ending);
+        assert_eq!(Cdm::from_kvn(&input).unwrap(), expected, "{ending:?}");
+    }
 }

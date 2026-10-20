@@ -67,12 +67,10 @@ mean-elements comments. KVN parsing stores the combined list in `OmmData.comment
 `MeanElements.comment` empty. Text and relative order in the combined list survive, but the
 original XML ownership cannot be reconstructed.
 
-Shared `UserDefined` blocks retain comments and parameters in separate lists. XML permits
-comments interleaved between parameters; parsing keeps each list's order, and both XML and
-KVN generation put all comments before the parameters. Comments are not associated with
-individual parameters. `conversion::comment_merges_and_user_parameter_interleaving_are_canonicalized`
-covers both normalizations. Applications needing the original interleaving must retain the
-source document; the library does not provide a second archival representation.
+Shared `UserDefined.entries` retains XML comments and parameters in their original order,
+including interleaving. XML regeneration keeps that order. KVN generation refuses interleaving
+because its logical block permits leading comments only.
+`conversion::comment_merges_and_user_parameter_interleaving_are_preserved` covers both behaviors.
 
 ## Allocation and packaged-surface evidence
 
@@ -103,11 +101,31 @@ which formerly required TLE fields became optional:
 | Difference | Decision and evidence |
 | --- | --- |
 | No `CLASSIFICATION` or `MESSAGE_ID` in the 2.0 header | Both parse notations and mutated models reject these fields; `conformance::odm2::opm_and_omm_2_reject_new_header_fields_in_both_notations`. |
-| A present 2.0 TLE block requires `NORAD_CAT_ID`, `ELEMENT_SET_NO`, `REV_AT_EPOCH`, `BSTAR`, and `MEAN_MOTION_DDOT` in addition to `MEAN_MOTION_DOT` | The root edition gate enforces the complete old shape independently of theory; `conformance::odm2::omm_2_tle_shape_is_checked_after_mutation_and_at_both_input_boundaries`. |
+| A present 2.0 TLE block requires `NORAD_CAT_ID`, `ELEMENT_SET_NO`, `REV_AT_EPOCH`, `BSTAR`, and `MEAN_MOTION_DDOT` in addition to `MEAN_MOTION_DOT` | The XML edition gate enforces the complete old shape independently of theory; KVN and model validation retain the book's conditional requirements. `conformance::odm2::omm_2_tle_schema_shape_is_xml_only`. |
 | `BTERM` and `AGOM` were introduced in 3.0 | Reject them in 2.0; do not substitute a coefficient with different physical meaning. The same TLE-shape regression covers both input and output notations. |
 | `EPHEMERIS_TYPE` numbering was updated in 3.0 | Both schemas use an integer rather than a closed enumeration. Preserve the supplied integer; do not infer the actual propagator from it or certify the generated ephemeris. |
-| Mean elements, spacecraft, covariance, and user-defined blocks retain the same shape | Every shipped OMM KVN fixture, with its newer header removed and edition changed, preserves its model through both notations and passes the official 2.0 XSD; `conformance::odm2::omm_2_generation_is_schema_valid_and_round_trips`. |
+| A present XML spacecraft block requires all five spacecraft fields | The 2.0 common schema makes them required while 3.0 makes them optional. Partial blocks remain usable in KVN/model form, and fail only 2.0 XML input/output. `conformance::odm2::odm_2_partial_spacecraft_is_kvn_valid_but_not_xml_representable`. |
+| Mean elements, covariance, and user-defined blocks retain the same shape | Every shipped OMM KVN fixture, with its newer header removed and edition changed, preserves its model through both notations and passes the official 2.0 XSD; `conformance::odm2::omm_2_generation_is_schema_valid_and_round_trips`. |
 | Public adapters retain edition | The Python conformance matrix exercises both editions through every ordinary string, file, and conversion route. |
 
 Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
+
+## Reading, preservation and XML facets
+
+All four CCSDS KVN line terminators are accepted. Numerical input accepts unambiguous producer
+spellings such as `1e3`, `.5`, and `1.` as well as more than sixteen digits; nonfinite values,
+overflow, and nonzero values below the double range are rejected. KVN output retains the
+sixteen-significant-digit limit. GM positivity belongs to XML `gmType`: finite zero or negative
+values remain usable in KVN/model form but fail XML input/output.
+
+`UserDefined.entries` preserves XML comment/parameter interleaving exactly. KVN conversion
+refuses comments after parameters, because its logical block permits leading comments only.
+Parameter names are exact suffixes and must be printable uppercase ASCII without whitespace or
+`=` when writing KVN; XML leaves them as strings. An initial `USER_DEFINED_` within the stored
+suffix is literal and is not stripped. XML mean-elements comments still merge into data comments
+across a KVN hop, in data-then-mean-elements order; XML-to-XML retains both positions.
+
+An XML `userDefinedParameters` block with no parameters may be retained and regenerated as XML.
+KVN generation refuses that empty or comment-only block: without delimiters, KVN cannot preserve
+its presence or distinguish those comments from the previous logical block.

@@ -9,6 +9,24 @@ use ccsds_ndm::types::{
 use ccsds_ndm::{Ndm, Validate};
 
 #[test]
+fn user_defined_punctuation_survives_generated_kvn() {
+    use ccsds_ndm::types::{UserDefined, UserDefinedEntry, UserDefinedParameter};
+    let mut message = Rdm::from_kvn(KVN).unwrap();
+    let block = UserDefined {
+        entries: vec![UserDefinedEntry::Parameter(UserDefinedParameter {
+            parameter: "USER_DEFINED_FOO-BAR.X".into(),
+            value: "1".into(),
+        })],
+    };
+    message.body.segment.data.user_defined_parameters = Some(block.clone());
+    let parsed = Rdm::from_kvn(&message.to_kvn().unwrap()).unwrap();
+    assert_eq!(
+        parsed.body.segment.data.user_defined_parameters,
+        Some(block)
+    );
+}
+
+#[test]
 fn edited_reentry_confidence_and_altitudes_are_revalidated() {
     for invalid in [-1.0, 101.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         let mut message = Rdm::from_kvn(KVN).unwrap();
@@ -162,7 +180,7 @@ fn rdm_kvn_rejects_an_xml_only_outer_data_comment_before_writing() {
 
 #[test]
 fn orbit_lifetime_rule_is_enforced_at_every_public_boundary() {
-    for value in [-1.0, 0.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+    for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         let mut message = Rdm::from_kvn(KVN).unwrap();
         message
             .body
@@ -186,18 +204,19 @@ fn orbit_lifetime_rule_is_enforced_at_every_public_boundary() {
             "ORBIT_LIFETIME = 5.5 [d]",
             &format!("ORBIT_LIFETIME = {value} [d]"),
         );
-        let error = Rdm::from_kvn(&kvn).unwrap_err();
         if matches!(value, "-1" | "0") {
-            crate::common::assert_validation_field(&error, "DayIntervalRequired");
-        } else {
-            assert_eq!(error.code(), Some("parse.kvn.syntax"), "{value}: {error}");
-            assert!(
-                crate::common::kvn_parse_error(&error)
-                    .unwrap()
-                    .contexts
-                    .contains(&"Invalid float"),
-                "{error}"
+            let message = Rdm::from_kvn(&kvn).unwrap();
+            message.validate().unwrap();
+            assert_eq!(Rdm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+            crate::common::assert_validation_field(
+                &message.to_xml().unwrap_err(),
+                "ORBIT_LIFETIME",
             );
+            let mut output = Vec::new();
+            assert!(message.write_xml_to(&mut output).is_err());
+            assert!(output.is_empty());
+        } else {
+            assert!(Rdm::from_kvn(&kvn).is_err(), "{value}");
         }
 
         let xml = mutated(
@@ -205,7 +224,8 @@ fn orbit_lifetime_rule_is_enforced_at_every_public_boundary() {
             "<ORBIT_LIFETIME units=\"d\">5.5</ORBIT_LIFETIME>",
             &format!("<ORBIT_LIFETIME units=\"d\">{value}</ORBIT_LIFETIME>"),
         );
-        crate::common::assert_validation_field(&Rdm::from_xml(&xml).unwrap_err(), "ORBIT_LIFETIME");
+        let error = Rdm::from_xml(&xml).unwrap_err();
+        assert!(error.to_string().contains("DayIntervalRequired"), "{error}");
     }
 }
 
@@ -970,4 +990,71 @@ IMPACT_1_CROSS_TRACK = 50.0 [km]
 
     let kvn2 = rdm.to_kvn().unwrap();
     assert_eq!(Rdm::from_kvn(&kvn2).unwrap(), rdm);
+}
+
+#[test]
+fn ordered_user_defined_xml_is_preserved_and_unrepresentable_kvn_is_refused() {
+    use ccsds_ndm::types::{UserDefined, UserDefinedEntry, UserDefinedParameter};
+    let parameter = |name: &str| {
+        UserDefinedEntry::Parameter(UserDefinedParameter {
+            parameter: name.into(),
+            value: "value".into(),
+        })
+    };
+    let mut message = Rdm::from_kvn(KVN).unwrap();
+    for entries in [
+        vec![
+            parameter("FIRST"),
+            UserDefinedEntry::Comment("between".into()),
+            parameter("SECOND"),
+        ],
+        vec![UserDefinedEntry::Comment("only a comment".into())],
+        vec![],
+    ] {
+        message.body.segment.data.user_defined_parameters = Some(UserDefined { entries });
+        let xml = message.to_xml().unwrap();
+        validate_xml("RDM ordered user-defined entries", &xml);
+        assert_eq!(Rdm::from_xml(&xml).unwrap(), message);
+        assert!(message.to_kvn().is_err());
+        let mut output = Vec::new();
+        assert!(message.write_kvn_to(&mut output).is_err());
+        assert!(output.is_empty());
+    }
+    message.body.segment.data.user_defined_parameters = Some(UserDefined {
+        entries: vec![
+            UserDefinedEntry::Comment("before".into()),
+            parameter("FIRST"),
+            parameter("SECOND"),
+        ],
+    });
+    let kvn = message.to_kvn().unwrap();
+    assert_eq!(Rdm::from_kvn(&kvn).unwrap(), message);
+}
+
+#[test]
+fn lifetime_window_offsets_keep_xml_positivity_separate_from_finite_kvn() {
+    use ccsds_ndm::types::DayIntervalRequired;
+    for field in ["ORBIT_LIFETIME_WINDOW_START", "ORBIT_LIFETIME_WINDOW_END"] {
+        for value in [-1.0, 0.0] {
+            let mut message = Rdm::from_kvn(KVN).unwrap();
+            let atmospheric = &mut message.body.segment.data.atmospheric_reentry_parameters;
+            let interval = Some(DayIntervalRequired::new(value).unwrap());
+            if field.ends_with("START") {
+                atmospheric.orbit_lifetime_window_start = interval;
+            } else {
+                atmospheric.orbit_lifetime_window_end = interval;
+            }
+            message.validate().unwrap();
+            assert_eq!(Rdm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+            crate::common::assert_validation_field(&message.to_xml().unwrap_err(), field);
+            let mut output = Vec::new();
+            assert!(message.write_xml_to(&mut output).is_err());
+            assert!(output.is_empty());
+            let input = XML.replace(
+                "</REENTRY_ALTITUDE>",
+                &format!("</REENTRY_ALTITUDE><{field} units=\"d\">{value}</{field}>"),
+            );
+            assert!(Rdm::from_xml(&input).is_err(), "{field}={value}");
+        }
+    }
 }

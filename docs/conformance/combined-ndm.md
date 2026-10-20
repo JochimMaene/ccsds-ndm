@@ -69,3 +69,14 @@ constituent consistently with standalone OPM.
 
 Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
+
+## Constituent editions in the bundled envelope
+
+The supported envelope is NDM/XML 4.0.0. Its included `opmType`, `ommType`, and `oemType`
+fix `version` to `3.0`; the other included families use their current editions. Standalone
+ODM 2.0 parsing/generation remains supported with its own schema, but a 2.0 ODM constituent
+cannot be represented in this combined envelope. Combined XML input rejects that combination,
+and materialized/streaming output refuses it before writing bytes. The model is not silently
+upgraded or relabeled. Earlier combined schema sets are not an additional supported envelope.
+`combined_schema_refuses_standalone_odm2_constituents_before_output` covers all three ODM families,
+standalone controls, model validation, XML input, and both output paths.

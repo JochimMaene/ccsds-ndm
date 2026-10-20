@@ -290,6 +290,7 @@ impl GenerationMetadata for crate::messages::opm::Opm {
     }
 
     fn validate_xml_model(&self) -> Result<()> {
+        self.validate_xml_representability()?;
         self.validate_xml_text()
     }
 

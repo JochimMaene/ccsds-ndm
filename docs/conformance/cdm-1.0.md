@@ -19,7 +19,7 @@ The `cdm` suite establishes:
 | Concern | Evidence |
 | --- | --- |
 | KVN lexical and logical structure | The family-local scanner rejects non-ASCII/control input, overlong records, malformed assignments, unknown and duplicate keywords, fixed-order violations, nonstandard marked blocks, misplaced comments, extra segments, and trailing content. It models the header, relative data, two metadata sections, and each flattened OD, additional-parameter, state-vector, and covariance block in CDM order. |
-| XML structure | The shared XML sequence engine is registered for the complete CDM root, header, body, relative-state vector, two segments, metadata, data, OD, additional-parameter, state-vector, and covariance hierarchy. It rejects unknown, duplicate, reordered, and non-schema children and attributes, including the non-XSD `nil` spelling previously accepted by a permissive test. |
+| XML structure | The shared XML sequence engine is registered for the complete CDM root, header, body, relative-state vector, two segments, metadata, data, OD, additional-parameter, state-vector, and covariance hierarchy. It rejects unknown, duplicate, reordered, and non-schema children and attributes, subject to the explicit missing-value producer compatibility below. |
 | Delimiter-free COMMENT decision | A leading KVN comment run before the first data keyword is normatively retained on the outer data block; no textual delimiter exists from which to infer a split. If the typed model populates the first present nested block's comments, every materialized and streaming KVN generation route rejects the state before output. The shipped XML fixture demonstrates this richer, XML-only association and is therefore intentionally not convertible to KVN. |
 | Typed preservation and generation | All three shipped KVN fixtures retain their complete typed model through deterministic KVN and XML generation. The shipped XML fixture retains its model through XML generation. Every generated XML document validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
 | KVN fixed-point preflight | CDM's shape is a fixed, bounded set of scalar records. A private generation preflight writes and reparses that bounded representation before caller-visible output, rejecting lexical violations, multiline normalization, comment reassociation, or other nonnumeric model changes. Numeric rounding is checked separately under the policy below. Streaming rejection is proven to write zero bytes. |
@@ -90,3 +90,29 @@ none alone establishes conformance or exhaustive mutation coverage.
 
 Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
+
+## Operational missing values and complete relative vectors
+
+Operational CDM XML sometimes encodes unavailable optional scalar values as empty elements
+or with the non-XSD attribute `nil="true"` (also `nil="1"`). For known optional numeric,
+epoch and enumeration leaves, an empty element or one containing only literal XML whitespace
+(space, tab, CR, LF) means absent; entity references and CDATA are treated as content. An explicit
+nil marker also means absent for an optional text leaf with no meaningful content. Ordinary
+empty text elements remain populated empty strings. This is a deliberate producer-compatibility
+exception to the XSD, not a claim that those original documents validate against it. Generated
+XML omits absent leaves and uses the normal schema form.
+
+Only the unqualified `nil` producer attribute is accepted; `nil="false"`, nil on required
+values, nil with content, unknown attributes, and unknown/nested elements remain errors.
+Units attached to an unavailable value carry no measurement and are discarded with that leaf.
+Normalization preserves byte positions for subsequent diagnostics. The optional outer block
+still exists if its contents become empty; KVN conversion refuses any resulting model that
+cannot retain that block's typed content rather than silently dropping it.
+
+A relative-state vector is absent or contains all six position and velocity components.
+Supplying velocity components without position components is rejected in KVN, just as an
+incomplete XML `relativeStateVector` is rejected. Missing required metadata and state/covariance
+values are errors; the reader does not fabricate values from defaults.
+
+All four book line endings (LF, CR, CRLF and LFCR) are accepted with identical models and
+byte-position-preserving normalization.

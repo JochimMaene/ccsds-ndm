@@ -923,3 +923,12 @@ fn rdm_conditional_rules_name_the_offending_field() {
             );
         }
 }
+
+#[test]
+fn all_normative_line_endings_preserve_the_message() {
+    let expected = Rdm::from_kvn(crate::KVN).unwrap();
+    for ending in ["\n", "\r", "\r\n", "\n\r"] {
+        let input = crate::KVN.replace('\n', ending);
+        assert_eq!(Rdm::from_kvn(&input).unwrap(), expected, "{ending:?}");
+    }
+}

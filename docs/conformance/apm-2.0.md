@@ -81,3 +81,7 @@ A 2.0 message with a changed version header is not proof of legacy support. Inpu
 
 Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
+
+Angle bounds are semantic ADM rules: section 6.8.1 specifies degrees between -360 and
+360. Radians require an exchange-partner ICD and are outside this supported profile;
+unit annotations are never ignored on dimensionless quaternion components.

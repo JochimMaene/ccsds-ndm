@@ -276,7 +276,7 @@ fn opm_and_omm_2_reject_new_header_fields_in_both_notations() {
 }
 
 #[test]
-fn omm_2_tle_shape_is_checked_after_mutation_and_at_both_input_boundaries() {
+fn omm_2_tle_schema_shape_is_xml_only() {
     let base = Omm::from_kvn(&edition_2(include_str!("../../data/kvn/omm_g7.kvn"))).unwrap();
     type Edit = fn(&mut ccsds_ndm::messages::omm::TleParameters);
     let mutations: &[(&str, Edit)] = &[
@@ -297,14 +297,24 @@ fn omm_2_tle_shape_is_checked_after_mutation_and_at_both_input_boundaries() {
     for (field, mutate) in mutations {
         let mut message = base.clone();
         mutate(message.body.segment.data.tle_parameters.as_mut().unwrap());
-        assert!(message.validate().is_err(), "{field}");
-        assert!(message.to_kvn().is_err(), "{field}");
+        if matches!(*field, "bterm" | "agom") {
+            assert!(message.validate().is_err(), "{field}");
+            assert!(message.to_kvn().is_err(), "{field}");
+        } else {
+            message.validate().unwrap();
+            let kvn = message.to_kvn().unwrap();
+            assert_eq!(Omm::from_kvn(&kvn).unwrap(), message);
+        }
         assert!(message.to_xml().is_err(), "{field}");
         // A neutral theory permits KVN omissions in 3.0; XML still requires each choice.
         message.version = "3.0".into();
         message.body.segment.metadata.mean_element_theory = "ICD_THEORY".into();
         let source = message.to_kvn().unwrap().replacen("= 3.0", "= 2.0", 1);
-        assert!(ccsds_ndm::from_str(&source).is_err(), "{field}");
+        if matches!(*field, "bterm" | "agom") {
+            assert!(ccsds_ndm::from_str(&source).is_err(), "{field}");
+        } else {
+            ccsds_ndm::from_str(&source).unwrap();
+        }
         if matches!(*field, "bstar" | "mean_motion_ddot") {
             assert!(message.to_xml().is_err(), "{field}");
         } else {
@@ -351,5 +361,36 @@ fn opm_2_requires_negative_maneuver_delta_mass_in_every_route() {
                 .as_deref(),
             Some(path)
         );
+    }
+}
+
+#[test]
+fn odm_2_partial_spacecraft_is_kvn_valid_but_not_xml_representable() {
+    let mut opm = Opm::from_kvn(&edition_2(include_str!("../../data/kvn/opm_g2.kvn"))).unwrap();
+    let mut omm = Omm::from_kvn(&edition_2(include_str!("../../data/kvn/omm_g9.kvn"))).unwrap();
+    let parameters = ccsds_ndm::common::SpacecraftParameters {
+        mass: Some(ccsds_ndm::types::Mass::new(100.0, None).unwrap()),
+        ..Default::default()
+    };
+    opm.body.segment.data.spacecraft_parameters = Some(parameters.clone());
+    omm.body.segment.data.spacecraft_parameters = Some(parameters);
+    opm.validate().unwrap();
+    omm.validate().unwrap();
+    Opm::from_kvn(&opm.to_kvn().unwrap()).unwrap();
+    Omm::from_kvn(&omm.to_kvn().unwrap()).unwrap();
+    assert!(opm.to_xml().is_err());
+    assert!(omm.to_xml().is_err());
+    for (family, mut source) in [
+        ("opm", {
+            opm.version = "3.0".into();
+            opm.to_xml().unwrap()
+        }),
+        ("omm", {
+            omm.version = "3.0".into();
+            omm.to_xml().unwrap()
+        }),
+    ] {
+        source = source.replace("version=\"3.0\"", "version=\"2.0\"");
+        assert!(ccsds_ndm::from_str(&source).is_err(), "{family}");
     }
 }

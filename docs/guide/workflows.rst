@@ -66,6 +66,26 @@ message, generate and parse it again, for example ``Oem.from_str(message.to_str(
 That round trip validates and normalizes, so it only duplicates a complete, valid message, and it
 keeps only what the chosen notation represents.
 
+Preserving user-defined entry order
+-----------------------------------
+
+Shared user-defined blocks expose an ordered snapshot. Strings are comments; tuples are exact
+parameter names and values. Assign the whole list after editing:
+
+.. code-block:: python
+
+   from ccsds_ndm import UserDefined
+
+   user = UserDefined()
+   user.entries = [("SOURCE", "producer"), "Comment after SOURCE", ("QUALITY", "good")]
+
+XML preserves that order. KVN refuses interleaved comments where its logical-block rules cannot
+represent them. The ``comment`` and ``user_defined`` properties remain convenient projections;
+use ``entries`` to retain duplicate parameter names and exact comment associations.
+``OcmUserDefined.entries`` instead contains strings and live ``OcmUserDefinedParameter`` objects,
+including any ICD-defined sequence rows. Its ordered list is live; the filtered ``user_defined``
+list is a snapshot with live child objects, so use ``entries`` for append/delete operations.
+
 Converting notation
 -------------------
 
@@ -86,6 +106,11 @@ are not implemented as separate editions. See the project support matrix for the
 
 CCSDS units
 -----------
+
+Reading accepts unambiguous numeric spellings and all four book line endings; writing uses
+canonical notation rules. The `shared lexical decisions
+<https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/design/validation-contract.md#shared-lexical-decisions>`_
+define the common rules and notation boundaries.
 
 The parser checks supplied units against each field's CCSDS unit enum. Required XML unit
 attributes must be present, incompatible KVN units are rejected, and dimensionless fields reject

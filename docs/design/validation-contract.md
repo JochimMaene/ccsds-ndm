@@ -62,6 +62,45 @@ An XSD-only facet is sufficient evidence for P2 and XML P4. It is not automatica
 rule for P1 or P3. For example, positivity of `gmType` and `frequencyType` is established by the
 XSD but not by corresponding book text.
 
+## Shared lexical decisions
+
+These reading rules apply to every supported family and edition unless its decision record names
+an exception. They are compatibility rules, not a second parser mode.
+
+- **KVN lines:** accept LF, CR, CRLF, and LFCR. Normalization retains byte offsets for diagnostics.
+  Keywords and block markers remain case-sensitive; content must satisfy the family's ASCII and
+  line-length rules. Normalizing a terminator never joins two records.
+- **KVN real numbers:** accept ordinary signed decimal and exponent forms, including `.5`, `5.`,
+  `1e3`, and mantissas longer than 16 digits. Preserve the nearest representable finite `f64`;
+  reject malformed tokens, overflow, and nonzero values that underflow to zero. Integers used as
+  counts or identifiers retain their field-specific integer rules. Writers use the canonical
+  format and precision of the selected notation. Exact TDM phase counts remain decimal strings.
+- **Closed enumeration values:** KVN accepts supported all-uppercase and all-lowercase tokens,
+  including documented aliases, but rejects arbitrary mixed case. XML accepts the selected XSD's
+  exact spellings and specifically recorded compatibility aliases. Keywords, enum values, units,
+  free text, and open registry tokens are distinct domains: unit spellings stay exact, and open
+  tokens are preserved rather than uppercased or mapped to a fallback value.
+- **Units:** check any supplied annotation against the field's allowed unit, including XML fields
+  whose units are optional. Never discard an incompatible annotation or reinterpret its number.
+  No automatic unit conversion is performed.
+- **Missing values and defaults:** omitted optional fields remain absent in the model. Validators
+  may use an explicit book default to interpret them; writers may emit that default when the target
+  requires it, as a documented normalization. Required operational values are caller supplied.
+  XML optional free-text strings retain empty values. KVN optional-value adapters accept a blank
+  value or case-insensitive `N/A` as absence for optional numbers, epochs, enums, and strings;
+  raw header `CLASSIFICATION` and `MESSAGE_ID` strings instead retain empty text. Field records
+  identify additional notation-specific restrictions. CDM's specifically
+  documented producer compatibility accepts empty/nil optional numeric, epoch, and enum leaves
+  only when they carry no meaningful payload; generation omits absent values and emits standard XML.
+- **Schema-only bounds:** an XSD facet is enforced on XML input/output, not automatically on KVN or
+  notation-neutral validation. A separate book requirement or explicit semantic decision can
+  establish a common constraint. For example, GM and sensor-frequency positivity is XML-only;
+  their model/KVN values still must be finite. RDM day-interval positivity is likewise XML-only. A schema-valid double does not by itself establish
+  the physical correctness of a measurement.
+
+Each rule is implemented at the narrowest shared boundary. Family records identify exceptions,
+book defaults, and edition-specific restrictions; callers do not select a stricter or looser mode.
+
 ## Preservation and normalization
 
 Parsing and conversion preserve the supported model with the documented normalizations below;
@@ -81,8 +120,10 @@ notations. Whitespace, numeric spelling, and optional fixed-unit annotations may
 - Comment text and order are retained subject to documented whitespace normalization. Where KVN
   has fewer comment positions, a family either documents a canonical merge (OPM data/state-vector
   or OMM data/mean-elements comments) or refuses conversion (for example, CDM and RDM associations).
-  Shared `UserDefined` stores comment and parameter order separately and emits all comments
-  before all parameters; original XML interleaving between those lists is not retained.
+  Shared `UserDefined.entries` retains comment/parameter interleaving in XML. Its `Comment` and
+  `Parameter` variants preserve both order and exact parameter names, including names beginning
+  with `USER_DEFINED_`. KVN requires comments at the beginning of the logical block, so conversion
+  refuses interleaved comments rather than relocating them.
 - Documented aliases normalize to the same model meaning; for example, ACM KVN `RATE_TYPE=NONE`
   means no rate columns and generates as an omitted `RATE_TYPE`. RDM accepts the compatibility
   `MASS-LOSS + BREAKUP` alias and generates `MASS-LOSS + BREAK-UP`.

@@ -62,7 +62,8 @@ impl Ndm for Rdm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::detect::without_utf8_bom(kvn);
+        let kvn = crate::kvn::normalize_line_endings(crate::detect::without_utf8_bom(kvn));
+        let kvn = kvn.as_ref();
         kvn::validate_kvn_syntax(kvn)?;
         let rdm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&rdm)?;

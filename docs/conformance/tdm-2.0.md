@@ -143,3 +143,14 @@ choices, observation domains, and conditional metadata remain library checks.
 
 Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
+
+All four book line endings (LF, CR, CRLF and LFCR) are accepted with identical models and
+byte-position-preserving normalization.
+
+Optional XML `ANGLE_1`/`ANGLE_2` unit annotations are checked against the schema's `deg`
+spelling; `rad` is rejected rather than ignored or converted. Their fixed degree annotation
+may be omitted by the writer. Ordinary observation numbers use the shared finite-number reader,
+including nonzero-underflow rejection; exact phase counts retain their separate decimal model.
+`tdm_xml_accepts_the_schema_defined_optional_observation_units` covers incompatible annotations,
+and `observation_numbers_use_shared_reading_rules_without_underflow` covers observation spelling
+and range boundaries.

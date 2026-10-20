@@ -1082,6 +1082,7 @@ TRAJ_STOP
 fn xml_only_facets_are_checked_on_read_and_generation() {
     let mut message = Ocm::from_kvn(KVN).unwrap();
     message.body.segment.data.traj.truncate(1);
+    message.body.segment.data.traj[0].interpolation_degree = Some(3);
     let original_xml = message.to_xml().unwrap();
     let degree = message.body.segment.data.traj[0]
         .interpolation_degree
@@ -1225,4 +1226,109 @@ fn orbit_revolution_counts_are_finite_nonnegative_and_may_be_fractional() {
         assert_ne!(invalid_kvn, kvn.trim_end());
         assert!(Ocm::from_kvn(&invalid_kvn).is_err());
     }
+}
+
+#[test]
+fn book_valid_measure_domains_round_trip_kvn_without_xml_facets() {
+    let mut message = Ocm::from_kvn(KVN).unwrap();
+    let od = message.body.segment.data.od.as_mut().unwrap();
+    od.days_since_first_obs = Some(ccsds_ndm::types::DayInterval {
+        value: -1.0,
+        units: None,
+    });
+    od.days_since_last_obs = Some(ccsds_ndm::types::DayInterval {
+        value: -2.0,
+        units: None,
+    });
+    let man = message.body.segment.data.man.first_mut().unwrap();
+    man.dc_pa_start_angle = Some(ccsds_ndm::types::Angle {
+        value: 400.0,
+        units: None,
+    });
+    man.dc_pa_stop_angle = Some(ccsds_ndm::types::Angle {
+        value: -400.0,
+        units: None,
+    });
+    message.validate().unwrap();
+    let output = message.to_kvn().unwrap();
+    assert_eq!(Ocm::from_kvn(&output).unwrap(), message);
+    let mut streamed = Vec::new();
+    message.write_kvn_to(&mut streamed).unwrap();
+    assert_eq!(streamed, output.as_bytes());
+    assert!(message.to_xml().is_err());
+}
+
+#[test]
+fn omitted_optional_trajectory_defaults_stay_absent() {
+    let source = "CCSDS_OCM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\nMETA_START\nTIME_SYSTEM = UTC\nEPOCH_TZERO = 2023-01-01T00:00:00\nMETA_STOP\nTRAJ_START\nCENTER_NAME = EARTH\nTRAJ_REF_FRAME = GCRF\nTRAJ_TYPE = CARTPV\n0 1 2 3 4 5 6\nTRAJ_STOP\n";
+    let message = Ocm::from_kvn(source).unwrap();
+    let trajectory = &message.body.segment.data.traj[0];
+    assert_eq!(trajectory.interpolation_degree, None);
+    assert_eq!(trajectory.orb_revnum_basis, None);
+    assert_eq!(trajectory.orb_averaging, None);
+    let xml = message.to_xml().unwrap();
+    assert_eq!(Ocm::from_xml(&xml).unwrap(), message);
+    assert_eq!(Ocm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    for ending in ["\r", "\r\n", "\n\r"] {
+        assert_eq!(
+            Ocm::from_kvn(&source.replace('\n', ending)).unwrap(),
+            message
+        );
+    }
+}
+
+#[test]
+fn user_defined_xml_interleaving_is_preserved_and_kvn_refused() {
+    let message = Ocm::from_kvn(include_str!("../../data/kvn/ocm_g15.kvn")).unwrap();
+    let user = "<user><COMMENT>before</COMMENT><USER_DEFINED parameter=\"A\">1</USER_DEFINED><COMMENT>between</COMMENT><USER_DEFINED parameter=\"B\">2</USER_DEFINED></user>";
+    let xml = message
+        .to_xml()
+        .unwrap()
+        .replace("</data>", &format!("{user}</data>"));
+    let parsed = Ocm::from_xml(&xml).unwrap();
+    assert!(parsed.to_xml().unwrap().contains(user));
+    assert!(parsed.to_kvn().is_err());
+    let mut bytes = Vec::new();
+    assert!(parsed.write_kvn_to(&mut bytes).is_err());
+    assert!(bytes.is_empty());
+}
+
+#[test]
+fn zero_counts_are_usable_in_kvn_and_refused_by_positive_integer_xml() {
+    let mut message = Ocm::from_kvn(KVN).unwrap();
+    message.body.segment.data.od.as_mut().unwrap().consider_n = Some(0);
+    message
+        .body
+        .segment
+        .data
+        .pert
+        .as_mut()
+        .unwrap()
+        .albedo_grid_size = Some(0);
+    message.body.segment.data.man[0].dc_max_cycles = Some(0);
+    message.validate().unwrap();
+    let kvn = message.to_kvn().unwrap();
+    assert_eq!(Ocm::from_kvn(&kvn).unwrap(), message);
+    assert!(message.to_xml().is_err());
+    let mut bytes = Vec::new();
+    assert!(message.write_xml_to(&mut bytes).is_err());
+    assert!(bytes.is_empty());
+}
+
+#[test]
+fn user_defined_kvn_names_retain_normative_punctuation_and_literal_prefix() {
+    let message = Ocm::from_kvn(include_str!("../../data/kvn/ocm_g15.kvn")).unwrap();
+    let xml = message.to_xml().unwrap();
+    for suffix in ["A.B", "A-B", "USER_DEFINED_LITERAL"] {
+        let user =
+            format!("<user><USER_DEFINED parameter=\"{suffix}\">value</USER_DEFINED></user>");
+        let source = xml.replace("</data>", &format!("{user}</data>"));
+        let message = Ocm::from_xml(&source).unwrap();
+        assert_eq!(Ocm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    }
+    let source = xml.replace(
+        "</data>",
+        "<user><USER_DEFINED parameter=\"lowercase\">value</USER_DEFINED></user></data>",
+    );
+    assert!(Ocm::from_xml(&source).unwrap().to_kvn().is_err());
 }

@@ -65,15 +65,16 @@ fn aem_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
 }
 
 #[test]
-fn aem_kvn_rejects_non_ccsds_history_number_spellings() {
-    for value in [".5", "1e0", "12.5e3"] {
+fn aem_kvn_preserves_unambiguous_history_number_variations() {
+    for value in [".5", "5.", "1e0", "12.5e1", "268.62511000000001"] {
         let source = mutated_once(SPIN_KVN, "2.6862511e+002", value);
-        let error = Aem::from_kvn(&source).unwrap_err();
-        assert_eq!(error.code(), Some("parse.kvn.syntax"), "{value}: {error}");
+        let message = Aem::from_kvn(&source).unwrap();
+        Aem::from_kvn(&message.to_kvn().unwrap()).unwrap();
     }
-    // Reading does not apply the book's 16-digit cap: 17-digit doubles are common and lossless.
-    let source = mutated_once(SPIN_KVN, "2.6862511e+002", "268.62511000000001");
-    Aem::from_kvn(&source).unwrap();
+    for value in ["1D0", "5.e", "1_0", "NaN", "Inf", "1e999", "1e-9999"] {
+        let source = mutated_once(SPIN_KVN, "2.6862511e+002", value);
+        assert!(Aem::from_kvn(&source).is_err(), "{value}");
+    }
 }
 
 #[test]

@@ -504,18 +504,26 @@ fn parse_user_defined_block(input: &mut &str) -> KvnResult<crate::types::UserDef
         let _ = collect_comments.parse_next(input)?;
         input.reset(&checkpoint);
         let comments = collect_comments.parse_next(input)?;
-        block.comment.extend(comments);
+        block.entries.extend(
+            comments
+                .into_iter()
+                .map(crate::types::UserDefinedEntry::Comment),
+        );
 
         if at_block_end("USER", input) {
             break;
         }
 
-        let key = key_token.parse_next(input)?;
+        let key = user_defined_key_token.parse_next(input)?;
         let val = kv_string.parse_next(input)?;
-        block.user_defined.push(crate::types::UserDefinedParameter {
-            parameter: key.strip_prefix("USER_DEFINED_").unwrap_or(key).to_string(),
-            value: val,
-        });
+        block
+            .entries
+            .push(crate::types::UserDefinedEntry::Parameter(
+                crate::types::UserDefinedParameter {
+                    parameter: key.strip_prefix("USER_DEFINED_").unwrap_or(key).to_string(),
+                    value: val,
+                },
+            ));
     }
     expect_block_end("USER").parse_next(input)?;
     Ok(block)
@@ -1010,10 +1018,7 @@ impl ToKvn for AcmData {
         }
         if let Some(user) = &self.user {
             writer.write_section("USER_START");
-            writer.write_comments(&user.comment);
-            for p in &user.user_defined {
-                writer.write_user_defined(&p.parameter, &p.value);
-            }
+            user.write_kvn(writer);
             writer.write_section("USER_STOP");
         }
     }
@@ -1137,10 +1142,16 @@ impl ToKvn for AcmManeuverParameters {
             writer.write_pair("MAN_PURPOSE", v);
         }
         if let Some(v) = &self.man_begin_time {
-            writer.write_pair("MAN_BEGIN_TIME", v);
+            writer.write_odm_float_pair(
+                "MAN_BEGIN_TIME",
+                v.as_str().parse().expect("validated relative time"),
+            );
         }
         if let Some(v) = &self.man_end_time {
-            writer.write_pair("MAN_END_TIME", v);
+            writer.write_odm_float_pair(
+                "MAN_END_TIME",
+                v.as_str().parse().expect("validated relative time"),
+            );
         }
         if let Some(v) = &self.man_duration {
             writer.write_odm_float_measure("MAN_DURATION", &v.to_unit_value());
@@ -1510,9 +1521,9 @@ impl Acm {
             }
         }
         if let Some(user) = &data.user {
-            for value in user.comment.iter().chain(
-                user.user_defined
-                    .iter()
+            user.validate_kvn_representability()?;
+            for value in user.comments().chain(
+                user.parameters()
                     .flat_map(|parameter| [&parameter.parameter, &parameter.value]),
             ) {
                 check_text(value)?;

@@ -12,6 +12,33 @@ use std::borrow::Cow;
 mod kvn;
 mod xml;
 
+pub(crate) fn validate_xml_spacecraft_parameters(
+    version: &str,
+    parameters: Option<&SpacecraftParameters>,
+) -> Result<()> {
+    if version == "2.0" {
+        if let Some(parameters) = parameters {
+            for (field, present) in [
+                ("MASS", parameters.mass.is_some()),
+                ("SOLAR_RAD_AREA", parameters.solar_rad_area.is_some()),
+                ("SOLAR_RAD_COEFF", parameters.solar_rad_coeff.is_some()),
+                ("DRAG_AREA", parameters.drag_area.is_some()),
+                ("DRAG_COEFF", parameters.drag_coeff.is_some()),
+            ] {
+                if !present {
+                    return Err(ValidationError::missing_required(
+                        "XML 2.0 spacecraft parameters",
+                        field,
+                    )
+                    .at_path("body.segment.data.spacecraft_parameters")
+                    .into());
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 //----------------------------------------------------------------------
 // Root OPM Structure
 //----------------------------------------------------------------------

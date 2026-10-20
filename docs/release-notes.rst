@@ -4,6 +4,34 @@ Release notes
 Unreleased
 ----------
 
+Interoperability and preservation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Combined XML follows the bundled NDM/XML 4.0.0 constituent editions. OPM, OMM, and OEM
+  version 2.0 remain supported as standalone XML; combining them in the 4.0.0 envelope is
+  explicitly refused on input/output instead of producing schema-invalid XML.
+- All family KVN readers accept CR, LF, CRLF, and LFCR. Numeric readers consistently accept
+  unambiguous decimal/exponent spellings, including ``.5``, ``5.``, ``1e3``, and extra precision;
+  malformed values, overflow, and nonzero underflow are refused. Generation remains canonical.
+- Closed KVN enums accept supported uppercase/lowercase spellings, but arbitrary mixed case
+  and unknown closed values are rejected. Unknown object types no longer silently become
+  ``OTHER``. Open registry/ICD strings retain their supplied spelling.
+- Schema-only restrictions apply at XML boundaries. Finite GM, sensor frequency, and RDM day
+  intervals retain the broader book/KVN domain, with XML refusing values outside its schema.
+  Independently book-backed numeric rules remain semantic validation requirements.
+- Rust ``UserDefined`` and ``OcmUserDefined`` now expose ordered ``entries`` with comment and
+  parameter variants. XML retains interleaving and exact names. KVN refuses comment placements
+  or populated empty blocks it cannot preserve rather than moving or dropping information.
+- Python ``UserDefined.entries`` is an ordered snapshot of comment strings and ``(name, value)``
+  tuples. ``OcmUserDefined.entries`` is a live ordered list of comment strings and parameter
+  objects. The OCM ``user_defined`` projection is a list snapshot containing live parameter
+  objects; use ``entries`` for structural edits. Parameter dictionaries preserve insertion order;
+  ordered entries also retain duplicate names that a dictionary cannot represent.
+- Python covariance construction requires every covariance component instead of inventing zero
+  values. AEM attitude type, OMM mean-element theory, and CDM ephemeris declarations are supplied
+  explicitly. Generated enum annotations describe the actual PyO3 classes rather than claiming
+  Python's ``enum.Enum`` interface.
+
 Conformance review and compatibility changes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

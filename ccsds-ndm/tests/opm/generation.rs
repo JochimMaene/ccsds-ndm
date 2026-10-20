@@ -294,7 +294,9 @@ fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
                     .user_defined_parameters
                     .as_mut()
                     .unwrap()
-                    .user_defined[0]
+                    .parameters_mut()
+                    .next()
+                    .unwrap()
                     .parameter
                     .push('\u{1}')
             },
@@ -310,8 +312,8 @@ fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
                     .user_defined_parameters
                     .as_mut()
                     .unwrap()
-                    .comment
-                    .push("\u{1}".into())
+                    .entries
+                    .push(ccsds_ndm::types::UserDefinedEntry::Comment("\u{1}".into()))
             },
         ),
         (
@@ -325,7 +327,9 @@ fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
                     .user_defined_parameters
                     .as_mut()
                     .unwrap()
-                    .user_defined[0]
+                    .parameters_mut()
+                    .next()
+                    .unwrap()
                     .value
                     .push('\u{1}')
             },
@@ -756,7 +760,9 @@ fn opm_kvn_rejects_invalid_user_defined_keyword_suffixes() {
             .user_defined_parameters
             .as_mut()
             .unwrap()
-            .user_defined[0]
+            .parameters_mut()
+            .next()
+            .unwrap()
             .parameter = invalid.to_owned();
 
         let error = message
@@ -789,7 +795,9 @@ fn opm_kvn_accepts_normative_user_defined_keyword_forms() {
             .user_defined_parameters
             .as_mut()
             .unwrap()
-            .user_defined[0]
+            .parameters_mut()
+            .next()
+            .unwrap()
             .parameter = valid.to_owned();
 
         let generated = message.to_kvn().expect("valid KVN keyword should generate");
@@ -849,7 +857,9 @@ fn opm_kvn_attributes_an_oversized_user_defined_keyword_to_its_parameter() {
         .user_defined_parameters
         .as_mut()
         .unwrap()
-        .user_defined[0];
+        .parameters_mut()
+        .next()
+        .unwrap();
     parameter.parameter = "A".repeat(237);
     parameter.value = "V".to_owned();
 
@@ -869,7 +879,9 @@ fn opm_kvn_attributes_an_oversized_user_defined_keyword_to_its_parameter() {
         .user_defined_parameters
         .as_mut()
         .unwrap()
-        .user_defined[0]
+        .parameters_mut()
+        .next()
+        .unwrap()
         .parameter = "A".repeat(239);
     let error = message
         .to_kvn()
@@ -1136,4 +1148,25 @@ fn minimal_kvn_omits_optional_keplerian_elements() {
     let kvn = opm.to_kvn().unwrap();
     assert!(!kvn.contains("SEMI_MAJOR_AXIS"));
     assert!(opm.validate().is_ok());
+}
+
+#[test]
+fn zero_gm_is_book_valid_kvn_but_not_xml() {
+    let mut message = Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).unwrap();
+    message
+        .body
+        .segment
+        .data
+        .keplerian_elements
+        .as_mut()
+        .unwrap()
+        .gm
+        .value = 0.0;
+    message.validate().unwrap();
+    let kvn = message.to_kvn().unwrap();
+    assert_eq!(Opm::from_kvn(&kvn).unwrap(), message);
+    assert!(message.to_xml().is_err());
+    let mut bytes = Vec::new();
+    assert!(message.write_xml_to(&mut bytes).is_err());
+    assert!(bytes.is_empty());
 }

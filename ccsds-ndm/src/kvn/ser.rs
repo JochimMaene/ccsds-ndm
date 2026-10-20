@@ -644,14 +644,9 @@ impl<'a> KvnWriter<'a> {
         let _ = writeln!(self);
     }
 
-    /// Writes a user-defined parameter, ensuring the "USER_DEFINED_" prefix is present.
+    /// Writes the exact parameter name with the notation's USER_DEFINED_ prefix.
     pub fn write_user_defined(&mut self, parameter: &str, value: &str) {
-        let key = if parameter.starts_with("USER_DEFINED_") {
-            std::borrow::Cow::Borrowed(parameter)
-        } else {
-            std::borrow::Cow::Owned(format!("USER_DEFINED_{}", parameter))
-        };
-        self.write_pair(&key, value);
+        self.write_pair(&format!("USER_DEFINED_{parameter}"), value);
     }
 
     /// Returns the accumulated KVN content.

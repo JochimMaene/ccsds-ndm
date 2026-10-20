@@ -46,7 +46,7 @@ pub fn parse_f64_winnow(input: &mut &str) -> KvnResult<f64> {
     let s = take_while::<_, _, ()>(1.., ('0'..='9', '.', '-', '+', 'e', 'E'))
         .parse_next(input)
         .map_err(|_| cut_err(input, "Invalid float"))?;
-    fast_float::parse(s).map_err(|_| cut_err(input, "Invalid float"))
+    parse_ccsds_number(s).ok_or_else(|| cut_err(input, "Invalid finite number or double underflow"))
 }
 
 /// Return whether a token has the shape of a CCSDS integer, fixed-point, or floating-point number
@@ -67,26 +67,23 @@ pub(crate) fn valid_ccsds_number(token: &str) -> bool {
         index += 1;
     }
     let integer_digits = index - integer_start;
-    if integer_digits == 0 {
-        return false;
-    }
-
-    let has_decimal = bytes.get(index) == Some(&b'.');
-    if has_decimal {
+    let mut fraction_digits = 0;
+    if bytes.get(index) == Some(&b'.') {
         index += 1;
         let fraction_start = index;
         while bytes.get(index).is_some_and(u8::is_ascii_digit) {
             index += 1;
         }
-        if index == fraction_start {
-            return false;
-        }
+        fraction_digits = index - fraction_start;
+    }
+    if integer_digits + fraction_digits == 0 {
+        return false;
     }
 
     if index == bytes.len() {
         return true;
     }
-    if !has_decimal || integer_digits != 1 || !matches!(bytes.get(index), Some(b'e' | b'E')) {
+    if !matches!(bytes.get(index), Some(b'e' | b'E')) {
         return false;
     }
 
@@ -382,7 +379,7 @@ pub fn key_token<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
 /// ODM 7.4.4 requires uppercase keywords without blanks but does not make Annex F's recommended
 /// alphanumeric-and-underscore regex normative. `=` remains excluded because it delimits the
 /// single assignment permitted by 7.4.3.
-fn user_defined_key_token<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
+pub(crate) fn user_defined_key_token<'a>(input: &mut &'a str) -> KvnResult<&'a str> {
     terminated(
         preceded(
             ws,
@@ -512,6 +509,7 @@ pub fn kv_u32_opt(input: &mut &str) -> KvnResult<Option<u32>> {
         if kv_unit.parse_next(input)?.is_some() {
             return Err(cut_err(input, "Units are not allowed for integer fields"));
         }
+        let _ = till_line_ending.parse_next(input)?;
         opt_line_ending.parse_next(input)?;
         return Ok(None);
     }
@@ -1354,8 +1352,33 @@ pub fn covariance_matrix(input: &mut &str) -> KvnResult<Option<OpmCovarianceMatr
         "CZ_DOT_Z_DOT" => cz_dot_z_dot: kv_from_kvn,
     }, |_| false);
 
-    // If we have covariance data, build the struct
-    if cx_x.is_some() {
+    let has_covariance = cov_ref_frame.is_some()
+        || [
+            cx_x.is_some(),
+            cy_x.is_some(),
+            cy_y.is_some(),
+            cz_x.is_some(),
+            cz_y.is_some(),
+            cz_z.is_some(),
+            cx_dot_x.is_some(),
+            cx_dot_y.is_some(),
+            cx_dot_z.is_some(),
+            cx_dot_x_dot.is_some(),
+            cy_dot_x.is_some(),
+            cy_dot_y.is_some(),
+            cy_dot_z.is_some(),
+            cy_dot_x_dot.is_some(),
+            cy_dot_y_dot.is_some(),
+            cz_dot_x.is_some(),
+            cz_dot_y.is_some(),
+            cz_dot_z.is_some(),
+            cz_dot_x_dot.is_some(),
+            cz_dot_y_dot.is_some(),
+            cz_dot_z_dot.is_some(),
+        ]
+        .into_iter()
+        .any(|present| present);
+    if has_covariance {
         Ok(Some(OpmCovarianceMatrix {
             comment,
             cov_ref_frame,
@@ -1419,7 +1442,13 @@ pub fn spacecraft_parameters(input: &mut &str) -> KvnResult<Option<SpacecraftPar
     }, |_| false);
 
     // If we have any spacecraft data, build the struct
-    if mass.is_some() || solar_rad_area.is_some() || drag_area.is_some() {
+    if mass.is_some()
+        || solar_rad_area.is_some()
+        || solar_rad_coeff.is_some()
+        || drag_area.is_some()
+        || drag_coeff.is_some()
+        || !comment.is_empty()
+    {
         Ok(Some(SpacecraftParameters {
             comment,
             mass,
@@ -1435,47 +1464,29 @@ pub fn spacecraft_parameters(input: &mut &str) -> KvnResult<Option<SpacecraftPar
 
 /// Parses user-defined parameters.
 pub fn user_defined_parameters(input: &mut &str) -> KvnResult<Option<UserDefined>> {
-    let mut comment = Vec::new();
-    let mut params = Vec::new();
-
+    let mut entries = Vec::new();
     loop {
         let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
-
         let key = match user_defined_key_token.parse_next(input) {
-            Ok(k) => k,
+            Ok(key) => key,
             Err(_) => {
                 input.reset(&checkpoint);
                 break;
             }
         };
-
-        if key.starts_with("USER_DEFINED_") {
-            comment.extend(comments);
-            let val = kv_string.parse_next(input)?;
-            params.push(UserDefinedParameter {
-                parameter: key.strip_prefix("USER_DEFINED_").unwrap().to_string(),
-                value: val,
-            });
-        } else {
-            // Backtrack and end user defined section
+        let Some(parameter) = key.strip_prefix("USER_DEFINED_") else {
             input.reset(&checkpoint);
             break;
-        }
-
-        if input.offset_from(&checkpoint) == 0 {
-            break;
-        }
+        };
+        let value = kv_string.parse_next(input)?;
+        entries.extend(comments.into_iter().map(UserDefinedEntry::Comment));
+        entries.push(UserDefinedEntry::Parameter(UserDefinedParameter {
+            parameter: parameter.to_string(),
+            value,
+        }));
     }
-
-    if params.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(UserDefined {
-            comment,
-            user_defined: params,
-        }))
-    }
+    Ok((!entries.is_empty()).then_some(UserDefined { entries }))
 }
 
 //----------------------------------------------------------------------
@@ -1485,6 +1496,33 @@ pub fn user_defined_parameters(input: &mut &str) -> KvnResult<Option<UserDefined
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn optional_kvn_markers_consume_the_complete_record() {
+        let mut input = "N/A\nNEXT = 1\n";
+        assert_eq!(kv_u32_opt(&mut input).unwrap(), None);
+        assert_eq!(input, "NEXT = 1\n");
+    }
+
+    #[test]
+    fn numeric_reader_rejects_overflow_underflow_and_malformed_tokens() {
+        for token in [".5", "5.", "1e3", "12.5e-3", "1.2345678901234567", "5e-324"] {
+            assert!(parse_ccsds_number(token).is_some(), "{token}");
+        }
+        for token in ["1e999", "1e-999", "1..0", ".", "+", "1e", "NaN", "INF"] {
+            assert!(parse_ccsds_number(token).is_none(), "{token}");
+        }
+    }
+
+    #[test]
+    fn partial_covariance_is_an_error_and_spacecraft_coefficients_are_preserved() {
+        assert!(covariance_matrix(&mut "CY_Y = 1.0\n").is_err());
+        assert!(covariance_matrix(&mut "COV_REF_FRAME = GCRF\n").is_err());
+        let block = spacecraft_parameters(&mut "DRAG_COEFF = 0.5\n")
+            .unwrap()
+            .unwrap();
+        assert_eq!(block.drag_coeff.unwrap().value, 0.5);
+    }
 
     #[test]
     fn ccsds_number_lexical_validation_matches_book_forms() {
@@ -1504,12 +1542,16 @@ mod tests {
             "00000000002147483648",
             "1.2345678901234567",
             "-2757.3016318893897",
+            ".5",
+            "1.",
+            "1.e3",
+            "12e3",
+            "1e3",
+            "12.5e3",
         ] {
             assert!(valid_ccsds_number(value), "{value}");
         }
-        for value in [
-            "", "+", ".5", "1.", "1.e3", "12e3", "1e3", "1.0e", "1.0e+", "12.5e3",
-        ] {
+        for value in ["", "+", ".", "1.0e", "1.0e+", "1e2e3", "1..2", "--1"] {
             assert!(!valid_ccsds_number(value), "{value}");
         }
     }

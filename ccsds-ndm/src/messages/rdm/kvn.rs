@@ -512,19 +512,23 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         let checkpoint = input.checkpoint();
         let loop_comments = collect_comments.parse_next(input)?;
 
-        let key = match key_token.parse_next(input) {
+        let key = match user_defined_key_token.parse_next(input) {
             Ok(k) if k.starts_with("USER_DEFINED_") => k,
             _ => {
                 input.reset(&checkpoint);
                 break;
             }
         };
-        user_defined.comment.extend(loop_comments);
+        user_defined
+            .entries
+            .extend(loop_comments.into_iter().map(UserDefinedEntry::Comment));
         let v = kv_string.parse_next(input)?;
-        user_defined.user_defined.push(UserDefinedParameter {
-            parameter: key.strip_prefix("USER_DEFINED_").unwrap().to_string(),
-            value: v,
-        });
+        user_defined
+            .entries
+            .push(UserDefinedEntry::Parameter(UserDefinedParameter {
+                parameter: key.strip_prefix("USER_DEFINED_").unwrap().to_string(),
+                value: v,
+            }));
 
         if input.offset_from(&checkpoint) == 0 {
             break;
@@ -563,7 +567,7 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
             None
         },
         od_parameters: if have_od { Some(od_params) } else { None },
-        user_defined_parameters: if user_defined.user_defined.is_empty() {
+        user_defined_parameters: if user_defined.entries.is_empty() {
             None
         } else {
             Some(user_defined)
@@ -916,6 +920,17 @@ impl Rdm {
             }
             .into());
         }
+        if let Some(parameters) = &self.body.segment.data.user_defined_parameters {
+            parameters.validate_kvn_representability()?;
+            if parameters.parameters().next().is_none() {
+                return Err(crate::error::ValidationError::Generic {
+                    message: "RDM KVN cannot retain a user-defined block without a parameter"
+                        .into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
         Ok(())
     }
 }
@@ -1007,10 +1022,7 @@ impl RdmData {
         }
 
         if let Some(ud) = &self.user_defined_parameters {
-            writer.write_comments(&ud.comment);
-            for p in &ud.user_defined {
-                writer.write_user_defined(&p.parameter, &p.value);
-            }
+            ud.write_kvn(writer);
         }
     }
 }

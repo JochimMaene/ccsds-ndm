@@ -1356,7 +1356,7 @@ impl CdmMetadata {
         ref_frame,
         covariance_method,
         maneuverable,
-        ephemeris_name=String::from("NONE"),
+        ephemeris_name,
         object_type=None,
         operator_contact_position=None,
         operator_organization=None,
@@ -2425,7 +2425,7 @@ fn parse_cdm_object_type(ob: &Bound<'_, PyAny>) -> PyResult<CdmObjectType> {
         return Ok(val);
     }
     let s: String = ob.extract()?;
-    match s.to_uppercase().as_str() {
+    match crate::common::enum_token(&s)?.as_str() {
         "OBJECT1" | "OBJECT 1" => Ok(CdmObjectType::Object1),
         "OBJECT2" | "OBJECT 2" => Ok(CdmObjectType::Object2),
         other => Err(PyValueError::new_err(format!(
@@ -2463,7 +2463,7 @@ fn parse_screen_volume_frame_type(ob: &Bound<'_, PyAny>) -> PyResult<ScreenVolum
         return Ok(val);
     }
     let s: String = ob.extract()?;
-    match s.to_uppercase().as_str() {
+    match crate::common::enum_token(&s)?.as_str() {
         "RTN" => Ok(ScreenVolumeFrameType::Rtn),
         "TVN" => Ok(ScreenVolumeFrameType::Tvn),
         other => Err(PyValueError::new_err(format!(
@@ -2501,7 +2501,7 @@ fn parse_screen_volume_shape_type(ob: &Bound<'_, PyAny>) -> PyResult<ScreenVolum
         return Ok(val);
     }
     let s: String = ob.extract()?;
-    match s.to_uppercase().as_str() {
+    match crate::common::enum_token(&s)?.as_str() {
         "ELLIPSOID" => Ok(ScreenVolumeShapeType::Ellipsoid),
         "BOX" => Ok(ScreenVolumeShapeType::Box),
         other => Err(PyValueError::new_err(format!(
@@ -2541,7 +2541,7 @@ fn parse_reference_frame_type(ob: &Bound<'_, PyAny>) -> PyResult<ReferenceFrameT
         return Ok(val);
     }
     let s: String = ob.extract()?;
-    match s.to_uppercase().as_str() {
+    match crate::common::enum_token(&s)?.as_str() {
         "EME2000" => Ok(ReferenceFrameType::Eme2000),
         "GCRF" => Ok(ReferenceFrameType::Gcrf),
         "ITRF" => Ok(ReferenceFrameType::Itrf),
@@ -2580,7 +2580,7 @@ fn parse_covariance_method_type(ob: &Bound<'_, PyAny>) -> PyResult<CovarianceMet
         return Ok(val);
     }
     let s: String = ob.extract()?;
-    match s.to_uppercase().as_str() {
+    match crate::common::enum_token(&s)?.as_str() {
         "CALCULATED" => Ok(CovarianceMethodType::Calculated),
         "DEFAULT" => Ok(CovarianceMethodType::Default),
         other => Err(PyValueError::new_err(format!(
@@ -2620,7 +2620,7 @@ fn parse_maneuverable_type(ob: &Bound<'_, PyAny>) -> PyResult<ManeuverableType> 
         return Ok(val);
     }
     let s: String = ob.extract()?;
-    match s.to_uppercase().as_str() {
+    match crate::common::enum_token(&s)?.as_str() {
         "YES" => Ok(ManeuverableType::Yes),
         "NO" => Ok(ManeuverableType::No),
         "N/A" | "NA" => Ok(ManeuverableType::NA),

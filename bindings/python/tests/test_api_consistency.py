@@ -339,3 +339,85 @@ def test_interpretation_metadata_has_no_implicit_defaults():
             international_designator="I",
             epoch_tzero="2023-01-01T00:00:00",
         )
+
+
+def test_covariance_constructor_requires_all_entries():
+    with pytest.raises(TypeError):
+        ccsds_ndm.OpmCovarianceMatrix(cx_x=1.0)
+    names = (
+        "cx_x cy_x cy_y cz_x cz_y cz_z cx_dot_x cx_dot_y cx_dot_z "
+        "cy_dot_x cy_dot_y cy_dot_z cz_dot_x cz_dot_y cz_dot_z "
+        "cx_dot_x_dot cy_dot_x_dot cy_dot_y_dot cz_dot_x_dot cz_dot_y_dot cz_dot_z_dot"
+    ).split()
+    covariance = ccsds_ndm.OpmCovarianceMatrix(**dict.fromkeys(names, 0.0))
+    assert covariance.cx_x == 0.0
+
+
+def test_user_defined_entries_keep_comment_and_parameter_order():
+    block = ccsds_ndm.UserDefined({"B": "2", "A": "1"})
+    assert block.entries == [("B", "2"), ("A", "1")]
+    block.entries = [("B", "2"), "between", ("A", "1")]
+    assert block.entries == [("B", "2"), "between", ("A", "1")]
+    block.user_defined = {"C": "3", "D": "4"}
+    assert block.entries == [("C", "3"), "between", ("D", "4")]
+    block.comment = ["edited"]
+    assert block.entries == ["edited", ("C", "3"), ("D", "4")]
+
+
+def test_enum_stubs_match_simple_pyo3_classes():
+    import enum
+
+    assert not issubclass(ccsds_ndm.YesNo, enum.Enum)
+    assert isinstance(ccsds_ndm.YesNo.Yes, ccsds_ndm.YesNo)
+    from pathlib import Path
+
+    stub = (Path(__file__).parents[1] / "ccsds_ndm" / "__init__.pyi").read_text()
+    assert "(enum.Enum)" not in stub
+    assert "Yes: typing.ClassVar[YesNo]" in stub
+
+
+@pytest.mark.parametrize(
+    "constructor, arguments, missing",
+    [
+        (
+            ccsds_ndm.AemMetadata,
+            dict(
+                object_name="S",
+                object_id="I",
+                ref_frame_a="A",
+                ref_frame_b="B",
+                start_time="2023-01-01T00:00:00",
+                stop_time="2023-01-01T01:00:00",
+                time_system="UTC",
+            ),
+            "attitude_type",
+        ),
+        (
+            ccsds_ndm.OmmMetadata,
+            dict(
+                object_name="S",
+                object_id="I",
+                center_name="EARTH",
+                ref_frame="TEME",
+                time_system="UTC",
+            ),
+            "mean_element_theory",
+        ),
+    ],
+)
+def test_metadata_does_not_invent_interpretation(constructor, arguments, missing):
+    with pytest.raises(TypeError, match=missing):
+        constructor(**arguments)
+
+
+def test_user_defined_interleaving_survives_xml_and_refuses_kvn():
+    message = Opm.from_file(ROOT / "ccsds-ndm/data/kvn/opm_g1.kvn")
+    block = ccsds_ndm.UserDefined()
+    block.entries = ["before", ("B", "2"), "between", ("A", "1")]
+    message.segment.data.user_defined_parameters = block
+    xml = message.to_str(format="xml")
+    parsed = Opm.from_str(xml, format="xml")
+    assert parsed.segment.data.user_defined_parameters.entries == block.entries
+    assert parsed.to_str(format="xml") == xml
+    with pytest.raises(ccsds_ndm.NdmValidationError, match="comments must precede"):
+        parsed.to_str(format="kvn")

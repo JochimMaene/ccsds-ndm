@@ -760,8 +760,8 @@ USER_STOP
 "#;
     let ocm = Ocm::from_kvn(kvn).unwrap();
     let user = ocm.body.segment.data.user.as_ref().unwrap();
-    assert_eq!(user.user_defined.len(), 2);
-    assert_eq!(user.user_defined[0].parameter, "CUSTOM_PARAM");
+    assert_eq!(user.parameters().count(), 2);
+    assert_eq!(user.parameters().next().unwrap().parameter, "CUSTOM_PARAM");
 }
 
 #[test]
@@ -1190,8 +1190,8 @@ USER_STOP
         .user
         .as_ref()
         .unwrap()
-        .comment
-        .contains(&"Comment before USER".to_string()));
+        .comments()
+        .any(|value| value == "Comment before USER"));
 }
 
 #[test]
@@ -1216,8 +1216,8 @@ USER_STOP
         .user
         .as_ref()
         .unwrap()
-        .comment
-        .contains(&"inside user block".to_string()));
+        .comments()
+        .any(|value| value == "inside user block"));
 }
 
 #[test]
@@ -1243,8 +1243,8 @@ USER_STOP
             .user
             .as_ref()
             .unwrap()
-            .user_defined
-            .len(),
+            .parameters()
+            .count(),
         2
     );
 }
@@ -1810,4 +1810,26 @@ fn enum_error_is_preserved() {
     } else {
         panic!("Expected EnumParseError, got {format_error:?}");
     }
+}
+
+#[test]
+fn trajectory_numbers_accept_producer_spellings_without_underflow() {
+    let source = include_str!("../../data/kvn/ocm_g15.kvn");
+    let message = Ocm::from_kvn(source).unwrap();
+    let generated = message.to_kvn().unwrap();
+    let needle = generated
+        .lines()
+        .find(|line| {
+            line.split_whitespace()
+                .next()
+                .is_some_and(|value| value.parse::<f64>().is_ok())
+        })
+        .unwrap();
+    let mut tokens: Vec<_> = needle.split_whitespace().collect();
+    tokens[1] = "1e3";
+    let legal = generated.replacen(needle, &tokens.join(" "), 1);
+    assert!(Ocm::from_kvn(&legal).is_ok());
+    tokens[1] = "1e-9999";
+    let underflow = generated.replacen(needle, &tokens.join(" "), 1);
+    assert!(Ocm::from_kvn(&underflow).is_err());
 }

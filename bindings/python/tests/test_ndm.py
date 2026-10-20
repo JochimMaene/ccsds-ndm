@@ -118,6 +118,7 @@ class TestNdm:
         )
 
         meta1 = CdmMetadata(
+            ephemeris_name="NONE",
             object="OBJECT1",
             object_designator="12345",
             catalog_name="SATCAT",
@@ -160,6 +161,7 @@ class TestNdm:
         seg1 = CdmSegment(meta1, data1)
 
         meta2 = CdmMetadata(
+            ephemeris_name="NONE",
             object="OBJECT2",
             object_designator="67890",
             catalog_name="SATCAT",

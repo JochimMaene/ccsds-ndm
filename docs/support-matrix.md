@@ -36,7 +36,8 @@ conversion to succeed.
 
 Combined NDM is XML-only. Requests for combined KVN fail with `unsupported.notation`; several KVN
 messages need application framing, such as one file per message. Constituents must satisfy their
-standalone requirements.
+standalone requirements and the bundled NDM/XML 4.0.0 envelope's edition constraints: OPM, OMM,
+and OEM constituents must be 3.0. Standalone ODM 2.0 XML remains supported separately.
 
 ## Legacy compatibility
 
@@ -57,7 +58,9 @@ silently treated as current messages.
 Unsupported message content, duplicate singleton fields, malformed field values, and violations
 of the documented self-contained rules are rejected. Ordering and producer compatibility follow each family's
 record. Reading takes the permissive interpretation of an unclear requirement when doing so does
-not require guessing or losing data; writers follow the clear representation rules. See the
+not require guessing or losing data; writers follow the clear representation rules. The
+[shared lexical decisions](design/validation-contract.md#shared-lexical-decisions) define numeric
+spellings, line endings, case, units, missing values, and notation-specific bounds. See the
 [validation contract](design/validation-contract.md#authority-and-representability).
 
 The library retains the meaning of units, reference frames, time systems, and interpolation declarations. It

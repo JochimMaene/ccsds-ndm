@@ -298,6 +298,7 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
 
 /// Parses a single covariance matrix (within COVARIANCE_START/STOP block).
 fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
+    let mut comment = collect_comments.parse_next(input)?;
     // `validate_syntax` has already placed EPOCH first in every matrix.
     key_token.parse_next(input)?;
 
@@ -305,7 +306,7 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
 
     // An empty optional value is absent (ODM 7.5.1), like the other optional OEM keywords.
     blank_lines.parse_next(input)?;
-    let mut comment = collect_comments.parse_next(input)?;
+    comment.extend(collect_comments.parse_next(input)?);
     let mut cov_ref_frame = None;
     let next = input.trim_start_matches([' ', '\t']);
     if next
@@ -775,28 +776,6 @@ impl Oem {
                 })?;
             }
             if let Some(first) = segment.data.covariance_matrix.first() {
-                // ODM 7.8.9: KVN places covariance comments only at the start of the section.
-                if let Some((covariance_index, covariance)) = segment
-                    .data
-                    .covariance_matrix
-                    .iter()
-                    .enumerate()
-                    .skip(1)
-                    .find(|(_, covariance)| !covariance.comment.is_empty())
-                {
-                    return Err(ValidationError::InvalidValue {
-                        field: "COMMENT".into(),
-                        value: covariance.comment.join(" | "),
-                        expected:
-                            "comments attached only to the first covariance matrix for OEM KVN"
-                                .into(),
-                        line: None,
-                    }
-                    .at_path(format!(
-                        "{base}.data.covariance_matrix[{covariance_index}].comment"
-                    ))
-                    .into());
-                }
                 comments(&first.comment, || {
                     format!("{base}.data.covariance_matrix[0].comment")
                 })?;
@@ -818,6 +797,12 @@ impl Oem {
                     optional_text("COV_REF_FRAME", xml_trimmed(value), || {
                         format!("{base}.data.covariance_matrix[{covariance_index}].cov_ref_frame")
                     })?;
+                }
+                if covariance_index > 0 {
+                    comments(&covariance.comment, || {
+                        format!("{base}.data.covariance_matrix[{covariance_index}].comment")
+                    })?;
+                    writer.write_comments(&covariance.comment);
                 }
                 writer.write_pair("EPOCH", covariance.epoch);
                 if let Some(value) = &covariance.cov_ref_frame {
@@ -1053,7 +1038,7 @@ fn validate_syntax(kvn: &str, legacy_comments: bool) -> Result<()> {
                     Phase::Header => header_fields_seen & 1 != 0,
                     Phase::Metadata => true,
                     Phase::Ephemeris => state_records == 0,
-                    Phase::Covariance => covariance_row == 0,
+                    Phase::Covariance => covariance_row == 0 || covariance_row == 6,
                 }
             };
             if !allowed {

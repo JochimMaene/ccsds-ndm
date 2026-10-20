@@ -274,7 +274,7 @@ USER_DEFINED_BAZ = QUX
         .user_defined_parameters
         .as_ref()
         .unwrap();
-    let ud = &binding.user_defined;
+    let ud: Vec<_> = binding.parameters().collect();
     assert_eq!(ud.len(), 2);
     assert_eq!(ud[0].parameter, "FOO");
     assert_eq!(ud[0].value, "BAR");
@@ -419,4 +419,47 @@ fn omm_kvn_numbers_use_odm_spellings_in_every_block() {
         );
         assert!(line.len() <= 254, "{key} line exceeds 254 characters");
     }
+}
+
+#[test]
+fn omm_user_defined_names_and_line_endings_are_checked() {
+    let source = include_str!("../../data/kvn/omm_g9.kvn");
+    let expected = Omm::from_kvn(source).unwrap();
+    for ending in ["\r", "\r\n", "\n\r"] {
+        assert_eq!(
+            Omm::from_kvn(&source.replace('\n', ending)).unwrap(),
+            expected
+        );
+    }
+    for invalid in ["", "bad", "A B", "A=B"] {
+        let mut message = expected.clone();
+        message
+            .body
+            .segment
+            .data
+            .user_defined_parameters
+            .as_mut()
+            .unwrap()
+            .parameters_mut()
+            .next()
+            .unwrap()
+            .parameter = invalid.into();
+        assert!(message.to_kvn().is_err());
+        let mut bytes = Vec::new();
+        assert!(message.write_kvn_to(&mut bytes).is_err());
+        assert!(bytes.is_empty());
+    }
+    let mut message = expected;
+    message
+        .body
+        .segment
+        .data
+        .user_defined_parameters
+        .as_mut()
+        .unwrap()
+        .parameters_mut()
+        .next()
+        .unwrap()
+        .parameter = "USER_DEFINED_LITERAL".into();
+    assert_eq!(Omm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
 }

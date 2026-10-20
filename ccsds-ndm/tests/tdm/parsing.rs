@@ -1214,6 +1214,10 @@ fn tdm_xml_accepts_the_schema_defined_optional_observation_units() {
         "<ANGLE_1 units=\"deg\">1.0</ANGLE_1>",
     );
     Tdm::from_xml(&angle).expect("ANGLE_1 units=deg is allowed by the TDM schema");
+    for units in ["rad", "DEG", "km"] {
+        let invalid = mutated(&angle, "units=\"deg\"", &format!("units=\"{units}\""));
+        assert!(Tdm::from_xml(&invalid).is_err(), "ignored {units}");
+    }
 
     let humidity = mutated_once(
         XML,
@@ -1555,4 +1559,29 @@ fn tdm_xml_exhaustive_observations() {
         &Tdm::from_xml(xml_unknown).unwrap_err(),
         "unknown TDM root attribute 'extra'",
     );
+}
+
+#[test]
+fn all_normative_line_endings_preserve_the_message() {
+    let expected = Tdm::from_kvn(crate::KVN).unwrap();
+    for ending in ["\n", "\r", "\r\n", "\n\r"] {
+        let input = crate::KVN.replace('\n', ending);
+        assert_eq!(Tdm::from_kvn(&input).unwrap(), expected, "{ending:?}");
+    }
+}
+
+#[test]
+fn observation_numbers_use_shared_reading_rules_without_underflow() {
+    for value in [".5", "5.", "1e3", "1.2345678901234567", "5e-324"] {
+        assert!(
+            TdmObservationData::from_key_val("RANGE", value).is_ok(),
+            "{value}"
+        );
+    }
+    for value in ["1e-999", "1e999", "1e", "NaN", "INF"] {
+        assert!(
+            TdmObservationData::from_key_val("RANGE", value).is_err(),
+            "{value}"
+        );
+    }
 }

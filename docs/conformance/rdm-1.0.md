@@ -96,3 +96,23 @@ none alone establishes conformance or exhaustive mutation coverage.
 
 Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
+
+## User-defined order and line endings
+
+User-defined XML blocks retain comments and parameters in one ordered `entries` collection,
+including comments between parameters. XML generation preserves that order. Flattened RDM KVN
+can retain comments only before the first user-defined parameter; conversion rejects an
+interleaved, empty or comments-only user-defined block before writing bytes. Ordinary leading
+comments and all parameter values retain their order through KVN parsing and generation.
+
+All four book line endings (LF, CR, CRLF and LFCR) are accepted with identical models and
+byte-position-preserving normalization.
+
+## Atmospheric lifetime values and XML facets
+
+The book describes `ORBIT_LIFETIME` and its window offsets as double-precision remaining
+lifetimes without specifying a strict positive bound. The model and KVN retain finite signed
+values, including zero, rather than imposing the XML-only facet on both notations. The bundled
+XSD `dayIntervalTypeUR` requires a positive value and explicit day units. XML input and output
+apply that stricter domain to all three lifetime fields; conversion refuses an unrepresentable
+value before writing bytes. Existing lifetime-window start/end ordering checks still apply.

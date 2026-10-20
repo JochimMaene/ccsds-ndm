@@ -63,7 +63,8 @@ impl Ndm for Ocm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::detect::without_utf8_bom(kvn);
+        let normalized = crate::kvn::normalize_line_endings(crate::detect::without_utf8_bom(kvn));
+        let kvn = normalized.as_ref();
         kvn::validate_syntax(kvn)?;
         let ocm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&ocm)?;
@@ -167,7 +168,7 @@ impl crate::traits::Validate for OcmData {
             }
         }
         if let Some(user) = &self.user {
-            for parameter in &user.user_defined {
+            for parameter in user.parameters() {
                 let sequence = parameter.parameter.strip_prefix("COMPOSITION_");
                 if sequence.is_some_and(str::is_empty)
                     || (!parameter.records.is_empty() && sequence.is_none())
@@ -1083,17 +1084,6 @@ fn validate_man_duty_cycle(man: &OcmManeuverParameters) -> Result<()> {
                 }
                 .into());
             }
-        }
-    }
-
-    if let Some(max_cycles) = man.dc_max_cycles {
-        if max_cycles == 0 {
-            return Err(ValidationError::invalid_value(
-                "DC_MAX_CYCLES",
-                max_cycles.to_string(),
-                "a positive integer",
-            )
-            .into());
         }
     }
 
@@ -2174,36 +2164,40 @@ pub struct OcmData {
 /// OCM user-defined parameters, including ICD-defined time or event sequences.
 ///
 /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.11.
-#[derive(Serialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct OcmUserDefined {
-    /// Leading comments.
-    #[serde(rename = "COMMENT", default, skip_serializing_if = "Vec::is_empty")]
-    pub comment: Vec<String>,
-    /// Ordered parameters; composition parameters own their following sequence rows.
-    #[serde(
-        rename = "USER_DEFINED",
-        default,
-        skip_serializing_if = "Vec::is_empty"
-    )]
-    pub user_defined: Vec<OcmUserDefinedParameter>,
+    /// Comments and parameters in their original order; composition parameters own their rows.
+    #[serde(rename = "$value", default)]
+    pub entries: Vec<OcmUserDefinedEntry>,
 }
 
-impl<'de> Deserialize<'de> for OcmUserDefined {
-    fn deserialize<D: serde::Deserializer<'de>>(
-        deserializer: D,
-    ) -> std::result::Result<Self, D::Error> {
-        let block = UserDefined::deserialize(deserializer)?;
-        Ok(Self {
-            comment: block.comment,
-            user_defined: block
-                .user_defined
-                .into_iter()
-                .map(|parameter| OcmUserDefinedParameter {
-                    parameter: parameter.parameter,
-                    value: parameter.value,
-                    records: Vec::new(),
-                })
-                .collect(),
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum OcmUserDefinedEntry {
+    #[serde(rename = "COMMENT")]
+    Comment(String),
+    #[serde(rename = "USER_DEFINED")]
+    Parameter(OcmUserDefinedParameter),
+}
+
+impl OcmUserDefined {
+    pub fn comments(&self) -> impl Iterator<Item = &String> {
+        self.entries.iter().filter_map(|entry| match entry {
+            OcmUserDefinedEntry::Comment(value) => Some(value),
+            _ => None,
+        })
+    }
+
+    pub fn parameters(&self) -> impl Iterator<Item = &OcmUserDefinedParameter> {
+        self.entries.iter().filter_map(|entry| match entry {
+            OcmUserDefinedEntry::Parameter(value) => Some(value),
+            _ => None,
+        })
+    }
+
+    pub fn parameters_mut(&mut self) -> impl Iterator<Item = &mut OcmUserDefinedParameter> {
+        self.entries.iter_mut().filter_map(|entry| match entry {
+            OcmUserDefinedEntry::Parameter(value) => Some(value),
+            _ => None,
         })
     }
 }
@@ -2211,7 +2205,7 @@ impl<'de> Deserialize<'de> for OcmUserDefined {
 /// A scalar OCM user-defined parameter or an ICD-defined sequence composition and its rows.
 ///
 /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.11.
-#[derive(Serialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OcmUserDefinedParameter {
     /// Parameter name without the USER_DEFINED_ prefix.
     #[serde(rename = "@parameter")]
@@ -3915,17 +3909,6 @@ impl OcmPerturbations {
         if let Some(v) = self.oblate_flattening {
             require_positive(v, "OBLATE_FLATTENING")?;
         }
-        if let Some(v) = self.albedo_grid_size {
-            if v == 0 {
-                return Err(ValidationError::OutOfRange {
-                    name: "ALBEDO_GRID_SIZE".into(),
-                    value: v.to_string(),
-                    expected: ">= 1".into(),
-                    line: None,
-                }
-                .into());
-            }
-        }
         Ok(())
     }
 }
@@ -3933,28 +3916,6 @@ impl OcmPerturbations {
 impl OcmOdParameters {
     fn validate(&self) -> Result<()> {
         crate::validation::epoch_precision(&[("OD_EPOCH", &self.od_epoch)])?;
-        for (name, val) in [
-            ("OBS_AVAILABLE", self.obs_available),
-            ("OBS_USED", self.obs_used),
-            ("TRACKS_AVAILABLE", self.tracks_available),
-            ("TRACKS_USED", self.tracks_used),
-            ("SOLVE_N", self.solve_n),
-            ("CONSIDER_N", self.consider_n),
-            ("SENSORS_N", self.sensors_n),
-        ] {
-            if let Some(v) = val {
-                if v == 0 {
-                    return Err(ValidationError::OutOfRange {
-                        name: name.into(),
-                        value: v.to_string(),
-                        expected: ">= 1".into(),
-                        line: None,
-                    }
-                    .into());
-                }
-            }
-        }
-
         // GDOP and WEIGHTED_RMS are `nonNegativeDouble`; NaN and both infinities are excluded
         // by the shared predicate rather than by the sign comparison alone.
         for (name, val) in [
@@ -4365,8 +4326,7 @@ mod tests {
 
         man.dc_exec_stop = Some("2023-01-01T00:50:00".parse().unwrap());
         man.dc_max_cycles = Some(0);
-        let error = man.validate().unwrap_err().to_string();
-        assert!(error.contains("DC_MAX_CYCLES"));
+        man.validate().unwrap();
     }
 
     #[test]

@@ -275,7 +275,7 @@ impl AemMetadata {
         start_time,
         stop_time,
         time_system,
-        attitude_type=String::from("QUATERNION"),
+        attitude_type,
         center_name=None,
         useable_start_time=None,
         useable_stop_time=None,

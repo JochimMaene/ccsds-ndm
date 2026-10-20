@@ -78,3 +78,118 @@ fn omitted_optional_xml_values_are_none() {
         .is_none());
     assert!(cdm.body.relative_metadata_data.stop_screen_period.is_none());
 }
+
+#[test]
+fn operational_xml_missing_leaves_are_absent_without_erasing_text() {
+    let original = Cdm::from_kvn(crate::KVN).unwrap().to_xml().unwrap();
+    for (field, missing) in [
+        ("RELATIVE_SPEED", "<RELATIVE_SPEED/>"),
+        (
+            "START_SCREEN_PERIOD",
+            "<START_SCREEN_PERIOD>  </START_SCREEN_PERIOD>",
+        ),
+        ("SCREEN_VOLUME_SHAPE", "<SCREEN_VOLUME_SHAPE nil=\"true\"/>"),
+        ("AREA_PC", "<AREA_PC units=\"m**2\" nil=\"1\"/>"),
+        ("OBJECT_TYPE", "<OBJECT_TYPE/>"),
+        ("MESSAGE_FOR", "<MESSAGE_FOR nil=\"true\"/>"),
+    ] {
+        let mut expected = Cdm::from_xml(&original).unwrap();
+        match field {
+            "RELATIVE_SPEED" => expected.body.relative_metadata_data.relative_speed = None,
+            "START_SCREEN_PERIOD" => {
+                expected.body.relative_metadata_data.start_screen_period = None
+            }
+            "SCREEN_VOLUME_SHAPE" => {
+                expected.body.relative_metadata_data.screen_volume_shape = None
+            }
+            "AREA_PC" => {
+                expected.body.segments[0]
+                    .data
+                    .additional_parameters
+                    .as_mut()
+                    .unwrap()
+                    .area_pc = None
+            }
+            "OBJECT_TYPE" => expected.body.segments[0].metadata.object_type = None,
+            "MESSAGE_FOR" => expected.header.message_for = None,
+            _ => unreachable!(),
+        }
+        let start = original.find(&format!("<{field}")).unwrap();
+        let close = format!("</{field}>");
+        let end = original[start..].find(&close).unwrap() + start + close.len();
+        let mut input = original.clone();
+        input.replace_range(start..end, missing);
+        let parsed = Cdm::from_xml(&input).unwrap();
+        assert_eq!(parsed, expected, "{field}");
+        let output = parsed.to_xml().unwrap();
+        crate::common::validate_xml("CDM operational missing leaves", &output);
+        assert_eq!(Cdm::from_kvn(&parsed.to_kvn().unwrap()).unwrap(), parsed);
+    }
+    let empty_text = mutated(
+        &original,
+        "<MESSAGE_FOR>SATELLITE A</MESSAGE_FOR>",
+        "<MESSAGE_FOR/>",
+    );
+    assert_eq!(
+        Cdm::from_xml(&empty_text)
+            .unwrap()
+            .header
+            .message_for
+            .as_deref(),
+        Some("")
+    );
+}
+
+#[test]
+fn nil_cannot_hide_required_values_content_or_unknown_attributes() {
+    let original = Cdm::from_kvn(crate::KVN).unwrap().to_xml().unwrap();
+    for (field, replacement) in [
+        ("TCA", "<TCA nil=\"true\"/>"),
+        ("MESSAGE_FOR", "<MESSAGE_FOR nil=\"true\" units=\"m\"/>"),
+        (
+            "COLLISION_PROBABILITY",
+            "<COLLISION_PROBABILITY units=\"n/a\">0.5</COLLISION_PROBABILITY>",
+        ),
+        (
+            "WEIGHTED_RMS",
+            "<WEIGHTED_RMS units=\"n/a\">0.5</WEIGHTED_RMS>",
+        ),
+        (
+            "RELATIVE_SPEED",
+            "<RELATIVE_SPEED nil=\"true\">7</RELATIVE_SPEED>",
+        ),
+        ("RELATIVE_SPEED", "<RELATIVE_SPEED unexpected=\"value\"/>"),
+        ("RELATIVE_SPEED", "<RELATIVE_SPEED nil=\"false\"/>"),
+        ("RELATIVE_SPEED", "<RELATIVE_SPEED>\u{c}</RELATIVE_SPEED>"),
+        (
+            "RELATIVE_SPEED",
+            "<RELATIVE_SPEED nil=\"true\" units=\"<\"/>",
+        ),
+        (
+            "RELATIVE_SPEED",
+            "<RELATIVE_SPEED nil=\"true\" units=\"&unknown;\"/>",
+        ),
+        (
+            "RELATIVE_SPEED",
+            "<RELATIVE_SPEED nil=\"true\"><unknown/></RELATIVE_SPEED>",
+        ),
+    ] {
+        let start = original.find(&format!("<{field}")).unwrap();
+        let close = format!("</{field}>");
+        let end = original[start..].find(&close).unwrap() + start + close.len();
+        let mut input = original.clone();
+        input.replace_range(start..end, replacement);
+        assert!(Cdm::from_xml(&input).is_err(), "{replacement}");
+    }
+}
+
+#[test]
+fn velocity_only_kvn_is_rejected_instead_of_silently_discarded() {
+    let input = crate::KVN
+        .lines()
+        .filter(|line| !line.starts_with("RELATIVE_POSITION_"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let error = Cdm::from_kvn(&input).unwrap_err();
+    assert!(error.to_string().contains("RELATIVE_POSITION_R"), "{error}");
+}

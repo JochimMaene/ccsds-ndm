@@ -342,7 +342,7 @@ impl OmmMetadata {
         center_name,
         ref_frame,
         time_system,
-        mean_element_theory=String::from("SGP4"),
+        mean_element_theory,
         ref_frame_epoch=None,
         comment=None
     ))]

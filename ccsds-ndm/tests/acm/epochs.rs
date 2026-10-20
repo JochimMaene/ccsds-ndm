@@ -232,3 +232,20 @@ fn acm_interval_bounds_cannot_be_reversed() {
     message.body.segment.data.man[0].man_end_time = Some("100".parse().unwrap());
     message.validate().unwrap();
 }
+
+#[test]
+fn maneuver_kvn_canonicalizes_permissive_relative_numbers() {
+    let source = include_str!("../../data/kvn/acm_g7.kvn");
+    let input = source.replace("MAN_BEGIN_TIME = 100.0", "MAN_BEGIN_TIME = .5");
+    let message = Acm::from_kvn(&input).unwrap();
+    let generated = message.to_kvn().unwrap();
+    assert!(
+        generated.lines().any(|line| line
+            .split_once('=')
+            .is_some_and(|(key, value)| key.trim() == "MAN_BEGIN_TIME" && value.trim() == "0.5")),
+        "{generated}"
+    );
+    Acm::from_kvn(&generated).unwrap();
+    let xml = message.to_xml().unwrap();
+    assert!(xml.contains(">.5</MAN_BEGIN_TIME>"));
+}

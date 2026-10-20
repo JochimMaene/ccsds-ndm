@@ -1565,7 +1565,7 @@ impl AcmAttitudeDetermination {
                 }
             }
             if let Some(frequency) = &sensor.sensor_frequency {
-                require_positive(frequency.value, "SENSOR_FREQUENCY")?;
+                validate_finite_acm_value("SENSOR_FREQUENCY", frequency.value)?;
             }
         }
 

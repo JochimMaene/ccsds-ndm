@@ -280,7 +280,7 @@ fn validate_root_start(
 }
 
 // Even ignored schema-location/namespace attributes must be well-formed XML.
-fn validate_attribute_value(
+pub(crate) fn validate_attribute_value(
     attribute: &quick_xml::events::attributes::Attribute<'_>,
     invalid: &impl Fn(String) -> CcsdsNdmError,
 ) -> Result<()> {

@@ -51,11 +51,13 @@ They are not missing self-contained behavior and are not guessed; see
 - **GM unit spelling is canonicalized in KVN.** ODM 7.7.1 admits only the table spelling, so the
   uppercase `KM**3/S**2` that the XSD also permits is written as `km**3/s**2` rather than failing
   generation. XML output keeps the spelling held by the model.
-- **`userDefinedParameters` interleaving is not accepted.** The XSD permits `COMMENT` and
-  `USER_DEFINED` to interleave, but the typed model stores them separately, so accepting that
-  order would silently relocate comments on regeneration. Comments before parameters are accepted
-  and a later `COMMENT` is rejected; arbitrary interleaving would need a breaking ordered-entry
-  model.
+- **User-defined entry order.** `UserDefined.entries` retains XML comments and parameters in
+  their original order, including interleaving. XML regeneration preserves that order. KVN
+  requires leading comments, so conversion refuses an interleaved model before output. Parameter
+  names are exact suffixes: a stored `USER_DEFINED_FOO` generates `USER_DEFINED_USER_DEFINED_FOO`.
+- **GM positivity is XML-specific.** The book does not state a positive range. Any finite GM
+  remains valid in KVN and the model; XML input and output require `gmType`'s positive value.
+
 - **Zero delta mass is accepted.** 3.2.4.7 describes delta mass as negative, but the XSD's
   `deltamassTypeZ` permits zero; the schema governs the wire form.
 - **`nil` and `xsi:nil` are rejected.** The OPM schema declares no nillable element, so an
@@ -85,7 +87,8 @@ identify these model-relevant differences:
 | --- | --- |
 | `CLASSIFICATION` and `MESSAGE_ID` are not in the 2.0 header | Reject their presence in both parsed notations and mutated models; `conformance::odm2::opm_and_omm_2_reject_new_header_fields_in_both_notations`. |
 | Maneuver delta mass uses 2.0 `negativeDouble`, while 3.0 uses `deltamassTypeZ` | Zero remains accepted only for 3.0. The 2.0 root gate rejects zero, including KVN/XML input and output; `conformance::odm2::opm_2_requires_negative_maneuver_delta_mass_in_every_route`. |
-| Unchanged logical blocks retain their typed structure | Every shipped OPM KVN fixture, with only its new header removed and edition changed, passes 2.0 KVN/XML preservation and the official 2.0 XSD; `conformance::odm2::opm_2_generation_is_schema_valid_and_round_trips`. |
+| A present XML spacecraft block requires all five spacecraft fields | The 2.0 common schema makes these fields required; 3.0 makes them optional. Partial blocks remain valid KVN/model content, but 2.0 XML input/output refuses them. `conformance::odm2::odm_2_partial_spacecraft_is_kvn_valid_but_not_xml_representable`. |
+| Other logical blocks retain their typed structure | Every shipped OPM KVN fixture, with only its new header removed and edition changed, passes 2.0 KVN/XML preservation and the official 2.0 XSD; `conformance::odm2::opm_2_generation_is_schema_valid_and_round_trips`. |
 | Public adapters retain edition | Python's shared conformance matrix covers both notations and all string/file/conversion routes separately for 2.0 and 3.0. |
 
 **OPM 1.0 is not supported.** Its actual required-block and field rules differ from the
@@ -100,3 +103,7 @@ Run `just verify` for the full quality checks plus the packaged-artifact gates.
 
 Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
+
+An XML `userDefinedParameters` block with no parameters may be retained and regenerated as XML.
+KVN generation refuses that empty or comment-only block: without delimiters, KVN cannot preserve
+its presence or distinguish those comments from the previous logical block.

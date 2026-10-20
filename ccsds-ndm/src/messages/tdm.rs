@@ -13,7 +13,6 @@ use crate::types::{
     TdmDataQuality, TdmIntegrationRef, TdmMode, TdmPath, TdmRangeMode, TdmRangeUnits,
     TdmReferenceFrame, TdmTimetagRef, YesNo,
 };
-use fast_float;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
@@ -198,7 +197,8 @@ impl Ndm for Tdm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::detect::without_utf8_bom(kvn);
+        let kvn = crate::kvn::normalize_line_endings(crate::detect::without_utf8_bom(kvn));
+        let kvn = kvn.as_ref();
         kvn::validate_kvn_syntax(kvn)?;
         let tdm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&tdm)?;
@@ -1703,7 +1703,7 @@ impl TdmObservationData {
             phase.validate()?;
             return Ok(phase);
         }
-        let value = fast_float::parse(val).map_err(|_| {
+        let value = crate::kvn::parser::parse_ccsds_number(val.trim()).ok_or_else(|| {
             CcsdsNdmError::Format(Box::new(crate::error::FormatError::InvalidFormat(format!(
                 "Invalid float: {val}"
             ))))

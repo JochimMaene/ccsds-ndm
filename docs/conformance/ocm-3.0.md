@@ -44,8 +44,8 @@ inventory is reconciled as follows; the counts are statement rows, not public ca
 | Physical | 54 | The complete optional scalar/vector XML/KVN model is registered; required-field, unit, order, duplicate, and notation-preservation behavior is exercised by the fixture corpus. `OcmPhysicalDescription::validate` covers the block's own editable values: `DRAG_COEFF_NOM`, the eleven areas, three masses, two percentages, `REFLECTANCE`, the three attitude angles, and the remaining plain doubles for finiteness. |
 | Covariance | 18 | Block metadata, ordering, epoch sequence, composition/units, fixed record shape, and representability are covered by covariance validation and history tests, and `validate_ocm_line_values` rejects non-finite numbers in every `covLine`. |
 | Maneuver | 35 | Time-tag choice, composition/units, duty-cycle dependencies (including `TIME_AND_ANGLE` vectors), epoch sequence, and representability are covered by typed validation and regression tests. |
-| Perturbation | 33 | The complete nested block is retained rather than passed through the former nullable-scalar adapter; schema order, legal attributes, units, and round trips are exercised. `OcmPerturbations::validate` covers `GM`, `OBLATE_FLATTENING`, `ALBEDO_GRID_SIZE`, and the finiteness of `EQUATORIAL_RADIUS`, `CENTRAL_BODY_ROTATION`, and the geomagnetic and solar-flux values. |
-| Orbit determination | 33 | The complete nested block is retained with typed required/optional values, legal units, schema order, and fixture round trips. `OcmOdParameters::validate` covers the positive-integer counts, `GDOP` and `WEIGHTED_RMS` (including NaN and both infinities), the OD spans, the eigenvalue lengths, `OD_CONFIDENCE`, and `SEDR`. |
+| Perturbation | 33 | The complete nested block is retained rather than passed through the former nullable-scalar adapter; schema order, legal attributes, units, and round trips are exercised. `OcmPerturbations::validate` covers `GM`, `OBLATE_FLATTENING`, and the finiteness of `EQUATORIAL_RADIUS`, `CENTRAL_BODY_ROTATION`, and the geomagnetic and solar-flux values. |
+| Orbit determination | 33 | The complete nested block is retained with typed required/optional values, legal units, schema order, and fixture round trips. The XML gate covers positive-integer count facets; `OcmOdParameters::validate` covers `GDOP` and `WEIGHTED_RMS` (including NaN and both infinities), the OD spans, the eigenvalue lengths, `OD_CONFIDENCE`, and `SEDR`. |
 | User defined | 5 | Marked-block placement, comment placement, parameter names/values, and XML/KVN preservation are covered. |
 
 These OCM values are deliberately **not** validated, each for a recorded reason rather than by
@@ -259,3 +259,29 @@ record review, current-corrigendum regressions, family corpus, shared public wor
 installed-artifact tests establish the same scoped evidence required of every current family.
 The book/schema conflicts and externally governed interpretations above remain explicit limits
 of that claim, not promises of unrestricted XML conversion or physical-model certification.
+
+## Explicit input and representation boundaries
+
+KVN parsing accepts all four CCSDS line terminators and ordinary decimal/exponent spellings,
+including `1e3`, `.5`, and `1.`. Trajectory/covariance numbers use the shared finite-double reader,
+so a nonzero value that underflows to zero is rejected rather than silently changed. XML's
+additional facets on `DC_PA_START_ANGLE`, `DC_PA_STOP_ANGLE`, and `DAYS_SINCE_FIRST_OBS` /
+`DAYS_SINCE_LAST_OBS` do not constrain KVN or model validation: wider finite book-valid values
+round-trip in KVN and fail XML conversion. GM has the same notation distinction: finiteness in
+KVN/model form, positivity in XML.
+
+Omitted optional trajectory `INTERPOLATION_DEGREE`, `ORB_REVNUM_BASIS`, and `ORB_AVERAGING`
+remain absent in the model and regenerated output. The book's defaults describe interpretation;
+parsing does not insert optional assignments. Required concrete frame/center fields still use the
+book's documented defaults when omitted. Validation applies the interpolation-degree default
+without pretending that the producer supplied it.
+
+`OcmUserDefined.entries` retains scalar parameters and comments in XML order, including
+interleaving; composition parameters retain their opaque sequence rows. XML-to-XML preserves
+entry order. KVN conversion refuses comments after parameters rather than relocating them.
+
+OCM count fields (`DC_MAX_CYCLES`, `ALBEDO_GRID_SIZE`, observation/track counts,
+`SOLVE_N`, `CONSIDER_N`, and `SENSORS_N`) accept zero in KVN and model validation. The book
+names counts without a strictly-positive rule. The XML edition uses `xsd:positiveInteger`,
+so zero is rejected at XML input/output. This allows an explicitly empty count in real KVN
+without claiming it is representable by the narrower schema.

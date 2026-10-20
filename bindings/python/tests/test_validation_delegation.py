@@ -202,13 +202,16 @@ class TestAssignmentDefersToRootValidation:
         cdm.body.segments[0].data.additional_parameters = parameters
         assert_all_surfaces_reject(cdm, "AREA_PC")
 
-    def test_ocm_gm_defers_to_root(self):
-        """Zero is the interesting value: `gmType` is a positiveDouble, so it distinguishes this
-        setter from the non-negative ones. The rest of the domain is `types.rs::test_gm_validation`.
-        """
+    def test_ocm_gm_schema_facet_is_xml_only(self):
+        """Finite GM is model/KVN-valid; schema positivity is an XML boundary."""
         ocm = load("ocm_g18.kvn", ccsds_ndm.Ocm)
         ocm.segment.data.pert.gm = 0.0
         assert ocm.segment.data.pert.gm == 0.0
+        ocm.validate()
+        ocm.to_str(format="kvn")
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="GM"):
+            ocm.to_str(format="xml")
+        ocm.segment.data.pert.gm = float("nan")
         assert_all_surfaces_reject(ocm, "GM")
 
 

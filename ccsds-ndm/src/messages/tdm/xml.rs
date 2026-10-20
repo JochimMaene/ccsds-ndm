@@ -77,6 +77,14 @@ impl<'de> Deserialize<'de> for TdmObservation {
                             }
                             epoch = Some(map.next_value()?);
                         }
+                        "ANGLE_1" | "ANGLE_2" => {
+                            let value: crate::types::UnitValue<f64, crate::types::AngleUnits> =
+                                map.next_value()?;
+                            data = Some(
+                                TdmObservationData::from_key_value(&key, value.value)
+                                    .map_err(serde::de::Error::custom)?,
+                            );
+                        }
                         // RHUMIDITY uses Percentage so its optional units attribute is preserved.
                         "RHUMIDITY" => {
                             data = Some(TdmObservationData::Rhumidity(map.next_value()?));

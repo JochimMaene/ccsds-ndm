@@ -97,3 +97,17 @@ fn multiline_xml_comments_convert_to_separate_kvn_records() {
     message.write_kvn_to(&mut streamed).unwrap();
     assert_eq!(streamed, kvn.as_bytes());
 }
+
+#[test]
+fn empty_user_defined_xml_block_cannot_silently_disappear_in_kvn() {
+    let source = Opm::from_kvn(crate::KVN).unwrap().to_xml().unwrap();
+    for block in [
+        "<userDefinedParameters/>",
+        "<userDefinedParameters><COMMENT>only a comment</COMMENT></userDefinedParameters>",
+    ] {
+        let xml = source.replace("</data>", &format!("{block}</data>"));
+        let message = Opm::from_xml(&xml).unwrap();
+        assert!(message.to_kvn().is_err());
+        assert!(message.to_xml().unwrap().contains("userDefinedParameters"));
+    }
+}

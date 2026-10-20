@@ -2,7 +2,7 @@ use ccsds_ndm::messages::omm::{Omm, TleToOmmOptions};
 use ccsds_ndm::Ndm;
 
 #[test]
-fn comment_merges_and_user_parameter_interleaving_are_canonicalized() {
+fn comment_merges_and_user_parameter_interleaving_are_preserved() {
     let mut message = Omm::from_kvn(crate::KVN).unwrap();
     message.body.segment.data.comment = vec!["outer-data".into()];
     message.body.segment.data.mean_elements.comment = vec!["mean-elements".into()];
@@ -30,27 +30,19 @@ fn comment_merges_and_user_parameter_interleaving_are_canonicalized() {
         .user_defined_parameters
         .as_ref()
         .unwrap();
-    assert_eq!(user.comment, ["first", "second"]);
     assert_eq!(
-        user.user_defined
-            .iter()
+        user.comments().cloned().collect::<Vec<_>>(),
+        ["first", "second"]
+    );
+    assert_eq!(
+        user.parameters()
             .map(|value| value.parameter.as_str())
             .collect::<Vec<_>>(),
         ["A", "B"]
     );
-    for canonical in [message.to_xml().unwrap(), message.to_kvn().unwrap()] {
-        assert!(canonical.find("first").unwrap() < canonical.find("second").unwrap());
-        assert!(
-            canonical.find("second").unwrap()
-                < canonical
-                    .find(if canonical.starts_with('<') {
-                        "parameter=\"A\""
-                    } else {
-                        "USER_DEFINED_A"
-                    })
-                    .unwrap()
-        );
-    }
+    let regenerated = message.to_xml().unwrap();
+    assert!(regenerated.contains(user_xml));
+    assert!(message.to_kvn().is_err());
 }
 #[test]
 fn to_tle_lines_iss_example() {
@@ -314,4 +306,20 @@ fn from_tle_lines_rejects_invalid_length() {
     assert!(err
         .to_string()
         .contains("exactly 68 (no checksum) or 69 (with checksum) characters"));
+}
+
+#[test]
+fn empty_user_defined_xml_block_cannot_silently_disappear_in_kvn() {
+    let mut original = Omm::from_kvn(crate::KVN).unwrap();
+    original.body.segment.data.user_defined_parameters = None;
+    let source = original.to_xml().unwrap();
+    for block in [
+        "<userDefinedParameters/>",
+        "<userDefinedParameters><COMMENT>only a comment</COMMENT></userDefinedParameters>",
+    ] {
+        let xml = source.replace("</data>", &format!("{block}</data>"));
+        let message = Omm::from_xml(&xml).unwrap();
+        assert!(message.to_kvn().is_err());
+        assert!(message.to_xml().unwrap().contains("userDefinedParameters"));
+    }
 }

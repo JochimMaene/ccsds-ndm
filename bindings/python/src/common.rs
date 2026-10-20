@@ -385,6 +385,16 @@ impl AdmHeader {
     }
 }
 
+pub(crate) fn enum_token(value: &str) -> PyResult<String> {
+    let upper = value.to_ascii_uppercase();
+    if value != upper && value != value.to_ascii_lowercase() {
+        return Err(PyValueError::new_err(
+            "Enum strings must be all uppercase or all lowercase",
+        ));
+    }
+    Ok(upper)
+}
+
 /// Write an acceleration value, keeping any explicit XML units already on the record.
 pub(crate) fn set_acceleration(slot: &mut Option<Acc>, value: Option<f64>) {
     match (slot.as_mut(), value) {

@@ -377,6 +377,42 @@ impl Ocm {
     pub(crate) fn validate_xml_representability(&self) -> Result<()> {
         let data = &self.body.segment.data;
         let metadata = &self.body.segment.metadata;
+        let positive_count = |field, count: Option<u64>| -> Result<()> {
+            if count == Some(0) {
+                return Err(ValidationError::invalid_value(
+                    field,
+                    "0",
+                    "a positive integer for the XML edition",
+                )
+                .into());
+            }
+            Ok(())
+        };
+        if let Some(pert) = &data.pert {
+            positive_count("ALBEDO_GRID_SIZE", pert.albedo_grid_size)?;
+        }
+        if let Some(od) = &data.od {
+            for (field, count) in [
+                ("OBS_AVAILABLE", od.obs_available),
+                ("OBS_USED", od.obs_used),
+                ("TRACKS_AVAILABLE", od.tracks_available),
+                ("TRACKS_USED", od.tracks_used),
+                ("SOLVE_N", od.solve_n),
+                ("CONSIDER_N", od.consider_n),
+                ("SENSORS_N", od.sensors_n),
+            ] {
+                positive_count(field, count)?;
+            }
+        }
+        for man in &data.man {
+            positive_count("DC_MAX_CYCLES", man.dc_max_cycles)?;
+        }
+        if let Some(gm) = data.pert.as_ref().and_then(|pert| pert.gm.as_ref()) {
+            crate::validation::validate_at_field_path(
+                crate::types::Gm::validate_xml_value(gm.value, "GM"),
+                "body.segment.data.pert",
+            )?;
+        }
         for (index, trajectory) in data.traj.iter().enumerate() {
             if trajectory.interpolation_degree == Some(0) {
                 return Err(ValidationError::invalid_value(
@@ -426,8 +462,7 @@ impl Ocm {
             }
         }
         if data.user.as_ref().is_some_and(|user| {
-            user.user_defined
-                .iter()
+            user.parameters()
                 .any(|parameter| parameter.parameter.starts_with("COMPOSITION_"))
         }) {
             return Err(ValidationError::InvalidValue {

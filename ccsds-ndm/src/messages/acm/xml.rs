@@ -183,6 +183,11 @@ fn acm_xml_children(parent: &[u8]) -> Option<&'static [&'static [u8]]> {
 
 impl Acm {
     pub(crate) fn validate_xml_representability(&self) -> Result<()> {
+        for sensor in self.body.segment.data.ad.iter().flat_map(|ad| &ad.sensors) {
+            if let Some(frequency) = &sensor.sensor_frequency {
+                crate::types::Frequency::validate_xml_value(frequency.value, "SENSOR_FREQUENCY")?;
+            }
+        }
         for maneuver in &self.body.segment.data.man {
             let targets = usize::from(
                 maneuver.target_momentum.is_some() || maneuver.target_mom_frame.is_some(),

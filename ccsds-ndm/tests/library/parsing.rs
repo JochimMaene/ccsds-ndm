@@ -57,7 +57,9 @@ fn user_defined_values_may_contain_assignment_delimiters() {
             .user_defined_parameters
             .as_ref()
             .unwrap()
-            .user_defined[0]
+            .parameters()
+            .next()
+            .unwrap()
             .value,
         "a=b"
     );
@@ -74,7 +76,9 @@ fn user_defined_values_may_contain_assignment_delimiters() {
             .user_defined_parameters
             .as_ref()
             .unwrap()
-            .user_defined[0]
+            .parameters()
+            .next()
+            .unwrap()
             .value,
         "a=b"
     );

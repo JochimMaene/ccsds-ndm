@@ -359,3 +359,10 @@ fn apm_accepts_all_adm_line_endings() {
         );
     }
 }
+
+#[test]
+fn quaternion_components_refuse_ignored_units() {
+    let source = include_str!("../../data/kvn/apm_g1.kvn");
+    let input = source.replace("Q1 = 0.00005", "Q1 = 0.00005 [rad]");
+    assert!(Apm::from_kvn(&input).is_err());
+}

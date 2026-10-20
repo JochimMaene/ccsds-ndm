@@ -151,7 +151,12 @@ pub fn relative_metadata_data(input: &mut &str) -> KvnResult<RelativeMetadataDat
         "COLLISION_PROBABILITY_METHOD" => val: kv_string_opt => { collision_probability_method = val; },
     }, |i: &mut &str| at_block_start("META", i) || peek(key_token).parse_next(i).map(|k| k == "OBJECT").unwrap_or(false), "Unknown Relative Metadata key");
 
-    let relative_state_vector = if rel_pos_r.is_some() || rel_pos_t.is_some() || rel_pos_n.is_some()
+    let relative_state_vector = if rel_pos_r.is_some()
+        || rel_pos_t.is_some()
+        || rel_pos_n.is_some()
+        || rel_vel_r.is_some()
+        || rel_vel_t.is_some()
+        || rel_vel_n.is_some()
     {
         Some(RelativeStateVector {
             relative_position_r: rel_pos_r.ok_or_else(|| {

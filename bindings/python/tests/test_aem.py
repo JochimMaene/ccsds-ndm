@@ -74,6 +74,7 @@ class TestAem:
             AttitudeState("123.5", [0.0, 0.0, 0.0, 1.0])
 
         meta = AemMetadata(
+            attitude_type="QUATERNION",
             object_name="SAT1",
             object_id="2023-001A",
             ref_frame_a="EME2000",
@@ -291,6 +292,7 @@ class TestAem:
     def test_interpolation_degree_zero_is_rejected_not_dropped(self):
         with pytest.raises(ValueError, match="positive integer"):
             AemMetadata(
+                attitude_type="QUATERNION",
                 object_name="SAT1",
                 object_id="2023-001A",
                 ref_frame_a="EME2000",

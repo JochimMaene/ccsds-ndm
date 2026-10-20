@@ -2,7 +2,6 @@
 # ruff: noqa: E501, F401, F403, F405
 
 import builtins
-import enum
 import numpy
 import numpy.typing
 import os
@@ -2172,7 +2171,7 @@ class AemMetadata:
         start_time: builtins.str,
         stop_time: builtins.str,
         time_system: builtins.str,
-        attitude_type: builtins.str = "QUATERNION",
+        attitude_type: builtins.str,
         center_name: typing.Optional[builtins.str] = None,
         useable_start_time: typing.Optional[builtins.str] = None,
         useable_stop_time: typing.Optional[builtins.str] = None,
@@ -4359,7 +4358,7 @@ class CdmMetadata:
         ref_frame: ReferenceFrameType | builtins.str,
         covariance_method: CovarianceMethodType | builtins.str,
         maneuverable: ManeuverableType | builtins.str,
-        ephemeris_name: builtins.str = "NONE",
+        ephemeris_name: builtins.str,
         object_type: ObjectDescription | builtins.str | None = None,
         operator_contact_position: typing.Optional[builtins.str] = None,
         operator_organization: typing.Optional[builtins.str] = None,
@@ -10172,21 +10171,26 @@ class OcmUserDefined:
     @property
     def comment(self) -> builtins.list[builtins.str]:
         r"""
-        Leading comments.
-
-        :type: list[str]
+        Comment snapshot; assignment places all supplied comments before parameters.
         """
     @comment.setter
     def comment(self, value: typing.Sequence[builtins.str]) -> None: ...
     @property
     def user_defined(self) -> list[OcmUserDefinedParameter]:
         r"""
-        Live ordered list of scalar parameters and sequence compositions.
-
-        :type: list[OcmUserDefinedParameter]
+        Parameter list snapshot with live parameter objects; assign after list edits.
         """
     @user_defined.setter
     def user_defined(self, value: typing.Sequence[OcmUserDefinedParameter]) -> None: ...
+    @property
+    def entries(self) -> list[str | OcmUserDefinedParameter]:
+        r"""
+        Live ordered list: strings are comments, objects are parameters or compositions.
+
+        :type: list[str | OcmUserDefinedParameter]
+        """
+    @entries.setter
+    def entries(self, value: list[str | OcmUserDefinedParameter]) -> None: ...
     def __new__(
         cls,
         *,
@@ -11913,7 +11917,7 @@ class OmmMetadata:
         center_name: builtins.str,
         ref_frame: builtins.str,
         time_system: builtins.str,
-        mean_element_theory: builtins.str = "SGP4",
+        mean_element_theory: builtins.str,
         ref_frame_epoch: typing.Optional[builtins.str] = None,
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> OmmMetadata: ...
@@ -12061,52 +12065,52 @@ class Opm:
 @typing.final
 class OpmCovarianceMatrix:
     r"""
-    Position/Velocity Covariance Matrix (6x6 Lower Triangular Form. None or all parameters of the
-    matrix must be given. COV_REF_FRAME may be omitted if it is the same as REF_FRAME.)
+    Position/Velocity Covariance Matrix (6x6 Lower Triangular Form. All 21 parameters of the
+    matrix must be supplied explicitly. COV_REF_FRAME may be omitted if it is the same as REF_FRAME.)
 
     Parameters
     ----------
-    cx_x : float, optional
+    cx_x : float
         Position X covariance [1,1]. Units: km².
-    cy_x : float, optional
+    cy_x : float
         Position X-Y covariance [2,1]. Units: km².
-    cy_y : float, optional
+    cy_y : float
         Position Y covariance [2,2]. Units: km².
-    cz_x : float, optional
+    cz_x : float
         Position X-Z covariance [3,1]. Units: km².
-    cz_y : float, optional
+    cz_y : float
         Position Y-Z covariance [3,2]. Units: km².
-    cz_z : float, optional
+    cz_z : float
         Position Z covariance [3,3]. Units: km².
-    cx_dot_x : float, optional
+    cx_dot_x : float
         Velocity X / Position X covariance [4,1]. Units: km²/s.
-    cx_dot_y : float, optional
+    cx_dot_y : float
         Velocity X / Position Y covariance [4,2]. Units: km²/s.
-    cx_dot_z : float, optional
+    cx_dot_z : float
         Velocity X / Position Z covariance [4,3]. Units: km²/s.
-    cx_dot_x_dot : float, optional
+    cx_dot_x_dot : float
         Velocity X covariance [4,4]. Units: km²/s².
-    cy_dot_x : float, optional
+    cy_dot_x : float
         Velocity Y / Position X covariance [5,1]. Units: km²/s.
-    cy_dot_y : float, optional
+    cy_dot_y : float
         Velocity Y / Position Y covariance [5,2]. Units: km²/s.
-    cy_dot_z : float, optional
+    cy_dot_z : float
         Velocity Y / Position Z covariance [5,3]. Units: km²/s.
-    cy_dot_x_dot : float, optional
+    cy_dot_x_dot : float
         Velocity Y / Velocity X covariance [5,4]. Units: km²/s².
-    cy_dot_y_dot : float, optional
+    cy_dot_y_dot : float
         Velocity Y covariance [5,5]. Units: km²/s².
-    cz_dot_x : float, optional
+    cz_dot_x : float
         Velocity Z / Position X covariance [6,1]. Units: km²/s.
-    cz_dot_y : float, optional
+    cz_dot_y : float
         Velocity Z / Position Y covariance [6,2]. Units: km²/s.
-    cz_dot_z : float, optional
+    cz_dot_z : float
         Velocity Z / Position Z covariance [6,3]. Units: km²/s.
-    cz_dot_x_dot : float, optional
+    cz_dot_x_dot : float
         Velocity Z / Velocity X covariance [6,4]. Units: km²/s².
-    cz_dot_y_dot : float, optional
+    cz_dot_y_dot : float
         Velocity Z / Velocity Y covariance [6,5]. Units: km²/s².
-    cz_dot_z_dot : float, optional
+    cz_dot_z_dot : float
         Velocity Z covariance [6,6]. Units: km²/s².
     cov_ref_frame : str, optional
         Reference frame for the covariance matrix.
@@ -12417,27 +12421,27 @@ class OpmCovarianceMatrix:
     def cz_dot_z_dot(self, value: builtins.float) -> None: ...
     def __new__(
         cls,
-        cx_x: typing.Optional[builtins.float] = None,
-        cy_x: typing.Optional[builtins.float] = None,
-        cy_y: typing.Optional[builtins.float] = None,
-        cz_x: typing.Optional[builtins.float] = None,
-        cz_y: typing.Optional[builtins.float] = None,
-        cz_z: typing.Optional[builtins.float] = None,
-        cx_dot_x: typing.Optional[builtins.float] = None,
-        cx_dot_y: typing.Optional[builtins.float] = None,
-        cx_dot_z: typing.Optional[builtins.float] = None,
-        cy_dot_x: typing.Optional[builtins.float] = None,
-        cy_dot_y: typing.Optional[builtins.float] = None,
-        cy_dot_z: typing.Optional[builtins.float] = None,
-        cz_dot_x: typing.Optional[builtins.float] = None,
-        cz_dot_y: typing.Optional[builtins.float] = None,
-        cz_dot_z: typing.Optional[builtins.float] = None,
-        cx_dot_x_dot: typing.Optional[builtins.float] = None,
-        cy_dot_x_dot: typing.Optional[builtins.float] = None,
-        cy_dot_y_dot: typing.Optional[builtins.float] = None,
-        cz_dot_x_dot: typing.Optional[builtins.float] = None,
-        cz_dot_y_dot: typing.Optional[builtins.float] = None,
-        cz_dot_z_dot: typing.Optional[builtins.float] = None,
+        cx_x: builtins.float,
+        cy_x: builtins.float,
+        cy_y: builtins.float,
+        cz_x: builtins.float,
+        cz_y: builtins.float,
+        cz_z: builtins.float,
+        cx_dot_x: builtins.float,
+        cx_dot_y: builtins.float,
+        cx_dot_z: builtins.float,
+        cy_dot_x: builtins.float,
+        cy_dot_y: builtins.float,
+        cy_dot_z: builtins.float,
+        cz_dot_x: builtins.float,
+        cz_dot_y: builtins.float,
+        cz_dot_z: builtins.float,
+        cx_dot_x_dot: builtins.float,
+        cy_dot_x_dot: builtins.float,
+        cy_dot_y_dot: builtins.float,
+        cz_dot_x_dot: builtins.float,
+        cz_dot_y_dot: builtins.float,
+        cz_dot_z_dot: builtins.float,
         cov_ref_frame: typing.Optional[builtins.str] = None,
         comments: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> OpmCovarianceMatrix: ...
@@ -16530,37 +16534,39 @@ class UserDefined:
     @property
     def comment(self) -> builtins.list[builtins.str]:
         r"""
-        Comments (see 7.8 for formatting rules).
-
-        CCSDS Reference: 502.0-B-3, Section 6.2.9.
-
-        :type: list[str]
+        Comment snapshot; assignment places all supplied comments before parameters.
         """
     @comment.setter
     def comment(self, value: typing.Sequence[builtins.str]) -> None: ...
     @property
-    def user_defined(self) -> builtins.dict[builtins.str, builtins.str]:
+    def user_defined(self) -> dict[str, str]:
         r"""
-        User-defined parameters.
-
-        :type: dict[str, str]
+        Parameter dictionary snapshot, in message order; assign to replace parameters.
         """
     @user_defined.setter
-    def user_defined(
-        self, value: typing.Mapping[builtins.str, builtins.str]
-    ) -> None: ...
+    def user_defined(self, value: dict[str, str]) -> None: ...
+    @property
+    def entries(self) -> list[str | tuple[str, str]]:
+        r"""
+        Ordered snapshot: strings are comments; (name, value) tuples are parameters.
+        Assign the whole list after editing. XML keeps interleaving; KVN refuses it.
+
+        :type: list[str | tuple[str, str]]
+        """
+    @entries.setter
+    def entries(self, value: list[str | tuple[str, str]]) -> None: ...
     def __new__(
         cls,
-        parameters: typing.Optional[typing.Mapping[builtins.str, builtins.str]] = None,
+        parameters: dict[str, str] | None = None,
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> UserDefined:
         r"""
-        Create a new UserDefined object.
+        Create a block in dictionary insertion order, with any comments first.
         """
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class CdmObjectType(enum.Enum):
+class CdmObjectType:
     r"""
     Covariance Matrix at TCA.
 
@@ -16568,95 +16574,95 @@ class CdmObjectType(enum.Enum):
     Can be converted to a NumPy array using `to_numpy()`.
     """
 
-    Object1 = ...
-    Object2 = ...
+    Object1: typing.ClassVar[CdmObjectType]
+    Object2: typing.ClassVar[CdmObjectType]
 
     def __str__(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class ControlledType(enum.Enum):
-    Yes = ...
-    No = ...
-    Unknown = ...
+class ControlledType:
+    Yes: typing.ClassVar[ControlledType]
+    No: typing.ClassVar[ControlledType]
+    Unknown: typing.ClassVar[ControlledType]
 
     def __str__(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class CovarianceMethodType(enum.Enum):
-    Calculated = ...
-    Default = ...
+class CovarianceMethodType:
+    Calculated: typing.ClassVar[CovarianceMethodType]
+    Default: typing.ClassVar[CovarianceMethodType]
 
     def __str__(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class ManeuverableType(enum.Enum):
-    Yes = ...
-    No = ...
-    NA = ...
+class ManeuverableType:
+    Yes: typing.ClassVar[ManeuverableType]
+    No: typing.ClassVar[ManeuverableType]
+    NA: typing.ClassVar[ManeuverableType]
 
     def __str__(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class ObjectDescription(enum.Enum):
-    Payload = ...
-    RocketBody = ...
-    Debris = ...
-    Unknown = ...
-    Other = ...
+class ObjectDescription:
+    Payload: typing.ClassVar[ObjectDescription]
+    RocketBody: typing.ClassVar[ObjectDescription]
+    Debris: typing.ClassVar[ObjectDescription]
+    Unknown: typing.ClassVar[ObjectDescription]
+    Other: typing.ClassVar[ObjectDescription]
 
     def __str__(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class ReferenceFrameType(enum.Enum):
-    Eme2000 = ...
-    Gcrf = ...
-    Itrf = ...
+class ReferenceFrameType:
+    Eme2000: typing.ClassVar[ReferenceFrameType]
+    Gcrf: typing.ClassVar[ReferenceFrameType]
+    Itrf: typing.ClassVar[ReferenceFrameType]
 
     def __str__(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class ScreenVolumeFrameType(enum.Enum):
-    Rtn = ...
-    Tvn = ...
+class ScreenVolumeFrameType:
+    Rtn: typing.ClassVar[ScreenVolumeFrameType]
+    Tvn: typing.ClassVar[ScreenVolumeFrameType]
 
     def __str__(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class ScreenVolumeShapeType(enum.Enum):
-    Ellipsoid = ...
-    Box = ...
+class ScreenVolumeShapeType:
+    Ellipsoid: typing.ClassVar[ScreenVolumeShapeType]
+    Box: typing.ClassVar[ScreenVolumeShapeType]
 
     def __str__(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class TdmMode(enum.Enum):
-    Sequential = ...
-    SingleDiff = ...
+class TdmMode:
+    Sequential: typing.ClassVar[TdmMode]
+    SingleDiff: typing.ClassVar[TdmMode]
 
     def __str__(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class TdmPath(enum.Enum):
-    Path1 = ...
-    Path2 = ...
-    Path3 = ...
+class TdmPath:
+    Path1: typing.ClassVar[TdmPath]
+    Path2: typing.ClassVar[TdmPath]
+    Path3: typing.ClassVar[TdmPath]
 
     def __str__(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class YesNo(enum.Enum):
-    Yes = ...
-    No = ...
+class YesNo:
+    Yes: typing.ClassVar[YesNo]
+    No: typing.ClassVar[YesNo]
 
     def __str__(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...

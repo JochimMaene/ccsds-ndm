@@ -9,7 +9,7 @@
 use super::{
     CovLine, ManLine, Ocm, OcmBody, OcmCovarianceMatrix, OcmData, OcmManeuverParameters,
     OcmMetadata, OcmOdParameters, OcmPerturbations, OcmPhysicalDescription, OcmSegment,
-    OcmTrajState, OcmUserDefined, OcmUserDefinedParameter, TrajLine,
+    OcmTrajState, OcmUserDefined, OcmUserDefinedEntry, OcmUserDefinedParameter, TrajLine,
 };
 use crate::common::OdmHeader;
 use crate::error::{CcsdsNdmError, FormatError, InternalParserError, KvnParseError, Result};
@@ -23,6 +23,23 @@ use winnow::combinator::{peek, repeat};
 use winnow::error::{AddContext, ErrMode};
 use winnow::prelude::*;
 use winnow::stream::Offset;
+
+// These two ODM fields have wider KVN domains than their XML measure types.
+fn kv_phase_angle(input: &mut &str) -> KvnResult<Angle> {
+    let value: UnitValue<f64, AngleUnits> = kv_from_kvn.parse_next(input)?;
+    Ok(Angle {
+        value: value.value,
+        units: value.units,
+    })
+}
+
+fn kv_days_since_obs(input: &mut &str) -> KvnResult<DayInterval> {
+    let value: UnitValue<f64, DayIntervalUnits> = kv_from_kvn.parse_next(input)?;
+    Ok(DayInterval {
+        value: value.value,
+        units: value.units,
+    })
+}
 
 //----------------------------------------------------------------------
 // OCM Version Parser
@@ -256,10 +273,12 @@ pub fn ocm_traj_line(input: &mut &str) -> KvnResult<TrajLine> {
     let raw_values = till_line_ending.parse_next(input)?;
     let mut values = Vec::with_capacity(raw_values.split_whitespace().count());
     for value in raw_values.split_whitespace() {
-        values.push(
-            fast_float::parse(value)
-                .map_err(|_| cut_err(input, "Malformed OCM trajectory numeric value"))?,
-        );
+        values.push(parse_ccsds_number(value).ok_or_else(|| {
+            cut_err(
+                input,
+                "Malformed or unrepresentable OCM trajectory numeric value",
+            )
+        })?);
     }
     if values.is_empty() {
         return Err(cut_err(input, "Missing OCM trajectory values"));
@@ -360,7 +379,7 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
         traj_basis,
         traj_basis_id,
         interpolation,
-        interpolation_degree: interpolation_degree.or(Some(3)),
+        interpolation_degree,
         propagator,
         center_name: center_name.unwrap_or_else(|| "EARTH".to_string()),
         traj_ref_frame: traj_ref_frame.unwrap_or_else(|| "ICRF3".to_string()),
@@ -368,10 +387,10 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
         useable_start_time,
         useable_stop_time,
         orb_revnum,
-        orb_revnum_basis: orb_revnum_basis.or(Some(RevNumBasis::Zero)),
+        orb_revnum_basis,
         traj_type: traj_type
             .ok_or_else(|| missing_field_err(input, "Trajectory State", "TRAJ_TYPE"))?,
-        orb_averaging: orb_averaging.or(Some("OSCULATING".to_string())),
+        orb_averaging,
         traj_units,
         traj_lines,
     })
@@ -562,10 +581,12 @@ pub fn ocm_cov_line(input: &mut &str) -> KvnResult<CovLine> {
     let raw_values = till_line_ending.parse_next(input)?;
     let mut values = Vec::with_capacity(raw_values.split_whitespace().count());
     for value in raw_values.split_whitespace() {
-        values.push(
-            fast_float::parse(value)
-                .map_err(|_| cut_err(input, "Malformed OCM covariance numeric value"))?,
-        );
+        values.push(parse_ccsds_number(value).ok_or_else(|| {
+            cut_err(
+                input,
+                "Malformed or unrepresentable OCM covariance numeric value",
+            )
+        })?);
     }
     if values.is_empty() {
         return Err(cut_err(input, "Missing OCM covariance values"));
@@ -752,8 +773,8 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
         "DC_REF_DIR" => dc_ref_dir: kv_from_kvn_value,
         "DC_BODY_FRAME" => dc_body_frame: kv_string,
         "DC_BODY_TRIGGER" => dc_body_trigger: kv_from_kvn_value,
-        "DC_PA_START_ANGLE" => dc_pa_start_angle: kv_from_kvn,
-        "DC_PA_STOP_ANGLE" => dc_pa_stop_angle: kv_from_kvn,
+        "DC_PA_START_ANGLE" => dc_pa_start_angle: kv_phase_angle,
+        "DC_PA_STOP_ANGLE" => dc_pa_stop_angle: kv_phase_angle,
         "MAN_COMPOSITION" => man_composition: kv_man_composition,
         "MAN_UNITS" => man_units: kv_string,
     }, |i| at_block_end("MAN", i), "Unexpected OCM Maneuver key");
@@ -973,8 +994,8 @@ pub fn ocm_od(input: &mut &str) -> KvnResult<OcmOdParameters> {
         "OD_PREV_ID" => od_prev_id: kv_string,
         "OD_METHOD" => od_method: kv_string,
         "OD_EPOCH" => od_epoch: kv_epoch,
-        "DAYS_SINCE_FIRST_OBS" => days_since_first_obs: kv_from_kvn,
-        "DAYS_SINCE_LAST_OBS" => days_since_last_obs: kv_from_kvn,
+        "DAYS_SINCE_FIRST_OBS" => days_since_first_obs: kv_days_since_obs,
+        "DAYS_SINCE_LAST_OBS" => days_since_last_obs: kv_days_since_obs,
         "RECOMMENDED_OD_SPAN" => recommended_od_span: kv_from_kvn,
         "ACTUAL_OD_SPAN" => actual_od_span: kv_from_kvn,
         "OBS_AVAILABLE" => obs_available: kv_u64,
@@ -1048,22 +1069,21 @@ pub fn ocm_user(input: &mut &str) -> KvnResult<OcmUserDefined> {
     ws.parse_next(input)?;
     expect_block_start("USER").parse_next(input)?;
 
-    let mut comment = Vec::new();
-    let mut user_defined = Vec::new();
+    let mut entries = Vec::new();
 
     loop {
         let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
 
         if at_block_end("USER", input) {
-            comment.extend(comments);
+            entries.extend(comments.into_iter().map(OcmUserDefinedEntry::Comment));
             expect_block_end("USER").parse_next(input)?;
             break;
         }
 
-        match key_token.parse_next(input) {
+        match user_defined_key_token.parse_next(input) {
             Ok(k) => {
-                comment.extend(comments);
+                entries.extend(comments.into_iter().map(OcmUserDefinedEntry::Comment));
                 let v = kv_string.parse_next(input)?;
                 let mut records = Vec::new();
                 if k.starts_with("USER_DEFINED_COMPOSITION_") {
@@ -1085,11 +1105,11 @@ pub fn ocm_user(input: &mut &str) -> KvnResult<OcmUserDefined> {
                         opt_line_ending.parse_next(input)?;
                     }
                 }
-                user_defined.push(OcmUserDefinedParameter {
+                entries.push(OcmUserDefinedEntry::Parameter(OcmUserDefinedParameter {
                     records,
                     parameter: k.strip_prefix("USER_DEFINED_").unwrap_or(k).to_string(),
                     value: v,
-                });
+                }));
             }
             Err(_) => {
                 input.reset(&checkpoint);
@@ -1098,10 +1118,7 @@ pub fn ocm_user(input: &mut &str) -> KvnResult<OcmUserDefined> {
         }
     }
 
-    Ok(OcmUserDefined {
-        comment,
-        user_defined,
-    })
+    Ok(OcmUserDefined { entries })
 }
 
 //----------------------------------------------------------------------
@@ -1176,7 +1193,8 @@ fn ocm_data_block(input: &mut &str) -> KvnResult<OcmBlock> {
             x.comment.splice(0..0, comments);
         }
         OcmBlock::User(x) => {
-            x.comment.splice(0..0, comments);
+            x.entries
+                .splice(0..0, comments.into_iter().map(OcmUserDefinedEntry::Comment));
         }
     }
 
@@ -1754,6 +1772,34 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
 
 impl Ocm {
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        if let Some(user) = &self.body.segment.data.user {
+            let mut parameter_seen = false;
+            for entry in &user.entries {
+                match entry {
+                    OcmUserDefinedEntry::Parameter(value) => {
+                        if value.parameter.is_empty()
+                            || !value.parameter.bytes().all(|byte| {
+                                byte.is_ascii_graphic()
+                                    && !byte.is_ascii_lowercase()
+                                    && byte != b'='
+                            })
+                        {
+                            return Err(crate::error::ValidationError::invalid_value("USER_DEFINED parameter", &value.parameter, "a nonempty uppercase printable ASCII suffix without whitespace or =").into());
+                        }
+                        parameter_seen = true;
+                    }
+                    OcmUserDefinedEntry::Comment(_) if parameter_seen => {
+                        return Err(crate::error::ValidationError::invalid_value(
+                            "COMMENT",
+                            "after user-defined parameter",
+                            "leading comments for OCM KVN",
+                        )
+                        .into())
+                    }
+                    _ => {}
+                }
+            }
+        }
         for (trajectory_index, trajectory) in self.body.segment.data.traj.iter().enumerate() {
             for (line_index, line) in trajectory.traj_lines.iter().enumerate() {
                 for (value_index, value) in line.values.iter().enumerate() {
@@ -2033,11 +2079,17 @@ impl ToKvn for OcmData {
         }
         if let Some(u) = &self.user {
             writer.write_section("USER_START");
-            writer.write_comments(&u.comment);
-            for p in &u.user_defined {
-                writer.write_user_defined(&p.parameter, &p.value);
-                for record in &p.records {
-                    writer.write_line(record);
+            for entry in &u.entries {
+                match entry {
+                    OcmUserDefinedEntry::Comment(value) => {
+                        writer.write_comments(std::slice::from_ref(value))
+                    }
+                    OcmUserDefinedEntry::Parameter(p) => {
+                        writer.write_user_defined(&p.parameter, &p.value);
+                        for record in &p.records {
+                            writer.write_line(record);
+                        }
+                    }
                 }
             }
             writer.write_section("USER_STOP");

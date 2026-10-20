@@ -69,7 +69,8 @@ fn sequences_preserve_rows_and_parameter_order_and_refuse_xml() {
         .user
         .as_ref()
         .unwrap()
-        .user_defined;
+        .parameters()
+        .collect::<Vec<_>>();
     assert_eq!(parameters.len(), 4);
     assert_eq!(parameters[1].records.len(), 2);
     assert_eq!(parameters[2].value, "next");
@@ -93,7 +94,16 @@ fn sequences_preserve_rows_and_parameter_order_and_refuse_xml() {
     assert!(message.write_xml_to(&mut output).is_err());
     assert!(output.is_empty());
     let mut edited = message;
-    let parameter = &mut edited.body.segment.data.user.as_mut().unwrap().user_defined[1];
+    let parameter = &mut edited
+        .body
+        .segment
+        .data
+        .user
+        .as_mut()
+        .unwrap()
+        .parameters_mut()
+        .nth(1)
+        .unwrap();
     parameter.records[0] = "USER_STOP\nINJECTION = value".into();
     assert!(edited.to_kvn().is_err());
 }

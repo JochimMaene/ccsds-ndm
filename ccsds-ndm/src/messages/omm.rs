@@ -192,7 +192,8 @@ impl Ndm for Omm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::detect::without_utf8_bom(kvn);
+        let normalized = crate::kvn::normalize_line_endings(crate::detect::without_utf8_bom(kvn));
+        let kvn = normalized.as_ref();
         kvn::validate_kvn_syntax(kvn)?;
         let omm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&omm)?;

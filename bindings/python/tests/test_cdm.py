@@ -51,6 +51,7 @@ class TestCdm:
 
         # Object 1
         meta1 = CdmMetadata(
+            ephemeris_name="NONE",
             object="OBJECT1",
             object_designator="12345",
             catalog_name="SATCAT",
@@ -112,6 +113,7 @@ class TestCdm:
 
         # Object 2
         meta2 = CdmMetadata(
+            ephemeris_name="NONE",
             object="OBJECT2",
             object_designator="67890",
             catalog_name="SATCAT",
@@ -351,39 +353,33 @@ class TestCdm:
 
 
 class TestCdmRealWorldCorpus:
-    """An operational CDM that strict parsing rejects, kept as evidence.
+    """Known empty optional producer placeholders normalize to absence."""
 
-    `test_cdm.xml` is an unedited CSpOC conjunction message. It spells its
-    null-valued elements as a bare `nil="true"` attribute, 35 times, where the
-    NDM XSD requires the namespaced `xsi:nil`. Strict parsing rejects it, and
-    that rejection is the point: the document records what real operator output
-    looks like and pins the cost of the strict-parsing decision, so the choice
-    stays visible rather than being rediscovered against a live feed.
-    """
-
-    def test_operational_cdm_with_bare_nil_is_rejected(self):
+    def test_operational_cdm_empty_nil_placeholders_are_accepted(self):
         path = Path(__file__).resolve().parent / "test_cdm.xml"
-
-        # An unused xmlns:xsi is optional, but a bare nil attribute is still invalid.
-        with pytest.raises(ccsds_ndm.NdmFormatError, match="unknown attribute 'nil'"):
-            ccsds_ndm.from_file(str(path), format="xml")
-
-        # Adding the namespace declaration does not qualify the bare attribute.
-        declared = path.read_text().replace(
-            "<cdm ", '<cdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ', 1
+        message = ccsds_ndm.from_file(str(path), format="xml")
+        assert message.body.relative_metadata_data.start_screen_period is None
+        canonical = message.to_str(format="xml")
+        assert "nil=" not in canonical
+        ccsds_ndm.from_str(canonical, format="xml")
+        meaningful = path.read_text().replace(
+            '<START_SCREEN_PERIOD nil="true"/>',
+            '<START_SCREEN_PERIOD nil="true">2023-01-01T00:00:00</START_SCREEN_PERIOD>',
         )
-        with pytest.raises(ccsds_ndm.NdmFormatError) as excinfo:
-            ccsds_ndm.from_str(declared, format="xml")
-        assert "nil" in str(excinfo.value)
+        with pytest.raises(ccsds_ndm.NdmFormatError):
+            ccsds_ndm.from_str(meaningful, format="xml")
 
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
 
 
-@pytest.mark.parametrize("missing", ["covariance_method", "maneuverable"])
+@pytest.mark.parametrize(
+    "missing", ["covariance_method", "maneuverable", "ephemeris_name"]
+)
 def test_metadata_requires_operational_facts(missing):
     arguments = dict(
+        ephemeris_name="NONE",
         object="OBJECT1",
         object_designator="12345",
         catalog_name="SATCAT",
@@ -400,6 +396,7 @@ def test_metadata_requires_operational_facts(missing):
 
 def test_metadata_preserves_explicit_operational_facts():
     metadata = CdmMetadata(
+        ephemeris_name="NONE",
         object=ccsds_ndm.CdmObjectType.Object1,
         object_designator="12345",
         catalog_name="SATCAT",
