@@ -49,6 +49,31 @@ annex A2.5.2, has 70 numbered items. The repository copy
 The item inventory exposes no omitted OMM keyword or logical block. OMM has no exception to the
 shared policy on [externally governed values](../design/validation-contract.md#registry-governed-values).
 
+## XML TLE choices
+
+The OMM 3.0 schema requires exactly one of `BSTAR`/`BTERM` and exactly one of
+`MEAN_MOTION_DDOT`/`AGOM` when `tleParameters` is present; neither schema choice has
+`minOccurs="0"`. KVN and model validation permit these optional book fields to be omitted.
+XML parsing and generation enforce both choices and refuse an incomplete XML representation
+before streaming output. No missing quantity is synthesized.
+`generation::xml_tle_choices_are_required_without_rejecting_kvn_omissions` covers this
+notation-specific boundary and schema-valid complete XML.
+
+## Comment normalization
+
+XML has separate outer-data and mean-elements comment lists; flattened KVN has one leading
+mean-elements comment position. KVN generation writes outer-data comments followed by
+mean-elements comments. KVN parsing stores the combined list in `OmmData.comment` and leaves
+`MeanElements.comment` empty. Text and relative order in the combined list survive, but the
+original XML ownership cannot be reconstructed.
+
+Shared `UserDefined` blocks retain comments and parameters in separate lists. XML permits
+comments interleaved between parameters; parsing keeps each list's order, and both XML and
+KVN generation put all comments before the parameters. Comments are not associated with
+individual parameters. `conversion::comment_merges_and_user_parameter_interleaving_are_canonicalized`
+covers both normalizations. Applications needing the original interleaving must retain the
+source document; the library does not provide a second archival representation.
+
 ## Allocation and packaged-surface evidence
 
 `fixed_family_allocations` records strict KVN parse budgets of at most 128 allocations/24,000

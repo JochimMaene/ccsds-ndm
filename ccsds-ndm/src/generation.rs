@@ -215,7 +215,22 @@ impl GenerationMetadata for crate::messages::acm::Acm {
 
 impl_generation_metadata!(crate::messages::apm::Apm, Apm);
 
-impl_generation_metadata!(crate::messages::omm::Omm, Omm, kvn_representability);
+impl GenerationMetadata for crate::messages::omm::Omm {
+    const KIND: MessageKind = MessageKind::Omm;
+
+    fn version(&self) -> &str {
+        &self.version
+    }
+
+    fn validate_kvn_model(&self) -> Result<()> {
+        self.validate()?;
+        self.validate_kvn_representability()
+    }
+
+    fn validate_xml_model(&self) -> Result<()> {
+        self.validate_xml_representability()
+    }
+}
 impl_generation_metadata!(crate::messages::cdm::Cdm, Cdm, kvn_representability);
 impl_generation_metadata!(crate::messages::aem::Aem, Aem);
 impl GenerationMetadata for crate::messages::ocm::Ocm {

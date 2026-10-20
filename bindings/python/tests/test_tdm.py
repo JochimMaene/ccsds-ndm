@@ -162,7 +162,13 @@ def test_phase_counts_preserve_exact_decimal_text(direction, index):
         body=TdmBody(
             segments=[
                 TdmSegment(
-                    metadata=TdmMetadata(time_system="UTC", participant_1="STN"),
+                    metadata=TdmMetadata(
+                        time_system="UTC",
+                        **{
+                            f"participant_{number}": f"STN{number}"
+                            for number in range(1, 6)
+                        },
+                    ),
                     data=TdmData(observations=[observation]),
                 )
             ]

@@ -7,6 +7,42 @@ use ccsds_ndm::messages::omm::{
 };
 use ccsds_ndm::types::{Angle, ElementSetNo, Inclination, M2kg, NonNegativeDouble};
 use ccsds_ndm::Ndm;
+
+#[test]
+fn xml_tle_choices_are_required_without_rejecting_kvn_omissions() {
+    let control = Omm::from_kvn(KVN).unwrap();
+    let xml = control.to_xml().unwrap();
+    for (element, field) in [
+        ("BSTAR", "BSTAR or BTERM"),
+        ("MEAN_MOTION_DDOT", "MEAN_MOTION_DDOT or AGOM"),
+    ] {
+        let mut edited = control.clone();
+        let tle = edited.body.segment.data.tle_parameters.as_mut().unwrap();
+        if element == "BSTAR" {
+            tle.bstar = None;
+        } else {
+            tle.mean_motion_ddot = None;
+        }
+        edited.validate().unwrap();
+        assert_eq!(Omm::from_kvn(&edited.to_kvn().unwrap()).unwrap(), edited);
+        crate::common::assert_validation_field(&edited.to_xml().unwrap_err(), field);
+        let mut output = Vec::new();
+        crate::common::assert_validation_field(
+            &edited.write_xml_to(&mut output).unwrap_err(),
+            field,
+        );
+        assert!(output.is_empty());
+
+        let mut missing = xml.clone();
+        let begin = missing.find(&format!("<{element}")).unwrap();
+        let closing = format!("</{element}>");
+        let end = missing[begin..].find(&closing).unwrap() + begin + closing.len();
+        missing.replace_range(begin..end, "");
+        crate::common::assert_validation_field(&Omm::from_xml(&missing).unwrap_err(), field);
+        assert!(ccsds_ndm::from_str(&missing).is_err());
+    }
+    validate_xml("complete XML TLE choices", &xml);
+}
 /// `elementSetNoType` restricts to `[0, 9999]` in both bundled OMM schemas, but `ElementSetNo`
 /// only enforces that in its constructor and the value field is public. Before this was routed
 /// through the root, `ELEMENT_SET_NO = 100000` produced XML that `xmllint` rejected with

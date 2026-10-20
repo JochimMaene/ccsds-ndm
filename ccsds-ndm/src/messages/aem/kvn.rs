@@ -70,7 +70,7 @@ pub fn aem_metadata(input: &mut &str) -> KvnResult<AemMetadata> {
         "STOP_TIME" => stop_time: kv_calendar_epoch,
         "ATTITUDE_TYPE" => attitude_type: kv_enum,
         "EULER_ROT_SEQ" => euler_rot_seq: kv_enum,
-        "RATE_FRAME" => rate_frame: kv_string, // CCSDS 504.0-B-2 says RATE_FRAME in KVN
+        "ANGVEL_FRAME" | "RATE_FRAME" => rate_frame: kv_string,
         "INTERPOLATION_METHOD" => interpolation_method: kv_string,
         "INTERPOLATION_DEGREE" => interpolation_degree: kv_u32,
     }, |i: &mut &str| at_block_end("META", i));
@@ -273,7 +273,7 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
         "STOP_TIME",
         "ATTITUDE_TYPE",
         "EULER_ROT_SEQ",
-        "RATE_FRAME",
+        "ANGVEL_FRAME",
         "INTERPOLATION_METHOD",
         "INTERPOLATION_DEGREE",
     ];
@@ -355,6 +355,11 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
                     return fail("expected one AEM metadata assignment");
                 }
                 let key = line.split_once('=').unwrap().0.trim();
+                let key = if key == "RATE_FRAME" {
+                    "ANGVEL_FRAME"
+                } else {
+                    key
+                };
                 let rank = META
                     .iter()
                     .position(|candidate| *candidate == key)
@@ -462,7 +467,7 @@ impl ToKvn for AemMetadata {
             writer.write_pair("EULER_ROT_SEQ", v);
         }
         if let Some(v) = &self.angvel_frame {
-            writer.write_pair("RATE_FRAME", v);
+            writer.write_pair("ANGVEL_FRAME", v);
         }
         if let Some(v) = &self.interpolation_method {
             writer.write_pair("INTERPOLATION_METHOD", v);

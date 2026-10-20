@@ -36,7 +36,7 @@ Annex A, section A2.2.3 contains 110 ACM implementation-conformance statement ro
 | 30–43 | Attitude state history | Typed attitude/rate choices, fixed `NUMBER_STATES` record shape, epoch/value ordering, legal units, block comments, and history representability. |
 | 44–58 | Physical description | Complete typed scalar/vector physical model, CP frame dependency, fixed vector shape/units, schema order, and fixture preservation. Value validation covers `DRAG_COEFF` finiteness, `WET_MASS`/`DRY_MASS` as non-negative masses, and per-component finiteness of the fixed three-element `CP`. |
 | 59–68 | Covariance history | Covariance type/basis identifiers, fixed row shape/count, epochs, units, comments, and history representability. |
-| 69–82 | Maneuver history | Typed maneuver metadata and records, fixed vector/state shapes, units, comments, ordering, and representability. Value validation covers a non-negative `MAN_DURATION`, the `MAN_END_TIME`/`MAN_DURATION` exclusivity, the `TARGET_MOMENTUM`/`TARGET_MOM_FRAME` pairing, and per-component finiteness of every maneuver target choice. |
+| 69–82 | Maneuver history | Typed maneuver metadata and records, fixed vector/state shapes, units, comments, ordering, and representability. Value validation covers a non-negative `MAN_DURATION`, the `MAN_END_TIME`/`MAN_DURATION` exclusivity and ordered bounds, the frame requirement when `TARGET_MOMENTUM` is present, and per-component finiteness of every maneuver target choice. |
 | 83–105 | Attitude determination and sensors | Typed AD fields, Euler sequence, nested sensor blocks, declared sensor count/covariance dimensions, units, nesting, order, and duplicate rejection. |
 | 106–110 | User defined | Block placement, leading comments, names/values, order, and XML/KVN preservation. |
 
@@ -59,6 +59,55 @@ family tests, shared public-route tests, and packaged tests are complementary ev
 none alone establishes conformance or exhaustive mutation coverage.
 
 ## Decisions and limits
+
+**Declared content and intervals.** ADM table 5-3's optional `ACM_DATA_ELEMENTS` must
+name the actual blocks in order, including repeated ATT/COV/MAN entries. Uppercase and lowercase
+block names are accepted; unknown, missing and extra entries fail. Supplied `START_TIME` and
+`STOP_TIME` are compared when they use the same epoch branch; reversed bounds fail. Relative
+`MAN_END_TIME` cannot precede `MAN_BEGIN_TIME` (table 5-7). Calendar/relative bounds are not
+converted or inferred from histories. The declaration, interval and edited-model regressions
+in `acm::generation` and `acm::epochs` cover these boundaries.
+
+**Seconds and finite offsets.** Tables 5-3 and 5-7 and XSD `timeUnits` require seconds
+for leap offsets and maneuver durations/times. Days are rejected rather than reinterpreted;
+optional `[s]`/`units="s"` annotations are accepted. `TAIMUTC_AT_TZERO` and
+`NEXT_LEAP_TAIMUTC` must be finite even after direct model edits. The lexical maneuver time type
+preserves its number spelling; optional fixed seconds annotations normalize to omission.
+`acm::generation::acm_seconds_and_time_offsets_are_checked_at_every_boundary` exercises these rules.
+
+**Frames are one-way dependencies.** Tables 5-5 and 5-7 require `CP_REF_FRAME` when
+CP exists and `TARGET_MOM_FRAME` when TARGET_MOMENTUM exists. A frame supplied without
+its optional vector is permitted, matching the independently optional schema elements. The
+library does not infer a missing frame from other declarations.
+
+**Maneuver purposes and targets.** Table 5-7 marks targets conditional on `MOM_DESAT`,
+`ATT_ADJUST` and `SPIN_RATE_ADJUST`. Each supplied canonical purpose requires its matching
+target; lowercase aliases follow ADM §6.8.6. Purpose strings remain open, including custom purposes
+and comma-delimited lists, so unknown purposes do not acquire invented target requirements.
+A target quaternion uses the shared quaternion component and magnitude checks, with the documented
+rounded-data tolerance. Multiple purposes may require multiple targets: KVN retains them, while
+the bundled XSD's single target choice cannot represent them. XML input/output therefore refuses
+multiple target alternatives rather than dropping one. An unused momentum-frame declaration
+also occupies that XML choice. `acm::generation::acm_maneuver_targets_follow_purposes_without_closing_custom_values`
+covers custom/single/multiple purposes, quaternion validation and zero-byte XML refusal.
+
+**Optional sensor numbering.** ADM §5.3.9.6 says each sensor block includes the sensor
+number, while table 5-8, its ICS and XSD `sensorDataType` mark `SENSOR_NUMBER` optional.
+The table also says supplied numbers are unique and ascending. The library takes the permissive
+reading supported by the table/schema: it accepts omission and preserves sensor order. Numbers that are supplied must be positive, unique
+and ascending in that order; omitted numbers are neither filled in nor used to reorder sensors.
+This permissive reading avoids inventing mandatory identifiers.
+`acm::generation::acm_supplied_sensor_numbers_are_in_ascending_order_and_may_be_omitted` covers it.
+
+**Supported profile limits.** The book's table 5-3 repeats `CLASSIFICATION` in metadata,
+while the bundled `acmMetadataType` has no such element. The library supports the standard header
+classification only; the additional metadata spelling is rejected in both notations. It does not
+move a metadata classification into the header.
+ATT histories currently require an orientation primary type (`QUATERNION`, `EULER_ANGLES` or
+`DCM`), optionally followed by RATE_TYPE rate states. Annex B4's rate-only primary state types
+are not supported in ATT histories, despite their presence in the shared enum/schema vocabulary;
+they fail explicitly instead of being interpreted as orientation data. This is a library profile
+restriction, not a claim that the publication forbids those states.
 
 **History time rules.** ADM §5.3.4.4 forbids duplicate time tags; §5.3.7.5 additionally
 requires covariance histories to increase monotonically. Covariance time tags are therefore

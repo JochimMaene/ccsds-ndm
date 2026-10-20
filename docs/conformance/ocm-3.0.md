@@ -52,7 +52,7 @@ These OCM values are deliberately **not** validated, each for a recorded reason 
 omission:
 
 - `DRAG_COEFF_NOM` accepts zero because ODM says it disables atmospheric drag, while the XSD's
-  `positiveDouble` excludes it. KVN preserves zero and XML generation refuses it.
+  `positiveDouble` excludes it. KVN preserves zero; XML input and generation require a positive value.
 - `DAYS_SINCE_FIRST_OBS`, `DAYS_SINCE_LAST_OBS`, `DC_PA_START_ANGLE`, and `DC_PA_STOP_ANGLE` are
   validated for finiteness only, because ODM's domain is wider than the 3.0 schema's. The
   book-valid value is preserved and KVN writes it; XML generation refuses the conversion with the
@@ -77,6 +77,30 @@ omission:
   `xsd:string` and retains the original text. The `maneuver_numeric_precision_keeps_text_identifiers_and_legal_spellings`
   regression covers both composition spellings, text identifiers, rounding, and zero-output refusal
   of values whose rounded spelling overflows or whose nonzero text underflows a double.
+
+Maneuver compositions select distinct columns, in order, from either ODM table 6-8
+(propulsive) or table 6-9 (deployment); columns unique to the two tables cannot be mixed
+(§§6.2.8.15–16). Reading retains the existing unambiguous comma- or whitespace-separated
+compatibility spellings. A composition may select only its time tag: neither table requires
+another column, and both parsers retain those empty-value records. Text deployment IDs remain
+single tokens and may contain `=`, which does not turn a numerical history record into a KVN
+assignment. All epochs in one maneuver block must be unique (§6.2.2.4), including repeated
+nonadjacent epochs with equivalent decimal or calendar spellings. Maneuver histories need not
+be monotonic; validation preserves their supplied order and compares retained epochs without
+rounding through `f64`.
+
+`INTERPOLATION_DEGREE` illustrates a book/schema distinction. Table 6-4 calls it an integer,
+lists default 3, and conditionally requires it for interpolation other than PROPAGATE; the
+XML schema makes it optional but positive when supplied. The library accepts omission as use
+of the documented default instead of adding a required field or synthesizing a value. A supplied
+zero remains book-readable in KVN but is refused on XML input and output. No interpolation
+algorithm is executed, and record sufficiency for an externally chosen algorithm is caller context.
+
+`ORB_REVNUM` must be finite and nonnegative. Table 6-4 calls the count an integer, but its
+`ORB_REVNUM_BASIS` description refers to fractional counts `0.XXXX` and `1.XXXX`, and the XML
+schema uses `nonNegativeDouble`. The library therefore retains nonnegative fractional counts
+instead of truncating or rejecting them. `orbit_revolution_counts_are_finite_nonnegative_and_may_be_fractional`
+and `xml_only_facets_are_checked_on_read_and_generation` exercise these decisions.
 
 OCM's exception to the shared policy on [externally governed values](../design/validation-contract.md#registry-governed-values) is that its `OBJECT_TYPE` is delegated to the living
 SANA Object Types registry, so the token is preserved losslessly and checked for offline syntax
@@ -126,14 +150,26 @@ rounded values, comparison boundaries, SCLK, and the deliberately unchecked case
 `epochs::calendar_metadata_bounds_are_ordered_without_subtracting_time_scales` covers
 equal and reversed calendar bounds through parsing, mutation, and generation.
 
+### Trajectory usable bounds
+
+The trajectory `USEABLE_START_TIME` and `USEABLE_STOP_TIME` fields currently accept calendar
+or ordinal epochs only, even when trajectory rows use relative tags. The common `EPOCH_TZERO`
+anchors relative rows; the library does not convert those tags into the bounds' representation
+or prove that the usable interval covers the records. This is an explicit supported-profile
+restriction: ODM §6.2.2.3 broadly permits relative time tags and the XML fields use `epochType`,
+but table 6-4 specifically refers these bounds to §7.5.10's calendar syntax. Supporting relative
+usable bounds would require changing the public field types; the present release keeps the
+calendar interpretation and rejects relative bounds rather than guessing a conversion.
+
 ## Numerical record contracts
 
 ODM sections 6.2.5.11 and 6.2.7.10 and the [SANA Orbital Elements](https://sanaregistry.org/r/orbital_elements/)
 and [Orbital Covariance Matrix Types](https://sanaregistry.org/r/orbital_covariance_matrix_types/)
 registries govern the numerical compositions. The registry definitions were reviewed on
 2026-10-15. The implementation knows all 15 trajectory compositions and all 17 additional
-covariance representations present on that date. Registry extensions with unrecognized names
-remain opaque: their numbers are finite and their epochs are checked, but their dimensional,
+covariance representations present on that date. Known names
+are recognized case-insensitively while preserving the supplied token. Registry extensions with
+unrecognized names remain opaque: their numbers are finite and their epochs are checked, but their dimensional,
 unit, and physical interpretation cannot be established without a registry definition.
 
 - Known trajectory records have exactly the declared number of elements; known `TRAJ_UNITS`
@@ -145,12 +181,22 @@ unit, and physical interpretation cannot be established without a registry defin
   Positive definiteness is checked by Cholesky factorization after scaling the matrix to
   correlation units; positive diagonal entries alone are insufficient. The bounded stack
   workspace handles the largest known composition, the 10-dimensional TCARTPVA.
+  Before KVN output, the same record constraints are checked on the actual rounded 16-digit
+  numbers, for both matrix and eigenvector representations. If rounding would make a matrix
+  singular, indefinite, or inconsistent, or move an eigenvector basis outside its norm tolerance,
+  generation refuses the conversion before writing bytes; XML can still retain the original
+  doubles. No matrix repair or extra comparison tolerance is applied.
 - Hybrid covariance/correlation orderings must agree to absolute correlation tolerance `1e-12`.
   The book specifies no numeric comparison tolerance; `1e-12` is the implementation choice for
   double-precision comparison. It does not repair inconsistent values.
 - `SIG3EIGVEC3` and `TSIG3EIGVEC3` have 12 and 13 entries, respectively, positive dispersions,
   and an orthonormal eigenvector basis, checked with the same explicit absolute dot-product
   tolerance `1e-12`. Lower-precision rounded bases outside that tolerance are refused.
+  Their optional `COV_UNITS` lists describe diagonal standard deviations: `[km,km,km]`
+  for SIG3EIGVEC3 and `[s,km,km,km]` for TSIG3EIGVEC3. Table 6-6 first says “each element”
+  but then specifically requires diagonal standard-deviation entries. The latter definition
+  governs this interpretation; the nine dimensionless eigenvector components do not add
+  diagonal-unit entries. The schema's free-text `COV_UNITS` cannot establish this rule.
 - `COV_SCALE_MIN` and `COV_SCALE_MAX` must be finite and `COV_CONFIDENCE` must satisfy its
   percentage domain. No undocumented relationship between scale factors is inferred.
 
@@ -163,6 +209,15 @@ The published G15 example labels nine state elements as `CARTPV`, which specifie
 Its original bytes remain in `data/invalid/ocm_g15_original.kvn`; the current positive fixture
 is annotated and uses `CARTPVA`. The implementation follows the declared composition rather
 than inferring acceleration from extra columns or accepting the inconsistent original example.
+
+The published G17 propulsive composition spells `THR_ISP` as `ISP`, which is not a
+selectable column in normative table 6-8. Its propulsive `MAN_UNITS` also adds an extra `n/a`
+for the time tag, although table 6-7 defines these units for elements following that tag.
+The original bytes remain in `data/invalid/ocm_g17_original.kvn`; the annotated positive
+fixture corrects the keyword and removes that extra unit. This follows the declared standard
+columns instead of inventing an alias for the example's typo. The regression
+`published_g17_typo_is_preserved_separately_from_the_corrected_fixture` rejects the original
+composition and round-trips the corrected input in both notations.
 
 ## June 2026 technical corrigendum
 

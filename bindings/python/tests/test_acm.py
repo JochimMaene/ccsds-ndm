@@ -63,6 +63,44 @@ def test_kvn_none_rate_type_is_normalized_to_omission():
     assert Acm.from_str(xml, format="xml").segment.data.att[0].rate_type is None
 
 
+def test_declared_blocks_are_checked_after_live_metadata_edits():
+    message = Acm.from_file(KVN_DIR / "acm_g6.kvn")
+    metadata = message.segment.metadata
+    metadata.acm_data_elements = "ATT"
+    message.validate()
+    for notation in ("kvn", "xml"):
+        encoded = message.to_str(format=notation)
+        assert (
+            Acm.from_str(encoded, format=notation).segment.metadata.acm_data_elements
+            == "ATT"
+        )
+
+    metadata.acm_data_elements = "ATT,COV"
+    with pytest.raises(ccsds_ndm.NdmValidationError, match="ACM_DATA_ELEMENTS"):
+        message.validate()
+    for notation in ("kvn", "xml"):
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="ACM_DATA_ELEMENTS"):
+            message.to_str(format=notation)
+
+
+def test_maneuver_targets_follow_purposes_and_keep_multiple_targets_in_kvn():
+    message = Acm.from_file(KVN_DIR / "acm_g7.kvn")
+    maneuver = message.segment.data.man[0]
+    maneuver.man_purpose = "ATT_ADJUST"
+    with pytest.raises(ccsds_ndm.NdmValidationError, match="TARGET_ATTITUDE"):
+        message.validate()
+
+    maneuver.man_purpose = "MOM_DESAT, ATT_ADJUST"
+    maneuver.target_attitude = [0.0, 0.0, 0.0, 1.0]
+    message.validate()
+    reparsed = Acm.from_str(message.to_str(format="kvn"), format="kvn")
+    actual = reparsed.segment.data.man[0]
+    assert actual.target_momentum == maneuver.target_momentum
+    assert actual.target_attitude == maneuver.target_attitude
+    with pytest.raises(ccsds_ndm.NdmValidationError, match="one target choice"):
+        message.to_str(format="xml")
+
+
 class TestAcm:
     """Tests for ACM bindings."""
 

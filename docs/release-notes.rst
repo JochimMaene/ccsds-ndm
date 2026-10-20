@@ -23,13 +23,32 @@ Conformance review and compatibility changes
   alongside the remaining physical-validation limits.
 - Typed floating-point KVN fields now consistently use the existing CCSDS 16-digit
   formatter, including shared model blocks and TDM metadata/observations.
-  TDM phase counts retain their exact decimal strings. CDM's exact-model gate
-  refuses rounding that would change a value; XML retains full double precision.
+  TDM phase counts retain their exact decimal strings. CDM accepts ordinary
+  computed values under the same rounding policy while preserving its nonnumeric
+  content-loss checks; XML retains full double precision.
   KVN writes floating-point signed zero as ``0.0`` while readers remain permissive.
 - OCM maneuver rows require exactly one token per declared column. Extra values
   are rejected before output rather than silently dropped, and embedded whitespace
   cannot change the column count. Numeric maneuver signed zero also writes as
   ``0.0``; text identifiers and XML row spellings are retained.
+- Combined NDM decodes escaped text and CDATA, accepts empty envelope text
+  elements, ignores processing instructions, and rejects nested markup and
+  unsupported text-field attributes instead of changing or discarding them.
+- OMM enforces required TLE choices at XML boundaries while retaining book-valid
+  KVN omissions. RDM revalidates edited confidence percentages and finite altitudes.
+- ADM fields enforce seconds-only units. AEM writes ``ANGVEL_FRAME`` and accepts
+  ``RATE_FRAME`` as a compatibility alias; optional frame/sequence metadata stays
+  optional. APM accepts all four book-defined line endings. ACM checks declared
+  data blocks, comparable time ranges, supplied sensor order, known maneuver
+  purpose targets, and target quaternions; multiple maneuver targets remain
+  available in KVN and are refused by the narrower XML choice.
+- OCM known composition checks also apply to lowercase spellings, including
+  covariance units and eigenvectors. KVN refuses covariance rounding that breaks
+  positive definiteness. Maneuver columns and nonadjacent duplicate time tags
+  are checked, and XML facets apply on input as well as output.
+- TDM validates per-keyword observation chronology, integer Doppler counts, and
+  indexed participant references. Comment canonicalization, compatibility aliases,
+  the 64-byte epoch limit, and remaining supported-profile limits are documented.
 - The shared preservation contract now states numeric rounding, fixed-unit
   normalization, comment-position merging, and streaming sink failure behavior
   explicitly. ACM's relative-only history support and rate-type book/schema

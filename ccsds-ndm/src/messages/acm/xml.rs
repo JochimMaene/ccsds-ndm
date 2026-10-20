@@ -48,6 +48,8 @@ pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {
                             | b"IXY"
                             | b"IXZ"
                             | b"IYZ"
+                            | b"MAN_BEGIN_TIME"
+                            | b"MAN_END_TIME"
                             | b"MAN_DURATION"
                             | b"TARGET_MOMENTUM"
                             | b"TARGET_SPINRATE"
@@ -181,6 +183,21 @@ fn acm_xml_children(parent: &[u8]) -> Option<&'static [&'static [u8]]> {
 
 impl Acm {
     pub(crate) fn validate_xml_representability(&self) -> Result<()> {
+        for maneuver in &self.body.segment.data.man {
+            let targets = usize::from(
+                maneuver.target_momentum.is_some() || maneuver.target_mom_frame.is_some(),
+            ) + usize::from(maneuver.target_attitude.is_some())
+                + usize::from(maneuver.target_spinrate.is_some());
+            if targets > 1 {
+                return Err(ValidationError::invalid_value(
+                    "TARGET_MOMENTUM/TARGET_ATTITUDE/TARGET_SPINRATE",
+                    "multiple target choices",
+                    "one target choice in ACM 2.0 XML; KVN supports multiple-purpose maneuvers",
+                )
+                .into());
+            }
+        }
+
         if self
             .body
             .segment

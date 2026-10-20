@@ -377,6 +377,17 @@ impl Ocm {
     pub(crate) fn validate_xml_representability(&self) -> Result<()> {
         let data = &self.body.segment.data;
         let metadata = &self.body.segment.metadata;
+        for (index, trajectory) in data.traj.iter().enumerate() {
+            if trajectory.interpolation_degree == Some(0) {
+                return Err(ValidationError::invalid_value(
+                    "INTERPOLATION_DEGREE",
+                    "0",
+                    "a positive integer for the XML edition",
+                )
+                .at_path(format!("body.segment.data.traj[{index}]"))
+                .into());
+            }
+        }
         for (field, value) in [
             ("OPERATOR_URL", &metadata.operator_url),
             ("OPERATOR_EMAIL", &metadata.operator_email),

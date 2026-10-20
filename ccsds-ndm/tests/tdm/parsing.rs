@@ -7,6 +7,17 @@ use ccsds_ndm::types::{
     TdmReferenceFrame, TdmTimetagRef, YesNo,
 };
 use ccsds_ndm::Ndm;
+
+#[test]
+fn original_e17_repeated_rcs_epoch_is_rejected_and_adaptation_remains_valid() {
+    let original = include_str!("../../data/invalid/tdm_e17_original.kvn");
+    let error = Tdm::from_kvn(original).unwrap_err();
+    crate::common::assert_validation_field(&error, "RCS");
+    assert!(error.to_string().contains("strictly increasing epochs"));
+    let adapted = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e17.kvn")).unwrap();
+    assert_eq!(Tdm::from_kvn(&adapted.to_kvn().unwrap()).unwrap(), adapted);
+    assert_eq!(Tdm::from_xml(&adapted.to_xml().unwrap()).unwrap(), adapted);
+}
 #[test]
 fn test_parse_tdm_example_e1_oneway() {
     let kvn = r#"
@@ -604,6 +615,10 @@ ORIGINATOR = TEST
 META_START
 TIME_SYSTEM = UTC
 PARTICIPANT_1 = DSS-14
+PARTICIPANT_2 = P2
+PARTICIPANT_3 = P3
+PARTICIPANT_4 = P4
+PARTICIPANT_5 = P5
 META_STOP
 DATA_START
 RECEIVE_FREQ = 2023-01-01T00:00:00 8415000000.0
@@ -998,6 +1013,10 @@ ORIGINATOR = TEST
 META_START
 TIME_SYSTEM = UTC
 PARTICIPANT_1 = P1
+PARTICIPANT_2 = P2
+PARTICIPANT_3 = P3
+PARTICIPANT_4 = P4
+PARTICIPANT_5 = P5
 TRANSMIT_DELAY_3 = 0.3
 TRANSMIT_DELAY_4 = 0.4
 TRANSMIT_DELAY_5 = 0.5
@@ -1307,6 +1326,10 @@ fn tdm_xml_exhaustive_observations() {
       <metadata>
         <TIME_SYSTEM>UTC</TIME_SYSTEM>
         <PARTICIPANT_1>P1</PARTICIPANT_1>
+        <PARTICIPANT_2>P2</PARTICIPANT_2>
+        <PARTICIPANT_3>P3</PARTICIPANT_3>
+        <PARTICIPANT_4>P4</PARTICIPANT_4>
+        <PARTICIPANT_5>P5</PARTICIPANT_5>
       </metadata>
       <data>
         <observation>

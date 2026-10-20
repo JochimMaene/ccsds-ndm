@@ -4,6 +4,19 @@ use ccsds_ndm::error::{CcsdsNdmError, FormatError};
 use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::types::ControlledType;
 use ccsds_ndm::Ndm;
+
+#[test]
+fn disintegration_alias_is_accepted_and_generates_schema_spelling() {
+    let message = Rdm::from_xml(XML).unwrap();
+    assert!(XML.contains("MASS-LOSS + BREAKUP"));
+    let xml = message.to_xml().unwrap();
+    let kvn = message.to_kvn().unwrap();
+    assert!(xml.contains("MASS-LOSS + BREAK-UP"));
+    assert!(kvn.contains("MASS-LOSS + BREAK-UP"));
+    crate::common::validate_xml("RDM canonical disintegration", &xml);
+    assert_eq!(Rdm::from_xml(&xml).unwrap(), message);
+    assert_eq!(Rdm::from_kvn(&kvn).unwrap(), message);
+}
 #[test]
 fn rdm_root_attributes() {
     let kvn = r#"CCSDS_RDM_VERS = 1.0

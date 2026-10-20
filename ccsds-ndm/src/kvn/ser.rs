@@ -260,6 +260,7 @@ pub struct KvnWriter<'a> {
     line_length_error: Option<usize>,
     line_len: usize,
     allow_long_records: bool,
+    exact_floats: bool,
     line_buffer: String,
 }
 
@@ -295,6 +296,7 @@ impl KvnWriter<'static> {
             line_length_error: None,
             line_len: 0,
             allow_long_records: false,
+            exact_floats: false,
             line_buffer: String::new(),
         }
     }
@@ -308,7 +310,16 @@ impl KvnWriter<'static> {
             line_length_error: None,
             line_len: 0,
             allow_long_records: false,
+            exact_floats: false,
             line_buffer: String::new(),
+        }
+    }
+
+    /// Preserve numeric identity while checking whether nonnumeric model content survives KVN.
+    pub(crate) fn for_model_comparison() -> Self {
+        Self {
+            exact_floats: true,
+            ..Self::new()
         }
     }
 }
@@ -320,11 +331,15 @@ impl Default for KvnWriter<'static> {
 }
 
 impl<'a> KvnWriter<'a> {
-    fn build_odm_float_pair(line: &mut String, key: &str, value: f64) {
+    fn build_odm_float_pair(line: &mut String, key: &str, value: f64, exact: bool) {
         line.push_str(key);
         line.extend(std::iter::repeat_n(' ', 20usize.saturating_sub(key.len())));
         line.push_str(" = ");
-        let _ = OdmFloat(value).write_to(line);
+        if exact && value.is_finite() {
+            line.push_str(zmij::Buffer::new().format_finite(value));
+        } else {
+            let _ = OdmFloat(value).write_to(line);
+        }
     }
 
     fn build_tdm_observation<E: Display, V: Display>(
@@ -348,6 +363,7 @@ impl<'a> KvnWriter<'a> {
             line_length_error: None,
             line_len: 0,
             allow_long_records: false,
+            exact_floats: false,
             line_buffer: String::new(),
         }
     }
@@ -442,7 +458,8 @@ impl<'a> KvnWriter<'a> {
     /// Writes a CCSDS-compatible ODM number without allocating a value string.
     pub(crate) fn write_odm_float_pair(&mut self, key: &str, value: f64) {
         self.unrepresentable_number |= !OdmFloat::is_valid(value);
-        self.write_built_line(|line| Self::build_odm_float_pair(line, key, value));
+        let exact = self.exact_floats;
+        self.write_built_line(|line| Self::build_odm_float_pair(line, key, value, exact));
     }
 
     /// Writes a CCSDS-compatible ODM number and optional unit.
@@ -452,8 +469,9 @@ impl<'a> KvnWriter<'a> {
         measure: &UnitValue<f64, U>,
     ) {
         self.unrepresentable_number |= !OdmFloat::is_valid(measure.value);
+        let exact = self.exact_floats;
         let build = |line: &mut String| {
-            Self::build_odm_float_pair(line, key, measure.value);
+            Self::build_odm_float_pair(line, key, measure.value, exact);
             if let Some(unit) = &measure.units {
                 line.push_str(" [");
                 let _ = write!(line, "{unit}");

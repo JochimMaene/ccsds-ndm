@@ -215,3 +215,20 @@ fn kvn_none_rate_type_normalizes_to_omission_while_xml_token_is_refused() {
     );
     assert!(Acm::from_xml(&xml).is_err());
 }
+
+#[test]
+fn acm_interval_bounds_cannot_be_reversed() {
+    let mut message = Acm::from_kvn(ACM_KVN).unwrap();
+    message.body.segment.metadata.start_time = Some("200".parse().unwrap());
+    message.body.segment.metadata.stop_time = Some("100".parse().unwrap());
+    crate::common::assert_rejects(&message, "STOP_TIME");
+    message.body.segment.metadata.stop_time = Some("200".parse().unwrap());
+    message.validate().unwrap();
+    message.body.segment.metadata.stop_time = Some("2017-12-26T19:40:00".parse().unwrap());
+    message.validate().unwrap(); // No conversion between calendar and relative clocks.
+    message.body.segment.data.man[0].man_duration = None;
+    message.body.segment.data.man[0].man_end_time = Some("50".parse().unwrap());
+    crate::common::assert_rejects(&message, "MAN_END_TIME");
+    message.body.segment.data.man[0].man_end_time = Some("100".parse().unwrap());
+    message.validate().unwrap();
+}

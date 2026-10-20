@@ -459,35 +459,6 @@ impl AemMetadata {
             .into());
         }
 
-        let requires_euler_rot_seq = matches!(
-            self.attitude_type,
-            AttitudeTypeType::EulerAngle
-                | AttitudeTypeType::EulerAngleDerivative
-                | AttitudeTypeType::EulerAngleAngVel
-        );
-        let requires_angvel_frame = matches!(
-            self.attitude_type,
-            AttitudeTypeType::QuaternionAngVel | AttitudeTypeType::EulerAngleAngVel
-        );
-
-        // Validation Rule: EULER_ROT_SEQ is required if ATTITUDE_TYPE includes EULER_ANGLE
-        if requires_euler_rot_seq && self.euler_rot_seq.is_none() {
-            return Err(ValidationError::missing_required(
-                "AEM Metadata",
-                "EULER_ROT_SEQ (required for EULER_ANGLE types)",
-            )
-            .into());
-        }
-
-        // Validation Rule: ANGVEL_FRAME is required if ATTITUDE_TYPE includes ANGVEL
-        if requires_angvel_frame && self.angvel_frame.is_none() {
-            return Err(ValidationError::missing_required(
-                "AEM Metadata",
-                "ANGVEL_FRAME (required for ANGVEL types)",
-            )
-            .into());
-        }
-
         match self.first_time_span_error() {
             Some(error) => Err(error.into()),
             None => Ok(()),
@@ -892,7 +863,8 @@ impl AemAttitudeState {
                     ("NUTATION_PHASE", value.nutation_phase.value),
                 ])?;
                 finite(&[("SPIN_ANGLE_VEL", value.spin_angle_vel.value)])?;
-                Duration::validate_value(value.nutation_per.value, "NUTATION_PER")
+                Duration::validate_value(value.nutation_per.value, "NUTATION_PER")?;
+                TimeUnits::validate_seconds(&value.nutation_per.units, "NUTATION_PER")
             }
             Self::SpinNutationMom(value) => {
                 angles(&[

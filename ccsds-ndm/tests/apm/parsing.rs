@@ -347,3 +347,15 @@ fn dimensionless_kvn_values_reject_spurious_units() {
         "{error}"
     );
 }
+
+#[test]
+fn apm_accepts_all_adm_line_endings() {
+    let source = crate::KVN.replace("\r\n", "\n");
+    let control = Apm::from_kvn(&source).unwrap();
+    for ending in ["\r", "\n", "\r\n", "\n\r"] {
+        assert_eq!(
+            Apm::from_kvn(&source.replace('\n', ending)).unwrap(),
+            control
+        );
+    }
+}

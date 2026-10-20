@@ -64,6 +64,21 @@ the model preserves any finite altitude and validation enforces only finiteness.
 value; XML generation refuses it with the offending field path rather than altering it to fit.
 Both XSD boundaries generate schema-valid XML.
 
+All public validation and generation routes revisit mutable atmospheric values:
+`ORBIT_LIFETIME_CONFIDENCE_LEVEL` remains within `[0, 100]`, including after direct field
+mutation, and `REENTRY_ALTITUDE` and optional `DRAG_PARAMETERS_ALTITUDE` must be finite.
+These altitude fields retain their sign; no extra physical altitude range is inferred.
+
+## Disintegration compatibility alias
+
+The bundled Annex C XML fixture (`rdm_c4.xml`) uses `MASS-LOSS + BREAKUP` for
+`REENTRY_DISINTEGRATION`; the actual schema enumeration is `MASS-LOSS + BREAK-UP`.
+That source fixture therefore fails independent XSD validation for that token. The library
+deliberately accepts both spellings as the same `DisintegrationType::MassLossAndBreakUp`
+value and emits the schema spelling in KVN and XML. It does not preserve the alias lexically.
+`parsing::disintegration_alias_is_accepted_and_generates_schema_spelling` verifies
+the original input, canonical output, model roundtrips, and schema-valid generated XML.
+
 ## Allocation and packaged-surface evidence
 
 `fixed_family_allocations` fixes strict KVN parse budgets at 96 allocations/12,000 bytes and

@@ -79,6 +79,7 @@ impl Ndm for Acm {
         xml::validate_xml_sequences(xml)?;
         let acm: Self = crate::xml::from_str_with_context(xml, "ACM")?;
         crate::traits::Validate::validate(&acm)?;
+        acm.validate_xml_representability()?;
         Ok(acm)
     }
 
@@ -330,6 +331,25 @@ impl AcmMetadata {
             ("STOP_TIME", &self.stop_time),
             ("NEXT_LEAP_EPOCH", &self.next_leap_epoch),
         ])?;
+        for (field, value) in [
+            ("TAIMUTC_AT_TZERO", &self.taimutc_at_tzero),
+            ("NEXT_LEAP_TAIMUTC", &self.next_leap_taimutc),
+        ] {
+            if let Some(value) = value {
+                require_finite(field, value.value)?;
+                TimeUnits::validate_seconds(&value.units, field)?;
+            }
+        }
+        if let (Some(start), Some(stop)) = (&self.start_time, &self.stop_time) {
+            if start.cmp_same_branch(stop) == Some(std::cmp::Ordering::Greater) {
+                return Err(ValidationError::invalid_value(
+                    "STOP_TIME",
+                    stop.to_string(),
+                    "no earlier than START_TIME",
+                )
+                .into());
+            }
+        }
         if self.object_name.trim().is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: "ACM Metadata".into(),
@@ -431,8 +451,29 @@ impl crate::traits::Validate for AcmData {
 }
 
 impl AcmData {
-    pub fn validate_with_metadata(&self, _metadata: &AcmMetadata) -> Result<()> {
-        crate::traits::Validate::validate(self)
+    pub fn validate_with_metadata(&self, metadata: &AcmMetadata) -> Result<()> {
+        crate::traits::Validate::validate(self)?;
+        if let Some(declaration) = &metadata.acm_data_elements {
+            let mut actual = std::iter::repeat_n("ATT", self.att.len())
+                .chain(self.phys.iter().map(|_| "PHYS"))
+                .chain(std::iter::repeat_n("COV", self.cov.len()))
+                .chain(std::iter::repeat_n("MAN", self.man.len()))
+                .chain(self.ad.iter().map(|_| "AD"))
+                .chain(self.user.iter().map(|_| "USER"));
+            let mut declared = declaration.split(',').map(str::trim);
+            if !actual.all(|expected| {
+                declared.next().is_some_and(|token| {
+                    token == expected || token == expected.to_ascii_lowercase()
+                })
+            }) || declared.next().is_some()
+            {
+                return Err(ValidationError::invalid_value(
+                    "ACM_DATA_ELEMENTS", declaration,
+                    "ATT, PHYS, COV, MAN, AD, USER entries matching the blocks in order, including repetitions",
+                ).into());
+            }
+        }
+        Ok(())
     }
 
     pub fn validate(&self, metadata: &AcmMetadata) -> Result<()> {
@@ -854,14 +895,6 @@ impl AcmPhysicalDescription {
                 Mass::validate_value(value.value, field)?;
             }
         }
-        if self.cp_ref_frame.is_some() && self.cp.is_none() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "ACM Physical Description".into(),
-                field: "CP".into(),
-                line: None,
-            }
-            .into());
-        }
         if self.cp.is_some() && self.cp_ref_frame.is_none() {
             return Err(ValidationError::MissingRequiredField {
                 block: "ACM Physical Description".into(),
@@ -1160,19 +1193,24 @@ impl AcmManeuverParameters {
         }
         if let Some(value) = &self.man_duration {
             Duration::validate_value(value.value, "MAN_DURATION")?;
+            TimeUnits::validate_seconds(&value.units, "MAN_DURATION")?;
+        }
+        if let (Some(begin), Some(end)) = (&self.man_begin_time, &self.man_end_time) {
+            let begin: f64 = begin.as_str().parse().expect("validated relative time");
+            let end: f64 = end.as_str().parse().expect("validated relative time");
+            if begin > end {
+                return Err(ValidationError::invalid_value(
+                    "MAN_END_TIME",
+                    end.to_string(),
+                    "no earlier than MAN_BEGIN_TIME",
+                )
+                .into());
+            }
         }
         if self.target_momentum.is_some() && self.target_mom_frame.is_none() {
             return Err(ValidationError::MissingRequiredField {
                 block: "ACM Maneuver".into(),
                 field: "TARGET_MOM_FRAME".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.target_momentum.is_none() && self.target_mom_frame.is_some() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "ACM Maneuver".into(),
-                field: "TARGET_MOMENTUM".into(),
                 line: None,
             }
             .into());
@@ -1204,26 +1242,44 @@ impl AcmManeuverParameters {
             for value in &att.values {
                 validate_finite_acm_value("TARGET_ATTITUDE", *value)?;
             }
+            crate::common::Quaternion {
+                q1: att.values[0],
+                q2: att.values[1],
+                q3: att.values[2],
+                qc: att.values[3],
+            }
+            .validate()?;
         }
         if let Some(value) = &self.target_spinrate {
             validate_finite_acm_value("TARGET_SPINRATE", value.value)?;
         }
-        let has_target_momentum = self.target_momentum.is_some();
-        let has_target_attitude = self.target_attitude.is_some();
-        let has_target_spinrate = self.target_spinrate.is_some();
-        let choice_count = usize::from(has_target_momentum)
-            + usize::from(has_target_attitude)
-            + usize::from(has_target_spinrate);
-        if choice_count > 1 {
-            return Err(ValidationError::Conflict {
-                fields: vec![
-                    "TARGET_MOMENTUM".into(),
-                    "TARGET_ATTITUDE".into(),
-                    "TARGET_SPINRATE".into(),
-                ],
-                line: None,
+        for purpose in self
+            .man_purpose
+            .as_deref()
+            .unwrap_or("")
+            .split(',')
+            .map(str::trim)
+        {
+            let missing = match purpose {
+                "MOM_DESAT" | "mom_desat" if self.target_momentum.is_none() => {
+                    Some("TARGET_MOMENTUM")
+                }
+                "ATT_ADJUST" | "att_adjust" if self.target_attitude.is_none() => {
+                    Some("TARGET_ATTITUDE")
+                }
+                "SPIN_RATE_ADJUST" | "spin_rate_adjust" if self.target_spinrate.is_none() => {
+                    Some("TARGET_SPINRATE")
+                }
+                _ => None,
+            };
+            if let Some(field) = missing {
+                return Err(ValidationError::MissingRequiredField {
+                    block: "ACM Maneuver".into(),
+                    field: field.into(),
+                    line: None,
+                }
+                .into());
             }
-            .into());
         }
         Ok(())
     }
@@ -1513,25 +1569,21 @@ impl AcmAttitudeDetermination {
             }
         }
 
-        let mut numbers: Vec<u32> = self
+        let mut previous = None;
+        for number in self
             .sensors
             .iter()
-            .filter_map(|s| s.sensor_number)
-            .collect();
-        numbers.sort_unstable();
-
-        for window in numbers.windows(2) {
-            if let [prev, next] = *window {
-                if next == prev {
-                    return Err(ValidationError::InvalidValue {
-                        field: "SENSOR_NUMBER".into(),
-                        value: format!("{:?}", numbers),
-                        expected: "unique values".into(),
-                        line: None,
-                    }
-                    .into());
-                }
+            .filter_map(|sensor| sensor.sensor_number)
+        {
+            if previous.is_some_and(|prior| number <= prior) {
+                return Err(ValidationError::invalid_value(
+                    "SENSOR_NUMBER",
+                    number.to_string(),
+                    "unique supplied numbers in ascending order",
+                )
+                .into());
             }
+            previous = Some(number);
         }
 
         Ok(())

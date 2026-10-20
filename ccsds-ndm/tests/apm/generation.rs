@@ -100,3 +100,29 @@ fn kvn_lexical_errors_have_the_same_category_for_string_and_streaming_output() {
     assert!(direct.as_validation_error().is_some());
     assert!(streaming.as_validation_error().is_some());
 }
+
+#[test]
+fn apm_nutation_period_is_seconds_without_reinterpreting_day_units() {
+    use ccsds_ndm::types::TimeUnits;
+    let mut message = Apm::from_kvn(crate::SPIN_KVN).unwrap();
+    message.body.segment.data.spin[0]
+        .nutation_per
+        .as_mut()
+        .unwrap()
+        .units = Some(TimeUnits::Seconds);
+    let xml = message.to_xml().unwrap();
+    assert!(
+        Apm::from_xml(&xml.replace("NUTATION_PER units=\"s\"", "NUTATION_PER units=\"d\""))
+            .is_err()
+    );
+    assert!(Apm::from_kvn(
+        &crate::SPIN_KVN.replace("NUTATION_PER = 100", "NUTATION_PER = 100 [d]")
+    )
+    .is_err());
+    message.body.segment.data.spin[0]
+        .nutation_per
+        .as_mut()
+        .unwrap()
+        .units = Some(TimeUnits::Day);
+    assert_rejects(&message, "NUTATION_PER units");
+}

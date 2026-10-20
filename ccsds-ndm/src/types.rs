@@ -31,8 +31,9 @@ pub struct Epoch {
 
 /// Maximum retained lexical length of an epoch token.
 ///
-/// CCSDS time and numeric value rules fit within this bound. Keeping the limit explicit prevents
-/// one epoch in a large history from introducing an unbounded allocation.
+/// This is a library storage limit, not a CCSDS or XSD maximum. It applies to numeric and
+/// calendar epochs, including fractional digits, on every input route. Longer tokens are refused
+/// rather than truncated; the fixed storage avoids a heap allocation for each history epoch.
 pub const MAX_EPOCH_LEN: usize = 64;
 
 /// Lexical branch of the NDM/XML `epochType` union.
@@ -1026,7 +1027,42 @@ impl<'de> Deserialize<'de> for RelativeTime {
     where
         D: serde::Deserializer<'de>,
     {
-        crate::utils::deserialize_parsed(deserializer, "a CCSDS relative time value", Self::new)
+        struct RelativeTimeVisitor;
+        impl<'de> serde::de::Visitor<'de> for RelativeTimeVisitor {
+            type Value = RelativeTime;
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a CCSDS relative time in seconds")
+            }
+            fn visit_str<E: serde::de::Error>(
+                self,
+                value: &str,
+            ) -> std::result::Result<Self::Value, E> {
+                RelativeTime::new(value).map_err(E::custom)
+            }
+            fn visit_map<M: serde::de::MapAccess<'de>>(
+                self,
+                mut map: M,
+            ) -> std::result::Result<Self::Value, M::Error> {
+                let mut value = None;
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "$text" | "$value" => value = Some(map.next_value::<String>()?),
+                        "@units" => {
+                            let units = Some(map.next_value::<TimeUnits>()?);
+                            TimeUnits::validate_seconds(&units, "relative time")
+                                .map_err(serde::de::Error::custom)?;
+                        }
+                        _ => {
+                            let _ = map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let value =
+                    value.ok_or_else(|| serde::de::Error::missing_field("relative time"))?;
+                RelativeTime::new(&value).map_err(serde::de::Error::custom)
+            }
+        }
+        deserializer.deserialize_any(RelativeTimeVisitor)
     }
 }
 
@@ -3699,6 +3735,21 @@ impl std::str::FromStr for ControlledType {
 // Time units ("s") plus Duration / RelTime / TimeOffset (optional units per XSD)
 define_unit_enum!(TimeUnits, Seconds, { Seconds => "s", Day => "d" });
 
+impl TimeUnits {
+    pub(crate) fn validate_seconds(units: &Option<Self>, field: &'static str) -> Result<()> {
+        if matches!(units, Some(Self::Day)) {
+            return Err(crate::error::ValidationError::InvalidValue {
+                field: format!("{field} units").into(),
+                value: "d".into(),
+                expected: "s".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Duration {
     #[serde(rename = "$value")]
@@ -4154,7 +4205,8 @@ pub enum DisintegrationType {
     /// Break-up considered.
     #[serde(rename = "BREAK-UP")]
     BreakUp,
-    /// Both mass loss and break-up considered.
+    /// Both mass loss and break-up considered. The legacy `MASS-LOSS + BREAKUP` spelling is
+    /// accepted on input and emitted as the schema spelling `MASS-LOSS + BREAK-UP`.
     #[serde(rename = "MASS-LOSS + BREAK-UP", alias = "MASS-LOSS + BREAKUP")]
     MassLossAndBreakUp,
 }
@@ -4335,11 +4387,14 @@ impl std::fmt::Display for AngVelFrameType {
 ///
 /// Allow for the exchange of any desired orbital data not already provided in the message.
 ///
-/// **CCSDS Reference**: 502.0-B-3, Section 3.2.4 (OPM), Section 4.2.4 (OMM), Section 6.2.9 (OCM).
+/// **CCSDS Reference**: 502.0-B-3, Sections 3.2.4 (OPM) and 4.2.4 (OMM).
+/// OCM 3.0 uses its separate ordered `OcmUserDefined` model.
 #[derive(Serialize, Debug, PartialEq, Clone, Default)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UserDefined {
-    /// Comments (see 7.8 for formatting rules).
+    /// Comments (see 7.8 for formatting rules), emitted before all parameters.
+    /// Comment order and parameter order are retained separately; their original interleaving
+    /// is not represented by this model.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(rename = "COMMENT", default, skip_serializing_if = "Vec::is_empty")]
@@ -5534,6 +5589,14 @@ mod tests {
         assert!(Epoch::new(&long_numeric).is_ok());
         let too_long_numeric = "1".repeat(65);
         assert!(Epoch::new(&too_long_numeric).is_err());
+        let prefix = "2026-001T00:00:00.";
+        let calendar = format!("{prefix}{}", "0".repeat(MAX_EPOCH_LEN - prefix.len()));
+        assert_eq!(Epoch::new(&calendar).unwrap().as_str(), calendar);
+        assert!(CalendarEpoch::new(&calendar).is_ok());
+        assert!(matches!(
+            CalendarEpoch::new(&format!("{calendar}0")),
+            Err(EpochError::TooLong { .. })
+        ));
     }
 }
 

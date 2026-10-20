@@ -9,6 +9,61 @@ use ccsds_ndm::types::{
 use ccsds_ndm::{Ndm, Validate};
 
 #[test]
+fn edited_reentry_confidence_and_altitudes_are_revalidated() {
+    for invalid in [-1.0, 101.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let mut message = Rdm::from_kvn(KVN).unwrap();
+        message
+            .body
+            .segment
+            .data
+            .atmospheric_reentry_parameters
+            .orbit_lifetime_confidence_level = Some(PercentageRequired {
+            value: invalid,
+            units: Default::default(),
+        });
+        assert_rejects(&message, "ORBIT_LIFETIME_CONFIDENCE_LEVEL");
+    }
+    for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let mut message = Rdm::from_kvn(KVN).unwrap();
+        message
+            .body
+            .segment
+            .data
+            .atmospheric_reentry_parameters
+            .reentry_altitude
+            .value = invalid;
+        assert_rejects(&message, "REENTRY_ALTITUDE");
+
+        let mut message = Rdm::from_kvn(KVN).unwrap();
+        message.body.segment.metadata.drag_parameters_altitude = Some(Distance::new(invalid, None));
+        assert_rejects(&message, "DRAG_PARAMETERS_ALTITUDE");
+    }
+    let mut message = Rdm::from_kvn(KVN).unwrap();
+    message
+        .body
+        .segment
+        .data
+        .atmospheric_reentry_parameters
+        .orbit_lifetime_confidence_level = Some(PercentageRequired {
+        value: 100.0,
+        units: Default::default(),
+    });
+    message
+        .body
+        .segment
+        .data
+        .atmospheric_reentry_parameters
+        .reentry_altitude
+        .value = -1.0;
+    message.body.segment.metadata.drag_parameters_altitude = Some(Distance::new(-1.0, None));
+    validate_xml(
+        "RDM confidence and signed altitude boundaries",
+        &message.to_xml().unwrap(),
+    );
+    assert_eq!(Rdm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+}
+
+#[test]
 fn rdm_kvn_rounds_scalars_to_sixteen_digits_and_xml_retains_precision() {
     let mut message = Rdm::from_kvn(KVN).unwrap();
     let value = 0.300_000_000_000_000_04;

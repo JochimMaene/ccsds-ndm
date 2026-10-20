@@ -66,7 +66,8 @@ or interpolation. Runtime validation is offline; a valid message can still descr
 operationally incorrect situation.
 
 The shared [XML parser limits](design/validation-contract.md#xml-parser-limits) apply to all
-families. ACM attitude/covariance history records currently support relative time tags only;
+families. Every epoch token also has the documented [64-byte storage limit](design/validation-contract.md#epoch-storage-limit), independent of notation or standard edition.
+ACM attitude/covariance history records currently support relative time tags only;
 the book's absolute history form is not implemented. Family records list further checks left
 to the caller, including physical consistency and externally defined algorithms.
 

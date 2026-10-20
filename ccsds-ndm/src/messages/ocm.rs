@@ -78,6 +78,7 @@ impl Ndm for Ocm {
         xml::validate_sequences(xml)?;
         let ocm: Self = crate::xml::from_str_with_context(xml, "OCM")?;
         crate::traits::Validate::validate(&ocm)?;
+        ocm.validate_xml_representability()?;
         Ok(ocm)
     }
 
@@ -390,6 +391,7 @@ impl OcmTrajState {
             .into());
         }
         if let Some(rev) = self.orb_revnum {
+            require_finite("ORB_REVNUM", rev)?;
             if rev < 0.0 {
                 return Err(ValidationError::Generic {
                     message: Cow::Borrowed("ORB_REVNUM must be non-negative"),
@@ -410,7 +412,8 @@ impl OcmTrajState {
             "trajLine",
             self.traj_lines.iter().map(|l| &l.values),
         )?;
-        if let Some(dimension) = orbital_dimension(&self.traj_type) {
+        let traj_type = known_ocm_type(&self.traj_type);
+        if let Some(dimension) = orbital_dimension(traj_type) {
             for line in &self.traj_lines {
                 if line.values.len() != dimension {
                     return Err(ValidationError::invalid_value(
@@ -423,11 +426,9 @@ impl OcmTrajState {
             }
         }
 
-        let traj_type = self.traj_type.trim().to_uppercase();
-
         if let Some(units) = &self.traj_units {
             let unit_list = parse_units_list(units);
-            if let Some(expected_units) = expected_traj_units(&traj_type) {
+            if let Some(expected_units) = expected_traj_units(traj_type) {
                 if unit_list.len() != expected_units.len()
                     || unit_list
                         .iter()
@@ -592,51 +593,36 @@ impl OcmCovarianceMatrix {
         if let Some(confidence) = &self.cov_confidence {
             Percentage::validate_value(confidence.value, "COV_CONFIDENCE")?;
         }
-        if matches!(self.cov_type.as_str(), "SIG3EIGVEC3" | "TSIG3EIGVEC3") {
-            let offset = usize::from(self.cov_type.starts_with('T'));
-            for line in &self.cov_lines {
-                let values = &line.values;
-                if values.len() != 12 + offset {
+        let cov_type = known_ocm_type(&self.cov_type);
+        if matches!(cov_type, "SIG3EIGVEC3" | "TSIG3EIGVEC3") {
+            let offset = usize::from(cov_type.starts_with('T'));
+            if let Some(units) = &self.cov_units {
+                let expected: &[&str] = if offset == 0 {
+                    &["km", "km", "km"]
+                } else {
+                    &["s", "km", "km", "km"]
+                };
+                let listed = parse_units_list(units);
+                if listed.len() != expected.len()
+                    || listed
+                        .iter()
+                        .zip(expected)
+                        .any(|(actual, expected)| !unit_matches_expected(actual, expected))
+                {
                     return Err(ValidationError::invalid_value(
-                        "covLine",
-                        values.len().to_string(),
-                        format!("{} values for {}", 12 + offset, self.cov_type),
+                        "COV_UNITS",
+                        units,
+                        format!("diagonal-element units {}", expected.join(", ")),
                     )
                     .into());
-                }
-                if values[..3 + offset].iter().any(|value| *value <= 0.0) {
-                    return Err(ValidationError::invalid_value(
-                        "covLine",
-                        "nonpositive dispersion",
-                        "positive one-sigma dispersions",
-                    )
-                    .into());
-                }
-                for i in 0..3 {
-                    for j in 0..=i {
-                        let dot: f64 = (0..3)
-                            .map(|k| {
-                                values[offset + 3 + 3 * i + k] * values[offset + 3 + 3 * j + k]
-                            })
-                            .sum();
-                        let expected = if i == j { 1.0 } else { 0.0 };
-                        if (dot - expected).abs() > 1e-12 {
-                            return Err(ValidationError::invalid_value(
-                                "covLine",
-                                "nonorthonormal eigenvectors",
-                                "orthonormal eigenvectors (absolute tolerance 1e-12)",
-                            )
-                            .into());
-                        }
-                    }
                 }
             }
         }
-        if let Some(dimension) = covariance_dimension(&self.cov_type) {
+        if let Some(dimension) = covariance_dimension(cov_type) {
             if let Some(units) = &self.cov_units {
                 let listed = parse_units_list(units);
-                let expected = expected_traj_units(&self.cov_type).or_else(|| {
-                    self.cov_type
+                let expected = expected_traj_units(cov_type).or_else(|| {
+                    cov_type
                         .strip_prefix('T')
                         .and_then(expected_traj_units)
                         .map(|mut units| {
@@ -668,9 +654,9 @@ impl OcmCovarianceMatrix {
                     .into());
                 }
             }
-            for line in &self.cov_lines {
-                validate_covariance_record(&line.values, dimension, &self.cov_ordering)?;
-            }
+        }
+        for line in &self.cov_lines {
+            validate_covariance_values(&line.values, cov_type, &self.cov_ordering)?;
         }
 
         Ok(())
@@ -779,6 +765,30 @@ impl OcmManeuverParameters {
             .into());
         }
 
+        // ODM 6.2.8.15–16 selects one table in its fixed order, without repeated columns.
+        if ![MAN_PROPULSIVE_COLUMNS, MAN_DEPLOYMENT_COLUMNS]
+            .iter()
+            .any(|table| {
+                let mut previous = None;
+                tokens.iter().skip(1).all(|token| {
+                    let rank = table
+                        .iter()
+                        .position(|known| known.eq_ignore_ascii_case(token));
+                    let valid =
+                        rank.is_some() && previous.is_none_or(|previous| rank.unwrap() > previous);
+                    previous = rank;
+                    valid
+                })
+            })
+        {
+            return Err(ValidationError::invalid_value(
+                "MAN_COMPOSITION",
+                &self.man_composition,
+                "distinct columns from ODM table 6-8 or 6-9, in table order",
+            )
+            .into());
+        }
+
         for (field, epoch) in [
             ("MAN_PREV_EPOCH", self.man_prev_epoch.as_ref()),
             ("MAN_NEXT_EPOCH", self.man_next_epoch.as_ref()),
@@ -804,6 +814,8 @@ impl OcmManeuverParameters {
             .map(|token| is_numeric_man_column(token))
             .collect();
         let mut previous_key: Option<crate::types::EpochOrderKey<'_>> = None;
+        let mut direction = None;
+        let mut monotonic = true;
         for line in &self.man_lines {
             validate_man_history_epoch(&line.epoch, time_tag)?;
             let key = line
@@ -825,6 +837,10 @@ impl OcmManeuverParameters {
                             expected: Cow::Borrowed("a comparable calendar or numeric epoch"),
                             line: None,
                         })?;
+                if direction.is_some_and(|previous| previous != ordering) {
+                    monotonic = false;
+                }
+                direction = Some(ordering);
                 if ordering == Ordering::Equal {
                     return Err(ValidationError::InvalidValue {
                         field: Cow::Borrowed("manLine epoch"),
@@ -847,9 +863,63 @@ impl OcmManeuverParameters {
             }
             validate_man_line_values(&numeric_columns, &tokens, line)?;
         }
+        if !monotonic {
+            let mut epochs: Vec<_> = self
+                .man_lines
+                .iter()
+                .map(|line| line.epoch.order_key().unwrap())
+                .collect();
+            epochs.sort_unstable_by(|a, b| a.compare(b).unwrap());
+            if epochs
+                .windows(2)
+                .any(|pair| pair[0].compare(&pair[1]) == Some(Ordering::Equal))
+            {
+                return Err(ValidationError::invalid_value(
+                    "manLine epoch",
+                    "repeated",
+                    "a unique epoch within the MAN block",
+                )
+                .into());
+            }
+        }
         Ok(())
     }
 }
+
+const MAN_PROPULSIVE_COLUMNS: &[&str] = &[
+    "MAN_DURA",
+    "DELTA_MASS",
+    "ACC_X",
+    "ACC_Y",
+    "ACC_Z",
+    "ACC_INTERP",
+    "ACC_MAG_SIGMA",
+    "ACC_DIR_SIGMA",
+    "DV_X",
+    "DV_Y",
+    "DV_Z",
+    "DV_MAG_SIGMA",
+    "DV_DIR_SIGMA",
+    "THR_X",
+    "THR_Y",
+    "THR_Z",
+    "THR_EFFIC",
+    "THR_INTERP",
+    "THR_ISP",
+    "THR_MAG_SIGMA",
+    "THR_DIR_SIGMA",
+];
+const MAN_DEPLOYMENT_COLUMNS: &[&str] = &[
+    "DEPLOY_ID",
+    "DEPLOY_DV_X",
+    "DEPLOY_DV_Y",
+    "DEPLOY_DV_Z",
+    "DEPLOY_MASS",
+    "DEPLOY_DV_SIGMA",
+    "DEPLOY_DIR_SIGMA",
+    "DEPLOY_DV_RATIO",
+    "DEPLOY_DV_CDA",
+];
 
 /// Composition columns that do not hold a number.
 ///
@@ -1114,6 +1184,48 @@ fn validate_man_duty_cycle(man: &OcmManeuverParameters) -> Result<()> {
 
 // SANA Orbital Elements and Covariance Matrix Types, reviewed 2026-10-15.
 // Unknown registry extensions stay opaque; never infer a dimension from their spelling.
+fn known_ocm_type(kind: &str) -> &str {
+    const KNOWN: &[&str] = &[
+        "CARTP",
+        "CARTPV",
+        "CARTPVA",
+        "ADBARV",
+        "LDBARV",
+        "DELAUNAY",
+        "DELAUNAYMOD",
+        "GEODETIC",
+        "KEPLERIAN",
+        "KEPLERIANMEAN",
+        "ONSTATION",
+        "POINCARE",
+        "EQUINOCTIAL",
+        "EQUINOCTIALMOD",
+        "KEPLERIANMEANSGP-4",
+        "TCARTP",
+        "TCARTPV",
+        "TCARTPVA",
+        "TADBARV",
+        "TDELAUNAY",
+        "TDELAUNAYMOD",
+        "TGEODETIC",
+        "TKEPLERIAN",
+        "TKEPLERIANMEAN",
+        "TLDBARV",
+        "TPOINCARE",
+        "TEQUINOCTIAL_P",
+        "TEQUINOCTIAL_N",
+        "TEQUINOCTIALMOD_P",
+        "TEQUINOCTIALMOD_N",
+        "SIG3EIGVEC3",
+        "TSIG3EIGVEC3",
+    ];
+    KNOWN
+        .iter()
+        .copied()
+        .find(|known| known.eq_ignore_ascii_case(kind.trim()))
+        .unwrap_or(kind)
+}
+
 fn orbital_dimension(kind: &str) -> Option<usize> {
     match kind {
         "CARTP" => Some(3),
@@ -1134,6 +1246,47 @@ fn covariance_dimension(kind: &str) -> Option<usize> {
         | "TEQUINOCTIALMOD_P" | "TEQUINOCTIALMOD_N" => Some(7),
         _ => orbital_dimension(kind),
     }
+}
+
+fn validate_covariance_values(values: &[f64], kind: &str, ordering: &CovOrder) -> Result<()> {
+    if matches!(kind, "SIG3EIGVEC3" | "TSIG3EIGVEC3") {
+        let offset = usize::from(kind.starts_with('T'));
+        if values.len() != 12 + offset {
+            return Err(ValidationError::invalid_value(
+                "covLine",
+                values.len().to_string(),
+                format!("{} values for {}", 12 + offset, kind),
+            )
+            .into());
+        }
+        if values[..3 + offset].iter().any(|value| *value <= 0.0) {
+            return Err(ValidationError::invalid_value(
+                "covLine",
+                "nonpositive dispersion",
+                "positive one-sigma dispersions",
+            )
+            .into());
+        }
+        for i in 0..3 {
+            for j in 0..=i {
+                let dot: f64 = (0..3)
+                    .map(|k| values[offset + 3 + 3 * i + k] * values[offset + 3 + 3 * j + k])
+                    .sum();
+                let expected = if i == j { 1.0 } else { 0.0 };
+                if (dot - expected).abs() > 1e-12 {
+                    return Err(ValidationError::invalid_value(
+                        "covLine",
+                        "nonorthonormal eigenvectors",
+                        "orthonormal eigenvectors (absolute tolerance 1e-12)",
+                    )
+                    .into());
+                }
+            }
+        }
+    } else if let Some(dimension) = covariance_dimension(kind) {
+        validate_covariance_record(values, dimension, ordering)?;
+    }
+    Ok(())
 }
 
 fn validate_covariance_record(values: &[f64], dimension: usize, ordering: &CovOrder) -> Result<()> {

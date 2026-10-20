@@ -69,8 +69,8 @@ they are not byte-preserving archival operations or a guarantee of exact model e
 notations. Whitespace, numeric spelling, and optional fixed-unit annotations may change.
 
 - Floating-point fields use `f64`. Ordinary KVN numbers must fit their family's 16-digit format;
-  most writers round values requiring 17 significant digits to at most 16. CDM's exact-model
-  preflight instead refuses a value when that rounding would change its typed content. XML can
+  writers round values requiring 17 significant digits to at most 16. Generation refuses rounding
+  that invalidates a model constraint, such as a positive-definite covariance. XML can
   retain the full double representation. KVN rejects non-finite values and magnitudes whose
   rounded spelling would overflow. TDM phase counts follow the book's specific arbitrary-precision
   rule instead and retain exact decimal strings, subject to KVN's line-length limit.
@@ -80,14 +80,26 @@ notations. Whitespace, numeric spelling, and optional fixed-unit annotations may
   unit or applying a conversion. Optional XML annotations cannot always survive unitless KVN.
 - Comment text and order are retained subject to documented whitespace normalization. Where KVN
   has fewer comment positions, a family either documents a canonical merge (OPM data/state-vector
-  comments) or refuses conversion (for example, CDM and RDM associations).
+  or OMM data/mean-elements comments) or refuses conversion (for example, CDM and RDM associations).
+  Shared `UserDefined` stores comment and parameter order separately and emits all comments
+  before all parameters; original XML interleaving between those lists is not retained.
 - Documented aliases normalize to the same model meaning; for example, ACM KVN `RATE_TYPE=NONE`
-  means no rate columns and generates as an omitted `RATE_TYPE`.
+  means no rate columns and generates as an omitted `RATE_TYPE`. RDM accepts the compatibility
+  `MASS-LOSS + BREAKUP` alias and generates `MASS-LOSS + BREAK-UP`.
 
 Other populated information that the target notation cannot represent causes generation to fail;
 it is not silently dropped. Each family's record identifies its specific normalization and refusal
 rules. `validate()` checks model semantics; a successful call does not promise that every notation
 can represent the model or that its physical interpretation is correct.
+
+## Epoch storage limit
+
+Every epoch token has a maximum retained lexical length of 64 bytes, including calendar
+fractional seconds and numeric relative epochs. This is the library's fixed-storage limit,
+not a bound supplied by CCSDS or the XSD. Direct constructors and KVN/XML readers reject
+longer tokens rather than allocating, truncating, or rounding them. Field-specific rules,
+including any fractional-second precision bound, are additional requirements. TDM's
+arbitrary-precision phase-count values are separate strings and do not use epoch storage.
 
 ## XML parser limits
 

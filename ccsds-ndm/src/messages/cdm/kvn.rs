@@ -1346,10 +1346,8 @@ impl Cdm {
             }
         }
 
-        // CDM has a fixed, bounded scalar shape. A private model fixed-point preflight therefore
-        // catches every lossy KVN scalar spelling and lexical record without introducing an
-        // unbounded history-sized allocation or emitting caller-visible bytes.
-        let mut writer = KvnWriter::new();
+        // Keep the content-loss check independent of the documented 16-digit numeric rounding.
+        let mut writer = KvnWriter::for_model_comparison();
         self.write_kvn(&mut writer);
         let output = writer.finish_checked()?;
         validate_kvn_syntax(&output)?;
@@ -1364,6 +1362,10 @@ impl Cdm {
             }
             .into());
         }
+        let mut writer = KvnWriter::new();
+        self.write_kvn(&mut writer);
+        let rounded = writer.finish_checked()?;
+        crate::traits::Validate::validate(&Self::from_kvn_str(&rounded)?)?;
         Ok(())
     }
 }

@@ -660,7 +660,7 @@ pub fn ocm_man_line(input: &mut &str) -> KvnResult<ManLine> {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
     let epoch = kv_epoch_token.parse_next(input)?;
-    let values = repeat(1.., (space1, till_space).map(|(_, v)| v.to_string())).parse_next(input)?;
+    let values = repeat(0.., (space1, till_space).map(|(_, v)| v.to_string())).parse_next(input)?;
     opt_line_ending.parse_next(input)?;
     Ok(ManLine { epoch, values })
 }
@@ -1667,7 +1667,11 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
         }
 
         if let Some(block) = current_block {
-            if !line.contains('=') {
+            let history_record = block == "MAN"
+                && line.as_bytes().first().is_some_and(|byte| {
+                    byte.is_ascii_digit() || matches!(byte, b'+' | b'-' | b'.')
+                });
+            if !line.contains('=') || history_record {
                 if !(matches!(block, "TRAJ" | "COV" | "MAN") || block == "USER" && user_sequence) {
                     return fail("unexpected non-assignment in OCM logical block");
                 }
@@ -1765,7 +1769,12 @@ impl Ocm {
                 }
             }
         }
+        let mut rounded_values = [0.0; 100];
+        let mut number = String::new();
         for (covariance_index, covariance) in self.body.segment.data.cov.iter().enumerate() {
+            let kind = super::known_ocm_type(&covariance.cov_type);
+            let known = super::covariance_dimension(kind).is_some()
+                || matches!(kind, "SIG3EIGVEC3" | "TSIG3EIGVEC3");
             for (line_index, line) in covariance.cov_lines.iter().enumerate() {
                 for (value_index, value) in line.values.iter().enumerate() {
                     if !crate::kvn::ser::OdmFloat::is_valid(*value) {
@@ -1777,6 +1786,26 @@ impl Ocm {
                             ),
                         ));
                     }
+                }
+                if known {
+                    for (rounded, value) in rounded_values.iter_mut().zip(&line.values) {
+                        number.clear();
+                        crate::kvn::ser::OdmFloat::write_if_valid(*value, &mut number);
+                        *rounded = number.parse::<f64>().unwrap();
+                    }
+                    super::validate_covariance_values(
+                        &rounded_values[..line.values.len()],
+                        kind,
+                        &covariance.cov_ordering,
+                    )
+                    .map_err(|error| match error {
+                        crate::error::CcsdsNdmError::Validation(error) => {
+                            crate::error::CcsdsNdmError::from((*error).at_path(format!(
+                                "body.segment.data.cov[{covariance_index}].cov_lines[{line_index}]"
+                            )))
+                        }
+                        error => error,
+                    })?;
                 }
             }
         }

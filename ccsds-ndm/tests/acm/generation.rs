@@ -362,3 +362,160 @@ fn quaternion_histories_reject_nonunit_magnitude_after_mutation() {
     }
     assert_rejects(&message, "Quaternion not normalized");
 }
+
+#[test]
+fn acm_seconds_and_time_offsets_are_checked_at_every_boundary() {
+    use ccsds_ndm::types::{TimeOffset, TimeUnits};
+    let base = Acm::from_kvn(ATT_KVN).unwrap();
+    for field in ["MAN_DURATION", "TAIMUTC_AT_TZERO", "NEXT_LEAP_TAIMUTC"] {
+        let mut message = base.clone();
+        match field {
+            "MAN_DURATION" => {
+                message.body.segment.data.man[0]
+                    .man_duration
+                    .as_mut()
+                    .unwrap()
+                    .units = Some(TimeUnits::Day)
+            }
+            "TAIMUTC_AT_TZERO" => {
+                message.body.segment.metadata.taimutc_at_tzero = Some(TimeOffset {
+                    value: 37.0,
+                    units: Some(TimeUnits::Day),
+                })
+            }
+            _ => {
+                message.body.segment.metadata.next_leap_taimutc = Some(TimeOffset {
+                    value: 38.0,
+                    units: Some(TimeUnits::Day),
+                })
+            }
+        }
+        assert_rejects(&message, &format!("{field} units"));
+    }
+    for field in ["TAIMUTC_AT_TZERO", "NEXT_LEAP_TAIMUTC"] {
+        for number in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut message = base.clone();
+            let value = Some(TimeOffset {
+                value: number,
+                units: None,
+            });
+            if field == "TAIMUTC_AT_TZERO" {
+                message.body.segment.metadata.taimutc_at_tzero = value;
+            } else {
+                message.body.segment.metadata.next_leap_taimutc = value;
+            }
+            assert_rejects(&message, field);
+        }
+    }
+    for field in ["MAN_BEGIN_TIME", "MAN_END_TIME", "MAN_DURATION"] {
+        let source = if field == "MAN_END_TIME" {
+            ATT_KVN.replace("MAN_DURATION = 450.0", "MAN_END_TIME = 550.0")
+        } else {
+            ATT_KVN.to_owned()
+        };
+        let value = match field {
+            "MAN_BEGIN_TIME" => "100.0",
+            "MAN_END_TIME" => "550.0",
+            _ => "450.0",
+        };
+        let seconds = source.replace(
+            &format!("{field} = {value}"),
+            &format!("{field} = {value} [s]"),
+        );
+        let control = Acm::from_kvn(&seconds).unwrap();
+        let xml = control
+            .to_xml()
+            .unwrap()
+            .replace(&format!("<{field}>"), &format!("<{field} units=\"s\">"));
+        Acm::from_xml(&xml).unwrap();
+        assert!(
+            Acm::from_xml(&xml.replace("units=\"s\"", "units=\"d\"")).is_err(),
+            "{field}"
+        );
+        assert!(
+            Acm::from_kvn(&seconds.replace("[s]", "[d]")).is_err(),
+            "{field}"
+        );
+    }
+}
+
+#[test]
+fn acm_declared_elements_match_every_actual_block_in_order() {
+    let mut message = Acm::from_kvn(ATT_KVN).unwrap();
+    message
+        .body
+        .segment
+        .data
+        .att
+        .push(message.body.segment.data.att[0].clone());
+    for declaration in ["ATT,ATT,MAN,AD", "att,att,man,ad"] {
+        message.body.segment.metadata.acm_data_elements = Some(declaration.into());
+        let kvn = message.to_kvn().unwrap();
+        assert_eq!(Acm::from_kvn(&kvn).unwrap(), message);
+        assert_eq!(Acm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    }
+    let xml = message.to_xml().unwrap();
+    for declaration in ["BOGUS", "ATT,MAN", "MAN,ATT,ATT", "ATT,ATT,MAN,", ""] {
+        message.body.segment.metadata.acm_data_elements = Some(declaration.into());
+        assert_rejects(&message, "ACM_DATA_ELEMENTS");
+        assert!(Acm::from_xml(&xml.replace("att,att,man,ad", declaration)).is_err());
+    }
+}
+
+#[test]
+fn acm_maneuver_targets_follow_purposes_without_closing_custom_values() {
+    use ccsds_ndm::types::TargetMomentum;
+    let mut message = Acm::from_kvn(ATT_KVN).unwrap();
+    message.body.segment.data.man[0].man_purpose = Some("SCI_OBJ".into());
+    message.body.segment.data.man[0].target_momentum = None;
+    // An unused frame declaration is legal; a supplied vector still requires its frame.
+    assert_eq!(Acm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    for (purpose, field) in [
+        ("MOM_DESAT", "TARGET_MOMENTUM"),
+        ("ATT_ADJUST", "TARGET_ATTITUDE"),
+        ("spin_rate_adjust", "TARGET_SPINRATE"),
+    ] {
+        message.body.segment.data.man[0].man_purpose = Some(purpose.into());
+        assert_rejects(&message, field);
+    }
+    let man = &mut message.body.segment.data.man[0];
+    man.man_purpose = Some("MOM_DESAT, ATT_ADJUST".into());
+    man.target_momentum = Some(TargetMomentum {
+        elements: vec![1.0, 2.0, 3.0],
+        units: None,
+    });
+    man.target_attitude = Some(Vec4Double {
+        values: vec![0.0, 0.0, 0.0, 1.0],
+    });
+    let kvn = message.to_kvn().unwrap();
+    assert_eq!(Acm::from_kvn(&kvn).unwrap(), message);
+    assert!(message.to_xml().is_err());
+    let mut single = message.clone();
+    single.body.segment.data.man[0].man_purpose = Some("MOM_DESAT".into());
+    single.body.segment.data.man[0].target_attitude = None;
+    let invalid_xml = single
+        .to_xml()
+        .unwrap()
+        .replace("</man>", "<TARGET_ATTITUDE>0 0 0 1</TARGET_ATTITUDE></man>");
+    assert!(Acm::from_xml(&invalid_xml).is_err());
+    let mut output = Vec::new();
+    assert!(message.write_xml_to(&mut output).is_err());
+    assert!(output.is_empty());
+    let man = &mut message.body.segment.data.man[0];
+    man.man_purpose = Some("ATT_ADJUST".into());
+    man.target_momentum = None;
+    man.target_mom_frame = None;
+    man.target_attitude.as_mut().unwrap().values = vec![0.0; 4];
+    assert_rejects(&message, "Quaternion");
+}
+
+#[test]
+fn acm_supplied_sensor_numbers_are_in_ascending_order_and_may_be_omitted() {
+    let mut message = Acm::from_kvn(COV_KVN).unwrap();
+    let sensors = &mut message.body.segment.data.ad.as_mut().unwrap().sensors;
+    sensors[0].sensor_number = None;
+    assert_eq!(Acm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    let sensors = &mut message.body.segment.data.ad.as_mut().unwrap().sensors;
+    sensors[0].sensor_number = Some(8);
+    assert_rejects(&message, "SENSOR_NUMBER");
+}

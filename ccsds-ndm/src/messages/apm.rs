@@ -58,8 +58,9 @@ impl Ndm for Apm {
 
     fn from_kvn(kvn: &str) -> Result<Self> {
         let kvn = crate::detect::without_utf8_bom(kvn);
-        kvn::validate_kvn_syntax(kvn)?;
-        let apm = Self::from_kvn_str(kvn)?;
+        let normalized = crate::kvn::normalize_line_endings(kvn);
+        kvn::validate_kvn_syntax(&normalized)?;
+        let apm = Self::from_kvn_str(&normalized)?;
         crate::traits::Validate::validate(&apm)?;
         Ok(apm)
     }

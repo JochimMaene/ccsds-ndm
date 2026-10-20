@@ -427,3 +427,12 @@ def test_distance_and_speed_norms_reject_negative_scalars(field):
             operation()
     setattr(relative, field, 0.0)
     message.validate()
+
+
+def test_computed_cdm_values_follow_the_shared_numeric_rounding_policy():
+    message = TestCdm()._create_valid_cdm()
+    message.body.relative_metadata_data.miss_distance = 0.1 + 0.2
+    message.validate()
+    for notation, expected in [("kvn", 0.3), ("xml", 0.1 + 0.2)]:
+        parsed = Cdm.from_str(message.to_str(notation), format=notation)
+        assert parsed.body.relative_metadata_data.miss_distance == expected

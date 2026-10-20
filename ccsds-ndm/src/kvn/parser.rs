@@ -709,8 +709,11 @@ pub fn kv_calendar_epoch_token(input: &mut &str) -> KvnResult<CalendarEpoch> {
 /// Parses a finite relative time using the ADM/ACM `relTimeType` lexical rules.
 pub fn kv_relative_time(input: &mut &str) -> KvnResult<RelativeTime> {
     let value_start = *input;
-    let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    RelativeTime::from_str(v.trim()).map_err(|e| external_error_at(input, value_start, e))
+    let (value, units) = terminated(kvn_value, opt_line_ending).parse_next(input)?;
+    if units.is_some_and(|unit| unit != "s") {
+        return Err(cut_err(input, "relative time units must be s"));
+    }
+    RelativeTime::from_str(value.trim()).map_err(|e| external_error_at(input, value_start, e))
 }
 
 /// Parses a boolean (YES/NO) from a KVN line.

@@ -1077,3 +1077,152 @@ TRAJ_STOP
     let output = ocm.to_kvn().unwrap();
     assert_eq!(Ocm::from_kvn(&output).unwrap(), ocm);
 }
+
+#[test]
+fn xml_only_facets_are_checked_on_read_and_generation() {
+    let mut message = Ocm::from_kvn(KVN).unwrap();
+    message.body.segment.data.traj.truncate(1);
+    let original_xml = message.to_xml().unwrap();
+    let degree = message.body.segment.data.traj[0]
+        .interpolation_degree
+        .unwrap();
+    let invalid = mutated(
+        &original_xml,
+        &format!("<INTERPOLATION_DEGREE>{degree}</INTERPOLATION_DEGREE>"),
+        "<INTERPOLATION_DEGREE>0</INTERPOLATION_DEGREE>",
+    );
+    assert!(Ocm::from_xml(&invalid).is_err());
+    message.body.segment.data.traj[0].interpolation_degree = Some(0);
+    message.validate().unwrap();
+    assert!(message.to_xml().is_err());
+    let mut output = Vec::new();
+    assert!(message.write_xml_to(&mut output).is_err());
+    assert!(output.is_empty());
+    message.body.segment.data.traj[0].interpolation_degree = None;
+    // The table's default 3 makes omission usable despite its conditional wording.
+    Ocm::from_xml(&message.to_xml().unwrap()).unwrap();
+
+    let mut message = Ocm::from_kvn(KVN).unwrap();
+    message.body.segment.data.phys = Some(Default::default());
+    message
+        .body
+        .segment
+        .data
+        .phys
+        .as_mut()
+        .unwrap()
+        .drag_coeff_nom = Some(1.);
+    let xml = message.to_xml().unwrap();
+    for value in ["0", "-1"] {
+        let invalid = mutated(
+            &xml,
+            "<DRAG_COEFF_NOM>1</DRAG_COEFF_NOM>",
+            &format!("<DRAG_COEFF_NOM>{value}</DRAG_COEFF_NOM>"),
+        );
+        assert!(Ocm::from_xml(&invalid).is_err());
+    }
+    message
+        .body
+        .segment
+        .data
+        .phys
+        .as_mut()
+        .unwrap()
+        .drag_coeff_nom = Some(0.);
+    assert_eq!(Ocm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+}
+
+#[test]
+fn maneuver_composition_and_unique_epochs_hold_on_public_routes() {
+    let mut message = Ocm::from_kvn(KVN).unwrap();
+    message.body.segment.data.traj.clear();
+    message.body.segment.data.man.truncate(1);
+    let man = &mut message.body.segment.data.man[0];
+    man.man_composition = "TIME_RELATIVE, DEPLOY_ID".into();
+    man.man_prev_epoch = None;
+    man.man_next_epoch = None;
+    man.man_units = None;
+    man.man_lines = ["1", "3", "2"]
+        .iter()
+        .map(|epoch| ccsds_ndm::messages::ocm::ManLine {
+            epoch: epoch.parse().unwrap(),
+            values: vec!["CHILD=1".into()],
+        })
+        .collect();
+    message.validate().unwrap();
+    let kvn = message.to_kvn().unwrap();
+    assert_eq!(Ocm::from_kvn(&kvn).unwrap(), message);
+    let xml = message.to_xml().unwrap();
+    assert_eq!(Ocm::from_xml(&xml).unwrap(), message);
+    let mut duplicate = message.clone();
+    duplicate.body.segment.data.man[0].man_lines[2].epoch = "1.0".parse().unwrap();
+    assert_rejects(&duplicate, "manLine epoch");
+    assert!(Ocm::from_kvn(&kvn.replace("2 CHILD=1", "1.0 CHILD=1")).is_err());
+    assert!(Ocm::from_xml(&xml.replace("2 CHILD=1", "1.0 CHILD=1")).is_err());
+    // A nonmonotonic sequence that differs beyond f64 precision remains unique.
+    message.body.segment.data.man[0].man_lines[2].epoch = "1.0000000000000001".parse().unwrap();
+    message.validate().unwrap();
+    for composition in [
+        "TIME_RELATIVE, UNKNOWN",
+        "TIME_RELATIVE, DV_X, DV_X",
+        "TIME_RELATIVE, DV_Y, DV_X",
+        "TIME_RELATIVE, DEPLOY_ID, THR_X",
+    ] {
+        let mut invalid = message.clone();
+        invalid.body.segment.data.man[0].man_composition = composition.into();
+        assert_rejects(&invalid, "MAN_COMPOSITION");
+        assert!(Ocm::from_kvn(&kvn.replace("TIME_RELATIVE, DEPLOY_ID", composition)).is_err());
+        assert!(Ocm::from_xml(&xml.replace("TIME_RELATIVE, DEPLOY_ID", composition)).is_err());
+    }
+    // A selected subset may contain only its mandatory time tag.
+    let man = &mut message.body.segment.data.man[0];
+    man.man_composition = "TIME_RELATIVE".into();
+    for line in &mut man.man_lines {
+        line.values.clear();
+    }
+    assert_eq!(Ocm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+}
+
+#[test]
+fn orbit_revolution_counts_are_finite_nonnegative_and_may_be_fractional() {
+    let message = Ocm::from_kvn(KVN).unwrap();
+    for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let mut invalid = message.clone();
+        invalid.body.segment.data.traj[0].orb_revnum = Some(value);
+        assert_rejects(&invalid, "ORB_REVNUM");
+    }
+    let mut fractional = message;
+    fractional.body.segment.data.traj[0].orb_revnum = Some(1.5);
+    fractional.body.segment.data.traj[0].orb_revnum_basis = Some(RevNumBasis::One);
+    assert_eq!(
+        Ocm::from_xml(&fractional.to_xml().unwrap()).unwrap(),
+        fractional
+    );
+    assert_eq!(
+        Ocm::from_kvn(&fractional.to_kvn().unwrap()).unwrap(),
+        fractional
+    );
+    let xml = fractional.to_xml().unwrap();
+    let kvn = fractional.to_kvn().unwrap();
+    for invalid in ["NaN", "INF", "-INF"] {
+        assert!(Ocm::from_xml(&mutated(
+            &xml,
+            "<ORB_REVNUM>1.5</ORB_REVNUM>",
+            &format!("<ORB_REVNUM>{invalid}</ORB_REVNUM>")
+        ))
+        .is_err());
+        let invalid_kvn = kvn
+            .lines()
+            .map(|line| {
+                if line.starts_with("ORB_REVNUM ") {
+                    format!("ORB_REVNUM = {invalid}")
+                } else {
+                    line.to_owned()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert_ne!(invalid_kvn, kvn.trim_end());
+        assert!(Ocm::from_kvn(&invalid_kvn).is_err());
+    }
+}

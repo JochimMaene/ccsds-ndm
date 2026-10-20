@@ -133,7 +133,7 @@ fn every_kvn_generation_gate_rejects_loss_or_ambiguity_before_output() {
 }
 
 #[test]
-fn cdm_kvn_refuses_numeric_rounding_while_xml_retains_the_value() {
+fn cdm_kvn_rounds_computed_numbers_while_xml_retains_the_value() {
     let mut control = Cdm::from_kvn(KVN).unwrap();
     control.body.relative_metadata_data.miss_distance.value = 0.123_456_789_012_345_6;
     assert_eq!(Cdm::from_kvn(&control.to_kvn().unwrap()).unwrap(), control);
@@ -167,18 +167,38 @@ fn cdm_kvn_refuses_numeric_rounding_while_xml_retains_the_value() {
         let xml = message.to_xml().unwrap();
         assert_eq!(Cdm::from_xml(&xml).unwrap(), message);
         validate_xml("CDM full-precision double", &xml);
-        let error = message.to_kvn().unwrap_err();
-        assert!(
-            error.to_string().contains("without changing typed content"),
-            "{field}: {error}"
-        );
+        let kvn = message.to_kvn().unwrap();
+        let reparsed = Cdm::from_kvn(&kvn).unwrap();
+        let rounded = match field {
+            "MISS_DISTANCE" => reparsed.body.relative_metadata_data.miss_distance.value,
+            "COLLISION_PROBABILITY" => {
+                reparsed
+                    .body
+                    .relative_metadata_data
+                    .collision_probability
+                    .as_ref()
+                    .unwrap()
+                    .value
+            }
+            "X" => reparsed.body.segments[1].data.state_vector.x.value,
+            _ => {
+                reparsed.body.segments[1]
+                    .data
+                    .covariance_matrix
+                    .as_ref()
+                    .unwrap()
+                    .cr_r
+                    .value
+            }
+        };
+        assert_eq!(rounded, 0.3, "{field}");
         let mut output = Vec::new();
-        let error = message.write_kvn_to(&mut output).unwrap_err();
-        assert!(
-            error.to_string().contains("without changing typed content"),
-            "{field}: {error}"
+        message.write_kvn_to(&mut output).unwrap();
+        assert_eq!(output, kvn.as_bytes(), "{field}");
+        assert_eq!(
+            ccsds_ndm::Message::Cdm(message.clone()).to_kvn().unwrap(),
+            kvn
         );
-        assert!(output.is_empty(), "{field}");
     }
 }
 

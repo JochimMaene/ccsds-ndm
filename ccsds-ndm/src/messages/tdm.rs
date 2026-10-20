@@ -1069,6 +1069,37 @@ impl TdmMetadata {
     }
 
     fn validate_for(&self, data: &TdmData) -> Result<()> {
+        let participants = [
+            true,
+            self.participant_2.is_some(),
+            self.participant_3.is_some(),
+            self.participant_4.is_some(),
+            self.participant_5.is_some(),
+        ];
+        for (index, observation) in data.observations.iter().enumerate() {
+            let key = observation.data.key();
+            if [
+                "RECEIVE_FREQ_",
+                "RECEIVE_PHASE_CT_",
+                "TRANSMIT_FREQ_",
+                "TRANSMIT_PHASE_CT_",
+            ]
+            .iter()
+            .any(|prefix| key.starts_with(prefix))
+            {
+                let participant = (key.as_bytes()[key.len() - 1] - b'1') as usize;
+                if !participants[participant] {
+                    return Err(ValidationError::InvalidValue {
+                        field: key.into(),
+                        value: format!("PARTICIPANT_{}", participant + 1),
+                        expected: "a populated participant for the indexed observation".into(),
+                        line: None,
+                    }
+                    .at_path(format!("data.observations[{index}]"))
+                    .into());
+                }
+            }
+        }
         let has_differenced_frequency_or_range = data.observations.iter().any(|observation| {
             matches!(
                 observation.data,
@@ -1118,8 +1149,25 @@ impl crate::traits::Validate for TdmData {
             }
             .into());
         }
-        for observation in &self.observations {
+        let mut previous = std::collections::HashMap::new();
+        for (index, observation) in self.observations.iter().enumerate() {
             observation.data.validate()?;
+            if let Some(epoch) = previous.insert(observation.data.key(), observation.epoch) {
+                if epoch
+                    .into_epoch()
+                    .cmp_same_branch(&observation.epoch.into_epoch())
+                    != Some(std::cmp::Ordering::Less)
+                {
+                    return Err(ValidationError::InvalidValue {
+                        field: observation.data.key().into(),
+                        value: observation.epoch.to_string(),
+                        expected: "strictly increasing epochs for each observation keyword".into(),
+                        line: None,
+                    }
+                    .at_path(format!("observations[{index}].epoch"))
+                    .into());
+                }
+            }
         }
         Ok(())
     }
@@ -1481,6 +1529,8 @@ impl TdmObservationData {
             Percentage::validate_value(value.value, "RHUMIDITY")?;
         }
         let invalid_range = match self {
+            // §3.5.2.4 requires an integer; positivity is only a recommendation.
+            Self::DopplerCount(value) => (value.fract() != 0.0).then_some("an integer count"),
             Self::TransmitFreq1(value)
             | Self::TransmitFreq2(value)
             | Self::TransmitFreq3(value)

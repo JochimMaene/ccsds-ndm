@@ -1,5 +1,50 @@
 use ccsds_ndm::messages::tdm::{TdmBody, TdmObservationData};
 use ccsds_ndm::Validate;
+
+#[test]
+fn doppler_counts_are_integral_and_indexed_observations_require_their_participant() {
+    use ccsds_ndm::messages::tdm::Tdm;
+    use ccsds_ndm::Ndm;
+    let mut message = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e1.kvn")).unwrap();
+    message.body.segments[0].data.observations.truncate(1);
+    for count in [-2.0, -0.0, 0.0, 2.0] {
+        message.body.segments[0].data.observations[0].data =
+            TdmObservationData::DopplerCount(count);
+        message.validate().unwrap();
+        Tdm::from_kvn(&message.to_kvn().unwrap()).unwrap();
+        Tdm::from_xml(&message.to_xml().unwrap()).unwrap();
+    }
+    message.body.segments[0].data.observations[0].data = TdmObservationData::DopplerCount(0.5);
+    crate::common::assert_rejects(&message, "DOPPLER_COUNT");
+    for key in [
+        "RECEIVE_FREQ_5",
+        "RECEIVE_PHASE_CT_5",
+        "TRANSMIT_FREQ_5",
+        "TRANSMIT_FREQ_RATE_5",
+        "TRANSMIT_PHASE_CT_5",
+    ] {
+        message.body.segments[0].data.observations[0].data =
+            TdmObservationData::from_key_val(key, "1").unwrap();
+        crate::common::assert_rejects(&message, key);
+        message.body.segments[0].metadata.participant_5 = Some("receiver-five".into());
+        let kvn = message.to_kvn().unwrap();
+        let xml = message.to_xml().unwrap();
+        assert_eq!(Tdm::from_kvn(&kvn).unwrap(), message);
+        assert_eq!(Tdm::from_xml(&xml).unwrap(), message);
+        assert!(Tdm::from_kvn(
+            &kvn.lines()
+                .filter(|line| !line.starts_with("PARTICIPANT_5"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        )
+        .is_err());
+        assert!(
+            Tdm::from_xml(&xml.replace("<PARTICIPANT_5>receiver-five</PARTICIPANT_5>", ""))
+                .is_err()
+        );
+        message.body.segments[0].metadata.participant_5 = None;
+    }
+}
 #[test]
 fn tdm_body_requires_segment() {
     let body = TdmBody { segments: vec![] };
@@ -152,6 +197,9 @@ fn exact_phase_counts_survive_both_notations_without_floating_point() {
                 "1.234567890123456789e999",
             ] {
                 let mut message = Tdm::from_kvn(baseline).unwrap();
+                message.body.segments[0].metadata.participant_3 = Some("P3".into());
+                message.body.segments[0].metadata.participant_4 = Some("P4".into());
+                message.body.segments[0].metadata.participant_5 = Some("P5".into());
                 message.body.segments[0].data.observations[0].data =
                     TdmObservationData::from_key_val(&key, value).unwrap();
                 let kvn = message.to_kvn().unwrap();

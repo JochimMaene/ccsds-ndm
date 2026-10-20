@@ -66,6 +66,14 @@ none alone establishes conformance or exhaustive mutation coverage.
 
 ## Decisions and limits
 
+**Line endings and duration units.** ADM §6.6.6 permits CR, LF, CRLF and LFCR.
+APM uses the shared byte-length-preserving line normalization, covered by
+`apm::parsing::apm_accepts_all_adm_line_endings`. ADM table 3-3 and the XSD
+`durationType`/`timeUnits` define `NUTATION_PER` in seconds. Days are rejected in both
+readers, edited models and generation, rather than silently reinterpreted as seconds;
+`apm::generation::apm_nutation_period_is_seconds_without_reinterpreting_day_units` covers that boundary.
+
+
 ADM annex J lists incompatible APM 1.0 differences: quaternion frame/direction keywords,
 Euler sequence and inertia names, and the addition of repeatable logical-block delimiters.
 A 2.0 message with a changed version header is not proof of legacy support. Input edition

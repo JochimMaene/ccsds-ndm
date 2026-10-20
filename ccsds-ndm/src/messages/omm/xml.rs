@@ -4,6 +4,30 @@
 
 use crate::error::Result;
 
+impl super::Omm {
+    pub(crate) fn validate_xml_representability(&self) -> Result<()> {
+        if let Some(tle) = &self.body.segment.data.tle_parameters {
+            for (present, field) in [
+                (tle.bstar.is_some() || tle.bterm.is_some(), "BSTAR or BTERM"),
+                (
+                    tle.mean_motion_ddot.is_some() || tle.agom.is_some(),
+                    "MEAN_MOTION_DDOT or AGOM",
+                ),
+            ] {
+                if !present {
+                    return Err(crate::error::ValidationError::missing_required(
+                        "XML TLE parameters",
+                        field,
+                    )
+                    .at_path("body.segment.data.tle_parameters")
+                    .into());
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {
     use crate::xml::XmlSequenceRule;
 

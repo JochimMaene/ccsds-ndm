@@ -1,5 +1,57 @@
 use ccsds_ndm::messages::omm::{Omm, TleToOmmOptions};
 use ccsds_ndm::Ndm;
+
+#[test]
+fn comment_merges_and_user_parameter_interleaving_are_canonicalized() {
+    let mut message = Omm::from_kvn(crate::KVN).unwrap();
+    message.body.segment.data.comment = vec!["outer-data".into()];
+    message.body.segment.data.mean_elements.comment = vec!["mean-elements".into()];
+    let kvn = message.to_kvn().unwrap();
+    let reparsed = Omm::from_kvn(&kvn).unwrap();
+    assert_eq!(
+        reparsed.body.segment.data.comment,
+        ["outer-data", "mean-elements"]
+    );
+    assert!(reparsed.body.segment.data.mean_elements.comment.is_empty());
+    assert_eq!(reparsed.to_kvn().unwrap(), kvn);
+
+    let mut message = Omm::from_kvn(crate::KVN).unwrap();
+    let user_xml = "<userDefinedParameters><COMMENT>first</COMMENT><USER_DEFINED parameter=\"A\">1</USER_DEFINED><COMMENT>second</COMMENT><USER_DEFINED parameter=\"B\">2</USER_DEFINED></userDefinedParameters>";
+    let xml = message.to_xml().unwrap();
+    let start = xml.find("<userDefinedParameters>").unwrap();
+    let end = start
+        + xml[start..].find("</userDefinedParameters>").unwrap()
+        + "</userDefinedParameters>".len();
+    message = Omm::from_xml(&format!("{}{}{}", &xml[..start], user_xml, &xml[end..])).unwrap();
+    let user = message
+        .body
+        .segment
+        .data
+        .user_defined_parameters
+        .as_ref()
+        .unwrap();
+    assert_eq!(user.comment, ["first", "second"]);
+    assert_eq!(
+        user.user_defined
+            .iter()
+            .map(|value| value.parameter.as_str())
+            .collect::<Vec<_>>(),
+        ["A", "B"]
+    );
+    for canonical in [message.to_xml().unwrap(), message.to_kvn().unwrap()] {
+        assert!(canonical.find("first").unwrap() < canonical.find("second").unwrap());
+        assert!(
+            canonical.find("second").unwrap()
+                < canonical
+                    .find(if canonical.starts_with('<') {
+                        "parameter=\"A\""
+                    } else {
+                        "USER_DEFINED_A"
+                    })
+                    .unwrap()
+        );
+    }
+}
 #[test]
 fn to_tle_lines_iss_example() {
     let kvn = r#"CCSDS_OMM_VERS = 2.0

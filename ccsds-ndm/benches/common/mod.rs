@@ -173,7 +173,7 @@ pub fn create_test_ocm_covariance(num_states: usize) -> Ocm {
         .unwrap();
         cov_lines.push(CovLine {
             epoch: line_epoch,
-            values: vec![1.0 + i as f64, 0.0, 0.0, 0.0, 0.0, 1.0],
+            values: vec![1.0 + i as f64, 0.0, 1.0, 0.0, 0.0, 1.0],
         });
     }
 
@@ -259,12 +259,25 @@ pub fn create_test_ocm_maneuver(num_states: usize) -> Ocm {
         .build()
 }
 
-/// A TDM whose single segment repeats one shipped observation `records` times.
+/// A TDM whose single segment repeats one shipped observation on a one-second cadence.
 pub fn create_test_tdm(records: usize) -> Tdm {
     let mut message = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e1.kvn")).unwrap();
     message.body.segments.truncate(1);
     let observation = message.body.segments[0].data.observations[0].clone();
-    message.body.segments[0].data.observations = vec![observation; records];
+    message.body.segments[0].data.observations = (0..records)
+        .map(|index| {
+            let mut observation = observation.clone();
+            observation.epoch = format!(
+                "2005-159T{:02}:{:02}:{:02}",
+                index / 3600,
+                index / 60 % 60,
+                index % 60
+            )
+            .parse()
+            .unwrap();
+            observation
+        })
+        .collect();
     message
 }
 

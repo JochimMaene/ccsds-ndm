@@ -207,6 +207,7 @@ impl Ndm for Omm {
         xml::validate_xml_sequences(xml)?;
         let omm: Self = crate::xml::from_str_with_context(xml, "OMM")?;
         crate::traits::Validate::validate(&omm)?;
+        omm.validate_xml_representability()?;
         Ok(omm)
     }
 

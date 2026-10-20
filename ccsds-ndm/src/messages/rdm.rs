@@ -531,6 +531,9 @@ pub struct RdmData {
 
 impl crate::traits::Validate for RdmMetadata {
     fn validate(&self) -> Result<()> {
+        if let Some(altitude) = &self.drag_parameters_altitude {
+            crate::types::require_finite("DRAG_PARAMETERS_ALTITUDE", altitude.value)?;
+        }
         crate::validation::epoch_precision(&[
             ("EPOCH_TZERO", &self.epoch_tzero),
             ("REF_FRAME_EPOCH", &self.ref_frame_epoch),

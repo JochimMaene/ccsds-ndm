@@ -1059,6 +1059,7 @@ impl crate::traits::Validate for SpinState {
         }
         if let Some(value) = &self.nutation_per {
             Duration::validate_value(value.value, "NUTATION_PER")?;
+            TimeUnits::validate_seconds(&value.units, "NUTATION_PER")?;
         }
         if let Some(value) = &self.nutation_vel {
             if !value.value.is_finite() {
@@ -2336,6 +2337,13 @@ pub struct AtmosphericReentryParameters {
 
 impl crate::traits::Validate for AtmosphericReentryParameters {
     fn validate(&self) -> Result<()> {
+        require_finite("REENTRY_ALTITUDE", self.reentry_altitude.value)?;
+        if let Some(confidence) = &self.orbit_lifetime_confidence_level {
+            PercentageRequired::validate_value(
+                confidence.value,
+                "ORBIT_LIFETIME_CONFIDENCE_LEVEL",
+            )?;
+        }
         crate::validation::epoch_precision(&[
             ("NOMINAL_REENTRY_EPOCH", &self.nominal_reentry_epoch),
             ("REENTRY_WINDOW_START", &self.reentry_window_start),

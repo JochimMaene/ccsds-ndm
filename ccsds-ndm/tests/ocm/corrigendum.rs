@@ -266,3 +266,130 @@ fn published_g15_extra_acceleration_requires_the_correct_composition() {
     assert!(Ocm::from_kvn(include_str!("../../data/invalid/ocm_g15_original.kvn")).is_err());
     Ocm::from_kvn(BASE).unwrap();
 }
+
+#[test]
+fn rounded_covariance_must_retain_record_constraints_before_kvn_output() {
+    use ccsds_ndm::messages::ocm::{CovLine, OcmCovarianceMatrix};
+    let mut message = Ocm::from_kvn(BASE).unwrap();
+    message.body.segment.data.cov = vec![OcmCovarianceMatrix::builder()
+        .cov_ref_frame("GCRF")
+        .cov_type("CARTP")
+        .cov_lines(vec![CovLine {
+            epoch: "0".parse().unwrap(),
+            values: vec![1.0000000000000004, 1., 1., 0., 0., 1.],
+        }])
+        .build()];
+    message.validate().unwrap();
+    let xml = message.to_xml().unwrap();
+    assert_eq!(Ocm::from_xml(&xml).unwrap(), message);
+    assert!(message.to_kvn().is_err());
+    let mut output = Vec::new();
+    assert!(message.write_kvn_to(&mut output).is_err());
+    assert!(output.is_empty());
+    // Ordinary rounding is still available when it retains a valid covariance.
+    message.body.segment.data.cov[0].cov_lines[0].values[1] = 0.3;
+    let kvn = message.to_kvn().unwrap();
+    Ocm::from_kvn(&kvn).unwrap();
+
+    // The same preflight applies to eigenvector records close to their existing norm boundary.
+    for kind in ["SIG3EIGVEC3", "TSIG3EIGVEC3"] {
+        let covariance = &mut message.body.segment.data.cov[0];
+        covariance.cov_type = kind.into();
+        covariance.cov_lines[0].values = vec![
+            1.,
+            2.,
+            3.,
+            1.0000000000004998,
+            0.,
+            0.,
+            0.,
+            1.,
+            0.,
+            0.,
+            0.,
+            1.,
+        ];
+        if kind.starts_with('T') {
+            covariance.cov_lines[0].values.insert(0, 1.);
+        }
+        message.validate().unwrap();
+        assert_eq!(Ocm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+        assert!(message.to_kvn().is_err());
+        let mut output = Vec::new();
+        assert!(message.write_kvn_to(&mut output).is_err());
+        assert!(output.is_empty());
+    }
+}
+
+#[test]
+fn known_compositions_are_case_insensitive_without_rewriting_producer_tokens() {
+    use ccsds_ndm::messages::ocm::{CovLine, OcmCovarianceMatrix};
+    let mut message = Ocm::from_kvn(BASE).unwrap();
+    message.body.segment.data.traj[0].traj_type = "cartpva".into();
+    message.validate().unwrap();
+    assert_eq!(Ocm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    message.body.segment.data.traj[0].traj_lines[0].values.pop();
+    assert!(message.validate().is_err());
+    message.body.segment.data.traj.clear();
+    message.body.segment.data.cov = vec![OcmCovarianceMatrix::builder()
+        .cov_ref_frame("GCRF")
+        .cov_type("cartp")
+        .cov_lines(vec![CovLine {
+            epoch: "0".parse().unwrap(),
+            values: vec![1., 0., 1., 0., 0., 1.],
+        }])
+        .build()];
+    message.validate().unwrap();
+    assert_eq!(Ocm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    message.body.segment.data.cov[0].cov_lines[0].values[0] = 0.;
+    assert!(message.validate().is_err());
+}
+
+#[test]
+fn eigenvector_units_describe_diagonal_standard_deviations_in_any_case() {
+    use ccsds_ndm::messages::ocm::{CovLine, OcmCovarianceMatrix};
+    for kind in ["sig3eigvec3", "tsig3eigvec3"] {
+        let timed = kind.starts_with('t');
+        let mut values = vec![3., 2., 1., 1., 0., 0., 0., 1., 0., 0., 0., 1.];
+        if timed {
+            values.insert(0, 1.);
+        }
+        let mut message = Ocm::from_kvn(BASE).unwrap();
+        message.body.segment.data.traj.clear();
+        message.body.segment.data.cov = vec![OcmCovarianceMatrix::builder()
+            .cov_ref_frame("GCRF")
+            .cov_type(kind)
+            .cov_units(if timed { "[s,km,km,km]" } else { "[km,km,km]" })
+            .cov_lines(vec![CovLine {
+                epoch: "0".parse().unwrap(),
+                values,
+            }])
+            .build()];
+        message.validate().unwrap();
+        assert_eq!(Ocm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+        assert_eq!(Ocm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+        message.body.segment.data.cov[0].cov_units = Some("[m,m,m]".into());
+        assert!(message.validate().is_err());
+        message.body.segment.data.cov[0].cov_units = None;
+        *message.body.segment.data.cov[0].cov_lines[0]
+            .values
+            .last_mut()
+            .unwrap() = 0.;
+        assert!(message.validate().is_err());
+    }
+}
+
+#[test]
+fn published_g17_typo_is_preserved_separately_from_the_corrected_fixture() {
+    let original = include_str!("../../data/invalid/ocm_g17_original.kvn");
+    let error = Ocm::from_kvn(original).unwrap_err();
+    crate::common::assert_validation_field(&error, "MAN_COMPOSITION");
+    let corrected = include_str!("../../data/kvn/ocm_g17.kvn");
+    let message = Ocm::from_kvn(corrected).unwrap();
+    assert_eq!(Ocm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    assert_eq!(Ocm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    assert_eq!(
+        message.body.segment.data.man[1].man_units.as_deref(),
+        Some("[s, N, N, N, n/a, n/a, s, %]")
+    );
+}

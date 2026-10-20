@@ -300,17 +300,18 @@ fn omm_2_tle_shape_is_checked_after_mutation_and_at_both_input_boundaries() {
         assert!(message.validate().is_err(), "{field}");
         assert!(message.to_kvn().is_err(), "{field}");
         assert!(message.to_xml().is_err(), "{field}");
-        // A neutral theory permits omission of the 3.0 conditional coefficients while the
-        // 2.0 XSD requires them whenever the TLE block is present.
+        // A neutral theory permits KVN omissions in 3.0; XML still requires each choice.
         message.version = "3.0".into();
         message.body.segment.metadata.mean_element_theory = "ICD_THEORY".into();
-        for source in [
-            message.to_kvn().unwrap().replacen("= 3.0", "= 2.0", 1),
-            message
+        let source = message.to_kvn().unwrap().replacen("= 3.0", "= 2.0", 1);
+        assert!(ccsds_ndm::from_str(&source).is_err(), "{field}");
+        if matches!(*field, "bstar" | "mean_motion_ddot") {
+            assert!(message.to_xml().is_err(), "{field}");
+        } else {
+            let source = message
                 .to_xml()
                 .unwrap()
-                .replace("version=\"3.0\"", "version=\"2.0\""),
-        ] {
+                .replace("version=\"3.0\"", "version=\"2.0\"");
             assert!(ccsds_ndm::from_str(&source).is_err(), "{field}");
         }
     }

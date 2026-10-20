@@ -103,9 +103,9 @@ preserves the edition stored on the message. In Python, use ``to_str(format)`` f
 ``to_file(path, format)`` for atomic file replacement. Rust exposes ``to_kvn``, ``to_xml``, and
 the ``write_*_to`` streaming methods; streaming can leave partial output if the caller's sink
 fails mid-write. ``convert_file`` also replaces its destination atomically. Ordinary numeric
-values use double precision. Most KVN writers round them when necessary to the
-16-significant-digit representation; CDM refuses values when that rounding would change
-its typed model. TDM phase counts retain exact decimal strings instead, subject to KVN's line
+values use double precision. KVN writers round them when necessary to the
+16-significant-digit representation and refuse rounding that invalidates a model constraint.
+TDM phase counts retain exact decimal strings instead, subject to KVN's line
 limit. Optional fixed-unit annotations and some comment positions are normalized during
 conversion, so a notation round trip need not produce an identical model. Other information
 that cannot be represented causes conversion to fail. The support matrix and family records

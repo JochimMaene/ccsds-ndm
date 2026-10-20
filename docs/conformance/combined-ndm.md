@@ -17,6 +17,10 @@ The combined-NDM suites establish:
 
 - exact root and constituent attribute contracts, document-root/trailing-content checks, schema
   child ordering, and rejection of unknown or nested message structure;
+- envelope text decoding for XML entities, character references and CDATA, preservation of empty
+  `MESSAGE_ID`/`COMMENT` strings, and rejection of attributes or nested elements in those fields;
+- processing instructions and XML comments ignored throughout the envelope, including within
+  text fields, consistently with the shared XML contract;
 - ordered typed preservation of the `ndm_g12.xml` and `ndm_g21.xml` constituents, followed by
   official-master-XSD validation of generated XML;
 - a fixed internal XML nesting safety limit through direct Rust and Python entry points;

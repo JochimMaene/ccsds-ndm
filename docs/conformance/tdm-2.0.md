@@ -101,6 +101,36 @@ none alone establishes conformance or exhaustive mutation coverage.
 
 ## Decisions and limits
 
+**Observation order is per keyword.** Sections 3.4.10–3.4.11 require strictly increasing,
+non-repeated epochs for each observation keyword within a segment. Different keywords may
+interleave in any order, including a decrease in the overall row sequence. Validation checks
+each keyword separately and generation preserves producer row order; it never sorts records.
+Indexed receive/transmit frequency, frequency-rate, and phase-count observations require the
+corresponding `PARTICIPANT_n`, just as PATH references require a populated participant.
+`epochs::observations_are_ordered_per_keyword_without_reordering_other_keywords` and
+`model::doppler_counts_are_integral_and_indexed_observations_require_their_participant` cover
+these rules through parsing and generation.
+
+The published Annex E17 example repeats the RCS epoch `2011-05-11T10:26:33.7008` for two
+different measurements, contrary to section 3.4.11. Its original fixture is retained unchanged
+as `data/invalid/tdm_e17_original.kvn` and rejected. The annotated positive fixture adapts the
+last RCS epoch to `2011-05-11T10:26:33.9686`, matching the other measurements in that group.
+That repair is a test-fixture choice, not a correction published by CCSDS or a parser rewrite.
+`parsing::original_e17_repeated_rcs_epoch_is_rejected_and_adaptation_remains_valid` covers both.
+
+**Doppler counts are integral doubles.** Section 3.5.2.4 requires `DOPPLER_COUNT` to be an
+integer, although the XML schema declares an unrestricted double. The public numeric type
+remains `f64`; fractional, non-finite counts are rejected on both notations and generation.
+Positive counts are only recommended, so signed integer counts and zero remain accepted.
+This count is distinct from the arbitrary-precision decimal phase-count strings described
+above. Values already rounded by a caller into a double cannot recover lost integer digits.
+
+**Epoch storage has a library limit.** All epoch tokens, including observation epochs, are
+limited to 64 bytes before parsing. This is not a CCSDS or XSD length restriction. Longer
+tokens are rejected, never truncated, on both notations and in direct epoch construction.
+Other field-specific precision rules still apply where documented. See the shared
+[epoch storage policy](../design/validation-contract.md#epoch-storage-limit).
+
 The current implementation and evidence cover edition 2.0. Previous acceptance of 1.0
 merely reused the 2.0 grammar; tests changed version labels without providing actual 1.0
 wire-syntax and metadata fixtures. Agreement of several numeric domains across editions
