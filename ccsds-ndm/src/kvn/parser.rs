@@ -49,62 +49,12 @@ pub fn parse_f64_winnow(input: &mut &str) -> KvnResult<f64> {
     parse_ccsds_number(s).ok_or_else(|| cut_err(input, "Invalid finite number or double underflow"))
 }
 
-/// Return whether a token has the shape of a CCSDS integer, fixed-point, or floating-point number
-/// (ODM 7.5.4-7.5.7).
-///
-/// Reading does not apply the 16-digit cap of 7.5.6/7.5.7b or the 32-bit integer range of 7.5.4
-/// to data values: many producers write the 17-digit shortest round-trip spelling of a double,
-/// which loses nothing. Generation still writes at most 16 digits.
-pub(crate) fn valid_ccsds_number(token: &str) -> bool {
-    let bytes = token.as_bytes();
-    let mut index = usize::from(matches!(bytes.first(), Some(b'+' | b'-')));
-    if index == bytes.len() {
-        return false;
-    }
-
-    let integer_start = index;
-    while bytes.get(index).is_some_and(u8::is_ascii_digit) {
-        index += 1;
-    }
-    let integer_digits = index - integer_start;
-    let mut fraction_digits = 0;
-    if bytes.get(index) == Some(&b'.') {
-        index += 1;
-        let fraction_start = index;
-        while bytes.get(index).is_some_and(u8::is_ascii_digit) {
-            index += 1;
-        }
-        fraction_digits = index - fraction_start;
-    }
-    if integer_digits + fraction_digits == 0 {
-        return false;
-    }
-
-    if index == bytes.len() {
-        return true;
-    }
-    if !matches!(bytes.get(index), Some(b'e' | b'E')) {
-        return false;
-    }
-
-    index += 1;
-    if matches!(bytes.get(index), Some(b'+' | b'-')) {
-        index += 1;
-    }
-    let exponent_start = index;
-    while bytes.get(index).is_some_and(u8::is_ascii_digit) {
-        index += 1;
-    }
-    index == bytes.len() && index > exponent_start
-}
-
 /// Parse a token in the CCSDS number grammar whose value lies within the double range of
 /// ODM 7.5.7e. Overflow to infinity and a non-zero value that underflows to zero are rejected;
-/// subnormal values are kept.
+/// subnormal values are kept. The full-token decimal parser also enforces the lexical grammar.
+/// Reading accepts producer spellings beyond the book's 16-digit and 32-bit limits; generation
+/// still writes at most 16 digits.
 pub(crate) fn parse_ccsds_number(token: &str) -> Option<f64> {
-    if !valid_ccsds_number(token) {
-        return None;
-    }
     let value: f64 = fast_float::parse(token).ok()?;
     let underflow = value == 0.0
         && token
@@ -1617,10 +1567,33 @@ mod tests {
             "1e3",
             "12.5e3",
         ] {
-            assert!(valid_ccsds_number(value), "{value}");
+            assert!(parse_ccsds_number(value).is_some(), "{value}");
         }
-        for value in ["", "+", ".", "1.0e", "1.0e+", "1e2e3", "1..2", "--1"] {
-            assert!(!valid_ccsds_number(value), "{value}");
+        for value in [
+            "",
+            "+",
+            ".",
+            "1.0e",
+            "1.0e+",
+            "1e2e3",
+            "1..2",
+            "--1",
+            " 1",
+            "1 ",
+            "1\t",
+            "\n1",
+            "1_000",
+            "0x1p2",
+            "1[km]",
+            "١",
+            "1\u{a0}",
+            "nan",
+            "+NaN",
+            "-inf",
+            "Infinity",
+            "+Infinity",
+        ] {
+            assert!(parse_ccsds_number(value).is_none(), "{value}");
         }
     }
 

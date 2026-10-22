@@ -830,6 +830,10 @@ impl CalendarEpoch {
         self.0.is_empty()
     }
 
+    pub(crate) fn as_epoch(&self) -> &Epoch {
+        &self.0
+    }
+
     /// Converts back to the XSD-compatible epoch union without changing its spelling.
     pub fn into_epoch(self) -> Epoch {
         self.0

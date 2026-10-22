@@ -1300,45 +1300,49 @@ impl Cdm {
         validate_kvn_syntax(&output)?;
         let reparsed = Self::from_kvn_str(&output)?;
         crate::traits::Validate::validate(&reparsed)?;
-        // The documented KVN normalizations: the nested data-block comment merge
-        // (cdm-1.0.md, "KVN comment merge") and trailing-blank trimming of comment lines.
-        let mut expected = self.clone();
-        let trim = |comments: &mut Vec<String>| {
-            for comment in comments {
-                comment.truncate(comment.trim_end().len());
+        if reparsed != *self {
+            // The documented KVN normalizations: the nested data-block comment merge
+            // (cdm-1.0.md, "KVN comment merge") and trailing-blank trimming of comment lines.
+            let mut expected = self.clone();
+            let trim = |comments: &mut Vec<String>| {
+                for comment in comments {
+                    comment.truncate(comment.trim_end().len());
+                }
+            };
+            trim(&mut expected.header.comment);
+            trim(&mut expected.body.relative_metadata_data.comment);
+            for segment in &mut expected.body.segments {
+                let data = &mut segment.data;
+                data.canonicalize_kvn_comments();
+                trim(&mut segment.metadata.comment);
+                trim(&mut data.comment);
+                if let Some(od) = &mut data.od_parameters {
+                    trim(&mut od.comment);
+                }
+                if let Some(additional) = &mut data.additional_parameters {
+                    trim(&mut additional.comment);
+                }
+                trim(&mut data.state_vector.comment);
+                if let Some(covariance) = &mut data.covariance_matrix {
+                    trim(&mut covariance.comment);
+                }
             }
-        };
-        trim(&mut expected.header.comment);
-        trim(&mut expected.body.relative_metadata_data.comment);
-        for segment in &mut expected.body.segments {
-            let data = &mut segment.data;
-            data.canonicalize_kvn_comments();
-            trim(&mut segment.metadata.comment);
-            trim(&mut data.comment);
-            if let Some(od) = &mut data.od_parameters {
-                trim(&mut od.comment);
+            if reparsed != expected {
+                return Err(ValidationError::Generic {
+                    message: Cow::Borrowed(
+                        "CDM model cannot be represented in KVN without changing typed content",
+                    ),
+                    line: None,
+                }
+                .into());
             }
-            if let Some(additional) = &mut data.additional_parameters {
-                trim(&mut additional.comment);
-            }
-            trim(&mut data.state_vector.comment);
-            if let Some(covariance) = &mut data.covariance_matrix {
-                trim(&mut covariance.comment);
-            }
-        }
-        if reparsed != expected {
-            return Err(ValidationError::Generic {
-                message: Cow::Borrowed(
-                    "CDM model cannot be represented in KVN without changing typed content",
-                ),
-                line: None,
-            }
-            .into());
         }
         let mut writer = KvnWriter::new();
         self.write_kvn(&mut writer);
         let rounded = writer.finish_checked()?;
-        crate::traits::Validate::validate(&Self::from_kvn_str(&rounded)?)?;
+        if rounded != output {
+            crate::traits::Validate::validate(&Self::from_kvn_str(&rounded)?)?;
+        }
         Ok(())
     }
 }

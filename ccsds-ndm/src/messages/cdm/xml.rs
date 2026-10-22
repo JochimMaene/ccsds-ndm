@@ -8,35 +8,44 @@ use std::borrow::Cow;
 /// Some operational CDMs represent unavailable optional values with empty or `nil="true"`
 /// leaves (numbers, epochs, enumerations and text alike). Remove only those leaves, preserving byte offsets for later parse diagnostics.
 pub(super) fn normalize_missing_values(xml: &str) -> Result<Cow<'_, str>> {
-    use quick_xml::{events::Event, Reader};
+    use quick_xml::{
+        events::{BytesStart, Event},
+        Reader,
+    };
 
     let mut reader = Reader::from_str(xml);
-    let mut parents: Vec<Vec<u8>> = Vec::new();
+    // Reader events borrow the input; retaining them keeps ancestor names available without copies.
+    let mut parents: Vec<BytesStart<'_>> = Vec::new();
     let mut missing = Vec::new();
     let mut candidate = None;
     loop {
         let start = reader.buffer_position() as usize;
         let event = reader.read_event().map_err(FormatError::from)?;
+        let is_start = matches!(event, Event::Start(_));
         match event {
-            Event::Start(ref element) | Event::Empty(ref element) => {
+            Event::Start(element) | Event::Empty(element) => {
                 // A nested element is content, never an unavailable scalar.
                 if let Some((_, _, ref mut empty)) = candidate {
                     *empty = false;
                 }
-                let parent = parents.last().map(Vec::as_slice).unwrap_or_default();
-                let name = element.name();
-                if required_leaf(parent, name.as_ref()) {
+                let parent = parents
+                    .last()
+                    .map(|element| element.name().into_inner())
+                    .unwrap_or_default();
+                let name = element.name().into_inner();
+                let leaf = classify_leaf(parent, name);
+                if leaf == Leaf::Required {
                     for attribute in element.attributes().flatten() {
                         if attribute.key.as_ref() == b"nil" {
                             return Err(FormatError::InvalidFormat(format!(
                                 "{} is required and cannot be nil",
-                                String::from_utf8_lossy(name.as_ref())
+                                String::from_utf8_lossy(name)
                             ))
                             .into());
                         }
                     }
                 }
-                if optional_leaf(parent, name.as_ref()) {
+                if leaf == Leaf::Optional {
                     let mut supported_attributes = true;
                     for attribute in element.attributes() {
                         let attribute = attribute
@@ -47,20 +56,20 @@ pub(super) fn normalize_missing_values(xml: &str) -> Result<Cow<'_, str>> {
                         })?;
                         match attribute.key.as_ref() {
                             b"nil" if matches!(attribute.value.as_ref(), b"true" | b"1") => {}
-                            b"units" if allows_units(name.as_ref()) => {}
+                            b"units" if allows_units(name) => {}
                             _ => supported_attributes = false,
                         }
                     }
                     if supported_attributes {
-                        if matches!(event, Event::Empty(_)) {
+                        if !is_start {
                             missing.push(start..reader.buffer_position() as usize);
                         } else {
                             candidate = Some((start, parents.len(), true));
                         }
                     }
                 }
-                if matches!(event, Event::Start(_)) {
-                    parents.push(name.as_ref().to_vec());
+                if is_start {
+                    parents.push(element);
                 }
             }
             Event::End(_) => {
@@ -110,13 +119,20 @@ pub(super) fn normalize_missing_values(xml: &str) -> Result<Cow<'_, str>> {
     ))
 }
 
-fn optional_leaf(parent: &[u8], name: &[u8]) -> bool {
+#[derive(Clone, Copy, PartialEq)]
+enum Leaf {
+    Required,
+    Optional,
+    Other,
+}
+
+fn classify_leaf(parent: &[u8], name: &[u8]) -> Leaf {
     if !cdm_xml_children(parent).is_some_and(|children| children.contains(&name))
         || name == b"COMMENT"
     {
-        return false;
+        return Leaf::Other;
     }
-    match parent {
+    let optional = match parent {
         b"header" => name == b"MESSAGE_FOR",
         b"relativeMetadataData" => {
             !matches!(name, b"TCA" | b"MISS_DISTANCE" | b"relativeStateVector")
@@ -138,14 +154,14 @@ fn optional_leaf(parent: &[u8], name: &[u8]) -> bool {
             name.starts_with(b"CDRG_") || name.starts_with(b"CSRP_") || name.starts_with(b"CTHR_")
         }
         _ => false,
+    };
+    if optional {
+        Leaf::Optional
+    } else if cdm_xml_children(name).is_none() {
+        Leaf::Required
+    } else {
+        Leaf::Other
     }
-}
-
-fn required_leaf(parent: &[u8], name: &[u8]) -> bool {
-    cdm_xml_children(name).is_none()
-        && cdm_xml_children(parent).is_some_and(|children| children.contains(&name))
-        && name != b"COMMENT"
-        && !optional_leaf(parent, name)
 }
 
 pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {

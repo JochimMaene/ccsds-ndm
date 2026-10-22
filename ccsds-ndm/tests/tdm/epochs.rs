@@ -55,6 +55,45 @@ fn observations_are_ordered_per_keyword_without_reordering_other_keywords() {
 }
 
 #[test]
+fn chronology_tracks_consecutive_runs_and_returning_keywords_exactly() {
+    use ccsds_ndm::messages::tdm::{TdmObservation, TdmObservationData};
+    use ccsds_ndm::Validate;
+    let mut message = Tdm::from_kvn(TDM_KVN).unwrap();
+    message.body.segments[0].data.observations = [
+        ("2005-159T17:41:01", TdmObservationData::Range(1.0)),
+        ("2005-159T17:41:00", TdmObservationData::DopplerCount(-2.0)),
+        ("2005-159T17:41:02", TdmObservationData::Range(2.0)),
+        ("2005-159T17:41:03", TdmObservationData::Range(3.0)),
+        ("2005-159T17:41:01", TdmObservationData::DopplerCount(-1.0)),
+        ("2005-159T17:41:02", TdmObservationData::DopplerCount(0.0)),
+        ("2005-06-08T17:41:04Z", TdmObservationData::Range(4.0)),
+    ]
+    .into_iter()
+    .map(|(epoch, data)| TdmObservation {
+        epoch: epoch.parse().unwrap(),
+        data,
+    })
+    .collect();
+    assert_eq!(Tdm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    assert_eq!(Tdm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    for (index, epoch, keyword) in [
+        (3, "2005-159T17:41:02.0", "RANGE"),
+        (4, "2005-159T17:41:00", "DOPPLER_COUNT"),
+        (6, "2005-06-08T17:41:03.000Z", "RANGE"),
+    ] {
+        let mut invalid = message.clone();
+        invalid.body.segments[0].data.observations[index].epoch = epoch.parse().unwrap();
+        let error = invalid.validate().unwrap_err().to_string();
+        assert!(error.contains("strictly increasing epochs"), "{error}");
+        assert!(
+            error.contains(&format!("observations[{index}].epoch")),
+            "{error}"
+        );
+        crate::common::assert_rejects(&invalid, keyword);
+    }
+}
+
+#[test]
 fn tdm_epoch_fields_require_calendar_or_ordinal_form() {
     Tdm::from_kvn(TDM_KVN).expect("TDM fixture should parse");
 

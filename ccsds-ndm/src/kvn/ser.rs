@@ -643,44 +643,39 @@ impl<'a> KvnWriter<'a> {
         values: &[String],
         numeric_columns: &[bool],
     ) {
+        let mut line = std::mem::take(&mut self.line_buffer);
+        line.clear();
+        let _ = write!(line, "{epoch}");
         for (value, numeric) in values.iter().zip(numeric_columns) {
             self.check_text("OCM history record", value);
-            if *numeric {
-                self.unrepresentable_number |= value.trim().parse::<f64>().map_or(true, |number| {
-                    !OdmFloat::is_valid(number)
-                        || (number == 0.0
-                            && value
-                                .split(['e', 'E'])
-                                .next()
-                                .unwrap_or("")
-                                .bytes()
-                                .any(|byte| matches!(byte, b'1'..=b'9')))
-                });
+            line.push(' ');
+            if !numeric {
+                line.push_str(value);
+                continue;
+            }
+            let number = crate::kvn::parser::parse_ccsds_number(value.trim())
+                .filter(|number| OdmFloat::is_valid(*number));
+            let Some(number) = number else {
+                self.unrepresentable_number = true;
+                line.push_str(value);
+                continue;
+            };
+            let digits = value
+                .split(['e', 'E'])
+                .next()
+                .unwrap_or("")
+                .bytes()
+                .filter(u8::is_ascii_digit)
+                .count();
+            if digits > 16 || (number == 0.0 && number.is_sign_negative()) {
+                let _ = OdmFloat(number).write_to(&mut line);
+            } else {
+                line.push_str(value);
             }
         }
-        let build = |line: &mut String| {
-            let _ = write!(line, "{epoch}");
-            for (value, numeric) in values.iter().zip(numeric_columns) {
-                line.push(' ');
-                let digits = value
-                    .split(['e', 'E'])
-                    .next()
-                    .unwrap_or("")
-                    .bytes()
-                    .filter(u8::is_ascii_digit)
-                    .count();
-                let negative_zero =
-                    *numeric && value.starts_with('-') && value.parse::<f64>() == Ok(0.0);
-                if *numeric && (digits > 16 || negative_zero) {
-                    if let Ok(number) = value.trim().parse::<f64>() {
-                        let _ = OdmFloat(number).write_to(line);
-                    }
-                } else {
-                    line.push_str(value);
-                }
-            }
-        };
-        self.write_built_line(build);
+        line.push('\n');
+        let _ = self.write_str(&line);
+        self.line_buffer = line;
     }
 
     /// Writes a raw line of text.
@@ -890,6 +885,37 @@ mod tests {
             assert!(!OdmFloat::write_if_valid(value, &mut output));
             assert!(output.is_empty());
         }
+    }
+
+    #[test]
+    fn ocm_text_history_preserves_identifiers_and_checks_numeric_columns() {
+        let mut writer = KvnWriter::new();
+        writer.write_ocm_text_history(
+            &"0",
+            &[
+                "12345678901234567".into(),
+                "-0.0".into(),
+                "1.2345678901234567".into(),
+                "5e-324".into(),
+            ],
+            &[false, true, true, true],
+        );
+        assert_eq!(
+            writer.finish_checked().unwrap(),
+            "0 12345678901234567 0.0 1.234567890123457 5e-324\n"
+        );
+        for invalid in ["1e-400", "NaN", "1e400", "1.7976931348623157e308"] {
+            let mut writer = KvnWriter::new();
+            writer.write_ocm_text_history(&"0", &[invalid.into()], &[true]);
+            assert!(writer.finish_checked().is_err(), "{invalid}");
+        }
+        let mut writer = KvnWriter::new();
+        writer.write_ocm_text_history(&"0", &["é".into()], &[false]);
+        assert!(writer
+            .finish_checked()
+            .unwrap_err()
+            .to_string()
+            .contains("OCM history record"));
     }
 
     #[test]

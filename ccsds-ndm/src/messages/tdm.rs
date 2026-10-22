@@ -1222,23 +1222,37 @@ impl crate::traits::Validate for TdmData {
             .into());
         }
         let mut previous = std::collections::HashMap::new();
-        for (index, observation) in self.observations.iter().enumerate() {
-            observation.data.validate()?;
-            if let Some(epoch) = previous.insert(observation.data.key(), observation.epoch) {
-                if epoch
-                    .into_epoch()
-                    .cmp_same_branch(&observation.epoch.into_epoch())
-                    != Some(std::cmp::Ordering::Less)
-                {
-                    return Err(ValidationError::InvalidValue {
-                        field: observation.data.key().into(),
-                        value: observation.epoch.to_string(),
-                        expected: "strictly increasing epochs for each observation keyword".into(),
-                        line: None,
+        let mut index = 0;
+        for run in self
+            .observations
+            .chunk_by(|left, right| left.data.key() == right.data.key())
+        {
+            let keyword = run[0].data.key();
+            // Resolve chronology once per consecutive run, retaining borrowed comparison keys.
+            let prior: &mut Option<crate::types::EpochOrderKey<'_>> =
+                previous.entry(keyword).or_insert(None);
+            for observation in run {
+                observation.data.validate()?;
+                let current = observation
+                    .epoch
+                    .as_epoch()
+                    .order_key()
+                    .expect("CalendarEpoch contains a valid calendar epoch");
+                if let Some(epoch) = prior {
+                    if epoch.compare(&current) != Some(std::cmp::Ordering::Less) {
+                        return Err(ValidationError::InvalidValue {
+                            field: keyword.into(),
+                            value: observation.epoch.to_string(),
+                            expected: "strictly increasing epochs for each observation keyword"
+                                .into(),
+                            line: None,
+                        }
+                        .at_path(format!("observations[{index}].epoch"))
+                        .into());
                     }
-                    .at_path(format!("observations[{index}].epoch"))
-                    .into());
                 }
+                *prior = Some(current);
+                index += 1;
             }
         }
         Ok(())

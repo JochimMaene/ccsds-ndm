@@ -149,12 +149,16 @@ fn attitude_state_line(
             return Err(fail(input, record, "Invalid CCSDS number in data line"));
         };
         if value_count == values.len() {
-            break;
+            return Err(fail(
+                input,
+                record,
+                "data line has the wrong number of values for ATTITUDE_TYPE",
+            ));
         }
         values[value_count] = val;
         value_count += 1;
     }
-    if value_count != expected_values || line.split_whitespace().count() != expected_values + 1 {
+    if value_count != expected_values {
         return Err(fail(
             input,
             record,

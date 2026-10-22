@@ -651,6 +651,18 @@ fn data_row_shape_errors_name_the_problem_at_the_row() {
             row.replace("0.42319", "0.4x"),
             "Invalid CCSDS number in data line",
         ),
+        (
+            format!("{row} 0"),
+            "data line has the wrong number of values for ATTITUDE_TYPE",
+        ),
+        (
+            format!("{row} 0 0 0 0 0"),
+            "data line has the wrong number of values for ATTITUDE_TYPE",
+        ),
+        (
+            format!("{row} 0 0 0 0 bad"),
+            "Invalid CCSDS number in data line",
+        ),
     ] {
         let error = Aem::from_kvn(&crate::common::mutated(crate::KVN, row, &bad)).unwrap_err();
         let kvn = crate::common::kvn_parse_error(&error).expect("a KVN parse error");

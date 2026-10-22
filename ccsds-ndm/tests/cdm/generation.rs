@@ -360,9 +360,15 @@ fn xml_nested_comments_merge_canonically_into_kvn() {
 fn kvn_comment_lines_are_written_without_trailing_blanks() {
     let mut message = Cdm::from_kvn(KVN).unwrap();
     message.header.comment = vec!["padded   ".into()];
+    message.body.relative_metadata_data.miss_distance.value = 0.300_000_000_000_000_04;
     let kvn = message.to_kvn().unwrap();
     assert!(kvn.contains("COMMENT padded\n"), "{kvn}");
-    assert_eq!(Cdm::from_kvn(&kvn).unwrap().to_kvn().unwrap(), kvn);
+    let parsed = Cdm::from_kvn(&kvn).unwrap();
+    assert_eq!(parsed.body.relative_metadata_data.miss_distance.value, 0.3);
+    assert_eq!(parsed.to_kvn().unwrap(), kvn);
+    let mut streamed = Vec::new();
+    message.write_kvn_to(&mut streamed).unwrap();
+    assert_eq!(streamed, kvn.as_bytes());
 }
 
 #[test]

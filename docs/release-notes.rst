@@ -7,6 +7,9 @@ Unreleased
 Additional conformance corrections
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- KVN numeric parsing and AEM row parsing avoid duplicate scans. TDM reuses per-keyword
+  timestamp state, OCM maneuver output parses each numeric token once per write, and CDM
+  normalization/preflight avoids unnecessary allocations and identical-output reparsing.
 - History validation reuses timestamp comparison keys. KVN parsing avoids duplicate input
   normalization, and covariance output revalidates rounded matrices only when values change.
   Typed Python readers inspect the message header before parsing without a second full-file scan.
