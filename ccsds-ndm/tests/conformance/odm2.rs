@@ -277,7 +277,9 @@ fn opm_and_omm_2_reject_new_header_fields_in_both_notations() {
 
 #[test]
 fn omm_2_tle_schema_shape_is_xml_only() {
-    let base = Omm::from_kvn(&edition_2(include_str!("../../data/kvn/omm_g7.kvn"))).unwrap();
+    let mut base = Omm::from_kvn(&edition_2(include_str!("../../data/kvn/omm_g7.kvn"))).unwrap();
+    // A neutral theory isolates the schema shape from the 2.0 book's theory conditions.
+    base.body.segment.metadata.mean_element_theory = "ICD_THEORY".into();
     type Edit = fn(&mut ccsds_ndm::messages::omm::TleParameters);
     let mutations: &[(&str, Edit)] = &[
         ("norad_cat_id", |tle| tle.norad_cat_id = None),
@@ -285,6 +287,7 @@ fn omm_2_tle_schema_shape_is_xml_only() {
         ("rev_at_epoch", |tle| tle.rev_at_epoch = None),
         ("bstar", |tle| tle.bstar = None),
         ("mean_motion_ddot", |tle| tle.mean_motion_ddot = None),
+        ("mean_motion_dot", |tle| tle.mean_motion_dot = None),
         ("bterm", |tle| {
             tle.bstar = None;
             tle.bterm = Some(ccsds_ndm::types::M2kg::new(0.01, None));
@@ -308,14 +311,13 @@ fn omm_2_tle_schema_shape_is_xml_only() {
         assert!(message.to_xml().is_err(), "{field}");
         // A neutral theory permits KVN omissions in 3.0; XML still requires each choice.
         message.version = "3.0".into();
-        message.body.segment.metadata.mean_element_theory = "ICD_THEORY".into();
         let source = message.to_kvn().unwrap().replacen("= 3.0", "= 2.0", 1);
         if matches!(*field, "bterm" | "agom") {
             assert!(ccsds_ndm::from_str(&source).is_err(), "{field}");
         } else {
             ccsds_ndm::from_str(&source).unwrap();
         }
-        if matches!(*field, "bstar" | "mean_motion_ddot") {
+        if matches!(*field, "bstar" | "mean_motion_ddot" | "mean_motion_dot") {
             assert!(message.to_xml().is_err(), "{field}");
         } else {
             let source = message
@@ -393,4 +395,77 @@ fn odm_2_partial_spacecraft_is_kvn_valid_but_not_xml_representable() {
         source = source.replace("version=\"3.0\"", "version=\"2.0\"");
         assert!(ccsds_ndm::from_str(&source).is_err(), "{family}");
     }
+}
+
+/// ODM 2.0 table 4-3 states its own theory conditions: NORAD_CAT_ID and BSTAR for SGP/SGP4,
+/// both derivatives for SGP. PPT3 and SGP4-XP are 3.0 theories and impose nothing in 2.0.
+#[test]
+fn omm_2_applies_its_own_theory_table() {
+    let base = Omm::from_kvn(&edition_2(include_str!("../../data/kvn/omm_g7.kvn"))).unwrap();
+    for (theory, field) in [
+        ("SGP/SGP4", "NORAD_CAT_ID"),
+        ("SGP4", "BSTAR"),
+        ("SGP", "MEAN_MOTION_DOT"),
+    ] {
+        let mut message = base.clone();
+        message.body.segment.metadata.mean_element_theory = theory.into();
+        let tle = message.body.segment.data.tle_parameters.as_mut().unwrap();
+        match field {
+            "NORAD_CAT_ID" => tle.norad_cat_id = None,
+            "BSTAR" => tle.bstar = None,
+            _ => tle.mean_motion_dot = None,
+        }
+        crate::common::assert_validation_field(&message.validate().unwrap_err(), field);
+        // The same omission is valid in 3.0 except where the 3.0 table also requires it.
+        message.version = "3.0".into();
+        assert_eq!(
+            message.validate().is_ok(),
+            field == "NORAD_CAT_ID",
+            "{theory}"
+        );
+    }
+    for theory in ["PPT3", "SGP4-XP"] {
+        let mut message = base.clone();
+        message.body.segment.metadata.mean_element_theory = theory.into();
+        message.body.segment.data.tle_parameters = None;
+        message.validate().unwrap();
+        message.version = "3.0".into();
+        crate::common::assert_validation_field(&message.validate().unwrap_err(), "TLE_PARAMETERS");
+    }
+}
+
+/// The ODM 2.0 common schema's angleRange is [-180, 360); 3.0 allows [-360, 360).
+#[test]
+fn odm_2_angles_use_the_2_0_range() {
+    let mut omm = Omm::from_kvn(&edition_2(include_str!("../../data/kvn/omm_g7.kvn"))).unwrap();
+    omm.body.segment.data.mean_elements.mean_anomaly.value = -200.0;
+    let error = omm.validate().unwrap_err();
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment.data.mean_elements.mean_anomaly")
+    );
+    assert!(omm.to_kvn().is_err());
+    omm.version = "3.0".into();
+    omm.header.message_id = None;
+    omm.validate().unwrap();
+
+    let mut opm = Opm::from_kvn(&edition_2(include_str!("../../data/kvn/opm_g2.kvn"))).unwrap();
+    let elements = opm.body.segment.data.keplerian_elements.as_mut().unwrap();
+    elements.ra_of_asc_node.value = -180.5;
+    let error = opm.validate().unwrap_err();
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment.data.keplerian_elements.ra_of_asc_node")
+    );
+    // KVN input applies the same 2.0 bound; the 3.0 original still reads it.
+    let source = mutated_once(
+        include_str!("../../data/kvn/opm_g2.kvn"),
+        "RA_OF_ASC_NODE = 17.604721",
+        "RA_OF_ASC_NODE = -180.5",
+    );
+    Opm::from_kvn(&source).unwrap();
+    crate::common::assert_validation_field(
+        &Opm::from_kvn(&edition_2(&source)).unwrap_err(),
+        "RA_OF_ASC_NODE",
+    );
 }

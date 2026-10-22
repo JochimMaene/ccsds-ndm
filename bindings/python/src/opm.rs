@@ -25,15 +25,17 @@ use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 /// segment : OpmSegment
 ///     The data segment.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct Opm {
-    /// The message identifier.
+    /// Root identifier, always ``CCSDS_OPM_VERS`` (the KVN version keyword and XML ``id``
+    /// attribute); it does not identify an individual message (see ``header.message_id``).
     ///
     /// :type: Optional[str]
     #[pyo3(get)]
     id: Option<String>,
 
-    /// The message version.
+    /// Message edition: ``"3.0"`` (CCSDS 502.0-B-3) or ``"2.0"`` (502.0-B-2); both are read
+    /// and written.
     ///
     /// :type: str
     #[pyo3(get)]
@@ -116,9 +118,32 @@ impl Opm {
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
         crate::api::validate_message(py, &self.to_core(py)?)
     }
-
-    /// Create an OPM message from a string.
-
+    /// Parse a OPM document and validate its contents.
+    ///
+    /// Parameters
+    /// ----------
+    /// data : str
+    ///     KVN or XML content. Combined NDM requires XML.
+    /// format : str, optional
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// Opm
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmEpochError
+    ///     Invalid CCSDS epoch.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// ValueError
+    ///     Unsupported format argument.
     #[staticmethod]
     #[pyo3(signature = (data, format=None))]
     fn from_str(
@@ -130,8 +155,34 @@ impl Opm {
         let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Parse an OPM from a KVN or XML file.
+    /// Read a UTF-8 OPM document from a file and validate it.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Input file.
+    /// format : str, optional
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// Opm
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmEpochError
+    ///     Invalid CCSDS epoch.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Input file could not be read.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
@@ -144,8 +195,27 @@ impl Opm {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Atomically write this OPM as KVN or XML.
+    /// Validate this OPM message and atomically replace the destination.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Destination file; existing content is replaced only after successful generation.
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Temporary-file writing or atomic replacement failed.
     fn to_file(
         &self,
         py: Python<'_>,
@@ -161,8 +231,28 @@ impl Opm {
             format,
         )
     }
-
-    /// Serialize to KVN or XML after mandatory CCSDS validation.
+    /// Validate and serialize this OPM message, preserving its edition.
+    ///
+    /// Parameters
+    /// ----------
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     Generated document, subject to the documented notation normalizations.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
     fn to_str(
         &self,
         py: Python<'_>,
@@ -184,7 +274,7 @@ impl Opm {
 /// data : OpmData
 ///     Segment data.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct OpmSegment {
     /// A single segment of the OPM.
     ///
@@ -261,11 +351,12 @@ impl OpmSegment {
 /// time_system : str
 ///     Time system used for state vector, maneuver, and covariance data.
 /// ref_frame_epoch : str, optional
-///     Epoch of the reference frame, if not intrinsic to the definition (ISO 8601).
+///     Epoch of the reference frame, if not intrinsic to the definition (CCSDS
+///     epoch, ODM 7.5.10).
 /// comment : list[str], optional
 ///     Comments.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct OpmMetadata {
     pub inner: core_opm::OpmMetadata,
@@ -500,7 +591,7 @@ impl OpmMetadata {
 /// mean_anomaly : float or None
 ///     Mean anomaly. Units: deg.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct KeplerianElements {
     pub inner: core_opm::KeplerianElements,
@@ -771,8 +862,8 @@ impl KeplerianElements {
 ///     Velocity Z covariance [6,6]. Units: km²/s².
 /// cov_ref_frame : str, optional
 ///     Reference frame for the covariance matrix.
-///     comments : list[str], optional
-///     Comments.
+/// comments : list[str], optional
+///     Comments before the covariance matrix.
 ///
 /// Attributes
 /// ----------
@@ -780,7 +871,7 @@ impl KeplerianElements {
 ///     Position X covariance [1,1]. Units: km².
 ///     ... (see Parameters for full list of attributes with units)
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct OpmCovarianceMatrix {
     pub inner: ccsds_ndm::common::OpmCovarianceMatrix,
@@ -1272,8 +1363,10 @@ impl OpmCovarianceMatrix {
 /// ----------
 /// state_vector : StateVector
 ///     State vector.
+/// comment : list[str], optional
+///     Data-level comments; KVN merges them before state-vector comments.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct OpmData {
     /// Comments (see 7.8 for formatting rules).
     ///
@@ -1494,7 +1587,7 @@ impl OpmData {
 /// man_dv_3 : float
 ///     Velocity change in 3rd axis (km/s).
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct OpmManeuverParameters {
     pub inner: core_opm::ManeuverParameters,

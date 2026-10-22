@@ -112,9 +112,7 @@ __all__ = [
     "TdmData",
     "TdmHeader",
     "TdmMetadata",
-    "TdmMode",
     "TdmObservation",
-    "TdmPath",
     "TdmSegment",
     "TleParameters",
     "TrajLine",
@@ -141,18 +139,25 @@ class Acm:
     - Optional covariance elements
     - Optional maneuver parameters
     - Optional estimator information
+
+    Parameters
+    ----------
+    header : AdmHeader
+        Creation epoch and message provenance.
+    segment : AcmSegment
+        Comprehensive attitude segment.
     """
     @property
     def id(self) -> typing.Optional[builtins.str]:
         r"""
-        The message identifier.
+        Constant XML root identifier, `CCSDS_ACM_VERS`.
 
         :type: Optional[str]
         """
     @property
     def version(self) -> builtins.str:
         r"""
-        The message version.
+        Message edition, `2.0`.
 
         :type: str
         """
@@ -195,14 +200,69 @@ class Acm:
     @staticmethod
     def from_str(
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
-    ) -> Acm: ...
+    ) -> Acm:
+        r"""
+        Parse a ACM document and validate its contents.
+
+        Parameters
+        ----------
+        data : str
+            KVN or XML content. Combined NDM requires XML.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        Acm
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
+        """
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
     ) -> Acm:
         r"""
-        Parse an ACM from a KVN or XML file.
+        Read a UTF-8 ACM document from a file and validate it.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Input file.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        Acm
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Input file could not be read.
         """
     def to_file(
         self,
@@ -210,17 +270,66 @@ class Acm:
         format: typing.Literal["kvn", "xml"],
     ) -> None:
         r"""
-        Atomically write this ACM as KVN or XML.
+        Validate this ACM message and atomically replace the destination.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Destination file; existing content is replaced only after successful generation.
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Temporary-file writing or atomic replacement failed.
         """
     def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
         r"""
-        Serialize to validated KVN or XML.
+        Validate and serialize this ACM message, preserving its edition.
+
+        Parameters
+        ----------
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Returns
+        -------
+        str
+            Generated document, subject to the documented notation normalizations.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
         """
 
 @typing.final
 class AcmAttitudeDetermination:
     r"""
     ACM Data: Attitude Determination Data Section.
+
+    Parameters
+    ----------
+    ad_id : str, optional
+        Identifier for the attitude determination data.
+    comment : list[str], optional
+        Comments immediately after AD_START. Set determination fields and sensors before validation or
+        generation.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -282,7 +391,8 @@ class AcmAttitudeDetermination:
     @property
     def number_states(self) -> typing.Optional[builtins.int]:
         r"""
-        Number of estimator states.
+        Number of states if EKF, BATCH, or FILTER SMOOTHER is specified; at least 6 when
+        RATE_STATES is present.
 
         CCSDS Reference: 504.0-B-2, Section 5.3.9.
 
@@ -293,7 +403,8 @@ class AcmAttitudeDetermination:
     @property
     def attitude_states(self) -> typing.Optional[builtins.str]:
         r"""
-        Attitude state type for estimator.
+        Type of attitude data in the estimator, selected per annex B, subsection B4 (mandatory in
+        the AD block). Attitude states are listed before rate states.
 
         CCSDS Reference: 504.0-B-2, Section 5.3.9.
 
@@ -306,6 +417,8 @@ class AcmAttitudeDetermination:
         r"""
         Euler rotation sequence used by Euler-angle attitude states.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
+
         :type: str | None
         """
     @euler_rot_seq.setter
@@ -313,25 +426,15 @@ class AcmAttitudeDetermination:
     @property
     def cov_type(self) -> typing.Optional[builtins.str]:
         r"""
-        Covariance type for estimator.
-
-        CCSDS Reference: 504.0-B-2, Section 5.3.7.
-
-        :type: str | None
-        """
-    @cov_type.setter
-    def cov_type(self, value: typing.Optional[builtins.str]) -> None: ...
-    @property
-    def ad_epoch(self) -> typing.Optional[builtins.str]:
-        r"""
-        Epoch of the attitude determination.
+        Type of attitude error state included in the estimator (annex B, subsection B6). KVN
+        ``COV_TYPE = NONE`` is read as omission.
 
         CCSDS Reference: 504.0-B-2, Section 5.3.9.
 
         :type: str | None
         """
-    @ad_epoch.setter
-    def ad_epoch(self, value: typing.Optional[builtins.str]) -> None: ...
+    @cov_type.setter
+    def cov_type(self, value: typing.Optional[builtins.str]) -> None: ...
     @property
     def ref_frame_a(self) -> typing.Optional[builtins.str]:
         r"""
@@ -355,23 +458,10 @@ class AcmAttitudeDetermination:
     @ref_frame_b.setter
     def ref_frame_b(self, value: typing.Optional[builtins.str]) -> None: ...
     @property
-    def attitude_type(self) -> typing.Optional[builtins.str]:
-        r"""
-        Type of attitude data, selected per annex B, subsection B4. Attitude states must always be
-        listed before rate states.
-
-        Examples: QUATERNION
-
-        CCSDS Reference: 504.0-B-2, Section 5.3.9.
-
-        :type: str | None
-        """
-    @attitude_type.setter
-    def attitude_type(self, value: typing.Optional[builtins.str]) -> None: ...
-    @property
     def rate_states(self) -> typing.Optional[builtins.str]:
         r"""
-        Rate states type.
+        Type of rate state included in the estimator (e.g. ANGVEL, GYRO_BIAS). If rate states are
+        included, NUMBER_STATES must be at least 6.
 
         CCSDS Reference: 504.0-B-2, Section 5.3.9.
 
@@ -435,6 +525,26 @@ class AcmAttitudeDetermination:
 class AcmAttitudeState:
     r"""
     ACM Data: Attitude State Time History Section.
+
+    Parameters
+    ----------
+    ref_frame_a : str
+        Reference frame at the start of the attitude transformation.
+    ref_frame_b : str
+        Reference frame at the end of the attitude transformation.
+    att_type : str
+        Attitude representation (ADM table 5-4), for example QUATERNION.
+    att_lines : list[tuple[str, list[float]]]
+        Time tags and state components in ATT_TYPE order. Tags may be relative offsets or CCSDS
+        calendar epochs; each block uses one form. Every row must have the same nonzero number of
+        components.
+    comment : list[str], optional
+        Comments immediately after ATT_START.
+
+    Raises
+    ------
+    ValueError
+        If att_type or a time tag is invalid, the history is empty, or row widths differ.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -474,7 +584,9 @@ class AcmAttitudeState:
     @property
     def att_basis(self) -> typing.Optional[builtins.str]:
         r"""
-        Basis of this attitude state data.
+        Basis of this attitude state time history data. Suggested values: PREDICTED,
+        DETERMINED_GND, DETERMINED_OBC, SIMULATED. Any text is kept for KVN; XML input and output
+        require one of the suggested values (XSD ``attBasisType``).
 
         CCSDS Reference: 504.0-B-2, Section 5.3.5.
 
@@ -572,25 +684,34 @@ class AcmAttitudeState:
     @euler_rot_seq.setter
     def euler_rot_seq(self, value: typing.Optional[builtins.str]) -> None: ...
     @property
-    def att_lines(self) -> builtins.list[builtins.list[builtins.float]]:
+    def att_lines(
+        self,
+    ) -> builtins.list[tuple[builtins.str, builtins.list[builtins.float]]]:
         r"""
         Data lines that consist of attitude data followed by rate data. (For the data units, see
         above [ATT_TYPE and RATE_TYPE keywords]).
 
         CCSDS Reference: 504.0-B-2, Section 5.3.5.
 
-        :type: list[list[float]]
+        Each line is ``(time_tag, values)``. The time tag is a relative time in seconds from
+        EPOCH_TZERO (e.g. ``"20157.26"``) or an absolute CCSDS epoch, one form per block
+        (ADM 5.3.4.3 and 5.3.4.5); its spelling is preserved.
+
+        :type: list[tuple[str, list[float]]]
         """
     @att_lines.setter
     def att_lines(
-        self, value: typing.Sequence[typing.Sequence[builtins.float]]
+        self,
+        value: typing.Sequence[tuple[builtins.str, typing.Sequence[builtins.float]]],
     ) -> None: ...
     def __new__(
         cls,
         ref_frame_a: builtins.str,
         ref_frame_b: builtins.str,
         att_type: builtins.str,
-        att_lines: typing.Sequence[typing.Sequence[builtins.float]],
+        att_lines: typing.Sequence[
+            tuple[builtins.str, typing.Sequence[builtins.float]]
+        ],
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> AcmAttitudeState: ...
 
@@ -598,6 +719,25 @@ class AcmAttitudeState:
 class AcmCovarianceMatrix:
     r"""
     ACM Data: Covariance Time History Section.
+
+    Parameters
+    ----------
+    cov_basis : str
+        Covariance provenance, for example PREDICTED or DETERMINED.
+    cov_ref_frame : str
+        Reference frame for the covariance components.
+    cov_type : str
+        Covariance representation (ADM table 5-6), for example ANGLE.
+    cov_lines : list[tuple[str, list[float]]]
+        Time tags and covariance components in COV_TYPE order. Tags may be relative offsets or CCSDS
+        calendar epochs; each block uses one form.
+    comment : list[str], optional
+        Comments immediately after COV_START.
+
+    Raises
+    ------
+    ValueError
+        If cov_type or a time tag is invalid.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -628,6 +768,8 @@ class AcmCovarianceMatrix:
         r"""
         Previous covariance history identifier.
 
+        CCSDS Reference: 504.0-B-2, Section 5.3.7.
+
         :type: str | None
         """
     @cov_prev_id.setter
@@ -635,9 +777,13 @@ class AcmCovarianceMatrix:
     @property
     def cov_basis(self) -> typing.Optional[builtins.str]:
         r"""
-        Basis of this covariance time history data.
+        Basis of this covariance time history data. Suggested values: PREDICTED,
+        DETERMINED_GND, DETERMINED_OBC, SIMULATED. Any text is kept for KVN; XML input and output
+        require one of the suggested values (XSD ``attBasisType``).
 
         Examples: PREDICTED, DETERMINED_GND, DETERMINED_OBC, SIMULATED
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.7.
 
         :type: str | None
         """
@@ -647,6 +793,8 @@ class AcmCovarianceMatrix:
     def cov_basis_id(self) -> typing.Optional[builtins.str]:
         r"""
         Identifier for the covariance basis.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.7.
 
         :type: str | None
         """
@@ -680,36 +828,34 @@ class AcmCovarianceMatrix:
     @cov_type.setter
     def cov_type(self, value: builtins.str) -> None: ...
     @property
-    def cov_confidence(self) -> typing.Optional[builtins.float]:
-        r"""
-        Optional confidence level of the covariance matrix.
-
-        CCSDS Reference: 504.0-B-2, Section 5.3.7.
-
-        :type: float | None
-        """
-    @cov_confidence.setter
-    def cov_confidence(self, value: typing.Optional[builtins.float]) -> None: ...
-    @property
-    def cov_lines(self) -> builtins.list[builtins.list[builtins.float]]:
+    def cov_lines(
+        self,
+    ) -> builtins.list[tuple[builtins.str, builtins.list[builtins.float]]]:
         r"""
         Covariance data lines (diagonal terms only). (For the data units, see annex B, subsection
         B6.)
 
         CCSDS Reference: 504.0-B-2, Section 5.3.7.
 
-        :type: list[list[float]]
+        Each line is ``(time_tag, values)``. The time tag is a relative time in seconds from
+        EPOCH_TZERO or an absolute CCSDS epoch, one form per block, strictly increasing
+        (ADM 5.3.4.3 to 5.3.4.5 and 5.3.7.5); its spelling is preserved.
+
+        :type: list[tuple[str, list[float]]]
         """
     @cov_lines.setter
     def cov_lines(
-        self, value: typing.Sequence[typing.Sequence[builtins.float]]
+        self,
+        value: typing.Sequence[tuple[builtins.str, typing.Sequence[builtins.float]]],
     ) -> None: ...
     def __new__(
         cls,
         cov_basis: builtins.str,
         cov_ref_frame: builtins.str,
         cov_type: builtins.str,
-        cov_lines: typing.Sequence[typing.Sequence[builtins.float]],
+        cov_lines: typing.Sequence[
+            tuple[builtins.str, typing.Sequence[builtins.float]]
+        ],
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> AcmCovarianceMatrix: ...
 
@@ -717,6 +863,21 @@ class AcmCovarianceMatrix:
 class AcmData:
     r"""
     ACM Data Section.
+
+    Parameters
+    ----------
+    att : list[AcmAttitudeState], optional
+        Attitude history blocks in source order.
+    phys : AcmPhysicalDescription, optional
+        Spacecraft physical characteristics.
+    cov : list[AcmCovarianceMatrix], optional
+        Covariance histories in source order.
+    man : list[AcmManeuverParameters], optional
+        Maneuver blocks in source order.
+    ad : AcmAttitudeDetermination, optional
+        Attitude determination information and sensor descriptions.
+    user : UserDefined, optional
+        Ordered user-defined comments and named values.
     """
     @property
     def user(self) -> typing.Optional[UserDefined]:
@@ -804,6 +965,14 @@ class AcmData:
 class AcmManeuverParameters:
     r"""
     ACM Data: Maneuver Specification Section.
+
+    Parameters
+    ----------
+    man_id : str, optional
+        Identifier for the maneuver.
+    comment : list[str], optional
+        Comments immediately after MAN_START. Set required maneuver properties before validating or
+        generating the message.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -953,6 +1122,24 @@ class AcmManeuverParameters:
 class AcmMetadata:
     r"""
     ACM Metadata Section.
+
+    Parameters
+    ----------
+    object_name : str
+        Space-object name (ADM table 5-3).
+    epoch_tzero : str
+        CCSDS calendar reference epoch for relative history tags, in TIME_SYSTEM.
+    time_system : str
+        Time system used by the reference epoch and data time tags.
+    international_designator : str, optional
+        International designator of the space object.
+    comment : list[str], optional
+        Metadata comment lines in source order.
+
+    Raises
+    ------
+    ValueError
+        If epoch_tzero is not a CCSDS calendar epoch.
     """
     @property
     def object_name(self) -> builtins.str:
@@ -1220,6 +1407,12 @@ class AcmMetadata:
 class AcmPhysicalDescription:
     r"""
     ACM Data: Space Object Physical Characteristics Section.
+
+    Parameters
+    ----------
+    comment : list[str], optional
+        Comments immediately after PHYS_START. Set the physical properties before validating or
+        generating the message.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -1372,6 +1565,16 @@ class AcmPhysicalDescription:
 
 @typing.final
 class AcmSegment:
+    r"""
+    ACM metadata and comprehensive attitude data.
+
+    Parameters
+    ----------
+    metadata : AcmMetadata
+        Object identification, reference epoch and time system.
+    data : AcmData
+        Attitude histories and optional comprehensive data blocks.
+    """
     @property
     def metadata(self) -> AcmMetadata:
         r"""
@@ -1401,7 +1604,7 @@ class AcmSegment:
         :type: AcmData
         """
     def __new__(cls, metadata: AcmMetadata, data: AcmData) -> AcmSegment: ...
-    def validate(self, header: AdmHeader) -> None:
+    def validate(self) -> None:
         r"""
         Validate the segment against CCSDS rules.
         """
@@ -1410,11 +1613,24 @@ class AcmSegment:
 class AcmSensor:
     r"""
     ACM Data: Sensor Data Section.
+
+    Parameters
+    ----------
+    sensor_number : int, optional
+        Sensor index, unique and ascending within the attitude determination block.
+    sensor_used : str, optional
+        Sensor name or type.
+    sensor_noise_stddev : list[float], optional
+        Sensor noise standard deviations in degrees.
+    sensor_frequency : float, optional
+        Sensor sampling frequency in hertz.
+    comment : list[str], optional
+        Producer-extension comments after SENSOR_START; XML generation refuses them.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
         r"""
-        Comments allowed only immediately after the SENSOR_START keyword.
+        Producer-extension comments immediately after SENSOR_START; XML generation refuses them.
 
         Examples: This is a comment.
 
@@ -1453,6 +1669,8 @@ class AcmSensor:
     def number_sensor_noise_covariance(self) -> typing.Optional[builtins.int]:
         r"""
         Number of sensor-noise covariance elements.
+
+        CCSDS Reference: 504.0-B-2, Section 5.3.9.
 
         :type: int | None
         """
@@ -1657,6 +1875,29 @@ class AdditionalParameters:
 class AdmHeader:
     r"""
     Represents the `admHeader` complex type from the XSD.
+
+    Parameters
+    ----------
+    creation_date : str
+        File creation date/time in UTC. (For format specification, see 6.8.9.)
+    originator : str
+        Creating agency or operator. Select from the accepted set of values indicated in annex B,
+        subsection B1 from the ‘Abbreviation’ column (when present), or the ‘Name’ column when an
+        Abbreviation column is not populated. If desired organization is not listed there, follow
+        procedures to request that originator be added to SANA registry.
+    classification : str, optional
+        User-defined free-text message classification/caveats of this ADM. It is recommended that
+        selected values be pre-coordinated between exchanging entities by mutual agreement.
+    message_id : str, optional
+        ID that uniquely identifies a message from a given originator. The format and content of the
+        message identifier value are at the discretion of the originator.
+    comment : list[str], optional
+        User-defined comments. (See ADM 6.10 for formatting and placement rules.)
+
+    Raises
+    ------
+    ValueError
+        If creation_date is not a CCSDS calendar epoch.
     """
     @property
     def creation_date(self) -> builtins.str:
@@ -1665,7 +1906,7 @@ class AdmHeader:
 
         Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
 
-        CCSDS Reference: 504.0-B-2, Section 3.2.2.
+        CCSDS Reference: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
 
         :type: str
         """
@@ -1681,7 +1922,7 @@ class AdmHeader:
 
         Examples: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
 
-        CCSDS Reference: 504.0-B-2, Section 3.2.2.
+        CCSDS Reference: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
 
         :type: str
         """
@@ -1693,9 +1934,9 @@ class AdmHeader:
         ID that uniquely identifies a message from a given originator. The format and content of
         the message identifier value are at the discretion of the originator.
 
-        Examples: APM_201113719185, ABC-12_34
+        Examples: 201113719185, ABC-12_34
 
-        CCSDS Reference: 504.0-B-2, Section 3.2.2.
+        CCSDS Reference: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
 
         :type: Optional[str]
         """
@@ -1709,7 +1950,7 @@ class AdmHeader:
 
         Examples: SBU, ‘Operator-proprietary data; secondary distribution not permitted’
 
-        CCSDS Reference: 504.0-B-2, Section 3.2.2.
+        CCSDS Reference: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
 
         :type: Optional[str]
         """
@@ -1718,11 +1959,11 @@ class AdmHeader:
     @property
     def comment(self) -> builtins.list[builtins.str]:
         r"""
-        User-defined comments. (See 7.8 for formatting rules.)
+        User-defined comments. (See ADM 6.10 for formatting and placement rules.)
 
         Examples: This is a comment
 
-        CCSDS Reference: 504.0-B-2, Section 3.2.2.
+        CCSDS Reference: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
 
         :type: list[str]
         """
@@ -1751,18 +1992,25 @@ class Aem:
     The AEM allows for dynamic modeling of any number of torques (solar pressure, atmospheric
     torques, magnetics, etc.). It requires the use of an interpolation technique to interpret
     the attitude state at times different from the tabular epochs.
+
+    Parameters
+    ----------
+    header : AdmHeader
+        Message header.
+    segments : list[AemSegment]
+        AEM Segments.
     """
     @property
     def id(self) -> typing.Optional[builtins.str]:
         r"""
-        The message identifier.
+        The XML root id attribute, always "CCSDS_AEM_VERS"; see the header for MESSAGE_ID.
 
         :type: Optional[str]
         """
     @property
     def version(self) -> builtins.str:
         r"""
-        The message version.
+        Message edition; only "2.0" is accepted.
 
         :type: str
         """
@@ -1801,19 +2049,95 @@ class Aem:
         """
     def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
         r"""
-        Serialize to validated KVN or XML.
+        Validate and serialize this AEM message, preserving its edition.
+
+        Parameters
+        ----------
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Returns
+        -------
+        str
+            Generated document, subject to the documented notation normalizations.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
         """
     @staticmethod
     def from_str(
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
-    ) -> Aem: ...
+    ) -> Aem:
+        r"""
+        Parse a AEM document and validate its contents.
+
+        Parameters
+        ----------
+        data : str
+            KVN or XML content. Combined NDM requires XML.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        Aem
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
+        """
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
     ) -> Aem:
         r"""
-        Parse an AEM from a KVN or XML file.
+        Read a UTF-8 AEM document from a file and validate it.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Input file.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        Aem
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Input file could not be read.
         """
     def to_file(
         self,
@@ -1821,7 +2145,27 @@ class Aem:
         format: typing.Literal["kvn", "xml"],
     ) -> None:
         r"""
-        Atomically write this AEM as KVN or XML.
+        Validate this AEM message and atomically replace the destination.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Destination file; existing content is replaced only after successful generation.
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Temporary-file writing or atomic replacement failed.
         """
 
 @typing.final
@@ -1831,12 +2175,17 @@ class AemData:
 
     Parameters
     ----------
-        attitude_states : list[AttitudeState]
+    attitude_states : list[AttitudeState]
         Attitude states.
-        attitude_type : str
-        CCSDS attitude type shared by every state.
-        comment : list[str], optional
+    attitude_type : str
+        CCSDS attitude type shared by every state (ADM table 4-4).
+    comment : list[str], optional
         Comments.
+
+    Raises
+    ------
+    ValueError
+        If attitude_type is unknown or a state has the wrong number of components.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -1872,7 +2221,7 @@ class AemData:
     @property
     def attitude_states_epochs(self) -> builtins.list[builtins.str]:
         r"""
-        Epochs for attitude states (ISO 8601).
+        CCSDS calendar epochs for attitude states (ADM §6.8.9).
 
         :type: list[str]
         """
@@ -1898,9 +2247,15 @@ class AemData:
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> AemData: ...
     def __repr__(self) -> builtins.str: ...
-    def validate(self, attitude_type: builtins.str) -> None:
+    def validate(self) -> None:
         r"""
-        Validate the data section against CCSDS rules.
+        Validate the data section's records against CCSDS rules.
+
+        Records are always built for this section's ``attitude_type``; whether that matches the
+        metadata's ``ATTITUDE_TYPE`` (ADM 4.2.4.5) is checked by segment or message validation.
+
+        Raises:
+            NdmValidationError: If a record value or the record count is invalid.
         """
     @staticmethod
     def from_numpy(
@@ -1914,6 +2269,86 @@ class AemData:
 class AemMetadata:
     r"""
     AEM Metadata Section.
+
+    Parameters
+    ----------
+    object_name : str
+        Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
+        restriction on the value for this keyword, it is recommended to use names from the UN Office
+        of Outer Space Affairs designator index (reference [ADM-2], which include Object name and
+        international designator). When OBJECT_NAME is not known or cannot be disclosed, the value
+        should be set to UNKNOWN.
+    object_id : str
+        Spacecraft identifier of the object corresponding to the attitude data to be given. While
+        there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
+        international designators from the UN Office of Outer Space Affairs (reference [ADM-2]).
+        Recommended values have the format YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = Three-
+        digit serial number of launch in year YYYY (with leading zeros). P{PP} = At least one capital
+        letter for the identification of the part brought into space by the launch. In cases in which
+        the asset is not listed in reference [ADM-2], the UN Office of Outer Space Affairs designator
+        index format is not used, or the content cannot be disclosed, the value should be set to
+        UNKNOWN.
+    ref_frame_a : str
+        Name of the reference frame that defines the starting point of the transformation. The set of
+        allowed values is described in annex B, subsection B3.
+    ref_frame_b : str
+        Name of the reference frame that defines the end point of the transformation. The set of
+        allowed values is described in annex B, subsection B3.
+    start_time : str
+        Start of TOTAL time span covered by attitude ephemeris data immediately following this
+        metadata block.
+    stop_time : str
+        End of TOTAL time span covered by the attitude ephemeris data immediately following this
+        metadata block.
+    time_system : str
+        Time system used for both attitude ephemeris data and metadata. The set of allowed values is
+        described in annex B, subsection B2.
+    attitude_type : str
+        The type of information contained in the data lines. This keyword must have a value from the
+        set specified at the right. (See table 4-4 for details of the data contained in each line.)
+    center_name : str, optional
+        Celestial body orbited by the object, which may be a natural solar system body (planets,
+        asteroids, comets, and natural satellites), including any planet barycenter or the solar
+        system barycenter. The set of allowed values is described in annex B, subsection B8.
+    useable_start_time : str, optional
+        Optional start of USEABLE time span covered by attitude ephemeris data immediately following
+        this metadata block. To allow for proper interpolation near the beginning/end of the attitude
+        ephemeris data block, it may be necessary to utilize this keyword with values within the time
+        span covered by the attitude ephemeris data records as denoted by the START/STOP_TIME time
+        tags. The USEABLE_START_TIME time tag of a new block of ephemeris data must be greater than or
+        equal to the USEABLE_STOP_TIME time tag of the previous block.
+    useable_stop_time : str, optional
+        Optional stop of USEABLE time span covered by attitude ephemeris data immediately following
+        this metadata block. (See also USEABLE_START_TIME.)
+    euler_rot_seq : str, optional
+        Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of the
+        transformation is from left to right, where the leftmost letter (X, Y, or Z) represents the
+        rotation axis of the first rotation, the second letter (X, Y, or Z) represents the rotation
+        axis of the second rotation, and the third letter (X, Y, or Z) represents the rotation axis of
+        the third rotation. This keyword is applicable only if ATTITUDE_TYPE specifies the use of
+        Euler angles. Accepts the twelve letter sequences in either case and the ADM 1.0 numeric
+        spellings (``"313"`` for ``ZXZ``) as a legacy alias; the getter and all output use uppercase
+        letters.
+    angvel_frame : str, optional
+        The frame of reference in which angular velocity data are specified. The set of allowed values
+        is described in annex B, subsection B3. This keyword is applicable only if ATTITUDE_TYPE
+        specifies the use of angular velocities in conjunction with either quaternions or Euler
+        angles.
+    interpolation_method : str, optional
+        Recommended interpolation method for attitude ephemeris data in the block immediately
+        following this metadata block.
+    interpolation_degree : int, optional
+        Recommended interpolation degree for attitude ephemeris data in the block immediately
+        following this metadata block. It must be an integer value. This keyword must be used if the
+        ‘INTERPOLATION_METHOD’ keyword is used.
+    comment : list[str], optional
+        Comments allowed only at the beginning of the Metadata section. Each comment line shall begin
+        with this keyword.
+
+    Raises
+    ------
+    ValueError
+        If an epoch, attitude type, rotation sequence or interpolation degree is invalid.
     """
     @property
     def object_name(self) -> builtins.str:
@@ -2108,6 +2543,8 @@ class AemMetadata:
         rotation axis of the second rotation, and the third letter (X, Y, or Z) represents the
         rotation axis of the third rotation. This keyword is applicable only if ATTITUDE_TYPE
         specifies the use of Euler angles.
+        Accepts the twelve letter sequences in either case and the ADM 1.0 numeric spellings
+        (``"313"`` for ``ZXZ``) as a legacy alias; the getter and all output use uppercase letters.
 
         Examples: ZXZ, XYZ
 
@@ -2188,6 +2625,16 @@ class AemMetadata:
 
 @typing.final
 class AemSegment:
+    r"""
+    AEM metadata and attitude data for one segment.
+
+    Parameters
+    ----------
+    metadata : AemMetadata
+        Segment interpretation, reference frames and time system.
+    data : AemData
+        Attitude data interpreted by the segment metadata.
+    """
     @property
     def metadata(self) -> AemMetadata:
         r"""
@@ -2229,6 +2676,26 @@ class AngVelState:
 
     All mandatory elements are to be provided if the block is present.
     (See annex F for conventions and further detail.)
+
+    Parameters
+    ----------
+    ref_frame_a : str
+        Name of the reference frame that defines the starting point of the transformation. The set of
+        allowed values is described in annex B, subsection B3.
+    ref_frame_b : str
+        Name of the reference frame that defines the end point of the transformation. The set of
+        allowed values is described in annex B, subsection B3.
+    angvel_frame : str
+        Reference frame in which the components of the angular velocity vector are given. The set of
+        allowed values is described in annex B, subsection B3.
+    angvel_x : float
+        Component of the angular velocity vector on the X axis.
+    angvel_y : float
+        Component of the angular velocity vector on the Y axis.
+    angvel_z : float
+        Component of the angular velocity vector on the Z axis.
+    comment : list[str], optional
+        One or more comment line(s). Each comment line shall begin with this keyword.
     """
     @property
     def ref_frame_a(self) -> builtins.str:
@@ -2334,22 +2801,29 @@ class Apm:
 
     An APM specifies the attitude state of a single object at a specified epoch. This message
     is suited to interagency exchanges that involve automated interaction and/or human
-    interaction, and/or human interaction, and do not require high-fidelity dynamic modeling.
+    interaction, and do not require high-fidelity dynamic modeling.
 
     The APM requires the use of a propagation technique to determine the attitude state at
     times different from the specified epoch.
+
+    Parameters
+    ----------
+    header : AdmHeader
+        Message header.
+    segment : ApmSegment
+        The attitude segment.
     """
     @property
     def id(self) -> typing.Optional[builtins.str]:
         r"""
-        The message identifier.
+        The XML root id attribute, always "CCSDS_APM_VERS"; see the header for MESSAGE_ID.
 
         :type: Optional[str]
         """
     @property
     def version(self) -> builtins.str:
         r"""
-        The message version.
+        Message edition; only "2.0" is accepted.
 
         :type: str
         """
@@ -2391,19 +2865,95 @@ class Apm:
         """
     def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
         r"""
-        Serialize to validated KVN or XML.
+        Validate and serialize this APM message, preserving its edition.
+
+        Parameters
+        ----------
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Returns
+        -------
+        str
+            Generated document, subject to the documented notation normalizations.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
         """
     @staticmethod
     def from_str(
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
-    ) -> Apm: ...
+    ) -> Apm:
+        r"""
+        Parse a APM document and validate its contents.
+
+        Parameters
+        ----------
+        data : str
+            KVN or XML content. Combined NDM requires XML.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        Apm
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
+        """
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
     ) -> Apm:
         r"""
-        Parse an APM from a KVN or XML file.
+        Read a UTF-8 APM document from a file and validate it.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Input file.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        Apm
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Input file could not be read.
         """
     def to_file(
         self,
@@ -2411,13 +2961,61 @@ class Apm:
         format: typing.Literal["kvn", "xml"],
     ) -> None:
         r"""
-        Atomically write this APM as KVN or XML.
+        Validate this APM message and atomically replace the destination.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Destination file; existing content is replaced only after successful generation.
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Temporary-file writing or atomic replacement failed.
         """
 
 @typing.final
 class ApmData:
     r"""
     APM Data Section.
+
+    Parameters
+    ----------
+    epoch : str
+        Epoch of the attitude elements and optional logical blocks.
+    quaternion_state : list[QuaternionState], optional
+        Attitude quaternion. All mandatory elements are to be provided if the block is present. (See
+        annex F for conventions and further detail.)
+    euler_angle_state : list[EulerAngleState], optional
+        Euler angle elements. All mandatory elements of the logical block are to be provided if the
+        block is present. (See annex F for conventions and further detail.)
+    angular_velocity : list[AngVelState], optional
+        Angular velocity vector.
+    spin : list[SpinState], optional
+        Spin. All mandatory elements are to be provided if the block is present. (See annex F for
+        conventions and further detail.)
+    inertia : list[InertiaState], optional
+        Inertia. All mandatory elements are to be provided if the block is present. (See annex F for
+        conventions and further detail.)
+    maneuver_parameters : list[ApmManeuverParameters], optional
+        Maneuver Parameters.
+    comment : list[str], optional
+        Comment lines in source order; omitted comments become an empty list.
+
+    Raises
+    ------
+    ValueError
+        If epoch is not a CCSDS calendar epoch.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -2541,6 +3139,31 @@ class ApmManeuverParameters:
 
     All mandatory elements are to be provided if the block is present.
     (See annex F for conventions and further detail.)
+
+    Parameters
+    ----------
+    man_epoch_start : str
+        Epoch of start of maneuver. (For format specification, see 6.8.9.)
+    man_duration : float
+        Maneuver duration.
+    man_ref_frame : str
+        Coordinate system for the torque vector. The set of allowed values is described in annex B,
+        subsection B3.
+    man_tor_1 : float
+        Man tor 1.
+    man_tor_2 : float
+        Man tor 2.
+    man_tor_3 : float
+        Man tor 3.
+    man_delta_mass : float, optional
+        Mass change during maneuver (value is < 0)
+    comment : list[str], optional
+        One or more comment line(s). Each comment line shall begin with this keyword.
+
+    Raises
+    ------
+    ValueError
+        If man_epoch_start is not a CCSDS calendar epoch.
     """
     @property
     def man_epoch_start(self) -> builtins.str:
@@ -2660,6 +3283,35 @@ class ApmManeuverParameters:
 class ApmMetadata:
     r"""
     APM Metadata Section.
+
+    Parameters
+    ----------
+    object_name : str
+        Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
+        restriction on the value for this keyword, it is recommended to use names from the UN Office
+        of Outer Space Affairs designator index (reference [ADM-2], which include object name and
+        international designator). When OBJECT_NAME is not known or cannot be disclosed, the value
+        should be set to UNKNOWN.
+    object_id : str
+        Spacecraft identifier of the object corresponding to the attitude data to be given. While
+        there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
+        international designators from the UN Office of Outer Space Affairs (reference [ADM-2]).
+        Recommended values have the format YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = Three
+        digit serial number of launch in year YYYY (with leading zeros). P{PP} = At least one letter
+        for the identification of the part brought into space by the launch. In cases in which the
+        asset is not listed in reference [ADM-2], the UN Office of Outer Space Affairs designator
+        index format is not used, or the content cannot be disclosed, the value should be set to
+        UNKNOWN.
+    time_system : str
+        Time system used for attitude and maneuver data. The set of allowed values is described in
+        annex B, subsection B2.
+    center_name : str, optional
+        Celestial body orbited by the object, which may be a natural solar system body (planets,
+        asteroids, comets, and natural satellites), including any planet barycenter or the solar
+        system barycenter. The set of allowed values is described in annex B, subsection B8.
+    comment : list[str], optional
+        Comments (allowed only at the beginning of the APM Metadata before OBJECT_NAME). Each comment
+        line shall begin with this keyword.
     """
     @property
     def object_name(self) -> builtins.str:
@@ -2753,6 +3405,16 @@ class ApmMetadata:
 
 @typing.final
 class ApmSegment:
+    r"""
+    APM metadata and attitude data for one segment.
+
+    Parameters
+    ----------
+    metadata : ApmMetadata
+        Segment interpretation, reference frames and time system.
+    data : ApmData
+        Attitude data interpreted by the segment metadata.
+    """
     @property
     def metadata(self) -> ApmMetadata:
         r"""
@@ -2794,6 +3456,25 @@ class AtmosphericReentryParameters:
         Remaining time in orbit (days).
     reentry_altitude : float
         Defined re-entry altitude (km).
+    orbit_lifetime_window_start : float, optional
+        Lower estimate of remaining orbital lifetime, in days; positive when supplied.
+    orbit_lifetime_window_end : float, optional
+        Upper estimate of remaining orbital lifetime, in days; positive when supplied.
+    nominal_reentry_epoch : str, optional
+        Predicted calendar epoch of atmospheric re-entry.
+    reentry_window_start : str, optional
+        Calendar epoch opening the re-entry window.
+    reentry_window_end : str, optional
+        Calendar epoch closing the re-entry window.
+    orbit_lifetime_confidence_level : float, optional
+        Confidence level for the lifetime window, in percent from 0 through 100.
+    comment : list[str], optional
+        Comments at the start of this logical block.
+
+    Raises
+    ------
+    ValueError
+        Invalid lifetime, confidence level, or calendar epoch.
     """
     @property
     def orbit_lifetime(self) -> builtins.float:
@@ -2943,6 +3624,22 @@ class AtmosphericReentryParameters:
 
 @typing.final
 class AttitudeState:
+    r"""
+    One attitude state with a CCSDS calendar epoch and ordered numeric components.
+
+    Parameters
+    ----------
+    epoch : str
+        CCSDS calendar epoch (ADM §6.8.9), interpreted in the segment TIME_SYSTEM.
+    values : list[float]
+        State components in the order and fixed units of ATTITUDE_TYPE (ADM table 4-4).
+        AemData checks the component count when this state is added to a data section.
+
+    Raises
+    ------
+    ValueError
+        If epoch is not a CCSDS calendar epoch.
+    """
     @property
     def values(self) -> builtins.list[builtins.float]: ...
     @values.setter
@@ -2969,18 +3666,25 @@ class Cdm:
     - Covariance matrices for both objects at TCA.
     - Relative position and velocity of Object2 with respect to Object1.
     - Metadata describing how the data was determined (orbit determination settings).
+
+    Parameters
+    ----------
+    header : CdmHeader
+        Creation information and message identity.
+    body : CdmBody
+        Relative conjunction data and the ordered OBJECT1/OBJECT2 segments.
     """
     @property
     def id(self) -> typing.Optional[builtins.str]:
         r"""
-        Unique ID for this message.
+        Fixed XML root identifier, ``CCSDS_CDM_VERS``; use MESSAGE_ID for message identity.
 
         :type: Optional[str]
         """
     @property
     def version(self) -> builtins.str:
         r"""
-        The CDM version.
+        Message edition, ``"1.0"`` (CCSDS 508.0-B-1); read and written in KVN/XML.
 
         :type: str
         """
@@ -3024,19 +3728,32 @@ class Cdm:
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Cdm:
         r"""
-        Parse a CDM from a string with optional format.
+        Parse a CDM document and validate its contents.
 
         Parameters
         ----------
         data : str
-            The string content to parse.
+            KVN or XML content. Combined NDM requires XML.
         format : str, optional
-            The format of the input ('kvn' or 'xml'). If None, it will be auto-detected.
+            ``"kvn"`` or ``"xml"``; detected when omitted.
 
         Returns
         -------
         Cdm
-            The parsed CDM object.
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
         """
     @staticmethod
     def from_file(
@@ -3044,7 +3761,34 @@ class Cdm:
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
     ) -> Cdm:
         r"""
-        Parse a CDM from a KVN or XML file.
+        Read a UTF-8 CDM document from a file and validate it.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Input file.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        Cdm
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Input file could not be read.
         """
     def to_file(
         self,
@@ -3052,11 +3796,52 @@ class Cdm:
         format: typing.Literal["kvn", "xml"],
     ) -> None:
         r"""
-        Atomically write this CDM as KVN or XML.
+        Validate this CDM message and atomically replace the destination.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Destination file; existing content is replaced only after successful generation.
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Temporary-file writing or atomic replacement failed.
         """
     def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
         r"""
-        Serialize to validated KVN or XML.
+        Validate and serialize this CDM message, preserving its edition.
+
+        Parameters
+        ----------
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Returns
+        -------
+        str
+            Generated document, subject to the documented notation normalizations.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
         """
 
 @typing.final
@@ -3108,6 +3893,9 @@ class CdmCovarianceMatrix:
     r"""
     Covariance Matrix.
 
+    The optional rows 7 (CDRG_*), 8 (CSRP_*) and 9 (CTHR_*) follow CDM 3.5.2: a row that is
+    given must be complete, and every preceding optional row must be given too.
+
     Parameters
     ----------
     cr_r : float
@@ -3152,54 +3940,54 @@ class CdmCovarianceMatrix:
         Normal velocity - Transverse velocity covariance. Units: m^2/s^2
     cndot_ndot : float
         Normal velocity variance. Units: m^2/s^2
-    cdrg_r : float
-        Drag coeff - Radial position covariance.
-    cdrg_t : float
-        Drag coeff - Transverse position covariance.
-    cdrg_n : float
-        Drag coeff - Normal position covariance.
-    cdrg_rdot : float
-        Drag coeff - Radial velocity covariance.
-    cdrg_tdot : float
-        Drag coeff - Transverse velocity covariance.
-    cdrg_ndot : float
-        Drag coeff - Normal velocity covariance.
-    cdrg_drg : float
-        Drag coeff variance.
-    csrp_r : float
-        SRP coeff - Radial position covariance.
-    csrp_t : float
-        SRP coeff - Transverse position covariance.
-    csrp_n : float
-        SRP coeff - Normal position covariance.
-    csrp_rdot : float
-        SRP coeff - Radial velocity covariance.
-    csrp_tdot : float
-        SRP coeff - Transverse velocity covariance.
-    csrp_ndot : float
-        SRP coeff - Normal velocity covariance.
-    csrp_drg : float
-        SRP coeff - Drag coeff covariance.
-    csrp_srp : float
-        SRP coeff variance.
-    cthr_r : float
-        Thrust - Radial position covariance.
-    cthr_t : float
-        Thrust - Transverse position covariance.
-    cthr_n : float
-        Thrust - Normal position covariance.
-    cthr_rdot : float
-        Thrust - Radial velocity covariance.
-    cthr_tdot : float
-        Thrust - Transverse velocity covariance.
-    cthr_ndot : float
-        Thrust - Normal velocity covariance.
-    cthr_drg : float
-        Thrust - Drag coeff covariance.
-    cthr_srp : float
-        Thrust - SRP coeff covariance.
-    cthr_thr : float
-        Thrust variance.
+    cdrg_r : float, optional
+        Drag coeff - Radial position covariance. Units: m^3/kg
+    cdrg_t : float, optional
+        Drag coeff - Transverse position covariance. Units: m^3/kg
+    cdrg_n : float, optional
+        Drag coeff - Normal position covariance. Units: m^3/kg
+    cdrg_rdot : float, optional
+        Drag coeff - Radial velocity covariance. Units: m^3/(kg*s)
+    cdrg_tdot : float, optional
+        Drag coeff - Transverse velocity covariance. Units: m^3/(kg*s)
+    cdrg_ndot : float, optional
+        Drag coeff - Normal velocity covariance. Units: m^3/(kg*s)
+    cdrg_drg : float, optional
+        Drag coeff variance. Units: m^4/kg^2
+    csrp_r : float, optional
+        SRP coeff - Radial position covariance. Units: m^3/kg
+    csrp_t : float, optional
+        SRP coeff - Transverse position covariance. Units: m^3/kg
+    csrp_n : float, optional
+        SRP coeff - Normal position covariance. Units: m^3/kg
+    csrp_rdot : float, optional
+        SRP coeff - Radial velocity covariance. Units: m^3/(kg*s)
+    csrp_tdot : float, optional
+        SRP coeff - Transverse velocity covariance. Units: m^3/(kg*s)
+    csrp_ndot : float, optional
+        SRP coeff - Normal velocity covariance. Units: m^3/(kg*s)
+    csrp_drg : float, optional
+        SRP coeff - Drag coeff covariance. Units: m^4/kg^2
+    csrp_srp : float, optional
+        SRP coeff variance. Units: m^4/kg^2
+    cthr_r : float, optional
+        Thrust - Radial position covariance. Units: m^2/s^2
+    cthr_t : float, optional
+        Thrust - Transverse position covariance. Units: m^2/s^2
+    cthr_n : float, optional
+        Thrust - Normal position covariance. Units: m^2/s^2
+    cthr_rdot : float, optional
+        Thrust - Radial velocity covariance. Units: m^2/s^3
+    cthr_tdot : float, optional
+        Thrust - Transverse velocity covariance. Units: m^2/s^3
+    cthr_ndot : float, optional
+        Thrust - Normal velocity covariance. Units: m^2/s^3
+    cthr_drg : float, optional
+        Thrust - Drag coeff covariance. Units: m^3/(kg*s^2)
+    cthr_srp : float, optional
+        Thrust - SRP coeff covariance. Units: m^3/(kg*s^2)
+    cthr_thr : float, optional
+        Thrust variance. Units: m^2/s^4
     comment : list of str, optional
         Comments.
     """
@@ -3780,8 +4568,15 @@ class CdmData:
     ----------
     state_vector : CdmStateVector
         Object position and velocity at TCA.
-    covariance_matrix : CdmCovarianceMatrix
-        Object covariance at TCA.
+    covariance_matrix : CdmCovarianceMatrix, optional
+        Object covariance at TCA. Required (CDM 3.5.2): validation and generation reject
+        ``None``; it may be omitted only while a message is being built incrementally.
+    od_parameters : OdParameters, optional
+        Orbit-determination spans, counts, and residual statistics.
+    additional_parameters : AdditionalParameters, optional
+        Physical and propagation parameters for the object.
+    comment : list[str], optional
+        Leading data comments; KVN merges comments before the first data keyword.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -3814,7 +4609,8 @@ class CdmData:
     @property
     def covariance_matrix(self) -> typing.Optional[CdmCovarianceMatrix]:
         r"""
-        Covariance Matrix.
+        Covariance Matrix (CDM 3.5.2). Required: validation and generation reject ``None``;
+        ``None`` is allowed only while a message is being built incrementally.
 
         :type: Optional[CdmCovarianceMatrix]
         """
@@ -3897,7 +4693,7 @@ class CdmHeader:
     Parameters
     ----------
     creation_date : str
-        Message creation date/time in UTC (ISO 8601).
+        Message creation date/time in UTC (CCSDS calendar epoch, CDM §6.3.2.6).
     originator : str
         Creating agency or owner/operator.
     message_id : str
@@ -4383,6 +5179,13 @@ class CdmMetadata:
 class CdmSegment:
     r"""
     A CDM Segment, consisting of metadata and data for a specific object.
+
+    Parameters
+    ----------
+    metadata : CdmMetadata
+        Object identity, reference frame, and propagation assumptions.
+    data : CdmData
+        State and covariance at TCA, with optional OD and additional parameters.
     """
     @property
     def metadata(self) -> CdmMetadata:
@@ -4434,6 +5237,8 @@ class CdmStateVector:
         Velocity Y component. Units: km/s.
     z_dot : float
         Velocity Z component. Units: km/s.
+    comment : list[str], optional
+        Comments before the state-vector block.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -4548,6 +5353,15 @@ class CombinedNdm:
     spacecraft attitude that depends upon a particular orbital state (an APM and its
     associated OPM could be conveniently conveyed in a single NDM); (3) an ephemeris message
     with the set of tracking data messages used in the orbit determination.
+
+    Parameters
+    ----------
+    messages : sequence of message objects
+        Ordered standalone constituents. Nested combined messages are not supported.
+    id : str, optional
+        Envelope MESSAGE_ID (not a root id attribute).
+    comments : list[str], optional
+        Envelope comments, in document order.
     """
     @property
     def id(self) -> typing.Optional[builtins.str]:
@@ -4603,7 +5417,32 @@ class CombinedNdm:
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> CombinedNdm:
         r"""
-        Parse an XML combined NDM. KVN has no combined representation.
+        Parse a NDM document and validate its contents.
+
+        Parameters
+        ----------
+        data : str
+            KVN or XML content. Combined NDM requires XML.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        CombinedNdm
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
         """
     @staticmethod
     def from_file(
@@ -4611,7 +5450,34 @@ class CombinedNdm:
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
     ) -> CombinedNdm:
         r"""
-        Parse an XML combined NDM file. KVN has no combined representation.
+        Read a UTF-8 NDM document from a file and validate it.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Input file.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        CombinedNdm
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Input file could not be read.
         """
     def to_file(
         self,
@@ -4619,16 +5485,52 @@ class CombinedNdm:
         format: typing.Literal["kvn", "xml"],
     ) -> None:
         r"""
-        Atomically write this combined NDM as XML.
+        Validate this NDM message and atomically replace the destination.
 
-        Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError` and leaves the
-        destination untouched.
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Destination file; existing content is replaced only after successful generation.
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Temporary-file writing or atomic replacement failed.
         """
     def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
         r"""
-        Serialize to an XML string.
+        Validate and serialize this NDM message, preserving its edition.
 
-        Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError`.
+        Parameters
+        ----------
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Returns
+        -------
+        str
+            Generated document, subject to the documented notation normalizations.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
         """
     def __repr__(self) -> builtins.str: ...
 
@@ -4677,6 +5579,42 @@ class EulerAngleState:
 
     All mandatory elements of the logical block are to be provided if the block is present.
     (See annex F for conventions and further detail.)
+
+    Parameters
+    ----------
+    ref_frame_a : str
+        Name of the reference frame that defines the starting point of the transformation. The set of
+        allowed values is described in annex B, subsection B3.
+    ref_frame_b : str
+        Name of the reference frame that defines the end point of the transformation. The set of
+        allowed values is described in annex B, subsection B3.
+    euler_rot_seq : str
+        Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of the
+        transformation is from left to right, where the leftmost letter (X, Y, or Z) represents the
+        rotation axis of the first rotation, the second letter (X, Y, or Z) represents the rotation
+        axis of the second rotation, and the third letter (X, Y, or Z) represents the rotation axis of
+        the third rotation. Accepts the twelve letter sequences in either case and the ADM 1.0 numeric
+        spellings (``"313"`` for ``ZXZ``) as a legacy alias; the getter and all output use uppercase
+        letters.
+    angle_1 : float
+        Angle of the first rotation.
+    angle_2 : float
+        Angle of the second rotation.
+    angle_3 : float
+        Angle of the third rotation.
+    angle_1_dot : float, optional
+        Time derivative of angle of the first rotation.
+    angle_2_dot : float, optional
+        Time derivative of angle of the second rotation.
+    angle_3_dot : float, optional
+        Time derivative of angle of the third rotation.
+    comment : list[str], optional
+        One or more comment line(s). Each comment line shall begin with this keyword.
+
+    Raises
+    ------
+    ValueError
+        If the rotation sequence is unknown or an angle is outside [-360, 360).
     """
     @property
     def ref_frame_a(self) -> builtins.str:
@@ -4710,6 +5648,8 @@ class EulerAngleState:
         the rotation axis of the first rotation, the second letter (X, Y, or Z) represents the
         rotation axis of the second rotation, and the third letter (X, Y, or Z) represents the
         rotation axis of the third rotation.
+        Accepts the twelve letter sequences in either case and the ADM 1.0 numeric spellings
+        (``"313"`` for ``ZXZ``) as a legacy alias; the getter and all output use uppercase letters.
 
         CCSDS Reference: 504.0-B-2, Section 3.2.4.
 
@@ -4850,7 +5790,7 @@ class GroundImpactParameters:
     nominal_impact_lat : float, optional
         Nominal impact latitude. Units: deg
     nominal_impact_alt : float, optional
-        Nominal impact altitude. Units: km
+        Nominal impact altitude. Units: m
     impact_1_confidence : float, optional
         Impact 1 confidence. Units: %
     impact_1_start_lon : float, optional
@@ -5359,6 +6299,26 @@ class InertiaState:
 
     All mandatory elements are to be provided if the block is present.
     (See annex F for conventions and further detail.)
+
+    Parameters
+    ----------
+    inertia_ref_frame : str
+        Coordinate system for the inertia tensor. The set of allowed values is described in annex B,
+        subsection B3.
+    ixx : float
+        Moment of Inertia about the X-axis.
+    iyy : float
+        Moment of Inertia about the Y-axis.
+    izz : float
+        Moment of Inertia about the Z-axis.
+    ixy : float
+        Inertia Cross Product of the X and Y axes.
+    ixz : float
+        Inertia Cross Product of the X and Z axes.
+    iyz : float
+        Inertia Cross Product of the Y and Z axes.
+    comment : list[str], optional
+        One or more comment line(s). Each comment line shall begin with this keyword.
     """
     @property
     def inertia_ref_frame(self) -> builtins.str:
@@ -5878,17 +6838,49 @@ class NdmEpochError(builtins.ValueError):
     """
 
     operation: typing.Optional[builtins.str]
+    r"""
+    Operation: parse, validate, or generate; None when unavailable.
+    """
     notation: typing.Optional[builtins.str]
+    r"""
+    Lowercase wire notation: kvn or xml; None when unavailable.
+    """
     message_kind: typing.Optional[builtins.str]
+    r"""
+    Lowercase message family, such as opm; None when unavailable.
+    """
     source_edition: typing.Optional[builtins.str]
+    r"""
+    Source edition, or the requested model edition on output failure.
+    """
     code: typing.Optional[builtins.str]
+    r"""
+    Stable machine-readable error category; None for manually created exceptions.
+    """
     field_path: typing.Optional[builtins.str]
+    r"""
+    Canonical model path, when the containing validator provides one.
+    """
     line: typing.Optional[builtins.int]
+    r"""
+    One-based source line, when available.
+    """
     column: typing.Optional[builtins.int]
+    r"""
+    One-based source column, when available.
+    """
     byte_offset: typing.Optional[builtins.int]
+    r"""
+    Zero-based input byte position, when available.
+    """
     original_token: typing.Optional[builtins.str]
+    r"""
+    Source excerpt limited to 128 characters, when available.
+    """
     expected: typing.Optional[builtins.str]
-    requirement: typing.Optional[builtins.str]
+    r"""
+    Expected parser token, when available; excludes internal labels.
+    """
 
 class NdmError(builtins.Exception):
     r"""
@@ -5896,17 +6888,49 @@ class NdmError(builtins.Exception):
     """
 
     operation: typing.Optional[builtins.str]
+    r"""
+    Operation: parse, validate, or generate; None when unavailable.
+    """
     notation: typing.Optional[builtins.str]
+    r"""
+    Lowercase wire notation: kvn or xml; None when unavailable.
+    """
     message_kind: typing.Optional[builtins.str]
+    r"""
+    Lowercase message family, such as opm; None when unavailable.
+    """
     source_edition: typing.Optional[builtins.str]
+    r"""
+    Source edition, or the requested model edition on output failure.
+    """
     code: typing.Optional[builtins.str]
+    r"""
+    Stable machine-readable error category; None for manually created exceptions.
+    """
     field_path: typing.Optional[builtins.str]
+    r"""
+    Canonical model path, when the containing validator provides one.
+    """
     line: typing.Optional[builtins.int]
+    r"""
+    One-based source line, when available.
+    """
     column: typing.Optional[builtins.int]
+    r"""
+    One-based source column, when available.
+    """
     byte_offset: typing.Optional[builtins.int]
+    r"""
+    Zero-based input byte position, when available.
+    """
     original_token: typing.Optional[builtins.str]
+    r"""
+    Source excerpt limited to 128 characters, when available.
+    """
     expected: typing.Optional[builtins.str]
-    requirement: typing.Optional[builtins.str]
+    r"""
+    Expected parser token, when available; excludes internal labels.
+    """
 
 class NdmFormatError(builtins.ValueError):
     r"""
@@ -5914,17 +6938,49 @@ class NdmFormatError(builtins.ValueError):
     """
 
     operation: typing.Optional[builtins.str]
+    r"""
+    Operation: parse, validate, or generate; None when unavailable.
+    """
     notation: typing.Optional[builtins.str]
+    r"""
+    Lowercase wire notation: kvn or xml; None when unavailable.
+    """
     message_kind: typing.Optional[builtins.str]
+    r"""
+    Lowercase message family, such as opm; None when unavailable.
+    """
     source_edition: typing.Optional[builtins.str]
+    r"""
+    Source edition, or the requested model edition on output failure.
+    """
     code: typing.Optional[builtins.str]
+    r"""
+    Stable machine-readable error category; None for manually created exceptions.
+    """
     field_path: typing.Optional[builtins.str]
+    r"""
+    Canonical model path, when the containing validator provides one.
+    """
     line: typing.Optional[builtins.int]
+    r"""
+    One-based source line, when available.
+    """
     column: typing.Optional[builtins.int]
+    r"""
+    One-based source column, when available.
+    """
     byte_offset: typing.Optional[builtins.int]
+    r"""
+    Zero-based input byte position, when available.
+    """
     original_token: typing.Optional[builtins.str]
+    r"""
+    Source excerpt limited to 128 characters, when available.
+    """
     expected: typing.Optional[builtins.str]
-    requirement: typing.Optional[builtins.str]
+    r"""
+    Expected parser token, when available; excludes internal labels.
+    """
 
 class NdmIoError(builtins.OSError):
     r"""
@@ -5932,17 +6988,49 @@ class NdmIoError(builtins.OSError):
     """
 
     operation: typing.Optional[builtins.str]
+    r"""
+    Operation: parse, validate, or generate; None when unavailable.
+    """
     notation: typing.Optional[builtins.str]
+    r"""
+    Lowercase wire notation: kvn or xml; None when unavailable.
+    """
     message_kind: typing.Optional[builtins.str]
+    r"""
+    Lowercase message family, such as opm; None when unavailable.
+    """
     source_edition: typing.Optional[builtins.str]
+    r"""
+    Source edition, or the requested model edition on output failure.
+    """
     code: typing.Optional[builtins.str]
+    r"""
+    Stable machine-readable error category; None for manually created exceptions.
+    """
     field_path: typing.Optional[builtins.str]
+    r"""
+    Canonical model path, when the containing validator provides one.
+    """
     line: typing.Optional[builtins.int]
+    r"""
+    One-based source line, when available.
+    """
     column: typing.Optional[builtins.int]
+    r"""
+    One-based source column, when available.
+    """
     byte_offset: typing.Optional[builtins.int]
+    r"""
+    Zero-based input byte position, when available.
+    """
     original_token: typing.Optional[builtins.str]
+    r"""
+    Source excerpt limited to 128 characters, when available.
+    """
     expected: typing.Optional[builtins.str]
-    requirement: typing.Optional[builtins.str]
+    r"""
+    Expected parser token, when available; excludes internal labels.
+    """
 
 class NdmKvnParseError(NdmFormatError):
     r"""
@@ -6005,14 +7093,14 @@ class Ocm:
     @property
     def id(self) -> typing.Optional[builtins.str]:
         r"""
-        The message identifier.
+        Constant XML root identifier, `CCSDS_OCM_VERS`.
 
         :type: Optional[str]
         """
     @property
     def version(self) -> builtins.str:
         r"""
-        The message version.
+        Message edition, `3.0`.
 
         :type: str
         """
@@ -6051,19 +7139,32 @@ class Ocm:
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Ocm:
         r"""
-        Create an OCM message from a string.
+        Parse a OCM document and validate its contents.
 
         Parameters
         ----------
         data : str
-            Input string/content.
+            KVN or XML content. Combined NDM requires XML.
         format : str, optional
-            Format ('kvn' or 'xml'). Auto-detected if None.
+            ``"kvn"`` or ``"xml"``; detected when omitted.
 
         Returns
         -------
         Ocm
-            The parsed Ocm object.
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
         """
     @staticmethod
     def from_file(
@@ -6071,7 +7172,34 @@ class Ocm:
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
     ) -> Ocm:
         r"""
-        Parse an OCM from a KVN or XML file.
+        Read a UTF-8 OCM document from a file and validate it.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Input file.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        Ocm
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Input file could not be read.
         """
     def to_file(
         self,
@@ -6079,7 +7207,27 @@ class Ocm:
         format: typing.Literal["kvn", "xml"],
     ) -> None:
         r"""
-        Atomically write this OCM as KVN or XML.
+        Validate this OCM message and atomically replace the destination.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Destination file; existing content is replaced only after successful generation.
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Temporary-file writing or atomic replacement failed.
         """
     def __new__(cls, header: OdmHeader, segment: OcmSegment) -> Ocm:
         r"""
@@ -6092,7 +7240,28 @@ class Ocm:
         """
     def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
         r"""
-        Serialize to KVN or XML after mandatory CCSDS validation.
+        Validate and serialize this OCM message, preserving its edition.
+
+        Parameters
+        ----------
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Returns
+        -------
+        str
+            Generated document, subject to the documented notation normalizations.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
         """
 
 @typing.final
@@ -6102,45 +7271,39 @@ class OcmCovarianceMatrix:
 
     Parameters
     ----------
-        epoch : str
-        Epoch of the covariance matrix.
-        (Mandatory)
     cov_ref_frame : str
         Reference frame for the covariance matrix.
-        (Mandatory)
     cov_type : str
         Specifies the covariance element set type.
-        (Mandatory)
-        cov_matrix : list of float
-        Upper triangular part of the covariance matrix.
-        (Mandatory)
+    cov_ordering : str
+        Covariance element ordering, for example LTM or UTM.
+    cov_lines : list[CovLine]
+        Covariance time-history rows in cov_ordering order.
+    traj_id : str, optional
+        Corresponding trajectory identifier, required for multiple trajectory or covariance blocks.
     cov_id : str, optional
         Identification number for this covariance matrix time history block.
-        (Optional)
     cov_prev_id : str, optional
         Identification number for the previous covariance matrix time history.
-        (Optional)
     cov_next_id : str, optional
         Identification number for the next covariance matrix time history.
-        (Optional)
     cov_basis : str, optional
         Basis of this covariance matrix time history data (PREDICTED, DETERMINED, etc.).
-        (Optional)
     cov_basis_id : str, optional
         Identification number for the telemetry dataset, orbit determination, or simulation.
-        (Optional)
+    cov_frame_epoch : str, optional
+        Epoch of the covariance data reference frame, if not intrinsic to the definition of the
+        reference frame. (See 7.5.10 for formatting rules.)
+    cov_scale_min : float, optional
+        Minimum scale factor to apply to this covariance data to achieve realism.
+    cov_scale_max : float, optional
+        Maximum scale factor to apply to this covariance data to achieve realism.
     cov_confidence : float, optional
         The confidence level associated with the covariance [0-100].
-        (Optional)
-        cov_scale_factor : float, optional
-        Scale factor to be applied to the covariance matrix.
-        (Optional)
     cov_units : str, optional
         Comma-delimited set of SI unit designations for the covariance elements.
-        (Optional)
     comment : list[str], optional
         Comments.
-        (Optional)
     """
     @property
     def traj_id(self) -> typing.Optional[builtins.str]:
@@ -6490,7 +7653,7 @@ class OcmManeuverParameters:
     man_device_id : str
         Identifier for the maneuver device (e.g., thruster name).
     man_composition : str
-        Specifies the maneuver composition (e.g., 'VECTOR', 'SCALAR').
+        Comma-separated row fields beginning with TIME_ABSOLUTE or TIME_RELATIVE.
     man_ref_frame : str
         Reference frame for the maneuver data.
     man_lines : list of ManLine
@@ -6500,7 +7663,7 @@ class OcmManeuverParameters:
     man_next_id : str, optional
         Identifier for the next maneuver block for this space object.
     man_basis : str, optional
-        Basis of the maneuver data ('Observed', 'Predicted', etc.).
+        Basis of the maneuver data ('CANDIDATE', 'PLANNED', 'ANTICIPATED', 'TELEMETRY', 'DETERMINED').
     man_basis_id : str, optional
         Identifier for the orbit determination or simulation basis.
     man_prev_epoch : str, optional
@@ -6516,7 +7679,44 @@ class OcmManeuverParameters:
     grav_assist_name : str, optional
         Name of the gravity assist body.
     dc_type : str, optional
-        Type of duty cycle ('Continuous', 'Impulsive', 'Duration').
+        Type of duty cycle ('CONTINUOUS', 'TIME', 'TIME_AND_ANGLE').
+    dc_win_open : str, optional
+        Start time of the duty cycle-based maneuver window that occurs on or prior to the actual
+        maneuver execution start time.
+    dc_win_close : str, optional
+        End time of the duty cycle-based maneuver window that occurs on or after the actual maneuver
+        execution end time.
+    dc_min_cycles : int, optional
+        Minimum number of 'ON' duty cycles (may override DC_EXEC_STOP). This value is optional even if
+        DC_TYPE = 'CONTINUOUS'.
+    dc_max_cycles : int, optional
+        Maximum number of 'ON' duty cycles (may override DC_EXEC_STOP). This value is optional even if
+        DC_TYPE = 'CONTINUOUS'.
+    dc_exec_start : str, optional
+        Start time of the initial duty cycle-based maneuver sequence execution.
+    dc_exec_stop : str, optional
+        End time of the final duty cycle-based maneuver sequence execution.
+    dc_ref_time : str, optional
+        Reference time for the THRUST duty cycle, specified as either time in seconds (relative to
+        EPOCH_TZERO), or as an absolute '`<epoch>`' (see 7.5.10 for formatting rules).
+    dc_time_pulse_duration : float, optional
+        Thruster pulse 'ON' duration, initiated at first satisfaction of the burn 'ON' time constraint
+        or upon completion of the previous DC_TIME_PULSE_PERIOD cycle. This keyword shall be set if
+        DC_TYPE ≠ 'CONTINUOUS'. Units: s
+    dc_time_pulse_period : float, optional
+        Elapsed time between the start of one pulse and the start of the next. Must be greater than or
+        equal to DC_TIME_PULSE_DURATION. This keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'. Units: s
+    dc_ref_dir : list[float], optional
+        Three-component reference direction in MAN_REF_FRAME for TIME_AND_ANGLE duty cycles.
+    dc_body_frame : str, optional
+        For phase angle thruster duty cycles (DC_TYPE=TIME_AND_ANGLE); specifies the body reference
+        frame in which DC_BODY_TRIGGER will be specified.
+    dc_body_trigger : list[float], optional
+        Three-component trigger direction in DC_BODY_FRAME for TIME_AND_ANGLE duty cycles.
+    dc_pa_start_angle : float, optional
+        Thruster start phase relative to the projected trigger/reference crossing. Units: deg
+    dc_pa_stop_angle : float, optional
+        Thruster stop phase relative to the projected trigger/reference crossing. Units: deg
     man_units : str, optional
         SI unit designations for the maneuver elements.
     comment : list of str, optional
@@ -7031,10 +8231,10 @@ class OcmMetadata:
 
     Parameters
     ----------
+    epoch_tzero : str
+        Epoch to which all relative times in the message are referenced (CCSDS epoch, ODM 7.5.10).
     time_system : str
         Time system that shall be used for all absolute time stamps in the message.
-    epoch_tzero : str
-        Epoch to which all relative times in the message are referenced (ISO 8601).
     object_name : str, optional
         Name of the space object that the message is associated with.
     international_designator : str, optional
@@ -7083,6 +8283,26 @@ class OcmMetadata:
         Identifier of linked Tracking Data Message.
     operator : str, optional
         Operator of the space object.
+    operator_url : str, optional
+        URL of the space object operator.
+    operator_email : str, optional
+        Operator email address for non-emergencies.
+    operator_phone : str, optional
+        Operator phone number for non-emergencies.
+    operator_automated_url : str, optional
+        URL of the operator automated coordination service.
+    emergency_email : str, optional
+        Email address for emergency coordination.
+    emergency_phone : str, optional
+        Phone number for emergency coordination.
+    emergency_availability : str, optional
+        Hours of availability of the emergency contact.
+    ssa_email : str, optional
+        Email address of the primary external SSA service provider.
+    ssa_phone : str, optional
+        Emergency phone number of the primary external SSA service provider.
+    owner_url : str, optional
+        URL of the space object owner.
     owner : str, optional
         Owner of the space object.
     country : str, optional
@@ -7102,19 +8322,19 @@ class OcmMetadata:
     sclk_sec_per_si_sec : float, optional
         Spacecraft clock scale factor (s/SI-s).
     previous_message_epoch : str, optional
-        Epoch of the previous message (ISO 8601).
+        Epoch of the previous message (CCSDS epoch, ODM 7.5.10).
     next_message_epoch : str, optional
-        Anticipated epoch of the next message (ISO 8601).
+        Anticipated epoch of the next message (CCSDS epoch, ODM 7.5.10).
     start_time : str, optional
-        Time of the earliest data in the message (ISO 8601).
+        Time of the earliest data in the message (CCSDS epoch, ODM 7.5.10).
     stop_time : str, optional
-        Time of the latest data in the message (ISO 8601).
+        Time of the latest data in the message (CCSDS epoch, ODM 7.5.10).
     time_span : float, optional
         Approximate time span covered by the data (d).
     taimutc_at_tzero : float, optional
         TAI minus UTC difference at EPOCH_TZERO (s).
     next_leap_epoch : str, optional
-        Epoch of the next leap second (ISO 8601).
+        Epoch of the next leap second (CCSDS epoch, ODM 7.5.10).
     next_leap_taimutc : float, optional
         TAI minus UTC difference at NEXT_LEAP_EPOCH (s).
     ut1mutc_at_tzero : float, optional
@@ -8032,17 +9252,15 @@ class OcmOdParameters:
         (Mandatory)
     od_prev_id : str, optional
         Identification number for the previous orbit determination block.
-        (Optional)
     comment : list[str], optional
         Comments.
-        (Optional)
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
         r"""
         Comments (see 7.8 for formatting rules).
 
-        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
 
         :type: list[str]
         """
@@ -8055,7 +9273,7 @@ class OcmOdParameters:
 
         Examples: 1
 
-        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
 
         :type: str
         """
@@ -8068,7 +9286,7 @@ class OcmOdParameters:
 
         Examples: 0
 
-        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
 
         :type: Optional[str]
         """
@@ -8079,9 +9297,7 @@ class OcmOdParameters:
         r"""
         Type of orbit determination method used to produce the orbit estimate.
 
-        Examples: LEAST_SQUARES, KALMAN_FILTER
-
-        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
 
         :type: str
         """
@@ -8095,7 +9311,7 @@ class OcmOdParameters:
 
         Examples: 2000-01-01T12:00:00Z
 
-        CCSDS Reference: 502.0-B-3, Section 6.2.8.
+        CCSDS Reference: 502.0-B-3, Section 6.2.10.
 
         :type: str
         """
@@ -8452,11 +9668,7 @@ class OcmPerturbations:
     r"""
     OCM Perturbations Parameters.
 
-    Parameters
-    ----------
-    comment : list[str], optional
-        Comments.
-        (Optional)
+    Construct with no arguments, then assign the perturbation-model properties.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -8873,10 +10085,137 @@ class OcmPhysicalDescription:
     ----------
     manufacturer : str, optional
         The manufacturer of the space object.
-        (Optional)
+    bus_model : str, optional
+        Free-text field containing the satellite manufacturer's spacecraft bus model name.
+    docked_with : str, optional
+        Free-text field containing a comma-separated list of other space objects that this object is
+        docked to.
+    drag_const_area : float, optional
+        Attitude-independent drag cross-sectional area (AD) facing the relative wind vector, not
+        already incorporated into the attitude-dependent 'AREA_ALONG_OEB' parameters. Units: m²
+    drag_coeff_nom : float, optional
+        Nominal drag Coefficient (CD Nom). If the atmospheric drag coefficient, CD, is set to zero, no
+        atmospheric drag shall be considered.
+    drag_uncertainty : float, optional
+        Drag coefficient one sigma (1σ) percent uncertainty, where the actual range of drag
+        coefficients to within 1σ shall be obtained from [1.0 ± DRAG_UNCERTAINTY/100.0] * (CD Nom).
+        Units: %
+    initial_wet_mass : float, optional
+        Space object total mass at beginning of life. Units: kg
+    wet_mass : float, optional
+        Space object total mass (including propellant, i.e., 'wet mass') at the current reference
+        epoch 'EPOCH_TZERO'. Units: kg
+    dry_mass : float, optional
+        Space object dry mass (without propellant). Units: kg
+    oeb_parent_frame : str, optional
+        Parent reference frame that maps to the OEB frame via the quaternion-based transformation
+        defined in annex F, subsection F1.
+    oeb_parent_frame_epoch : str, optional
+        Epoch of the OEB parent frame, if OEB_PARENT_FRAME is provided and its epoch is not intrinsic
+        to the definition of the reference frame. (See 7.5.10 for formatting rules.)
+    oeb_q1 : float, optional
+        First vector component of the quaternion from the parent frame to the OEB frame.
+    oeb_q2 : float, optional
+        Second vector component of the quaternion from the parent frame to the OEB frame.
+    oeb_q3 : float, optional
+        Third vector component of the quaternion from the parent frame to the OEB frame.
+    oeb_qc : float, optional
+        Scalar component of the quaternion from the parent frame to the OEB frame.
+    oeb_max : float, optional
+        Maximum physical dimension (along Xoeb) of the OEB. Units: m
+    oeb_int : float, optional
+        Intermediate physical dimension (along Ŷoeb) of OEB normal to OEB_MAX direction. Units: m
+    oeb_min : float, optional
+        Minimum physical dimension (along Ẑoeb) of OEB in direction normal to both OEB_MAX and OEB_INT
+        directions. Units: m
+    area_along_oeb_max : float, optional
+        Attitude-dependent cross-sectional area of space object (not already included in
+        DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along max OEB (Xoeb) direction as defined in
+        annex F. Units: m²
+    area_along_oeb_int : float, optional
+        Attitude-dependent cross-sectional area of space object (not already included in
+        DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along intermediate OEB (Ŷoeb) direction as
+        defined in annex F. Units: m²
+    area_along_oeb_min : float, optional
+        Attitude-dependent cross-sectional area of space object (not already included in
+        DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along minimum OEB (Ẑoeb) direction as defined
+        in annex F. Units: m²
+    area_min_for_pc : float, optional
+        Minimum cross-sectional area for collision probability estimation purposes. Units: m²
+    area_max_for_pc : float, optional
+        Maximum cross-sectional area for collision probability estimation purposes. Units: m²
+    area_typ_for_pc : float, optional
+        Typical (50th percentile) cross-sectional area sampled over all space object orientations for
+        collision probability estimation purposes. Units: m²
+    rcs : float, optional
+        Typical (50th percentile) effective Radar Cross Section of the space object sampled over all
+        possible viewing angles. Units: m²
+    rcs_min : float, optional
+        Minimum Radar Cross Section observed for this object. Units: m²
+    rcs_max : float, optional
+        Maximum Radar Cross Section observed for this object. Units: m²
+    srp_const_area : float, optional
+        Attitude-independent solar radiation pressure cross-sectional area (AR) facing the Sun, not
+        already incorporated into the attitude-dependent ‘AREA_ALONG_OEB’ parameters. Units: m²
+    solar_rad_coeff : float, optional
+        Nominal Solar Radiation Pressure Coefficient (CR NOM). If the solar radiation coefficient, CR,
+        is set to zero, no solar radiation pressure shall be considered.
+    solar_rad_uncertainty : float, optional
+        SRP one sigma (1σ) percent uncertainty, where the actual range of SRP coefficients to within
+        1σ shall be obtained from [1.0 ± 0.01*SRP_UNCERTAINTY] (CR NOM). Units: %
+    vm_absolute : float, optional
+        Median visual magnitude normalized to a Sun-to-object distance of 1 AU, phase angle of 0
+        degrees, and object-to-sensor distance of 40,000 km.
+    vm_apparent_min : float, optional
+        Minimum apparent Visual Magnitude observed for this space object.
+    vm_apparent : float, optional
+        Typical (50th percentile) apparent Visual Magnitude observed for this space object.
+    vm_apparent_max : float, optional
+        Maximum apparent Visual Magnitude observed for this space object. NOTE—The 'MAX' value
+        represents the brightest observation, which associates with a lower Vmag.
+    reflectance : float, optional
+        Typical (50th percentile) coefficient of REFLECTANCE of the space object over all possible
+        viewing angles, ranging from 0 (none) to 1 (perfect reflectance).
+    att_control_mode : str, optional
+        Free-text specification of primary mode of attitude control for the space object. Suggested
+        examples include: THREE_AXIS, SPIN, DUAL_SPIN, TUMBLING, GRAVITY_GRADIENT
+    att_actuator_type : str, optional
+        Free-text specification of type of actuator for attitude control. Suggested examples include:
+        ATT_THRUSTERS, ACTIVE_MAG_TORQUE, PASSIVE_MAG_TORQUE, REACTION_WHEELS, MOMENTUM_WHEELS,
+        CONTROL_MOMENT_GYROSCOPE, NONE, OTHER
+    att_knowledge : float, optional
+        Accuracy of attitude knowledge. Units: deg
+    att_control : float, optional
+        Accuracy of attitude control system (ACS) to maintain attitude, assuming attitude knowledge
+        was perfect (i.e., deadbands). Units: deg
+    att_pointing : float, optional
+        Overall accuracy of spacecraft to maintain attitude, including attitude knowledge errors and
+        ACS operation. Units: deg
+    avg_maneuver_freq : float, optional
+        Average maneuver frequency, measured in the number of orbit- or attitude-adjust maneuvers per
+        year. Units: #/yr
+    max_thrust : float, optional
+        Maximum composite thrust the spacecraft can accomplish in any single body-fixed direction.
+        Units: N
+    dv_bol : float, optional
+        Total ΔV capability of the spacecraft at beginning of life. Units: km/s
+    dv_remaining : float, optional
+        Total ΔV remaining for the spacecraft. Units: km/s
+    ixx : float, optional
+        Moment of Inertia about the X-axis of the space object's primary body frame (e.g., SC_Body_1)
+        (see reference `[H1]`). Units: kg·m²
+    iyy : float, optional
+        Moment of Inertia about the Y-axis. Units: kg·m²
+    izz : float, optional
+        Moment of Inertia about the Z-axis. Units: kg·m²
+    ixy : float, optional
+        Inertia Cross Product of the X & Y axes. Units: kg·m²
+    ixz : float, optional
+        Inertia Cross Product of the X & Z axes. Units: kg·m²
+    iyz : float, optional
+        Inertia Cross Product of the Y & Z axes. Units: kg·m²
     comment : list[str], optional
         Comments.
-        (Optional)
     """
     @property
     def manufacturer(self) -> typing.Optional[builtins.str]:
@@ -10167,6 +11506,13 @@ class OcmUserDefined:
     Ordered OCM user-defined parameters and optional ICD-defined sequences.
 
     CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.11.
+
+    Parameters
+    ----------
+    user_defined : list[OcmUserDefinedParameter], optional
+        Parameters and optional sequence compositions in their stored order.
+    comment : list[str], optional
+        Leading comments; the entries property also permits interleaved comments.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -10204,6 +11550,15 @@ class OcmUserDefinedParameter:
     OCM user-defined parameter or sequence composition with its opaque ICD-defined rows.
 
     CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.11.
+
+    Parameters
+    ----------
+    parameter : str
+        Parameter name without the ``USER_DEFINED_`` prefix.
+    value : str
+        Scalar value, or comma-delimited composition for ``COMPOSITION_<sequence ID>``.
+    records : list[str], optional
+        Opaque sequence rows defined by the exchange partners' ICD.
     """
     @property
     def parameter(self) -> builtins.str:
@@ -10217,7 +11572,7 @@ class OcmUserDefinedParameter:
     @property
     def value(self) -> builtins.str:
         r"""
-        Scalar value, or comma-delimited composition for COMPOSITION_<sequence ID>.
+        Scalar value, or comma-delimited composition for ``COMPOSITION_<sequence ID>``.
 
         :type: str
         """
@@ -10544,14 +11899,16 @@ class Oem:
     @property
     def id(self) -> typing.Optional[builtins.str]:
         r"""
-        The message identifier.
+        The root `id` attribute, always ``"CCSDS_OEM_VERS"`` (ODM 8.3.6); not a message
+        identifier (see ``OdmHeader.message_id``).
 
         :type: Optional[str]
         """
     @property
     def version(self) -> builtins.str:
         r"""
-        The message version.
+        The OEM edition: ``"3.0"`` or ``"2.0"`` can be set and written. A parsed ``"1.0"``
+        message keeps ``"1.0"`` but is read-only; setting ``"1.0"`` raises ``ValueError``.
 
         :type: str
         """
@@ -10602,20 +11959,32 @@ class Oem:
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Oem:
         r"""
-        Create an OEM message from a string.
+        Parse a OEM document and validate its contents.
 
         Parameters
         ----------
         data : str
-            Input string/content.
+            KVN or XML content. Combined NDM requires XML.
         format : str, optional
-            Format ('kvn' or 'xml'). Auto-detected if None.
-            (Optional)
+            ``"kvn"`` or ``"xml"``; detected when omitted.
 
         Returns
         -------
         Oem
-            The parsed OEM object.
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
         """
     @staticmethod
     def from_file(
@@ -10623,7 +11992,34 @@ class Oem:
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
     ) -> Oem:
         r"""
-        Parse an OEM from a KVN or XML file.
+        Read a UTF-8 OEM document from a file and validate it.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Input file.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        Oem
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Input file could not be read.
         """
     def to_file(
         self,
@@ -10631,11 +12027,52 @@ class Oem:
         format: typing.Literal["kvn", "xml"],
     ) -> None:
         r"""
-        Atomically write this OEM as KVN or XML.
+        Validate this OEM message and atomically replace the destination.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Destination file; existing content is replaced only after successful generation.
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Temporary-file writing or atomic replacement failed.
         """
     def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
         r"""
-        Serialize to validated KVN or XML.
+        Validate and serialize this OEM message, preserving its edition.
+
+        Parameters
+        ----------
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Returns
+        -------
+        str
+            Generated document, subject to the documented notation normalizations.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
         """
 
 @typing.final
@@ -10649,7 +12086,7 @@ class OemCovarianceMatrix:
     Parameters
     ----------
     epoch : str
-        Epoch of the covariance matrix (ISO 8601).
+        Epoch of the covariance matrix (CCSDS epoch, ODM 7.5.10).
     values : numpy.ndarray
         NumPy array of shape (21,) containing the lower-triangular values, or (6,6) for
         a full symmetric matrix. Only the lower triangle of a (6,6) input is read, so a
@@ -11077,7 +12514,7 @@ class OemData:
     @property
     def state_vector_epochs(self) -> builtins.list[builtins.str]:
         r"""
-        Epochs for state vectors (ISO 8601).
+        Epochs for state vectors (CCSDS epoch, ODM 7.5.10).
 
         The list is a copy; assigning a list of the same length updates the records in place.
 
@@ -11108,7 +12545,7 @@ class OemData:
     @property
     def covariance_matrix_epochs(self) -> builtins.list[builtins.str]:
         r"""
-        Epochs for covariance matrices (ISO 8601).
+        Epochs for covariance matrices (CCSDS epoch, ODM 7.5.10).
 
         The list is a copy; assigning a list of the same length updates the records in place.
 
@@ -11197,13 +12634,13 @@ class OemData:
         Parameters
         ----------
         state_vector_epochs : list[str]
-            Epoch of each state vector (ISO 8601), one per row of `state_vector_numpy`.
+            Epoch of each state vector (CCSDS epoch, ODM 7.5.10), one per row of `state_vector_numpy`.
         state_vector_numpy : numpy.ndarray
             Array of shape (N, 6) with [X, Y, Z, X_DOT, Y_DOT, Z_DOT], or (N, 9) with
             accelerations [X_DDOT, Y_DDOT, Z_DDOT] appended. A NaN acceleration omits that
             acceleration for the row. Units: km, km/s, km/s².
         covariance_matrix_epochs : list[str], optional
-            Epoch of each covariance matrix (ISO 8601). Required when any covariance argument
+            Epoch of each covariance matrix (CCSDS epoch, ODM 7.5.10). Required when any covariance argument
             is given.
         covariance_matrix_numpy : numpy.ndarray, optional
             Covariance matrices shaped (N, 6, 6) or (N, 21), or a single matrix shaped (6, 6) or
@@ -11234,25 +12671,27 @@ class OemMetadata:
     object_id : str
         Object identifier of the object for which orbit state data is provided.
     start_time : str
-        Start time of the total time span covered by the ephemeris data (ISO 8601).
+        Start time of the total time span covered by the ephemeris data (CCSDS epoch, ODM 7.5.10).
     stop_time : str
-        Stop time of the total time span covered by the ephemeris data (ISO 8601).
+        Stop time of the total time span covered by the ephemeris data (CCSDS epoch, ODM 7.5.10).
     center_name : str
         Origin of the reference frame.
     ref_frame : str
         Reference frame in which state vector data is given.
     time_system : str
-        Time system used for state vector, maneuver, and covariance data.
+        Time system used for the metadata times, state vectors and covariance epochs; the same
+        in every segment (ODM 5.2.4.5).
     ref_frame_epoch : str, optional
-        Epoch of the reference frame, if not intrinsic to the definition (ISO 8601).
+        Epoch of the reference frame, if not intrinsic to the definition (CCSDS epoch, ODM 7.5.10).
     useable_start_time : str, optional
-        Start of the recommended time span for use of the ephemeris data (ISO 8601).
+        Start of the recommended time span for use of the ephemeris data (CCSDS epoch, ODM 7.5.10).
     useable_stop_time : str, optional
-        End of the recommended time span for use of the ephemeris data (ISO 8601).
+        End of the recommended time span for use of the ephemeris data (CCSDS epoch, ODM 7.5.10).
     interpolation : str, optional
         Recommended interpolation method for ephemeris data.
     interpolation_degree : int, optional
-        Degree of the interpolation polynomial.
+        Recommended interpolation degree; a positive integer, required when `interpolation` is
+        given (ODM table 5-3).
     comment : list[str], optional
         Comments.
     """
@@ -11440,8 +12879,8 @@ class OemMetadata:
     def interpolation_degree(self) -> typing.Optional[builtins.int]:
         r"""
         Recommended interpolation degree for ephemeris data in the immediately following set of
-        ephemeris lines. Must be an integer value. This keyword must be used if the
-        ‘INTERPOLATION’ keyword is used.
+        ephemeris lines. Must be a positive integer (the XSD's positiveInteger), and must be
+        given if ``interpolation`` is.
 
         Examples: 5, 8
 
@@ -11557,14 +12996,16 @@ class Omm:
     @property
     def id(self) -> typing.Optional[builtins.str]:
         r"""
-        The message identifier.
+        Root identifier, always ``CCSDS_OMM_VERS`` (the KVN version keyword and XML ``id``
+        attribute); it does not identify an individual message (see ``header.message_id``).
 
         :type: Optional[str]
         """
     @property
     def version(self) -> builtins.str:
         r"""
-        The message version.
+        Message edition: ``"3.0"`` (CCSDS 502.0-B-3) or ``"2.0"`` (502.0-B-2); both are read
+        and written.
 
         :type: str
         """
@@ -11607,14 +13048,69 @@ class Omm:
     @staticmethod
     def from_str(
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
-    ) -> Omm: ...
+    ) -> Omm:
+        r"""
+        Parse a OMM document and validate its contents.
+
+        Parameters
+        ----------
+        data : str
+            KVN or XML content. Combined NDM requires XML.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        Omm
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
+        """
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
     ) -> Omm:
         r"""
-        Parse an OMM from a KVN or XML file.
+        Read a UTF-8 OMM document from a file and validate it.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Input file.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        Omm
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Input file could not be read.
         """
     def to_file(
         self,
@@ -11622,15 +13118,59 @@ class Omm:
         format: typing.Literal["kvn", "xml"],
     ) -> None:
         r"""
-        Atomically write this OMM as KVN or XML.
+        Validate this OMM message and atomically replace the destination.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Destination file; existing content is replaced only after successful generation.
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Temporary-file writing or atomic replacement failed.
         """
     def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
         r"""
-        Serialize to validated KVN or XML.
+        Validate and serialize this OMM message, preserving its edition.
+
+        Parameters
+        ----------
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Returns
+        -------
+        str
+            Generated document, subject to the documented notation normalizations.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
         """
     def to_tle_lines(self) -> tuple[builtins.str, builtins.str]:
         r"""
         Generate canonical NORAD TLE lines (line 1 and line 2) from this OMM.
+
+        Requires Earth-centered TEME elements and UTC epochs; no coordinate/time conversion.
+        Cyclic angles round to four decimals, with a rounded 360 degrees emitted as zero.
 
         Returns
         -------
@@ -11672,6 +13212,13 @@ class Omm:
 class OmmData:
     r"""
     OMM Data section.
+
+    Parameters
+    ----------
+    mean_elements : MeanElements
+        Mean orbital elements at their CCSDS epoch.
+    comment : list[str], optional
+        Leading data comments.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -11715,7 +13262,8 @@ class OmmData:
     @property
     def tle_parameters(self) -> typing.Optional[TleParameters]:
         r"""
-        TLE Related Parameters (Only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
+        TLE-related parameters, required for the edition's recognized TLE theories.
+        Field requirements depend on the theory and edition; see ``TleParameters``.
 
         :type: Optional[TleParameters]
         """
@@ -11753,6 +13301,8 @@ class OmmData:
         ----------
         mean_elements : MeanElements
             Mean elements.
+        comment : list[str], optional
+            Leading data comments.
         """
     def __repr__(self) -> builtins.str: ...
 
@@ -11987,14 +13537,16 @@ class Opm:
     @property
     def id(self) -> typing.Optional[builtins.str]:
         r"""
-        The message identifier.
+        Root identifier, always ``CCSDS_OPM_VERS`` (the KVN version keyword and XML ``id``
+        attribute); it does not identify an individual message (see ``header.message_id``).
 
         :type: Optional[str]
         """
     @property
     def version(self) -> builtins.str:
         r"""
-        The message version.
+        Message edition: ``"3.0"`` (CCSDS 502.0-B-3) or ``"2.0"`` (502.0-B-2); both are read
+        and written.
 
         :type: str
         """
@@ -12039,7 +13591,32 @@ class Opm:
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Opm:
         r"""
-        Create an OPM message from a string.
+        Parse a OPM document and validate its contents.
+
+        Parameters
+        ----------
+        data : str
+            KVN or XML content. Combined NDM requires XML.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        Opm
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
         """
     @staticmethod
     def from_file(
@@ -12047,7 +13624,34 @@ class Opm:
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
     ) -> Opm:
         r"""
-        Parse an OPM from a KVN or XML file.
+        Read a UTF-8 OPM document from a file and validate it.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Input file.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        Opm
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Input file could not be read.
         """
     def to_file(
         self,
@@ -12055,11 +13659,52 @@ class Opm:
         format: typing.Literal["kvn", "xml"],
     ) -> None:
         r"""
-        Atomically write this OPM as KVN or XML.
+        Validate this OPM message and atomically replace the destination.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Destination file; existing content is replaced only after successful generation.
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Temporary-file writing or atomic replacement failed.
         """
     def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
         r"""
-        Serialize to KVN or XML after mandatory CCSDS validation.
+        Validate and serialize this OPM message, preserving its edition.
+
+        Parameters
+        ----------
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Returns
+        -------
+        str
+            Generated document, subject to the documented notation normalizations.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
         """
 
 @typing.final
@@ -12114,8 +13759,8 @@ class OpmCovarianceMatrix:
         Velocity Z covariance [6,6]. Units: km²/s².
     cov_ref_frame : str, optional
         Reference frame for the covariance matrix.
-        comments : list[str], optional
-        Comments.
+    comments : list[str], optional
+        Comments before the covariance matrix.
 
     Attributes
     ----------
@@ -12456,6 +14101,8 @@ class OpmData:
     ----------
     state_vector : StateVector
         State vector.
+    comment : list[str], optional
+        Data-level comments; KVN merges them before state-vector comments.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -12700,7 +14347,8 @@ class OpmMetadata:
     time_system : str
         Time system used for state vector, maneuver, and covariance data.
     ref_frame_epoch : str, optional
-        Epoch of the reference frame, if not intrinsic to the definition (ISO 8601).
+        Epoch of the reference frame, if not intrinsic to the definition (CCSDS
+        epoch, ODM 7.5.10).
     comment : list[str], optional
         Comments.
     """
@@ -12894,15 +14542,52 @@ class QuaternionState:
     All mandatory elements are to be provided if the block is present.
     (See annex F for conventions and further detail.)
     The four quaternion derivative components must be supplied together or all omitted.
+
+    Parameters
+    ----------
+    ref_frame_a : str
+        Name of the reference frame that defines the starting point of the transformation. The set of
+        allowed values is described in annex B, subsection B3.
+    ref_frame_b : str
+        Name of the reference frame that defines the end point of the transformation. The set of
+        allowed values is described in annex B, subsection B3.
+    q1 : float
+        Q1 = e1 * sin(phi/2), where phi is the rotation angle and e1 the first component of the
+        rotation axis.
+    q2 : float
+        Q2 = e2 * sin(phi/2), where phi is the rotation angle and e2 the second component of the
+        rotation axis.
+    q3 : float
+        Q3 = e3 * sin(phi/2), where phi is the rotation angle and e3 the third component of the
+        rotation axis.
+    qc : float
+        QC = cos(phi/2), the scalar component, where phi is the rotation angle.
+    q1_dot : float, optional
+        Time derivative of Q1, in 1/s; provide all four derivatives together.
+    q2_dot : float, optional
+        Time derivative of Q2, in 1/s; provide all four derivatives together.
+    q3_dot : float, optional
+        Time derivative of Q3, in 1/s; provide all four derivatives together.
+    qc_dot : float, optional
+        Time derivative of QC, in 1/s; provide all four derivatives together.
+    comment : list[str], optional
+        One or more comment line(s). Each comment line shall begin with this keyword.
+
+    Raises
+    ------
+    ValueError
+        If a component is outside [-1, 1], or only some quaternion derivatives are supplied.
     """
     @property
     def q1(self) -> builtins.float:
         r"""
-        Quaternion components Q1, Q2, Q3, QC.
+        Q1 = e1 * sin(phi/2), where phi is the rotation angle and e1 the first component of the
+        rotation axis.
 
         Units: dimensionless
 
         CCSDS Reference: 504.0-B-2, Section 3.2.4.
+        See table 3-3 for the component convention.
 
         :type: float
         """
@@ -12911,11 +14596,13 @@ class QuaternionState:
     @property
     def q2(self) -> builtins.float:
         r"""
-        Quaternion components Q1, Q2, Q3, QC.
+        Q2 = e2 * sin(phi/2), where phi is the rotation angle and e2 the second component of the
+        rotation axis.
 
         Units: dimensionless
 
         CCSDS Reference: 504.0-B-2, Section 3.2.4.
+        See table 3-3 for the component convention.
 
         :type: float
         """
@@ -12924,11 +14611,13 @@ class QuaternionState:
     @property
     def q3(self) -> builtins.float:
         r"""
-        Quaternion components Q1, Q2, Q3, QC.
+        Q3 = e3 * sin(phi/2), where phi is the rotation angle and e3 the third component of the
+        rotation axis.
 
         Units: dimensionless
 
         CCSDS Reference: 504.0-B-2, Section 3.2.4.
+        See table 3-3 for the component convention.
 
         :type: float
         """
@@ -12937,11 +14626,12 @@ class QuaternionState:
     @property
     def qc(self) -> builtins.float:
         r"""
-        Quaternion components Q1, Q2, Q3, QC.
+        QC = cos(phi/2), the scalar component, where phi is the rotation angle.
 
         Units: dimensionless
 
         CCSDS Reference: 504.0-B-2, Section 3.2.4.
+        See table 3-3 for the component convention.
 
         :type: float
         """
@@ -12950,7 +14640,8 @@ class QuaternionState:
     @property
     def quaternion_dot(self) -> typing.Optional[builtins.list[builtins.float]]:
         r"""
-        Quaternion derivative components [Q1_DOT, Q2_DOT, Q3_DOT, QC_DOT].
+        Time derivatives of Q1, Q2, Q3 and QC, as [Q1_DOT, Q2_DOT, Q3_DOT, QC_DOT]. Table 3-3
+        marks each optional; the XSD makes them all-or-none, which this library follows.
 
         Units: 1/s
 
@@ -13039,14 +14730,14 @@ class Rdm:
     @property
     def id(self) -> typing.Optional[builtins.str]:
         r"""
-        The message identifier.
+        Fixed XML root identifier, ``CCSDS_RDM_VERS``; use header.message_id for message identity.
 
         :type: Optional[str]
         """
     @property
     def version(self) -> builtins.str:
         r"""
-        The message version.
+        Message edition, ``"1.0"`` (CCSDS 508.1-B-1); read and written in KVN/XML.
 
         :type: str
         """
@@ -13091,20 +14782,32 @@ class Rdm:
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Rdm:
         r"""
-        Create an RDM message from a string.
+        Parse a RDM document and validate its contents.
 
         Parameters
         ----------
         data : str
-            Input string/content.
+            KVN or XML content. Combined NDM requires XML.
         format : str, optional
-            Format ('kvn' or 'xml'). Auto-detected if None.
-            (Optional)
+            ``"kvn"`` or ``"xml"``; detected when omitted.
 
         Returns
         -------
         Rdm
-            The parsed RDM object.
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
         """
     @staticmethod
     def from_file(
@@ -13112,7 +14815,34 @@ class Rdm:
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
     ) -> Rdm:
         r"""
-        Parse an RDM from a KVN or XML file.
+        Read a UTF-8 RDM document from a file and validate it.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Input file.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        Rdm
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Input file could not be read.
         """
     def to_file(
         self,
@@ -13120,20 +14850,52 @@ class Rdm:
         format: typing.Literal["kvn", "xml"],
     ) -> None:
         r"""
-        Atomically write this RDM as KVN or XML.
+        Validate this RDM message and atomically replace the destination.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Destination file; existing content is replaced only after successful generation.
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Temporary-file writing or atomic replacement failed.
         """
     def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
         r"""
-        Serialize to string (generic).
+        Validate and serialize this RDM message, preserving its edition.
 
         Parameters
         ----------
         format : str
-            Format ('kvn' or 'xml').
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
         Returns
         -------
         str
-            The serialized string.
+            Generated document, subject to the documented notation normalizations.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
         """
 
 @typing.final
@@ -13277,7 +15039,6 @@ class RdmHeader:
         (Mandatory)
     comment : list[str], optional
         Comments.
-        (Optional)
     """
     @property
     def originator(self) -> builtins.str:
@@ -13350,8 +15111,54 @@ class RdmMetadata:
         Time system for all data/metadata (e.g., UTC, TAI).
     epoch_tzero : str
         Epoch from which the ORBIT_LIFETIME is calculated.
-
-        Optional
+    catalog_name : str, optional
+        Satellite catalog assigning the object designator.
+    object_designator : str, optional
+        Identifier assigned by that catalog.
+    object_type : ObjectDescription | str, optional
+        Object category, such as PAYLOAD, ROCKET BODY, or DEBRIS.
+    object_owner : str, optional
+        Owner of the object.
+    object_operator : str, optional
+        Operator of the object.
+    ref_frame : str, optional
+        Reference frame, required when a state vector is supplied.
+    ref_frame_epoch : str, optional
+        CCSDS calendar epoch qualifying a time-dependent frame.
+    ephemeris_name : str, optional
+        Source ephemeris name.
+    gravity_model : str, optional
+        Gravity model used for propagation.
+    atmospheric_model : str, optional
+        Atmospheric density model used for propagation.
+    solar_flux_prediction : str, optional
+        Source of the solar-flux prediction.
+    n_body_perturbations : str, optional
+        Additional attracting bodies considered.
+    solar_rad_pressure : str, optional
+        Solar-radiation-pressure model.
+    earth_tides : str, optional
+        Earth-tide model.
+    intrack_thrust : str, optional
+        In-track thrust treatment.
+    drag_parameters_source : str, optional
+        Source of the drag parameters.
+    drag_parameters_altitude : float, optional
+        Altitude for the drag parameters, in km.
+    reentry_uncertainty_method : str, optional
+        NONE, ANALYTICAL, STOCHASTIC, or EMPIRICAL.
+    reentry_disintegration : str, optional
+        NONE, MASS-LOSS, BREAK-UP, or MASS-LOSS + BREAK-UP.
+    impact_uncertainty_method : str, optional
+        NONE, ANALYTICAL, STOCHASTIC, or EMPIRICAL.
+    previous_message_id : str, optional
+        Identifier of the preceding message.
+    previous_message_epoch : str, optional
+        CCSDS calendar creation epoch of the preceding message.
+    next_message_epoch : str, optional
+        CCSDS calendar epoch of the next scheduled message; omit when none is scheduled.
+    comment : list[str], optional
+        Leading metadata comments.
     """
     @property
     def object_name(self) -> builtins.str:
@@ -13770,9 +15577,12 @@ class RdmMetadata:
     def next_message_epoch(self) -> typing.Optional[builtins.str]:
         r"""
         Scheduled UTC epoch of the next RDM for the same object (formatting rules specified in
-        5.3.3.5); N/A if no other message is scheduled.
+        5.3.3.5); the book writes N/A if no other message is scheduled.
 
-        Examples: 2001-11-06T11:17:33, N/A
+        None means "no message scheduled": KVN NEXT_MESSAGE_EPOCH = N/A (or a blank value) reads
+        as None, and None is written by omitting the keyword. Assign None, not "N/A".
+
+        Examples: 2001-11-06T11:17:33
 
         CCSDS Reference: 508.1-B-1, Section 3.4.
 
@@ -13797,7 +15607,7 @@ class RdmMetadata:
         object_name: builtins.str,
         international_designator: builtins.str,
         epoch_tzero: builtins.str,
-        controlled_reentry: ControlledType | builtins.str | None = None,
+        controlled_reentry: ControlledType | builtins.str,
         center_name: builtins.str,
         time_system: builtins.str,
         catalog_name: typing.Optional[builtins.str] = None,
@@ -13878,6 +15688,18 @@ class RdmSegment:
 class RdmSpacecraftParameters:
     r"""
     RDM spacecraft parameters (rdmSpacecraftParametersType).
+
+    Parameters
+    ----------
+    wet_mass : float, optional
+        Mass including consumables, in kg.
+    dry_mass : float, optional
+        Mass without consumables, in kg.
+    comment : list[str], optional
+        Comments at the start of this logical block.
+
+    Other spacecraft fields can be assigned after construction; complete-message validation
+    checks their domains and dependencies.
     """
     @property
     def wet_mass(self) -> typing.Optional[builtins.float]:
@@ -13921,7 +15743,7 @@ class RdmSpacecraftParameters:
         r"""
         Object area exposed to Solar Radiation Pressure (SRP).
 
-        Units: m²
+        Units: m**2
 
         CCSDS Reference: 508.1-B-1, Section 3.5.
 
@@ -13945,7 +15767,7 @@ class RdmSpacecraftParameters:
         r"""
         Object cross-sectional area.
 
-        Units: m²
+        Units: m**2
 
         CCSDS Reference: 508.1-B-1, Section 3.5.
 
@@ -13969,7 +15791,7 @@ class RdmSpacecraftParameters:
         r"""
         Object radar cross section.
 
-        Units: m²
+        Units: m**2
 
         CCSDS Reference: 508.1-B-1, Section 3.5.
 
@@ -13982,7 +15804,7 @@ class RdmSpacecraftParameters:
         r"""
         Object ballistic coefficient.
 
-        Units: kg/m²
+        Units: kg/m**2
 
         CCSDS Reference: 508.1-B-1, Section 3.5.
 
@@ -13996,7 +15818,7 @@ class RdmSpacecraftParameters:
         The object’s acceleration due to in-track thrust used to propagate the state vector and
         covariance to NOMINAL_RENTRY_EPOCH (if a controlled re-entry).
 
-        Units: m/s²
+        Units: m/s**2
 
         CCSDS Reference: 508.1-B-1, Section 3.5.
 
@@ -14034,7 +15856,7 @@ class RelativeMetadataData:
     Parameters
     ----------
     tca : str
-        The date and time in UTC of the closest approach (ISO 8601).
+        The date and time in UTC of the closest approach (CCSDS calendar epoch, CDM §6.3.2.6).
     miss_distance : float
         The norm of the relative position vector at TCA. Units: m.
     relative_speed : float, optional
@@ -14533,6 +16355,42 @@ class SpinState:
 
     All mandatory elements are to be provided if the block is present.
     (See annex F for conventions and further detail.)
+
+    Parameters
+    ----------
+    ref_frame_a : str
+        Name of the reference frame that defines the starting point of the transformation. The set of
+        allowed values is described in annex B, subsection B3.
+    ref_frame_b : str
+        Name of the reference frame that defines the end point of the transformation. The set of
+        allowed values is described in annex B, subsection B3.
+    spin_alpha : float
+        Right ascension of spin axis vector in frame A.
+    spin_delta : float
+        Declination of the spin axis vector in frame A.
+    spin_angle : float
+        Phase of the satellite about the spin axis.
+    spin_angle_vel : float
+        Angular velocity of satellite around spin axis.
+    nutation : float, optional
+        Nutation angle of spin axis.
+    nutation_per : float, optional
+        Body nutation period of the spin axis.
+    nutation_phase : float, optional
+        Inertial nutation phase.
+    momentum_alpha : float, optional
+        Right ascension of angular momentum vector in frame A.
+    momentum_delta : float, optional
+        Declination of angular momentum vector in frame A.
+    nutation_vel : float, optional
+        Angular velocity of spin vector around the angular momentum vector.
+    comment : list[str], optional
+        One or more comment line(s). Each comment line shall begin with this keyword.
+
+    Raises
+    ------
+    ValueError
+        If an angle is outside [-360, 360). Other spin constraints are checked by validate().
     """
     @property
     def ref_frame_a(self) -> builtins.str:
@@ -14737,6 +16595,13 @@ class StateVector:
         Velocity vector Y-component (km/s).
     z_dot : float
         Velocity vector Z-component (km/s).
+    comment : list[str], optional
+        Comments before this state vector.
+
+    Raises
+    ------
+    ValueError
+        Invalid CCSDS epoch.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -14878,6 +16743,11 @@ class StateVectorAcc:
         Acceleration vector Y-component (km/s²).
     z_ddot : float, optional
         Acceleration vector Z-component (km/s²).
+
+    Raises
+    ------
+    ValueError
+        Invalid CCSDS epoch.
     """
     @property
     def epoch(self) -> builtins.str:
@@ -15052,14 +16922,14 @@ class Tdm:
     @property
     def id(self) -> typing.Optional[builtins.str]:
         r"""
-        The message identifier.
+        The XML root id attribute, always "CCSDS_TDM_VERS"; see the header for MESSAGE_ID.
 
         :type: Optional[str]
         """
     @property
     def version(self) -> builtins.str:
         r"""
-        The message version.
+        Message edition; only "2.0" is accepted.
 
         :type: str
         """
@@ -15111,20 +16981,32 @@ class Tdm:
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Tdm:
         r"""
-        Create a TDM message from a string.
+        Parse a TDM document and validate its contents.
 
         Parameters
         ----------
         data : str
-            Input string/content.
+            KVN or XML content. Combined NDM requires XML.
         format : str, optional
-            Format ('kvn' or 'xml'). Auto-detected if None.
-            (Optional)
+            ``"kvn"`` or ``"xml"``; detected when omitted.
 
         Returns
         -------
         Tdm
-            The parsed TDM object.
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
         """
     @staticmethod
     def from_file(
@@ -15132,7 +17014,34 @@ class Tdm:
         format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
     ) -> Tdm:
         r"""
-        Parse a TDM from a KVN or XML file.
+        Read a UTF-8 TDM document from a file and validate it.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Input file.
+        format : str, optional
+            ``"kvn"`` or ``"xml"``; detected when omitted.
+
+        Returns
+        -------
+        Tdm
+            Parsed and validated message.
+
+        Raises
+        ------
+        NdmFormatError
+            Malformed KVN/XML content.
+        NdmEpochError
+            Invalid CCSDS epoch.
+        NdmValidationError
+            CCSDS validation failure or unsupported edition.
+        NdmUnsupportedMessageError
+            Unrecognized or different message family.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Input file could not be read.
         """
     def to_file(
         self,
@@ -15140,11 +17049,52 @@ class Tdm:
         format: typing.Literal["kvn", "xml"],
     ) -> None:
         r"""
-        Atomically write this TDM as KVN or XML.
+        Validate this TDM message and atomically replace the destination.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Destination file; existing content is replaced only after successful generation.
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
+        NdmIoError
+            Temporary-file writing or atomic replacement failed.
         """
     def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
         r"""
-        Serialize to validated KVN or XML.
+        Validate and serialize this TDM message, preserving its edition.
+
+        Parameters
+        ----------
+        format : str
+            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+
+        Returns
+        -------
+        str
+            Generated document, subject to the documented notation normalizations.
+
+        Raises
+        ------
+        NdmValidationError
+            Invalid model or unsupported output edition.
+        NdmFormatError
+            Content cannot be represented in the requested notation.
+        NdmUnsupportedNotationError
+            No CCSDS representation exists for the requested notation.
+        ValueError
+            Unsupported format argument.
         """
 
 @typing.final
@@ -15180,24 +17130,22 @@ class TdmData:
     ----------
     observations : list[TdmObservation], optional
         List of tracking data records.
-        (Optional)
     comment : list[str], optional
         Comments in the data section.
-        (Optional)
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
         r"""
         Comments.
 
-        :type: list[TdmObservation]
+        :type: list[str]
         """
     @comment.setter
     def comment(self, value: typing.Sequence[builtins.str]) -> None:
         r"""
         Comments.
 
-        :type: list[TdmObservation]
+        :type: list[str]
         """
     @property
     def observations(self) -> list[TdmObservation]:
@@ -15230,10 +17178,13 @@ class TdmHeader:
         (Mandatory)
     message_id : str, optional
         ID that uniquely identifies a message from a given originator.
-        (Optional)
     comment : list[str], optional
         Comments.
-        (Optional)
+
+    Raises
+    ------
+    ValueError
+        If creation_date is not a CCSDS calendar epoch.
     """
     @property
     def originator(self) -> builtins.str:
@@ -15308,17 +17259,205 @@ class TdmMetadata:
 
     Contains configuration details applicable to the Data Section in the same TDM Segment.
 
-    Mandatory Parameters
-    --------------------
-    time_system : str
-        Time system used for timetags (e.g., "UTC", "TAI").
+    Parameters
+    ----------
     participant_1 : str
-        First participant in the tracking session.
+        The PARTICIPANT_n keyword shall represent the participants (see 1.3.4.1) in a tracking data
+        session. It is indexed to allow unambiguous reference to other data in the TDM (max index is
+        5). At least two participants must be specified for most sessions; for some special TDMs such
+        as tropospheric media, only one participant need be listed.
+    time_system : str
+        The TIME_SYSTEM keyword shall specify the time system used for timetags in the associated Data
+        Section. This should be UTC for ground-based data. The value associated with this keyword must
+        be selected from the full set of allowed values enumerated in the SANA Time Systems Registry
+        <https://sanaregistry.org/r/time_systems> (reference `[12]`). (See annex B.)
+    track_id : str, optional
+        The TRACK_ID keyword specifies a unique identifier for the tracking data in the associated
+        data section. The value may be a freely selected string of characters and numbers, only
+        required to be unique for each track of the corresponding sensor. For example, the value may
+        be constructed from the measurement date and time and a counter to distinguish simultaneously
+        tracked objects.
+    data_types : str, optional
+        Comma-separated list of data types in the Data Section. The elements of the list shall be
+        selected from the data types shown in table 3-5, with the exception of the DATA_START,
+        DATA_STOP, and COMMENT keywords.
+    start_time : str, optional
+        The START_TIME keyword shall specify the UTC start time of the total time span covered by the
+        tracking data immediately following this Metadata Section. (For format specification, see
+        4.3.9.)
+    stop_time : str, optional
+        The STOP_TIME keyword shall specify the UTC stop time of the total time span covered by the
+        tracking data immediately following this Metadata Section. (For format specification, see
+        4.3.9.)
+    participant_2 : str, optional
+        The second participant in a tracking data session.
+    participant_3 : str, optional
+        The third participant in a tracking data session.
+    participant_4 : str, optional
+        The fourth participant in a tracking data session.
+    participant_5 : str, optional
+        The fifth participant in a tracking data session.
+    mode : str, optional
+        The MODE keyword shall reflect the tracking mode associated with the Data Section of the
+        segment. The value ‘SEQUENTIAL’ applies for most sequential signal paths; the name implies a
+        sequential signal path between tracking participants. The value ‘SINGLE_DIFF’ applies only for
+        differenced data.
+    path : str, optional
+        The PATH keywords shall reflect the signal path by listing the index of each participant in
+        order, separated by commas, with no inserted white space. Correlated with the indices of the
+        PARTICIPANT_n keywords. The first entry in the PATH shall be the transmit participant.
+    path_1 : str, optional
+        The first signal path where the MODE is 'SINGLE_DIFF'.
+    path_2 : str, optional
+        The second signal path where the MODE is 'SINGLE_DIFF'.
+    transmit_band : str, optional
+        The TRANSMIT_BAND keyword shall indicate the frequency band for transmitted frequencies. The
+        frequency ranges associated with each band should be specified in the ICD.
+    receive_band : str, optional
+        The RECEIVE_BAND keyword shall indicate the frequency band for received frequencies. Although
+        not required in general, the RECEIVE_BAND must be present if the MODE is SINGLE_DIFF and
+        differenced frequencies or differenced range are provided in order to allow proper frequency
+        dependent corrections to be applied.
+    turnaround_numerator : int, optional
+        The TURNAROUND_NUMERATOR keyword shall indicate the numerator of the turnaround ratio that is
+        necessary to calculate the coherent downlink from the uplink frequency.
+    turnaround_denominator : int, optional
+        The TURNAROUND_DENOMINATOR keyword shall indicate the denominator of the turnaround ratio that
+        is necessary to calculate the coherent downlink from the uplink frequency.
+    timetag_ref : str, optional
+        The TIMETAG_REF keyword shall provide a reference for time tags in the tracking data. This
+        keyword indicates whether the timetag associated with the data is the transmit time or the
+        receive time.
+    integration_interval : float, optional
+        The INTEGRATION_INTERVAL keyword shall provide the Doppler count time in seconds for Doppler
+        data or for the creation of normal points.
+    integration_ref : str, optional
+        Indicates the relationship between the INTEGRATION_INTERVAL and the timetag on the data, i.e.,
+        whether the timetag represents the start, middle, or end of the integration period.
+    freq_offset : float, optional
+        The FREQ_OFFSET keyword represents a frequency in Hz that must be added to every RECEIVE_FREQ
+        to reconstruct it. One use is if a Doppler shift frequency observable is transferred instead
+        of the actual received frequency. The default shall be 0.0.
+    range_mode : str, optional
+        The value of the RANGE_MODE keyword shall be ‘COHERENT’, in which case the range tones are
+        coherent with the uplink carrier; ‘CONSTANT’, in which case the range tones have a constant
+        frequency; or ‘ONE_WAY’ (used in Delta-DOR).
+    range_modulus : float, optional
+        The value associated with the RANGE_MODULUS keyword shall be the modulus of the range
+        observable in the units as specified by the RANGE_UNITS keyword; that is, the actual
+        (unambiguous) range is an integer k times the modulus, plus the observable value. The default
+        value shall be 0.0.
+    range_units : str, optional
+        The RANGE_UNITS keyword specifies the units for the range observable. ‘km’ shall be used if
+        the range is measured in kilometers. ‘s’ shall be used if the range is measured in seconds.
+        ‘RU’, for ‘range units’, shall be used where the transmit frequency is changing. The default
+        value shall be ‘km’.
+    angle_type : str, optional
+        The ANGLE_TYPE keyword shall indicate the type of antenna geometry represented in the angle
+        data (ANGLE_1 and ANGLE_2 keywords).
+    reference_frame : str, optional
+        The REFERENCE_FRAME keyword shall be used in conjunction with the ‘ANGLE_TYPE=RADEC’
+        keyword/value combination, indicating the inertial reference frame to which the antenna frame
+        is referenced.
+    interpolation : str, optional
+        The INTERPOLATION keyword shall specify the interpolation method to be used to calculate a
+        transmit phase count at an arbitrary time in tracking data where the uplink frequency is not
+        constant.
+    interpolation_degree : int, optional
+        The INTERPOLATION_DEGREE keyword shall specify the recommended degree of the interpolating
+        polynomial used to calculate a transmit phase count at an arbitrary time in tracking data
+        where the uplink frequency is not constant.
+    doppler_count_bias : float, optional
+        Doppler counts are generally biased so as to accommodate negative Doppler within an
+        accumulator. In order to reconstruct the measurement, the bias shall be subtracted from the
+        DOPPLER_COUNT data value.
+    doppler_count_scale : int, optional
+        Doppler counts are generally scaled so as to capture partial cycles in an integer count. In
+        order to reconstruct the measurement, the DOPPLER_COUNT data value shall be divided by the
+        scale factor. The default shall be 1.
+    doppler_count_rollover : str, optional
+        Doppler counts may overflow the accumulator and roll over in cases where the track is of long
+        duration or very high Doppler shift. This flag indicates whether or not a counter rollover has
+        occurred during the track.
+    transmit_delay_1 : float, optional
+        The TRANSMIT_DELAY_n keyword shall specify a fixed interval of time, in seconds, required for
+        the signal to travel from the transmitting electronics to the transmit point. The default
+        value shall be 0.0.
+    transmit_delay_2 : float, optional
+        Fixed interval of time, in seconds, required for the signal to travel from the transmitting
+        electronics to the transmit point for participant 2.
+    transmit_delay_3 : float, optional
+        Fixed interval of time, in seconds, required for the signal to travel from the transmitting
+        electronics to the transmit point for participant 3.
+    transmit_delay_4 : float, optional
+        Fixed interval of time, in seconds, required for the signal to travel from the transmitting
+        electronics to the transmit point for participant 4.
+    transmit_delay_5 : float, optional
+        Fixed interval of time, in seconds, required for the signal to travel from the transmitting
+        electronics to the transmit point for participant 5.
+    receive_delay_1 : float, optional
+        The RECEIVE_DELAY_n keyword shall specify a fixed interval of time, in seconds, required for
+        the signal to travel from the tracking point to the receiving electronics. The default value
+        shall be 0.0.
+    receive_delay_2 : float, optional
+        Fixed interval of time, in seconds, required for the signal to travel from the tracking point
+        to the receiving electronics for participant 2.
+    receive_delay_3 : float, optional
+        Fixed interval of time, in seconds, required for the signal to travel from the tracking point
+        to the receiving electronics for participant 3.
+    receive_delay_4 : float, optional
+        Fixed interval of time, in seconds, required for the signal to travel from the tracking point
+        to the receiving electronics for participant 4.
+    receive_delay_5 : float, optional
+        Fixed interval of time, in seconds, required for the signal to travel from the tracking point
+        to the receiving electronics for participant 5.
+    data_quality : str, optional
+        Provides an estimate of the quality of the data, based on indicators from the producers of the
+        data (e.g., bad time synchronization flags, marginal lock status indicators, etc.). The
+        default value shall be ‘RAW’.
+    correction_angle_1 : float, optional
+        The set of CORRECTION_* keywords may be used to reflect the values of corrections that have
+        been added to the data or should be added to the data (e.g., ranging station delay
+        calibration, etc.).
+    correction_angle_2 : float, optional
+        A correction value to be added to the ANGLE_2 data.
+    correction_doppler : float, optional
+        A correction value to be added to the Doppler data.
+    correction_mag : float, optional
+        A correction value to be added to the magnitude data.
+    correction_range : float, optional
+        A correction value to be added to the range data.
+    correction_rcs : float, optional
+        A correction value to be added to the RCS data.
+    correction_receive : float, optional
+        A correction value to be added to the received frequency or phase count data.
+    correction_transmit : float, optional
+        A correction value to be added to the transmitted frequency or phase count data.
+    correction_aberration_yearly : float, optional
+        A correction value for yearly aberration.
+    correction_aberration_diurnal : float, optional
+        A correction value for diurnal aberration.
+    corrections_applied : Boun, optional
+        This keyword is used to indicate whether or not the values associated with the CORRECTION_*
+        keywords have been applied to the tracking data. Required if any of the CORRECTION_* keywords
+        is used.
+    ephemeris_name_1 : str, optional
+        Unique name of the external ephemeris file used for participant 1.
+    ephemeris_name_2 : str, optional
+        Unique name of the external ephemeris file used for participant 2.
+    ephemeris_name_3 : str, optional
+        Unique name of the external ephemeris file used for participant 3.
+    ephemeris_name_4 : str, optional
+        Unique name of the external ephemeris file used for participant 4.
+    ephemeris_name_5 : str, optional
+        Unique name of the external ephemeris file used for participant 5.
+    comment : list[str], optional
+        Comments.
 
-    Optional Parameters
-    -------------------
-    Many optional parameters are available to describe the tracking configuration,
-    signal path, frequencies, and corrections. See CCSDS TDM Blue Book for full details.
+    Raises
+    ------
+    ValueError
+        If an epoch, enumeration, integer, or unit-bearing metadata value is invalid.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -16131,8 +18270,8 @@ class TdmMetadata:
         participant_3: typing.Optional[builtins.str] = None,
         participant_4: typing.Optional[builtins.str] = None,
         participant_5: typing.Optional[builtins.str] = None,
-        mode: TdmMode | builtins.str | None = None,
-        path: TdmPath | builtins.str | None = None,
+        mode: typing.Optional[builtins.str] = None,
+        path: typing.Optional[builtins.str] = None,
         path_1: typing.Optional[builtins.str] = None,
         path_2: typing.Optional[builtins.str] = None,
         transmit_band: typing.Optional[builtins.str] = None,
@@ -16295,9 +18434,9 @@ class TleParameters:
     Parameters
     ----------
     ephemeris_type : int, optional
-        Ephemeris Type, default value = 0.
+        Ephemeris Type. When omitted, the book's default 0 applies; nothing is stored.
     classification_type : str, optional
-        Classification Type, default value = U.
+        Classification Type. When omitted, the book's default U applies; nothing is stored.
     norad_cat_id : int, optional
         NORAD Catalog Number ('Satellite Number').
     element_set_no : int, optional
@@ -16305,15 +18444,24 @@ class TleParameters:
     rev_at_epoch : int, optional
         Revolution Number.
     bstar : float, optional
-        B* drag term in 1/ER (Inverse Earth Radii). Required for SGP4.
+        B* drag term in 1/ER (Inverse Earth Radii). Required for SGP4 (ODM 2.0: SGP, SGP4 and
+        SGP/SGP4). Mutually exclusive with ``bterm``.
     bterm : float, optional
-        Ballistic coefficient (m²/kg). Required for SGP4-XP.
+        Ballistic coefficient (m²/kg). Required for SGP4-XP. Mutually exclusive with ``bstar``;
+        not available in ODM 2.0.
     mean_motion_dot : float, optional
-        First derivative of mean motion (rev/day²). Required when MEAN_ELEMENT_THEORY = SGP or PPT3.
+        First derivative of mean motion (rev/day²). Required when MEAN_ELEMENT_THEORY = SGP or
+        PPT3 (ODM 2.0: SGP).
     mean_motion_ddot : float, optional
-        Second derivative of mean motion (rev/day³). Required when MEAN_ELEMENT_THEORY = SGP or PPT3.
+        Second derivative of mean motion (rev/day³). Required when MEAN_ELEMENT_THEORY = SGP or
+        PPT3 (ODM 2.0: SGP). Mutually exclusive with ``agom``.
     agom : float, optional
-        Solar radiation pressure coefficient (m²/kg). Required for SGP4-XP.
+        Solar radiation pressure coefficient (m²/kg). Required for SGP4-XP. Mutually exclusive
+        with ``mean_motion_ddot``; not available in ODM 2.0.
+
+    XML additionally requires ``mean_motion_dot``, one of ``bstar``/``bterm`` and one of
+    ``mean_motion_ddot``/``agom`` (ODM 2.0 XML: ``norad_cat_id``, ``element_set_no``,
+    ``rev_at_epoch``, ``bstar`` and ``mean_motion_ddot`` as well).
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -16329,7 +18477,8 @@ class TleParameters:
     @property
     def ephemeris_type(self) -> typing.Optional[builtins.int]:
         r"""
-        Ephemeris type. Default value = 0. (See 4.2.4.7.)
+        Ephemeris type. When omitted, the book's default 0 applies; nothing is stored. (See
+        4.2.4.7.)
 
         CCSDS Reference: 502.0-B-3, Section 4.2.4.
 
@@ -16340,7 +18489,8 @@ class TleParameters:
     @property
     def classification_type(self) -> typing.Optional[builtins.str]:
         r"""
-        Classification type. Default value = U. (See 4.2.4.7.)
+        Classification type. When omitted, the book's default U applies; nothing is stored.
+        (See 4.2.4.7.)
 
         CCSDS Reference: 502.0-B-3, Section 4.2.4.
 
@@ -16417,19 +18567,20 @@ class TleParameters:
     @bterm.setter
     def bterm(self, value: typing.Optional[builtins.float]) -> None: ...
     @property
-    def mean_motion_dot(self) -> builtins.float:
+    def mean_motion_dot(self) -> typing.Optional[builtins.float]:
         r"""
         First Time Derivative of the Mean Motion (i.e., a drag term, required when
-        MEAN_ELEMENT_THEORY = SGP or PPT3). (See 4.2.4.7 for important details).
+        MEAN_ELEMENT_THEORY = SGP or PPT3; ODM 2.0: SGP). (See 4.2.4.7 for important details).
+        XML requires it in every TLE block.
 
         Units: rev/day²
 
         CCSDS Reference: 502.0-B-3, Section 4.2.4.
 
-        :type: float
+        :type: Optional[float]
         """
     @mean_motion_dot.setter
-    def mean_motion_dot(self, value: builtins.float) -> None: ...
+    def mean_motion_dot(self, value: typing.Optional[builtins.float]) -> None: ...
     @property
     def mean_motion_ddot(self) -> typing.Optional[builtins.float]:
         r"""
@@ -16463,7 +18614,6 @@ class TleParameters:
     def __new__(
         cls,
         *,
-        mean_motion_dot: builtins.float,
         ephemeris_type: typing.Optional[builtins.int] = None,
         classification_type: typing.Optional[builtins.str] = None,
         norad_cat_id: typing.Optional[builtins.int] = None,
@@ -16471,6 +18621,7 @@ class TleParameters:
         rev_at_epoch: typing.Optional[builtins.int] = None,
         bstar: typing.Optional[builtins.float] = None,
         bterm: typing.Optional[builtins.float] = None,
+        mean_motion_dot: typing.Optional[builtins.float] = None,
         mean_motion_ddot: typing.Optional[builtins.float] = None,
         agom: typing.Optional[builtins.float] = None,
     ) -> TleParameters: ...
@@ -16526,7 +18677,7 @@ class UserDefined:
 
     Parameters
     ----------
-        parameters : dict[str, str], optional
+    parameters : dict[str, str], optional
         A dictionary of user-defined parameters and their values.
     comment : list[str], optional
         Comments.
@@ -16643,23 +18794,6 @@ class ScreenVolumeShapeType:
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
-class TdmMode:
-    Sequential: typing.ClassVar[TdmMode]
-    SingleDiff: typing.ClassVar[TdmMode]
-
-    def __str__(self) -> builtins.str: ...
-    def __repr__(self) -> builtins.str: ...
-
-@typing.final
-class TdmPath:
-    Path1: typing.ClassVar[TdmPath]
-    Path2: typing.ClassVar[TdmPath]
-    Path3: typing.ClassVar[TdmPath]
-
-    def __str__(self) -> builtins.str: ...
-    def __repr__(self) -> builtins.str: ...
-
-@typing.final
 class YesNo:
     Yes: typing.ClassVar[YesNo]
     No: typing.ClassVar[YesNo]
@@ -16672,6 +18806,33 @@ def convert(
 ) -> builtins.str:
     r"""
     Convert any recognized NDM message between KVN and XML through the shared generation gate.
+
+    Parameters
+    ----------
+    data : str
+        Input KVN or XML; notation is detected automatically.
+    to_format : str
+        ``"kvn"`` or ``"xml"``. The message's edition is preserved.
+
+    Returns
+    -------
+    str
+        Validated output, subject to the documented notation normalizations.
+
+    Raises
+    ------
+    NdmFormatError
+        Malformed input or content unrepresentable in the target notation.
+    NdmEpochError
+        Invalid epoch.
+    NdmValidationError
+        Invalid message or unsupported edition.
+    NdmUnsupportedMessageError
+        Unrecognized family.
+    NdmUnsupportedNotationError
+        No CCSDS representation exists for the target notation.
+    ValueError
+        Unsupported format argument.
     """
 
 def convert_file(
@@ -16681,6 +18842,32 @@ def convert_file(
 ) -> None:
     r"""
     Convert any recognized NDM file and atomically replace the destination on success.
+
+    Parameters
+    ----------
+    source_path : str or os.PathLike
+        UTF-8 input file; notation is detected automatically.
+    destination_path : str or os.PathLike
+        Output file, replaced only after successful validation and generation.
+    to_format : str
+        ``"kvn"`` or ``"xml"``; the source edition is preserved.
+
+    Raises
+    ------
+    NdmIoError
+        File read, write, or replacement failed; filename and filename2 name both paths.
+    NdmFormatError
+        Malformed input or content unrepresentable in the target notation.
+    NdmEpochError
+        Invalid epoch.
+    NdmValidationError
+        Invalid message or unsupported edition.
+    NdmUnsupportedMessageError
+        Unrecognized family.
+    NdmUnsupportedNotationError
+        No CCSDS representation exists for the target notation.
+    ValueError
+        Unsupported format argument.
     """
 
 def from_file(
@@ -16693,7 +18880,25 @@ def from_file(
     Parameters
     ----------
     path : str or os.PathLike
-        Path to the file.
+        Path to the UTF-8 file.
+    format : str, optional
+        ``"kvn"`` or ``"xml"``; detected when omitted.
+
+    Raises
+    ------
+    NdmIoError
+        The file could not be read.
+    NdmFormatError
+        Malformed document or invalid text encoding.
+    NdmEpochError
+        Invalid CCSDS epoch.
+    NdmValidationError
+        Validation failed or the edition is unsupported.
+    NdmUnsupportedMessageError
+        Unrecognized message family.
+    ValueError
+        Unsupported format argument.
+
     Returns
     -------
     Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, CombinedNdm, Aem, Apm, Acm]
@@ -16722,6 +18927,8 @@ def from_str(
     ------
     NdmFormatError
         If the input is malformed.
+    NdmEpochError
+        If a CCSDS epoch is invalid.
     NdmValidationError
         If the message fails validation or uses an unsupported edition.
     NdmUnsupportedMessageError

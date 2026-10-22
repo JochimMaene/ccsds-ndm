@@ -7,6 +7,47 @@ use crate::error::Result;
 use crate::types::CalendarEpoch;
 use serde::Deserialize;
 
+// XSD element defaults apply to present, empty elements, not omitted optional fields.
+pub(super) fn default_zero<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Option<f64>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Value {
+        Number(Option<f64>),
+        Text(String),
+        Element {
+            #[serde(rename = "$text", default)]
+            text: String,
+        },
+    }
+    let text = match Value::deserialize(deserializer)? {
+        Value::Number(value) => return Ok(value),
+        Value::Text(text) | Value::Element { text } => text,
+    };
+    if text.is_empty() {
+        Ok(Some(0.0))
+    } else {
+        crate::types::parse_xml_value(&text)
+            .map(Some)
+            .map_err(serde::de::Error::custom)
+    }
+}
+
+pub(super) fn default_quality<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Option<crate::types::TdmDataQuality>, D::Error> {
+    Option::<String>::deserialize(deserializer)?
+        .map(|value| {
+            if value.is_empty() {
+                Ok(crate::types::TdmDataQuality::Raw)
+            } else {
+                value.parse().map_err(serde::de::Error::custom)
+            }
+        })
+        .transpose()
+}
+
 pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {
     use crate::xml::XmlSequenceRule;
 
@@ -85,12 +126,23 @@ impl<'de> Deserialize<'de> for TdmObservation {
                                     .map_err(serde::de::Error::custom)?,
                             );
                         }
-                        // RHUMIDITY uses Percentage so its optional units attribute is preserved.
+                        // RHUMIDITY keeps its optional units attribute; the range error names
+                        // RHUMIDITY rather than the shared Percentage type.
                         "RHUMIDITY" => {
-                            data = Some(TdmObservationData::Rhumidity(map.next_value()?));
+                            let value: crate::types::UnitValue<f64, crate::types::PercentageUnits> =
+                                map.next_value()?;
+                            crate::types::Percentage::validate_value(value.value, "RHUMIDITY")
+                                .map_err(serde::de::Error::custom)?;
+                            data = Some(TdmObservationData::Rhumidity(crate::types::Percentage {
+                                value: value.value,
+                                units: value.units,
+                            }));
                         }
                         key => {
-                            let value: String = map.next_value()?;
+                            let mut value: String = map.next_value()?;
+                            if matches!(key, "CLOCK_BIAS" | "CLOCK_DRIFT") && value.is_empty() {
+                                value = "0.0".into();
+                            }
                             data = Some(
                                 TdmObservationData::from_key_val(key, &value)
                                     .map_err(serde::de::Error::custom)?,

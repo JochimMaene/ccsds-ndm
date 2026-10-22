@@ -33,7 +33,6 @@ def describe(
         error.field_path,
         error.original_token,
         error.expected,
-        error.requirement,
     )
     location: tuple[int | None, int | None, int | None] = (
         error.line,

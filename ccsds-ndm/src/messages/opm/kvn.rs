@@ -178,6 +178,7 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<Option<ManeuverParamet
 
     loop {
         let checkpoint = input.checkpoint();
+        blank_lines.parse_next(input)?;
         let key = match key_token.parse_next(input) {
             Ok(key) => key,
             Err(_) => {
@@ -1021,7 +1022,7 @@ impl Opm {
                 .map(|(_, value)| value.trim())
         });
         (|| {
-            let normalized = crate::kvn::normalize_line_endings(kvn);
+            let normalized = crate::kvn::prepare_input(kvn, crate::validation::MessageKind::Opm)?;
             validate_kvn_syntax(&normalized)?;
             let opm = Self::from_kvn_str(&normalized)?;
             crate::traits::Validate::validate(&opm)?;
@@ -1296,6 +1297,7 @@ impl Opm {
             )?;
         }
         if let Some(parameters) = &data.spacecraft_parameters {
+            parameters.validate_kvn_representability()?;
             comments(
                 &parameters.comment,
                 "body.segment.data.spacecraft_parameters.comment",

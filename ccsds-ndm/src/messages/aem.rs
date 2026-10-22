@@ -35,11 +35,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "aem")]
 pub struct Aem {
+    /// Message provenance and creation epoch.
     pub header: AdmHeader,
+    /// Message segments and their data.
     pub body: AemBody,
+    /// XML root identifier; when present it must match this message family.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_AEM_VERS".to_string()))]
     pub id: Option<String>,
+    /// Supported message edition, "2.0".
     #[serde(rename = "@version")]
     #[builder(default = "2.0".to_string(), into)]
     pub version: String,
@@ -63,8 +67,10 @@ impl Ndm for Aem {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::detect::without_utf8_bom(kvn);
-        let normalized = crate::kvn::normalize_line_endings(kvn);
+        let normalized = crate::kvn::prepare_input(
+            crate::detect::without_utf8_bom(kvn),
+            crate::validation::MessageKind::Aem,
+        )?;
         kvn::validate_kvn_syntax(&normalized)?;
         let aem = Self::from_kvn_str(&normalized)?;
         crate::traits::Validate::validate(&aem)?;
@@ -116,6 +122,14 @@ impl AemBody {
         }
 
         for (index, pair) in self.segment.windows(2).enumerate() {
+            if !pair[0]
+                .metadata
+                .time_system
+                .trim()
+                .eq_ignore_ascii_case(pair[1].metadata.time_system.trim())
+            {
+                continue;
+            }
             let (Some(previous), Some(current)) = (
                 pair[0].metadata.useable_stop_time,
                 pair[1].metadata.useable_start_time,
@@ -185,6 +199,7 @@ impl crate::traits::Validate for AemSegment {
 }
 
 impl AemSegment {
+    /// Validate this value against the supported CCSDS profile.
     pub fn validate(&self) -> Result<()> {
         self.validate_inner()
     }
@@ -250,17 +265,22 @@ impl AemSegment {
 // Body & Segment
 //----------------------------------------------------------------------
 
+/// Attitude ephemeris segments (ADM §4.2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct AemBody {
+    /// Segments in source order.
     #[serde(rename = "segment")]
     pub segment: Vec<AemSegment>,
 }
 
+/// AEM metadata and its attitude history (ADM §4.2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct AemSegment {
+    /// Object, reference-frame and time-system interpretation for this segment.
     pub metadata: AemMetadata,
+    /// Records interpreted using this segment metadata.
     pub data: AemData,
 }
 
@@ -424,6 +444,7 @@ pub struct AemMetadata {
 }
 
 impl AemMetadata {
+    /// Validate this value against the supported CCSDS profile.
     pub fn validate(&self) -> Result<()> {
         self.validate_inner()
     }
@@ -744,6 +765,7 @@ impl AemAttitudeState {
         }
     }
 
+    /// The calendar epoch carried by this attitude state.
     pub fn epoch(&self) -> &CalendarEpoch {
         match self {
             Self::QuaternionEphemeris(v) => &v.epoch,
@@ -758,6 +780,7 @@ impl AemAttitudeState {
         }
     }
 
+    /// The ATTITUDE_TYPE corresponding to this state variant (ADM table 4-4).
     pub fn attitude_type(&self) -> AttitudeTypeType {
         match self {
             Self::QuaternionEphemeris(_) => AttitudeTypeType::Quaternion,
@@ -881,22 +904,10 @@ impl AemAttitudeState {
             }
         }
     }
-
-    fn validate_state(&self) -> Result<()> {
-        self.validate_values()?;
-        match self {
-            Self::QuaternionEphemeris(value) => {
-                crate::traits::Validate::validate(&value.quaternion)
-            }
-            Self::QuaternionDerivative(value) => {
-                crate::traits::Validate::validate(&value.quaternion)
-            }
-            Self::QuaternionAngVel(value) => crate::traits::Validate::validate(&value.quaternion),
-            _ => Ok(()),
-        }
-    }
 }
 
+/// Checks the records on their own. Whether each record matches the segment's `ATTITUDE_TYPE`
+/// (ADM 4.2.4.5) needs the metadata, so `AemSegment` validation performs that check.
 impl crate::traits::Validate for AemData {
     fn validate(&self) -> Result<()> {
         self.validate_structure()
@@ -916,7 +927,7 @@ impl AemData {
             .into());
         }
         for state in &self.attitude_states {
-            state.validate_state()?;
+            state.validate_values()?;
         }
         Ok(())
     }
@@ -933,10 +944,5 @@ impl AemData {
             }
         }
         Ok(())
-    }
-
-    pub fn validate(&self, attitude_type: &AttitudeTypeType) -> Result<()> {
-        self.validate_structure()?;
-        self.validate_attitude_type(attitude_type)
     }
 }

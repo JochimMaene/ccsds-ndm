@@ -219,11 +219,10 @@ class TestAem:
     def test_section_validation_raises_ndm_validation_error(self):
         aem = Aem.from_file(KVN_DIR / "aem_g5.kvn")
         segment = aem.segments[0]
-        attitude_type = segment.metadata.attitude_type
         state = segment.data.attitude_states[0]
         state.values = [float("nan"), *state.values[1:]]
         with pytest.raises(ccsds_ndm.NdmValidationError):
-            segment.data.validate(attitude_type)
+            segment.data.validate()
 
         segment.metadata.object_name = ""
         for validate in (segment.metadata.validate, segment.validate):

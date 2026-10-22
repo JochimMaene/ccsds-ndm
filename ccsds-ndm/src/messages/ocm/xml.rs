@@ -5,7 +5,6 @@
 use super::{CovLine, ManLine, Ocm, TrajLine};
 use crate::error::{Result, ValidationError};
 use crate::types::Epoch;
-use fast_float;
 use serde::{Deserialize, Serialize};
 
 fn ocm_xml_children(parent: &[u8]) -> Option<&'static [&'static [u8]]> {
@@ -377,52 +376,54 @@ impl Ocm {
     pub(crate) fn validate_xml_representability(&self) -> Result<()> {
         let data = &self.body.segment.data;
         let metadata = &self.body.segment.metadata;
-        let positive_count = |field, count: Option<u64>| -> Result<()> {
-            if count == Some(0) {
-                return Err(ValidationError::invalid_value(
-                    field,
-                    "0",
-                    "a positive integer for the XML edition",
-                )
-                .into());
+        // KVN and the model keep these open (registry token / book "suggested values"); the XML
+        // edition enumerates them.
+        let enumerated = |field: &'static str,
+                          value: Option<&String>,
+                          allowed: &[&str],
+                          path: String|
+         -> Result<()> {
+            match value {
+                Some(value) if !allowed.contains(&value.as_str()) => Err(
+                    ValidationError::invalid_value(field, value, allowed.join(", "))
+                        .at_path(path)
+                        .into(),
+                ),
+                _ => Ok(()),
             }
-            Ok(())
         };
-        if let Some(pert) = &data.pert {
-            positive_count("ALBEDO_GRID_SIZE", pert.albedo_grid_size)?;
-        }
-        if let Some(od) = &data.od {
-            for (field, count) in [
-                ("OBS_AVAILABLE", od.obs_available),
-                ("OBS_USED", od.obs_used),
-                ("TRACKS_AVAILABLE", od.tracks_available),
-                ("TRACKS_USED", od.tracks_used),
-                ("SOLVE_N", od.solve_n),
-                ("CONSIDER_N", od.consider_n),
-                ("SENSORS_N", od.sensors_n),
-            ] {
-                positive_count(field, count)?;
-            }
-        }
-        for man in &data.man {
-            positive_count("DC_MAX_CYCLES", man.dc_max_cycles)?;
-        }
-        if let Some(gm) = data.pert.as_ref().and_then(|pert| pert.gm.as_ref()) {
-            crate::validation::validate_at_field_path(
-                crate::types::Gm::validate_xml_value(gm.value, "GM"),
-                "body.segment.data.pert",
+        enumerated(
+            "OBJECT_TYPE",
+            metadata.object_type.as_ref(),
+            &[
+                "PAYLOAD",
+                "payload",
+                "ROCKET BODY",
+                "rocket body",
+                "DEBRIS",
+                "debris",
+                "UNKNOWN",
+                "unknown",
+                "OTHER",
+                "other",
+            ],
+            "body.segment.metadata".to_string(),
+        )?;
+        for (index, trajectory) in data.traj.iter().enumerate() {
+            enumerated(
+                "TRAJ_BASIS",
+                trajectory.traj_basis.as_ref(),
+                &["PREDICTED", "DETERMINED", "TELEMETRY", "SIMULATED", "OTHER"],
+                format!("body.segment.data.traj[{index}]"),
             )?;
         }
-        for (index, trajectory) in data.traj.iter().enumerate() {
-            if trajectory.interpolation_degree == Some(0) {
-                return Err(ValidationError::invalid_value(
-                    "INTERPOLATION_DEGREE",
-                    "0",
-                    "a positive integer for the XML edition",
-                )
-                .at_path(format!("body.segment.data.traj[{index}]"))
-                .into());
-            }
+        for (index, covariance) in data.cov.iter().enumerate() {
+            enumerated(
+                "COV_BASIS",
+                covariance.cov_basis.as_ref(),
+                &["PREDICTED", "DETERMINED", "EMPIRICAL", "SIMULATED", "OTHER"],
+                format!("body.segment.data.cov[{index}]"),
+            )?;
         }
         for (field, value) in [
             ("OPERATOR_URL", &metadata.operator_url),
@@ -559,7 +560,10 @@ impl<'de> Deserialize<'de> for TrajLine {
                     .parse::<Epoch>()
                     .map_err(|error| error.to_string())?;
                 let values: std::result::Result<Vec<f64>, _> = parts
-                    .map(|v| fast_float::parse(v).map_err(|error| error.to_string()))
+                    .map(|v| {
+                        crate::kvn::parser::parse_ccsds_number(v)
+                            .ok_or_else(|| format!("invalid or unrepresentable number {v}"))
+                    })
                     .collect();
                 Ok(TrajLine {
                     epoch,
@@ -600,7 +604,10 @@ impl<'de> Deserialize<'de> for CovLine {
                     .parse::<Epoch>()
                     .map_err(|error| error.to_string())?;
                 let values: std::result::Result<Vec<f64>, _> = parts
-                    .map(|v| fast_float::parse(v).map_err(|error| error.to_string()))
+                    .map(|v| {
+                        crate::kvn::parser::parse_ccsds_number(v)
+                            .ok_or_else(|| format!("invalid or unrepresentable number {v}"))
+                    })
                     .collect();
                 Ok(CovLine {
                     epoch,

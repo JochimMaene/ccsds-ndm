@@ -246,15 +246,17 @@ fn state_vector_from_row(
 /// segments : list[OemSegment]
 ///     The list of data segments.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct Oem {
-    /// The message identifier.
+    /// The root `id` attribute, always ``"CCSDS_OEM_VERS"`` (ODM 8.3.6); not a message
+    /// identifier (see ``OdmHeader.message_id``).
     ///
     /// :type: Optional[str]
     #[pyo3(get)]
     id: Option<String>,
 
-    /// The message version.
+    /// The OEM edition: ``"3.0"`` or ``"2.0"`` can be set and written. A parsed ``"1.0"``
+    /// message keeps ``"1.0"`` but is read-only; setting ``"1.0"`` raises ``ValueError``.
     ///
     /// :type: str
     #[pyo3(get)]
@@ -316,7 +318,7 @@ impl Oem {
 /// data : OemData
 ///     Segment data.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct OemSegment {
     /// Segment metadata.
     ///
@@ -361,29 +363,31 @@ impl OemSegment {
 /// object_id : str
 ///     Object identifier of the object for which orbit state data is provided.
 /// start_time : str
-///     Start time of the total time span covered by the ephemeris data (ISO 8601).
+///     Start time of the total time span covered by the ephemeris data (CCSDS epoch, ODM 7.5.10).
 /// stop_time : str
-///     Stop time of the total time span covered by the ephemeris data (ISO 8601).
+///     Stop time of the total time span covered by the ephemeris data (CCSDS epoch, ODM 7.5.10).
 /// center_name : str
 ///     Origin of the reference frame.
 /// ref_frame : str
 ///     Reference frame in which state vector data is given.
 /// time_system : str
-///     Time system used for state vector, maneuver, and covariance data.
+///     Time system used for the metadata times, state vectors and covariance epochs; the same
+///     in every segment (ODM 5.2.4.5).
 /// ref_frame_epoch : str, optional
-///     Epoch of the reference frame, if not intrinsic to the definition (ISO 8601).
+///     Epoch of the reference frame, if not intrinsic to the definition (CCSDS epoch, ODM 7.5.10).
 /// useable_start_time : str, optional
-///     Start of the recommended time span for use of the ephemeris data (ISO 8601).
+///     Start of the recommended time span for use of the ephemeris data (CCSDS epoch, ODM 7.5.10).
 /// useable_stop_time : str, optional
-///     End of the recommended time span for use of the ephemeris data (ISO 8601).
+///     End of the recommended time span for use of the ephemeris data (CCSDS epoch, ODM 7.5.10).
 /// interpolation : str, optional
 ///     Recommended interpolation method for ephemeris data.
 /// interpolation_degree : int, optional
-///     Degree of the interpolation polynomial.
+///     Recommended interpolation degree; a positive integer, required when `interpolation` is
+///     given (ODM table 5-3).
 /// comment : list[str], optional
 ///     Comments.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct OemMetadata {
     pub inner: core_oem::OemMetadata,
@@ -400,7 +404,7 @@ pub struct OemMetadata {
 /// comment : list[str], optional
 ///     Comments.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct OemData {
     /// Comments (see 7.8 for formatting rules).
     ///
@@ -458,7 +462,7 @@ impl OemData {
 /// Parameters
 /// ----------
 /// epoch : str
-///     Epoch of the covariance matrix (ISO 8601).
+///     Epoch of the covariance matrix (CCSDS epoch, ODM 7.5.10).
 /// values : numpy.ndarray
 ///     NumPy array of shape (21,) containing the lower-triangular values, or (6,6) for
 ///     a full symmetric matrix. Only the lower triangle of a (6,6) input is read, so a
@@ -515,7 +519,7 @@ impl OemData {
 /// cz_dot_z_dot : float
 ///     Velocity Z covariance [6,6]. Units: km²/s².
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct OemCovarianceMatrix {
     pub inner: core_oem::OemCovarianceMatrix,
@@ -586,21 +590,32 @@ impl Oem {
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
         crate::api::validate_message(py, &self.to_core(py)?)
     }
-
-    /// Create an OEM message from a string.
+    /// Parse a OEM document and validate its contents.
     ///
     /// Parameters
     /// ----------
     /// data : str
-    ///     Input string/content.
+    ///     KVN or XML content. Combined NDM requires XML.
     /// format : str, optional
-    ///     Format ('kvn' or 'xml'). Auto-detected if None.
-    ///     (Optional)
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
     ///
     /// Returns
     /// -------
     /// Oem
-    ///     The parsed OEM object.
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmEpochError
+    ///     Invalid CCSDS epoch.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// ValueError
+    ///     Unsupported format argument.
     #[staticmethod]
     #[pyo3(signature = (data, format=None))]
     fn from_str(
@@ -612,8 +627,34 @@ impl Oem {
         let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Parse an OEM from a KVN or XML file.
+    /// Read a UTF-8 OEM document from a file and validate it.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Input file.
+    /// format : str, optional
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// Oem
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmEpochError
+    ///     Invalid CCSDS epoch.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Input file could not be read.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
@@ -626,8 +667,27 @@ impl Oem {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Atomically write this OEM as KVN or XML.
+    /// Validate this OEM message and atomically replace the destination.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Destination file; existing content is replaced only after successful generation.
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Temporary-file writing or atomic replacement failed.
     fn to_file(
         &self,
         py: Python<'_>,
@@ -643,8 +703,28 @@ impl Oem {
             format,
         )
     }
-
-    /// Serialize to validated KVN or XML.
+    /// Validate and serialize this OEM message, preserving its edition.
+    ///
+    /// Parameters
+    /// ----------
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     Generated document, subject to the documented notation normalizations.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
     fn to_str(
         &self,
         py: Python<'_>,
@@ -981,8 +1061,8 @@ impl OemMetadata {
     }
 
     /// Recommended interpolation degree for ephemeris data in the immediately following set of
-    /// ephemeris lines. Must be an integer value. This keyword must be used if the
-    /// ‘INTERPOLATION’ keyword is used.
+    /// ephemeris lines. Must be a positive integer (the XSD's positiveInteger), and must be
+    /// given if ``interpolation`` is.
     ///
     /// Examples: 5, 8
     ///
@@ -1052,13 +1132,13 @@ impl OemData {
     /// Parameters
     /// ----------
     /// state_vector_epochs : list[str]
-    ///     Epoch of each state vector (ISO 8601), one per row of `state_vector_numpy`.
+    ///     Epoch of each state vector (CCSDS epoch, ODM 7.5.10), one per row of `state_vector_numpy`.
     /// state_vector_numpy : numpy.ndarray
     ///     Array of shape (N, 6) with [X, Y, Z, X_DOT, Y_DOT, Z_DOT], or (N, 9) with
     ///     accelerations [X_DDOT, Y_DDOT, Z_DDOT] appended. A NaN acceleration omits that
     ///     acceleration for the row. Units: km, km/s, km/s².
     /// covariance_matrix_epochs : list[str], optional
-    ///     Epoch of each covariance matrix (ISO 8601). Required when any covariance argument
+    ///     Epoch of each covariance matrix (CCSDS epoch, ODM 7.5.10). Required when any covariance argument
     ///     is given.
     /// covariance_matrix_numpy : numpy.ndarray, optional
     ///     Covariance matrices shaped (N, 6, 6) or (N, 21), or a single matrix shaped (6, 6) or
@@ -1206,7 +1286,7 @@ impl OemData {
         })
     }
 
-    /// Epochs for state vectors (ISO 8601).
+    /// Epochs for state vectors (CCSDS epoch, ODM 7.5.10).
     ///
     /// The list is a copy; assigning a list of the same length updates the records in place.
     ///
@@ -1271,7 +1351,7 @@ impl OemData {
         })
     }
 
-    /// Epochs for covariance matrices (ISO 8601).
+    /// Epochs for covariance matrices (CCSDS epoch, ODM 7.5.10).
     ///
     /// The list is a copy; assigning a list of the same length updates the records in place.
     ///

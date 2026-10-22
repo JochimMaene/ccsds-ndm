@@ -638,3 +638,34 @@ fn aem_uses_canonical_angular_velocity_frame_and_preserves_optional_metadata() {
         }
     }
 }
+
+#[test]
+fn data_row_shape_errors_name_the_problem_at_the_row() {
+    let row = "1996-11-28T22:08:03.5555 0.42319 -0.45697 0.23784 0.74533";
+    for (bad, message) in [
+        (
+            row.replace(" 0.74533", ""),
+            "data line has the wrong number of values for ATTITUDE_TYPE",
+        ),
+        (
+            row.replace("0.42319", "0.4x"),
+            "Invalid CCSDS number in data line",
+        ),
+    ] {
+        let error = Aem::from_kvn(&crate::common::mutated(crate::KVN, row, &bad)).unwrap_err();
+        let kvn = crate::common::kvn_parse_error(&error).expect("a KVN parse error");
+        assert_eq!((kvn.line, kvn.message.as_str()), (25, message));
+    }
+}
+
+/// ADM 6.10.3 forbids comments after DATA_STOP; the diagnostic used to blame the header.
+#[test]
+fn aem_comment_after_data_stop_names_the_rule() {
+    let error = Aem::from_kvn(&format!("{KVN}COMMENT trailing\n")).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("must not follow META_STOP or DATA_STOP"),
+        "{error}"
+    );
+}

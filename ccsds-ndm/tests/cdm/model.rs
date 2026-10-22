@@ -12,7 +12,10 @@ fn cdm_validation_probability_range() {
         "COLLISION_PROBABILITY = 0.001",
         "COLLISION_PROBABILITY = 1.5",
     );
-    crate::common::assert_validation_field(&Cdm::from_kvn(&kvn).unwrap_err(), "Probability");
+    crate::common::assert_validation_field(
+        &Cdm::from_kvn(&kvn).unwrap_err(),
+        "COLLISION_PROBABILITY",
+    );
 }
 
 #[test]

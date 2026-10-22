@@ -4,6 +4,62 @@ Release notes
 Unreleased
 ----------
 
+Additional conformance corrections
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- TLE export requires Earth/TEME/UTC metadata and canonicalizes rounded cyclic-angle boundaries.
+- OPM/OMM KVN output refuses empty or comment-only spacecraft blocks before writing.
+- AEM compares adjacent usable bounds only within the same declared time system.
+- CDM/TDM XML accepts schema-listed lowercase categories; TDM reads present-empty schema defaults.
+- ACM XML enforces the attitude-determination method enumeration; OCM uses numeric revolution-basis
+  equality and standard XML double spellings for time offsets.
+- OMM recognized theory spellings share their conditional checks, without guessing the propagator
+  behind ``SGP/SGP4``. Family records now state the remaining book/schema and storage boundaries.
+- Shared KVN reading, in every family: blank lines anywhere, indented records (including the
+  version and header), TABs as blanks, lines over 254 characters, a leading ``+`` on integers,
+  and ``_`` for a blank in ``ROCKET BODY``. A blank or ``N/A`` optional value is absent; a blank
+  mandatory value is missing at its record. Trailing junk after a number is "Invalid ... for KEY"
+  at that line; non-ASCII errors name the byte column and code point. The edition is checked
+  before the structure, so unsupported editions report ``parse.unsupported_input_version``.
+  UTF-16/UTF-32 input is refused as "input must be UTF-8".
+- Mixed-case text values are accepted and preserved in every family; OEM no longer enforces the
+  ODM 7.5.3 single-case rule. A missing ``<?xml ...?>`` declaration is accepted.
+- KVN writers trim values, refuse empty or ``N/A`` values and integers above 2³¹−1, name the field
+  in non-ASCII refusals, and write rounded 17-digit numbers in their shortest stable spelling.
+
+- ACM histories accept absolute calendar tags as well as relative offsets; each block uses one
+  form. XML Euler/rate field ordering is corrected. The unused ``cov_confidence``, ``ad_epoch``,
+  and determination ``attitude_type`` fields are removed.
+- OCM applies book defaults for omitted KVN time system and trajectory/covariance composition;
+  open book values remain usable in KVN and are checked against XML enums on XML output.
+  XML numeric history rows reject nonzero underflow and empty value lists. Trailing unattached
+  KVN comments are refused, and equinoctial covariance checks omit the constant retrograde factor.
+- CDM nested data comments and RDM data-level comments merge canonically for KVN conversion.
+  Empty optional blocks normalize to absent; RDM comment-only blocks still fail explicitly.
+- RDM removes unsupported uncertainty methods, preserves a lone covariance reference frame,
+  and always writes required KVN units. Python ``RdmMetadata`` requires re-entry status explicitly.
+- OPM/OMM 2.0 output enforces that edition's angle bounds and TLE requirements. OMM's mean-motion
+  derivative may be omitted where its theory permits, but XML still enforces its required shape.
+- APM KVN omits metadata delimiters and preserves quaternion-derivative units. AEM data validation
+  takes no attitude-type argument; metadata/type matching is checked by the segment or message.
+  ``TdmPath`` is removed; path properties use strings with arbitrary supported participant sequences.
+- Error codes cover all error categories, including Python file and EOF errors. Typed Python
+  readers identify a wrong message family before parsing its body. Unused ``requirement``
+  diagnostics are removed; available paths and source lines are retained in diagnostics.
+  Validation locations remain aligned for LF, CR, CRLF, and LFCR input.
+  Python classes now identify their module as ``ccsds_ndm``.
+
+- Breaking Rust validation changes: helpers taking unused headers or metadata have been
+  removed; use the ``Validate`` trait or complete-message validation. OMM's
+  ``OmmData::validate_with_metadata`` and ``TleParameters::validate`` now take the edition;
+  validate a complete OMM for edition-dependent rules instead of its body or segment alone.
+- Breaking ACM history representation: Rust ``AttLine``/``CovLine`` store a lexical ``epoch``
+  separately from their numeric ``values``. Python ``att_lines``/``cov_lines`` use
+  ``(epoch_string, values)`` tuples. History basis fields use strings so book-defined free text
+  can be retained.
+- ACM XML histories reject nonzero numeric underflow instead of silently replacing it with
+  zero. Typed Python readers retain the generic reader's parse-operation and encoding diagnostics.
+
 Interoperability and preservation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -16,9 +72,8 @@ Interoperability and preservation
 - Closed KVN enums accept supported uppercase/lowercase spellings, but arbitrary mixed case
   and unknown closed values are rejected. Unknown object types no longer silently become
   ``OTHER``. Open registry/ICD strings retain their supplied spelling.
-- Schema-only restrictions apply at XML boundaries. Finite GM, sensor frequency, and RDM day
-  intervals retain the broader book/KVN domain, with XML refusing values outside its schema.
-  Independently book-backed numeric rules remain semantic validation requirements.
+- Schema numeric facets now apply in all notations: GM, sensor frequency, and RDM day
+  intervals must be positive. Explicit book/schema conflicts are recorded per family.
 - Rust ``UserDefined`` and ``OcmUserDefined`` now expose ordered ``entries`` with comment and
   parameter variants. XML retains interleaving and exact names. KVN refuses comment placements
   or populated empty blocks it cannot preserve rather than moving or dropping information.
@@ -36,8 +91,8 @@ Conformance review and compatibility changes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - ACM rejects duplicate attitude-history timestamps and non-increasing covariance
-  timestamps. KVN also refuses distinct timestamps that its numeric precision
-  would merge. OCM checks same-representation start/stop ordering and numeric
+  timestamps. History tags retain their lexical spelling; numeric-value rounding cannot merge
+  distinct time tags. OCM checks same-representation start/stop ordering and numeric
   relative bounds against their declared span, allowing a documented rounding
   tolerance. These checks also apply after model edits and before generation.
 - ACM KVN accepts the book's ``RATE_TYPE=NONE`` as an alias for omitted rates;
@@ -79,7 +134,7 @@ Conformance review and compatibility changes
   the 64-byte epoch limit, and remaining supported-profile limits are documented.
 - The shared preservation contract now states numeric rounding, fixed-unit
   normalization, comment-position merging, and streaming sink failure behavior
-  explicitly. ACM's relative-only history support and rate-type book/schema
+  explicitly. ACM's relative/absolute history forms and rate-type book/schema
   conflict, CDM's physical-validation boundary, and the shared XML parser's
   lexical limits are documented without adding API options.
 - Every current message family now uses the same verification criteria and
@@ -240,13 +295,9 @@ listed in the OEM conformance inventory. Newly accepted:
 
 Newly rejected:
 
-- XML documents in every family without an XML 1.0 declaration, with a
-  non-UTF-8 encoding, or with an undeclared prefix used in a schema hint.
-- OEM KVN covariance rows of the wrong width, and mixed-case KVN spellings of
-  the time systems and reference frames listed by the 2.0 and 3.0 books (for
-  example ``Utc`` or ``Eme2000``). OEM 1.0 accepts these spellings. XML text follows ``xsd:string``,
-  so such XML values are accepted and only their conversion to KVN fails;
-  ICD-defined values keep their spelling in both notations.
+- XML documents in every family with a non-UTF-8 encoding, or with an
+  undeclared prefix used in a schema hint.
+- OEM KVN covariance rows of the wrong width.
 - Time tags with more than 16 fractional-second digits, in every family except
   TDM (ODM 7.5.10 and the matching ADM, CDM and RDM rules).
 - Empty or ``n/a`` XML values for optional numbers, epochs and enumerations in
@@ -361,13 +412,13 @@ Python metadata construction (breaking change)
 Metadata constructors now require explicit interpretation fields instead of
 silently supplying defaults:
 
-* ``AemMetadata`` requires ``ref_frame_a``, ``ref_frame_b``, ``start_time``,
+- ``AemMetadata`` requires ``ref_frame_a``, ``ref_frame_b``, ``start_time``,
   ``stop_time``, and ``time_system``.
-* ``OemMetadata`` requires ``center_name``, ``ref_frame``, and ``time_system``.
-* ``OmmMetadata`` and ``OpmMetadata`` require ``center_name``, ``ref_frame``,
+- ``OemMetadata`` requires ``center_name``, ``ref_frame``, and ``time_system``.
+- ``OmmMetadata`` and ``OpmMetadata`` require ``center_name``, ``ref_frame``,
   and ``time_system``.
-* ``RdmMetadata`` requires ``center_name`` and ``time_system``.
-* ``AcmMetadata``, ``ApmMetadata``, ``OcmMetadata``, and ``TdmMetadata`` require
+- ``RdmMetadata`` requires ``center_name`` and ``time_system``.
+- ``AcmMetadata``, ``ApmMetadata``, ``OcmMetadata``, and ``TdmMetadata`` require
   ``time_system``.
 
 Calls omitting these arguments now raise ``TypeError``. Pass the values appropriate

@@ -5,7 +5,8 @@ and `ccsds-ndm/data/xsd/ndmxml-4.0.0-master-4.0.xsd`. It is the only representat
 parses or writes.
 
 CCSDS defines no KVN combined instantiation. Section 4.11 lives in the XML specification and
-requires the `<ndm></ndm>` root element tags, while each KVN family section requires the message
+requires the `<ndm></ndm>` root element tags (NDM/XML §§4.11.4–4.11.5;
+ODM §§8.12.6–8.12.7), while each KVN family section requires the message
 header line to be the first non-blank line in the file (CDM 508.0-B-1 section 6.3.1.2, ODM
 502.0-B-3 section 7.3.6, ADM 504.0-B-2 sections 3.2.2.3/4.2.2.3/5.3.2.3, RDM 508.1-B-1 section
 5.3.2.2). The ODM and ADM books also prescribe separate *files* for multiple messages (ODM
@@ -60,16 +61,6 @@ Python combined construction/identity and aggregate limits are exercised by
 `bindings/python/tests/test_ndm.py` and `test_parse_and_generation_options.py`. `package-python`
 and `package-rust` are the shared built-artifact gates.
 
-## Verification outcome
-
-Combined NDM meets the common [verification criteria](README.md#verification-criteria)
-on Rust and Python for XML. KVN is an explicitly unsupported notation, not a missing
-conversion implementation. The G22 example defect is resolved by rejecting its invalid
-constituent consistently with standalone OPM.
-
-Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
-artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
-
 ## Constituent editions in the bundled envelope
 
 The supported envelope is NDM/XML 4.0.0. Its included `opmType`, `ommType`, and `oemType`
@@ -80,3 +71,13 @@ and materialized/streaming output refuses it before writing bytes. The model is 
 upgraded or relabeled. Earlier combined schema sets are not an additional supported envelope.
 `combined_schema_refuses_standalone_odm2_constituents_before_output` covers all three ODM families,
 standalone controls, model validation, XML input, and both output paths.
+
+## Verification outcome
+
+Combined NDM meets the common [verification criteria](README.md#verification-criteria)
+on Rust and Python for XML. KVN is an explicitly unsupported notation, not a missing
+conversion implementation. The G22 example defect is resolved by rejecting its invalid
+constituent consistently with standalone OPM.
+
+Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
+artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).

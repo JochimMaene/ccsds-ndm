@@ -103,16 +103,7 @@ fn edited_cdm_numeric_values_are_validated_before_any_output() {
 #[test]
 fn every_kvn_generation_gate_rejects_loss_or_ambiguity_before_output() {
     type CdmMutation = fn(&mut Cdm);
-    let cases: [(&str, CdmMutation); 3] = [
-        ("first nested logical-block COMMENT", |message| {
-            message.body.segments[0]
-                .data
-                .od_parameters
-                .as_mut()
-                .unwrap()
-                .comment
-                .push("nested".to_owned());
-        }),
+    let cases: [(&str, CdmMutation); 2] = [
         ("only printable ASCII records", |message| {
             message.body.segments[0].metadata.object_name = "SATELLITE €".to_owned();
         }),
@@ -323,6 +314,55 @@ fn cdm_kvn_comments_keep_their_normative_block_association() {
 
     let regenerated = cdm.to_kvn().unwrap();
     assert_eq!(Cdm::from_kvn(&regenerated).unwrap(), cdm);
+}
+
+#[test]
+fn xml_nested_comments_merge_canonically_into_kvn() {
+    // Space-Track layout: empty <data> COMMENT, a comment-only odParameters (all leaves nil),
+    // then commented additionalParameters. KVN has one leading run for all of them.
+    let mut xml = Cdm::from_kvn(KVN).unwrap();
+    let data = &mut xml.body.segments[0].data;
+    data.comment.clear();
+    data.od_parameters = Some(ccsds_ndm::common::OdParameters {
+        comment: vec!["od".into()],
+        ..Default::default()
+    });
+    data.additional_parameters.as_mut().unwrap().comment = vec!["additional".into()];
+    data.state_vector.comment = vec!["state".into()];
+    // Second segment: comments after a valued first block stay with their own block.
+    let second = &mut xml.body.segments[1].data;
+    second.comment = vec!["outer".into()];
+    second.od_parameters.as_mut().unwrap().comment = vec!["od2".into()];
+    second.additional_parameters = None;
+    second.state_vector.comment = vec!["state2".into()];
+    let xml = Cdm::from_xml(&xml.to_xml().unwrap()).unwrap();
+
+    let kvn = xml.to_kvn().unwrap();
+    let merged = Cdm::from_kvn(&kvn).unwrap();
+    let first = &merged.body.segments[0].data;
+    assert_eq!(first.comment, ["od", "additional"]);
+    assert!(first.od_parameters.is_none());
+    assert!(first
+        .additional_parameters
+        .as_ref()
+        .unwrap()
+        .comment
+        .is_empty());
+    assert_eq!(first.state_vector.comment, ["state"]);
+    let second = &merged.body.segments[1].data;
+    assert_eq!(second.comment, ["outer", "od2"]);
+    assert!(second.od_parameters.as_ref().unwrap().comment.is_empty());
+    assert_eq!(second.state_vector.comment, ["state2"]);
+    assert_eq!(merged.to_kvn().unwrap(), kvn, "the merge is idempotent");
+}
+
+#[test]
+fn kvn_comment_lines_are_written_without_trailing_blanks() {
+    let mut message = Cdm::from_kvn(KVN).unwrap();
+    message.header.comment = vec!["padded   ".into()];
+    let kvn = message.to_kvn().unwrap();
+    assert!(kvn.contains("COMMENT padded\n"), "{kvn}");
+    assert_eq!(Cdm::from_kvn(&kvn).unwrap().to_kvn().unwrap(), kvn);
 }
 
 #[test]

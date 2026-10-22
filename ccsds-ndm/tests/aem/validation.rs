@@ -143,3 +143,19 @@ fn aem_quaternion_magnitude_is_checked_on_later_records() {
     assert!(message.write_xml_to(&mut output).is_err());
     assert!(output.is_empty());
 }
+
+#[test]
+fn cross_segment_chronology_requires_the_same_time_system() {
+    let mut message = valid_aem();
+    let first = message.body.segment[0].clone();
+    message.body.segment = vec![first.clone(), first];
+    // Equal lexical spans can represent different instants; no time-scale conversion is done.
+    message.body.segment[0].metadata.time_system = "TAI".into();
+    message.body.segment[1].metadata.time_system = "UTC".into();
+    message.validate().unwrap();
+    for output in [message.to_kvn().unwrap(), message.to_xml().unwrap()] {
+        ccsds_ndm::from_str(&output).unwrap();
+    }
+    message.body.segment[1].metadata.time_system = " tai ".into();
+    crate::common::assert_validation_field(&message.validate().unwrap_err(), "USEABLE_START_TIME");
+}

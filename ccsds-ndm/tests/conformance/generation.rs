@@ -62,17 +62,19 @@ fn xml_fixtures_preserve_models_and_generate_deterministically() {
             from_str(&input).unwrap_or_else(|error| panic!("{label} strict parse failed: {error}"));
         assert_xml_generation(&label, &message);
         match label.as_ref() {
-            // KVN cannot represent Unicode participant names, nested CDM comment
-            // associations, or multiline OCM assignment/history values.
-            "tdm_e21.xml" | "cdm_44.xml" | "ocm_g20.xml" => {
+            // KVN cannot represent Unicode participant names or multiline OCM
+            // assignment/history values.
+            "tdm_e21.xml" | "ocm_g20.xml" => {
                 let error = message.to_kvn().expect_err(&label);
-                // CDM and OCM use generic validation errors without stable codes.
-                let reason = if label == "cdm_44.xml" {
-                    "COMMENT"
-                } else {
-                    "printable ASCII"
-                };
-                assert!(error.to_string().contains(reason), "{label}: {error}");
+                assert!(
+                    error.to_string().contains("printable ASCII"),
+                    "{label}: {error}"
+                );
+            }
+            "cdm_44.xml" => {
+                // Nested data-block comments merge into KVN's leading run (cdm-1.0.md).
+                let kvn = message.to_kvn().unwrap();
+                assert_eq!(from_str(&kvn).unwrap().to_kvn().unwrap(), kvn, "{label}");
             }
             "apm_g10.xml" => {
                 // A multiline XML comment becomes separate KVN COMMENT records.
@@ -93,6 +95,40 @@ fn xml_fixtures_preserve_models_and_generate_deterministically() {
                 assert_kvn_generation(&label, &message, &from_str(&normalized).unwrap());
             }
             _ => assert_kvn_generation(&label, &message, &message),
+        }
+    }
+}
+
+#[test]
+fn empty_spacecraft_blocks_are_xml_only_and_kvn_refuses_before_output() {
+    use ccsds_ndm::{
+        common::SpacecraftParameters,
+        messages::{omm::Omm, opm::Opm},
+        Ndm, Validate,
+    };
+    for comment in [vec![], vec!["spacecraft comment".into()]] {
+        let spacecraft = Some(SpacecraftParameters {
+            comment,
+            ..Default::default()
+        });
+        let mut opm = Opm::from_kvn(include_str!("../../data/kvn/opm_g1.kvn")).unwrap();
+        opm.body.segment.data.maneuver_parameters.clear();
+        opm.body.segment.data.spacecraft_parameters = spacecraft.clone();
+        let mut omm = Omm::from_kvn(include_str!("../../data/kvn/omm_g9.kvn")).unwrap();
+        omm.body.segment.data.spacecraft_parameters = spacecraft;
+        for message in [ccsds_ndm::Message::Opm(opm), ccsds_ndm::Message::Omm(omm)] {
+            message.validate().unwrap();
+            let xml = message.to_xml().unwrap();
+            crate::common::validate_xml("empty spacecraft", &xml);
+            assert_eq!(ccsds_ndm::from_str(&xml).unwrap(), message);
+            let error = message.to_kvn().unwrap_err();
+            assert_eq!(
+                error.field_path().as_deref(),
+                Some("body.segment.data.spacecraft_parameters")
+            );
+            let mut output = Vec::new();
+            assert!(message.write_kvn_to(&mut output).is_err());
+            assert!(output.is_empty());
         }
     }
 }

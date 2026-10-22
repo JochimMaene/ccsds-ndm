@@ -13,7 +13,8 @@ impl Omm {
     /// Generate canonical NORAD TLE line 1 and line 2 from this OMM.
     ///
     /// This method requires:
-    /// - `MEAN_ELEMENT_THEORY` to be `SGP` or `SGP4`
+    /// - `MEAN_ELEMENT_THEORY` to be `SGP`, `SGP4`, or `SGP/SGP4` (case-insensitive)
+    /// - Earth-centered TEME elements with UTC epochs (no coordinate/time conversion)
     /// - presence of `TLE_PARAMETERS`
     /// - either a launch designator in `OBJECT_ID` (`YYYY-NNN[PPP]`) or `OBJECT_ID=UNKNOWN`
     /// - strict field-width compliance for NORAD fixed-width line formats
@@ -31,7 +32,8 @@ impl Omm {
                 line: None,
             })?;
 
-        let theory = metadata.mean_element_theory.trim();
+        let normalized_theory = metadata.mean_element_theory.trim().to_ascii_uppercase();
+        let theory = normalized_theory.as_str();
         if !matches!(theory, "SGP" | "SGP4" | "SGP/SGP4") {
             return Err(ValidationError::InvalidValue {
                 field: Cow::Borrowed("MEAN_ELEMENT_THEORY"),
@@ -50,6 +52,15 @@ impl Omm {
                 line: None,
             }
             .into());
+        }
+
+        for (field, value, expected) in [
+            ("CENTER_NAME", metadata.center_name.as_str(), "EARTH"),
+            ("REF_FRAME", metadata.ref_frame.as_str(), "TEME"),
+        ] {
+            if !value.trim().eq_ignore_ascii_case(expected) {
+                return Err(ValidationError::invalid_value(field, value, expected).into());
+            }
         }
 
         let launch = parse_object_id_launch_designator(&metadata.object_id)?;
@@ -117,7 +128,11 @@ impl Omm {
 
         let (epoch_year_2, epoch_day_field) =
             format_tle_epoch_components(data.mean_elements.epoch.as_str())?;
-        let mean_motion_dot_field = format_tle_dot_term(tle.mean_motion_dot.value)?;
+        let mean_motion_dot = require_tle_field(
+            tle.mean_motion_dot.as_ref().map(|v| v.value),
+            "MEAN_MOTION_DOT",
+        )?;
+        let mean_motion_dot_field = format_tle_dot_term(mean_motion_dot)?;
         let mean_motion_ddot_field = format_tle_assumed_decimal(mean_motion_ddot.value)?;
         let bstar_field = format_tle_assumed_decimal(bstar.value)?;
 
@@ -189,14 +204,16 @@ impl Omm {
         let checksum1 = tle_checksum(&line1_no_checksum);
         let line1 = format!("{}{}", line1_no_checksum, checksum1);
 
+        // Rounding a cyclic angle to 360 degrees represents the same angle as zero.
+        let cyclic_angle = |angle: f64| (angle * 10_000.0).round() % 3_600_000.0 / 10_000.0;
         let mut line2_no_checksum = format!(
             "2 {} {:8.4} {:8.4} {:07} {:8.4} {:8.4} {:11.8}{:5}",
             norad_cat_id_field,
             inclination,
-            raan,
+            cyclic_angle(raan),
             ecc_scaled as u32,
-            arg_pericenter,
-            mean_anomaly,
+            cyclic_angle(arg_pericenter),
+            cyclic_angle(mean_anomaly),
             mean_motion.value,
             rev_at_epoch
         );
@@ -340,7 +357,7 @@ impl Omm {
                             rev_at_epoch: Some(rev_at_epoch),
                             bstar: Some(BStar::new(bstar, None)),
                             bterm: None,
-                            mean_motion_dot: MeanMotionDot::new(mean_motion_dot, None),
+                            mean_motion_dot: Some(MeanMotionDot::new(mean_motion_dot, None)),
                             mean_motion_ddot: Some(MeanMotionDDot::new(mean_motion_ddot, None)),
                             agom: None,
                         }),

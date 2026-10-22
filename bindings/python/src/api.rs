@@ -10,9 +10,8 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::path::Path;
 
-pub trait FromMessage: Ndm {
+pub trait FromMessage: Ndm + Send {
     const KIND: MessageKind;
-
     fn from_message_type(message: Message) -> Option<Self>;
 }
 
@@ -20,7 +19,6 @@ macro_rules! impl_from_message_type {
     ($type:path, $variant:ident) => {
         impl FromMessage for $type {
             const KIND: MessageKind = MessageKind::$variant;
-
             fn from_message_type(message: Message) -> Option<Self> {
                 match message {
                     Message::$variant(message) => Some(message),
@@ -57,37 +55,41 @@ pub fn notation(format: &str) -> PyResult<Notation> {
     }
 }
 
-/// Reject a message of another family; `origin` names the file it was read from, if any.
-fn expect_typed<T: FromMessage>(
-    message: Message,
-    origin: Option<&Path>,
+/// Check the family before parsing its contents, so a malformed other family is still a mismatch.
+fn expect_kind<T: FromMessage>(
+    py: Python<'_>,
+    data: &str,
     notation: Option<Notation>,
-) -> PyResult<T> {
-    let actual = message.kind();
-    T::from_message_type(message).ok_or_else(|| {
-        let found = format!("expected {}, found {}", T::KIND.as_str(), actual.as_str());
-        let error = crate::errors::NdmUnsupportedMessageError::new_err(match origin {
-            Some(path) => format!("{}: {found}", path.display()),
-            None => found,
-        });
-        crate::errors::enrich_exception(
-            error,
-            "parse",
-            notation.map(|notation| match notation {
-                Notation::Kvn => ccsds_ndm::error::DiagnosticNotation::Kvn,
-                Notation::Xml => ccsds_ndm::error::DiagnosticNotation::Xml,
-            }),
-            Some(T::KIND.as_str()),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-    })
+    origin: Option<&Path>,
+) -> PyResult<()> {
+    let actual = py
+        .detach(|| ccsds_ndm::detect::detect_message_kind(data, notation))
+        .map_err(ccsds_error_to_pyerr)?;
+    if actual == T::KIND {
+        return Ok(());
+    }
+    let found = format!("expected {}, found {}", T::KIND.as_str(), actual.as_str());
+    let error = crate::errors::NdmUnsupportedMessageError::new_err(match origin {
+        Some(path) => format!("{}: {found}", path.display()),
+        None => found,
+    });
+    Err(crate::errors::enrich_exception(
+        error,
+        "parse",
+        notation.map(|notation| match notation {
+            Notation::Kvn => ccsds_ndm::error::DiagnosticNotation::Kvn,
+            Notation::Xml => ccsds_ndm::error::DiagnosticNotation::Xml,
+        }),
+        Some(T::KIND.as_str()),
+        None,
+        Some("parse.unexpected_message_type"),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    ))
 }
 
 // The Rust core holds no Python objects, so parsing, validation, generation, and file I/O run
@@ -99,11 +101,24 @@ pub fn parse_typed<T: FromMessage>(
     data: &str,
     format: Option<&str>,
 ) -> PyResult<T> {
-    let notation = selected_notation(format)?;
+    parse_typed_input(py, data, selected_notation(format)?, None)
+}
+
+fn parse_typed_input<T: FromMessage>(
+    py: Python<'_>,
+    data: &str,
+    notation: Option<Notation>,
+    origin: Option<&Path>,
+) -> PyResult<T> {
+    expect_kind::<T>(py, data, notation, origin)?;
     let message = py
         .detach(|| ccsds_ndm::from_str_with_notation(data, notation))
         .map_err(ccsds_error_to_pyerr)?;
-    expect_typed(message, None, notation)
+    T::from_message_type(message).ok_or_else(|| {
+        ccsds_error_to_pyerr(ccsds_ndm::error::CcsdsNdmError::UnsupportedMessage(
+            "parsed message family differs from the requested type".into(),
+        ))
+    })
 }
 
 pub fn parse_typed_file<T: FromMessage>(
@@ -112,12 +127,13 @@ pub fn parse_typed_file<T: FromMessage>(
     format: Option<&str>,
 ) -> PyResult<T> {
     let notation = selected_notation(format)?;
-    let message = py
-        .detach(|| ccsds_ndm::from_file_with_notation(path, notation))
-        .map_err(|error| {
-            crate::errors::file_parse_error_to_pyerr(error, Some(path), notation, Some(T::KIND))
-        })?;
-    expect_typed(message, Some(path), notation)
+    let bytes = py
+        .detach(|| std::fs::read(path))
+        .map_err(|error| crate::errors::file_error_to_pyerr(error.into(), path))?;
+    let data = py
+        .detach(|| ccsds_ndm::detect::decode_utf8(&bytes))
+        .map_err(|error| crate::errors::file_error_to_pyerr(error, path))?;
+    parse_typed_input::<T>(py, data, notation, Some(path))
 }
 
 pub fn validate_message<T: Validate + Sync>(py: Python<'_>, message: &T) -> PyResult<()> {

@@ -25,7 +25,7 @@ fn kvn_syntax_diagnostics_are_located_and_machine_readable() {
     assert_eq!(diagnostic.source_edition, Some("3.0"));
     assert_eq!(diagnostic.code, Some("parse.kvn.syntax"));
     assert_eq!(diagnostic.original_token, Some("UNKNOWN = value"));
-    assert_eq!(diagnostic.expected, Some("strict OEM KVN"));
+    assert_eq!(diagnostic.expected, None);
     assert!(diagnostic.source_location.is_some());
 }
 
@@ -52,7 +52,7 @@ fn carriage_return_diagnostics_keep_the_edition_and_excerpt_to_one_record() {
 }
 
 #[test]
-fn semantic_paths_survive_parse_context() {
+fn blank_mandatory_value_is_missing_at_its_record() {
     let object_name = KVN_FIXTURES[0]
         .lines()
         .find(|line| line.trim_start().starts_with("OBJECT_NAME"))
@@ -61,9 +61,36 @@ fn semantic_paths_survive_parse_context() {
     let error = Oem::from_kvn(&input).expect_err("empty object name should fail");
     let diagnostic = error.diagnostic().expect("parse context should be present");
     assert_eq!(diagnostic.code, Some("validation.missing_required_field"));
+    // A blank mandatory value is absent under the shared KVN rule; the error names its record.
+    let line = KVN_FIXTURES[0]
+        .lines()
+        .position(|line| line == object_name)
+        .unwrap()
+        + 1;
+    assert!(matches!(
+        crate::common::validation_error_source(error.as_validation_error().unwrap()),
+        ccsds_ndm::error::ValidationError::MissingRequiredField { line: Some(found), .. } if *found == line
+    ));
     assert_eq!(
-        diagnostic.field_path.as_deref(),
+        error.field_path().as_deref(),
         Some("body.segment[0].metadata.object_name")
+    );
+
+    // The path names the segment that holds the blank record.
+    let second = KVN_FIXTURES[0].rfind(object_name).unwrap();
+    let input = format!(
+        "{}OBJECT_NAME ={}",
+        &KVN_FIXTURES[0][..second],
+        &KVN_FIXTURES[0][second + object_name.len()..]
+    );
+    let error = Oem::from_kvn(&input).unwrap_err();
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[1].metadata.object_name")
+    );
+    assert!(
+        error.to_string().contains("in block OEM Metadata"),
+        "{error}"
     );
 }
 

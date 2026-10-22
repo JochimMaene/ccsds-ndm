@@ -18,9 +18,10 @@ use crate::kvn::ser::KvnWriter;
 use crate::parse_block;
 use crate::traits::ToKvn;
 use crate::types::*;
+use std::str::FromStr;
 use winnow::ascii::{space1, till_line_ending};
-use winnow::combinator::{peek, repeat};
-use winnow::error::{AddContext, ErrMode};
+use winnow::combinator::{peek, repeat, terminated};
+use winnow::error::{AddContext, ErrMode, FromExternalError};
 use winnow::prelude::*;
 use winnow::stream::Offset;
 
@@ -39,6 +40,75 @@ fn kv_days_since_obs(input: &mut &str) -> KvnResult<DayInterval> {
         value: value.value,
         units: value.units,
     })
+}
+
+/// Rewrites an exponent relative time tag (`1.5e3`) as the plain decimal (`1500`) that the XSD
+/// `epochType` can represent. ODM 6.2.2.3 defines relative tags as doubles and 7.5.6 allows
+/// exponents; shifting the decimal point is exact, so no value changes.
+fn expand_exponent(token: &str) -> Option<String> {
+    let (mantissa, exponent) = token.split_once(['e', 'E'])?;
+    let exponent: i32 = exponent
+        .parse()
+        .ok()
+        .filter(|e: &i32| e.unsigned_abs() <= 64)?;
+    let (sign, unsigned) = match mantissa.as_bytes().first()? {
+        b'+' | b'-' => mantissa.split_at(1),
+        _ => ("", mantissa),
+    };
+    let (integer, fraction) = unsigned.split_once('.').unwrap_or((unsigned, ""));
+    let digits = format!("{integer}{fraction}");
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    let point = integer.len() as i32 + exponent;
+    let plain = if point <= 0 {
+        format!("0.{}{digits}", "0".repeat(point.unsigned_abs() as usize))
+    } else if point as usize >= digits.len() {
+        format!("{digits}{}", "0".repeat(point as usize - digits.len()))
+    } else {
+        let (whole, part) = digits.split_at(point as usize);
+        format!("{whole}.{part}")
+    };
+    Some(format!("{sign}{plain}"))
+}
+
+fn ocm_epoch(value: &str) -> std::result::Result<Epoch, EpochError> {
+    Epoch::from_str(value).or_else(|error| {
+        expand_exponent(value)
+            .ok_or(error)
+            .and_then(|plain| Epoch::from_str(&plain))
+    })
+}
+
+fn epoch_error<'a>(
+    input: &mut &'a str,
+    start: &'a str,
+    error: EpochError,
+) -> ErrMode<InternalParserError> {
+    *input = start.trim_start_matches([' ', '\t']);
+    ErrMode::Cut(InternalParserError::from_external_error(input, error))
+}
+
+/// OCM epoch value: either `epochType` branch, plus exponent relative tags.
+fn kv_ocm_epoch(input: &mut &str) -> KvnResult<Epoch> {
+    let start = *input;
+    let value = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
+    ocm_epoch(value.trim()).map_err(|error| epoch_error(input, start, error))
+}
+
+fn kv_ocm_epoch_token(input: &mut &str) -> KvnResult<Epoch> {
+    let start = *input;
+    let value = till_space.parse_next(input)?;
+    ocm_epoch(value).map_err(|error| epoch_error(input, start, error))
+}
+
+/// OBJECT_TYPE is an open SANA token; the five XSD values are normalized case-insensitively with
+/// `_` equal to a blank (ODM 7.5.9), everything else is kept as supplied.
+fn kv_object_type(input: &mut &str) -> KvnResult<String> {
+    let value = kv_string.parse_next(input)?;
+    Ok(value
+        .parse::<ObjectDescription>()
+        .map_or(value, |known| known.to_string()))
 }
 
 //----------------------------------------------------------------------
@@ -165,7 +235,7 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
         "OWNER" => owner: kv_string,
         "COUNTRY" => country: kv_string,
         "CONSTELLATION" => constellation: kv_string,
-        "OBJECT_TYPE" => object_type: kv_enum,
+        "OBJECT_TYPE" => object_type: kv_object_type,
         "TIME_SYSTEM" => time_system: kv_string,
         "EPOCH_TZERO" => epoch_tzero: kv_calendar_epoch,
         "OPS_STATUS" => ops_status: kv_string,
@@ -175,8 +245,8 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
         "SCLK_SEC_PER_SI_SEC" => sclk_sec_per_si_sec: kv_from_kvn,
         "PREVIOUS_MESSAGE_EPOCH" => previous_message_epoch: kv_calendar_epoch,
         "NEXT_MESSAGE_EPOCH" => next_message_epoch: kv_calendar_epoch,
-        "START_TIME" => start_time: kv_epoch,
-        "STOP_TIME" => stop_time: kv_epoch,
+        "START_TIME" => start_time: kv_ocm_epoch,
+        "STOP_TIME" => stop_time: kv_ocm_epoch,
         "TIME_SPAN" => time_span: kv_from_kvn,
         "TAIMUTC_AT_TZERO" => taimutc_at_tzero: kv_from_kvn,
         "NEXT_LEAP_EPOCH" => next_leap_epoch: kv_calendar_epoch,
@@ -231,8 +301,8 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
         country,
         constellation,
         object_type,
-        time_system: time_system
-            .ok_or_else(|| missing_field_err(input, "Metadata", "TIME_SYSTEM"))?,
+        // ODM 6.2.1.3 / table 6-3 default; the XSD requires the element.
+        time_system: time_system.unwrap_or_else(|| "UTC".to_string()),
         epoch_tzero: epoch_tzero
             .ok_or_else(|| missing_field_err(input, "Metadata", "EPOCH_TZERO"))?,
         ops_status,
@@ -268,7 +338,7 @@ pub fn ocm_traj_line(input: &mut &str) -> KvnResult<TrajLine> {
     {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
-    let epoch = kv_epoch_token.parse_next(input)?;
+    let epoch = kv_ocm_epoch_token.parse_next(input)?;
     space1.parse_next(input)?;
     let raw_values = till_line_ending.parse_next(input)?;
     let mut values = Vec::with_capacity(raw_values.split_whitespace().count());
@@ -287,7 +357,7 @@ pub fn ocm_traj_line(input: &mut &str) -> KvnResult<TrajLine> {
     Ok(TrajLine { epoch, values })
 }
 
-pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
+pub fn ocm_traj_state(input: &mut &str) -> KvnResult<Option<OcmTrajState>> {
     ws.parse_next(input)?;
     expect_block_start("TRAJ").parse_next(input)?;
 
@@ -316,14 +386,14 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
         "TRAJ_ID" => traj_id: kv_string,
         "TRAJ_PREV_ID" => traj_prev_id: kv_string,
         "TRAJ_NEXT_ID" => traj_next_id: kv_string,
-        "TRAJ_BASIS" => traj_basis: kv_enum,
+        "TRAJ_BASIS" => traj_basis: kv_string,
         "TRAJ_BASIS_ID" => traj_basis_id: kv_string,
         "INTERPOLATION" => interpolation: kv_string,
         "INTERPOLATION_DEGREE" => interpolation_degree: kv_u32,
         "PROPAGATOR" => propagator: kv_string,
         "CENTER_NAME" => center_name: kv_string,
         "TRAJ_REF_FRAME" => traj_ref_frame: kv_string,
-        "TRAJ_FRAME_EPOCH" => traj_frame_epoch: kv_calendar_epoch,
+        "TRAJ_FRAME_EPOCH" => traj_frame_epoch: kv_ocm_epoch,
         "USEABLE_START_TIME" => useable_start_time: kv_calendar_epoch,
         "USEABLE_STOP_TIME" => useable_stop_time: kv_calendar_epoch,
         "ORB_REVNUM" => orb_revnum: kv_float,
@@ -364,14 +434,41 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
         }
     }
 
+    // An empty, comment-free block carries no data and is read as absent.
+    if traj_lines.is_empty()
+        && comment.is_empty()
+        && [
+            &traj_id,
+            &traj_prev_id,
+            &traj_next_id,
+            &traj_basis,
+            &traj_basis_id,
+        ]
+        .iter()
+        .all(|value| value.is_none())
+        && [&interpolation, &propagator, &center_name, &traj_ref_frame]
+            .iter()
+            .all(|value| value.is_none())
+        && [&traj_type, &orb_averaging, &traj_units]
+            .iter()
+            .all(|value| value.is_none())
+        && interpolation_degree.is_none()
+        && traj_frame_epoch.is_none()
+        && useable_start_time.is_none()
+        && useable_stop_time.is_none()
+        && orb_revnum.is_none()
+        && orb_revnum_basis.is_none()
+    {
+        return Ok(None);
+    }
     if traj_lines.is_empty() {
         return Err(cut_err(
             input,
-            "OCM Trajectory block must contain at least one state vector (trajLine)",
+            "OCM Trajectory block must contain at least one TRAJ data line",
         ));
     }
 
-    Ok(OcmTrajState {
+    Ok(Some(OcmTrajState {
         comment,
         traj_id,
         traj_prev_id,
@@ -388,12 +485,12 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
         useable_stop_time,
         orb_revnum,
         orb_revnum_basis,
-        traj_type: traj_type
-            .ok_or_else(|| missing_field_err(input, "Trajectory State", "TRAJ_TYPE"))?,
+        // ODM 6.2.1.3 / table 6-4 default; the XSD requires the element.
+        traj_type: traj_type.unwrap_or_else(|| "CARTPV".to_string()),
         orb_averaging,
         traj_units,
         traj_lines,
-    })
+    }))
 }
 
 //----------------------------------------------------------------------
@@ -576,7 +673,7 @@ pub fn ocm_cov_line(input: &mut &str) -> KvnResult<CovLine> {
     {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
-    let epoch = kv_epoch_token.parse_next(input)?;
+    let epoch = kv_ocm_epoch_token.parse_next(input)?;
     space1.parse_next(input)?;
     let raw_values = till_line_ending.parse_next(input)?;
     let mut values = Vec::with_capacity(raw_values.split_whitespace().count());
@@ -595,7 +692,7 @@ pub fn ocm_cov_line(input: &mut &str) -> KvnResult<CovLine> {
     Ok(CovLine { epoch, values })
 }
 
-pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
+pub fn ocm_cov(input: &mut &str) -> KvnResult<Option<OcmCovarianceMatrix>> {
     let mut traj_id = None;
     ws.parse_next(input)?;
     expect_block_start("COV").parse_next(input)?;
@@ -621,10 +718,10 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
         "COV_ID" => cov_id: kv_string,
         "COV_PREV_ID" => cov_prev_id: kv_string,
         "COV_NEXT_ID" => cov_next_id: kv_string,
-        "COV_BASIS" => cov_basis: kv_enum,
+        "COV_BASIS" => cov_basis: kv_string,
         "COV_BASIS_ID" => cov_basis_id: kv_string,
         "COV_REF_FRAME" => cov_ref_frame: kv_string,
-        "COV_FRAME_EPOCH" => cov_frame_epoch: kv_calendar_epoch,
+        "COV_FRAME_EPOCH" => cov_frame_epoch: kv_ocm_epoch,
         "COV_TYPE" => cov_type: kv_string,
         "COV_UNITS" => cov_units: kv_string,
         "COV_ORDERING" => cov_ordering: kv_enum,
@@ -654,7 +751,32 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
         }
     }
 
-    Ok(OcmCovarianceMatrix {
+    // An empty, comment-free block carries no data and is read as absent.
+    if cov_lines.is_empty()
+        && comment.is_empty()
+        && [
+            &traj_id,
+            &cov_id,
+            &cov_prev_id,
+            &cov_next_id,
+            &cov_basis,
+            &cov_basis_id,
+            &cov_ref_frame,
+            &cov_type,
+            &cov_units,
+        ]
+        .iter()
+        .all(|value| value.is_none())
+        && cov_frame_epoch.is_none()
+        && cov_scale_min.is_none()
+        && cov_scale_max.is_none()
+        && cov_confidence.is_none()
+        && cov_ordering.is_none()
+    {
+        return Ok(None);
+    }
+
+    Ok(Some(OcmCovarianceMatrix {
         traj_id,
         comment,
         cov_id,
@@ -667,11 +789,12 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
         cov_scale_min,
         cov_scale_max,
         cov_confidence,
-        cov_type: cov_type.ok_or_else(|| missing_field_err(input, "Covariance", "COV_TYPE"))?,
+        // ODM 6.2.1.3 / table 6-6 default; the XSD requires the element.
+        cov_type: cov_type.unwrap_or_else(|| "CARTPV".to_string()),
         cov_ordering: cov_ordering.unwrap_or(CovOrder::Ltm),
         cov_units,
         cov_lines,
-    })
+    }))
 }
 
 pub fn ocm_man_line(input: &mut &str) -> KvnResult<ManLine> {
@@ -680,7 +803,7 @@ pub fn ocm_man_line(input: &mut &str) -> KvnResult<ManLine> {
     if input.starts_with(|c: char| c.is_ascii_uppercase()) {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
-    let epoch = kv_epoch_token.parse_next(input)?;
+    let epoch = kv_ocm_epoch_token.parse_next(input)?;
     let values = repeat(0.., (space1, till_space).map(|(_, v)| v.to_string())).parse_next(input)?;
     opt_line_ending.parse_next(input)?;
     Ok(ManLine { epoch, values })
@@ -694,6 +817,7 @@ fn kv_man_composition(input: &mut &str) -> KvnResult<String> {
             break;
         }
 
+        blank_lines.parse_next(input)?;
         let continuation = peek(till_line_ending).parse_next(input)?.trim();
         if continuation.is_empty() || continuation.contains('=') || at_block_end("MAN", input) {
             return Err(cut_err(input, "Malformed MAN_COMPOSITION continuation"));
@@ -706,7 +830,17 @@ fn kv_man_composition(input: &mut &str) -> KvnResult<String> {
             .trim_end();
         composition = format!("{prefix} {continuation}");
     }
-    Ok(composition)
+    Ok(canonical_man_composition(&composition))
+}
+
+/// Canonical MAN_COMPOSITION spelling: uppercase keywords separated by ", ". Reading accepts any
+/// case and blanks instead of commas (table 6-7 asks for a comma-separated list).
+pub(super) fn canonical_man_composition(composition: &str) -> String {
+    super::parse_csv_list(composition)
+        .iter()
+        .map(|column| column.to_ascii_uppercase())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
@@ -753,21 +887,21 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
         "MAN_BASIS" => man_basis: kv_enum,
         "MAN_BASIS_ID" => man_basis_id: kv_string,
         "MAN_DEVICE_ID" => man_device_id: kv_string,
-        "MAN_PREV_EPOCH" => man_prev_epoch: kv_epoch,
-        "MAN_NEXT_EPOCH" => man_next_epoch: kv_epoch,
+        "MAN_PREV_EPOCH" => man_prev_epoch: kv_ocm_epoch,
+        "MAN_NEXT_EPOCH" => man_next_epoch: kv_ocm_epoch,
         "MAN_PURPOSE" => man_purpose: kv_string,
         "MAN_PRED_SOURCE" => man_pred_source: kv_string,
         "MAN_REF_FRAME" => man_ref_frame: kv_string,
-        "MAN_FRAME_EPOCH" => man_frame_epoch: kv_calendar_epoch,
+        "MAN_FRAME_EPOCH" => man_frame_epoch: kv_ocm_epoch,
         "GRAV_ASSIST_NAME" => grav_assist_name: kv_string,
         "DC_TYPE" => dc_type: kv_enum,
-        "DC_WIN_OPEN" => dc_win_open: kv_epoch,
-        "DC_WIN_CLOSE" => dc_win_close: kv_epoch,
+        "DC_WIN_OPEN" => dc_win_open: kv_ocm_epoch,
+        "DC_WIN_CLOSE" => dc_win_close: kv_ocm_epoch,
         "DC_MIN_CYCLES" => dc_min_cycles: kv_u64,
         "DC_MAX_CYCLES" => dc_max_cycles: kv_u64,
-        "DC_EXEC_START" => dc_exec_start: kv_epoch,
-        "DC_EXEC_STOP" => dc_exec_stop: kv_epoch,
-        "DC_REF_TIME" => dc_ref_time: kv_epoch,
+        "DC_EXEC_START" => dc_exec_start: kv_ocm_epoch,
+        "DC_EXEC_STOP" => dc_exec_stop: kv_ocm_epoch,
+        "DC_REF_TIME" => dc_ref_time: kv_ocm_epoch,
         "DC_TIME_PULSE_DURATION" => dc_time_pulse_duration: kv_from_kvn,
         "DC_TIME_PULSE_PERIOD" => dc_time_pulse_period: kv_from_kvn,
         "DC_REF_DIR" => dc_ref_dir: kv_from_kvn_value,
@@ -901,7 +1035,7 @@ pub fn ocm_pert(input: &mut &str) -> KvnResult<OcmPerturbations> {
         "SHADOW_BODIES" => shadow_bodies: kv_string,
         "SRP_MODEL" => srp_model: kv_string,
         "SW_DATA_SOURCE" => sw_data_source: kv_string,
-        "SW_DATA_EPOCH" => sw_data_epoch: kv_epoch,
+        "SW_DATA_EPOCH" => sw_data_epoch: kv_ocm_epoch,
         "SW_INTERP_METHOD" => sw_interp_method: kv_string,
         "FIXED_GEOMAG_KP" => fixed_geomag_kp: kv_from_kvn,
         "FIXED_GEOMAG_AP" => fixed_geomag_ap: kv_from_kvn,
@@ -993,7 +1127,7 @@ pub fn ocm_od(input: &mut &str) -> KvnResult<OcmOdParameters> {
         "OD_ID" => od_id: kv_string,
         "OD_PREV_ID" => od_prev_id: kv_string,
         "OD_METHOD" => od_method: kv_string,
-        "OD_EPOCH" => od_epoch: kv_epoch,
+        "OD_EPOCH" => od_epoch: kv_ocm_epoch,
         "DAYS_SINCE_FIRST_OBS" => days_since_first_obs: kv_days_since_obs,
         "DAYS_SINCE_LAST_OBS" => days_since_last_obs: kv_days_since_obs,
         "RECOMMENDED_OD_SPAN" => recommended_od_span: kv_from_kvn,
@@ -1084,6 +1218,10 @@ pub fn ocm_user(input: &mut &str) -> KvnResult<OcmUserDefined> {
         match user_defined_key_token.parse_next(input) {
             Ok(k) => {
                 entries.extend(comments.into_iter().map(OcmUserDefinedEntry::Comment));
+                if !k.starts_with("USER_DEFINED_COMPOSITION_") && value_is_absent(k, input) {
+                    skip_record(input);
+                    continue;
+                }
                 let v = kv_string.parse_next(input)?;
                 let mut records = Vec::new();
                 if k.starts_with("USER_DEFINED_COMPOSITION_") {
@@ -1130,9 +1268,9 @@ pub fn ocm_user(input: &mut &str) -> KvnResult<OcmUserDefined> {
 // heap allocation for every parsed block, which is worse for the hot KVN path.
 #[allow(clippy::large_enum_variant)]
 enum OcmBlock {
-    Traj(OcmTrajState),
+    Traj(Option<OcmTrajState>),
     Phys(OcmPhysicalDescription),
-    Cov(OcmCovarianceMatrix),
+    Cov(Option<OcmCovarianceMatrix>),
     Man(OcmManeuverParameters),
     Pert(OcmPerturbations),
     Od(OcmOdParameters),
@@ -1174,15 +1312,16 @@ fn ocm_data_block(input: &mut &str) -> KvnResult<OcmBlock> {
 
     // Prepend comments collected before the block start
     match &mut block {
-        OcmBlock::Traj(x) => {
+        OcmBlock::Traj(Some(x)) => {
             x.comment.splice(0..0, comments);
         }
         OcmBlock::Phys(x) => {
             x.comment.splice(0..0, comments);
         }
-        OcmBlock::Cov(x) => {
+        OcmBlock::Cov(Some(x)) => {
             x.comment.splice(0..0, comments);
         }
+        OcmBlock::Traj(None) | OcmBlock::Cov(None) => {}
         OcmBlock::Man(x) => {
             x.comment.splice(0..0, comments);
         }
@@ -1208,9 +1347,9 @@ pub fn ocm_data(input: &mut &str) -> KvnResult<OcmData> {
         let checkpoint = input.checkpoint();
         match ocm_data_block.parse_next(input) {
             Ok(block) => match block {
-                OcmBlock::Traj(x) => data.traj.push(x),
+                OcmBlock::Traj(x) => data.traj.extend(x),
                 OcmBlock::Phys(x) => data.phys = Some(x),
-                OcmBlock::Cov(x) => data.cov.push(x),
+                OcmBlock::Cov(x) => data.cov.extend(x),
                 OcmBlock::Man(x) => data.man.push(x),
                 OcmBlock::Pert(x) => data.pert = Some(x),
                 OcmBlock::Od(x) => data.od = Some(x),
@@ -1254,7 +1393,7 @@ pub fn ocm_header(input: &mut &str) -> KvnResult<OdmHeader> {
             break;
         }
 
-        let key = match keyword.parse_next(input) {
+        let key = match winnow::combinator::preceded(ws, keyword).parse_next(input) {
             Ok(k) => k,
             Err(_) => {
                 input.reset(&checkpoint);
@@ -1273,7 +1412,7 @@ pub fn ocm_header(input: &mut &str) -> KvnResult<OdmHeader> {
         kv_sep.parse_next(input)?;
         match key {
             "CLASSIFICATION" => {
-                classification = Some(kv_string.parse_next(input)?);
+                classification = kv_optional(kv_string).parse_next(input)?;
             }
             "CREATION_DATE" => {
                 creation_date = Some(kv_calendar_epoch.parse_next(input)?);
@@ -1282,7 +1421,7 @@ pub fn ocm_header(input: &mut &str) -> KvnResult<OdmHeader> {
                 originator = Some(kv_string.parse_next(input)?);
             }
             "MESSAGE_ID" => {
-                message_id = Some(kv_string.parse_next(input)?);
+                message_id = kv_optional(kv_string).parse_next(input)?;
             }
             _ => unreachable!(),
         }
@@ -1601,7 +1740,6 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
     let mut last_block_rank = None;
     let mut block_has_content = false;
     let mut history_started = false;
-    let mut pending_block_comment = false;
     let mut top_rank = None;
     let mut user_sequence = false;
     let mut offset = 0usize;
@@ -1612,9 +1750,6 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
         let fail = |message: &str| Err(invalid(number, offset, message.into()));
         if line.as_bytes().contains(&b'\r') {
             return fail("lone carriage return");
-        }
-        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
-            return fail("non-printable or non-ASCII character");
         }
         let line = line.trim();
         if line.is_empty() {
@@ -1635,14 +1770,14 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
             if block_has_content {
                 return fail("COMMENT is not at the beginning of a logical block");
             }
-            if current_block.is_none()
-                && top_rank != Some(0)
-                && top_rank.is_none_or(|rank| rank < 3)
-            {
-                return fail("COMMENT is not at the beginning of the header or a data block");
+            // Tables 6-2 to 6-11 allow comments only immediately after CCSDS_OCM_VERS or a
+            // block's *_START. Anything else (after ORIGINATOR, between or after blocks) has no
+            // place in the model, so it is refused rather than moved or dropped.
+            if current_block.is_none() && (top_rank != Some(0) || last_block_rank.is_some()) {
+                return fail(
+                    "COMMENT is only allowed after CCSDS_OCM_VERS or at the beginning of a block",
+                );
             }
-            pending_block_comment =
-                current_block.is_none() && top_rank.is_some_and(|rank| rank >= 3);
             offset += raw_line.len() + 1;
             continue;
         }
@@ -1667,7 +1802,6 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
             block_has_content = false;
             history_started = false;
             user_sequence = false;
-            pending_block_comment = false;
             last_block_rank = Some(rank);
             offset += raw_line.len() + 1;
             continue;
@@ -1737,9 +1871,6 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
             previous_key = Some(rank);
             block_has_content = true;
         } else {
-            if pending_block_comment {
-                return fail("Unexpected OCM Data key");
-            }
             if !line.contains('=') {
                 return fail("expected exactly one top-level assignment");
             }
@@ -1998,7 +2129,7 @@ impl ToKvn for OcmMetadata {
             writer.write_pair("CONSTELLATION", v);
         }
         if let Some(v) = &self.object_type {
-            writer.write_pair("OBJECT_TYPE", v.to_string());
+            writer.write_pair("OBJECT_TYPE", v);
         }
         writer.write_pair("TIME_SYSTEM", &self.time_system);
         writer.write_pair("EPOCH_TZERO", self.epoch_tzero);
@@ -2111,7 +2242,7 @@ impl ToKvn for OcmTrajState {
             writer.write_pair("TRAJ_NEXT_ID", v);
         }
         if let Some(v) = &self.traj_basis {
-            writer.write_pair("TRAJ_BASIS", v.to_string());
+            writer.write_pair("TRAJ_BASIS", v);
         }
         if let Some(v) = &self.traj_basis_id {
             writer.write_pair("TRAJ_BASIS_ID", v);
@@ -2120,7 +2251,7 @@ impl ToKvn for OcmTrajState {
             writer.write_pair("INTERPOLATION", v);
         }
         if let Some(v) = &self.interpolation_degree {
-            writer.write_pair("INTERPOLATION_DEGREE", v);
+            writer.write_integer_pair("INTERPOLATION_DEGREE", v);
         }
         if let Some(v) = &self.propagator {
             writer.write_pair("PROPAGATOR", v);
@@ -2337,7 +2468,7 @@ impl ToKvn for OcmCovarianceMatrix {
             writer.write_pair("COV_NEXT_ID", v);
         }
         if let Some(v) = &self.cov_basis {
-            writer.write_pair("COV_BASIS", v.to_string());
+            writer.write_pair("COV_BASIS", v);
         }
         if let Some(v) = &self.cov_basis_id {
             writer.write_pair("COV_BASIS_ID", v);
@@ -2412,10 +2543,10 @@ impl ToKvn for OcmManeuverParameters {
             writer.write_pair("DC_WIN_CLOSE", v);
         }
         if let Some(v) = &self.dc_min_cycles {
-            writer.write_pair("DC_MIN_CYCLES", v);
+            writer.write_integer_pair("DC_MIN_CYCLES", v);
         }
         if let Some(v) = &self.dc_max_cycles {
-            writer.write_pair("DC_MAX_CYCLES", v);
+            writer.write_integer_pair("DC_MAX_CYCLES", v);
         }
         if let Some(v) = &self.dc_exec_start {
             writer.write_pair("DC_EXEC_START", v);
@@ -2447,11 +2578,14 @@ impl ToKvn for OcmManeuverParameters {
         if let Some(v) = &self.dc_pa_stop_angle {
             writer.write_odm_float_measure("DC_PA_STOP_ANGLE", &v.to_unit_value());
         }
-        writer.write_pair("MAN_COMPOSITION", &self.man_composition);
+        let composition = super::parse_csv_list(&self.man_composition);
+        writer.write_pair(
+            "MAN_COMPOSITION",
+            canonical_man_composition(&self.man_composition),
+        );
         if let Some(v) = &self.man_units {
             writer.write_pair("MAN_UNITS", v);
         }
-        let composition = super::parse_csv_list(&self.man_composition);
         let numeric_columns: Vec<_> = composition
             .iter()
             .skip(1)
@@ -2502,7 +2636,7 @@ impl ToKvn for OcmPerturbations {
             writer.write_pair("ALBEDO_MODEL", v);
         }
         if let Some(v) = &self.albedo_grid_size {
-            writer.write_pair("ALBEDO_GRID_SIZE", v);
+            writer.write_integer_pair("ALBEDO_GRID_SIZE", v);
         }
         if let Some(v) = &self.shadow_model {
             writer.write_pair("SHADOW_MODEL", v);
@@ -2582,16 +2716,16 @@ impl ToKvn for OcmOdParameters {
             writer.write_odm_float_measure("ACTUAL_OD_SPAN", &v.to_unit_value());
         }
         if let Some(v) = &self.obs_available {
-            writer.write_pair("OBS_AVAILABLE", v);
+            writer.write_integer_pair("OBS_AVAILABLE", v);
         }
         if let Some(v) = &self.obs_used {
-            writer.write_pair("OBS_USED", v);
+            writer.write_integer_pair("OBS_USED", v);
         }
         if let Some(v) = &self.tracks_available {
-            writer.write_pair("TRACKS_AVAILABLE", v);
+            writer.write_integer_pair("TRACKS_AVAILABLE", v);
         }
         if let Some(v) = &self.tracks_used {
-            writer.write_pair("TRACKS_USED", v);
+            writer.write_integer_pair("TRACKS_USED", v);
         }
         if let Some(v) = &self.maximum_obs_gap {
             writer.write_odm_float_measure("MAXIMUM_OBS_GAP", &v.to_unit_value());
@@ -2618,13 +2752,13 @@ impl ToKvn for OcmOdParameters {
             writer.write_odm_float_pair("GDOP", *v);
         }
         if let Some(v) = &self.solve_n {
-            writer.write_pair("SOLVE_N", v);
+            writer.write_integer_pair("SOLVE_N", v);
         }
         if let Some(v) = &self.solve_states {
             writer.write_pair("SOLVE_STATES", v);
         }
         if let Some(v) = &self.consider_n {
-            writer.write_pair("CONSIDER_N", v);
+            writer.write_integer_pair("CONSIDER_N", v);
         }
         if let Some(v) = &self.consider_params {
             writer.write_pair("CONSIDER_PARAMS", v);
@@ -2633,7 +2767,7 @@ impl ToKvn for OcmOdParameters {
             writer.write_odm_float_measure("SEDR", &v.to_unit_value());
         }
         if let Some(v) = &self.sensors_n {
-            writer.write_pair("SENSORS_N", v);
+            writer.write_integer_pair("SENSORS_N", v);
         }
         if let Some(v) = &self.sensors {
             writer.write_pair("SENSORS", v);

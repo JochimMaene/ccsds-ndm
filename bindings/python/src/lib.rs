@@ -106,6 +106,8 @@ pub(crate) fn message_to_py(py: Python<'_>, message: Message) -> PyResult<Py<PyA
 /// ------
 /// NdmFormatError
 ///     If the input is malformed.
+/// NdmEpochError
+///     If a CCSDS epoch is invalid.
 /// NdmValidationError
 ///     If the message fails validation or uses an unsupported edition.
 /// NdmUnsupportedMessageError
@@ -134,7 +136,25 @@ fn from_str(
 /// Parameters
 /// ----------
 /// path : str or os.PathLike
-///     Path to the file.
+///     Path to the UTF-8 file.
+/// format : str, optional
+///     ``"kvn"`` or ``"xml"``; detected when omitted.
+///
+/// Raises
+/// ------
+/// NdmIoError
+///     The file could not be read.
+/// NdmFormatError
+///     Malformed document or invalid text encoding.
+/// NdmEpochError
+///     Invalid CCSDS epoch.
+/// NdmValidationError
+///     Validation failed or the edition is unsupported.
+/// NdmUnsupportedMessageError
+///     Unrecognized message family.
+/// ValueError
+///     Unsupported format argument.
+///
 /// Returns
 /// -------
 /// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, CombinedNdm, Aem, Apm, Acm]
@@ -158,6 +178,33 @@ fn from_file(
 }
 
 /// Convert any recognized NDM message between KVN and XML through the shared generation gate.
+///
+/// Parameters
+/// ----------
+/// data : str
+///     Input KVN or XML; notation is detected automatically.
+/// to_format : str
+///     ``"kvn"`` or ``"xml"``. The message's edition is preserved.
+///
+/// Returns
+/// -------
+/// str
+///     Validated output, subject to the documented notation normalizations.
+///
+/// Raises
+/// ------
+/// NdmFormatError
+///     Malformed input or content unrepresentable in the target notation.
+/// NdmEpochError
+///     Invalid epoch.
+/// NdmValidationError
+///     Invalid message or unsupported edition.
+/// NdmUnsupportedMessageError
+///     Unrecognized family.
+/// NdmUnsupportedNotationError
+///     No CCSDS representation exists for the target notation.
+/// ValueError
+///     Unsupported format argument.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (data, to_format))]
@@ -173,6 +220,32 @@ fn convert(
 }
 
 /// Convert any recognized NDM file and atomically replace the destination on success.
+///
+/// Parameters
+/// ----------
+/// source_path : str or os.PathLike
+///     UTF-8 input file; notation is detected automatically.
+/// destination_path : str or os.PathLike
+///     Output file, replaced only after successful validation and generation.
+/// to_format : str
+///     ``"kvn"`` or ``"xml"``; the source edition is preserved.
+///
+/// Raises
+/// ------
+/// NdmIoError
+///     File read, write, or replacement failed; filename and filename2 name both paths.
+/// NdmFormatError
+///     Malformed input or content unrepresentable in the target notation.
+/// NdmEpochError
+///     Invalid epoch.
+/// NdmValidationError
+///     Invalid message or unsupported edition.
+/// NdmUnsupportedMessageError
+///     Unrecognized family.
+/// NdmUnsupportedNotationError
+///     No CCSDS representation exists for the target notation.
+/// ValueError
+///     Unsupported format argument.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (source_path, destination_path, to_format))]
@@ -189,13 +262,17 @@ fn convert_file(
     py.detach(|| ccsds_ndm::convert_file(&source_path, &destination_path, notation))
         .map_err(|error| match error.as_io_error() {
             // Either side can fail, so name both, as OSError's filename and filename2.
-            Some(io) => crate::errors::NdmIoError::new_err((
-                io.raw_os_error().unwrap_or(0),
-                io.to_string(),
-                source_path.display().to_string(),
-                None::<i32>,
-                destination_path.display().to_string(),
-            )),
+            Some(io) => {
+                let exception = crate::errors::NdmIoError::new_err((
+                    io.raw_os_error().unwrap_or(0),
+                    io.to_string(),
+                    source_path.display().to_string(),
+                    None::<i32>,
+                    destination_path.display().to_string(),
+                ));
+                let _ = exception.value(py).setattr("code", "io.error");
+                exception
+            }
             None => ccsds_error_to_pyerr(error),
         })
 }
@@ -270,8 +347,6 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<tdm::TdmMetadata>()?;
     m.add_class::<tdm::TdmData>()?;
     m.add_class::<tdm::TdmObservation>()?;
-    m.add_class::<tdm::TdmMode>()?;
-    m.add_class::<tdm::TdmPath>()?;
 
     // Register RDM wrapper classes
     m.add_class::<rdm::Rdm>()?;

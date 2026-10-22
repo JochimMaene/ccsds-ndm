@@ -107,9 +107,7 @@ from .ccsds_ndm import (
     TdmData,
     TdmHeader,
     TdmMetadata,
-    TdmMode,
     TdmObservation,
-    TdmPath,
     TdmSegment,
     TleParameters,
     TrajLine,
@@ -192,8 +190,6 @@ __all__ = [
     "TdmMetadata",
     "TdmData",
     "TdmObservation",
-    "TdmMode",
-    "TdmPath",
     # RDM
     "Rdm",
     "RdmHeader",

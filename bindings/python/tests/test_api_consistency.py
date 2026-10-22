@@ -149,7 +149,6 @@ def test_ndm_errors_expose_unavailable_diagnostics_as_none(error_type):
         "byte_offset",
         "original_token",
         "expected",
-        "requirement",
     ):
         assert getattr(error, field) is None
 
@@ -190,16 +189,15 @@ def test_wrong_family_errors_have_diagnostic_fields(format, from_file):
     assert error.operation == "parse"
     assert error.notation == format
     assert error.message_kind == "oem"
+    assert error.code == "parse.unexpected_message_type"
     for field in (
         "source_edition",
-        "code",
         "field_path",
         "line",
         "column",
         "byte_offset",
         "original_token",
         "expected",
-        "requirement",
     ):
         assert getattr(error, field) is None
 
@@ -421,3 +419,97 @@ def test_user_defined_interleaving_survives_xml_and_refuses_kvn():
     assert parsed.to_str(format="xml") == xml
     with pytest.raises(ccsds_ndm.NdmValidationError, match="comments must precede"):
         parsed.to_str(format="kvn")
+
+
+@pytest.mark.parametrize(
+    "source",
+    ["CCSDS_OEM_VERS = 3.0\nBROKEN = content", '<oem version="3.0"><broken/></oem>'],
+)
+@pytest.mark.parametrize("from_file", [False, True])
+def test_wrong_family_is_reported_before_content_errors(source, from_file, tmp_path):
+    with pytest.raises(ccsds_ndm.NdmUnsupportedMessageError) as caught:
+        if from_file:
+            path = tmp_path / "wrong.ndm"
+            path.write_text(source)
+            ccsds_ndm.Opm.from_file(path)
+        else:
+            ccsds_ndm.Opm.from_str(source)
+    assert caught.value.code == "parse.unexpected_message_type"
+
+
+def test_io_and_empty_input_errors_keep_their_codes(tmp_path):
+    with pytest.raises(ccsds_ndm.NdmIoError) as caught:
+        ccsds_ndm.from_file(tmp_path / "missing.ndm")
+    assert caught.value.code == "io.error"
+    assert caught.value.filename == str(tmp_path / "missing.ndm")
+    with pytest.raises(ccsds_ndm.NdmFormatError) as caught:
+        ccsds_ndm.from_str("")
+    assert caught.value.code == "parse.unexpected_eof"
+
+
+def test_probability_constructor_and_setter_both_check_the_domain():
+    with pytest.raises(ValueError):
+        ccsds_ndm.GroundImpactParameters(probability_of_impact=1.5)
+    parameters = ccsds_ndm.GroundImpactParameters(probability_of_impact=0.5)
+    with pytest.raises(ValueError):
+        parameters.probability_of_impact = 1.5
+    assert parameters.probability_of_impact == 0.5
+
+
+def test_model_classes_name_the_public_package():
+    for cls in (
+        ccsds_ndm.Opm,
+        ccsds_ndm.Oem,
+        ccsds_ndm.OdmHeader,
+        ccsds_ndm.GroundImpactParameters,
+    ):
+        assert cls.__module__ == "ccsds_ndm"
+
+
+@pytest.mark.parametrize("cls", [ccsds_ndm.Opm, ccsds_ndm.CombinedNdm])
+def test_typed_detection_refusals_are_parse_operations(cls):
+    source = "CCSDS_OPM_VERS = 3.0\nCCSDS_OPM_VERS = 3.0\n"
+    with pytest.raises(ccsds_ndm.NdmUnsupportedNotationError) as caught:
+        cls.from_str(source)
+    assert caught.value.operation == "parse"
+    assert caught.value.code == "unsupported.notation"
+
+
+@pytest.mark.parametrize(
+    "encoding", ["utf-16-le", "utf-16-be", "utf-32-le", "utf-32-be"]
+)
+@pytest.mark.parametrize(
+    "source", ["CCSDS_OPM_VERS = 3.0\n", '<?xml version="1.0"?><opm/>']
+)
+def test_typed_and_generic_files_agree_on_wide_encodings(tmp_path, encoding, source):
+    path = tmp_path / "encoded.ndm"
+    path.write_bytes(source.encode(encoding))
+    errors = []
+    for reader in (ccsds_ndm.from_file, ccsds_ndm.Opm.from_file):
+        with pytest.raises(ccsds_ndm.NdmFormatError) as caught:
+            reader(path)
+        error = caught.value
+        errors.append((type(error), error.code, error.operation, error.notation))
+    assert errors[0] == errors[1]
+    assert errors[0][2] == "parse"
+
+
+def test_typed_and_generic_files_preserve_invalid_utf8_io_details(tmp_path):
+    path = tmp_path / "invalid.ndm"
+    path.write_bytes(b"\xff")
+    for reader in (ccsds_ndm.from_file, ccsds_ndm.Opm.from_file):
+        with pytest.raises(ccsds_ndm.NdmIoError) as caught:
+            reader(path)
+        assert caught.value.code == "io.error"
+        assert caught.value.filename == str(path)
+
+
+@pytest.mark.parametrize("cls", [ccsds_ndm, ccsds_ndm.Acm])
+def test_semantic_input_errors_keep_the_parse_operation(cls):
+    source = (ROOT / "ccsds-ndm/data/kvn/acm_g6.kvn").read_text()
+    source = source.replace("NUMBER_STATES = 4", "NUMBER_STATES = 0")
+    assert "NUMBER_STATES = 0" in source
+    with pytest.raises(ccsds_ndm.NdmValidationError) as caught:
+        cls.from_str(source)
+    assert caught.value.operation == "parse"
+    assert caught.value.message_kind == "acm"

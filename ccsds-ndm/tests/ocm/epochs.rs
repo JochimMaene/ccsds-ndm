@@ -265,24 +265,33 @@ fn xml_parsing_rejects_numeric_optional_reference_epochs() {
 }
 
 #[test]
-fn xml_parsing_rejects_numeric_frame_reference_epochs() {
+fn xml_frame_epochs_accept_relative_tags_except_oeb_parent() {
     let xml = Ocm::from_kvn(OCM_FRAME_EPOCH_KVN)
         .expect("frame-reference KVN fixture should parse")
         .to_xml()
         .expect("frame-reference fixture should serialize");
     Ocm::from_xml(&xml).expect("generated frame-reference XML should parse");
 
-    for tag in [
-        "TRAJ_FRAME_EPOCH",
-        "OEB_PARENT_FRAME_EPOCH",
-        "COV_FRAME_EPOCH",
-        "MAN_FRAME_EPOCH",
+    // TRAJ/COV/MAN_FRAME_EPOCH are XSD `epochType` and table 6-4/6-6/6-7 frame epochs, which
+    // ODM 6.2.2.3 lets be relative; OEB_PARENT_FRAME_EPOCH stays calendar-only.
+    for (tag, relative_ok) in [
+        ("TRAJ_FRAME_EPOCH", true),
+        ("OEB_PARENT_FRAME_EPOCH", false),
+        ("COV_FRAME_EPOCH", true),
+        ("MAN_FRAME_EPOCH", true),
     ] {
         let needle = format!("<{tag}>2023-01-01T00:00:00</{tag}>");
         let replacement = format!("<{tag}>123.5</{tag}>");
-        let invalid = mutated(&xml, &needle, &replacement);
+        let edited = mutated(&xml, &needle, &replacement);
         assert!(xml.contains(&needle), "generated XML should contain {tag}");
-        crate::common::assert_invalid_epoch(&Ocm::from_xml(&invalid).unwrap_err(), "123.5");
+        if relative_ok {
+            let parsed = Ocm::from_xml(&edited).unwrap_or_else(|error| panic!("{tag}: {error}"));
+            assert!(parsed.to_kvn().unwrap().lines().any(|line| line
+                .split_once('=')
+                .is_some_and(|(key, value)| key.trim() == tag && value.trim() == "123.5")));
+        } else {
+            crate::common::assert_invalid_epoch(&Ocm::from_xml(&edited).unwrap_err(), "123.5");
+        }
     }
 }
 
@@ -388,7 +397,10 @@ fn trajectory_history_time_tags_must_use_one_epoch_branch() {
         "TRAJ_STOP",
         "123.5 7 8 9 10 11 12\nTRAJ_STOP",
     );
-    crate::common::assert_validation_field(&Ocm::from_kvn(&mixed).unwrap_err(), "trajLine epoch");
+    crate::common::assert_validation_field(
+        &Ocm::from_kvn(&mixed).unwrap_err(),
+        "TRAJ data line epoch",
+    );
 
     let valid = Ocm::from_kvn(OCM_TRAJ_USEABLE_KVN).expect("fixture should parse");
     let xml = valid.to_xml().expect("fixture should serialize");
@@ -399,7 +411,7 @@ fn trajectory_history_time_tags_must_use_one_epoch_branch() {
     );
     crate::common::assert_validation_field(
         &Ocm::from_xml(&mixed_xml).unwrap_err(),
-        "trajLine epoch",
+        "TRAJ data line epoch",
     );
 }
 
@@ -445,7 +457,7 @@ META_STOP
 }
 
 #[test]
-fn frame_reference_epochs_require_calendar_form() {
+fn frame_epochs_accept_relative_tags_except_oeb_parent_in_kvn() {
     let kvn = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -506,16 +518,88 @@ MAN_STOP
         "2023-01-01T00:00:00"
     );
 
-    for key in [
-        "TRAJ_FRAME_EPOCH",
-        "OEB_PARENT_FRAME_EPOCH",
-        "COV_FRAME_EPOCH",
-        "MAN_FRAME_EPOCH",
+    for (key, relative_ok) in [
+        ("TRAJ_FRAME_EPOCH", true),
+        ("OEB_PARENT_FRAME_EPOCH", false),
+        ("COV_FRAME_EPOCH", true),
+        ("MAN_FRAME_EPOCH", true),
     ] {
-        let invalid = kvn.replace(
+        let edited = kvn.replace(
             &format!("{key} = 2023-01-01T00:00:00"),
             &format!("{key} = 123.5"),
         );
-        crate::common::assert_invalid_epoch(&Ocm::from_kvn(&invalid).unwrap_err(), "123.5");
+        if relative_ok {
+            Ocm::from_kvn(&edited).unwrap_or_else(|error| panic!("{key}: {error}"));
+        } else {
+            crate::common::assert_invalid_epoch(&Ocm::from_kvn(&edited).unwrap_err(), "123.5");
+        }
+    }
+}
+
+#[test]
+fn time_offsets_use_xml_double_lexical_forms() {
+    use ccsds_ndm::types::TimeOffset;
+    for value in [f64::INFINITY, f64::NEG_INFINITY, f64::NAN] {
+        let mut message = Ocm::from_xml(OCM_XML).unwrap();
+        let metadata = &mut message.body.segment.metadata;
+        for offset in [
+            &mut metadata.sclk_offset_at_epoch,
+            &mut metadata.taimutc_at_tzero,
+            &mut metadata.next_leap_taimutc,
+            &mut metadata.ut1mutc_at_tzero,
+        ] {
+            *offset = Some(TimeOffset { value, units: None });
+        }
+        message.validate().unwrap();
+        let xml = message.to_xml().unwrap();
+        crate::common::validate_xml("time offset", &xml);
+        Ocm::from_xml(&xml).unwrap();
+        assert!(message.to_kvn().is_err());
+    }
+    for spelling in ["inf", "+infinity", "nan", "+INF", "-NaN"] {
+        let mut message = Ocm::from_xml(OCM_XML).unwrap();
+        message.body.segment.metadata.taimutc_at_tzero = Some(TimeOffset {
+            value: 36.0,
+            units: None,
+        });
+        let xml = message.to_xml().unwrap();
+        let invalid = mutated(
+            &xml,
+            "<TAIMUTC_AT_TZERO>36</TAIMUTC_AT_TZERO>",
+            &format!("<TAIMUTC_AT_TZERO>{spelling}</TAIMUTC_AT_TZERO>"),
+        );
+        assert!(Ocm::from_xml(&invalid).is_err(), "{spelling}");
+    }
+}
+
+#[test]
+fn revolution_basis_uses_integer_value_equality_in_xml() {
+    let mut message = Ocm::from_xml(OCM_XML).unwrap();
+    message.body.segment.data.traj[0].orb_revnum_basis = Some(ccsds_ndm::types::RevNumBasis::One);
+    let xml = message.to_xml().unwrap();
+    // The schema gives ORB_REVNUM_BASIS the numeric value space {0, 1}.
+    for (spelling, expected) in [
+        ("0", "0"),
+        ("-0", "0"),
+        ("+00", "0"),
+        ("01", "1"),
+        ("+01", "1"),
+        (" 1 ", "1"),
+    ] {
+        let source = mutated(
+            &xml,
+            "<ORB_REVNUM_BASIS>1</ORB_REVNUM_BASIS>",
+            &format!("<ORB_REVNUM_BASIS>{spelling}</ORB_REVNUM_BASIS>"),
+        );
+        crate::common::validate_xml("revolution basis", &source);
+        let parsed = Ocm::from_xml(&source).unwrap();
+        assert_eq!(
+            parsed.body.segment.data.traj[0]
+                .orb_revnum_basis
+                .as_ref()
+                .unwrap()
+                .to_string(),
+            expected
+        );
     }
 }

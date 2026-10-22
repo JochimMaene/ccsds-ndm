@@ -174,8 +174,7 @@ pub fn tle_parameters(input: &mut &str) -> KvnResult<Option<TleParameters>> {
         rev_at_epoch,
         bstar,
         bterm,
-        mean_motion_dot: mean_motion_dot
-            .ok_or_else(|| missing_field_err(input, "TLE Parameters", "MEAN_MOTION_DOT"))?,
+        mean_motion_dot,
         mean_motion_ddot,
         agom,
     }))
@@ -449,8 +448,11 @@ impl ToKvn for MeanElements {
         writer
             .write_odm_float_measure("ARG_OF_PERICENTER", &self.arg_of_pericenter.to_unit_value());
         writer.write_odm_float_measure("MEAN_ANOMALY", &self.mean_anomaly.to_unit_value());
+        // ODM 7.7.1 requires KVN units to match the keyword table spelling exactly, so the
+        // uppercase spelling the XML schema also permits is canonicalized on output.
         if let Some(v) = &self.gm {
-            writer.write_odm_float_measure("GM", &UnitValue::new(v.value, v.units.clone()));
+            let units = v.units.as_ref().map(|_| GmUnits::Km3PerS2);
+            writer.write_odm_float_measure("GM", &UnitValue::new(v.value, units));
         }
     }
 }
@@ -465,13 +467,13 @@ impl ToKvn for TleParameters {
             writer.write_pair("CLASSIFICATION_TYPE", v);
         }
         if let Some(v) = self.norad_cat_id {
-            writer.write_pair("NORAD_CAT_ID", v);
+            writer.write_integer_pair("NORAD_CAT_ID", v);
         }
         if let Some(v) = self.element_set_no {
-            writer.write_pair("ELEMENT_SET_NO", v);
+            writer.write_integer_pair("ELEMENT_SET_NO", v);
         }
         if let Some(v) = self.rev_at_epoch {
-            writer.write_pair("REV_AT_EPOCH", v);
+            writer.write_integer_pair("REV_AT_EPOCH", v);
         }
         if let Some(v) = &self.bstar {
             writer.write_odm_float_measure("BSTAR", v);
@@ -479,7 +481,9 @@ impl ToKvn for TleParameters {
         if let Some(v) = &self.bterm {
             writer.write_odm_float_measure("BTERM", v);
         }
-        writer.write_odm_float_measure("MEAN_MOTION_DOT", &self.mean_motion_dot);
+        if let Some(v) = &self.mean_motion_dot {
+            writer.write_odm_float_measure("MEAN_MOTION_DOT", v);
+        }
         if let Some(v) = &self.mean_motion_ddot {
             writer.write_odm_float_measure("MEAN_MOTION_DDOT", v);
         }
@@ -490,12 +494,10 @@ impl ToKvn for TleParameters {
 }
 
 impl Omm {
-    /// Reject values that KVN generation could not spell back to the same number.
+    /// Reject blocks and numeric magnitudes that KVN cannot represent.
     ///
-    /// The schema types these fields as plain doubles, so range and finiteness checks let through
-    /// magnitudes whose shortest round-tripping spelling exceeds the 16 significant digits and
-    /// 255-character line that ODM 7.7.1 allows. Catching them here keeps generation from
-    /// emitting a document this library would refuse to read back.
+    /// Numbers round to 16 significant digits; reject magnitudes whose rounding overflows.
+    /// Delimiter-free empty blocks cannot retain their presence or comment associations.
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
         fn check(field: &'static str, value: f64, path: &'static str) -> Result<()> {
             if OdmFloat::is_valid(value) {
@@ -507,6 +509,9 @@ impl Omm {
         }
 
         let data = &self.body.segment.data;
+        if let Some(parameters) = &data.spacecraft_parameters {
+            parameters.validate_kvn_representability()?;
+        }
         if let Some(user_defined) = &data.user_defined_parameters {
             if user_defined.parameters().next().is_none() {
                 return Err(crate::error::ValidationError::invalid_value(
@@ -612,7 +617,7 @@ impl Omm {
                 ),
                 (
                     "MEAN_MOTION_DOT",
-                    Some(tle.mean_motion_dot.value),
+                    tle.mean_motion_dot.as_ref().map(|v| v.value),
                     "body.segment.data.tle_parameters.mean_motion_dot",
                 ),
                 (
@@ -908,9 +913,10 @@ AGOM = 0.0001 [m**2/kg]
 
         // TLE: independent checks for format
 
-        // TLE: missing MEAN_MOTION_DOT (Mandatory in parser now)
+        // TLE: MEAN_MOTION_DOT is conditional on the theory, so the parser accepts its absence
         let mut input = "BSTAR = 0.0001\nMEAN_MOTION_DDOT = 0.0\n";
-        assert!(tle_parameters.parse_next(&mut input).is_err());
+        let tle = tle_parameters.parse_next(&mut input).unwrap().unwrap();
+        assert!(tle.mean_motion_dot.is_none());
 
         // TLE: both MEAN_MOTION_DDOT and AGOM parses; semantic check is in validation
         let mut input =
@@ -979,8 +985,6 @@ AGOM = 0.0001 [m**2/kg]
         assert!(tle_parameters.parse_next(&mut input).is_err());
 
         // Extra error coverage
-        let mut input = "REV_AT_EPOCH = 1\n";
-        assert!(tle_parameters.parse_next(&mut input).is_err());
 
         let mut input = "MEAN_MOTION_DOT = 0\nBSTAR = 0\nREV_AT_EPOCH = 1\nMEAN_MOTION_DDOT = 0\n";
         assert!(tle_parameters.parse_next(&mut input).is_ok());

@@ -19,7 +19,7 @@ The `acm` and `acm_kvn_allocations` suites establish:
 | --- | --- |
 | KVN structure | The family-local scanner rejects non-ASCII/control input, malformed/unknown/duplicate/reordered assignments, misplaced comments, assignments after history data, unknown/nested/mismatched blocks, invalid outer-block order/repetition, invalid SENSOR nesting, and trailing content. ACM lines may have arbitrary length under CCSDS 504.0-B-2 section 6.6.2. |
 | XML structure | The shared sequence engine covers root/header/body/segment, metadata, all six data block types, nested sensor data, history records, user-defined parameters, and their legal attributes. Unknown, duplicate, reordered, and illegal-attribute content is rejected. |
-| Schema-model fidelity | ACM 2.0 covariance identifiers and basis identifiers, AD Euler sequence, sensor covariance count, frequency units, CP vector units, and target-momentum vector units are modeled. Non-schema `COV_CONFIDENCE`, `AD_EPOCH`, split CP/momentum aliases, and AD `ATTITUDE_TYPE` are rejected rather than emitted or silently lost. |
+| Schema-model fidelity | ACM 2.0 covariance identifiers and basis identifiers, AD Euler sequence, sensor covariance count, frequency units, CP vector units, and target-momentum vector units are modeled. Non-schema `COV_CONFIDENCE`, `AD_EPOCH`, and AD `ATTITUDE_TYPE` have no public model fields and are rejected on input; split CP/momentum aliases are also rejected. |
 | Fixture preservation | All four shipped KVN fixtures preserve their complete typed model through KVN and XML. Generated XML validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
 | Generation boundary | Materialized and streaming KVN generation reject non-ASCII text and unrepresentable numbers before writing bytes while preserving ACM's arbitrary line lengths. The shared writer rounds representable values to the CCSDS 16-significant-digit format. Fixed-shape CP, momentum, target-attitude, and attitude-history records are validated. |
 | Resource behaviour | Attitude and covariance rows allocate exact numeric capacity. History generation uses allocation-free numeric-record/vector writers. Strictly increasing or decreasing attitude histories need no temporary storage for duplicate checks; mixed-order attitude histories use a temporary time/index vector and sorting to check uniqueness without quadratic work. |
@@ -119,21 +119,13 @@ ADM §6.8.5 excludes negative zero. Reading nevertheless accepts signed zero as 
 producer-compatibility choice: its numeric zero value is preserved, and a sign cannot make
 an otherwise duplicate time tag unique. This acceptance is not a claim that negative zero
 is a normative spelling. Floating-point KVN output canonicalizes either signed zero to `0.0`.
-KVN's 16-significant-digit rounding must also preserve timestamp uniqueness and covariance
-order: generation refuses a history whose distinct model times collapse to the same output
-time. XML can still represent those distinct `f64` times. The
-`acm::generation::kvn_rounding_must_not_collapse_distinct_history_times` regression checks
-that refusal before KVN output without banning other 17-digit input values.
-
-**Relative history times only.** ADM §5.3.4.3 permits either absolute or relative history
-time tags, with one representation throughout a block (§5.3.4.5). The bundled ACM schema
-declares both `attLine` and `covLine` as `xsd:string`; it does not limit these tags to
-relative numbers. The library's shared typed rows currently support only relative seconds
-from `EPOCH_TZERO` in both notations. This is a library model limitation, not a book/schema
-conflict. Absolute
-history epochs are rejected rather than converted or guessed. This is a supported-profile
-limitation, not a claim that the book forbids them.
-`acm::epochs::history_epochs_support_relative_numbers_only` fixes that boundary.
+History tags use lexical `Epoch` values independently of their numerical state columns. KVN
+and XML retain the tag spelling, including absolute calendar and ordinal tags, rather than
+rounding tags through `f64`. A block must use one form (relative or calendar), and comparisons
+use `Epoch::cmp_same_branch` without time-scale conversion. This implements ADM §§5.3.4.3–5
+and the XSD's string-valued history rows.
+`acm::epochs::history_time_tags_are_relative_or_absolute_one_form_per_block` covers absolute
+input, output validated against the XSD, mixed-form refusal and covariance chronology.
 
 **Maneuver times are relative.** The general absolute-or-relative wording in ADM §5.3.4.3
 conflicts with the more specific table 5-7 descriptions of `MAN_BEGIN_TIME` and
@@ -164,11 +156,53 @@ caller context; fixed shapes, declared counts, and numeric domains remain librar
 Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
 
-**Sensor frequency and XML domains.** A supplied sensor frequency must be finite. The
-book specifies Hz but no positive bound, so KVN preserves zero and negative producer values;
-XML input and output enforce the schema's strictly positive `frequencyType`. Generation
-refuses an XML-incompatible value before writing bytes.
+**Sensor frequency.** The XSD's positive `frequencyType` facet applies to model, KVN, and
+XML values under the [shared validation contract](../design/validation-contract.md).
+`acm::generation::sensor_frequency_schema_bound_applies_in_every_notation` checks constructors,
+edited models, and refusal before output.
 
 **Relative-number spelling.** Maneuver time reading accepts finite producer forms such as
 `.5`, `5.`, and exponent notation. XML retains the stored spelling. KVN writes the shared
 canonical numeric form with at most 16 significant digits, as for other numeric fields.
+
+## Additional schema and producer decisions
+
+**Attitude-determination method.** The book's method names are externally described in
+ADM annex B5, so `AD_METHOD` remains a preserved string in KVN/model form. XML input/output
+requires the bundled `adMethodType` enumeration: `EKF`, `TRIAD`, `QUEST`, `BATCH`,
+`Q_METHOD`, `FILTER_SMOOTHER`, `OTHER`, or their explicitly enumerated lowercase forms.
+Mixed case and extensions fail XML representability; they are not rewritten to `OTHER`.
+`acm::generation::attitude_determination_method_has_an_xml_enum_but_open_kvn_text` covers both domains.
+
+**Sensor comments.** Leading comments immediately inside `SENSOR_START` are accepted and
+preserved as a KVN producer extension. ADM table 5-8 places standard comments immediately
+after `AD_START`, and the bundled `sensorDataType` has no comment element. XML generation
+therefore refuses sensor comments rather than moving them to the AD block or dropping them.
+`acm::generation::xml_generation_rejects_kvn_only_sensor_comments_before_output` covers the refusal.
+
+**Euler-history angles.** ACM preserves finite Euler-history angles without enforcing
+ADM §6.8.1's −360…360-degree bound on history columns. This deliberately follows the
+XSD's string-valued `attLine` representation and allows unwrapped history angles to remain
+usable without normalization. Callers requiring that book bound must check Euler-history
+columns themselves. This exception does not relax the fixed row shape, declared units,
+quaternion checks, or the typed scalar angle bounds in APM/AEM. The preservation regression
+is `acm::parsing::euler_history_preserves_unwrapped_finite_angles`.
+
+**Producer order and open basis text.** `EULER_ROT_SEQ` may precede `NUMBER_STATES` in ATT
+and AD KVN blocks, matching Orekit output; generation writes table order. Euler sequences accept
+all-uppercase or all-lowercase axis letters in KVN and write uppercase. Euler histories place
+`EULER_ROT_SEQ` before `RATE_TYPE` in XML, matching `acmAttitudeStateType`.
+`ATT_BASIS` and `COV_BASIS` retain book-suggested free text in KVN/model form; XML requires the
+schema enumeration. AD `COV_TYPE = NONE` normalizes to omission, as does `RATE_TYPE = NONE`.
+
+**User comments.** ADM §5.3.10.5 permits comments between user parameters. Their order survives
+both notations. Empty user-parameter suffixes are rejected, and blank separators inside histories
+and after sensor blocks are insignificant. Other block comments retain their beginning-only rule.
+
+**Required identity and maneuver choice.** `OBJECT_NAME` stays required, following table 5-3's
+mandatory marker and the XML element despite the table's permissive note. Exactly one of
+`MAN_END_TIME` and `MAN_DURATION` is required, adopting the XSD choice over the book's softer
+“should” wording.
+
+XML history numbers use the same finite-number check as KVN: nonzero underflow is refused,
+while representable subnormal doubles are retained (`xml_history_values_refuse_nonzero_underflow_and_keep_subnormals`).

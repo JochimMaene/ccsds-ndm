@@ -135,8 +135,8 @@ DATA_STOP
     assert!(
         crate::common::kvn_parse_error(&error)
             .unwrap()
-            .contexts
-            .contains(&"Expected CREATION_DATE"),
+            .message
+            .contains("Expected CREATION_DATE"),
         "{error}"
     );
 }
@@ -1105,6 +1105,8 @@ fn test_observation_value_error_reports_record_line() {
     let CcsdsNdmError::Validation(error) = Tdm::from_kvn(&bad).unwrap_err() else {
         panic!("expected a validation error");
     };
+    // The range error names the keyword, not the shared Rust `Percentage` type.
+    assert!(error.to_string().contains("RHUMIDITY"), "{error}");
     let ccsds_ndm::error::ValidationError::OutOfRange { line, .. } = *error else {
         panic!("expected an out-of-range error");
     };
@@ -1300,6 +1302,11 @@ fn tdm_conditional_metadata_rules_name_the_offending_field() {
             ),
             (
                 mutated(FIXTURE, "DATA_QUALITY = RAW", "ANGLE_TYPE = RADEC\nDATA_QUALITY = RAW"),
+                "Missing required field: REFERENCE_FRAME (required when ANGLE_TYPE=RADEC)",
+            ),
+            // The RADEC rule applies in any letter case, even when the value stays `Other`.
+            (
+                mutated(FIXTURE, "DATA_QUALITY = RAW", "ANGLE_TYPE = Radec\nDATA_QUALITY = RAW"),
                 "Missing required field: REFERENCE_FRAME (required when ANGLE_TYPE=RADEC)",
             ),
             // Path indices must refer to populated participants.
@@ -1584,4 +1591,178 @@ fn observation_numbers_use_shared_reading_rules_without_underflow() {
             "{value}"
         );
     }
+}
+
+#[test]
+fn xml_accepts_schema_listed_lowercase_categories() {
+    for (field, upper, lower) in [
+        ("MODE", "SEQUENTIAL", "sequential"),
+        ("TIMETAG_REF", "TRANSMIT", "transmit"),
+        ("INTEGRATION_REF", "MIDDLE", "middle"),
+        ("RANGE_MODE", "COHERENT", "coherent"),
+        ("ANGLE_TYPE", "AZEL", "azel"),
+        ("REFERENCE_FRAME", "EME2000", "eme2000"),
+        ("DATA_QUALITY", "RAW", "raw"),
+    ] {
+        let base = if field == "MODE" {
+            mutated(XML, "<MODE>SEQUENTIAL</MODE>", "")
+        } else {
+            XML.to_owned()
+        };
+        let insertion = if field == "MODE" {
+            "<PATH>"
+        } else {
+            "</metadata>"
+        };
+        let make = |value: &str| {
+            mutated(
+                &base,
+                insertion,
+                &format!("<{field}>{value}</{field}>{insertion}"),
+            )
+        };
+        let xml = make(lower);
+        crate::common::validate_xml("lowercase TDM", &xml);
+        assert_eq!(
+            Tdm::from_xml(&xml).unwrap(),
+            Tdm::from_xml(&make(upper)).unwrap(),
+            "{field}"
+        );
+    }
+    for (field, value) in [
+        ("MODE", "Sequential"),
+        ("ANGLE_TYPE", "AzEl"),
+        ("REFERENCE_FRAME", "Eme2000"),
+    ] {
+        let base = mutated(XML, "<MODE>SEQUENTIAL</MODE>", "");
+        let insertion = if field == "MODE" {
+            "<PATH>"
+        } else {
+            "</metadata>"
+        };
+        let xml = mutated(
+            &base,
+            insertion,
+            &format!("<{field}>{value}</{field}>{insertion}"),
+        );
+        assert!(Tdm::from_xml(&xml).is_err(), "{field}={value}");
+    }
+}
+
+#[test]
+fn present_empty_xml_elements_use_schema_defaults_and_omissions_stay_absent() {
+    let source = XML.replace("‘DSS-25’", "DSS-25");
+    let baseline = Tdm::from_xml(&source).unwrap();
+    assert!(baseline.body.segments[0].metadata.freq_offset.is_none());
+    assert!(baseline.body.segments[0].metadata.data_quality.is_none());
+    let fields = [
+        "FREQ_OFFSET",
+        "RANGE_MODULUS",
+        "TRANSMIT_DELAY_1",
+        "TRANSMIT_DELAY_2",
+        "TRANSMIT_DELAY_3",
+        "TRANSMIT_DELAY_4",
+        "TRANSMIT_DELAY_5",
+        "RECEIVE_DELAY_1",
+        "RECEIVE_DELAY_2",
+        "RECEIVE_DELAY_3",
+        "RECEIVE_DELAY_4",
+        "RECEIVE_DELAY_5",
+        "DATA_QUALITY",
+    ];
+    for field in fields {
+        let explicit = if field == "DATA_QUALITY" {
+            "RAW"
+        } else {
+            "0.0"
+        };
+        let expected = Tdm::from_xml(&mutated(
+            &source,
+            "</metadata>",
+            &format!("<{field}>{explicit}</{field}></metadata>"),
+        ))
+        .unwrap();
+        let metadata = &expected.body.segments[0].metadata;
+        let json = serde_json::to_string(metadata).unwrap();
+        assert_eq!(
+            serde_json::from_str::<ccsds_ndm::messages::tdm::TdmMetadata>(&json).unwrap(),
+            *metadata
+        );
+        for empty in [format!("<{field}/>"), format!("<{field}></{field}>")] {
+            let xml = mutated(&source, "</metadata>", &format!("{empty}</metadata>"));
+            crate::common::validate_xml("TDM default", &xml);
+            let parsed = Tdm::from_xml(&xml).unwrap();
+            assert_eq!(parsed, expected, "{field}");
+            assert_eq!(Tdm::from_kvn(&parsed.to_kvn().unwrap()).unwrap(), expected);
+        }
+    }
+    for (field, data) in [
+        ("CLOCK_BIAS", TdmObservationData::ClockBias(0.0)),
+        ("CLOCK_DRIFT", TdmObservationData::ClockDrift(0.0)),
+    ] {
+        let mut expected = baseline.clone();
+        expected.body.segments[0].metadata.data_types = None;
+        expected.body.segments[0].data.observations[0].data = data;
+        let xml = expected.to_xml().unwrap();
+        let xml = mutated(
+            &xml,
+            &format!("<{field}>0</{field}>"),
+            &format!("<{field}/>"),
+        );
+        crate::common::validate_xml("TDM clock default", &xml);
+        assert_eq!(Tdm::from_xml(&xml).unwrap(), expected);
+    }
+    for field in ["INTEGRATION_INTERVAL", "ANGLE_TYPE"] {
+        let xml = mutated(&source, "</metadata>", &format!("<{field}/></metadata>"));
+        assert!(Tdm::from_xml(&xml).is_err(), "non-defaulted {field}");
+    }
+}
+
+#[test]
+fn kvn_paths_with_blanks_after_commas_read_as_canonical_paths() {
+    // Orekit writes `PATH = 2, 1`; TDM 3.3 forbids the blank, but it carries no information.
+    const FIXTURE: &str = include_str!("../../data/kvn/tdm_e2.kvn");
+    let tdm = Tdm::from_kvn(&mutated(FIXTURE, "PATH = 2,1", "PATH = 2 , 1")).unwrap();
+    assert_eq!(tdm, Tdm::from_kvn(FIXTURE).unwrap());
+    assert!(tdm
+        .to_kvn()
+        .unwrap()
+        .contains("PATH                 = 2,1\n"));
+    let single_diff = mutated(
+        FIXTURE,
+        "MODE = SEQUENTIAL\nPATH = 2,1",
+        "MODE = SINGLE_DIFF\nPATH_1 = 2, 1\nPATH_2 = 1, 2",
+    );
+    let metadata = &Tdm::from_kvn(&single_diff).unwrap().body.segments[0].metadata;
+    assert_eq!(metadata.path_1, Some(TdmPath("2,1".into())));
+    assert_eq!(metadata.path_2, Some(TdmPath("1,2".into())));
+}
+
+#[test]
+fn phase_count_exponents_are_xml_double_spellings_but_not_kvn_phase_counts() {
+    const FIXTURE: &str = include_str!("../../data/kvn/tdm_e18.kvn");
+    let line = "TRANSMIT_PHASE_CT_1=2005-184T11:12:23 7175173383.615373";
+    // TDM 4.3.11: KVN phase counts contain no alphabetic characters.
+    let error = Tdm::from_kvn(&mutated(
+        FIXTURE,
+        line,
+        "TRANSMIT_PHASE_CT_1=2005-184T11:12:23 7.175173383615373E9",
+    ))
+    .unwrap_err();
+    assert!(error.to_string().contains("without an exponent"), "{error}");
+    // The XSD types XML phase counts as xsd:double, so XML keeps the exponent text (trimmed
+    // like every other XML number) and KVN output refuses it rather than rewriting digits.
+    let xml = Tdm::from_kvn(FIXTURE).unwrap().to_xml().unwrap().replacen(
+        "<TRANSMIT_PHASE_CT_1>7175173383.615373<",
+        "<TRANSMIT_PHASE_CT_1> 7.175173383615373E9 <",
+        1,
+    );
+    let tdm = Tdm::from_xml(&xml).unwrap();
+    assert_eq!(
+        tdm.body.segments[0].data.observations[0].data,
+        TdmObservationData::TransmitPhaseCt1("7.175173383615373E9".into())
+    );
+    let error = tdm.to_kvn().unwrap_err();
+    crate::common::assert_validation_field(&error, "TRANSMIT_PHASE_CT_1");
+    assert!(error.to_string().contains("without an exponent"), "{error}");
 }

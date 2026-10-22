@@ -45,7 +45,7 @@ represent it. It does not alter the value to make the conversion succeed.
 Where the books are silent or unclear, or two sources conflict, parsing takes the more permissive
 reading. Reading also accepts documented producer variations when the interpretation is unambiguous
 and preserves the values: for example, equivalent UTF-8 XML declarations, a leading byte-order
-mark, and excess trailing padding in OEM KVN. Reject input when interpreting it would require
+mark, and KVN lines longer than 254 characters. Reject input when interpreting it would require
 guessing missing values, dropping content, or accepting inconsistent message semantics. Each
 exception to a clear book rule is recorded in the family conformance document and tested
 alongside nearby invalid cases; this policy is not a blanket relaxation of the grammar.
@@ -58,45 +58,78 @@ its family document. There is no blanket rule that a schema always overrides pro
 narrower domain always wins. Some conflicts require a notation-specific refusal; others reflect an
 explicit edition change. See the [family decision records](../conformance/README.md#family-records).
 
-An XSD-only facet is sufficient evidence for P2 and XML P4. It is not automatically a semantic
-rule for P1 or P3. For example, positivity of `gmType` and `frequencyType` is established by the
-XSD but not by corresponding book text.
+XSD value facets (bounds, patterns, enumerations, positivity) apply in every notation and to
+model validation, P1 through P4, so that a valid model always converts. The one exception is a
+value the book explicitly permits and the XSD forbids: the model preserves it, and XML generation
+refuses it; the family record names each such field.
+
+The books win over the XSD in one shared case: XML epochs with a timezone offset (`+hh:mm`),
+bare numeric epochs, and empty epochs are rejected although `epochType` admits them, because the
+books define only calendar and ordinal forms without a numeric offset (for example ODM 7.5.10). Empty mandatory
+XML strings (`<OBJECT_ID/>`) are likewise rejected although `xsd:string` admits them, because the
+books require mandatory values to be present (ODM 7.5.1, ADM 6.8.7). Family records link here
+rather than restating this rule.
 
 ## Shared lexical decisions
 
 These reading rules apply to every supported family and edition unless its decision record names
-an exception. They are compatibility rules, not a second parser mode.
+an exception. They are compatibility rules, not a second parser mode: reading accepts lossless
+producer deviations, and writing always emits the canonical form.
 
-- **KVN lines:** accept LF, CR, CRLF, and LFCR. Normalization retains byte offsets for diagnostics.
-  Keywords and block markers remain case-sensitive; content must satisfy the family's ASCII and
-  line-length rules. Normalizing a terminator never joins two records.
-- **KVN real numbers:** accept ordinary signed decimal and exponent forms, including `.5`, `5.`,
-  `1e3`, and mantissas longer than 16 digits. Preserve the nearest representable finite `f64`;
-  reject malformed tokens, overflow, and nonzero values that underflow to zero. Integers used as
-  counts or identifiers retain their field-specific integer rules. Writers use the canonical
-  format and precision of the selected notation. Exact TDM phase counts remain decimal strings.
-- **Closed enumeration values:** KVN accepts supported all-uppercase and all-lowercase tokens,
-  including documented aliases, but rejects arbitrary mixed case. XML accepts the selected XSD's
-  exact spellings and specifically recorded compatibility aliases. Keywords, enum values, units,
-  free text, and open registry tokens are distinct domains: unit spellings stay exact, and open
-  tokens are preserved rather than uppercased or mapped to a fallback value.
+- **KVN records:** accept LF, CR, CRLF, and LFCR terminators; normalizing a terminator never joins
+  two records. Blank lines are allowed anywhere, and leading and trailing blanks on a record are
+  insignificant, including on the version and header records. A TAB reads as a blank; writers
+  never emit TAB. Content must be printable ASCII: anything else is rejected at its line and byte
+  column, naming the code point. Lines longer than 254 characters are read in every family;
+  writers keep the limit where the family has one. A UTF-8 byte-order mark is skipped; UTF-16 and
+  UTF-32 input is rejected as "input must be UTF-8". Keywords and block markers are case-sensitive.
+- **Edition first:** the `CCSDS_xxx_VERS` value (KVN) or root `version` attribute (XML) is checked
+  after encoding/character checks and before the structural parse. Lexically valid input in an
+  unsupported edition reports `parse.unsupported_input_version`.
+- **KVN numbers:** accept ordinary signed decimal and exponent forms, including `.5`, `5.`, `1e3`,
+  and mantissas longer than 16 digits. Integers accept a leading `+` (ODM 7.5.4); unsigned fields
+  still refuse `-`. Preserve the nearest representable finite `f64`; reject malformed tokens,
+  overflow, and nonzero values that underflow to zero. Anything after a number other than blanks
+  and its unit (`25x70 [km]`, `1D-3`) is reported as "Invalid ... for KEY" at that record. A unit
+  may follow its number without a blank (`1[km]`). Writers emit at most 16 significant digits,
+  using the shortest spelling of the rounded value, so rewriting what was read is stable. KVN
+  integers are written only within −2³¹ through 2³¹−1; wider model integers are refused. Exact
+  TDM phase counts remain decimal strings.
+- **XML values:** blanks around an XML number are ignored; blanks around an epoch are not. `NaN`
+  and `INF` are rejected as non-finite despite `xsd:double`, except where a family record accepts
+  them (OEM states and covariance). `xsi:nil` is rejected except where the CDM record documents it.
+  A missing `<?xml ...?>` declaration is accepted (XML 1.0 makes it optional and UTF-8 is the
+  default); a declaration that is present must open the document, and writers always emit it.
+  Element nesting is limited to 16 levels.
+- **Absent optional KVN values:** one shared rule covers every family and every optional value —
+  number, epoch, enum, or string: a blank value or case-insensitive `N/A` means the keyword is
+  absent. CDM `MANEUVERABLE` keeps `N/A` as the value the book lists for it. RDM
+  `NEXT_MESSAGE_EPOCH = N/A` ("no other message is scheduled") is therefore read as absent and
+  written by omission. A blank mandatory value is reported as missing at its record. Writers never
+  emit an empty or `N/A` value: an optional value that would read back as absent, such as an empty
+  string from XML, is refused at KVN generation, naming the keyword. XML optional strings keep
+  empty values. Values are trimmed when written to KVN, as readers trim them.
+- **Case:** `EULER_ROT_SEQ` reads lowercase letters and legacy ADM 1.0 numeric sequences
+  in KVN/Python, writing canonical uppercase letters; XML requires its exact enum spelling.
+  Keywords are uppercase. Closed enumeration values accept all-uppercase or
+  all-lowercase spellings and documented aliases, but not arbitrary mixed case. Free text and
+  open or ICD-defined values (frames, time systems, names) are accepted and preserved in any case,
+  in every notation; the ODM 7.5.3 single-case rule is not enforced.
+- **Underscore:** in a multi-word enumeration value, `_` is equivalent to a blank (CDM 6.3.2.5,
+  RDM 5.3.3.4, ODM 7.5.9), so `OBJECT_TYPE = ROCKET_BODY` reads as `ROCKET BODY`. Writers emit the
+  blank spelling. Free text keeps its underscores.
+- **Comments:** trailing blanks on a comment line are trimmed (including fixed-width padding),
+  although 7.8.5 calls them significant; leading text is kept as written.
 - **Units:** check any supplied annotation against the field's allowed unit, including XML fields
   whose units are optional. Never discard an incompatible annotation or reinterpret its number.
-  No automatic unit conversion is performed.
-- **Missing values and defaults:** omitted optional fields remain absent in the model. Validators
-  may use an explicit book default to interpret them; writers may emit that default when the target
-  requires it, as a documented normalization. Required operational values are caller supplied.
-  XML optional free-text strings retain empty values. KVN optional-value adapters accept a blank
-  value or case-insensitive `N/A` as absence for optional numbers, epochs, enums, and strings;
-  raw header `CLASSIFICATION` and `MESSAGE_ID` strings instead retain empty text. Field records
-  identify additional notation-specific restrictions. CDM's specifically
-  documented producer compatibility accepts empty/nil optional numeric, epoch, and enum leaves
-  only when they carry no meaningful payload; generation omits absent values and emits standard XML.
-- **Schema-only bounds:** an XSD facet is enforced on XML input/output, not automatically on KVN or
-  notation-neutral validation. A separate book requirement or explicit semantic decision can
-  establish a common constraint. For example, GM and sensor-frequency positivity is XML-only;
-  their model/KVN values still must be finite. RDM day-interval positivity is likewise XML-only. A schema-valid double does not by itself establish
-  the physical correctness of a measurement.
+  No automatic unit conversion is performed. Some families read alias unit spellings, such as
+  uppercase `[KM**3/S**2]` in OPM and OMM; see the family records.
+- **Defaults:** omitted optional fields remain absent in the model. Validators may use an explicit
+  book default to interpret them; writers may emit that default when the target requires it, as a
+  documented normalization. Present, empty XML elements with an explicit schema default use that
+  default (TDM numeric defaults and `DATA_QUALITY=RAW`); this does not populate omitted optional
+  fields. CDM's documented producer compatibility accepts empty/nil optional numeric, epoch, and
+  enum XML leaves only when they carry no meaningful payload; generation omits absent values.
 
 Each rule is implemented at the narrowest shared boundary. Family records identify exceptions,
 book defaults, and edition-specific restrictions; callers do not select a stricter or looser mode.
@@ -107,8 +140,8 @@ Parsing and conversion preserve the supported model with the documented normaliz
 they are not byte-preserving archival operations or a guarantee of exact model equality across
 notations. Whitespace, numeric spelling, and optional fixed-unit annotations may change.
 
-- Floating-point fields use `f64`. Ordinary KVN numbers must fit their family's 16-digit format;
-  writers round values requiring 17 significant digits to at most 16. Generation refuses rounding
+- Floating-point fields use `f64`. Readers accept longer mantissas; KVN writers emit at most 16
+  significant digits, rounding values that need 17. Generation refuses rounding
   that invalidates a model constraint, such as a positive-definite covariance. XML can
   retain the full double representation. KVN rejects non-finite values and magnitudes whose
   rounded spelling would overflow. TDM phase counts follow the book's specific arbitrary-precision
@@ -118,12 +151,14 @@ notations. Whitespace, numeric spelling, and optional fixed-unit annotations may
 - Fixed-unit annotations may be omitted or canonicalized without changing the measurement's
   unit or applying a conversion. Optional XML annotations cannot always survive unitless KVN.
 - Comment text and order are retained subject to documented whitespace normalization. Where KVN
-  has fewer comment positions, a family either documents a canonical merge (OPM data/state-vector
-  or OMM data/mean-elements comments) or refuses conversion (for example, CDM and RDM associations).
-  Shared `UserDefined.entries` retains comment/parameter interleaving in XML. Its `Comment` and
+  has fewer comment positions, a family either documents a canonical merge (OPM data/state-vector,
+  OMM data/mean-elements, CDM nested data, and RDM data/atmospheric comments) or refuses
+  conversion (for example, RDM comment-only optional blocks).
+  Shared `UserDefined.entries` retains comment/parameter interleaving in XML. ACM also represents
+  interleaved USER comments in KVN (ADM §5.3.10.5); other families retain their own block rules. Its `Comment` and
   `Parameter` variants preserve both order and exact parameter names, including names beginning
-  with `USER_DEFINED_`. KVN requires comments at the beginning of the logical block, so conversion
-  refuses interleaved comments rather than relocating them.
+  with `USER_DEFINED_`. Outside ACM, shared user-defined KVN blocks require comments at the
+  beginning; conversion refuses interleaved comments rather than relocating them.
 - Documented aliases normalize to the same model meaning; for example, ACM KVN `RATE_TYPE=NONE`
   means no rate columns and generates as an omitted `RATE_TYPE`. RDM accepts the compatibility
   `MASS-LOSS + BREAKUP` alias and generates `MASS-LOSS + BREAK-UP`.
@@ -211,4 +246,28 @@ decisions are recorded beside the rule they govern in the applicable family docu
 summarized in [the support matrix](../support-matrix.md). Deliberate alias behavior (accepted
 versus advertised spellings) is documented beside its `FromStr` implementation in
 `ccsds-ndm/src/types.rs`; the OPM KVN ordering rationale lives beside `OPM_KVN_BLOCKS` in
-`ccsds-ndm/src/messages/opm.rs`.
+`ccsds-ndm/src/messages/opm/kvn.rs`.
+
+## Integer storage limits
+
+Integer fields retain the native width declared by their Rust model: signed `i32` values
+range from −2,147,483,648 through 2,147,483,647; `u32` values from 0 through 4,294,967,295;
+`u64` values from 0 through 18,446,744,073,709,551,615. Field-specific positivity, edition,
+and notation bounds still apply. These are storage limits on parsing and construction in
+both Rust and Python, including XML fields whose XSD integer type has no upper bound;
+out-of-range values fail rather than truncate or wrap. For example, TDM interpolation
+degree uses `u32`, TDM Doppler-count scale uses `u64`, and shared CDM/RDM observation and
+track counts use positive `u32`. Python's unbounded `int` does not expand these domains.
+TDM phase counts are decimal strings and retain their separately documented arbitrary precision.
+
+## OPM and OMM elapsed-time profile
+
+OPM and OMM retain public `CalendarEpoch` fields. Epochs must have real calendar/ordinal
+fields even when `TIME_SYSTEM` is MET or MRT. The full elapsed ordinal syntax of ODM
+§3.2.3.2, including day `000` and days beyond the indicated year's calendar length, is
+not supported by these two families. Calendar-field-valid elapsed spellings are retained
+with their declared time system; no time-scale conversion or relabeling is performed.
+This is a library profile restriction, not an XSD restriction. Keeping the calendar-field
+contract avoids changing the shared state-vector and mean-elements APIs in this release.
+OEM separately supports contextual MET/MRT elapsed fields. The regression
+`conformance::values::opm_and_omm_elapsed_time_profile_is_explicit` records the OPM/OMM boundary.

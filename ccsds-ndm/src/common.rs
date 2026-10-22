@@ -68,14 +68,15 @@ impl crate::traits::Validate for NdmHeader {
     }
 }
 
+/// Common APM, AEM and ACM header (ADM §§3.2.2, 4.2.2 and 5.3.2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct AdmHeader {
-    /// User-defined comments. (See 7.8 for formatting rules.)
+    /// User-defined comments. (See ADM 6.10 for formatting and placement rules.)
     ///
     /// **Examples**: This is a comment
     ///
-    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
+    /// **CCSDS Reference**: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default)]
     pub comment: Vec<String>,
@@ -84,14 +85,14 @@ pub struct AdmHeader {
     ///
     /// **Examples**: SBU, ‘Operator-proprietary data; secondary distribution not permitted’
     ///
-    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
+    /// **CCSDS Reference**: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classification: Option<String>,
     /// File creation date/time in UTC. (For format specification, see 6.8.9.)
     ///
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
-    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
+    /// **CCSDS Reference**: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
     pub creation_date: CalendarEpoch,
     /// Creating agency or operator. Select from the accepted set of values indicated in annex B,
     /// subsection B1 from the ‘Abbreviation’ column (when present), or the ‘Name’ column when an
@@ -100,15 +101,15 @@ pub struct AdmHeader {
     ///
     /// **Examples**: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
     ///
-    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
+    /// **CCSDS Reference**: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
     #[builder(into)]
     pub originator: String,
     /// ID that uniquely identifies a message from a given originator. The format and content of
     /// the message identifier value are at the discretion of the originator.
     ///
-    /// **Examples**: APM_201113719185, ABC-12_34
+    /// **Examples**: 201113719185, ABC-12_34
     ///
-    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
+    /// **CCSDS Reference**: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub message_id: Option<String>,
@@ -295,6 +296,26 @@ pub struct SpacecraftParameters {
     pub drag_coeff: Option<NonNegativeDouble>,
 }
 
+impl SpacecraftParameters {
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        if self.mass.is_none()
+            && self.solar_rad_area.is_none()
+            && self.solar_rad_coeff.is_none()
+            && self.drag_area.is_none()
+            && self.drag_coeff.is_none()
+        {
+            return Err(ValidationError::invalid_value(
+                "spacecraftParameters",
+                "no parameters",
+                "at least one parameter to preserve the block and its comments in KVN",
+            )
+            .at_path("body.segment.data.spacecraft_parameters")
+            .into());
+        }
+        Ok(())
+    }
+}
+
 impl crate::traits::Validate for SpacecraftParameters {
     fn validate(&self) -> Result<()> {
         for (field, value) in [
@@ -340,6 +361,11 @@ impl crate::traits::Validate for SpacecraftParameters {
     }
 }
 
+/// Orbit-determination spans, observation counts, and residual statistics shared by CDM/RDM.
+///
+/// Counts are positive when supplied, following the XSD in all notations. Last-observation
+/// endpoints remain lexical epochs; validation does not compare their order.
+/// CCSDS 508.0-B-1 section 3.5.2 and CCSDS 508.1-B-1 section 3.5.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OdParameters {
@@ -553,16 +579,22 @@ pub struct StateVectorAcc {
 }
 
 // Quaternion (components each in [-1, 1])
+/// Rotation quaternion in vector-first order (ADM annex F).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct Quaternion {
+    /// First vector component, e1 * sin(phi/2) (ADM annex F).
     pub q1: f64,
+    /// Second vector component, e2 * sin(phi/2) (ADM annex F).
     pub q2: f64,
+    /// Third vector component, e3 * sin(phi/2) (ADM annex F).
     pub q3: f64,
+    /// Scalar component, cos(phi/2) (ADM annex F).
     pub qc: f64,
 }
 
 impl Quaternion {
+    /// Construct a quaternion with finite components in [-1, 1]; full validation also checks its norm.
     pub fn new(q1: f64, q2: f64, q3: f64, qc: f64) -> crate::error::Result<Self> {
         let quaternion = Self { q1, q2, q3, qc };
         quaternion.validate_components()?;
@@ -605,22 +637,29 @@ impl crate::traits::Validate for Quaternion {
     }
 }
 
-// Quaternion derivative (dot components with units 1/s)
-// Quaternion derivative (dot components with units 1/s)
+/// Complete quaternion time-derivative vector in 1/s (ADM table 3-3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionDot {
+    /// Time derivative of Q1, in 1/s (ADM table 3-3).
     pub q1_dot: QuaternionDotComponent,
+    /// Time derivative of Q2, in 1/s (ADM table 3-3).
     pub q2_dot: QuaternionDotComponent,
+    /// Time derivative of Q3, in 1/s (ADM table 3-3).
     pub q3_dot: QuaternionDotComponent,
+    /// Time derivative of QC, in 1/s (ADM table 3-3).
     pub qc_dot: QuaternionDotComponent,
 }
 
 // Angular velocity triple (ANGVEL_X/Y/Z)
+/// Angular-velocity components in degrees per second (ADM table 4-4).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct AngularVelocity {
+    /// Angular velocity about the X axis, in deg/s (ADM table 4-4).
     pub x: AngleRate,
+    /// Angular velocity about the Y axis, in deg/s (ADM table 4-4).
     pub y: AngleRate,
+    /// Angular velocity about the Z axis, in deg/s (ADM table 4-4).
     pub z: AngleRate,
 }
 
@@ -1639,8 +1678,11 @@ impl ToKvn for SpinNutationMom {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AngVel {
+    /// Angular velocity about the X axis, in deg/s (ADM table 4-4).
     pub angvel_x: AngleRate,
+    /// Angular velocity about the Y axis, in deg/s (ADM table 4-4).
     pub angvel_y: AngleRate,
+    /// Angular velocity about the Z axis, in deg/s (ADM table 4-4).
     pub angvel_z: AngleRate,
 }
 
@@ -1654,10 +1696,10 @@ impl ToKvn for QuaternionState {
         writer.write_odm_float_pair("Q3", self.quaternion.q3);
         writer.write_odm_float_pair("QC", self.quaternion.qc);
         if let Some(dot) = &self.quaternion_dot {
-            writer.write_odm_float_pair("Q1_DOT", dot.q1_dot.value);
-            writer.write_odm_float_pair("Q2_DOT", dot.q2_dot.value);
-            writer.write_odm_float_pair("Q3_DOT", dot.q3_dot.value);
-            writer.write_odm_float_pair("QC_DOT", dot.qc_dot.value);
+            writer.write_odm_float_measure("Q1_DOT", &dot.q1_dot);
+            writer.write_odm_float_measure("Q2_DOT", &dot.q2_dot);
+            writer.write_odm_float_measure("Q3_DOT", &dot.q3_dot);
+            writer.write_odm_float_measure("QC_DOT", &dot.qc_dot);
         }
     }
 }
@@ -1672,16 +1714,16 @@ impl crate::traits::Validate for EulerAngleState {
         }
 
         for (field, angle) in [
-            ("EULER_ANGLE_1", &self.angle_1),
-            ("EULER_ANGLE_2", &self.angle_2),
-            ("EULER_ANGLE_3", &self.angle_3),
+            ("ANGLE_1", &self.angle_1),
+            ("ANGLE_2", &self.angle_2),
+            ("ANGLE_3", &self.angle_3),
         ] {
             Angle::validate_value(angle.value, field)?;
         }
         for (field, rate) in [
-            ("EULER_ANGLE_1_DOT", &self.angle_1_dot),
-            ("EULER_ANGLE_2_DOT", &self.angle_2_dot),
-            ("EULER_ANGLE_3_DOT", &self.angle_3_dot),
+            ("ANGLE_1_DOT", &self.angle_1_dot),
+            ("ANGLE_2_DOT", &self.angle_2_dot),
+            ("ANGLE_3_DOT", &self.angle_3_dot),
         ] {
             if let Some(rate) = rate {
                 require_finite(field, rate.value)?;
@@ -2942,7 +2984,7 @@ pub struct RdmSpacecraftParameters {
     pub hazardous_substances: Option<String>,
     /// Object area exposed to Solar Radiation Pressure (SRP).
     ///
-    /// **Units**: m²
+    /// **Units**: m**2
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2954,7 +2996,7 @@ pub struct RdmSpacecraftParameters {
     pub solar_rad_coeff: Option<NonNegativeDouble>,
     /// Object cross-sectional area.
     ///
-    /// **Units**: m²
+    /// **Units**: m**2
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2966,14 +3008,14 @@ pub struct RdmSpacecraftParameters {
     pub drag_coeff: Option<NonNegativeDouble>,
     /// Object radar cross section.
     ///
-    /// **Units**: m²
+    /// **Units**: m**2
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rcs: Option<Area>,
     /// Object ballistic coefficient.
     ///
-    /// **Units**: kg/m²
+    /// **Units**: kg/m**2
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2981,7 +3023,7 @@ pub struct RdmSpacecraftParameters {
     /// The object’s acceleration due to in-track thrust used to propagate the state vector and
     /// covariance to NOMINAL_RENTRY_EPOCH (if a controlled re-entry).
     ///
-    /// **Units**: m/s²
+    /// **Units**: m/s**2
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]

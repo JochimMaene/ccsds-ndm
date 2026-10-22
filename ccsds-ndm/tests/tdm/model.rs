@@ -2,7 +2,7 @@ use ccsds_ndm::messages::tdm::{TdmBody, TdmObservationData};
 use ccsds_ndm::Validate;
 
 #[test]
-fn doppler_counts_are_integral_and_indexed_observations_require_their_participant() {
+fn doppler_counts_are_integral_and_only_phase_counts_require_their_participant() {
     use ccsds_ndm::messages::tdm::Tdm;
     use ccsds_ndm::Ndm;
     let mut message = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e1.kvn")).unwrap();
@@ -16,15 +16,18 @@ fn doppler_counts_are_integral_and_indexed_observations_require_their_participan
     }
     message.body.segments[0].data.observations[0].data = TdmObservationData::DopplerCount(0.5);
     crate::common::assert_rejects(&message, "DOPPLER_COUNT");
-    for key in [
-        "RECEIVE_FREQ_5",
-        "RECEIVE_PHASE_CT_5",
-        "TRANSMIT_FREQ_5",
-        "TRANSMIT_FREQ_RATE_5",
-        "TRANSMIT_PHASE_CT_5",
-    ] {
+    // TDM §§3.5.2.8-3.5.2.10 index frequencies by downlink/transmitter, not by participant.
+    for key in ["RECEIVE_FREQ_5", "TRANSMIT_FREQ_5", "TRANSMIT_FREQ_RATE_5"] {
         message.body.segments[0].data.observations[0].data =
             TdmObservationData::from_key_val(key, "1").unwrap();
+        message.validate().unwrap();
+    }
+    // §§3.5.2.11-3.5.2.12 tie phase counts to PARTICIPANT_n; an empty XML participant names none.
+    for key in ["RECEIVE_PHASE_CT_5", "TRANSMIT_PHASE_CT_5"] {
+        message.body.segments[0].data.observations[0].data =
+            TdmObservationData::from_key_val(key, "1").unwrap();
+        crate::common::assert_rejects(&message, key);
+        message.body.segments[0].metadata.participant_5 = Some(" ".into());
         crate::common::assert_rejects(&message, key);
         message.body.segments[0].metadata.participant_5 = Some("receiver-five".into());
         let kvn = message.to_kvn().unwrap();
@@ -202,15 +205,18 @@ fn exact_phase_counts_survive_both_notations_without_floating_point() {
                 message.body.segments[0].metadata.participant_5 = Some("P5".into());
                 message.body.segments[0].data.observations[0].data =
                     TdmObservationData::from_key_val(&key, value).unwrap();
-                let kvn = message.to_kvn().unwrap();
                 let xml = message.to_xml().unwrap();
-                assert!(kvn.contains(value));
                 assert!(xml.contains(value));
-                assert_eq!(Tdm::from_kvn(&kvn).unwrap(), message);
                 assert_eq!(Tdm::from_xml(&xml).unwrap(), message);
-                assert!(convert(&xml, ccsds_ndm::Notation::Kvn)
-                    .unwrap()
-                    .contains(value));
+                // The exponent spelling is XML-only (TDM 4.3.11); see the parsing test.
+                if !value.contains('e') {
+                    let kvn = message.to_kvn().unwrap();
+                    assert!(kvn.contains(value));
+                    assert_eq!(Tdm::from_kvn(&kvn).unwrap(), message);
+                    assert!(convert(&xml, ccsds_ndm::Notation::Kvn)
+                        .unwrap()
+                        .contains(value));
+                }
                 assert_eq!(
                     message.body.segments[0].data.observations[0].data.value(),
                     None
@@ -255,27 +261,4 @@ fn tdm_open_metadata_domains_refuse_only_unrepresentable_xml() {
     }
     message.body.segments[0].metadata.data_types = Some("RANGE, TRANSMIT_FREQ_n".into());
     message.validate().unwrap();
-}
-
-#[test]
-fn xml_metadata_enumerations_keep_their_case_sensitive_domain() {
-    use ccsds_ndm::messages::tdm::Tdm;
-    use ccsds_ndm::Ndm;
-    let baseline = include_str!("../../data/kvn/tdm_e1.kvn");
-    for (field, value) in [("ANGLE_TYPE", "AZEL"), ("REFERENCE_FRAME", "EME2000")] {
-        let mut message = Tdm::from_kvn(baseline).unwrap();
-        let metadata = &mut message.body.segments[0].metadata;
-        if field == "ANGLE_TYPE" {
-            metadata.angle_type = Some(value.parse().unwrap());
-        } else {
-            metadata.reference_frame = Some(value.parse().unwrap());
-        }
-        let xml = message.to_xml().unwrap();
-        let lower = xml.replace(
-            &format!("<{field}>{value}"),
-            &format!("<{field}>{}", value.to_ascii_lowercase()),
-        );
-        assert_ne!(xml, lower);
-        assert!(Tdm::from_xml(&lower).is_err());
-    }
 }

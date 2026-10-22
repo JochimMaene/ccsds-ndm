@@ -81,7 +81,11 @@ fn generation_diagnostics_identify_the_message_and_field() {
     let mut invalid = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
     invalid.body.segment[0].metadata.object_name.clear();
     for error in [invalid.to_kvn().unwrap_err(), invalid.to_xml().unwrap_err()] {
-        assert_eq!(error.code(), Some("validation.missing_required_field"));
+        assert_eq!(error.code(), Some("validation.invalid_value"));
+        assert!(
+            error.to_string().contains("OBJECT_NAME is empty"),
+            "{error}"
+        );
         assert_eq!(
             error.field_path().as_deref(),
             Some("body.segment[0].metadata.object_name")
@@ -114,7 +118,7 @@ fn kvn_generation_rejects_overlapping_useable_spans() {
 fn kvn_rounds_to_the_ccsds_digit_limit() {
     let mut message = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
     message.body.segment[0].data.state_vector[0].x.value = 1.234_567_890_123_456_7;
-    assert!(message.to_kvn().unwrap().contains("1.234567890123457e0"));
+    assert!(message.to_kvn().unwrap().contains("1.234567890123457"));
     message.to_xml().expect("XML retains the exact f64 value");
 }
 

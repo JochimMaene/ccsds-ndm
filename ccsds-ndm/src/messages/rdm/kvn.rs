@@ -45,7 +45,7 @@ pub fn rdm_header(input: &mut &str) -> KvnResult<RdmHeader> {
         let checkpoint = input.checkpoint();
         comment.extend(collect_comments.parse_next(input)?);
 
-        let key = match keyword.parse_next(input) {
+        let key = match winnow::combinator::preceded(ws, keyword).parse_next(input) {
             Ok(k) => k,
             Err(_) => {
                 input.reset(&checkpoint);
@@ -441,7 +441,10 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         None
     };
 
-    let have_cov = cx_x.is_some()
+    // A lone COV_REF_FRAME (and its comments) opens the block too, so it is reported as an
+    // incomplete matrix instead of being dropped.
+    let have_cov = cov_ref_frame.is_some()
+        || cx_x.is_some()
         || cy_x.is_some()
         || cy_y.is_some()
         || cz_x.is_some()
@@ -522,6 +525,10 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         user_defined
             .entries
             .extend(loop_comments.into_iter().map(UserDefinedEntry::Comment));
+        if value_is_absent(key, input) {
+            skip_record(input);
+            continue;
+        }
         let v = kv_string.parse_next(input)?;
         user_defined
             .entries
@@ -802,6 +809,7 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
 
 impl ToKvn for Rdm {
     fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.always_write_units();
         writer.write_pair("CCSDS_RDM_VERS", &self.version);
         self.header.write_kvn(writer);
         self.body.write_kvn(writer);
@@ -912,19 +920,60 @@ impl ToKvn for RdmMetadata {
 }
 
 impl Rdm {
+    /// Refuse model states that flattened KVN cannot hold. XML `<data>` comments need no
+    /// refusal: they are merged into the atmospheric block's leading comments (see
+    /// [`RdmData::comment`]).
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
-        if !self.body.segment.data.comment.is_empty() {
-            return Err(crate::error::ValidationError::Generic {
-                message: "RDM XML data-level COMMENT cannot be represented distinctly from the first KVN logical-block COMMENT".into(),
-                line: None,
-            }
-            .into());
-        }
-        if let Some(parameters) = &self.body.segment.data.user_defined_parameters {
-            parameters.validate_kvn_representability()?;
-            if parameters.parameters().next().is_none() {
+        let data = &self.body.segment.data;
+        // KVN attaches a comment to the block of the keyword that follows it, so the comments of
+        // a block without values would move to the next block or trail the message.
+        let comment_only = [
+            data.ground_impact_parameters.as_ref().is_some_and(|g| {
+                !g.comment.is_empty()
+                    && GroundImpactParameters {
+                        comment: Vec::new(),
+                        ..g.clone()
+                    } == GroundImpactParameters::default()
+            }),
+            data.spacecraft_parameters.as_ref().is_some_and(|p| {
+                !p.comment.is_empty()
+                    && RdmSpacecraftParameters {
+                        comment: Vec::new(),
+                        ..p.clone()
+                    } == RdmSpacecraftParameters::default()
+            }),
+            data.od_parameters.as_ref().is_some_and(|p| {
+                !p.comment.is_empty()
+                    && OdParameters {
+                        comment: Vec::new(),
+                        ..p.clone()
+                    } == OdParameters::default()
+            }),
+        ];
+        for (block, refused) in [
+            "groundImpactParameters",
+            "spacecraftParameters",
+            "odParameters",
+        ]
+        .into_iter()
+        .zip(comment_only)
+        {
+            if refused {
                 return Err(crate::error::ValidationError::Generic {
-                    message: "RDM KVN cannot retain a user-defined block without a parameter"
+                    message: format!(
+                        "RDM KVN cannot retain the COMMENT of a {block} block that has no values"
+                    )
+                    .into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        if let Some(parameters) = &data.user_defined_parameters {
+            parameters.validate_kvn_representability()?;
+            if parameters.parameters().next().is_none() && !parameters.entries.is_empty() {
+                return Err(crate::error::ValidationError::Generic {
+                    message: "RDM KVN cannot retain the COMMENT of a userDefinedParameters block that has no parameter"
                         .into(),
                     line: None,
                 }
@@ -1002,16 +1051,16 @@ impl RdmData {
                 writer.write_odm_float_measure("ACTUAL_OD_SPAN", &v.to_unit_value());
             }
             if let Some(v) = &od.obs_available {
-                writer.write_pair("OBS_AVAILABLE", v);
+                writer.write_integer_pair("OBS_AVAILABLE", v);
             }
             if let Some(v) = &od.obs_used {
-                writer.write_pair("OBS_USED", v);
+                writer.write_integer_pair("OBS_USED", v);
             }
             if let Some(v) = &od.tracks_available {
-                writer.write_pair("TRACKS_AVAILABLE", v);
+                writer.write_integer_pair("TRACKS_AVAILABLE", v);
             }
             if let Some(v) = &od.tracks_used {
-                writer.write_pair("TRACKS_USED", v);
+                writer.write_integer_pair("TRACKS_USED", v);
             }
             if let Some(v) = &od.residuals_accepted {
                 writer.write_odm_float_measure("RESIDUALS_ACCEPTED", &v.to_unit_value());

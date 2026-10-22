@@ -19,7 +19,7 @@ fn tle_parameters_validate_dispatches_on_theory() {
     let mut conflicting = base();
     conflicting.bstar = Some(BStar::new(0.0001, None));
     conflicting.bterm = Some(M2kg::new(0.01, None));
-    let error = conflicting.validate("SGP4").unwrap_err();
+    let error = conflicting.validate("SGP4", "3.0").unwrap_err();
     assert!(error.as_validation_error().is_some_and(|error| {
         matches!(error, ValidationError::Conflict { fields, .. }
                 if fields.iter().any(|field| field.as_ref() == "BSTAR")
@@ -29,7 +29,7 @@ fn tle_parameters_validate_dispatches_on_theory() {
     let mut conflicting = base();
     conflicting.mean_motion_ddot = Some(MeanMotionDDot::new(0.0, None));
     conflicting.agom = Some(M2kg::new(0.001, None));
-    let error = conflicting.validate("SGP").unwrap_err();
+    let error = conflicting.validate("SGP", "3.0").unwrap_err();
     assert!(error.as_validation_error().is_some_and(|error| {
         matches!(error, ValidationError::Conflict { fields, .. }
                 if fields.iter().any(|field| field.as_ref() == "MEAN_MOTION_DDOT")
@@ -37,13 +37,13 @@ fn tle_parameters_validate_dispatches_on_theory() {
     }));
 
     // An unrecognised theory imposes nothing beyond the conflict rules.
-    assert!(base().validate("UNKNOWN").is_ok());
+    assert!(base().validate("UNKNOWN", "3.0").is_ok());
 
     let mut satisfied = base();
     satisfied.bterm = Some(M2kg::new(0.01, None));
     satisfied.agom = Some(M2kg::new(1.0, None));
     satisfied
-        .validate("SGP4-XP")
+        .validate("SGP4-XP", "3.0")
         .expect("BTERM and AGOM satisfy SGP4-XP");
 }
 

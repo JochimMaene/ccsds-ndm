@@ -597,7 +597,7 @@ fn opm_kvn_rounds_values_that_need_seventeen_digits() {
     message.body.segment.data.state_vector.x.value = 1.234_567_890_123_456_7;
 
     let generated = message.to_kvn().expect("finite value should be rounded");
-    assert!(generated.contains("X                    = 1.234567890123457e0"));
+    assert!(generated.contains("X                    = 1.234567890123457"));
 
     let mut output = Vec::new();
     message
@@ -680,7 +680,7 @@ fn opm_kvn_rounds_numbers_in_every_optional_numeric_block() {
         assert!(message
             .to_kvn()
             .expect("finite value should be rounded")
-            .contains("1.234567890123457e0"));
+            .contains("1.234567890123457"));
         message
             .to_xml()
             .expect("the KVN-specific precision rule must not affect XML");
@@ -1148,25 +1148,4 @@ fn minimal_kvn_omits_optional_keplerian_elements() {
     let kvn = opm.to_kvn().unwrap();
     assert!(!kvn.contains("SEMI_MAJOR_AXIS"));
     assert!(opm.validate().is_ok());
-}
-
-#[test]
-fn zero_gm_is_book_valid_kvn_but_not_xml() {
-    let mut message = Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).unwrap();
-    message
-        .body
-        .segment
-        .data
-        .keplerian_elements
-        .as_mut()
-        .unwrap()
-        .gm
-        .value = 0.0;
-    message.validate().unwrap();
-    let kvn = message.to_kvn().unwrap();
-    assert_eq!(Opm::from_kvn(&kvn).unwrap(), message);
-    assert!(message.to_xml().is_err());
-    let mut bytes = Vec::new();
-    assert!(message.write_xml_to(&mut bytes).is_err());
-    assert!(bytes.is_empty());
 }

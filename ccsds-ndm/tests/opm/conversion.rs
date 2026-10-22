@@ -32,7 +32,7 @@ fn xml_to_kvn_rounds_values_to_the_ccsds_digit_limit() {
 
     let kvn = convert(&xml, Notation::Kvn)
         .expect("finite XML value should round to a conforming KVN value");
-    assert!(kvn.contains("X                    = 1.234567890123457e0"));
+    assert!(kvn.contains("X                    = 1.234567890123457"));
 }
 
 /// KVN has one comment slot ahead of `EPOCH`, so `data.COMMENT` and `stateVector.COMMENT` are

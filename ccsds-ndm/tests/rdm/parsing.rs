@@ -7,8 +7,10 @@ use ccsds_ndm::Ndm;
 
 #[test]
 fn disintegration_alias_is_accepted_and_generates_schema_spelling() {
-    let message = Rdm::from_xml(XML).unwrap();
-    assert!(XML.contains("MASS-LOSS + BREAKUP"));
+    // `MASS-LOSS + BREAKUP` is a tolerated transcription variant, in neither the book nor the XSD.
+    let alias = mutated(XML, "MASS-LOSS + BREAK-UP", "MASS-LOSS + BREAKUP");
+    let message = Rdm::from_xml(&alias).unwrap();
+    assert_eq!(message, Rdm::from_xml(XML).unwrap());
     let xml = message.to_xml().unwrap();
     let kvn = message.to_kvn().unwrap();
     assert!(xml.contains("MASS-LOSS + BREAK-UP"));
@@ -16,7 +18,123 @@ fn disintegration_alias_is_accepted_and_generates_schema_spelling() {
     crate::common::validate_xml("RDM canonical disintegration", &xml);
     assert_eq!(Rdm::from_xml(&xml).unwrap(), message);
     assert_eq!(Rdm::from_kvn(&kvn).unwrap(), message);
+    // The diagnostic advertises only the book spellings.
+    let error = Rdm::from_xml(&mutated(XML, "MASS-LOSS + BREAK-UP", "BOTH"))
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("MASS-LOSS + BREAK-UP"), "{error}");
+    assert!(!error.contains("BREAKUP"), "{error}");
 }
+
+#[test]
+fn rdm_kvn_method_enums_accept_lowercase_and_reject_invented_values() {
+    const DISINTEGRATION: &str = "REENTRY_DISINTEGRATION = MASS-LOSS + BREAK-UP\n";
+    let with = |keyword: &str, value: &str| {
+        let line = format!("{keyword} = {value}\n");
+        match keyword {
+            "REENTRY_DISINTEGRATION" => mutated(KVN, DISINTEGRATION, &line),
+            "REENTRY_UNCERTAINTY_METHOD" => mutated(KVN, DISINTEGRATION, &(line + DISINTEGRATION)),
+            _ => mutated(KVN, DISINTEGRATION, &(DISINTEGRATION.to_owned() + &line)),
+        }
+    };
+    for (keyword, value, canonical) in [
+        (
+            "REENTRY_DISINTEGRATION",
+            "mass-loss + break-up",
+            "MASS-LOSS + BREAK-UP",
+        ),
+        ("REENTRY_UNCERTAINTY_METHOD", "stochastic", "STOCHASTIC"),
+        ("IMPACT_UNCERTAINTY_METHOD", "empirical", "EMPIRICAL"),
+    ] {
+        let output = Rdm::from_kvn(&with(keyword, value))
+            .unwrap()
+            .to_kvn()
+            .unwrap();
+        assert!(output.contains(&format!("= {canonical}\n")), "{keyword}");
+    }
+    // XSD 4.0 lists only NONE, ANALYTICAL, STOCHASTIC, EMPIRICAL (audit 2.2).
+    for keyword in ["REENTRY_UNCERTAINTY_METHOD", "IMPACT_UNCERTAINTY_METHOD"] {
+        for invented in ["COVARIANCE", "STATISTICAL"] {
+            assert!(
+                Rdm::from_kvn(&with(keyword, invented)).is_err(),
+                "{keyword} = {invented}"
+            );
+        }
+    }
+}
+
+#[test]
+fn rdm_kvn_lone_cov_ref_frame_is_an_incomplete_covariance() {
+    // Audit 2.5: a COV_REF_FRAME without matrix used to be dropped with its comment.
+    let kvn: String = KVN
+        .lines()
+        .filter(|line| {
+            !(line.starts_with("CX_") || line.starts_with("CY_") || line.starts_with("CZ_"))
+        })
+        .map(|line| format!("{line}\n"))
+        .collect();
+    assert!(kvn.contains("COV_REF_FRAME = RTN"));
+    let error = Rdm::from_kvn(&kvn).unwrap_err().to_string();
+    assert!(error.contains("CX_X"), "{error}");
+}
+
+#[test]
+fn rdm_xml_empty_optional_blocks_read_as_absent_and_comment_only_blocks_are_refused_for_kvn() {
+    let mut xml = XML.to_string();
+    for (start, end) in [
+        ("<groundImpactParameters>", "</groundImpactParameters>"),
+        ("<spacecraftParameters>", "</spacecraftParameters>"),
+        ("<odParameters>", "</odParameters>"),
+    ] {
+        let a = xml.find(start).unwrap() + start.len();
+        let b = xml.find(end).unwrap();
+        xml.replace_range(a..b, "");
+    }
+    let message = Rdm::from_xml(&xml).unwrap();
+    let data = &message.body.segment.data;
+    assert!(data.ground_impact_parameters.is_none());
+    assert!(data.spacecraft_parameters.is_none());
+    assert!(data.od_parameters.is_none());
+    assert_eq!(
+        Rdm::from_kvn(&message.to_kvn().unwrap()).unwrap().body,
+        message.body
+    );
+
+    for block in [
+        "groundImpactParameters",
+        "spacecraftParameters",
+        "odParameters",
+    ] {
+        let input = xml.replace(
+            &format!("<{block}></{block}>"),
+            &format!("<{block}><COMMENT>orphan</COMMENT></{block}>"),
+        );
+        let message = Rdm::from_xml(&input).unwrap();
+        let error = message.to_kvn().unwrap_err().to_string();
+        assert!(error.contains(block), "{error}");
+        let mut output = Vec::new();
+        assert!(message.write_kvn_to(&mut output).is_err());
+        assert!(output.is_empty());
+    }
+}
+
+#[test]
+fn rdm_kvn_always_displays_the_fixed_units() {
+    // RDM 5.2.4.1: applicable units "must be displayed", even when XML omitted the optional attribute.
+    let xml = XML
+        .replace(" units=\"kg\"", "")
+        .replace(" units=\"km**2\"", "");
+    let message = Rdm::from_xml(&xml).unwrap();
+    let kvn = message.to_kvn().unwrap();
+    assert!(kvn.contains("[kg]\n"), "{kvn}");
+    assert!(
+        kvn.lines()
+            .filter(|l| l.starts_with("CX_X"))
+            .all(|l| l.ends_with("[km**2]")),
+        "{kvn}"
+    );
+}
+
 #[test]
 fn rdm_root_attributes() {
     let kvn = r#"CCSDS_RDM_VERS = 1.0
@@ -156,6 +274,13 @@ REENTRY_ALTITUDE = 80 [km]
             obj_type
         );
     }
+    // RDM 5.3.3.4: an underscore in a text value is equivalent to a blank (Orekit writes it).
+    let kvn = crate::common::mutated(
+        KVN,
+        "OBJECT_TYPE = ROCKET BODY",
+        "OBJECT_TYPE = ROCKET_BODY",
+    );
+    assert_eq!(Rdm::from_kvn(&kvn).unwrap(), Rdm::from_kvn(KVN).unwrap());
 }
 
 #[test]
@@ -930,5 +1055,66 @@ fn all_normative_line_endings_preserve_the_message() {
     for ending in ["\n", "\r", "\r\n", "\n\r"] {
         let input = crate::KVN.replace('\n', ending);
         assert_eq!(Rdm::from_kvn(&input).unwrap(), expected, "{ending:?}");
+    }
+}
+
+#[test]
+fn rdm_range_errors_name_the_keyword_in_both_notations() {
+    // Audit 6.4: errors used to name Rust types ('Probability', 'PositiveInteger', ...).
+    let cases = [
+        ("PROBABILITY_OF_IMPACT = 0.0", "PROBABILITY_OF_IMPACT = 1.5", "PROBABILITY_OF_IMPACT"),
+        ("TRACKS_USED = 17", "TRACKS_USED = 0", "TRACKS_USED"),
+        (
+            "PROBABILITY_OF_BURN_UP = 1.0",
+            "PROBABILITY_OF_BURN_UP = 1.0\nIMPACT_REF_FRAME = EFG\nNOMINAL_IMPACT_LON = 181 [deg]\nNOMINAL_IMPACT_LAT = 0 [deg]",
+            "NOMINAL_IMPACT_LON",
+        ),
+        (
+            "REENTRY_WINDOW_END = 2018-04-27T22:12:56",
+            "REENTRY_WINDOW_END = 2018-04-27T22:12:56\nORBIT_LIFETIME_CONFIDENCE_LEVEL = 101 [%]",
+            "ORBIT_LIFETIME_CONFIDENCE_LEVEL",
+        ),
+    ];
+    for (from, to, keyword) in cases {
+        let kvn = KVN.replacen(from, to, 1);
+        let error = Rdm::from_kvn(&kvn).unwrap_err();
+        crate::common::assert_validation_field(&error, keyword);
+    }
+    for (from, to, keyword) in [
+        (
+            ">0.0</PROBABILITY_OF_IMPACT>",
+            ">1.5</PROBABILITY_OF_IMPACT>",
+            "PROBABILITY_OF_IMPACT",
+        ),
+        (">17</TRACKS_USED>", ">0</TRACKS_USED>", "TRACKS_USED"),
+    ] {
+        let error = Rdm::from_xml(&mutated(XML, from, to)).unwrap_err();
+        crate::common::assert_validation_field(&error, keyword);
+    }
+}
+
+#[test]
+fn rdm_empty_mandatory_xml_strings_are_reported_as_empty() {
+    let original = Rdm::from_xml(XML).unwrap().to_xml().unwrap();
+    for keyword in [
+        "ORIGINATOR",
+        "MESSAGE_ID",
+        "OBJECT_NAME",
+        "INTERNATIONAL_DESIGNATOR",
+        "CENTER_NAME",
+        "TIME_SYSTEM",
+    ] {
+        let start_tag = format!("<{keyword}>");
+        let end_tag = format!("</{keyword}>");
+        let start = original.find(&start_tag).unwrap();
+        let end = original[start..].find(&end_tag).unwrap() + start + end_tag.len();
+        let mut xml = original.clone();
+        xml.replace_range(start..end, &format!("<{keyword}/>"));
+        let error = Rdm::from_xml(&xml).unwrap_err();
+        assert_eq!(error.code(), Some("validation.invalid_value"), "{error}");
+        assert!(
+            error.to_string().contains(&format!("{keyword} is empty")),
+            "{error}"
+        );
     }
 }

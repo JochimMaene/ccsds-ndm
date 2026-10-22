@@ -3,8 +3,9 @@ use crate::{KVN, XML};
 use ccsds_ndm::common::{GroundImpactParameters, OdParameters, RdmSpacecraftParameters};
 use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::types::{
-    Area, BallisticCoeff, DayInterval, Distance, LatitudeRequired, LongitudeRequired, Mass, Ms2,
-    NonNegativeDouble, Percentage, PercentageRequired, PositionUnits, PositiveInteger, Probability,
+    Area, BallisticCoeff, DayInterval, DayIntervalRequired, Distance, LatitudeRequired,
+    LongitudeRequired, Mass, Ms2, NonNegativeDouble, Percentage, PercentageRequired, PositionUnits,
+    PositiveInteger, Probability,
 };
 use ccsds_ndm::{Ndm, Validate};
 
@@ -73,7 +74,8 @@ fn edited_reentry_confidence_and_altitudes_are_revalidated() {
         .atmospheric_reentry_parameters
         .reentry_altitude
         .value = -1.0;
-    message.body.segment.metadata.drag_parameters_altitude = Some(Distance::new(-1.0, None));
+    message.body.segment.metadata.drag_parameters_altitude =
+        Some(Distance::new(-1.0, Some(PositionUnits::Km)));
     validate_xml(
         "RDM confidence and signed altitude boundaries",
         &message.to_xml().unwrap(),
@@ -109,7 +111,7 @@ fn rdm_kvn_rounds_scalars_to_sixteen_digits_and_xml_retains_precision() {
     let kvn = message.to_kvn().unwrap();
     for field in ["DRAG_PARAMETERS_ALTITUDE", "DRAG_COEFF", "ORBIT_LIFETIME"] {
         let line = kvn.lines().find(|line| line.starts_with(field)).unwrap();
-        assert!(line.contains("3.0e-1"), "{line}");
+        assert!(line.contains("= 0.3"), "{line}");
         assert!(!line.contains("30000000000000004"), "{line}");
     }
     let reparsed = Rdm::from_kvn(&kvn).unwrap();
@@ -166,16 +168,28 @@ fn rdm_kvn_preserves_each_logical_blocks_comments() {
 }
 
 #[test]
-fn rdm_kvn_rejects_an_xml_only_outer_data_comment_before_writing() {
+fn rdm_kvn_merges_an_xml_outer_data_comment_into_the_atmospheric_block() {
+    // KVN has no `<data>` comment position; decision 7 merges it canonically.
     let mut message = Rdm::from_xml(XML).unwrap();
     message.body.segment.data.comment.push("outer".into());
-    crate::common::assert_validation_field(&message.to_kvn().unwrap_err(), "data-level COMMENT");
+    let kvn = message.to_kvn().unwrap();
     let mut output = Vec::new();
-    crate::common::assert_validation_field(
-        &message.write_kvn_to(&mut output).unwrap_err(),
-        "data-level COMMENT",
+    message.write_kvn_to(&mut output).unwrap();
+    assert_eq!(output, kvn.as_bytes());
+    let reparsed = Rdm::from_kvn(&kvn).unwrap();
+    let data = &reparsed.body.segment.data;
+    assert!(data.comment.is_empty());
+    let atmospheric = &data.atmospheric_reentry_parameters.comment;
+    assert_eq!(atmospheric[0], "outer");
+    assert_eq!(
+        atmospheric[1..],
+        message
+            .body
+            .segment
+            .data
+            .atmospheric_reentry_parameters
+            .comment[..]
     );
-    assert!(output.is_empty());
 }
 
 #[test]
@@ -198,35 +212,29 @@ fn orbit_lifetime_rule_is_enforced_at_every_public_boundary() {
         assert_rejects(&message, "ORBIT_LIFETIME");
     }
 
+    // Decision 5: the XSD `dayIntervalTypeUR` positivity applies in every notation (the book
+    // gives no zero/negative lifetime), and the error names the keyword, not the Rust type.
     for value in ["-1", "0", "NaN", "INF", "-INF"] {
         let kvn = mutated(
             KVN,
             "ORBIT_LIFETIME = 5.5 [d]",
             &format!("ORBIT_LIFETIME = {value} [d]"),
         );
-        if matches!(value, "-1" | "0") {
-            let message = Rdm::from_kvn(&kvn).unwrap();
-            message.validate().unwrap();
-            assert_eq!(Rdm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
-            crate::common::assert_validation_field(
-                &message.to_xml().unwrap_err(),
-                "ORBIT_LIFETIME",
-            );
-            let mut output = Vec::new();
-            assert!(message.write_xml_to(&mut output).is_err());
-            assert!(output.is_empty());
-        } else {
-            assert!(Rdm::from_kvn(&kvn).is_err(), "{value}");
-        }
-
+        let error = Rdm::from_kvn(&kvn).unwrap_err();
+        assert!(error.to_string().contains("ORBIT_LIFETIME"), "{error}");
         let xml = mutated(
             XML,
             "<ORBIT_LIFETIME units=\"d\">5.5</ORBIT_LIFETIME>",
             &format!("<ORBIT_LIFETIME units=\"d\">{value}</ORBIT_LIFETIME>"),
         );
         let error = Rdm::from_xml(&xml).unwrap_err();
-        assert!(error.to_string().contains("DayIntervalRequired"), "{error}");
+        assert!(
+            !error.to_string().contains("DayIntervalRequired"),
+            "{error}"
+        );
+        crate::common::assert_validation_field(&error, "ORBIT_LIFETIME");
     }
+    assert!(ccsds_ndm::types::DayIntervalRequired::new(0.0).is_err());
 }
 
 fn complete_ground_impact_parameters() -> GroundImpactParameters {
@@ -395,14 +403,14 @@ fn ground_impact_dependencies_and_confidence_order_are_enforced() {
 
 fn complete_spacecraft_parameters() -> RdmSpacecraftParameters {
     RdmSpacecraftParameters {
-        wet_mass: Some(Mass::new(1.0, None).unwrap()),
-        dry_mass: Some(Mass::new(1.0, None).unwrap()),
-        solar_rad_area: Some(Area::new(1.0, None).unwrap()),
+        wet_mass: Some(Mass::new(1.0, Some(Default::default())).unwrap()),
+        dry_mass: Some(Mass::new(1.0, Some(Default::default())).unwrap()),
+        solar_rad_area: Some(Area::new(1.0, Some(Default::default())).unwrap()),
         solar_rad_coeff: Some(NonNegativeDouble::new(1.0).unwrap()),
-        drag_area: Some(Area::new(1.0, None).unwrap()),
+        drag_area: Some(Area::new(1.0, Some(Default::default())).unwrap()),
         drag_coeff: Some(NonNegativeDouble::new(1.0).unwrap()),
-        rcs: Some(Area::new(1.0, None).unwrap()),
-        ballistic_coeff: Some(BallisticCoeff::new(1.0, None)),
+        rcs: Some(Area::new(1.0, Some(Default::default())).unwrap()),
+        ballistic_coeff: Some(BallisticCoeff::new(1.0, Some(Default::default()))),
         thrust_acceleration: Some(Ms2::new(1.0)),
         ..Default::default()
     }
@@ -452,13 +460,13 @@ fn edited_rdm_spacecraft_values_are_revalidated_before_output() {
 
 fn complete_od_parameters() -> OdParameters {
     OdParameters {
-        recommended_od_span: Some(DayInterval::new(1.0, None).unwrap()),
-        actual_od_span: Some(DayInterval::new(1.0, None).unwrap()),
+        recommended_od_span: Some(DayInterval::new(1.0, Some(Default::default())).unwrap()),
+        actual_od_span: Some(DayInterval::new(1.0, Some(Default::default())).unwrap()),
         obs_available: Some(PositiveInteger::new(1).unwrap()),
         obs_used: Some(PositiveInteger::new(1).unwrap()),
         tracks_available: Some(PositiveInteger::new(1).unwrap()),
         tracks_used: Some(PositiveInteger::new(1).unwrap()),
-        residuals_accepted: Some(Percentage::new(50.0, None).unwrap()),
+        residuals_accepted: Some(Percentage::new(50.0, Some(Default::default())).unwrap()),
         weighted_rms: Some(NonNegativeDouble::new(1.0).unwrap()),
         ..Default::default()
     }
@@ -858,9 +866,9 @@ EARTH_TIDES = NONE
 INTRACK_THRUST = NO
 DRAG_PARAMETERS_SOURCE = ESTIMATED
 DRAG_PARAMETERS_ALTITUDE = 250.5 [km]
-REENTRY_UNCERTAINTY_METHOD = COVARIANCE
+REENTRY_UNCERTAINTY_METHOD = ANALYTICAL
 REENTRY_DISINTEGRATION = BREAK-UP
-IMPACT_UNCERTAINTY_METHOD = STATISTICAL
+IMPACT_UNCERTAINTY_METHOD = EMPIRICAL
 PREVIOUS_MESSAGE_ID = MSG-PREV-001
 PREVIOUS_MESSAGE_EPOCH = 2022-12-25T00:00:00
 NEXT_MESSAGE_EPOCH = 2023-01-08T00:00:00
@@ -1009,7 +1017,6 @@ fn ordered_user_defined_xml_is_preserved_and_unrepresentable_kvn_is_refused() {
             parameter("SECOND"),
         ],
         vec![UserDefinedEntry::Comment("only a comment".into())],
-        vec![],
     ] {
         message.body.segment.data.user_defined_parameters = Some(UserDefined { entries });
         let xml = message.to_xml().unwrap();
@@ -1032,29 +1039,42 @@ fn ordered_user_defined_xml_is_preserved_and_unrepresentable_kvn_is_refused() {
 }
 
 #[test]
-fn lifetime_window_offsets_keep_xml_positivity_separate_from_finite_kvn() {
-    use ccsds_ndm::types::DayIntervalRequired;
+fn lifetime_window_offsets_are_positive_in_every_notation() {
     for field in ["ORBIT_LIFETIME_WINDOW_START", "ORBIT_LIFETIME_WINDOW_END"] {
         for value in [-1.0, 0.0] {
             let mut message = Rdm::from_kvn(KVN).unwrap();
             let atmospheric = &mut message.body.segment.data.atmospheric_reentry_parameters;
-            let interval = Some(DayIntervalRequired::new(value).unwrap());
+            let interval = Some(DayIntervalRequired {
+                value,
+                units: Default::default(),
+            });
             if field.ends_with("START") {
                 atmospheric.orbit_lifetime_window_start = interval;
             } else {
                 atmospheric.orbit_lifetime_window_end = interval;
             }
-            message.validate().unwrap();
-            assert_eq!(Rdm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
-            crate::common::assert_validation_field(&message.to_xml().unwrap_err(), field);
-            let mut output = Vec::new();
-            assert!(message.write_xml_to(&mut output).is_err());
-            assert!(output.is_empty());
+            assert_rejects(&message, field);
             let input = XML.replace(
                 "</REENTRY_ALTITUDE>",
                 &format!("</REENTRY_ALTITUDE><{field} units=\"d\">{value}</{field}>"),
             );
-            assert!(Rdm::from_xml(&input).is_err(), "{field}={value}");
+            crate::common::assert_validation_field(&Rdm::from_xml(&input).unwrap_err(), field);
         }
     }
+}
+
+#[test]
+fn confidence_only_region_follows_the_schema_without_inventing_a_nominal_solution() {
+    let mut message = Rdm::from_kvn(KVN).unwrap();
+    let mut ground = complete_ground_impact_parameters();
+    ground.impact_ref_frame = None;
+    ground.nominal_impact_lon = None;
+    ground.nominal_impact_lat = None;
+    ground.nominal_impact_alt = None;
+    message.body.segment.data.ground_impact_parameters = Some(ground);
+    message.validate().unwrap();
+    let xml = message.to_xml().unwrap();
+    validate_xml("confidence-only impact region", &xml);
+    assert_eq!(Rdm::from_xml(&xml).unwrap(), message);
+    assert_eq!(Rdm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
 }

@@ -6,7 +6,7 @@ use crate::error::{FormatError, Result};
 use std::borrow::Cow;
 
 /// Some operational CDMs represent unavailable optional values with empty or `nil="true"`
-/// leaves. Remove only those leaves, preserving byte offsets for later parse diagnostics.
+/// leaves (numbers, epochs, enumerations and text alike). Remove only those leaves, preserving byte offsets for later parse diagnostics.
 pub(super) fn normalize_missing_values(xml: &str) -> Result<Cow<'_, str>> {
     use quick_xml::{events::Event, Reader};
 
@@ -25,8 +25,18 @@ pub(super) fn normalize_missing_values(xml: &str) -> Result<Cow<'_, str>> {
                 }
                 let parent = parents.last().map(Vec::as_slice).unwrap_or_default();
                 let name = element.name();
+                if required_leaf(parent, name.as_ref()) {
+                    for attribute in element.attributes().flatten() {
+                        if attribute.key.as_ref() == b"nil" {
+                            return Err(FormatError::InvalidFormat(format!(
+                                "{} is required and cannot be nil",
+                                String::from_utf8_lossy(name.as_ref())
+                            ))
+                            .into());
+                        }
+                    }
+                }
                 if optional_leaf(parent, name.as_ref()) {
-                    let mut nil = false;
                     let mut supported_attributes = true;
                     for attribute in element.attributes() {
                         let attribute = attribute
@@ -36,14 +46,12 @@ pub(super) fn normalize_missing_values(xml: &str) -> Result<Cow<'_, str>> {
                             FormatError::InvalidFormat(message).into()
                         })?;
                         match attribute.key.as_ref() {
-                            b"nil" if matches!(attribute.value.as_ref(), b"true" | b"1") => {
-                                nil = true
-                            }
+                            b"nil" if matches!(attribute.value.as_ref(), b"true" | b"1") => {}
                             b"units" if allows_units(name.as_ref()) => {}
                             _ => supported_attributes = false,
                         }
                     }
-                    if supported_attributes && (nil || empty_is_absent(name.as_ref())) {
+                    if supported_attributes {
                         if matches!(event, Event::Empty(_)) {
                             missing.push(start..reader.buffer_position() as usize);
                         } else {
@@ -133,20 +141,11 @@ fn optional_leaf(parent: &[u8], name: &[u8]) -> bool {
     }
 }
 
-fn empty_is_absent(name: &[u8]) -> bool {
-    !matches!(
-        name,
-        b"MESSAGE_FOR"
-            | b"COLLISION_PROBABILITY_METHOD"
-            | b"OPERATOR_CONTACT_POSITION"
-            | b"OPERATOR_ORGANIZATION"
-            | b"OPERATOR_PHONE"
-            | b"OPERATOR_EMAIL"
-            | b"ORBIT_CENTER"
-            | b"GRAVITY_MODEL"
-            | b"ATMOSPHERIC_MODEL"
-            | b"N_BODY_PERTURBATIONS"
-    )
+fn required_leaf(parent: &[u8], name: &[u8]) -> bool {
+    cdm_xml_children(name).is_none()
+        && cdm_xml_children(parent).is_some_and(|children| children.contains(&name))
+        && name != b"COMMENT"
+        && !optional_leaf(parent, name)
 }
 
 pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {

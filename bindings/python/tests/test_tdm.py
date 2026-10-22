@@ -140,6 +140,18 @@ class TestTdm:
         ]
         tdm.validate()
 
+    def test_mode_and_path_are_plain_strings(self):
+        """MODE and PATH are str on input and output; no TdmMode/TdmPath enum classes."""
+        assert not hasattr(ccsds_ndm, "TdmMode")
+        assert not hasattr(ccsds_ndm, "TdmPath")
+        metadata = self._create_valid_tdm().body.segments[0].metadata
+        assert metadata.mode == "SEQUENTIAL"
+        assert metadata.path == "1,2,1"
+        metadata.mode = "single_diff"
+        assert metadata.mode == "SINGLE_DIFF"
+        with pytest.raises(ValueError):
+            metadata.path = "1,6"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

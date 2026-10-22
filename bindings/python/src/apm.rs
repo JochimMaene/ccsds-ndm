@@ -14,20 +14,27 @@ use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 ///
 /// An APM specifies the attitude state of a single object at a specified epoch. This message
 /// is suited to interagency exchanges that involve automated interaction and/or human
-/// interaction, and/or human interaction, and do not require high-fidelity dynamic modeling.
+/// interaction, and do not require high-fidelity dynamic modeling.
 ///
 /// The APM requires the use of a propagation technique to determine the attitude state at
 /// times different from the specified epoch.
+///
+/// Parameters
+/// ----------
+/// header : AdmHeader
+///     Message header.
+/// segment : ApmSegment
+///     The attitude segment.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct Apm {
-    /// The message identifier.
+    /// The XML root id attribute, always "CCSDS_APM_VERS"; see the header for MESSAGE_ID.
     ///
     /// :type: Optional[str]
     #[pyo3(get)]
     id: Option<String>,
 
-    /// The message version.
+    /// Message edition; only "2.0" is accepted.
     ///
     /// :type: str
     #[pyo3(get)]
@@ -110,8 +117,28 @@ impl Apm {
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
         crate::api::validate_message(py, &self.to_core(py)?)
     }
-
-    /// Serialize to validated KVN or XML.
+    /// Validate and serialize this APM message, preserving its edition.
+    ///
+    /// Parameters
+    /// ----------
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     Generated document, subject to the documented notation normalizations.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
     fn to_str(
         &self,
         py: Python<'_>,
@@ -120,7 +147,32 @@ impl Apm {
     ) -> PyResult<String> {
         crate::api::generate_string(py, &self.to_core(py)?, format)
     }
-
+    /// Parse a APM document and validate its contents.
+    ///
+    /// Parameters
+    /// ----------
+    /// data : str
+    ///     KVN or XML content. Combined NDM requires XML.
+    /// format : str, optional
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// Apm
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmEpochError
+    ///     Invalid CCSDS epoch.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// ValueError
+    ///     Unsupported format argument.
     #[staticmethod]
     #[pyo3(signature = (data, format=None))]
     fn from_str(
@@ -132,8 +184,34 @@ impl Apm {
         let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Parse an APM from a KVN or XML file.
+    /// Read a UTF-8 APM document from a file and validate it.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Input file.
+    /// format : str, optional
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// Apm
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmEpochError
+    ///     Invalid CCSDS epoch.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Input file could not be read.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
@@ -146,8 +224,27 @@ impl Apm {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Atomically write this APM as KVN or XML.
+    /// Validate this APM message and atomically replace the destination.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Destination file; existing content is replaced only after successful generation.
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Temporary-file writing or atomic replacement failed.
     fn to_file(
         &self,
         py: Python<'_>,
@@ -165,8 +262,16 @@ impl Apm {
     }
 }
 
+/// APM metadata and attitude data for one segment.
+///
+/// Parameters
+/// ----------
+/// metadata : ApmMetadata
+///     Segment interpretation, reference frames and time system.
+/// data : ApmData
+///     Attitude data interpreted by the segment metadata.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct ApmSegment {
     /// APM Metadata Section.
     ///
@@ -212,8 +317,37 @@ impl ApmSegment {
 }
 
 /// APM Metadata Section.
+///
+/// Parameters
+/// ----------
+/// object_name : str
+///     Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
+///     restriction on the value for this keyword, it is recommended to use names from the UN Office
+///     of Outer Space Affairs designator index (reference [ADM-2], which include object name and
+///     international designator). When OBJECT_NAME is not known or cannot be disclosed, the value
+///     should be set to UNKNOWN.
+/// object_id : str
+///     Spacecraft identifier of the object corresponding to the attitude data to be given. While
+///     there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
+///     international designators from the UN Office of Outer Space Affairs (reference [ADM-2]).
+///     Recommended values have the format YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = Three
+///     digit serial number of launch in year YYYY (with leading zeros). P{PP} = At least one letter
+///     for the identification of the part brought into space by the launch. In cases in which the
+///     asset is not listed in reference [ADM-2], the UN Office of Outer Space Affairs designator
+///     index format is not used, or the content cannot be disclosed, the value should be set to
+///     UNKNOWN.
+/// time_system : str
+///     Time system used for attitude and maneuver data. The set of allowed values is described in
+///     annex B, subsection B2.
+/// center_name : str, optional
+///     Celestial body orbited by the object, which may be a natural solar system body (planets,
+///     asteroids, comets, and natural satellites), including any planet barycenter or the solar
+///     system barycenter. The set of allowed values is described in annex B, subsection B8.
+/// comment : list[str], optional
+///     Comments (allowed only at the beginning of the APM Metadata before OBJECT_NAME). Each comment
+///     line shall begin with this keyword.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct ApmMetadata {
     pub inner: core_apm::ApmMetadata,
@@ -351,8 +485,36 @@ impl ApmMetadata {
 }
 
 /// APM Data Section.
+///
+/// Parameters
+/// ----------
+/// epoch : str
+///     Epoch of the attitude elements and optional logical blocks.
+/// quaternion_state : list[QuaternionState], optional
+///     Attitude quaternion. All mandatory elements are to be provided if the block is present. (See
+///     annex F for conventions and further detail.)
+/// euler_angle_state : list[EulerAngleState], optional
+///     Euler angle elements. All mandatory elements of the logical block are to be provided if the
+///     block is present. (See annex F for conventions and further detail.)
+/// angular_velocity : list[AngVelState], optional
+///     Angular velocity vector.
+/// spin : list[SpinState], optional
+///     Spin. All mandatory elements are to be provided if the block is present. (See annex F for
+///     conventions and further detail.)
+/// inertia : list[InertiaState], optional
+///     Inertia. All mandatory elements are to be provided if the block is present. (See annex F for
+///     conventions and further detail.)
+/// maneuver_parameters : list[ApmManeuverParameters], optional
+///     Maneuver Parameters.
+/// comment : list[str], optional
+///     Comment lines in source order; omitted comments become an empty list.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If epoch is not a CCSDS calendar epoch.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct ApmData {
     /// One or more comment line(s). Each comment line shall begin with this keyword.
     ///
@@ -604,8 +766,33 @@ impl ApmData {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
+///
+/// Parameters
+/// ----------
+/// man_epoch_start : str
+///     Epoch of start of maneuver. (For format specification, see 6.8.9.)
+/// man_duration : float
+///     Maneuver duration.
+/// man_ref_frame : str
+///     Coordinate system for the torque vector. The set of allowed values is described in annex B,
+///     subsection B3.
+/// man_tor_1 : float
+///     Man tor 1.
+/// man_tor_2 : float
+///     Man tor 2.
+/// man_tor_3 : float
+///     Man tor 3.
+/// man_delta_mass : float, optional
+///     Mass change during maneuver (value is < 0)
+/// comment : list[str], optional
+///     One or more comment line(s). Each comment line shall begin with this keyword.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If man_epoch_start is not a CCSDS calendar epoch.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct ApmManeuverParameters {
     pub inner: ccsds_ndm::common::AttManeuverState,

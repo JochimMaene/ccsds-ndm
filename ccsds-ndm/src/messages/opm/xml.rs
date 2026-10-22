@@ -222,12 +222,6 @@ impl Opm {
             &self.version,
             data.spacecraft_parameters.as_ref(),
         )?;
-        if let Some(elements) = &data.keplerian_elements {
-            crate::validation::validate_at_field_path(
-                crate::types::Gm::validate_xml_value(elements.gm.value, "GM"),
-                "body.segment.data.keplerian_elements",
-            )?;
-        }
         Ok(())
     }
 

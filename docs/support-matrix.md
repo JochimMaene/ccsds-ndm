@@ -20,7 +20,7 @@ behavior governed by an external algorithm, registry, or ICD.
 | RDM | 1.0 | Parse, write, convert | Parse, write, convert | [Reentry data](conformance/rdm-1.0.md) |
 | APM | 2.0 | Parse, write, convert | Parse, write, convert | [Attitude parameters](conformance/apm-2.0.md) |
 | AEM | 2.0 | Parse, write, convert | Parse, write, convert | [Attitude ephemerides](conformance/aem-2.0.md) |
-| ACM | 2.0 | Parse, write, convert; relative histories | Parse, write, convert; relative histories | [Comprehensive attitude data](conformance/acm-2.0.md) |
+| ACM | 2.0 | Parse, write, convert; relative or absolute histories | Parse, write, convert; relative or absolute histories | [Comprehensive attitude data](conformance/acm-2.0.md) |
 | Combined NDM | XML envelope | Not defined | Parse and write | [Combined instantiation](conformance/combined-ndm.md) |
 
 Conversion preserves the supported model subject to documented normalization: ordinary numbers
@@ -30,8 +30,8 @@ see [preservation and normalization](design/validation-contract.md#preservation-
 Other information the target cannot represent causes an explicit refusal. For
 example, OCM's June 2026 technical corrigendum adds contact fields, covariance-to-trajectory
 identifiers, and user-defined sequences that NDM/XML 4.0.0 cannot express. These remain available
-in KVN; XML generation refuses them before output. CDM and RDM also document comment associations
-that cannot be retained in flattened KVN. The library does not discard those values to force a
+in KVN; XML generation refuses them before output. CDM and RDM merge documented XML comment positions in flattened KVN;
+RDM still refuses comment-only optional blocks that have no representable KVN content. The library does not discard those values to force a
 conversion to succeed.
 
 Combined NDM is XML-only. Requests for combined KVN fail with `unsupported.notation`; several KVN
@@ -50,8 +50,9 @@ rejected. See [the complete compatibility limits](conformance/oem-3.0.md#oem-10)
 OPM, APM, AEM, and TDM 1.0 input is not supported: their older requirements or syntax have not
 been implemented and verified as separate editions. ACM was introduced in ADM issue 2; the
 library accepts its defined 2.0 representation. A version label on a newer-format example is not
-evidence of an older format's support. Unsupported versions fail explicitly rather than being
-silently treated as current messages.
+evidence of an older format's support. Unsupported versions fail explicitly with
+`parse.unsupported_input_version`, checked after encoding/character checks and before structural
+parsing, rather than being silently treated as current messages.
 
 ## Common guarantees and boundaries
 
@@ -70,8 +71,11 @@ operationally incorrect situation.
 
 The shared [XML parser limits](design/validation-contract.md#xml-parser-limits) apply to all
 families. Every epoch token also has the documented [64-byte storage limit](design/validation-contract.md#epoch-storage-limit), independent of notation or standard edition.
-ACM attitude/covariance history records currently support relative time tags only;
-the book's absolute history form is not implemented. Family records list further checks left
+OPM and OMM retain a narrower [elapsed-time profile](design/validation-contract.md#opm-and-omm-elapsed-time-profile)
+than the complete MET/MRT duration syntax. Native [integer storage limits](design/validation-contract.md#integer-storage-limits)
+also apply where an XSD integer type is unbounded.
+ACM attitude/covariance histories support relative or absolute calendar time tags; each block
+uses a single form, compared lexically within that form without time-scale conversion. Family records list further checks left
 to the caller, including physical consistency and externally defined algorithms.
 
 Run `just verify` for the quality suite and installed-artifact checks. The

@@ -89,13 +89,11 @@ fn acm_maneuver_times_use_relative_numeric_form() {
 fn covariance_times_are_strictly_increasing_on_input_and_after_edits() {
     let source = crate::COV_KVN;
     let original = Acm::from_kvn(source).unwrap();
-    for time in [0.0, -1.0] {
+    for time in ["0.0", "-1.0"] {
         let mut value = original.clone();
-        value.body.segment.data.cov[0].cov_lines[1].values[0] = time;
-        crate::common::assert_rejects(&value, "covLine time");
-        assert!(
-            Acm::from_kvn(&mutated(source, "1.096694 6.74", &format!("{time} 6.74"),)).is_err()
-        );
+        value.body.segment.data.cov[0].cov_lines[1].epoch = time.parse().unwrap();
+        crate::common::assert_rejects(&value, "COV time tag");
+        assert!(Acm::from_kvn(&mutated(source, "1.096694 6.74", &format!("{time} 6.74"))).is_err());
         let xml = mutated(
             &original.to_xml().unwrap(),
             "<covLine>1.096694 ",
@@ -108,23 +106,24 @@ fn covariance_times_are_strictly_increasing_on_input_and_after_edits() {
 #[test]
 fn attitude_times_must_be_unique_but_need_not_increase() {
     let original = Acm::from_kvn(include_str!("../../data/kvn/acm_g6.kvn")).unwrap();
-    for times in [[0.5, 0.25, 0.0], [0.25, 0.0, 0.5]] {
+    for times in [["0.5", "0.25", "0.0"], ["0.25", "0.0", "0.5"]] {
         let mut value = original.clone();
         for (line, time) in value.body.segment.data.att[0]
             .att_lines
             .iter_mut()
             .zip(times)
         {
-            line.values[0] = time;
+            line.epoch = time.parse().unwrap();
         }
         value.validate().unwrap();
         assert_eq!(Acm::from_kvn(&value.to_kvn().unwrap()).unwrap(), value);
         assert_eq!(Acm::from_xml(&value.to_xml().unwrap()).unwrap(), value);
     }
-    for time in [0.0, -0.0, 0.25] {
+    // Signed zero and trailing zeros do not make a repeated time tag unique.
+    for time in ["0.0", "-0.0", "0.250", "+0.25"] {
         let mut value = original.clone();
-        value.body.segment.data.att[0].att_lines[2].values[0] = time;
-        crate::common::assert_rejects(&value, "attLine time");
+        value.body.segment.data.att[0].att_lines[2].epoch = time.parse().unwrap();
+        crate::common::assert_rejects(&value, "ATT time tag");
     }
     let kvn = mutated(
         include_str!("../../data/kvn/acm_g6.kvn"),
@@ -132,31 +131,71 @@ fn attitude_times_must_be_unique_but_need_not_increase() {
         "0.0 0.73492",
     );
     assert!(Acm::from_kvn(&kvn).is_err());
-    let xml = mutated(&original.to_xml().unwrap(), "0.5 0.73492", "0.0 0.73492");
+    let xml = mutated(&original.to_xml().unwrap(), "0.50 0.73492", "0.0 0.73492");
     assert!(Acm::from_xml(&xml).is_err());
 }
 
 #[test]
-fn history_epochs_support_relative_numbers_only() {
-    for (source, token, element) in [
+fn history_time_tags_are_relative_or_absolute_one_form_per_block() {
+    // ADM 5.3.4.3 permits absolute tags; 5.3.4.5 forbids mixing forms within a block.
+    for (source, tokens, element) in [
         (
             include_str!("../../data/kvn/acm_g6.kvn"),
-            "0.0 0.73566",
+            ["0.0 0.73566", "0.25 0.73529", "0.50 0.73492"],
             "attLine",
         ),
-        (crate::COV_KVN, "0.0 6.74", "covLine"),
+        (
+            crate::COV_KVN,
+            ["0.0 6.74", "1.096694 6.74", "59.896697 6.74"],
+            "covLine",
+        ),
     ] {
-        let original = Acm::from_kvn(source).unwrap();
-        let absolute = "2017-12-30T00:00:00.0";
-        let replacement = token.replacen("0.0", absolute, 1);
-        assert!(Acm::from_kvn(&mutated(source, token, &replacement)).is_err());
-        assert!(Acm::from_xml(&mutated(
-            &original.to_xml().unwrap(),
-            &format!("<{element}>0 "),
-            &format!("<{element}>{absolute} "),
-        ))
-        .is_err());
+        let absolute = [
+            "2017-12-30T00:00:00.0",
+            "2017-12-30T00:00:01Z",
+            "2017-364T00:00:02",
+        ];
+        let mut kvn = source.to_owned();
+        for (token, time) in tokens.iter().zip(absolute) {
+            let time_token = token.split(' ').next().unwrap();
+            kvn = mutated(&kvn, token, &token.replacen(time_token, time, 1));
+        }
+        let message = Acm::from_kvn(&kvn).unwrap();
+        let generated = message.to_kvn().unwrap();
+        assert!(generated.contains("\n2017-12-30T00:00:01Z "), "{generated}");
+        assert_eq!(Acm::from_kvn(&generated).unwrap(), message);
+        let xml = message.to_xml().unwrap();
+        crate::common::validate_xml("ACM absolute history time tags", &xml);
+        assert!(xml.contains(&format!("<{element}>2017-12-30T00:00:00.0 ")));
+        assert_eq!(Acm::from_xml(&xml).unwrap(), message);
+
+        let mixed = mutated(
+            source,
+            tokens[0],
+            &tokens[0].replacen(tokens[0].split(' ').next().unwrap(), absolute[0], 1),
+        );
+        let error = Acm::from_kvn(&mixed).unwrap_err().to_string();
+        assert!(error.contains("ADM 5.3.4.5"), "{error}");
+        let mixed_xml = mutated(
+            &Acm::from_kvn(source).unwrap().to_xml().unwrap(),
+            &format!("<{element}>0.0 "),
+            &format!("<{element}>{} ", absolute[0]),
+        );
+        assert!(Acm::from_xml(&mixed_xml).is_err());
+        // Absolute tags are compared within their branch: an earlier covariance tag fails.
+        let reversed = mutated(&kvn, absolute[1], "2017-12-29T00:00:00");
+        if element == "covLine" {
+            assert!(Acm::from_kvn(&reversed).is_err());
+        } else {
+            Acm::from_kvn(&reversed).unwrap();
+        }
     }
+    let invalid = mutated(
+        include_str!("../../data/kvn/acm_g6.kvn"),
+        "0.0 0.73566",
+        "2017-13-30T00:00:00 0.73566",
+    );
+    assert!(Acm::from_kvn(&invalid).is_err());
 }
 
 #[test]
@@ -194,7 +233,12 @@ fn kvn_none_rate_type_normalizes_to_omission_while_xml_token_is_refused() {
         Acm::from_kvn(&mutated(&kvn, "RATE_TYPE = NONE", "RATE_TYPE = none")).unwrap(),
         original
     );
-    for token in ["UNKNOWN", "None", "N/A"] {
+    // Blank and `N/A` are the shared KVN spelling of an absent optional value.
+    for token in ["", "N/A"] {
+        let source = mutated(&kvn, "RATE_TYPE = NONE", &format!("RATE_TYPE = {token}"));
+        assert_eq!(Acm::from_kvn(&source).unwrap(), original);
+    }
+    for token in ["UNKNOWN", "None"] {
         assert!(Acm::from_kvn(&mutated(
             &kvn,
             "RATE_TYPE = NONE",

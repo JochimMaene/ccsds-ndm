@@ -14,7 +14,7 @@ fn acm(records: usize) -> Acm {
     message.body.segment.data.att[0].att_lines = (0..records)
         .map(|index| {
             let mut line = line.clone();
-            line.values[0] = index as f64;
+            line.epoch = format!("{index}.0").parse().unwrap();
             line
         })
         .collect();

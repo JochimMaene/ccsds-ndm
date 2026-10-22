@@ -34,11 +34,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "rdm")]
 pub struct Rdm {
+    /// Creation information and message identity (RDM section 3.2).
     pub header: RdmHeader,
+    /// The message payload (RDM section 3).
     pub body: RdmBody,
+    /// Fixed XML root identifier; message identity is carried by MESSAGE_ID.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_RDM_VERS".to_string()))]
     pub id: Option<String>,
+    /// Supported message edition, `1.0`.
     #[serde(rename = "@version")]
     #[builder(default = "1.0".to_string(), into)]
     pub version: String,
@@ -62,7 +66,10 @@ impl Ndm for Rdm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::kvn::normalize_line_endings(crate::detect::without_utf8_bom(kvn));
+        let kvn = crate::kvn::prepare_input(
+            crate::detect::without_utf8_bom(kvn),
+            crate::validation::MessageKind::Rdm,
+        )?;
         let kvn = kvn.as_ref();
         kvn::validate_kvn_syntax(kvn)?;
         let rdm = Self::from_kvn_str(kvn)?;
@@ -76,7 +83,8 @@ impl Ndm for Rdm {
 
     fn from_xml(xml: &str) -> Result<Self> {
         xml::validate_xml_sequences(xml)?;
-        let rdm: Self = crate::xml::from_str_with_context(xml, "RDM")?;
+        let mut rdm: Self = crate::xml::from_str_with_context(xml, "RDM")?;
+        rdm.body.segment.data.drop_empty_blocks();
         crate::traits::Validate::validate(&rdm)?;
         Ok(rdm)
     }
@@ -94,6 +102,7 @@ impl Ndm for Rdm {
 // Header
 //----------------------------------------------------------------------
 
+/// Message creation information and identity (RDM section 3.2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct RdmHeader {
@@ -121,28 +130,13 @@ impl crate::traits::Validate for RdmHeader {
     fn validate(&self) -> Result<()> {
         crate::validation::epoch_precision(&[("CREATION_DATE", &self.creation_date)])?;
         if self.creation_date.is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "RDM Header".into(),
-                field: "CREATION_DATE".into(),
-                line: None,
-            }
-            .into());
+            return Err(crate::error::ValidationError::empty_value("CREATION_DATE").into());
         }
         if self.originator.trim().is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "RDM Header".into(),
-                field: "ORIGINATOR".into(),
-                line: None,
-            }
-            .into());
+            return Err(crate::error::ValidationError::empty_value("ORIGINATOR").into());
         }
         if self.message_id.trim().is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "RDM Header".into(),
-                field: "MESSAGE_ID".into(),
-                line: None,
-            }
-            .into());
+            return Err(crate::error::ValidationError::empty_value("MESSAGE_ID").into());
         }
         Ok(())
     }
@@ -156,6 +150,7 @@ impl crate::traits::Validate for RdmHeader {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct RdmBody {
+    /// The single object and re-entry prediction represented by this message.
     pub segment: Box<RdmSegment>,
 }
 
@@ -165,6 +160,7 @@ impl crate::traits::Validate for RdmBody {
     }
 }
 
+/// Metadata and re-entry estimates for a single object (RDM sections 3.4 and 3.5).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct RdmSegment {
@@ -462,9 +458,13 @@ pub struct RdmMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_message_epoch: Option<CalendarEpoch>,
     /// Scheduled UTC epoch of the next RDM for the same object (formatting rules specified in
-    /// 5.3.3.5); N/A if no other message is scheduled.
+    /// 5.3.3.5); the book writes `N/A` if no other message is scheduled.
     ///
-    /// **Examples**: 2001-11-06T11:17:33, N/A
+    /// `None` means "no message scheduled": KVN `NEXT_MESSAGE_EPOCH = N/A` (or a blank value)
+    /// reads as `None`, and `None` is written by omitting the keyword, since the XSD epoch type
+    /// has no `N/A` spelling.
+    ///
+    /// **Examples**: 2001-11-06T11:17:33
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -479,7 +479,9 @@ pub struct RdmMetadata {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct RdmData {
-    /// Comments.
+    /// XML `<data>` comments. KVN has no such position: KVN generation writes them first,
+    /// directly before the atmospheric block's own comments, so a KVN reparse returns them in
+    /// [`AtmosphericReentryParameters::comment`] (canonical merge).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default)]
     pub comment: Vec<String>,
@@ -542,44 +544,21 @@ impl crate::traits::Validate for RdmMetadata {
             ("NEXT_MESSAGE_EPOCH", &self.next_message_epoch),
         ])?;
         if self.object_name.trim().is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "RDM Metadata".into(),
-                field: "OBJECT_NAME".into(),
-                line: None,
-            }
-            .into());
+            return Err(crate::error::ValidationError::empty_value("OBJECT_NAME").into());
         }
         if self.international_designator.trim().is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "RDM Metadata".into(),
-                field: "INTERNATIONAL_DESIGNATOR".into(),
-                line: None,
-            }
-            .into());
+            return Err(
+                crate::error::ValidationError::empty_value("INTERNATIONAL_DESIGNATOR").into(),
+            );
         }
         if self.center_name.trim().is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "RDM Metadata".into(),
-                field: "CENTER_NAME".into(),
-                line: None,
-            }
-            .into());
+            return Err(crate::error::ValidationError::empty_value("CENTER_NAME").into());
         }
         if self.time_system.trim().is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "RDM Metadata".into(),
-                field: "TIME_SYSTEM".into(),
-                line: None,
-            }
-            .into());
+            return Err(crate::error::ValidationError::empty_value("TIME_SYSTEM").into());
         }
         if self.epoch_tzero.is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "RDM Metadata".into(),
-                field: "EPOCH_TZERO".into(),
-                line: None,
-            }
-            .into());
+            return Err(crate::error::ValidationError::empty_value("EPOCH_TZERO").into());
         }
         Ok(())
     }
@@ -647,8 +626,23 @@ impl crate::traits::Validate for RdmData {
 }
 
 impl RdmData {
+    /// Validate required re-entry data and every populated optional parameter block.
     pub fn validate(&self) -> Result<()> {
         crate::traits::Validate::validate(self)
+    }
+
+    /// An empty, comment-free optional XML block (`<odParameters/>`) carries nothing; read it as
+    /// absent so XML and KVN produce the same model.
+    fn drop_empty_blocks(&mut self) {
+        fn drop_empty<T: Default + PartialEq>(block: &mut Option<T>) {
+            if block.as_ref().is_some_and(|value| *value == T::default()) {
+                *block = None;
+            }
+        }
+        drop_empty(&mut self.ground_impact_parameters);
+        drop_empty(&mut self.spacecraft_parameters);
+        drop_empty(&mut self.od_parameters);
+        drop_empty(&mut self.user_defined_parameters);
     }
 }
 

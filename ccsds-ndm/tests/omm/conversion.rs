@@ -323,3 +323,31 @@ fn empty_user_defined_xml_block_cannot_silently_disappear_in_kvn() {
         assert!(message.to_xml().unwrap().contains("userDefinedParameters"));
     }
 }
+
+#[test]
+fn tle_export_requires_earth_teme_and_rounds_cyclic_angle_boundaries() {
+    for (center, frame, field) in [
+        ("MARS", "TEME", "CENTER_NAME"),
+        ("EARTH", "ICRF", "REF_FRAME"),
+    ] {
+        let mut message = Omm::from_kvn(crate::KVN).unwrap();
+        message.body.segment.metadata.center_name = center.into();
+        message.body.segment.metadata.ref_frame = frame.into();
+        crate::common::assert_validation_field(&message.to_tle_lines().unwrap_err(), field);
+        // Ordinary OMM remains usable; only the TLE representation requires these frames.
+        message.to_xml().unwrap();
+    }
+    for (value, expected) in [(359.999_94, 359.9999), (359.999_96, 0.0)] {
+        let mut message = Omm::from_kvn(crate::KVN).unwrap();
+        let elements = &mut message.body.segment.data.mean_elements;
+        elements.ra_of_asc_node.value = value;
+        elements.arg_of_pericenter.value = value;
+        elements.mean_anomaly.value = value;
+        let (line1, line2) = message.to_tle_lines().unwrap();
+        let parsed = Omm::from_tle_lines(&line1, &line2).unwrap();
+        let elements = &parsed.body.segment.data.mean_elements;
+        assert_eq!(elements.ra_of_asc_node.value, expected);
+        assert_eq!(elements.arg_of_pericenter.value, expected);
+        assert_eq!(elements.mean_anomaly.value, expected);
+    }
+}

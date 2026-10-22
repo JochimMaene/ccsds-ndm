@@ -34,9 +34,10 @@ fn is_kvn_message_header(line: &str) -> bool {
 }
 
 fn has_multiple_kvn_messages(input: &str) -> bool {
-    input
+    // Same record boundaries as the readers: all four terminators, insignificant leading blanks.
+    crate::kvn::normalize_line_endings(input)
         .lines()
-        .filter(|line| is_kvn_message_header(line))
+        .filter(|line| is_kvn_message_header(line.trim_start()))
         .nth(1)
         .is_some()
 }
@@ -44,13 +45,45 @@ fn has_multiple_kvn_messages(input: &str) -> bool {
 /// Wire notation used by complete NDM documents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Notation {
+    /// CCSDS line-oriented Key-Value Notation.
     Kvn,
+    /// CCSDS XML document notation.
     Xml,
 }
 
 /// Remove one leading UTF-8 byte-order mark.
 pub(crate) fn without_utf8_bom(input: &str) -> &str {
     input.strip_prefix('\u{feff}').unwrap_or(input)
+}
+
+/// Refuse UTF-16 and UTF-32 input, recognized by a byte-order mark or by the NUL bytes such
+/// encodings put among the first ASCII characters (XML 1.0 appendix F). NDM text is UTF-8.
+pub(crate) fn reject_wide_encoding(input: &[u8]) -> Result<()> {
+    let start = &input[..input.len().min(4)];
+    if !(start.starts_with(&[0xfe, 0xff]) || start.starts_with(&[0xff, 0xfe]) || start.contains(&0))
+    {
+        return Ok(());
+    }
+    let notation = match input.iter().find(|byte| !matches!(byte, 0 | 0xfe | 0xff)) {
+        Some(b'<') => crate::error::DiagnosticNotation::Xml,
+        _ => crate::error::DiagnosticNotation::Kvn,
+    };
+    Err(
+        CcsdsNdmError::Format(Box::new(crate::error::FormatError::InvalidFormat(
+            "input must be UTF-8; found UTF-16 or UTF-32".into(),
+        )))
+        .with_parse_context(crate::validation::MessageKind::Ndm, notation, "", None),
+    )
+}
+
+/// Decode UTF-8 file contents, rejecting UTF-16/UTF-32 before decoding.
+///
+/// Wide encodings produce a parse diagnostic. Other invalid UTF-8 bytes retain the file
+/// reader's `InvalidData` I/O category.
+pub fn decode_utf8(input: &[u8]) -> Result<&str> {
+    reject_wide_encoding(input)?;
+    std::str::from_utf8(input)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error).into())
 }
 
 /// Detect whether a complete NDM document uses KVN or XML notation.
@@ -76,11 +109,40 @@ pub(crate) fn detect_notation_bytes(input: &[u8]) -> Result<Notation> {
     }
 }
 
+/// Identify a document's family from its KVN header or XML root without parsing its body.
+///
+/// This does not validate the document. An omitted notation is detected automatically.
+pub fn detect_message_kind(
+    input: &str,
+    notation: Option<Notation>,
+) -> Result<crate::validation::MessageKind> {
+    reject_wide_encoding(input.as_bytes())?;
+    let input = without_utf8_bom(input);
+    let notation = notation.map_or_else(|| detect_notation(input), Ok)?;
+    let kind = match notation {
+        Notation::Kvn => detect_kvn_kind(input),
+        Notation::Xml => detect_xml_kind(input),
+    }
+    .map_err(|error| {
+        ensure_parse_context(
+            error,
+            crate::validation::MessageKind::Ndm,
+            match notation {
+                Notation::Kvn => crate::error::DiagnosticNotation::Kvn,
+                Notation::Xml => crate::error::DiagnosticNotation::Xml,
+            },
+            input,
+        )
+    })?;
+    Ok(kind.message_kind())
+}
+
 pub(crate) fn detect_message_type(s: &str) -> Result<Message> {
     detect_message_type_as(s, None)
 }
 
 pub(crate) fn detect_message_type_as(s: &str, notation: Option<Notation>) -> Result<Message> {
+    reject_wide_encoding(s.as_bytes())?;
     let input = without_utf8_bom(s);
     let notation = notation.map_or_else(|| detect_notation(input), Ok)?;
     let result = match notation {
@@ -245,9 +307,7 @@ fn parse_kvn_kind(input: &mut &str) -> PResult<NdmKind> {
     .parse_next(input)
 }
 
-/// Detects and parses KVN message type
-fn detect_kvn_type(s: &str) -> Result<Message> {
-    // We need a mutable slice for winnow, but we don't want to consume "s" for the final parsing.
+fn detect_kvn_kind(s: &str) -> Result<NdmKind> {
     let mut input = s;
     let kind = parse_kvn_kind
         .parse_next(&mut input)
@@ -256,6 +316,13 @@ fn detect_kvn_type(s: &str) -> Result<Message> {
     if has_multiple_kvn_messages(s) {
         return Err(crate::messages::ndm::combined_kvn_unsupported());
     }
+
+    Ok(kind)
+}
+
+/// Detects and parses KVN message type
+fn detect_kvn_type(s: &str) -> Result<Message> {
+    let kind = detect_kvn_kind(s)?;
 
     let result = kind.parse_kvn(s);
     result.map_err(|error| {
@@ -273,6 +340,11 @@ use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 
 fn detect_xml_type(s: &str) -> Result<Message> {
+    let kind = detect_xml_kind(s)?;
+    with_xml_parse_context(kind.parse_xml(s), kind.message_kind(), s)
+}
+
+fn detect_xml_kind(s: &str) -> Result<NdmKind> {
     let mut reader = Reader::from_str(s);
     reader.config_mut().trim_text_start = true;
     reader.config_mut().trim_text_end = true;
@@ -289,8 +361,7 @@ fn detect_xml_type(s: &str) -> Result<Message> {
                         String::from_utf8_lossy(root_name.as_ref())
                     ))
                 })?;
-                let message_kind = kind.message_kind();
-                return with_xml_parse_context(kind.parse_xml(s), message_kind, s);
+                return Ok(kind);
             }
             Ok(Event::Decl(_))
             | Ok(Event::Comment(_))

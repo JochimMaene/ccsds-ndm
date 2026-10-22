@@ -56,6 +56,33 @@ fn from_file_reports_invalid_utf8_as_an_io_error() {
 }
 
 #[test]
+fn from_file_refuses_utf16_and_utf32_with_a_parse_error() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("wide.xml");
+    let text = "<?xml version=\"1.0\"?><opm/>";
+    let utf16_le: Vec<u8> = text.encode_utf16().flat_map(u16::to_le_bytes).collect();
+    let utf16_be: Vec<u8> = text.encode_utf16().flat_map(u16::to_be_bytes).collect();
+    let utf32_be: Vec<u8> = text
+        .chars()
+        .flat_map(|c| u32::from(c).to_be_bytes())
+        .collect();
+    for (label, bytes) in [
+        ("UTF-16LE", utf16_le.clone()),
+        ("UTF-16LE BOM", [&[0xff, 0xfe][..], &utf16_le].concat()),
+        ("UTF-16BE BOM", [&[0xfe, 0xff][..], &utf16_be].concat()),
+        ("UTF-32BE", utf32_be),
+    ] {
+        std::fs::write(&path, bytes).unwrap();
+        let error = from_file(&path).unwrap_err();
+        assert_eq!(error.code(), Some("parse.xml.syntax"), "{label}: {error}");
+        assert!(
+            error.to_string().contains("input must be UTF-8"),
+            "{label}: {error}"
+        );
+    }
+}
+
+#[test]
 fn from_file_reports_missing_files() {
     let directory = tempfile::tempdir().unwrap();
     let error = from_file(directory.path().join("missing.kvn")).unwrap_err();

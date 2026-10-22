@@ -6,10 +6,10 @@ This inventory records maintainer evidence for standalone CDM 1.0. The
 ## Scope and authorities
 
 - Message edition: CDM 1.0.
-- Semantic and KVN authority: CCSDS 508.0-B-1 with editorial corrigendum 2 and
-  technical corrigendum 2 (`data/cdm_508x0b1e2c2.pdf`), principally sections 3 and 6 and annex D.
+- Semantic and KVN authority: CCSDS 508.0-B-1 with editorial corrigenda 1 and 2 and
+  technical corrigenda 1 and 2 (`data/cdm_508x0b1e2c2.pdf`), principally sections 3 and 6 and annex D.
 - XML authority: NDM/XML schema set 4.0.0 and CDM schema 1.0.
-- Profile: strict standalone parsing, self-contained validation, deterministic KVN/XML generation,
+- Profile: tolerant standalone parsing, self-contained validation, deterministic KVN/XML generation,
   and loss-rejecting notation conversion through the shared Rust generation gate.
 
 ## Executable evidence
@@ -18,11 +18,11 @@ The `cdm` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN lexical and logical structure | The family-local scanner rejects non-ASCII/control input, overlong records, malformed assignments, unknown and duplicate keywords, fixed-order violations, nonstandard marked blocks, misplaced comments, extra segments, and trailing content. It models the header, relative data, two metadata sections, and each flattened OD, additional-parameter, state-vector, and covariance block in CDM order. |
+| KVN lexical and logical structure | The family-local scanner rejects non-ASCII/control input, malformed assignments, unknown and duplicate keywords, fixed-order violations, nonstandard marked blocks, misplaced comments, extra segments, and trailing content. It models the header, relative data, two metadata sections, and each flattened OD, additional-parameter, state-vector, and covariance block in CDM order. |
 | XML structure | The shared XML sequence engine is registered for the complete CDM root, header, body, relative-state vector, two segments, metadata, data, OD, additional-parameter, state-vector, and covariance hierarchy. It rejects unknown, duplicate, reordered, and non-schema children and attributes, subject to the explicit missing-value producer compatibility below. |
-| Delimiter-free COMMENT decision | A leading KVN comment run before the first data keyword is normatively retained on the outer data block; no textual delimiter exists from which to infer a split. If the typed model populates the first present nested block's comments, every materialized and streaming KVN generation route rejects the state before output. The shipped XML fixture demonstrates this richer, XML-only association and is therefore intentionally not convertible to KVN. |
+| Delimiter-free COMMENT decision | A leading KVN comment run before the first data keyword is normatively retained on the outer data block; no textual delimiter exists from which to infer a split. XML nested comments are merged canonically into that leading run when needed; see KVN comment merge below. Empty optional blocks do not obstruct conversion. |
 | Typed preservation and generation | All three shipped KVN fixtures retain their complete typed model through deterministic KVN and XML generation. The shipped XML fixture retains its model through XML generation. Every generated XML document validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
-| KVN fixed-point preflight | CDM's shape is a fixed, bounded set of scalar records. A private generation preflight writes and reparses that bounded representation before caller-visible output, rejecting lexical violations, multiline normalization, comment reassociation, or other nonnumeric model changes. Numeric rounding is checked separately under the policy below. Streaming rejection is proven to write zero bytes. |
+| KVN fixed-point preflight | CDM's shape is a fixed, bounded set of scalar records. A private generation preflight writes and reparses that bounded representation before caller-visible output, rejecting lexical violations or nonnumeric model changes outside the documented comment merge and trailing-blank trimming. Numeric rounding is checked separately under the policy below. Streaming rejection is proven to write zero bytes. |
 | KVN numeric precision | Sections 6.3.2.2 and 6.3.2.3(b) limit ordinary KVN numbers to 16 decimal digits. All numeric fields use the shared formatter, so computed values such as `0.30000000000000004` round to `0.3`. The private exact-model preflight protects nonnumeric content independently of this permitted rounding; the actual rounded model must still validate before output. XML retains the full double. `cdm_kvn_rounds_computed_numbers_while_xml_retains_the_value` covers scalar/unit-bearing fields, both output forms, generic dispatch, and schema-valid XML preservation. |
 | Shared surfaces | `library::parsing` and `library::output`, Python API tests, and the shared generation plumbing exercise parsing, generation, structured diagnostics, and Rust-core delegation. No separate CDM semantics are implemented in an adapter. |
 
@@ -105,9 +105,9 @@ XML omits absent leaves and uses the normal schema form.
 Only the unqualified `nil` producer attribute is accepted; `nil="false"`, nil on required
 values, nil with content, unknown attributes, and unknown/nested elements remain errors.
 Units attached to an unavailable value carry no measurement and are discarded with that leaf.
-Normalization preserves byte positions for subsequent diagnostics. The optional outer block
-still exists if its contents become empty; KVN conversion refuses any resulting model that
-cannot retain that block's typed content rather than silently dropping it.
+Normalization preserves byte positions for subsequent diagnostics. Empty, comment-free optional
+OD and additional-parameter blocks normalize to absent. Comment-only blocks retain their text
+through the canonical KVN comment merge below.
 
 A relative-state vector is absent or contains all six position and velocity components.
 Supplying velocity components without position components is rejected in KVN, just as an
@@ -116,3 +116,36 @@ values are errors; the reader does not fabricate values from defaults.
 
 All four book line endings (LF, CR, CRLF and LFCR) are accepted with identical models and
 byte-position-preserving normalization.
+
+## Categorical aliases and OD count profile
+
+XML accepts the uppercase and lowercase spellings explicitly enumerated by the bundled
+CDM XSD for `OBJECT`, screening volume frame/shape, `REF_FRAME`, `COVARIANCE_METHOD`, and
+`MANEUVERABLE`; generation uses canonical uppercase. Arbitrary mixed case is not an alias.
+`cdm::parsing::xml_accepts_schema_listed_lowercase_categories` checks full-message preservation.
+
+Shared `OBS_AVAILABLE`, `OBS_USED`, `TRACKS_AVAILABLE`, and `TRACKS_USED` use positive
+`u32` in both notations, matching the XSD `positiveInteger` domain within the
+[integer storage limit](../design/validation-contract.md#integer-storage-limits).
+The book's table calls these integer counts without separately requiring positivity.
+This is a deliberate shared CDM/RDM profile choice: a supplied count must also fit XML;
+zero is rejected even in KVN/model form, rather than being silently omitted on conversion.
+This follows the shared policy of adopting XSD facets in all notations so a valid model
+can convert to XML.
+
+## KVN comment merge
+
+KVN cannot distinguish outer data comments from comments before its first nested data
+keyword. Generation combines those runs in XML order. Comments from an optional block
+without values move to the next present block; leading runs become outer data comments.
+Later comments keep their association with the following block. Empty optional blocks
+normalize to absent. This preserves comment text and order, and repeating conversion is
+stable; XML-to-XML retains its original associations. Space-Track layouts with nil leaves
+and nested OD comments are covered by `xml_nested_comments_merge_canonically_into_kvn`.
+
+Namespace-qualified XML introduced by Cor.2 is supported. All epochs use the calendar
+branch; the shared [validation contract](../design/validation-contract.md) records the
+book-over-XSD policy for empty mandatory values and epoch lexical forms.
+`INTERNATIONAL_DESIGNATOR` enforces its character repertoire but not its external layout,
+and `TIME_LASTOB_START`/`TIME_LASTOB_END` are not compared. Covariance is optional only
+during incremental construction: validation and generation require it.

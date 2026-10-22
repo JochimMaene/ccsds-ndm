@@ -18,7 +18,7 @@ The `apm` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN lexical and structural strictness | The APM marked-block scanner rejects non-ASCII/control input, overlong lines, malformed assignments, unknown and duplicate keywords, fixed-order violations within logical blocks, misplaced comments, unknown/nested blocks, and mismatched block ends. It accepts both the optional metadata delimiters and repeated attitude block families represented by the standard fixtures. |
+| KVN lexical and structural strictness | The APM marked-block scanner rejects non-ASCII/control input, malformed assignments, unknown and duplicate keywords, fixed-order violations within logical blocks, misplaced comments, unknown/nested blocks, and mismatched block ends. It accepts repeated attitude block families represented by the standard fixtures. Reading also tolerates `META_START`/`META_STOP` around the metadata, a non-standard producer spelling that ADM table 3-2 does not define; the writer never emits them (`apm::generation::apm_kvn_output_omits_metadata_delimiters_and_keeps_quaternion_rate_units`). |
 | XML structure | The shared XML sequence engine is registered for the complete APM root, header, metadata, data, and six attitude logical-block families, including nested quaternion components. It rejects unknown, duplicate, and reordered children and non-schema attributes. |
 | Valid input and preservation | All three shipped KVN fixtures and the shipped XML fixture parse through the public strict API. Generated KVN and XML reparse to the same typed model. |
 | XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
@@ -82,6 +82,49 @@ A 2.0 message with a changed version header is not proof of legacy support. Inpu
 Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
 
-Angle bounds are semantic ADM rules: section 6.8.1 specifies degrees between -360 and
-360. Radians require an exchange-partner ICD and are outside this supported profile;
-unit annotations are never ignored on dimensionless quaternion components.
+**Angle domain.** ADM §6.8.1 gives angles in degrees "between −360 and 360"; the XSD
+`angleRange` makes this `[-360, 360)` (upper bound exclusive). The XSD interval applies in KVN,
+XML and model validation alike, so a valid model always converts (the shared rule on
+[XSD facets](../design/validation-contract.md#authority-and-representability)). Radians require an
+exchange-partner ICD and are outside this supported profile; unit annotations are never ignored
+on dimensionless quaternion components.
+
+**Numbers.** KVN number reading and 16-significant-digit writing follow the shared
+[KVN number rule](../design/validation-contract.md#shared-lexical-decisions). ADM §6.8.5 says
+`-0` is not a supported value. That sentence sits in the KVN chapter, and the KVN writer already
+writes negative zero as `0.0`. XML follows the XSD `xsd:double`, which admits `-0`, so XML keeps the
+sign ([preservation rules](../design/validation-contract.md#preservation-and-normalization)).
+
+**Units on output.** KVN output keeps every unit annotation the model carries, including
+`[1/s]` on `Q1_DOT`..`QC_DOT` (table 3-3).
+
+**Quaternion derivatives are all-or-none.** Table 3-3 marks each of `Q1_DOT`, `Q2_DOT`, `Q3_DOT`
+and `QC_DOT` optional on its own. The XSD `quaternionDotType` requires all four together. The
+library follows the XSD in every notation, so a partial set is rejected rather than a message being
+produced that XML cannot represent.
+
+**Rotation sequences.** XML accepts only the twelve uppercase `rotseqType` letters. KVN and Python
+also read lowercase (`zxz`, ADM §6.8.6) and, as a documented legacy alias, the ADM 1.0 numeric
+spellings (`313` for `ZXZ`, annex J), because both convert without loss. Every writer emits the
+uppercase letters (`apm::parsing::euler_rot_seq_reads_lowercase_and_legacy_digits_in_kvn_only`).
+
+**Logical-block order.** Table 3-3 and the XSD `apmData` sequence list the blocks in a fixed
+order (quaternion, Euler, angular velocity, spin, inertia, maneuver). KVN reading accepts the
+blocks in any order and interleaved, since each block is self-delimited and no value is lost.
+The model stores each block type in its own list, so the order within one block type is kept but
+the relative order across block types is not: output is always written in table order.
+
+**Comments.** XML allows a line break inside one `<COMMENT>`; KVN has one comment per line. On
+KVN output such a comment becomes several `COMMENT` lines, which read back as several comment
+entries, so the model differs after an XML-to-KVN hop. Without metadata delimiters, KVN comments
+after the header belong to the metadata and comments after `TIME_SYSTEM` to the data section
+(ADM 6.10.2; `apm::parsing::apm_comments_without_metadata_delimiters_stay_in_their_section`).
+
+## Spin choice: schema versus prose
+
+ADM §3.2.4.6 says a spin block contains either the complete nutation triple or the complete
+momentum triple. Bundled `spinStateType` instead sets the choice's `minOccurs` to zero.
+The library follows the schema in both notations: neither triple is allowed, one complete
+triple is allowed, and partial or simultaneous triples fail. It does not invent nutation
+or momentum values to complete a bare spin state. The regression
+`apm::generation::spin_without_optional_triples_follows_the_schema` checks preservation and schema validity.

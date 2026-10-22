@@ -125,19 +125,79 @@ fn operational_xml_missing_leaves_are_absent_without_erasing_text() {
         crate::common::validate_xml("CDM operational missing leaves", &output);
         assert_eq!(Cdm::from_kvn(&parsed.to_kvn().unwrap()).unwrap(), parsed);
     }
+    // Empty optional text is an unavailable value too, so the message still converts to KVN.
     let empty_text = mutated(
         &original,
         "<MESSAGE_FOR>SATELLITE A</MESSAGE_FOR>",
         "<MESSAGE_FOR/>",
     );
-    assert_eq!(
-        Cdm::from_xml(&empty_text)
-            .unwrap()
-            .header
-            .message_for
-            .as_deref(),
-        Some("")
+    let parsed = Cdm::from_xml(&empty_text).unwrap();
+    assert_eq!(parsed.header.message_for, None);
+    parsed.to_kvn().unwrap();
+}
+
+#[test]
+fn blank_optional_kvn_values_create_no_block() {
+    let segment = |kvn: &str| {
+        let start = kvn.find("COMMENT Object1 OD Parameters").unwrap();
+        let end = kvn.find("COMMENT Object1 State Vector").unwrap();
+        (start, end)
+    };
+    let (start, end) = segment(crate::KVN);
+    let mut kvn = crate::KVN.to_owned();
+    kvn.replace_range(
+        start..end,
+        "COMMENT od\nOBS_USED =\nCOMMENT additional\nMASS = [kg]\n",
     );
+    let cdm = Cdm::from_kvn(&kvn).unwrap();
+    let data = &cdm.body.segments[0].data;
+    assert!(data.od_parameters.is_none());
+    assert!(data.additional_parameters.is_none());
+    // No data keyword has a value before X, so the whole run is the leading data run.
+    assert_eq!(
+        data.comment,
+        ["Object1 Data", "od", "additional", "Object1 State Vector"]
+    );
+    assert!(data.state_vector.comment.is_empty());
+    assert_eq!(Cdm::from_kvn(&cdm.to_kvn().unwrap()).unwrap(), cdm);
+}
+
+#[test]
+fn empty_comment_free_xml_blocks_are_absent() {
+    let original = Cdm::from_kvn(crate::KVN).unwrap().to_xml().unwrap();
+    let start = original.find("<odParameters>").unwrap();
+    let end = original.find("</odParameters>").unwrap() + "</odParameters>".len();
+    let mut xml = original.clone();
+    xml.replace_range(
+        start..end,
+        "<odParameters><OBS_USED nil=\"true\"/><WEIGHTED_RMS/></odParameters>",
+    );
+    let cdm = Cdm::from_xml(&xml).unwrap();
+    assert!(cdm.body.segments[0].data.od_parameters.is_none());
+    Cdm::from_kvn(&cdm.to_kvn().unwrap()).unwrap();
+}
+
+#[test]
+fn nil_and_empty_required_values_name_the_problem() {
+    let original = Cdm::from_kvn(crate::KVN).unwrap().to_xml().unwrap();
+    let start = original.find("<X ").unwrap();
+    let end = original[start..].find("</X>").unwrap() + start + "</X>".len();
+    let mut nil = original.clone();
+    nil.replace_range(start..end, "<X units=\"km\" nil=\"true\"/>");
+    let error = Cdm::from_xml(&nil).unwrap_err().to_string();
+    assert!(error.contains("X is required and cannot be nil"), "{error}");
+
+    let empty = mutated(
+        &original,
+        &format!(
+            "<ORIGINATOR>{}</ORIGINATOR>",
+            Cdm::from_kvn(crate::KVN).unwrap().header.originator
+        ),
+        "<ORIGINATOR/>",
+    );
+    let error = Cdm::from_xml(&empty).unwrap_err();
+    assert_eq!(error.code(), Some("validation.invalid_value"), "{error}");
+    assert!(error.to_string().contains("ORIGINATOR is empty"), "{error}");
 }
 
 #[test]

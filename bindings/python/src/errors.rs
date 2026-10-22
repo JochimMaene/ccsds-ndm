@@ -13,29 +13,55 @@ use ccsds_ndm::validation::MessageKind;
 use ccsds_ndm::Notation;
 use pyo3_stub_gen::{type_info::MemberInfo, PyStubType};
 
-const fn diagnostic_field<T: PyStubType>(name: &'static str) -> MemberInfo {
+const fn diagnostic_field<T: PyStubType>(name: &'static str, doc: &'static str) -> MemberInfo {
     MemberInfo {
         name,
         r#type: T::type_output,
-        doc: "",
+        doc,
         default: None,
         deprecated: None,
     }
 }
 
 const DIAGNOSTIC_FIELDS: &[MemberInfo] = &[
-    diagnostic_field::<Option<String>>("operation"),
-    diagnostic_field::<Option<String>>("notation"),
-    diagnostic_field::<Option<String>>("message_kind"),
-    diagnostic_field::<Option<String>>("source_edition"),
-    diagnostic_field::<Option<String>>("code"),
-    diagnostic_field::<Option<String>>("field_path"),
-    diagnostic_field::<Option<usize>>("line"),
-    diagnostic_field::<Option<usize>>("column"),
-    diagnostic_field::<Option<usize>>("byte_offset"),
-    diagnostic_field::<Option<String>>("original_token"),
-    diagnostic_field::<Option<String>>("expected"),
-    diagnostic_field::<Option<String>>("requirement"),
+    diagnostic_field::<Option<String>>(
+        "operation",
+        "Operation: parse, validate, or generate; None when unavailable.",
+    ),
+    diagnostic_field::<Option<String>>(
+        "notation",
+        "Lowercase wire notation: kvn or xml; None when unavailable.",
+    ),
+    diagnostic_field::<Option<String>>(
+        "message_kind",
+        "Lowercase message family, such as opm; None when unavailable.",
+    ),
+    diagnostic_field::<Option<String>>(
+        "source_edition",
+        "Source edition, or the requested model edition on output failure.",
+    ),
+    diagnostic_field::<Option<String>>(
+        "code",
+        "Stable machine-readable error category; None for manually created exceptions.",
+    ),
+    diagnostic_field::<Option<String>>(
+        "field_path",
+        "Canonical model path, when the containing validator provides one.",
+    ),
+    diagnostic_field::<Option<usize>>("line", "One-based source line, when available."),
+    diagnostic_field::<Option<usize>>("column", "One-based source column, when available."),
+    diagnostic_field::<Option<usize>>(
+        "byte_offset",
+        "Zero-based input byte position, when available.",
+    ),
+    diagnostic_field::<Option<String>>(
+        "original_token",
+        "Source excerpt limited to 128 characters, when available.",
+    ),
+    diagnostic_field::<Option<String>>(
+        "expected",
+        "Expected parser token, when available; excludes internal labels.",
+    ),
 ];
 
 /// Declares a custom exception with stub metadata.
@@ -173,7 +199,8 @@ create_exception!(
 /// This function maps each variant of the Rust error enum to the corresponding
 /// Python exception type.
 pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
-    match e {
+    let code = e.code();
+    let error = match e {
         CcsdsNdmError::Generation { context, source } => {
             let code = source.code();
             let field_path = source.field_path();
@@ -331,13 +358,7 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
         }
         error @ CcsdsNdmError::ResourceLimitExceeded { .. } => {
             let code = error.code();
-            let operation = match &error {
-                CcsdsNdmError::ResourceLimitExceeded {
-                    resource: "generated_document",
-                    ..
-                } => "generate",
-                _ => "parse",
-            };
+            let operation = "parse";
             enrich_exception(
                 NdmError::new_err(error.to_string()),
                 operation,
@@ -354,18 +375,30 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
             )
         }
         _ => NdmError::new_err(e.to_string()),
-    }
+    };
+    Python::attach(|py| {
+        if let Some(code) = code {
+            let _ = error.value(py).setattr("code", code);
+        }
+    });
+    error
 }
 
 /// Map a file operation's error, giving I/O failures the `errno` and `filename` of an
 /// `OSError` so callers can tell which file failed and why.
 pub fn file_error_to_pyerr(error: CcsdsNdmError, path: &std::path::Path) -> PyErr {
     match error.as_io_error() {
-        Some(io) => NdmIoError::new_err((
-            io.raw_os_error().unwrap_or(0),
-            io.to_string(),
-            path.display().to_string(),
-        )),
+        Some(io) => {
+            let exception = NdmIoError::new_err((
+                io.raw_os_error().unwrap_or(0),
+                io.to_string(),
+                path.display().to_string(),
+            ));
+            Python::attach(|py| {
+                let _ = exception.value(py).setattr("code", "io.error");
+            });
+            exception
+        }
         None => ccsds_error_to_pyerr(error),
     }
 }
@@ -439,7 +472,6 @@ pub(crate) fn enrich_exception(
         let _ = value.setattr("byte_offset", byte_offset);
         let _ = value.setattr("original_token", original_token);
         let _ = value.setattr("expected", expected);
-        let _ = value.setattr("requirement", Option::<&str>::None);
     });
     error
 }

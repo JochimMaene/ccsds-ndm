@@ -92,12 +92,14 @@ fn tdm_paths_and_single_diff_receive_band_use_segment_context() {
     }
 
     let single_diff = include_str!("../../data/kvn/tdm_e10.kvn");
-    for data in [
-        TdmObservationData::ReceiveFreq(1.0),
-        TdmObservationData::Range(1.0),
+    // An empty XML RECEIVE_BAND names no band, so it does not satisfy the rule either.
+    for (data, band) in [
+        (TdmObservationData::ReceiveFreq(1.0), None),
+        (TdmObservationData::Range(1.0), None),
+        (TdmObservationData::Range(1.0), Some(String::new())),
     ] {
         let mut message = Tdm::from_kvn(single_diff).unwrap();
-        message.body.segments[0].metadata.receive_band = None;
+        message.body.segments[0].metadata.receive_band = band;
         message.body.segments[0].data.observations.truncate(1);
         message.body.segments[0].data.observations[0].data = data;
         assert_rejects(
@@ -386,7 +388,7 @@ fn kvn_numbers_follow_the_digit_limit_without_rounding_phase_counts() {
         !kvn.contains("1.2345678901234567"),
         "unrounded number: {kvn}"
     );
-    assert!(kvn.contains("1.234567890123457e0"));
+    assert!(kvn.contains("1.234567890123457"));
     let reparsed = Tdm::from_kvn(&kvn).unwrap();
     assert_eq!(
         reparsed.body.segments[0].metadata.freq_offset,
@@ -427,4 +429,29 @@ fn kvn_refuses_numbers_whose_rounded_spelling_overflows_before_output() {
             .contains("number"));
         assert!(output.is_empty());
     }
+}
+
+#[test]
+fn kvn_output_refuses_integers_and_lines_beyond_the_kvn_limits() {
+    // DOPPLER_COUNT_SCALE is u64 (XSD positiveInteger), but a KVN integer stops at 2^31-1.
+    let mut message = Tdm::from_kvn(KVN).unwrap();
+    message.body.segments[0].metadata.doppler_count_scale = Some(i32::MAX as u64 + 1);
+    message.validate().unwrap();
+    Tdm::from_xml(&message.to_xml().unwrap()).unwrap();
+    let error = message.to_kvn().unwrap_err();
+    assert!(error.to_string().contains("DOPPLER_COUNT_SCALE"), "{error}");
+
+    // A long DATA_TYPES line (Orekit) is read, but TDM 4.2.1 has no continuation lines,
+    // so output is refused and names the keyword.
+    let types = vec!["RANGE"; 60].join(",");
+    let long = KVN.replacen(
+        "TIME_SYSTEM = UTC\n",
+        &format!("DATA_TYPES = {types}\nTIME_SYSTEM = UTC\n"),
+        1,
+    );
+    let message = Tdm::from_kvn(&long).unwrap();
+    Tdm::from_xml(&message.to_xml().unwrap()).unwrap();
+    let error = message.to_kvn().unwrap_err();
+    assert!(error.to_string().contains("DATA_TYPES"), "{error}");
+    assert!(error.to_string().contains("254"), "{error}");
 }

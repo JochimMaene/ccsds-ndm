@@ -1060,3 +1060,35 @@ fn all_normative_line_endings_preserve_the_message() {
         assert_eq!(Cdm::from_kvn(&input).unwrap(), expected, "{ending:?}");
     }
 }
+
+#[test]
+fn xml_accepts_schema_listed_lowercase_categories() {
+    let baseline = Cdm::from_xml(XML).unwrap();
+    for (upper, lower) in [
+        ("OBJECT1", "object1"),
+        ("OBJECT2", "object2"),
+        ("RTN", "rtn"),
+        ("ELLIPSOID", "ellipsoid"),
+        ("EME2000", "eme2000"),
+        ("CALCULATED", "calculated"),
+        ("YES", "yes"),
+    ] {
+        let xml = mutated(XML, &format!(">{upper}<"), &format!(">{lower}<"));
+        crate::common::validate_xml("lowercase CDM", &xml);
+        assert_eq!(Cdm::from_xml(&xml).unwrap(), baseline, "{lower}");
+    }
+    let invalid = mutated(XML, ">CALCULATED<", ">Calculated<");
+    assert!(Cdm::from_xml(&invalid).is_err());
+}
+
+#[test]
+fn namespace_qualified_xml_reads_as_the_unqualified_message() {
+    // Cor. 2 (4.3.3.3) adds the `ndm:`-qualified form; generation stays unqualified.
+    let qualified = XML.replace("</", "</ndm:").replace('<', "<ndm:");
+    let qualified = qualified
+        .replace("<ndm:?", "<?")
+        .replace("<ndm:/ndm:", "</ndm:");
+    let message = Cdm::from_xml(&qualified).unwrap();
+    assert_eq!(message, Cdm::from_xml(XML).unwrap());
+    assert!(message.to_xml().unwrap().contains("<cdm "));
+}

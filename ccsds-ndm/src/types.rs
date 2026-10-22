@@ -75,12 +75,20 @@ impl<'de> Deserialize<'de> for Epoch {
     }
 }
 
+/// Failure to retain a schema-compatible lexical epoch token.
 #[derive(Error, Debug, PartialEq, Clone)]
 pub enum EpochError {
+    /// The token is not a valid epoch for the requested type.
     #[error("invalid epoch format: '{0}'")]
     InvalidFormat(String),
     #[error("epoch token is {length} bytes; maximum supported length is {maximum} bytes")]
-    TooLong { length: usize, maximum: usize },
+    /// The token cannot fit the fixed epoch storage.
+    TooLong {
+        /// Length of the supplied token in bytes.
+        length: usize,
+        /// Maximum retained length in bytes.
+        maximum: usize,
+    },
 }
 
 fn classify_epoch(s: &str) -> Option<EpochClassification> {
@@ -367,6 +375,8 @@ pub(crate) fn fraction_digit_count(bytes: &[u8]) -> usize {
 }
 
 impl Epoch {
+    /// Retain a schema-compatible epoch spelling of at most MAX_EPOCH_LEN bytes.
+    /// Message validation additionally enforces calendar and book-specific field rules.
     pub fn new(value: &str) -> std::result::Result<Self, EpochError> {
         // Fast path for empty or very short strings which are common in some tests
         // and allowed by the regex [+-]?\d*(\.\d*)?
@@ -395,6 +405,7 @@ impl Epoch {
             Err(EpochError::InvalidFormat(value.to_string()))
         }
     }
+    /// Borrow the retained epoch spelling without normalization.
     pub fn as_str(&self) -> &str {
         // Bytes are validated to be ASCII/UTF-8 during creation.
         std::str::from_utf8(&self.bytes[..self.len as usize])
@@ -1034,8 +1045,10 @@ pub(crate) trait FromKvn: Sized {
 #[derive(Serialize, Debug, PartialEq, Clone, Default)]
 #[serde(bound(serialize = "V: Serialize + 'static, U: Serialize"))]
 pub struct UnitValue<V, U> {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value", serialize_with = "serialize_xml_value")]
     pub value: V,
+    /// Unit annotation. Omission uses the fixed units specified by the containing field.
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<U>,
 }
@@ -1093,7 +1106,7 @@ where
 /// Parse a [`UnitValue`] value from decoded XML text. Surrounding XML whitespace is collapsed;
 /// special values must use the xsd:double spellings `INF`, `-INF`, and `NaN` (ODM 8.13.4),
 /// which Rust's float parser would otherwise extend with `inf`, `+infinity`, `nan`, ...
-fn parse_xml_value<V>(text: &str) -> std::result::Result<V, String>
+pub(crate) fn parse_xml_value<V>(text: &str) -> std::result::Result<V, String>
 where
     V: FromStr,
     V::Err: std::fmt::Display,
@@ -1261,7 +1274,8 @@ where
                     }
                 }
 
-                let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
+                let value = value
+                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
                 Ok(UnitValue { value, units })
             }
         }
@@ -1424,9 +1438,12 @@ pub(crate) fn require_finite(field: &'static str, value: f64) -> Result<()> {
 macro_rules! define_required_type {
     ($name:ident, $unit_enum:ident, $default_unit:ident) => {
         #[derive(Serialize, Debug, PartialEq, Clone, Default)]
+        #[doc = concat!("Numeric quantity with a required `", stringify!($unit_enum), "` annotation.")]
         pub struct $name {
+            /// Numeric value in the declared units.
             #[serde(rename = "$value")]
             pub value: f64,
+            /// Required unit annotation; construction selects the standard default.
             #[serde(rename = "@units")]
             pub units: $unit_enum,
         }
@@ -1479,8 +1496,9 @@ macro_rules! define_required_type {
                                 let _ = map.next_value::<serde::de::IgnoredAny>()?;
                             }
                         }
-                        let value =
-                            value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
+                        let value = value.ok_or_else(|| {
+                            serde::de::Error::custom("an empty element is not a number")
+                        })?;
                         let units =
                             units.ok_or_else(|| serde::de::Error::missing_field("@units"))?;
                         Ok($name { value, units })
@@ -1490,12 +1508,14 @@ macro_rules! define_required_type {
             }
         }
         impl $name {
+            /// Construct a quantity with its standard default unit; owning message validation checks its domain.
             pub fn new(value: f64) -> Self {
                 Self {
                     value,
                     units: $unit_enum::$default_unit,
                 }
             }
+            /// Copy the quantity into an optional-unit wrapper, preserving the unit annotation.
             pub fn to_unit_value(&self) -> UnitValue<f64, $unit_enum> {
                 UnitValue {
                     value: self.value,
@@ -1523,7 +1543,8 @@ macro_rules! define_required_type {
 macro_rules! define_unit_enum {
     ($unit_enum:ident, $default_variant:ident, { $($variant:ident => $str_rep:expr),+ $(,)? }) => {
         #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-        pub enum $unit_enum { $(#[serde(rename = $str_rep)] $variant),+ }
+        #[doc = concat!("Unit spellings accepted by `", stringify!($unit_enum), "` quantities.")]
+        pub enum $unit_enum { $(#[doc = $str_rep] #[serde(rename = $str_rep)] $variant),+ }
         impl Default for $unit_enum { fn default() -> Self { Self::$default_variant } }
         impl std::fmt::Display for $unit_enum {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -1553,6 +1574,7 @@ macro_rules! define_unit_enum {
 macro_rules! define_unit_type {
     ($type_alias:ident, $unit_enum:ident, $default_variant:ident, { $($variant:ident => $str_rep:expr),+ $(,)? }) => {
         define_unit_enum!($unit_enum, $default_variant, { $($variant => $str_rep),+ });
+        #[doc = concat!("Numeric quantity with optional `", stringify!($unit_enum), "` units. The containing field defines its meaning and range.")]
         pub type $type_alias = UnitValue<f64, $unit_enum>;
     };
 }
@@ -1597,16 +1619,20 @@ define_unit_type!(
 
 define_required_type!(VelocityRequired, VelocityUnits, KmPerS);
 // Type alias for Distance used in Keplerian elements
+/// Distance in kilometres; an alias of Position.
 pub type Distance = Position;
 
 // --- Angle ---
 
 define_unit_enum!(AngleUnits, Deg, { Deg => "deg" });
 
+/// Angle in degrees with the supported XSD interval [-360, 360).
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct Angle {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
+    /// Unit annotation. Omission uses the fixed units specified by the containing field.
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<AngleUnits>,
 }
@@ -1657,7 +1683,8 @@ impl<'de> serde::Deserialize<'de> for Angle {
                     }
                 }
 
-                let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
+                let value = value
+                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
                 Angle::new(value, units).map_err(serde::de::Error::custom)
             }
         }
@@ -1685,6 +1712,7 @@ impl Angle {
         }
         Ok(())
     }
+    /// Copy this quantity and its unit annotation into the shared measurement wrapper.
     pub fn to_unit_value(&self) -> UnitValue<f64, AngleUnits> {
         UnitValue {
             value: self.value,
@@ -1702,6 +1730,7 @@ impl FromKvnFloat for Angle {
 
 define_unit_enum!(AngleRateUnits, DegPerS, { DegPerS => "deg/s" });
 
+/// Angular rate in degrees per second.
 pub type AngleRate = UnitValue<f64, AngleRateUnits>;
 
 // --- Angular Momentum ---
@@ -1711,10 +1740,13 @@ define_unit_type!(AngMomentum, AngMomentumUnits, NmS, { NmS => "N*m*s" });
 
 define_unit_enum!(DayIntervalUnits, D, { D => "d" });
 
+/// Positive day interval (XSD dayIntervalType), with optional units.
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct DayInterval {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
+    /// Unit annotation. Omission uses the fixed units specified by the containing field.
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<DayIntervalUnits>,
 }
@@ -1765,7 +1797,8 @@ impl<'de> serde::Deserialize<'de> for DayInterval {
                     }
                 }
 
-                let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
+                let value = value
+                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
                 DayInterval::new(value, units).map_err(serde::de::Error::custom)
             }
         }
@@ -1784,6 +1817,7 @@ impl DayInterval {
     pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
         require_non_negative(value, name)
     }
+    /// Copy this quantity and its unit annotation into the shared measurement wrapper.
     pub fn to_unit_value(&self) -> UnitValue<f64, DayIntervalUnits> {
         UnitValue {
             value: self.value,
@@ -1802,10 +1836,13 @@ impl std::fmt::Display for DayInterval {
         write!(f, "{}", self.value)
     }
 }
+/// Percentage in [0, 100], with an optional percent unit annotation.
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct Percentage {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
+    /// Unit annotation. Omission uses the fixed units specified by the containing field.
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<PercentageUnits>,
 }
@@ -1852,7 +1889,8 @@ impl<'de> serde::Deserialize<'de> for Percentage {
                         let _ = map.next_value::<serde::de::IgnoredAny>()?;
                     }
                 }
-                let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
+                let value = value
+                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
                 Percentage::new(value, units).map_err(serde::de::Error::custom)
             }
         }
@@ -1861,6 +1899,7 @@ impl<'de> serde::Deserialize<'de> for Percentage {
 }
 
 impl Percentage {
+    /// Construct a percentage in [0, 100]; reject values outside that domain.
     pub fn new(value: f64, units: Option<PercentageUnits>) -> Result<Self> {
         Self::validate_value(value, "Percentage")?;
         Ok(Self { value, units })
@@ -1878,6 +1917,7 @@ impl Percentage {
         }
         Ok(())
     }
+    /// Copy this quantity and its unit annotation into the shared measurement wrapper.
     pub fn to_unit_value(&self) -> UnitValue<f64, PercentageUnits> {
         UnitValue {
             value: self.value,
@@ -1896,15 +1936,18 @@ impl std::fmt::Display for Percentage {
         write!(f, "{}", self.value)
     }
 }
+/// Positive day interval with a required day unit annotation.
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct DayIntervalRequired {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
+    /// Required unit annotation for this quantity.
     #[serde(rename = "@units")]
     pub units: DayIntervalUnits,
 }
 impl DayIntervalRequired {
-    /// A finite day interval; XML additionally requires positivity and day units.
+    /// A positive day interval (XSD `dayIntervalTypeUR`), applied in every notation.
     pub fn new(value: f64) -> Result<Self> {
         Self::validate_value(value, "DayIntervalRequired")?;
         Ok(Self {
@@ -1914,12 +1957,9 @@ impl DayIntervalRequired {
     }
 
     pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
-        require_finite(name, value)
-    }
-
-    pub(crate) fn validate_xml_value(value: f64, name: &'static str) -> Result<()> {
         require_positive(value, name)
     }
+    /// Copy this quantity and its unit annotation into the shared measurement wrapper.
     pub fn to_unit_value(&self) -> UnitValue<f64, DayIntervalUnits> {
         UnitValue {
             value: self.value,
@@ -1938,9 +1978,8 @@ impl<'de> Deserialize<'de> for DayIntervalRequired {
             #[serde(rename = "@units")]
             units: DayIntervalUnits,
         }
+        // Range is checked by `AtmosphericReentryParameters::validate`, naming the keyword.
         let value = XmlValue::deserialize(deserializer)?;
-        Self::validate_xml_value(value.value, "DayIntervalRequired")
-            .map_err(serde::de::Error::custom)?;
         Ok(Self {
             value: value.value,
             units: value.units,
@@ -1948,10 +1987,12 @@ impl<'de> Deserialize<'de> for DayIntervalRequired {
     }
 }
 impl FromKvnFloat for DayIntervalRequired {
+    // Range is checked by the owning block's validator, which names the keyword.
     fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
-        let mut parsed = Self::new(value)?;
-        parsed.units = kvn_unit_or_default(unit, DayIntervalUnits::D)?;
-        Ok(parsed)
+        Ok(Self {
+            value,
+            units: kvn_unit_or_default(unit, DayIntervalUnits::D)?,
+        })
     }
 }
 impl std::fmt::Display for DayIntervalRequired {
@@ -1963,23 +2004,27 @@ impl std::fmt::Display for DayIntervalRequired {
 
 define_unit_enum!(FrequencyUnits, Hz, { Hz => "Hz" });
 
+/// Positive frequency in hertz, with an optional unit annotation.
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct Frequency {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
+    /// Unit annotation. Omission uses the fixed units specified by the containing field.
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<FrequencyUnits>,
 }
 impl Frequency {
-    /// Construct a finite frequency; XML additionally requires a positive value.
+    /// Construct a positive frequency, following the XSD facet in every notation.
     pub fn new(value: f64, units: Option<FrequencyUnits>) -> Result<Self> {
-        require_finite("Frequency", value)?;
+        require_positive(value, "Frequency")?;
         Ok(Self { value, units })
     }
 
     pub(crate) fn validate_xml_value(value: f64, name: &'static str) -> Result<()> {
         require_positive(value, name)
     }
+    /// Copy this quantity and its unit annotation into the shared measurement wrapper.
     pub fn to_unit_value(&self) -> UnitValue<f64, FrequencyUnits> {
         UnitValue {
             value: self.value,
@@ -2017,10 +2062,13 @@ define_unit_type!(PositionVelocityCovariance, PositionVelocityCovarianceUnits, K
 
 define_unit_enum!(GmUnits, Km3PerS2, { Km3PerS2 => "km**3/s**2", KM3PerS2 => "KM**3/S**2" });
 
+/// Positive gravitational parameter in km**3/s**2.
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct Gm {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
+    /// Unit annotation. Omission uses the fixed units specified by the containing field.
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<GmUnits>,
 }
@@ -2073,7 +2121,8 @@ impl<'de> serde::Deserialize<'de> for Gm {
                     }
                 }
 
-                let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
+                let value = value
+                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
                 Gm::validate_xml_value(value, "GM").map_err(serde::de::Error::custom)?;
                 Gm::new(value, units).map_err(serde::de::Error::custom)
             }
@@ -2097,6 +2146,7 @@ impl Gm {
     pub(crate) fn validate_xml_value(value: f64, name: &'static str) -> Result<()> {
         require_positive(value, name)
     }
+    /// Copy this quantity and its unit annotation into the shared measurement wrapper.
     pub fn to_unit_value(&self) -> UnitValue<f64, GmUnits> {
         UnitValue {
             value: self.value,
@@ -2120,10 +2170,13 @@ define_unit_type!(
     { M => "m" }
 );
 
+/// Altitude with a required length unit annotation; the owning field defines its range.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct AltitudeRequired {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
+    /// Required unit annotation for this quantity.
     #[serde(rename = "@units")]
     pub units: LengthUnits,
 }
@@ -2148,6 +2201,7 @@ impl AltitudeRequired {
     pub fn is_xml_representable(&self) -> bool {
         Self::XML_RANGE.contains(&self.value)
     }
+    /// Copy this quantity and its unit annotation into the shared measurement wrapper.
     pub fn to_unit_value(&self) -> UnitValue<f64, LengthUnits> {
         UnitValue {
             value: self.value,
@@ -2176,10 +2230,13 @@ define_required_unit_type!(Wkg, WkgUnits, WPerKg, { WPerKg => "W/kg" });
 
 define_unit_enum!(MassUnits, Kg, { Kg => "kg" });
 
+/// Non-negative mass in kilograms, with optional units.
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct Mass {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
+    /// Unit annotation. Omission uses the fixed units specified by the containing field.
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<MassUnits>,
 }
@@ -2230,7 +2287,8 @@ impl<'de> serde::Deserialize<'de> for Mass {
                     }
                 }
 
-                let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
+                let value = value
+                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
                 Mass::new(value, units).map_err(serde::de::Error::custom)
             }
         }
@@ -2249,6 +2307,7 @@ impl Mass {
     pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
         require_non_negative(value, name)
     }
+    /// Copy this quantity and its unit annotation into the shared measurement wrapper.
     pub fn to_unit_value(&self) -> UnitValue<f64, MassUnits> {
         UnitValue {
             value: self.value,
@@ -2271,10 +2330,13 @@ impl std::fmt::Display for Mass {
 
 define_unit_enum!(AreaUnits, M2, { M2 => "m**2" });
 
+/// Non-negative area in square metres, with optional units.
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct Area {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
+    /// Unit annotation. Omission uses the fixed units specified by the containing field.
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<AreaUnits>,
 }
@@ -2325,7 +2387,8 @@ impl<'de> serde::Deserialize<'de> for Area {
                     }
                 }
 
-                let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
+                let value = value
+                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
                 Area::new(value, units).map_err(serde::de::Error::custom)
             }
         }
@@ -2344,6 +2407,7 @@ impl Area {
     pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
         require_non_negative(value, name)
     }
+    /// Copy this quantity and its unit annotation into the shared measurement wrapper.
     pub fn to_unit_value(&self) -> UnitValue<f64, AreaUnits> {
         UnitValue {
             value: self.value,
@@ -2403,10 +2467,13 @@ define_unit_type!(BallisticCoeff, BallisticCoeffUnits, KgPerM2, { KgPerM2 => "kg
 
 define_unit_enum!(PercentageUnits, Percent, { Percent => "%" });
 
+/// Percentage in [0, 100], with a required percent unit annotation.
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct PercentageRequired {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
+    /// Required unit annotation for this quantity.
     #[serde(rename = "@units")]
     pub units: PercentageUnits,
 }
@@ -2458,16 +2525,20 @@ impl<'de> serde::Deserialize<'de> for PercentageRequired {
                         let _ = map.next_value::<serde::de::IgnoredAny>()?;
                     }
                 }
-                let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
-                let mut s = PercentageRequired::new(value).map_err(serde::de::Error::custom)?;
-                s.units = units.ok_or_else(|| serde::de::Error::missing_field("@units"))?;
-                Ok(s)
+                // Range is checked by the owning block's validator, naming the keyword.
+                Ok(PercentageRequired {
+                    value: value.ok_or_else(|| {
+                        serde::de::Error::custom("an empty element is not a number")
+                    })?,
+                    units: units.ok_or_else(|| serde::de::Error::missing_field("@units"))?,
+                })
             }
         }
         deserializer.deserialize_any(Visitor)
     }
 }
 impl PercentageRequired {
+    /// Construct a percentage in [0, 100]; reject values outside that domain.
     pub fn new(value: f64) -> Result<Self> {
         Self::validate_value(value, "PercentageRequired")?;
         Ok(Self {
@@ -2489,6 +2560,7 @@ impl PercentageRequired {
         Ok(())
     }
 
+    /// Copy this quantity and its unit annotation into the shared measurement wrapper.
     pub fn to_unit_value(&self) -> UnitValue<f64, PercentageUnits> {
         UnitValue {
             value: self.value,
@@ -2502,15 +2574,19 @@ impl std::fmt::Display for PercentageRequired {
     }
 }
 impl FromKvnFloat for PercentageRequired {
+    // Range is checked by the owning block's validator, which names the keyword.
     fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
-        let mut parsed = Self::new(value)?;
-        parsed.units = kvn_unit_or_default(unit, PercentageUnits::Percent)?;
-        Ok(parsed)
+        Ok(Self {
+            value,
+            units: kvn_unit_or_default(unit, PercentageUnits::Percent)?,
+        })
     }
 }
 
+/// Dimensionless probability in [0, 1].
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct Probability {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
 }
@@ -2537,11 +2613,13 @@ impl<'de> serde::Deserialize<'de> for Probability {
                 formatter.write_str("a primitive value or a map with $value")
             }
 
+            // Range is checked by the owning block's validator, which names the keyword.
             fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
             where
                 E: serde::de::Error,
             {
-                v.parse::<Probability>().map_err(E::custom)
+                let value = v.parse::<f64>().map_err(E::custom)?;
+                Ok(Probability { value })
             }
 
             fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
@@ -2558,8 +2636,9 @@ impl<'de> serde::Deserialize<'de> for Probability {
                     }
                 }
 
-                let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
-                Probability::new(value).map_err(serde::de::Error::custom)
+                let value = value
+                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
+                Ok(Probability { value })
             }
         }
 
@@ -2568,6 +2647,7 @@ impl<'de> serde::Deserialize<'de> for Probability {
 }
 
 impl Probability {
+    /// Construct a probability in [0, 1]; reject values outside that domain.
     pub fn new(value: f64) -> Result<Self> {
         Self::validate_value(value, "Probability")?;
         Ok(Self { value })
@@ -2594,15 +2674,17 @@ impl std::fmt::Display for Probability {
 }
 
 impl FromKvnFloat for Probability {
+    // Range is checked by the owning block's validator, which names the keyword.
     fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
         reject_kvn_unit(unit)?;
-        Self::new(value)
+        Ok(Self { value })
     }
 }
 
 /// XSD nonNegativeDouble - value must be >= 0
 #[derive(Serialize, Debug, PartialEq, Clone, Copy)]
 pub struct NonNegativeDouble {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
 }
@@ -2642,7 +2724,8 @@ impl<'de> serde::Deserialize<'de> for NonNegativeDouble {
                     }
                 }
 
-                let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
+                let value = value
+                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
                 NonNegativeDouble::new(value).map_err(serde::de::Error::custom)
             }
         }
@@ -2652,6 +2735,7 @@ impl<'de> serde::Deserialize<'de> for NonNegativeDouble {
 }
 
 impl NonNegativeDouble {
+    /// Construct a finite number at or above zero; reject values outside that domain.
     pub fn new(value: f64) -> Result<Self> {
         Self::validate_value(value, "NonNegativeDouble")?;
         Ok(Self { value })
@@ -2686,6 +2770,7 @@ impl FromKvnFloat for NonNegativeDouble {
 /// XSD positiveInteger - value must be > 0
 #[derive(Serialize, Debug, PartialEq, Clone, Copy)]
 pub struct PositiveInteger {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: u32,
 }
@@ -2704,11 +2789,13 @@ impl<'de> serde::Deserialize<'de> for PositiveInteger {
                 formatter.write_str("a primitive value or a map with $value")
             }
 
+            // Range is checked by `OdParameters::validate`, which names the keyword.
             fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
             where
                 E: serde::de::Error,
             {
-                v.parse::<PositiveInteger>().map_err(E::custom)
+                let value = v.parse::<u32>().map_err(E::custom)?;
+                Ok(PositiveInteger { value })
             }
 
             fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
@@ -2725,8 +2812,9 @@ impl<'de> serde::Deserialize<'de> for PositiveInteger {
                     }
                 }
 
-                let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
-                PositiveInteger::new(value).map_err(serde::de::Error::custom)
+                let value = value
+                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
+                Ok(PositiveInteger { value })
             }
         }
 
@@ -2735,6 +2823,7 @@ impl<'de> serde::Deserialize<'de> for PositiveInteger {
 }
 
 impl PositiveInteger {
+    /// Construct an integer above zero; reject values outside that domain.
     pub fn new(value: u32) -> Result<Self> {
         Self::validate_value(value, "PositiveInteger")?;
         Ok(Self { value })
@@ -2832,7 +2921,8 @@ impl<'de> serde::Deserialize<'de> for InterpolationDegree {
                     }
                 }
 
-                let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
+                let value = value
+                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
                 std::num::NonZeroU32::new(value)
                     .map(InterpolationDegree)
                     .ok_or_else(|| serde::de::Error::custom("expected non-zero u32"))
@@ -2870,6 +2960,7 @@ impl From<u32> for PositiveInteger {
 /// XSD elementSetNoType - value must be between 0 and 9999
 #[derive(Serialize, Debug, PartialEq, Clone, Copy)]
 pub struct ElementSetNo {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: u32,
 }
@@ -2917,7 +3008,8 @@ impl<'de> serde::Deserialize<'de> for ElementSetNo {
                     }
                 }
 
-                let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
+                let value = value
+                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
                 ElementSetNo::new(value).map_err(serde::de::Error::custom)
             }
         }
@@ -2927,6 +3019,7 @@ impl<'de> serde::Deserialize<'de> for ElementSetNo {
 }
 
 impl ElementSetNo {
+    /// Construct a four-digit element-set number; reject values outside that domain.
     pub fn new(value: u32) -> Result<Self> {
         Self::validate_value(value, "ElementSetNo")
     }
@@ -2959,14 +3052,18 @@ impl From<u32> for ElementSetNo {
 }
 
 // Delta mass types (negative or non-positive)
+/// Mass change strictly below zero, in kilograms.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct DeltaMass {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
+    /// Unit annotation. Omission uses the fixed units specified by the containing field.
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<MassUnits>,
 }
 impl DeltaMass {
+    /// Construct a mass change, rejecting non-negative values.
     pub fn new(value: f64, units: Option<MassUnits>) -> Result<Self> {
         if value >= 0.0 {
             return Err(crate::error::ValidationError::OutOfRange {
@@ -2988,14 +3085,18 @@ impl FromKvnFloat for DeltaMass {
     }
 }
 
+/// Mass change at or below zero, in kilograms.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct DeltaMassZ {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
+    /// Unit annotation. Omission uses the fixed units specified by the containing field.
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<MassUnits>,
 }
 impl DeltaMassZ {
+    /// Construct a mass change, rejecting positive values.
     pub fn new(value: f64, units: Option<MassUnits>) -> Result<Self> {
         if value > 0.0 {
             return Err(crate::error::ValidationError::OutOfRange {
@@ -3009,6 +3110,7 @@ impl DeltaMassZ {
         Ok(Self { value, units })
     }
 
+    /// Copy this quantity and its unit annotation into the shared measurement wrapper.
     pub fn to_unit_value(&self) -> UnitValue<f64, MassUnits> {
         UnitValue {
             value: self.value,
@@ -3029,18 +3131,25 @@ define_unit_type!(QuaternionDotComponent, QuaternionDotUnits, PerS, { PerS => "1
 
 // Latitude / Longitude / Altitude
 define_unit_enum!(LatLonUnits, Deg, { Deg => "deg" });
+/// Latitude with optional degree units; the owning field enforces its range.
 pub type Latitude = UnitValue<f64, LatLonUnits>;
+/// Longitude with optional degree units; the owning field enforces its range.
 pub type Longitude = UnitValue<f64, LatLonUnits>;
+/// Altitude with optional length units.
 pub type Altitude = UnitValue<f64, LengthUnits>;
 
+/// Latitude in [-90, 90] degrees, with a required unit annotation.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct LatitudeRequired {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
+    /// Required unit annotation for this quantity.
     #[serde(rename = "@units")]
     pub units: LatLonUnits,
 }
 impl LatitudeRequired {
+    /// Construct a latitude in [-90, 90] degrees; reject values outside that domain.
     pub fn new(value: f64) -> Result<Self> {
         Self::validate_value(value, "Latitude")?;
         Ok(Self {
@@ -3062,6 +3171,7 @@ impl LatitudeRequired {
         Ok(())
     }
 
+    /// Copy this quantity and its unit annotation into the shared measurement wrapper.
     pub fn to_unit_value(&self) -> UnitValue<f64, LatLonUnits> {
         UnitValue {
             value: self.value,
@@ -3084,21 +3194,27 @@ impl std::str::FromStr for LatitudeRequired {
 }
 
 impl FromKvnFloat for LatitudeRequired {
+    // Range is checked by the owning block's validator, which names the keyword.
     fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
-        let mut parsed = Self::new(value)?;
-        parsed.units = kvn_unit_or_default(unit, LatLonUnits::Deg)?;
-        Ok(parsed)
+        Ok(Self {
+            value,
+            units: kvn_unit_or_default(unit, LatLonUnits::Deg)?,
+        })
     }
 }
 
+/// Longitude in [-180, 180] degrees, with a required unit annotation.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct LongitudeRequired {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
+    /// Required unit annotation for this quantity.
     #[serde(rename = "@units")]
     pub units: LatLonUnits,
 }
 impl LongitudeRequired {
+    /// Construct a longitude in [-180, 180] degrees; reject values outside that domain.
     pub fn new(value: f64) -> Result<Self> {
         Self::validate_value(value, "Longitude")?;
         Ok(Self {
@@ -3120,6 +3236,7 @@ impl LongitudeRequired {
         Ok(())
     }
 
+    /// Copy this quantity and its unit annotation into the shared measurement wrapper.
     pub fn to_unit_value(&self) -> UnitValue<f64, LatLonUnits> {
         UnitValue {
             value: self.value,
@@ -3142,10 +3259,12 @@ impl std::str::FromStr for LongitudeRequired {
 }
 
 impl FromKvnFloat for LongitudeRequired {
+    // Range is checked by the owning block's validator, which names the keyword.
     fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
-        let mut parsed = Self::new(value)?;
-        parsed.units = kvn_unit_or_default(unit, LatLonUnits::Deg)?;
-        Ok(parsed)
+        Ok(Self {
+            value,
+            units: kvn_unit_or_default(unit, LatLonUnits::Deg)?,
+        })
     }
 }
 
@@ -3153,14 +3272,18 @@ impl FromKvnFloat for LongitudeRequired {
 define_unit_type!(Torque, TorqueUnits, Nm, { Nm => "N*m" });
 
 // Vector helper for cpType / targetMomentumType
+/// Three-component length vector, used for a center-of-pressure position.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Vector3 {
+    /// Three vector components in their declared unit and reference frame.
     #[serde(rename = "$value", with = "crate::utils::vec_f64_space_sep")]
     pub elements: Vec<f64>, // Expect length 3
+    /// Unit annotation. Omission uses the fixed units specified by the containing field.
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<LengthUnits>,
 }
 impl Vector3 {
+    /// Construct a three-component position vector with the supplied unit annotation.
     pub fn new(elements: [f64; 3], units: Option<LengthUnits>) -> Self {
         Self {
             elements: elements.to_vec(),
@@ -3170,14 +3293,18 @@ impl Vector3 {
 }
 
 // Target momentum vector (uses angular momentum units)
+/// Three-component target angular momentum in N*m*s.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TargetMomentum {
+    /// Three vector components in their declared unit and reference frame.
     #[serde(rename = "$value", with = "crate::utils::vec_f64_space_sep")]
     pub elements: Vec<f64>, // length 3
+    /// Unit annotation. Omission uses the fixed units specified by the containing field.
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<AngMomentumUnits>,
 }
 impl TargetMomentum {
+    /// Construct a three-component angular momentum vector with the supplied units.
     pub fn new(elements: [f64; 3], units: Option<AngMomentumUnits>) -> Self {
         Self {
             elements: elements.to_vec(),
@@ -3200,16 +3327,22 @@ fn enum_token(value: &str) -> std::borrow::Cow<'_, str> {
 // Categorical Enums
 //----------------------------------------------------------------------
 
+/// Object classification tokens shared by conjunction and orbit messages.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ObjectDescription {
+    /// Operational payload.
     #[serde(rename = "PAYLOAD", alias = "payload")]
     Payload,
+    /// Rocket body or upper stage.
     #[serde(rename = "ROCKET BODY", alias = "rocket body")]
     RocketBody,
+    /// Orbital debris.
     #[serde(rename = "DEBRIS", alias = "debris")]
     Debris,
+    /// The classification or status is unknown.
     #[serde(rename = "UNKNOWN", alias = "unknown")]
     Unknown,
+    /// Other classification or method specified by the exchange partners.
     #[serde(rename = "OTHER", alias = "other")]
     Other,
 }
@@ -3219,7 +3352,8 @@ impl std::str::FromStr for ObjectDescription {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match enum_token(s).as_ref() {
             "PAYLOAD" => Ok(Self::Payload),
-            "ROCKET BODY" => Ok(Self::RocketBody),
+            // CDM 6.3.2.5, RDM 5.3.3.4, ODM 7.5.9: an underscore in a text value equals a blank.
+            "ROCKET BODY" | "ROCKET_BODY" => Ok(Self::RocketBody),
             "DEBRIS" => Ok(Self::Debris),
             "UNKNOWN" => Ok(Self::Unknown),
             "OTHER" => Ok(Self::Other),
@@ -3244,30 +3378,47 @@ impl std::fmt::Display for ObjectDescription {
     }
 }
 
+/// Euler rotation sequence (ADM table 3-3 `EULER_ROT_SEQ`).
+///
+/// XML (serde) accepts exactly the twelve uppercase XSD `rotseqType` tokens. `FromStr`, used by
+/// KVN and Python, also accepts lowercase per ADM 6.8.6 and the ADM 1.0 numeric spellings
+/// (`313` for `ZXZ`, annex J) as a KVN-only legacy alias; every writer emits the uppercase letters.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum RotSeq {
+    /// Successive rotations about the X, Y, X axes (ADM §6.8.6).
     #[serde(rename = "XYX")]
     XYX,
+    /// Successive rotations about the X, Y, Z axes (ADM §6.8.6).
     #[serde(rename = "XYZ")]
     XYZ,
+    /// Successive rotations about the X, Z, X axes (ADM §6.8.6).
     #[serde(rename = "XZX")]
     XZX,
+    /// Successive rotations about the X, Z, Y axes (ADM §6.8.6).
     #[serde(rename = "XZY")]
     XZY,
+    /// Successive rotations about the Y, X, Y axes (ADM §6.8.6).
     #[serde(rename = "YXY")]
     YXY,
+    /// Successive rotations about the Y, X, Z axes (ADM §6.8.6).
     #[serde(rename = "YXZ")]
     YXZ,
+    /// Successive rotations about the Y, Z, X axes (ADM §6.8.6).
     #[serde(rename = "YZX")]
     YZX,
+    /// Successive rotations about the Y, Z, Y axes (ADM §6.8.6).
     #[serde(rename = "YZY")]
     YZY,
+    /// Successive rotations about the Z, X, Y axes (ADM §6.8.6).
     #[serde(rename = "ZXY")]
     ZXY,
+    /// Successive rotations about the Z, X, Z axes (ADM §6.8.6).
     #[serde(rename = "ZXZ")]
     ZXZ,
+    /// Successive rotations about the Z, Y, X axes (ADM §6.8.6).
     #[serde(rename = "ZYX")]
     ZYX,
+    /// Successive rotations about the Z, Y, Z axes (ADM §6.8.6).
     #[serde(rename = "ZYZ")]
     ZYZ,
 }
@@ -3275,7 +3426,7 @@ pub enum RotSeq {
 impl std::str::FromStr for RotSeq {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
+        match s.to_ascii_uppercase().as_str() {
             "XYX" => Ok(Self::XYX),
             "XYZ" => Ok(Self::XYZ),
             "XZX" => Ok(Self::XZX),
@@ -3303,7 +3454,7 @@ impl std::str::FromStr for RotSeq {
             _ => Err(crate::error::EnumParseError {
                 field: "EULER_ROT_SEQ",
                 value: s.to_string(),
-                expected: "XYX, XYZ, XZX, XZY, YXY, YXZ, YZX, YZY, ZXY, ZXZ, ZYX, ZYZ, or numeric equivalents",
+                expected: "XYX, XYZ, XZX, XZY, YXY, YXZ, YZX, YZY, ZXY, ZXZ, ZYX, ZYZ (either case), or ADM 1.0 numeric equivalents",
             }),
         }
     }
@@ -3328,28 +3479,59 @@ impl std::fmt::Display for RotSeq {
     }
 }
 
+/// Attitude determination method (ADM table 5-8).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum AdMethod {
+    /// Extended Kalman filter.
     #[serde(rename = "EKF", alias = "ekf")]
     Ekf,
+    /// TRIAD attitude determination.
     #[serde(rename = "TRIAD", alias = "triad")]
     Triad,
+    /// QUEST attitude determination.
     #[serde(rename = "QUEST", alias = "quest")]
     Quest,
+    /// Batch attitude estimation.
     #[serde(rename = "BATCH", alias = "batch")]
     Batch,
+    /// Quaternion q-method.
     #[serde(rename = "Q_METHOD", alias = "q_method")]
     QMethod,
+    /// Combined filtering and smoothing.
     #[serde(rename = "FILTER_SMOOTHER", alias = "filter_smoother")]
     FilterSmoother,
+    /// Other classification or method specified by the exchange partners.
     #[serde(rename = "OTHER", alias = "other")]
     Other,
 }
 
+impl std::str::FromStr for AdMethod {
+    type Err = crate::error::EnumParseError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match enum_token(s).as_ref() {
+            "EKF" => Ok(Self::Ekf),
+            "TRIAD" => Ok(Self::Triad),
+            "QUEST" => Ok(Self::Quest),
+            "BATCH" => Ok(Self::Batch),
+            "Q_METHOD" => Ok(Self::QMethod),
+            "FILTER_SMOOTHER" => Ok(Self::FilterSmoother),
+            "OTHER" => Ok(Self::Other),
+            _ => Err(crate::error::EnumParseError {
+                field: "AD_METHOD",
+                value: s.to_owned(),
+                expected: "EKF, TRIAD, QUEST, BATCH, Q_METHOD, FILTER_SMOOTHER, or OTHER",
+            }),
+        }
+    }
+}
+
+/// CCSDS boolean vocabulary expressed as YES or NO.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum YesNo {
+    /// Affirmative status.
     #[serde(rename = "YES", alias = "yes")]
     Yes,
+    /// Negative status.
     #[serde(rename = "NO", alias = "no")]
     No,
 }
@@ -3377,68 +3559,25 @@ impl std::str::FromStr for YesNo {
     }
 }
 
-/// Basis of the trajectory state time history data.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub enum TrajBasis {
-    /// Basis of this trajectory state time history data is 'PREDICTED'.
-    #[serde(rename = "PREDICTED")]
-    Predicted,
-    /// Basis of this trajectory state time history data is 'DETERMINED' when estimated from
-    /// observation-based orbit determination, reconstruction, and/or calibration. For
-    /// definitive OD performed onboard spacecraft whose solutions have been telemetered to the
-    /// ground for inclusion in an OCM, the TRAJ_BASIS shall be DETERMINED.
-    #[serde(rename = "DETERMINED")]
-    Determined,
-    /// Basis of this trajectory state time history data is 'TELEMETRY' when the trajectory
-    /// states are read directly from telemetry, for example, based on inertial navigation
-    /// systems or GNSS data.
-    #[serde(rename = "TELEMETRY")]
-    Telemetry,
-    /// Basis of this trajectory state time history data is 'SIMULATED' for generic
-    /// simulations, future mission design studies, and optimization studies.
-    #[serde(rename = "SIMULATED")]
-    Simulated,
-    /// Basis of this trajectory state time history data is 'OTHER' for other bases of this data.
-    #[serde(rename = "OTHER")]
-    Other,
-}
-
-impl std::fmt::Display for TrajBasis {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Predicted => write!(f, "PREDICTED"),
-            Self::Determined => write!(f, "DETERMINED"),
-            Self::Telemetry => write!(f, "TELEMETRY"),
-            Self::Simulated => write!(f, "SIMULATED"),
-            Self::Other => write!(f, "OTHER"),
-        }
-    }
-}
-
-impl std::str::FromStr for TrajBasis {
-    type Err = crate::error::EnumParseError;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match enum_token(s).as_ref() {
-            "PREDICTED" => Ok(Self::Predicted),
-            "DETERMINED" => Ok(Self::Determined),
-            "TELEMETRY" => Ok(Self::Telemetry),
-            "SIMULATED" => Ok(Self::Simulated),
-            "OTHER" => Ok(Self::Other),
-            _ => Err(crate::error::EnumParseError {
-                field: "TRAJ_BASIS",
-                value: s.to_string(),
-                expected: "PREDICTED, DETERMINED, TELEMETRY, SIMULATED, or OTHER",
-            }),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+/// Whether orbit revolution numbering begins at zero or one.
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub enum RevNumBasis {
+    /// The first orbit revolution is numbered zero.
     #[serde(rename = "0")]
     Zero,
+    /// The first orbit revolution is numbered one.
     #[serde(rename = "1")]
     One,
+}
+
+impl<'de> Deserialize<'de> for RevNumBasis {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        crate::utils::deserialize_parsed(deserializer, "0 or 1", |value| {
+            value.trim_matches([' ', '\t', '\r', '\n']).parse::<Self>()
+        })
+    }
 }
 
 impl std::fmt::Display for RevNumBasis {
@@ -3453,69 +3592,13 @@ impl std::fmt::Display for RevNumBasis {
 impl std::str::FromStr for RevNumBasis {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "0" => Ok(Self::Zero),
-            "1" => Ok(Self::One),
+        match s.parse::<i32>() {
+            Ok(0) => Ok(Self::Zero),
+            Ok(1) => Ok(Self::One),
             _ => Err(crate::error::EnumParseError {
                 field: "ORB_REVNUM_BASIS",
                 value: s.to_string(),
                 expected: "0 or 1",
-            }),
-        }
-    }
-}
-
-/// Basis of the covariance time history data.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub enum CovBasis {
-    /// Basis of this covariance time history data is 'PREDICTED'.
-    #[serde(rename = "PREDICTED")]
-    Predicted,
-    /// Basis of this covariance time history data is 'DETERMINED' when estimated from
-    /// observation-based orbit determination, reconstruction and/or calibration. For
-    /// definitive OD performed onboard spacecraft whose solutions have been telemetered to the ground for
-    /// inclusion in an OCM, the COV_BASIS shall be considered to be DETERMINED.
-    #[serde(rename = "DETERMINED")]
-    Determined,
-    /// Basis of this covariance time history data is 'EMPIRICAL' (for empirically determined
-    /// such as overlap analyses).
-    #[serde(rename = "EMPIRICAL")]
-    Empirical,
-    /// Basis of this covariance time history data is 'SIMULATED' for simulation-based
-    /// (including Monte Carlo) estimations, future mission design studies, and optimization
-    /// studies.
-    #[serde(rename = "SIMULATED")]
-    Simulated,
-    /// Basis of this covariance time history data is 'OTHER' for other bases of this data.
-    #[serde(rename = "OTHER")]
-    Other,
-}
-
-impl std::fmt::Display for CovBasis {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Predicted => write!(f, "PREDICTED"),
-            Self::Determined => write!(f, "DETERMINED"),
-            Self::Empirical => write!(f, "EMPIRICAL"),
-            Self::Simulated => write!(f, "SIMULATED"),
-            Self::Other => write!(f, "OTHER"),
-        }
-    }
-}
-
-impl std::str::FromStr for CovBasis {
-    type Err = crate::error::EnumParseError;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match enum_token(s).as_ref() {
-            "PREDICTED" => Ok(Self::Predicted),
-            "DETERMINED" => Ok(Self::Determined),
-            "EMPIRICAL" => Ok(Self::Empirical),
-            "SIMULATED" => Ok(Self::Simulated),
-            "OTHER" => Ok(Self::Other),
-            _ => Err(crate::error::EnumParseError {
-                field: "COV_BASIS",
-                value: s.to_string(),
-                expected: "PREDICTED, DETERMINED, EMPIRICAL, SIMULATED, or OTHER",
             }),
         }
     }
@@ -3687,12 +3770,16 @@ impl std::str::FromStr for CovOrder {
     }
 }
 
+/// Whether a reentry is controlled (RDM table 3-3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ControlledType {
+    /// Affirmative status.
     #[serde(rename = "YES", alias = "yes")]
     Yes,
+    /// Negative status.
     #[serde(rename = "NO", alias = "no")]
     No,
+    /// The classification or status is unknown.
     #[serde(rename = "UNKNOWN", alias = "unknown")]
     Unknown,
 }
@@ -3740,14 +3827,18 @@ impl TimeUnits {
     }
 }
 
+/// Non-negative duration with an optional time unit annotation.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Duration {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64, // nonNegativeDouble
+    /// Unit annotation. Omission uses the fixed units specified by the containing field.
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<TimeUnits>,
 }
 impl Duration {
+    /// Construct a non-negative duration; reject values outside that domain.
     pub fn new(value: f64, units: Option<TimeUnits>) -> Result<Self> {
         Self::validate_value(value, "Duration")?;
         Ok(Self { value, units })
@@ -3756,6 +3847,7 @@ impl Duration {
     pub(crate) fn validate_value(value: f64, name: &'static str) -> Result<()> {
         require_non_negative(value, name)
     }
+    /// Copy this quantity and its unit annotation into the shared measurement wrapper.
     pub fn to_unit_value(&self) -> UnitValue<f64, TimeUnits> {
         UnitValue {
             value: self.value,
@@ -3769,18 +3861,24 @@ impl FromKvnFloat for Duration {
         Self::new(uv.value, uv.units)
     }
 }
+/// Signed relative time, interpreted using the containing field and time system.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct RelTime {
+    /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64, // double (can be negative)
+    /// Unit annotation. Omission uses the fixed units specified by the containing field.
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<TimeUnits>,
 }
 
+/// Signed time offset with an optional time unit annotation.
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct TimeOffset {
-    #[serde(rename = "$value")]
+    /// Numeric value; the containing type defines its unit and permitted domain.
+    #[serde(rename = "$value", serialize_with = "serialize_xml_value")]
     pub value: f64, // double
+    /// Unit annotation. Omission uses the fixed units specified by the containing field.
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<TimeUnits>,
 }
@@ -3797,49 +3895,14 @@ impl std::str::FromStr for TimeOffset {
 }
 
 impl<'de> serde::Deserialize<'de> for TimeOffset {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct TimeOffsetVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for TimeOffsetVisitor {
-            type Value = TimeOffset;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a primitive value or a map with $value and optionally @units")
-            }
-
-            fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                v.parse::<TimeOffset>().map_err(E::custom)
-            }
-
-            fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
-            where
-                A: serde::de::MapAccess<'de>,
-            {
-                let mut value = None;
-                let mut units = None;
-
-                while let Some(key) = map.next_key::<String>()? {
-                    if key == "$value" || key == "$text" {
-                        value = Some(map.next_value()?);
-                    } else if key == "@units" {
-                        units = Some(map.next_value()?);
-                    } else {
-                        let _: serde::de::IgnoredAny = map.next_value()?;
-                    }
-                }
-
-                let value = value.ok_or_else(|| serde::de::Error::missing_field("$value"))?;
-                Ok(TimeOffset { value, units })
-            }
-        }
-
-        deserializer.deserialize_any(TimeOffsetVisitor)
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let value = UnitValue::<f64, TimeUnits>::deserialize(deserializer)?;
+        Ok(Self {
+            value: value.value,
+            units: value.units,
+        })
     }
 }
 
@@ -3853,6 +3916,7 @@ impl FromKvnFloat for TimeOffset {
     }
 }
 impl TimeOffset {
+    /// Copy this quantity and its unit annotation into the shared measurement wrapper.
     pub fn to_unit_value(&self) -> UnitValue<f64, TimeUnits> {
         UnitValue {
             value: self.value,
@@ -3862,12 +3926,15 @@ impl TimeOffset {
 }
 
 // Inclination (0 ..= 180 deg)
+/// Orbital inclination in [0, 180] degrees.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(transparent)]
 pub struct Inclination {
+    /// Inclination angle with its optional degree annotation.
     pub angle: Angle, // uses AngleUnits (deg)
 }
 impl Inclination {
+    /// Construct an inclination in [0, 180] degrees; reject values outside that domain.
     pub fn new(value: f64, units: Option<AngleUnits>) -> Result<Self> {
         if !(0.0..=180.0).contains(&value) {
             return Err(crate::error::ValidationError::OutOfRange {
@@ -3882,6 +3949,7 @@ impl Inclination {
             angle: Angle { value, units },
         })
     }
+    /// Copy this quantity and its unit annotation into the shared measurement wrapper.
     pub fn to_unit_value(&self) -> UnitValue<f64, AngleUnits> {
         UnitValue {
             value: self.angle.value,
@@ -3897,20 +3965,28 @@ impl FromKvnFloat for Inclination {
 }
 
 // Attitude related enums (acmAttitudeType, attRateType, attBasisType, acmCovarianceLineType, attitudeTypeType)
+/// ACM attitude-state representation (ADM table 5-4).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum AcmAttitudeType {
+    /// Quaternion components.
     #[serde(rename = "QUATERNION", alias = "quaternion")]
     Quaternion,
+    /// Euler-angle components.
     #[serde(rename = "EULER_ANGLES", alias = "euler_angles")]
     EulerAngles,
+    /// Direction cosine matrix components.
     #[serde(rename = "DCM", alias = "dcm")]
     Dcm,
+    /// Angular-velocity components.
     #[serde(rename = "ANGVEL", alias = "angvel")]
     AngVel,
+    /// Quaternion time derivatives.
     #[serde(rename = "Q_DOT", alias = "q_dot")]
     QDot,
+    /// Euler-angle time derivatives.
     #[serde(rename = "EULER_RATE", alias = "euler_rate")]
     EulerRate,
+    /// Gyroscope bias components.
     #[serde(rename = "GYRO_BIAS", alias = "gyro_bias")]
     GyroBias,
 }
@@ -3950,14 +4026,19 @@ impl std::fmt::Display for AcmAttitudeType {
     }
 }
 
+/// ACM attitude-rate representation (ADM table 5-4).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum AttRateType {
+    /// Angular-velocity components.
     #[serde(rename = "ANGVEL", alias = "angvel")]
     AngVel,
+    /// Quaternion time derivatives.
     #[serde(rename = "Q_DOT", alias = "q_dot")]
     QDot,
+    /// Euler-angle time derivatives.
     #[serde(rename = "EULER_RATE", alias = "euler_rate")]
     EulerRate,
+    /// Gyroscope bias components.
     #[serde(rename = "GYRO_BIAS", alias = "gyro_bias")]
     GyroBias,
 }
@@ -3991,14 +4072,19 @@ impl std::fmt::Display for AttRateType {
     }
 }
 
+/// Provenance of an attitude history (ADM table 5-4).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum AttBasisType {
+    /// Predicted attitude.
     #[serde(rename = "PREDICTED", alias = "predicted")]
     Predicted,
+    /// Attitude determined on the ground.
     #[serde(rename = "DETERMINED_GND", alias = "determined_gnd")]
     DeterminedGnd,
+    /// Attitude determined by the onboard computer.
     #[serde(rename = "DETERMINED_OBC", alias = "determined_obc")]
     DeterminedObc,
+    /// Simulated attitude.
     #[serde(rename = "SIMULATED", alias = "simulated")]
     Simulated,
 }
@@ -4032,18 +4118,25 @@ impl std::fmt::Display for AttBasisType {
     }
 }
 
+/// ACM covariance composition (ADM table 5-6).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum AcmCovarianceLineType {
+    /// Attitude-angle covariance.
     #[serde(rename = "ANGLE", alias = "angle")]
     Angle,
+    /// Combined attitude-angle and gyroscope-bias covariance.
     #[serde(rename = "ANGLE_GYROBIAS", alias = "angle_gyrobias")]
     AngleGyroBias,
+    /// Combined attitude-angle and angular-velocity covariance.
     #[serde(rename = "ANGLE_ANGVEL", alias = "angle_angvel")]
     AngleAngVel,
+    /// Quaternion components.
     #[serde(rename = "QUATERNION", alias = "quaternion")]
     Quaternion,
+    /// Combined quaternion and gyroscope-bias covariance.
     #[serde(rename = "QUATERNION_GYROBIAS", alias = "quaternion_gyrobias")]
     QuaternionGyroBias,
+    /// Quaternion components with angular-velocity components.
     #[serde(rename = "QUATERNION_ANGVEL", alias = "quaternion_angvel")]
     QuaternionAngVel,
 }
@@ -4081,29 +4174,40 @@ impl std::fmt::Display for AcmCovarianceLineType {
     }
 }
 
+/// AEM attitude-state representation and record layout (ADM table 4-4).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum AttitudeTypeType {
+    /// Quaternion components.
     #[serde(rename = "QUATERNION", alias = "quaternion")]
     Quaternion,
+    /// Quaternion components and their time derivatives.
     #[serde(rename = "QUATERNION/DERIVATIVE", alias = "quaternion/derivative")]
     QuaternionDerivative,
+    /// Quaternion components with angular-velocity components.
     #[serde(rename = "QUATERNION/ANGVEL", alias = "quaternion/angvel")]
     QuaternionAngVel,
+    /// Euler-angle components.
     #[serde(rename = "EULER_ANGLE", alias = "euler_angle")]
     EulerAngle,
+    /// Euler angles and their time derivatives.
     #[serde(rename = "EULER_ANGLE/DERIVATIVE", alias = "euler_angle/derivative")]
     EulerAngleDerivative,
+    /// Euler angles with angular-velocity components.
     #[serde(rename = "EULER_ANGLE/ANGVEL", alias = "euler_angle/angvel")]
     EulerAngleAngVel,
+    /// Spin-axis direction, phase and rate.
     #[serde(rename = "SPIN", alias = "spin")]
     Spin,
+    /// Spin state with a nutation description.
     #[serde(rename = "SPIN/NUTATION", alias = "spin/nutation")]
     SpinNutation,
+    /// Spin state with angular-momentum and nutation-rate information.
     #[serde(rename = "SPIN/NUTATION_MOM", alias = "spin/nutation_mom")]
     SpinNutationMom,
 }
 
 impl AttitudeTypeType {
+    /// Number of numeric components per history record, excluding its epoch (ADM table 4-4).
     pub const fn value_count(&self) -> usize {
         match self {
             Self::Quaternion | Self::Spin => 4,
@@ -4159,32 +4263,46 @@ impl std::fmt::Display for AttitudeTypeType {
 }
 
 // APM rate frame
+/// Euler frame used for attitude rate components (ADM table 3-3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ApmRateFrame {
+    /// Rates expressed in the first Euler frame.
     #[serde(rename = "EULER_FRAME_A")]
     EulerFrameA,
+    /// Rates expressed in the second Euler frame.
     #[serde(rename = "EULER_FRAME_B")]
     EulerFrameB,
 }
 
 // SigmaU / SigmaV units and types
 define_unit_enum!(SigmaUUnits, DegPerS15, { DegPerS15 => "deg/s**1.5" });
+/// Uncertainty component along the U axis, with optional units.
 pub type SigmaU = UnitValue<f64, SigmaUUnits>;
 
 define_unit_enum!(SigmaVUnits, DegPerS05, { DegPerS05 => "deg/s**0.5" });
+/// Uncertainty component along the V axis, with optional units.
 pub type SigmaV = UnitValue<f64, SigmaVUnits>;
 
 // Sensor noise (string with optional angle units)
+/// Sensor noise standard deviations with optional angular units (ADM table 5-9).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SensorNoise {
+    /// Noise standard deviations in sensor-defined component order.
     #[serde(rename = "$value", default, with = "crate::utils::vec_f64_space_sep")]
     pub values: Vec<f64>,
+    /// Unit annotation. Omission uses the fixed units specified by the containing field.
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<AngleUnits>,
 }
 
 /// Re-entry disintegration type.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+///
+/// KVN additionally accepts the all-lowercase spellings. Both notations tolerate
+/// `MASS-LOSS + BREAKUP`, a transcription variant that is in neither the book nor the XSD (the
+/// book's Figure C-4 breaks `BREAK-` / `UP` across a line); it reads as
+/// [`DisintegrationType::MassLossAndBreakUp`] and is always written as `MASS-LOSS + BREAK-UP`.
+/// Diagnostics list only the book spellings.
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub enum DisintegrationType {
     /// No disintegration considered.
     #[serde(rename = "NONE")]
@@ -4195,30 +4313,51 @@ pub enum DisintegrationType {
     /// Break-up considered.
     #[serde(rename = "BREAK-UP")]
     BreakUp,
-    /// Both mass loss and break-up considered. The legacy `MASS-LOSS + BREAKUP` spelling is
-    /// accepted on input and emitted as the schema spelling `MASS-LOSS + BREAK-UP`.
-    #[serde(rename = "MASS-LOSS + BREAK-UP", alias = "MASS-LOSS + BREAKUP")]
+    /// Both mass loss and break-up considered.
+    #[serde(rename = "MASS-LOSS + BREAK-UP")]
     MassLossAndBreakUp,
+}
+
+impl DisintegrationType {
+    fn from_upper(s: &str) -> Option<Self> {
+        match s {
+            "NONE" => Some(Self::None),
+            "MASS-LOSS" => Some(Self::MassLoss),
+            "BREAK-UP" => Some(Self::BreakUp),
+            "MASS-LOSS + BREAK-UP" | "MASS-LOSS + BREAKUP" => Some(Self::MassLossAndBreakUp),
+            _ => None,
+        }
+    }
+
+    fn parse_error(s: &str) -> crate::error::EnumParseError {
+        crate::error::EnumParseError {
+            field: "REENTRY_DISINTEGRATION",
+            value: s.to_string(),
+            expected: "NONE, MASS-LOSS, BREAK-UP, or MASS-LOSS + BREAK-UP",
+        }
+    }
 }
 
 impl std::str::FromStr for DisintegrationType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "NONE" => Ok(Self::None),
-            "MASS-LOSS" => Ok(Self::MassLoss),
-            "BREAK-UP" => Ok(Self::BreakUp),
-            // `BREAKUP` is not an XSD spelling. It is accepted because the published RDM example
-            // `data/xml/rdm_c4.xml` uses it; generation always emits the canonical `BREAK-UP`, so
-            // the non-conforming spelling is normalised rather than propagated. The diagnostic
-            // below deliberately advertises only the conforming spellings.
-            "MASS-LOSS + BREAK-UP" | "MASS-LOSS + BREAKUP" => Ok(Self::MassLossAndBreakUp),
-            _ => Err(crate::error::EnumParseError {
-                field: "REENTRY_DISINTEGRATION",
-                value: s.to_string(),
-                expected: "NONE, MASS-LOSS, BREAK-UP, or MASS-LOSS + BREAK-UP",
-            }),
-        }
+        let lower_only = s.bytes().all(|b| !b.is_ascii_uppercase());
+        let canonical = if lower_only {
+            s.to_ascii_uppercase()
+        } else {
+            s.to_string()
+        };
+        Self::from_upper(&canonical).ok_or_else(|| Self::parse_error(s))
+    }
+}
+
+// XML follows the XSD enumeration (uppercase) plus the tolerated `BREAKUP` variant.
+impl<'de> Deserialize<'de> for DisintegrationType {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        Self::from_upper(&s).ok_or_else(|| serde::de::Error::custom(Self::parse_error(&s)))
     }
 }
 
@@ -4248,28 +4387,20 @@ pub enum ImpactUncertaintyType {
     /// Empirical uncertainty method.
     #[serde(rename = "EMPIRICAL")]
     Empirical,
-    /// Covariance uncertainty method.
-    #[serde(rename = "COVARIANCE")]
-    Covariance,
-    /// Statistical uncertainty method.
-    #[serde(rename = "STATISTICAL")]
-    Statistical,
 }
 
 impl std::str::FromStr for ImpactUncertaintyType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "NONE" => Ok(Self::None),
-            "ANALYTICAL" => Ok(Self::Analytical),
-            "STOCHASTIC" => Ok(Self::Stochastic),
-            "EMPIRICAL" => Ok(Self::Empirical),
-            "COVARIANCE" => Ok(Self::Covariance),
-            "STATISTICAL" => Ok(Self::Statistical),
+            "NONE" | "none" => Ok(Self::None),
+            "ANALYTICAL" | "analytical" => Ok(Self::Analytical),
+            "STOCHASTIC" | "stochastic" => Ok(Self::Stochastic),
+            "EMPIRICAL" | "empirical" => Ok(Self::Empirical),
             _ => Err(crate::error::EnumParseError {
                 field: "IMPACT_UNCERTAINTY_METHOD",
                 value: s.to_string(),
-                expected: "NONE, ANALYTICAL, STOCHASTIC, EMPIRICAL, COVARIANCE, or STATISTICAL",
+                expected: "NONE, ANALYTICAL, STOCHASTIC, or EMPIRICAL",
             }),
         }
     }
@@ -4282,8 +4413,6 @@ impl std::fmt::Display for ImpactUncertaintyType {
             Self::Analytical => write!(f, "ANALYTICAL"),
             Self::Stochastic => write!(f, "STOCHASTIC"),
             Self::Empirical => write!(f, "EMPIRICAL"),
-            Self::Covariance => write!(f, "COVARIANCE"),
-            Self::Statistical => write!(f, "STATISTICAL"),
         }
     }
 }
@@ -4303,28 +4432,20 @@ pub enum ReentryUncertaintyMethodType {
     /// Empirical uncertainty method.
     #[serde(rename = "EMPIRICAL")]
     Empirical,
-    /// Covariance uncertainty method.
-    #[serde(rename = "COVARIANCE")]
-    Covariance,
-    /// Statistical uncertainty method.
-    #[serde(rename = "STATISTICAL")]
-    Statistical,
 }
 
 impl std::str::FromStr for ReentryUncertaintyMethodType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "NONE" => Ok(Self::None),
-            "ANALYTICAL" => Ok(Self::Analytical),
-            "STOCHASTIC" => Ok(Self::Stochastic),
-            "EMPIRICAL" => Ok(Self::Empirical),
-            "COVARIANCE" => Ok(Self::Covariance),
-            "STATISTICAL" => Ok(Self::Statistical),
+            "NONE" | "none" => Ok(Self::None),
+            "ANALYTICAL" | "analytical" => Ok(Self::Analytical),
+            "STOCHASTIC" | "stochastic" => Ok(Self::Stochastic),
+            "EMPIRICAL" | "empirical" => Ok(Self::Empirical),
             _ => Err(crate::error::EnumParseError {
                 field: "REENTRY_UNCERTAINTY_METHOD",
                 value: s.to_string(),
-                expected: "NONE, ANALYTICAL, STOCHASTIC, EMPIRICAL, COVARIANCE, or STATISTICAL",
+                expected: "NONE, ANALYTICAL, STOCHASTIC, or EMPIRICAL",
             }),
         }
     }
@@ -4337,8 +4458,6 @@ impl std::fmt::Display for ReentryUncertaintyMethodType {
             Self::Analytical => write!(f, "ANALYTICAL"),
             Self::Stochastic => write!(f, "STOCHASTIC"),
             Self::Empirical => write!(f, "EMPIRICAL"),
-            Self::Covariance => write!(f, "COVARIANCE"),
-            Self::Statistical => write!(f, "STATISTICAL"),
         }
     }
 }
@@ -4390,13 +4509,16 @@ pub struct UserDefined {
 /// An ordered entry in a user-defined block.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum UserDefinedEntry {
+    /// Comment text at this position in the user-defined block.
     #[serde(rename = "COMMENT")]
     Comment(String),
+    /// A named user-defined value at this position in the block.
     #[serde(rename = "USER_DEFINED")]
     Parameter(UserDefinedParameter),
 }
 
 impl UserDefined {
+    /// Iterate comment entries in source order, skipping parameters.
     pub fn comments(&self) -> impl Iterator<Item = &String> {
         self.entries.iter().filter_map(|entry| match entry {
             UserDefinedEntry::Comment(value) => Some(value),
@@ -4404,6 +4526,7 @@ impl UserDefined {
         })
     }
 
+    /// Iterate parameter entries in source order, skipping comments.
     pub fn parameters(&self) -> impl Iterator<Item = &UserDefinedParameter> {
         self.entries.iter().filter_map(|entry| match entry {
             UserDefinedEntry::Parameter(value) => Some(value),
@@ -4411,6 +4534,7 @@ impl UserDefined {
         })
     }
 
+    /// Mutably iterate parameter entries without changing the comment order.
     pub fn parameters_mut(&mut self) -> impl Iterator<Item = &mut UserDefinedParameter> {
         self.entries.iter_mut().filter_map(|entry| match entry {
             UserDefinedEntry::Parameter(value) => Some(value),
@@ -4418,23 +4542,33 @@ impl UserDefined {
         })
     }
 
+    /// Checks that every parameter name can be written as a `USER_DEFINED_<name>` keyword.
+    pub(crate) fn validate_kvn_parameter_names(&self) -> Result<()> {
+        for value in self.parameters() {
+            if value.parameter.is_empty()
+                || !value.parameter.bytes().all(|byte| {
+                    byte.is_ascii_graphic() && !byte.is_ascii_lowercase() && byte != b'='
+                })
+            {
+                return Err(crate::error::ValidationError::InvalidValue {
+                    field: "USER_DEFINED parameter".into(),
+                    value: value.parameter.clone(),
+                    expected: "a nonempty uppercase printable ASCII suffix without whitespace or ="
+                        .into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        self.validate_kvn_parameter_names()?;
         let mut parameter_seen = false;
         for entry in &self.entries {
             match entry {
-                UserDefinedEntry::Parameter(value) => {
-                    if value.parameter.is_empty()
-                        || !value.parameter.bytes().all(|byte| {
-                            byte.is_ascii_graphic() && !byte.is_ascii_lowercase() && byte != b'='
-                        })
-                    {
-                        return Err(crate::error::ValidationError::InvalidValue {
-                            field: "USER_DEFINED parameter".into(),
-                            value: value.parameter.clone(),
-                            expected: "a nonempty uppercase printable ASCII suffix without whitespace or =".into(),
-                            line: None,
-                        }.into());
-                    }
+                UserDefinedEntry::Parameter(_) => {
                     parameter_seen = true;
                 }
                 UserDefinedEntry::Comment(_) if parameter_seen => {
@@ -4520,10 +4654,10 @@ define_required_type!(M2kgRequired, M2kgUnits, M2PerKg);
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum CdmObjectType {
     /// The object to which the metadata and data apply is OBJECT1.
-    #[serde(rename = "OBJECT1")]
+    #[serde(rename = "OBJECT1", alias = "object1")]
     Object1,
     /// The object to which the metadata and data apply is OBJECT2.
-    #[serde(rename = "OBJECT2")]
+    #[serde(rename = "OBJECT2", alias = "object2")]
     Object2,
 }
 
@@ -4546,10 +4680,10 @@ impl std::str::FromStr for CdmObjectType {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ScreenVolumeFrameType {
     /// Radial, Transverse, and Normal (RTN) coordinate frame.
-    #[serde(rename = "RTN")]
+    #[serde(rename = "RTN", alias = "rtn")]
     Rtn,
     /// Transverse, Velocity, and Normal (TVN) coordinate frame.
-    #[serde(rename = "TVN")]
+    #[serde(rename = "TVN", alias = "tvn")]
     Tvn,
 }
 
@@ -4581,10 +4715,10 @@ impl std::str::FromStr for ScreenVolumeFrameType {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ScreenVolumeShapeType {
     /// Ellipsoid screening volume.
-    #[serde(rename = "ELLIPSOID")]
+    #[serde(rename = "ELLIPSOID", alias = "ellipsoid")]
     Ellipsoid,
     /// Box screening volume.
-    #[serde(rename = "BOX")]
+    #[serde(rename = "BOX", alias = "box")]
     Box,
 }
 
@@ -4616,13 +4750,13 @@ impl std::str::FromStr for ScreenVolumeShapeType {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ReferenceFrameType {
     /// Geocentric Celestial Reference Frame.
-    #[serde(rename = "GCRF")]
+    #[serde(rename = "GCRF", alias = "gcrf")]
     Gcrf,
     /// Earth Mean Equinox and Equator of J2000.
-    #[serde(rename = "EME2000")]
+    #[serde(rename = "EME2000", alias = "eme2000")]
     Eme2000,
     /// International Terrestrial Reference Frame.
-    #[serde(rename = "ITRF")]
+    #[serde(rename = "ITRF", alias = "itrf")]
     Itrf,
 }
 
@@ -4656,10 +4790,10 @@ impl std::str::FromStr for ReferenceFrameType {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum CovarianceMethodType {
     /// Covariance was calculated during the OD.
-    #[serde(rename = "CALCULATED")]
+    #[serde(rename = "CALCULATED", alias = "calculated")]
     Calculated,
     /// An arbitrary, non-calculated default value was used.
-    #[serde(rename = "DEFAULT")]
+    #[serde(rename = "DEFAULT", alias = "default")]
     Default,
 }
 
@@ -4691,13 +4825,13 @@ impl std::str::FromStr for CovarianceMethodType {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ManeuverableType {
     /// Object is maneuverable.
-    #[serde(rename = "YES")]
+    #[serde(rename = "YES", alias = "yes")]
     Yes,
     /// Object is not maneuverable.
-    #[serde(rename = "NO")]
+    #[serde(rename = "NO", alias = "no")]
     No,
     /// Maneuverability is not applicable or unknown.
-    #[serde(rename = "N/A")]
+    #[serde(rename = "N/A", alias = "n/a")]
     NA,
 }
 
@@ -4734,12 +4868,16 @@ impl std::str::FromStr for ManeuverableType {
 /// A 3-element vector of doubles (XSD vec3Double)
 #[derive(Debug, PartialEq, Clone)]
 pub struct Vec3Double {
+    /// First vector component; units and reference frame are supplied by the containing field.
     pub x: f64,
+    /// Second vector component; units and reference frame are supplied by the containing field.
     pub y: f64,
+    /// Third vector component; units and reference frame are supplied by the containing field.
     pub z: f64,
 }
 
 impl Vec3Double {
+    /// Construct a vector in component order; the owning field defines its units.
     pub fn new(x: f64, y: f64, z: f64) -> Self {
         Self { x, y, z }
     }
@@ -4809,11 +4947,13 @@ impl std::fmt::Display for Vec3Double {
 /// A 4-element vector of doubles (XSD vec4Double)
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Vec4Double {
+    /// Four components in source order.
     #[serde(rename = "$value", with = "crate::utils::vec_f64_space_sep")]
     pub values: Vec<f64>,
 }
 
 impl Vec4Double {
+    /// Construct four components in their wire order; the owning field defines their meaning.
     pub fn new(a: f64, b: f64, c: f64, d: f64) -> Self {
         Self {
             values: vec![a, b, c, d],
@@ -4916,11 +5056,13 @@ impl TryFrom<String> for TdmAngleType {
     type Error = crate::error::EnumParseError;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
-        // XML enumerations are case-sensitive; KVN FromStr also accepts case aliases.
-        if value.bytes().any(|byte| byte.is_ascii_lowercase()) {
-            Ok(Self::Other(value))
-        } else {
-            value.parse()
+        match value.as_str() {
+            "azel" => Ok(Self::Azel),
+            "radec" => Ok(Self::Radec),
+            "xeyn" => Ok(Self::Xeyn),
+            "xsye" => Ok(Self::Xsye),
+            _ if value.bytes().any(|byte| byte.is_ascii_lowercase()) => Ok(Self::Other(value)),
+            _ => value.parse(),
         }
     }
 }
@@ -4935,13 +5077,13 @@ impl From<TdmAngleType> for String {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum TdmDataQuality {
     /// No quality check of the data has occurred.
-    #[serde(rename = "RAW")]
+    #[serde(rename = "RAW", alias = "raw")]
     Raw,
     /// Data quality has been checked, and passed tests.
-    #[serde(rename = "VALIDATED")]
+    #[serde(rename = "VALIDATED", alias = "validated")]
     Validated,
     /// Data quality has been checked and quality issues exist.
-    #[serde(rename = "DEGRADED")]
+    #[serde(rename = "DEGRADED", alias = "degraded")]
     Degraded,
 }
 
@@ -4975,13 +5117,13 @@ impl std::fmt::Display for TdmDataQuality {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum TdmIntegrationRef {
     /// Timetag represents the start of the integration period.
-    #[serde(rename = "START")]
+    #[serde(rename = "START", alias = "start")]
     Start,
     /// Timetag represents the middle of the integration period.
-    #[serde(rename = "MIDDLE")]
+    #[serde(rename = "MIDDLE", alias = "middle")]
     Middle,
     /// Timetag represents the end of the integration period.
-    #[serde(rename = "END")]
+    #[serde(rename = "END", alias = "end")]
     End,
 }
 
@@ -5018,10 +5160,10 @@ pub enum TdmMode {
     /// carrier-power-to-noise spectral density, ranging-power-to-noise spectral density,
     /// optical, angles, and line-of-sight ionosphere calibrations; the name implies a
     /// sequential signal path between tracking participants.
-    #[serde(rename = "SEQUENTIAL")]
+    #[serde(rename = "SEQUENTIAL", alias = "sequential")]
     Sequential,
     /// The value ‘SINGLE_DIFF’ applies only for differenced data.
-    #[serde(rename = "SINGLE_DIFF")]
+    #[serde(rename = "SINGLE_DIFF", alias = "single_diff")]
     SingleDiff,
 }
 
@@ -5053,13 +5195,13 @@ impl std::fmt::Display for TdmMode {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum TdmRangeMode {
     /// Range tones are coherent with the uplink carrier.
-    #[serde(rename = "COHERENT")]
+    #[serde(rename = "COHERENT", alias = "coherent")]
     Coherent,
     /// Range tones have a constant frequency.
-    #[serde(rename = "CONSTANT")]
+    #[serde(rename = "CONSTANT", alias = "constant")]
     Constant,
     /// Used in Delta-DOR.
-    #[serde(rename = "ONE_WAY")]
+    #[serde(rename = "ONE_WAY", alias = "one_way")]
     OneWay,
 }
 
@@ -5129,19 +5271,26 @@ impl std::fmt::Display for TdmRangeUnits {
     }
 }
 
+/// TDM reference frames, including open KVN values that XML cannot represent.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(try_from = "String", into = "String")]
 pub enum TdmReferenceFrame {
+    /// Earth mean equator and equinox of J2000.
     #[serde(rename = "EME2000")]
     Eme2000,
+    /// International Celestial Reference Frame.
     #[serde(rename = "ICRF")]
     Icrf,
+    /// International Terrestrial Reference Frame, 2000 realization.
     #[serde(rename = "ITRF2000")]
     Itrf2000,
+    /// International Terrestrial Reference Frame, 1993 realization.
     #[serde(rename = "ITRF-93")]
     Itrf93,
+    /// International Terrestrial Reference Frame, 1997 realization.
     #[serde(rename = "ITRF-97")]
     Itrf97,
+    /// True equator and equinox of date.
     #[serde(rename = "TOD")]
     Tod,
     /// A book-valid ICD or registry value outside the bundled XML enumeration.
@@ -5191,11 +5340,15 @@ impl TryFrom<String> for TdmReferenceFrame {
     type Error = crate::error::EnumParseError;
 
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
-        // XML enumerations are case-sensitive; KVN FromStr also accepts case aliases.
-        if value.bytes().any(|byte| byte.is_ascii_lowercase()) {
-            Ok(Self::Other(value))
-        } else {
-            value.parse()
+        match value.as_str() {
+            "eme2000" => Ok(Self::Eme2000),
+            "icrf" => Ok(Self::Icrf),
+            "itrf2000" => Ok(Self::Itrf2000),
+            "itrf-93" => Ok(Self::Itrf93),
+            "itrf-97" => Ok(Self::Itrf97),
+            "tod" => Ok(Self::Tod),
+            _ if value.bytes().any(|byte| byte.is_ascii_lowercase()) => Ok(Self::Other(value)),
+            _ => value.parse(),
         }
     }
 }
@@ -5210,10 +5363,10 @@ impl From<TdmReferenceFrame> for String {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum TdmTimetagRef {
     /// Timetag is the transmit time.
-    #[serde(rename = "TRANSMIT")]
+    #[serde(rename = "TRANSMIT", alias = "transmit")]
     Transmit,
     /// Timetag is the receive time.
-    #[serde(rename = "RECEIVE")]
+    #[serde(rename = "RECEIVE", alias = "receive")]
     Receive,
 }
 
@@ -5725,8 +5878,8 @@ mod extra_tests {
         assert!(DayInterval::new(10.0, None).is_ok());
         assert!(DayInterval::new(-0.1, None).is_err());
         assert!(DayIntervalRequired::new(0.1).is_ok());
-        assert!(DayIntervalRequired::new(0.0).is_ok());
-        assert!(DayIntervalRequired::validate_xml_value(0.0, "day interval").is_err());
+        assert!(DayIntervalRequired::new(0.0).is_err());
+        assert!(DayIntervalRequired::new(-1.0).is_err());
         assert!(DayIntervalRequired::new(f64::NAN).is_err());
         assert!(DayIntervalRequired::new(f64::INFINITY).is_err());
         assert!(DayIntervalRequired::new(f64::NEG_INFINITY).is_err());
@@ -5735,7 +5888,7 @@ mod extra_tests {
     #[test]
     fn test_frequency_validation() {
         assert!(Frequency::new(1.0, None).is_ok());
-        assert!(Frequency::new(0.0, None).is_ok());
+        assert!(Frequency::new(0.0, None).is_err());
         assert!(Frequency::validate_xml_value(0.0, "Frequency").is_err());
     }
 

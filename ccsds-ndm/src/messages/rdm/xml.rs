@@ -266,28 +266,9 @@ pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {
 }
 
 impl Rdm {
-    /// Apply XML-only lifetime positivity and Earth-derived impact-altitude bounds without
-    /// imposing those schema facets on the book's finite-double KVN domains.
+    /// Apply the XML-only Earth-derived impact-altitude bounds without imposing that schema
+    /// facet on the book's finite-double KVN domain.
     pub(crate) fn validate_xml_representability(&self) -> Result<()> {
-        let atmospheric = &self.body.segment.data.atmospheric_reentry_parameters;
-        for (name, interval) in [
-            ("ORBIT_LIFETIME", Some(&atmospheric.orbit_lifetime)),
-            (
-                "ORBIT_LIFETIME_WINDOW_START",
-                atmospheric.orbit_lifetime_window_start.as_ref(),
-            ),
-            (
-                "ORBIT_LIFETIME_WINDOW_END",
-                atmospheric.orbit_lifetime_window_end.as_ref(),
-            ),
-        ] {
-            if let Some(interval) = interval {
-                crate::validation::validate_at_field_path(
-                    crate::types::DayIntervalRequired::validate_xml_value(interval.value, name),
-                    "body.segment.data.atmospheric_reentry_parameters",
-                )?;
-            }
-        }
         let Some(parameters) = &self.body.segment.data.ground_impact_parameters else {
             return Ok(());
         };

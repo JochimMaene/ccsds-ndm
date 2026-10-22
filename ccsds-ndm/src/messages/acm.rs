@@ -35,11 +35,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "acm")]
 pub struct Acm {
+    /// Message provenance and creation epoch.
     pub header: AdmHeader,
+    /// The message segment and its data.
     pub body: AcmBody,
+    /// XML root identifier; when present it must match this family.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_ACM_VERS".to_string()))]
     pub id: Option<String>,
+    /// Supported message edition, "2.0".
     #[serde(rename = "@version")]
     #[builder(default = "2.0".to_string(), into)]
     pub version: String,
@@ -63,8 +67,10 @@ impl Ndm for Acm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::detect::without_utf8_bom(kvn);
-        let normalized = crate::kvn::normalize_line_endings(kvn);
+        let normalized = crate::kvn::prepare_input(
+            crate::detect::without_utf8_bom(kvn),
+            crate::validation::MessageKind::Acm,
+        )?;
         kvn::validate_kvn_syntax(&normalized)?;
         let acm = Self::from_kvn_str(&normalized)?;
         crate::traits::Validate::validate(&acm)?;
@@ -96,9 +102,11 @@ impl Ndm for Acm {
 // Body & Segment
 //----------------------------------------------------------------------
 
+/// Single-segment ACM body (ADM §5.3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct AcmBody {
+    /// The single comprehensive-message segment.
     #[serde(rename = "segment")]
     pub segment: Box<AcmSegment>,
 }
@@ -109,10 +117,13 @@ impl crate::traits::Validate for AcmBody {
     }
 }
 
+/// ACM metadata and comprehensive attitude data (ADM §5.3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct AcmSegment {
+    /// Object identification, time system and segment interpretation.
     pub metadata: AcmMetadata,
+    /// Comprehensive data blocks interpreted using the segment metadata.
     pub data: AcmData,
 }
 
@@ -120,12 +131,6 @@ impl crate::traits::Validate for AcmSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
         self.data.validate_with_metadata(&self.metadata)
-    }
-}
-
-impl AcmSegment {
-    pub fn validate(&self, _header: &AdmHeader) -> Result<()> {
-        crate::traits::Validate::validate(self)
     }
 }
 
@@ -324,6 +329,7 @@ pub struct AcmMetadata {
 }
 
 impl AcmMetadata {
+    /// Validate ACM metadata and its local conditional requirements.
     pub fn validate(&self) -> Result<()> {
         crate::validation::epoch_precision(&[
             ("EPOCH_TZERO", &self.epoch_tzero),
@@ -451,6 +457,7 @@ impl crate::traits::Validate for AcmData {
 }
 
 impl AcmData {
+    /// Validate all data blocks against the segment metadata and reference epoch.
     pub fn validate_with_metadata(&self, metadata: &AcmMetadata) -> Result<()> {
         crate::traits::Validate::validate(self)?;
         if let Some(declaration) = &metadata.acm_data_elements {
@@ -474,10 +481,6 @@ impl AcmData {
             }
         }
         Ok(())
-    }
-
-    pub fn validate(&self, metadata: &AcmMetadata) -> Result<()> {
-        self.validate_with_metadata(metadata)
     }
 }
 
@@ -517,13 +520,15 @@ pub struct AcmAttitudeState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub att_prev_id: Option<String>,
-    /// Basis of this attitude state time history data.
+    /// Basis of this attitude state time history data. Table 5-4 lists suggested values, so KVN
+    /// and the model keep any text; XML input and output require the XSD `attBasisType` values.
     ///
     /// **Examples**: PREDICTED, DETERMINED_GND, DETERMINED_OBC, SIMULATED
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub att_basis: Option<AttBasisType>,
+    #[builder(into)]
+    pub att_basis: Option<String>,
     /// Free-text field containing the identification number for the telemetry dataset, attitude
     /// determination, or simulation upon which this attitude state time history block is based.
     /// When a matching attitude determination block accompanies this attitude state time history,
@@ -566,29 +571,31 @@ pub struct AcmAttitudeState {
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
     #[builder(into)]
     pub att_type: AcmAttitudeType,
-    /// Type of rate data, selected per annex B, subsection B4. If rate data are included,
-    /// NUMBER_STATES must be at least 6 to include both attitude and rate data. The units that
-    /// shall be used are given in annex B, subsection B4. If the value is ANGVEL, the reference
-    /// frame used shall be REF_FRAME_B.
-    ///
-    /// **Examples**: ANGVEL, GYRO_BIAS, Q_DOT, NONE
-    ///
-    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[builder(into)]
-    pub rate_type: Option<AttRateType>,
     /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
     /// the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
     /// the rotation axis of the first rotation, the second letter (X, Y, or Z) represents the
     /// rotation axis of the second rotation, and the third letter (X, Y, or Z) represents the
     /// rotation axis of the third rotation. This keyword is applicable only if ATT_TYPE specifies
-    /// the use of Euler angles.
+    /// the use of Euler angles. Written before RATE_TYPE (table 5-4, XSD `acmAttitudeStateType`);
+    /// KVN reading also accepts it just before NUMBER_STATES, the order Orekit writes.
     ///
     /// **Examples**: ZXZ, XYZ
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub euler_rot_seq: Option<RotSeq>,
+    /// Type of rate data, selected per annex B, subsection B4. If rate data are included,
+    /// NUMBER_STATES must be at least 6 to include both attitude and rate data. The units that
+    /// shall be used are given in annex B, subsection B4. If the value is ANGVEL, the reference
+    /// frame used shall be REF_FRAME_B.
+    ///
+    /// **Examples**: ANGVEL, GYRO_BIAS, Q_DOT. KVN `RATE_TYPE = NONE` (or `none`), which table 5-4
+    /// lists, is read as omission; the XSD `attRateType` has no `NONE` token.
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub rate_type: Option<AttRateType>,
     /// Data lines that consist of attitude data followed by rate data. (For the data units, see
     /// above [ATT_TYPE and RATE_TYPE keywords]).
     ///
@@ -673,74 +680,136 @@ impl AcmAttitudeState {
             }
             .into());
         }
-        let expected = attitude_width + rate_width + 1;
-        if let Some(line) = self
+        let expected = attitude_width + rate_width;
+        if let Some((index, line)) = self
             .att_lines
             .iter()
-            .find(|line| line.values.len() != expected)
+            .enumerate()
+            .find(|(_, line)| line.values.len() != expected)
         {
             return Err(ValidationError::InvalidValue {
-                field: "attLine".into(),
+                field: "ATT data line".into(),
                 value: line.values.len().to_string(),
-                expected: format!("relative time plus {} attitude states", self.number_states)
-                    .into(),
+                expected: format!("{expected} states after the time tag (NUMBER_STATES)").into(),
                 line: None,
             }
+            .at_path(format!("att_lines[{index}].values"))
             .into());
         }
         for line in &self.att_lines {
             if self.att_type == AcmAttitudeType::Quaternion {
                 crate::common::Quaternion {
-                    q1: line.values[1],
-                    q2: line.values[2],
-                    q3: line.values[3],
-                    qc: line.values[4],
+                    q1: line.values[0],
+                    q2: line.values[1],
+                    q3: line.values[2],
+                    qc: line.values[3],
                 }
                 .validate()?;
             }
             for value in &line.values {
-                validate_finite_acm_value("attLine", *value)?;
+                validate_finite_acm_value("ATT data line", *value)?;
             }
         }
-        self.validate_time_tags(|value| value)
-    }
-
-    fn validate_time_tags(&self, mut time: impl FnMut(f64) -> f64) -> Result<()> {
         // ADM 5.3.4.4 forbids duplicate tags without requiring attitude histories to increase.
-        if !self
-            .att_lines
-            .windows(2)
-            .all(|pair| time(pair[0].values[0]) < time(pair[1].values[0]))
-            && !self
-                .att_lines
-                .windows(2)
-                .all(|pair| time(pair[0].values[0]) > time(pair[1].values[0]))
-        {
-            let mut times: Vec<_> = self
-                .att_lines
-                .iter()
-                .enumerate()
-                .map(|(index, line)| (time(line.values[0]), index))
-                .collect();
-            times.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
-            if let Some(pair) = times.windows(2).find(|pair| pair[0].0 == pair[1].0) {
-                return Err(ValidationError::InvalidValue {
-                    field: "attLine time".into(),
-                    value: pair[1].0.to_string(),
-                    expected: "non-repeated attitude time tags (ADM 5.3.4.4)".into(),
-                    line: None,
-                }
-                .at_path(format!("att_lines[{}].time", pair[1].1))
-                .into());
-            }
-        }
-        Ok(())
+        validate_history_time_tags(
+            &self.att_lines,
+            |line| &line.epoch,
+            "ATT time tag",
+            "att_lines",
+            false,
+        )
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+/// Checks a history block's time tags: each is a relative time or an absolute CCSDS epoch
+/// (ADM 5.3.4.3), all use the same form (5.3.4.5), and none repeats (5.3.4.4). Covariance
+/// histories must also increase (5.3.7.5). Values are compared within their lexical branch with
+/// [`Epoch::cmp_same_branch`]; no time conversion takes place.
+fn validate_history_time_tags<L>(
+    lines: &[L],
+    epoch: impl Fn(&L) -> &Epoch,
+    field: &'static str,
+    path: &'static str,
+    increasing: bool,
+) -> Result<()> {
+    use std::cmp::Ordering;
+    let invalid =
+        |index: usize, tag: &Epoch, expected: &'static str| -> crate::error::CcsdsNdmError {
+            ValidationError::invalid_value(field, tag.to_string(), expected)
+                .at_path(format!("{path}[{index}].epoch"))
+                .into()
+        };
+    let mut kind = None;
+    for (index, tag) in lines.iter().map(&epoch).enumerate() {
+        let valid = match tag.kind() {
+            EpochKind::Calendar => tag.calendar_fields_are_valid() == Some(true),
+            EpochKind::Numeric => tag.order_key().is_some(),
+        };
+        if !valid {
+            return Err(invalid(
+                index,
+                tag,
+                "a relative time in seconds or a CCSDS calendar/ordinal epoch (ADM 5.3.4.3)",
+            ));
+        }
+        if *kind.get_or_insert(tag.kind()) != tag.kind() {
+            return Err(invalid(
+                index,
+                tag,
+                "the same relative or absolute form as the first time tag of the block (ADM 5.3.4.5)",
+            ));
+        }
+        crate::validation::epoch_precision(&[(field, tag)])?;
+    }
+    // Same-branch values always compare; treat an impossible `None` as a duplicate.
+    let order = |a: &L, b: &L| {
+        epoch(a)
+            .cmp_same_branch(epoch(b))
+            .unwrap_or(Ordering::Equal)
+    };
+    if let Some(index) = lines
+        .windows(2)
+        .position(|pair| order(&pair[0], &pair[1]) != Ordering::Less)
+    {
+        if increasing {
+            return Err(invalid(
+                index + 1,
+                epoch(&lines[index + 1]),
+                "strictly increasing, non-repeated covariance time tags (ADM 5.3.4.4 and 5.3.7.5)",
+            ));
+        }
+        if !lines
+            .windows(2)
+            .all(|pair| order(&pair[0], &pair[1]) == Ordering::Greater)
+        {
+            let mut indices: Vec<usize> = (0..lines.len()).collect();
+            indices.sort_unstable_by(|a, b| order(&lines[*a], &lines[*b]));
+            if let Some(pair) = indices
+                .windows(2)
+                .find(|pair| order(&lines[pair[0]], &lines[pair[1]]) == Ordering::Equal)
+            {
+                let index = pair[0].max(pair[1]);
+                return Err(invalid(
+                    index,
+                    epoch(&lines[index]),
+                    "non-repeated attitude time tags (ADM 5.3.4.4)",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// One attitude state time-history record (ADM table 5-4 data line).
+///
+/// **CCSDS Reference**: 504.0-B-2, Sections 5.3.4.3 and 5.3.5.
+#[derive(Debug, PartialEq, Clone)]
 pub struct AttLine {
-    #[serde(rename = "$value", with = "crate::utils::vec_f64_space_sep")]
+    /// Time tag: either a signed relative time in seconds from `EPOCH_TZERO` (e.g. `20157.26`)
+    /// or an absolute CCSDS calendar/ordinal epoch (ADM 5.3.4.3). One form is used throughout a
+    /// block (ADM 5.3.4.5). The lexical spelling is preserved and written back unchanged.
+    pub epoch: Epoch,
+    /// Attitude states followed by any rate states, in the units of annex B, subsection B4.
     pub values: Vec<f64>,
 }
 
@@ -948,17 +1017,39 @@ pub struct AcmCovarianceMatrix {
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comment: Vec<String>,
-    /// Basis of this covariance time history data.
+    /// Optional alphanumeric free-text string containing the identification number for this
+    /// covariance time history block.
+    ///
+    /// **Examples**: COV_20160402_XYZ
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cov_id: Option<String>,
+    /// Optional alphanumeric free-text string containing the identification number for the
+    /// previous covariance time history. Omit it when this history is not part of a sequence or
+    /// is the first of one.
+    ///
+    /// **Examples**: COV_20160401_XYZ
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cov_prev_id: Option<String>,
+    /// Basis of this covariance time history data. Table 5-6 lists suggested values, so KVN and
+    /// the model keep any text; XML input and output require the XSD `attBasisType` values.
     ///
     /// **Examples**: PREDICTED, DETERMINED_GND, DETERMINED_OBC, SIMULATED
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cov_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cov_prev_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cov_basis: Option<AttBasisType>,
+    pub cov_basis: Option<String>,
+    /// Free-text field containing the identification number for the telemetry dataset, attitude
+    /// determination, or simulation upon which this covariance time history block is based. When
+    /// a matching attitude determination block accompanies it, COV_BASIS_ID should match the
+    /// corresponding AD_ID (see table 5-8).
+    ///
+    /// **Examples**: AD_1985
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_basis_id: Option<String>,
     /// Reference frame of the covariance time history. The full set of values is enumerated in
@@ -975,11 +1066,6 @@ pub struct AcmCovarianceMatrix {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
     pub cov_type: AcmCovarianceLineType,
-    /// Optional confidence level of the covariance matrix.
-    ///
-    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
-    #[serde(skip)]
-    pub cov_confidence: Option<f64>,
     /// Covariance data lines (diagonal terms only). (For the data units, see annex B, subsection
     /// B6.)
     ///
@@ -990,15 +1076,6 @@ pub struct AcmCovarianceMatrix {
 
 impl AcmCovarianceMatrix {
     fn validate(&self) -> Result<()> {
-        if self.cov_confidence.is_some() {
-            return Err(ValidationError::InvalidValue {
-                field: "COV_CONFIDENCE".into(),
-                value: "present".into(),
-                expected: "omitted; ACM 2.0 does not define COV_CONFIDENCE".into(),
-                line: None,
-            }
-            .into());
-        }
         if self.cov_lines.is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: "ACM Covariance".into(),
@@ -1015,45 +1092,45 @@ impl AcmCovarianceMatrix {
                 7
             }
         };
-        for line in &self.cov_lines {
-            if line.values.len() != diagonal_width + 1 {
+        for (index, line) in self.cov_lines.iter().enumerate() {
+            if line.values.len() != diagonal_width {
                 return Err(ValidationError::InvalidValue {
-                    field: "covLine".into(),
+                    field: "COV data line".into(),
                     value: line.values.len().to_string(),
                     expected: format!(
-                        "relative time plus {diagonal_width} diagonal covariance elements"
+                        "{diagonal_width} diagonal covariance elements after the time tag (COV_TYPE)"
                     )
                     .into(),
                     line: None,
                 }
+                .at_path(format!("cov_lines[{index}].values"))
                 .into());
             }
             for value in &line.values {
-                validate_finite_acm_value("covLine", *value)?;
+                validate_finite_acm_value("COV data line", *value)?;
             }
         }
-        if let Some((index, pair)) = self
-            .cov_lines
-            .windows(2)
-            .enumerate()
-            .find(|(_, pair)| pair[0].values[0] >= pair[1].values[0])
-        {
-            return Err(ValidationError::InvalidValue {
-                field: "covLine time".into(),
-                value: pair[1].values[0].to_string(),
-                expected: "strictly increasing, non-repeated covariance time tags (ADM 5.3.4.4 and 5.3.7.5)".into(),
-                line: None,
-            }
-            .at_path(format!("cov_lines[{}].time", index + 1))
-            .into());
-        }
+        validate_history_time_tags(
+            &self.cov_lines,
+            |line| &line.epoch,
+            "COV time tag",
+            "cov_lines",
+            true,
+        )?;
         Ok(())
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+/// One covariance time-history record (ADM table 5-6 data line).
+///
+/// **CCSDS Reference**: 504.0-B-2, Sections 5.3.4.3 and 5.3.7.
+#[derive(Debug, PartialEq, Clone)]
 pub struct CovLine {
-    #[serde(rename = "$value", with = "crate::utils::vec_f64_space_sep")]
+    /// Time tag: either a signed relative time in seconds from `EPOCH_TZERO` or an absolute
+    /// CCSDS calendar/ordinal epoch (ADM 5.3.4.3), one form per block (ADM 5.3.4.5). The
+    /// lexical spelling is preserved and written back unchanged.
+    pub epoch: Epoch,
+    /// Diagonal covariance elements in the order and units of annex B, subsection B6.
     pub values: Vec<f64>,
 }
 
@@ -1102,7 +1179,10 @@ pub struct AcmManeuverParameters {
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_purpose: Option<String>,
-    /// Start time of actual maneuver, measured as a relative time with respect to EPOCH_TZERO.
+    /// Start time of actual maneuver, measured as a relative time with respect to EPOCH_TZERO
+    /// (table 5-7 and XSD `relTimeType`; absolute times are rejected). The spelling read is kept
+    /// for XML, while KVN output writes the canonical number, so `110` reads back as `110.0`
+    /// and a KVN round trip of such a model is not equal to the original.
     ///
     /// **Examples**: 100.0
     ///
@@ -1112,6 +1192,9 @@ pub struct AcmManeuverParameters {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_begin_time: Option<RelativeTime>,
     /// End time of actual maneuver, measured as a relative time with respect to EPOCH_TZERO.
+    /// Exactly one of MAN_END_TIME and MAN_DURATION is required: the book says "should only
+    /// specify MAN_END_TIME or MAN_DURATION, not both" and the XSD makes them a required choice.
+    /// It may not precede MAN_BEGIN_TIME.
     ///
     /// **Examples**: 120.0
     ///
@@ -1120,36 +1203,52 @@ pub struct AcmManeuverParameters {
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_end_time: Option<RelativeTime>,
-    /// Maneuver duration.
+    /// Length of the maneuver; non-negative. Exactly one of MAN_END_TIME and MAN_DURATION is
+    /// required (see `man_end_time`).
+    ///
+    /// **Examples**: 20.0
     ///
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub man_duration: Option<Duration>,
-    /// Actuator used for the maneuver.
+    /// Specifies the type of actuator used for the maneuver.
+    ///
+    /// **Examples**: ATT-THRUSTER, RWA
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actuator_used: Option<String>,
-    /// Target angular momentum vector.
+    /// Target momentum in TARGET_MOM_FRAME, required when MAN_PURPOSE includes MOM_DESAT.
+    /// Contains 3 elements, one for each axis.
+    ///
+    /// **Examples**: 0 -10 0
     ///
     /// **Units**: N*m*s
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_momentum: Option<TargetMomentum>,
-    /// Coordinate system for the target momentum vector.
+    /// Reference frame of TARGET_MOMENTUM (annex B, subsection B3). It shall be present if
+    /// TARGET_MOMENTUM is present.
+    ///
+    /// **Examples**: SC_BODY_1
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_mom_frame: Option<String>,
-    /// Target attitude (e.g., quaternion).
+    /// Target quaternion, required when MAN_PURPOSE includes ATT_ADJUST. Contains 4 elements in
+    /// the order Q1, Q2, Q3, QC.
+    ///
+    /// **Examples**: 0 0 0 1
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_attitude: Option<Vec4Double>,
-    /// Target spin rate.
+    /// Target spin rate, required when MAN_PURPOSE includes SPIN_RATE_ADJUST.
+    ///
+    /// **Examples**: 0.31
     ///
     /// **Units**: deg/s
     ///
@@ -1337,14 +1436,16 @@ pub struct AcmAttitudeDetermination {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub attitude_source: Option<String>,
-    /// Number of states if EKF, BATCH, or FILTER SMOOTHER is specified.
+    /// Number of states if EKF, BATCH, or FILTER SMOOTHER is specified. At least 6 when
+    /// RATE_STATES is present.
     ///
     /// **Examples**: 3, 6, 7
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub number_states: Option<u32>,
-    /// Type of attitude states if EKF, BATCH, or FILTER SMOOTHER is specified.
+    /// Type of attitude data, selected per annex B, subsection B4 (mandatory in the AD block).
+    /// Attitude states must always be listed before rate states.
     ///
     /// **Examples**: QUATERNION
     ///
@@ -1352,22 +1453,25 @@ pub struct AcmAttitudeDetermination {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub attitude_states: Option<AcmAttitudeType>,
-    /// Euler rotation sequence when the estimator attitude states use Euler angles.
+    /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation, required
+    /// when ATTITUDE_STATES specifies Euler angles. Written after ATTITUDE_STATES (table 5-8);
+    /// KVN reading also accepts it just before NUMBER_STATES, the order Orekit writes.
+    ///
+    /// **Examples**: ZXZ, XYZ
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub euler_rot_seq: Option<RotSeq>,
-    /// Indicates covariance composition. Select from annex B, subsection B6.
+    /// Type of attitude error state included in the estimator, selected from annex B,
+    /// subsection B6. Table 5-8 lists `NONE` among the examples while the XSD
+    /// `acmCovarianceLineType` lacks it, so KVN `COV_TYPE = NONE` (or `none`) is read as omission.
     ///
     /// **Examples**: ANGLE, ANGLE_GYROBIAS
     ///
-    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.7.
+    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub cov_type: Option<AcmCovarianceLineType>,
-    /// Epoch of the attitude determination.
-    ///
-    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(skip)]
-    pub ad_epoch: Option<Epoch>,
     /// Name of the reference frame that defines the starting point of the transformation described
     /// by the attitude state in the estimator. The set of allowed values is described in annex B,
     /// subsection B3.
@@ -1386,15 +1490,7 @@ pub struct AcmAttitudeDetermination {
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ref_frame_b: Option<String>,
-    /// Type of attitude data, selected per annex B, subsection B4. Attitude states must always be
-    /// listed before rate states.
-    ///
-    /// **Examples**: QUATERNION
-    ///
-    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
-    #[serde(skip)]
-    pub attitude_type: Option<String>,
-    /// Type of rate state included in the estimator. If rate states are included, attitude_states
+    /// Type of rate state included in the estimator. If rate states are included, NUMBER_STATES
     /// must be at least 6 to include both attitude states and rate states.
     ///
     /// **Examples**: ANGVEL, GYRO_BIAS
@@ -1429,7 +1525,7 @@ pub struct AcmAttitudeDetermination {
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rate_process_noise_stddev: Option<SigmaU>,
-    /// Sensor data blocks.
+    /// Sensor data sections (SENSOR_START/SENSOR_STOP), one per sensor used (ADM 5.3.9.5).
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(rename = "sensorData", default)]
@@ -1438,24 +1534,6 @@ pub struct AcmAttitudeDetermination {
 
 impl AcmAttitudeDetermination {
     fn validate(&self) -> Result<()> {
-        if self.ad_epoch.is_some() {
-            return Err(ValidationError::InvalidValue {
-                field: "AD_EPOCH".into(),
-                value: "present".into(),
-                expected: "omitted; ACM 2.0 does not define AD_EPOCH".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.attitude_type.is_some() {
-            return Err(ValidationError::InvalidValue {
-                field: "ATTITUDE_TYPE".into(),
-                value: "present".into(),
-                expected: "omitted; use ATTITUDE_STATES in ACM 2.0".into(),
-                line: None,
-            }
-            .into());
-        }
         if self.attitude_states.is_none() {
             return Err(ValidationError::MissingRequiredField {
                 block: "ACM Attitude Determination".into(),
@@ -1565,7 +1643,7 @@ impl AcmAttitudeDetermination {
                 }
             }
             if let Some(frequency) = &sensor.sensor_frequency {
-                validate_finite_acm_value("SENSOR_FREQUENCY", frequency.value)?;
+                Frequency::validate_xml_value(frequency.value, "SENSOR_FREQUENCY")?;
             }
         }
 
@@ -1594,7 +1672,7 @@ impl AcmAttitudeDetermination {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AcmSensor {
-    /// Comments allowed only immediately after the SENSOR_START keyword.
+    /// Producer-extension comments immediately after SENSOR_START; XML generation refuses them.
     ///
     /// **Examples**: This is a comment.
     ///
@@ -1616,10 +1694,16 @@ pub struct AcmSensor {
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sensor_used: Option<String>,
-    /// Number of elements in the sensor-noise covariance representation.
+    /// Number of noise elements for the sensor, for example noise along the horizontal and
+    /// vertical directions of a CCD, or along the x, y, and z axes of a sensor.
+    ///
+    /// **Examples**: 2, 3
+    ///
+    /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub number_sensor_noise_covariance: Option<u32>,
-    /// Standard deviation of sensor noise.
+    /// Standard deviation of sensor noise; its size equals NUMBER_SENSOR_NOISE_COVARIANCE when
+    /// that is supplied.
     ///
     /// **Examples**: 0.0097 0.0097
     ///

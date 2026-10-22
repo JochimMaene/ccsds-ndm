@@ -11,16 +11,11 @@ impl super::Omm {
             &self.version,
             data.spacecraft_parameters.as_ref(),
         )?;
-        if let Some(gm) = &data.mean_elements.gm {
-            crate::validation::validate_at_field_path(
-                crate::types::Gm::validate_xml_value(gm.value, "GM"),
-                "body.segment.data.mean_elements",
-            )?;
-        }
         crate::versioning::validate_omm_xml_edition(self)?;
         if let Some(tle) = &data.tle_parameters {
             for (present, field) in [
                 (tle.bstar.is_some() || tle.bterm.is_some(), "BSTAR or BTERM"),
+                (tle.mean_motion_dot.is_some(), "MEAN_MOTION_DOT"),
                 (
                     tle.mean_motion_ddot.is_some() || tle.agom.is_some(),
                     "MEAN_MOTION_DDOT or AGOM",

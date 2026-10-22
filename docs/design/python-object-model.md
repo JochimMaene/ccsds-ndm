@@ -7,8 +7,8 @@ Status: accepted
 Python messages will behave like ordinary mutable Python object graphs:
 
 ```python
-message.segment.metadata.object_name = "UPDATED"
-message.segments[0].data.state_vector[0].x = 7000.0
+opm.segment.metadata.object_name = "UPDATED"
+oem.segments[0].data.state_vector[0].x = 7000.0
 ```
 
 Nested getters return live child objects. Repeated model fields are live Python collections, so

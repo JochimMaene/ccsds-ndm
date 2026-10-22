@@ -27,7 +27,6 @@ use winnow::stream::Offset;
 
 pub fn cdm_version(input: &mut &str) -> KvnResult<String> {
     ws.parse_next(input)?;
-    let _ = collect_comments.parse_next(input)?;
     let value = expect_unitless_key("CCSDS_CDM_VERS").parse_next(input)?;
     Ok(value.to_string())
 }
@@ -53,7 +52,7 @@ pub fn cdm_header(input: &mut &str) -> KvnResult<CdmHeader> {
             break;
         }
 
-        let key = match keyword.parse_next(input) {
+        let key = match winnow::combinator::preceded(ws, keyword).parse_next(input) {
             Ok(k) => k,
             Err(_) => {
                 input.reset(&checkpoint);
@@ -61,7 +60,7 @@ pub fn cdm_header(input: &mut &str) -> KvnResult<CdmHeader> {
             }
         };
 
-        if key == "TCA" || key == "META_START" {
+        if key == "TCA" {
             input.reset(&checkpoint);
             break;
         }
@@ -75,7 +74,7 @@ pub fn cdm_header(input: &mut &str) -> KvnResult<CdmHeader> {
                 originator = Some(kv_string.parse_next(input)?);
             }
             "MESSAGE_FOR" => {
-                message_for = Some(kv_string.parse_next(input)?);
+                message_for = kv_optional(kv_string).parse_next(input)?;
             }
             "MESSAGE_ID" => {
                 message_id = Some(kv_string.parse_next(input)?);
@@ -149,7 +148,7 @@ pub fn relative_metadata_data(input: &mut &str) -> KvnResult<RelativeMetadataDat
         "SCREEN_EXIT_TIME" => val: kv_calendar_epoch_opt => { screen_exit_time = val; },
         "COLLISION_PROBABILITY" => val: kv_from_kvn_opt => { collision_probability = val; },
         "COLLISION_PROBABILITY_METHOD" => val: kv_string_opt => { collision_probability_method = val; },
-    }, |i: &mut &str| at_block_start("META", i) || peek(key_token).parse_next(i).map(|k| k == "OBJECT").unwrap_or(false), "Unknown Relative Metadata key");
+    }, |i: &mut &str| peek(key_token).parse_next(i).map(|k| k == "OBJECT").unwrap_or(false), "Unknown Relative Metadata key");
 
     let relative_state_vector = if rel_pos_r.is_some()
         || rel_pos_t.is_some()
@@ -318,13 +317,6 @@ fn is_state_vector_key(key: &str) -> bool {
 }
 
 pub fn cdm_metadata(input: &mut &str) -> KvnResult<CdmMetadata> {
-    let has_meta_block = if at_block_start("META", input) {
-        expect_block_start("META").parse_next(input)?;
-        true
-    } else {
-        false
-    };
-
     let mut comment = Vec::new();
     let mut object = None;
     let mut object_designator = None;
@@ -370,11 +362,7 @@ pub fn cdm_metadata(input: &mut &str) -> KvnResult<CdmMetadata> {
         "SOLAR_RAD_PRESSURE" => val: kv_yes_no_opt => { solar_rad_pressure = val; },
         "EARTH_TIDES" => val: kv_yes_no_opt => { earth_tides = val; },
         "INTRACK_THRUST" => val: kv_yes_no_opt => { intrack_thrust = val; },
-    }, |i: &mut &str| (has_meta_block && at_block_end("META", i)) || (!has_meta_block && is_cdm_data_key(peek(key_token).parse_next(i).unwrap_or(""))), "Unknown metadata key");
-
-    if has_meta_block && at_block_end("META", input) {
-        expect_block_end("META").parse_next(input)?;
-    }
+    }, |i: &mut &str| is_cdm_data_key(peek(key_token).parse_next(i).unwrap_or("")), "Unknown metadata key");
 
     Ok(CdmMetadata {
         comment,
@@ -426,10 +414,6 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
     let mut x_dot = None;
     let mut y_dot = None;
     let mut z_dot = None;
-
-    // OD Parameters flags
-    let mut has_od_params = false;
-    let mut has_add_params = false;
 
     let mut cr_r = None;
     let mut ct_r = None;
@@ -495,25 +479,25 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
             covariance_comment.extend(comments);
         }
     }, {
-        "TIME_LASTOB_START" => val: kv_calendar_epoch_opt => { od_params.time_lastob_start = val; has_od_params = true; },
-        "TIME_LASTOB_END" => val: kv_calendar_epoch_opt => { od_params.time_lastob_end = val; has_od_params = true; },
-        "RECOMMENDED_OD_SPAN" => val: kv_from_kvn_opt => { od_params.recommended_od_span = val; has_od_params = true; },
-        "ACTUAL_OD_SPAN" => val: kv_from_kvn_opt => { od_params.actual_od_span = val; has_od_params = true; },
-        "OBS_AVAILABLE" => val: kv_u32_opt => { od_params.obs_available = val.map(|v| v.into()); has_od_params = true; },
-        "OBS_USED" => val: kv_u32_opt => { od_params.obs_used = val.map(|v| v.into()); has_od_params = true; },
-        "TRACKS_AVAILABLE" => val: kv_u32_opt => { od_params.tracks_available = val.map(|v| v.into()); has_od_params = true; },
-        "TRACKS_USED" => val: kv_u32_opt => { od_params.tracks_used = val.map(|v| v.into()); has_od_params = true; },
-        "RESIDUALS_ACCEPTED" => val: kv_from_kvn_opt => { od_params.residuals_accepted = val; has_od_params = true; },
-        "WEIGHTED_RMS" => val: kv_from_kvn_opt => { od_params.weighted_rms = val; has_od_params = true; },
+        "TIME_LASTOB_START" => val: kv_calendar_epoch_opt => { od_params.time_lastob_start = val; },
+        "TIME_LASTOB_END" => val: kv_calendar_epoch_opt => { od_params.time_lastob_end = val; },
+        "RECOMMENDED_OD_SPAN" => val: kv_from_kvn_opt => { od_params.recommended_od_span = val; },
+        "ACTUAL_OD_SPAN" => val: kv_from_kvn_opt => { od_params.actual_od_span = val; },
+        "OBS_AVAILABLE" => val: kv_u32_opt => { od_params.obs_available = val.map(|v| v.into()); },
+        "OBS_USED" => val: kv_u32_opt => { od_params.obs_used = val.map(|v| v.into()); },
+        "TRACKS_AVAILABLE" => val: kv_u32_opt => { od_params.tracks_available = val.map(|v| v.into()); },
+        "TRACKS_USED" => val: kv_u32_opt => { od_params.tracks_used = val.map(|v| v.into()); },
+        "RESIDUALS_ACCEPTED" => val: kv_from_kvn_opt => { od_params.residuals_accepted = val; },
+        "WEIGHTED_RMS" => val: kv_from_kvn_opt => { od_params.weighted_rms = val; },
 
-        "AREA_PC" => val: kv_from_kvn_opt => { add_params.area_pc = val; has_add_params = true; },
-        "AREA_DRG" => val: kv_from_kvn_opt => { add_params.area_drg = val; has_add_params = true; },
-        "AREA_SRP" => val: kv_from_kvn_opt => { add_params.area_srp = val; has_add_params = true; },
-        "MASS" => val: kv_from_kvn_opt => { add_params.mass = val; has_add_params = true; },
-        "CD_AREA_OVER_MASS" => val: kv_from_kvn_opt => { add_params.cd_area_over_mass = val; has_add_params = true; },
-        "CR_AREA_OVER_MASS" => val: kv_from_kvn_opt => { add_params.cr_area_over_mass = val; has_add_params = true; },
-        "THRUST_ACCELERATION" => val: kv_from_kvn_opt => { add_params.thrust_acceleration = val; has_add_params = true; },
-        "SEDR" => val: kv_from_kvn_opt => { add_params.sedr = val; has_add_params = true; },
+        "AREA_PC" => val: kv_from_kvn_opt => { add_params.area_pc = val; },
+        "AREA_DRG" => val: kv_from_kvn_opt => { add_params.area_drg = val; },
+        "AREA_SRP" => val: kv_from_kvn_opt => { add_params.area_srp = val; },
+        "MASS" => val: kv_from_kvn_opt => { add_params.mass = val; },
+        "CD_AREA_OVER_MASS" => val: kv_from_kvn_opt => { add_params.cd_area_over_mass = val; },
+        "CR_AREA_OVER_MASS" => val: kv_from_kvn_opt => { add_params.cr_area_over_mass = val; },
+        "THRUST_ACCELERATION" => val: kv_from_kvn_opt => { add_params.thrust_acceleration = val; },
+        "SEDR" => val: kv_from_kvn_opt => { add_params.sedr = val; },
 
         "X" => val: kv_from_kvn => { x = Some(val); },
         "Y" => val: kv_from_kvn => { y = Some(val); },
@@ -567,7 +551,7 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
         "CTHR_DRG" => val: kv_from_kvn_opt => { cthr_drg = val; has_cov = true; },
         "CTHR_SRP" => val: kv_from_kvn_opt => { cthr_srp = val; has_cov = true; },
         "CTHR_THR" => val: kv_from_kvn_opt => { cthr_thr = val; has_cov = true; },
-    }, |i: &mut &str| at_block_start("META", i) || peek(key_token).parse_next(i).map(|k| k == "OBJECT").unwrap_or(false), "Unknown Data key");
+    }, |i: &mut &str| peek(key_token).parse_next(i).map(|k| k == "OBJECT").unwrap_or(false), "Unknown Data key");
 
     let covariance_matrix = if has_cov {
         Some(CdmCovarianceMatrix {
@@ -637,14 +621,10 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
         None
     };
 
-    Ok(CdmData {
+    let mut data = CdmData {
         comment,
-        od_parameters: if has_od_params { Some(od_params) } else { None },
-        additional_parameters: if has_add_params {
-            Some(add_params)
-        } else {
-            None
-        },
+        od_parameters: Some(od_params),
+        additional_parameters: Some(add_params),
         state_vector: CdmStateVector {
             comment: state_vector_comment,
             x: x.ok_or_else(|| missing_field_err(input, "Data", "X"))?,
@@ -655,7 +635,10 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
             z_dot: z_dot.ok_or_else(|| missing_field_err(input, "Data", "Z_DOT"))?,
         },
         covariance_matrix,
-    })
+    };
+    // A blank optional value leaves no block; any comment run read before it moves forward.
+    data.canonicalize_kvn_comments();
+    Ok(data)
 }
 
 //----------------------------------------------------------------------
@@ -663,23 +646,7 @@ pub fn cdm_data(input: &mut &str) -> KvnResult<CdmData> {
 //----------------------------------------------------------------------
 
 pub fn cdm_segment(input: &mut &str) -> KvnResult<CdmSegment> {
-    // 1. Metadata
-    // Metadata can start with optional META_START (for CDM 2.0) or just keys (for CDM 1.0)
-    // However, if it's CDM 2.0, we might see META_START.
-
-    // Collect comments before segment
-    let pre_comments = collect_comments.parse_next(input)?;
-
-    // winnow approach:
-    // Check if we have META_START
-    if at_block_start("META", input) {
-        expect_block_start("META").parse_next(input)?;
-    }
-
-    let mut metadata = cdm_metadata.parse_next(input)?;
-    metadata.comment.splice(0..0, pre_comments);
-
-    // 2. Data
+    let metadata = cdm_metadata.parse_next(input)?;
     let data = cdm_data.parse_next(input)?;
 
     Ok(CdmSegment { metadata, data })
@@ -888,12 +855,6 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
         let fail = |message: &str| Err(invalid(number, offset, message.into()));
         if line.as_bytes().contains(&b'\r') {
             return fail("lone carriage return");
-        }
-        if line.len() > 254 {
-            return fail("line exceeds the normative 254-character limit");
-        }
-        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
-            return fail("non-printable or non-ASCII character");
         }
         let line = line.trim();
         if line.is_empty() {
@@ -1159,16 +1120,16 @@ impl ToKvn for CdmData {
                 writer.write_odm_float_measure("ACTUAL_OD_SPAN", &v.to_unit_value());
             }
             if let Some(v) = &od.obs_available {
-                writer.write_pair("OBS_AVAILABLE", v);
+                writer.write_integer_pair("OBS_AVAILABLE", v);
             }
             if let Some(v) = &od.obs_used {
-                writer.write_pair("OBS_USED", v);
+                writer.write_integer_pair("OBS_USED", v);
             }
             if let Some(v) = &od.tracks_available {
-                writer.write_pair("TRACKS_AVAILABLE", v);
+                writer.write_integer_pair("TRACKS_AVAILABLE", v);
             }
             if let Some(v) = &od.tracks_used {
-                writer.write_pair("TRACKS_USED", v);
+                writer.write_integer_pair("TRACKS_USED", v);
             }
             if let Some(v) = &od.residuals_accepted {
                 writer.write_odm_float_measure("RESIDUALS_ACCEPTED", &v.to_unit_value());
@@ -1332,25 +1293,6 @@ impl ToKvn for CdmCovarianceMatrix {
 
 impl Cdm {
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
-        for segment in &self.body.segments {
-            let first_nested_comments = if let Some(od) = &segment.data.od_parameters {
-                &od.comment
-            } else if let Some(additional) = &segment.data.additional_parameters {
-                &additional.comment
-            } else {
-                &segment.data.state_vector.comment
-            };
-            if !first_nested_comments.is_empty() {
-                return Err(ValidationError::Generic {
-                    message: Cow::Borrowed(
-                        "CDM KVN cannot distinguish the outer data COMMENT run from the first nested logical-block COMMENT run",
-                    ),
-                    line: None,
-                }
-                .into());
-            }
-        }
-
         // Keep the content-loss check independent of the documented 16-digit numeric rounding.
         let mut writer = KvnWriter::for_model_comparison();
         self.write_kvn(&mut writer);
@@ -1358,7 +1300,33 @@ impl Cdm {
         validate_kvn_syntax(&output)?;
         let reparsed = Self::from_kvn_str(&output)?;
         crate::traits::Validate::validate(&reparsed)?;
-        if reparsed != *self {
+        // The documented KVN normalizations: the nested data-block comment merge
+        // (cdm-1.0.md, "KVN comment merge") and trailing-blank trimming of comment lines.
+        let mut expected = self.clone();
+        let trim = |comments: &mut Vec<String>| {
+            for comment in comments {
+                comment.truncate(comment.trim_end().len());
+            }
+        };
+        trim(&mut expected.header.comment);
+        trim(&mut expected.body.relative_metadata_data.comment);
+        for segment in &mut expected.body.segments {
+            let data = &mut segment.data;
+            data.canonicalize_kvn_comments();
+            trim(&mut segment.metadata.comment);
+            trim(&mut data.comment);
+            if let Some(od) = &mut data.od_parameters {
+                trim(&mut od.comment);
+            }
+            if let Some(additional) = &mut data.additional_parameters {
+                trim(&mut additional.comment);
+            }
+            trim(&mut data.state_vector.comment);
+            if let Some(covariance) = &mut data.covariance_matrix {
+                trim(&mut covariance.comment);
+            }
+        }
+        if reparsed != expected {
             return Err(ValidationError::Generic {
                 message: Cow::Borrowed(
                     "CDM model cannot be represented in KVN without changing typed content",

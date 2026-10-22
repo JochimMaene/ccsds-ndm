@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// An APM specifies the attitude state of a single object at a specified epoch. This message
 /// is suited to interagency exchanges that involve automated interaction and/or human
-/// interaction, and/or human interaction, and do not require high-fidelity dynamic modeling.
+/// interaction, and do not require high-fidelity dynamic modeling.
 ///
 /// The APM requires the use of a propagation technique to determine the attitude state at
 /// times different from the specified epoch.
@@ -29,11 +29,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "apm")]
 pub struct Apm {
+    /// Message provenance and creation epoch.
     pub header: AdmHeader,
+    /// Message segments and their data.
     pub body: ApmBody,
+    /// XML root identifier; when present it must match this message family.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_APM_VERS".to_string()))]
     pub id: Option<String>,
+    /// Supported message edition, "2.0".
     #[serde(rename = "@version")]
     #[builder(default = "2.0".to_string(), into)]
     pub version: String,
@@ -57,8 +61,10 @@ impl Ndm for Apm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::detect::without_utf8_bom(kvn);
-        let normalized = crate::kvn::normalize_line_endings(kvn);
+        let normalized = crate::kvn::prepare_input(
+            crate::detect::without_utf8_bom(kvn),
+            crate::validation::MessageKind::Apm,
+        )?;
         kvn::validate_kvn_syntax(&normalized)?;
         let apm = Self::from_kvn_str(&normalized)?;
         crate::traits::Validate::validate(&apm)?;
@@ -89,10 +95,12 @@ impl Ndm for Apm {
 // Body & Segment
 //----------------------------------------------------------------------
 
+/// The single-segment APM body (ADM §3.2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct ApmBody {
     // XSD says minOccurs=1 maxOccurs=1 for APM segment!
+    /// The single attitude segment (ADM §3.2).
     #[serde(rename = "segment")]
     pub segment: ApmSegment,
 }
@@ -103,10 +111,13 @@ impl crate::traits::Validate for ApmBody {
     }
 }
 
+/// APM metadata and attitude parameters (ADM §3.2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct ApmSegment {
+    /// Object, reference-frame and time-system interpretation for this segment.
     pub metadata: ApmMetadata,
+    /// Records interpreted using this segment metadata.
     pub data: ApmData,
 }
 
@@ -118,6 +129,7 @@ impl crate::traits::Validate for ApmSegment {
 }
 
 impl ApmSegment {
+    /// Validate this value against the supported CCSDS profile.
     pub fn validate(&self) -> Result<()> {
         crate::traits::Validate::validate(self)
     }
@@ -328,6 +340,7 @@ impl crate::traits::Validate for ApmData {
 }
 
 impl ApmData {
+    /// Validate this value against the supported CCSDS profile.
     pub fn validate(&self) -> Result<()> {
         crate::traits::Validate::validate(self)
     }

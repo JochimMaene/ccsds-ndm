@@ -20,6 +20,7 @@ from ccsds_ndm import (
     OcmMetadata,
     OcmOdParameters,
     OcmPhysicalDescription,
+    OcmPerturbations,
     OcmSegment,
     OcmTrajState,
     OdmHeader,
@@ -177,55 +178,37 @@ class TestOcm:
             with pytest.raises(ValueError):
                 setattr(metadata, field, "123.5")
 
-    def test_frame_reference_epochs_require_calendar_form(self):
-        with pytest.raises(ValueError):
-            OcmTrajState(
-                center_name="EARTH",
-                traj_ref_frame="GCRF",
-                traj_type="CARTPV",
-                traj_lines=[TrajLine(epoch="123.5", values=[1.0])],
-                traj_frame_epoch="123.5",
-            )
-
+    def test_frame_reference_epochs_accept_relative_except_calendar_only_fields(self):
+        trajectory = OcmTrajState(
+            center_name="EARTH",
+            traj_ref_frame="GCRF",
+            traj_type="CARTPV",
+            traj_lines=[TrajLine(epoch="123.5", values=[1.0])],
+            traj_frame_epoch="123.5",
+        )
+        assert trajectory.traj_frame_epoch == "123.5"
+        covariance = OcmCovarianceMatrix(
+            cov_ref_frame="GCRF",
+            cov_type="CARTPV",
+            cov_ordering="LTM",
+            cov_lines=[CovLine(epoch="123.5", values=[1.0])],
+            cov_frame_epoch="123.5",
+        )
+        assert covariance.cov_frame_epoch == "123.5"
+        maneuver = OcmManeuverParameters(
+            man_id="MAN-1",
+            man_device_id="THR-1",
+            man_composition="TIME_ABSOLUTE",
+            man_ref_frame="GCRF",
+            man_lines=[ManLine(epoch="123.5", values=["1.0"])],
+            man_frame_epoch="123.5",
+        )
+        assert maneuver.man_frame_epoch == "123.5"
         with pytest.raises(ValueError):
             OcmPhysicalDescription(oeb_parent_frame_epoch="123.5")
-
-        with pytest.raises(ValueError):
-            OcmCovarianceMatrix(
-                cov_ref_frame="GCRF",
-                cov_type="CARTPV",
-                cov_ordering="LTM",
-                cov_lines=[CovLine(epoch="123.5", values=[1.0])],
-                cov_frame_epoch="123.5",
-            )
-
-        with pytest.raises(ValueError):
-            OcmManeuverParameters(
-                man_id="MAN-1",
-                man_device_id="THR-1",
-                man_composition="TIME_ABSOLUTE",
-                man_ref_frame="GCRF",
-                man_lines=[ManLine(epoch="123.5", values=["1.0"])],
-                man_frame_epoch="123.5",
-            )
-
-        with pytest.raises(ValueError):
-            OcmTrajState(
-                center_name="EARTH",
-                traj_ref_frame="GCRF",
-                traj_type="CARTPV",
-                traj_lines=[TrajLine(epoch="123.5", values=[1.0])],
-                useable_start_time="123.5",
-            )
-
-        with pytest.raises(ValueError):
-            OcmTrajState(
-                center_name="EARTH",
-                traj_ref_frame="GCRF",
-                traj_type="CARTPV",
-                traj_lines=[TrajLine(epoch="123.5", values=[1.0])],
-                useable_stop_time="123.5",
-            )
+        for field in ("useable_start_time", "useable_stop_time"):
+            with pytest.raises(ValueError):
+                setattr(trajectory, field, "123.5")
 
     def test_file_io(self, tmp_path):
         ocm = self._create_valid_ocm()
@@ -254,8 +237,8 @@ class TestOcm:
         cov.cov_ordering = "UTM"
         assert cov.cov_ordering.lower().startswith("utm")
 
-        with pytest.raises(ValueError):
-            cov.cov_basis = "NOT_A_BASIS"
+        cov.cov_basis = "NOT_A_BASIS"
+        assert cov.cov_basis == "NOT_A_BASIS"
         with pytest.raises(ValueError):
             cov.cov_ordering = "NOT_A_ORDERING"
 
@@ -316,6 +299,7 @@ class TestOcm:
             od_method="LEAST_SQUARES",
             od_epoch="2023-01-01T00:00:00",
         )
+        ocm.segment.data.pert = OcmPerturbations()
         ocm.segment.data.od.weighted_rms = float("nan")
         with pytest.raises(NdmValidationError, match="WEIGHTED_RMS"):
             ocm.validate()
@@ -331,7 +315,7 @@ class TestOcm:
         ]
         ocm.segment.data.traj = [traj]
 
-        with pytest.raises(NdmValidationError, match="trajLine"):
+        with pytest.raises(NdmValidationError, match="TRAJ data line"):
             ocm.validate()
 
     def test_enum_constructor_arguments_are_not_discarded(self):
@@ -348,14 +332,8 @@ class TestOcm:
         assert traj.traj_basis == "PREDICTED"
         assert traj.orb_revnum_basis == "1"
 
-        with pytest.raises(ValueError):
-            OcmTrajState(
-                center_name="EARTH",
-                traj_ref_frame="EME2000",
-                traj_type="CARTPV",
-                traj_basis="NOT_A_BASIS",
-                traj_lines=[TrajLine(epoch="2023-01-01T00:00:00", values=[1.0])],
-            )
+        traj.traj_basis = "NOT_A_BASIS"
+        assert traj.traj_basis == "NOT_A_BASIS"
 
     def test_enum_getters_return_the_wire_spelling(self):
         """Getters used Rust's `Debug` spelling, so `orb_revnum_basis` read back as `'One'` and

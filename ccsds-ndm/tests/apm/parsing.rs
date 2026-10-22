@@ -366,3 +366,61 @@ fn quaternion_components_refuse_ignored_units() {
     let input = source.replace("Q1 = 0.00005", "Q1 = 0.00005 [rad]");
     assert!(Apm::from_kvn(&input).is_err());
 }
+
+/// ADM 6.8.6 allows all-lowercase text values and ADM 1.0 spelled rotation sequences as digits
+/// (annex J). KVN reads both; XML `rotseqType` admits only the uppercase letters; output is
+/// always the uppercase letters.
+#[test]
+fn euler_rot_seq_reads_lowercase_and_legacy_digits_in_kvn_only() {
+    for seq in ["zyx", "321"] {
+        let input = format!("{}{}EPOCH = 2023-01-01T00:00:00\nEULER_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nEULER_ROT_SEQ = {seq}\nANGLE_1 = 10\nANGLE_2 = 20\nANGLE_3 = 30\nEULER_STOP\n",
+            sample_apm_header(), sample_apm_meta());
+        let apm = Apm::from_kvn(&input).unwrap();
+        assert_eq!(
+            apm.body.segment.data.euler_angle_state[0].euler_rot_seq,
+            ccsds_ndm::types::RotSeq::ZYX
+        );
+        assert!(apm
+            .to_kvn()
+            .unwrap()
+            .lines()
+            .any(|l| l.starts_with("EULER_ROT_SEQ") && l.ends_with("= ZYX")));
+        let xml = apm.to_xml().unwrap().replace(">ZYX<", &format!(">{seq}<"));
+        assert!(Apm::from_xml(&xml).is_err(), "{seq}");
+    }
+}
+
+/// Shared value types such as `Angle` only know their type name; KVN range errors must name
+/// the keyword that carried the value.
+#[test]
+fn kvn_range_errors_name_the_keyword() {
+    let quat = "QUAT_START\nREF_FRAME_A = EME2000\nREF_FRAME_B = SC_BODY_1\nQ1 = 0.5\nQ2 = 0.5\nQ3 = 0.5\nQC = 0.5\nQUAT_STOP\n";
+    let man = |extra: &str| {
+        format!("MAN_START\nMAN_EPOCH_START = 2002-11-04T17:22:31\n{extra}MAN_REF_FRAME = A\nMAN_TOR_X = 1\nMAN_TOR_Y = 1\nMAN_TOR_Z = 1\nMAN_STOP\n")
+    };
+    for (block, field) in [
+        (
+            "EULER_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nEULER_ROT_SEQ = ZYX\nANGLE_1 = 10\nANGLE_2 = 400\nANGLE_3 = 30\nEULER_STOP\n".to_string(),
+            "ANGLE_2",
+        ),
+        (man("MAN_DURATION = -1\n"), "MAN_DURATION"),
+        (man("MAN_DURATION = 1\n").replace("MAN_TOR_Z = 1\n", "MAN_TOR_Z = 1\nMAN_DELTA_MASS = 1\n"), "MAN_DELTA_MASS"),
+    ] {
+        let error = Apm::from_kvn(&sample_apm_kvn().replace(quat, &block)).unwrap_err();
+        crate::common::assert_validation_field(&error, field);
+    }
+}
+
+/// ADM 6.10.2: without the non-standard META_START, comments after the header belong to the
+/// metadata and comments after TIME_SYSTEM to the data. Figure G-1 used to read its metadata
+/// comments into the header as well, and its data comments into the metadata.
+#[test]
+fn apm_comments_without_metadata_delimiters_stay_in_their_section() {
+    let apm = Apm::from_kvn(KVN).unwrap();
+    assert!(apm.header.comment.is_empty());
+    let segment = &apm.body.segment;
+    assert_eq!(segment.metadata.comment.len(), 3);
+    assert_eq!(segment.data.comment[0], "Current attitude for orbit 335");
+    assert_eq!(segment.data.comment.len(), 3);
+    assert_eq!(Apm::from_kvn(&apm.to_kvn().unwrap()).unwrap(), apm);
+}

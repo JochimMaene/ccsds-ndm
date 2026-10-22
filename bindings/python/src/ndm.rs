@@ -26,8 +26,17 @@ use crate::tdm::Tdm;
 /// spacecraft attitude that depends upon a particular orbital state (an APM and its
 /// associated OPM could be conveniently conveyed in a single NDM); (3) an ephemeris message
 /// with the set of tracking data messages used in the orbit determination.
+///
+/// Parameters
+/// ----------
+/// messages : sequence of message objects
+///     Ordered standalone constituents. Nested combined messages are not supported.
+/// id : str, optional
+///     Envelope MESSAGE_ID (not a root id attribute).
+/// comments : list[str], optional
+///     Envelope comments, in document order.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct CombinedNdm {
     /// Message Identifier (optional).
     ///
@@ -134,8 +143,32 @@ impl CombinedNdm {
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
         crate::api::validate_message(py, &self.to_core(py)?)
     }
-
-    /// Parse an XML combined NDM. KVN has no combined representation.
+    /// Parse a NDM document and validate its contents.
+    ///
+    /// Parameters
+    /// ----------
+    /// data : str
+    ///     KVN or XML content. Combined NDM requires XML.
+    /// format : str, optional
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// CombinedNdm
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmEpochError
+    ///     Invalid CCSDS epoch.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// ValueError
+    ///     Unsupported format argument.
     #[staticmethod]
     #[pyo3(signature = (data, format=None))]
     fn from_str(
@@ -147,8 +180,34 @@ impl CombinedNdm {
         let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Parse an XML combined NDM file. KVN has no combined representation.
+    /// Read a UTF-8 NDM document from a file and validate it.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Input file.
+    /// format : str, optional
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// CombinedNdm
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmEpochError
+    ///     Invalid CCSDS epoch.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Input file could not be read.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
@@ -161,11 +220,27 @@ impl CombinedNdm {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Atomically write this combined NDM as XML.
+    /// Validate this NDM message and atomically replace the destination.
     ///
-    /// Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError` and leaves the
-    /// destination untouched.
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Destination file; existing content is replaced only after successful generation.
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Temporary-file writing or atomic replacement failed.
     fn to_file(
         &self,
         py: Python<'_>,
@@ -176,10 +251,28 @@ impl CombinedNdm {
     ) -> PyResult<()> {
         crate::api::generate_file(py, &Message::Ndm(self.to_core(py)?), &path, format)
     }
-
-    /// Serialize to an XML string.
+    /// Validate and serialize this NDM message, preserving its edition.
     ///
-    /// Requesting ``format="kvn"`` raises :class:`NdmUnsupportedNotationError`.
+    /// Parameters
+    /// ----------
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     Generated document, subject to the documented notation normalizations.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
     fn to_str(
         &self,
         py: Python<'_>,

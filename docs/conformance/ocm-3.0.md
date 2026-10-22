@@ -19,7 +19,7 @@ The `ocm` and `ocm_kvn_allocations` suites establish:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN lexical and marked-block structure | The OCM scanner rejects non-ASCII/control input, malformed or unknown assignments, duplicate and reordered keywords, unknown/nested/mismatched blocks, invalid logical-block order, and comments outside the beginning of a block. OCM lines may have arbitrary length under CCSDS 502.0-B-3 section 7.3.3. |
+| KVN lexical and marked-block structure | The OCM scanner rejects non-ASCII/control input, malformed or unknown assignments, duplicate and reordered keywords, unknown/nested/mismatched blocks, invalid logical-block order, and comments outside the beginning of a block. OCM permits arbitrary line lengths under ODM §7.3.3; reading and generation preserve this family exception. |
 | XML structure | The shared XML sequence engine is registered for the complete OCM root, header, metadata, data, trajectory, physical, covariance, maneuver, perturbation, orbit-determination, and user-defined structures. It rejects unknown, duplicate, reordered, and non-schema nested content and attributes. |
 | Silent-loss corrections | Complex `pert`, `od`, and `user` elements no longer use the scalar nullable adapter, so they survive XML parsing. KVN retains optional GM units. `DC_REF_DIR` and `DC_BODY_TRIGGER` use the schema's single three-number lexical value rather than generating nested Rust field elements. |
 | Fixture and history preservation | The five current KVN fixtures and the shipped XML fixture retain their typed model under source-notation regeneration. KVN/XML crossings retain trajectory, physical, covariance, maneuver, perturbation, OD, and user blocks represented by the corpus. G19 is adapted for current covariance linkage and cannot cross to the older XML schema. Every generated XML document validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
@@ -45,7 +45,7 @@ inventory is reconciled as follows; the counts are statement rows, not public ca
 | Covariance | 18 | Block metadata, ordering, epoch sequence, composition/units, fixed record shape, and representability are covered by covariance validation and history tests, and `validate_ocm_line_values` rejects non-finite numbers in every `covLine`. |
 | Maneuver | 35 | Time-tag choice, composition/units, duty-cycle dependencies (including `TIME_AND_ANGLE` vectors), epoch sequence, and representability are covered by typed validation and regression tests. |
 | Perturbation | 33 | The complete nested block is retained rather than passed through the former nullable-scalar adapter; schema order, legal attributes, units, and round trips are exercised. `OcmPerturbations::validate` covers `GM`, `OBLATE_FLATTENING`, and the finiteness of `EQUATORIAL_RADIUS`, `CENTRAL_BODY_ROTATION`, and the geomagnetic and solar-flux values. |
-| Orbit determination | 33 | The complete nested block is retained with typed required/optional values, legal units, schema order, and fixture round trips. The XML gate covers positive-integer count facets; `OcmOdParameters::validate` covers `GDOP` and `WEIGHTED_RMS` (including NaN and both infinities), the OD spans, the eigenvalue lengths, `OD_CONFIDENCE`, and `SEDR`. |
+| Orbit determination | 33 | The complete nested block is retained with typed required/optional values, legal units, schema order, and fixture round trips. All notations enforce positive-integer count facets; `OcmOdParameters::validate` covers `GDOP` and `WEIGHTED_RMS` (including NaN and both infinities), the OD spans, the eigenvalue lengths, `OD_CONFIDENCE`, and `SEDR`. |
 | User defined | 5 | Marked-block placement, comment placement, parameter names/values, and XML/KVN preservation are covered. |
 
 These OCM values are deliberately **not** validated, each for a recorded reason rather than by
@@ -93,19 +93,19 @@ rounding through `f64`.
 lists default 3, and conditionally requires it for interpolation other than PROPAGATE; the
 XML schema makes it optional but positive when supplied. The library accepts omission as use
 of the documented default instead of adding a required field or synthesizing a value. A supplied
-zero remains book-readable in KVN but is refused on XML input and output. No interpolation
+zero is refused in every notation under the shared XSD-facet policy. No interpolation
 algorithm is executed, and record sufficiency for an externally chosen algorithm is caller context.
 
 `ORB_REVNUM` must be finite and nonnegative. Table 6-4 calls the count an integer, but its
 `ORB_REVNUM_BASIS` description refers to fractional counts `0.XXXX` and `1.XXXX`, and the XML
 schema uses `nonNegativeDouble`. The library therefore retains nonnegative fractional counts
 instead of truncating or rejecting them. `orbit_revolution_counts_are_finite_nonnegative_and_may_be_fractional`
-and `xml_only_facets_are_checked_on_read_and_generation` exercise these decisions.
+and the schema-facet regressions exercise these decisions.
 
 OCM's exception to the shared policy on [externally governed values](../design/validation-contract.md#registry-governed-values) is that its `OBJECT_TYPE` is delegated to the living
-SANA Object Types registry, so the token is preserved losslessly and checked for offline syntax
-rather than current membership — unlike the closed CDM and RDM lists. This mapping does not claim
-byte-preserving regeneration.
+SANA Object Types registry. KVN/model extensions remain free text without checking live registry
+membership; known spellings are normalized as described below. XML requires its published
+enumeration, as do the closed CDM and RDM models.
 
 ### Metadata time bounds
 
@@ -229,7 +229,7 @@ pre-corrigendum inventory, not the number of current keywords.
 | Change | Implementation and decision | Evidence |
 | --- | --- | --- |
 | Contact metadata | Ten new optional free-text fields are retained: `OPERATOR_URL`, `OPERATOR_EMAIL`, `OPERATOR_PHONE`, `OPERATOR_AUTOMATED_URL`, `EMERGENCY_EMAIL`, `EMERGENCY_PHONE`, `EMERGENCY_AVAILABILITY`, `SSA_EMAIL`, `SSA_PHONE`, `OWNER_URL`. `COUNTRY` already existed. No email, URL, phone, or country-registry truth is inferred or checked. | `corrigendum::contact_keywords_round_trip_and_refuse_old_xml_without_output` checks every new keyword. |
-| Covariance/trajectory linkage | Each trajectory must have a distinct nonempty `TRAJ_ID` when multiple trajectories and covariance histories coexist. Each covariance must identify its corresponding trajectory when there are multiple trajectory or covariance blocks. Any supplied covariance `TRAJ_ID` must resolve to a trajectory in this OCM; an identifier that could refer to several trajectories is rejected. | `corrigendum::covariance_links_are_required_resolved_and_unambiguous` tests missing, unknown, duplicate, and valid links. |
+| Covariance/trajectory linkage | Each trajectory must have a distinct nonempty `TRAJ_ID` when multiple trajectories and covariance histories coexist. Each covariance must identify its corresponding trajectory when there are multiple trajectory or covariance blocks. When trajectories are present, a supplied covariance `TRAJ_ID` must resolve to one of them; covariance-only messages may reference an external trajectory; an identifier that could refer to several trajectories is rejected. | `corrigendum::covariance_links_are_required_resolved_and_unambiguous` tests missing, unknown, duplicate, and valid links. |
 | User-defined sequences | `OcmUserDefined` retains ordered `OcmUserDefinedParameter` entries. A `COMPOSITION_<ID>` parameter owns its following raw `records`, terminated by the next user-defined assignment or `USER_STOP`. Names, comma-delimited composition, rows, and entry order survive KVN regeneration. Records cannot contain newlines, actual user-defined assignment delimiters, `USER_STOP`, or nonprintable characters; other ICD-defined punctuation and marker-like text is preserved. Leading/trailing whitespace and blank separator lines are normalized. | `corrigendum::sequences_preserve_rows_and_parameter_order_and_refuse_xml` and `sequences_reject_missing_id_rows_and_composition_columns`. |
 | ICD boundary | The accompanying ICD defines column interpretation, time/event/sample ordering, and what each value means. Records stay opaque rather than guessing an epoch or numeric format. The library validates the message envelope and preserves producer row order; it does not claim to establish monotonicity under an absent ICD. | The typed model exposes rows without numerical reinterpretation. |
 | Covariance dimensions | `TCARTPV` includes uncertain event time and has dimension seven; `CARTPV` has dimension six. The corrigendum clarifies their meaning without changing the token or representation. | `corrigendum::covariance_dimensions_orderings_and_positive_definiteness` establishes both dimensions. |
@@ -263,12 +263,13 @@ of that claim, not promises of unrestricted XML conversion or physical-model cer
 ## Explicit input and representation boundaries
 
 KVN parsing accepts all four CCSDS line terminators and ordinary decimal/exponent spellings,
-including `1e3`, `.5`, and `1.`. Trajectory/covariance numbers use the shared finite-double reader,
-so a nonzero value that underflows to zero is rejected rather than silently changed. XML's
-additional facets on `DC_PA_START_ANGLE`, `DC_PA_STOP_ANGLE`, and `DAYS_SINCE_FIRST_OBS` /
-`DAYS_SINCE_LAST_OBS` do not constrain KVN or model validation: wider finite book-valid values
-round-trip in KVN and fail XML conversion. GM has the same notation distinction: finiteness in
-KVN/model form, positivity in XML.
+including `1e3`, `.5`, and `1.`. Exponent relative time tags are expanded exactly to decimal
+before storing an `Epoch`, allowing XML output without changing their value. Trajectory and
+covariance values use the shared finite-double reader in XML and KVN; nonzero underflow is
+rejected. Every history line requires at least one value, including unknown trajectory/covariance
+types. XML schema bounds apply in every notation unless the book explicitly allows a wider
+range: signed `DAYS_SINCE_*_OBS` and wider duty-cycle phase angles retain their book domain in
+KVN/model form and refuse incompatible XML. GM must be positive in every notation.
 
 Omitted optional trajectory `INTERPOLATION_DEGREE`, `ORB_REVNUM_BASIS`, and `ORB_AVERAGING`
 remain absent in the model and regenerated output. The book's defaults describe interpretation;
@@ -280,8 +281,55 @@ without pretending that the producer supplied it.
 interleaving; composition parameters retain their opaque sequence rows. XML-to-XML preserves
 entry order. KVN conversion refuses comments after parameters rather than relocating them.
 
-OCM count fields (`DC_MAX_CYCLES`, `ALBEDO_GRID_SIZE`, observation/track counts,
-`SOLVE_N`, `CONSIDER_N`, and `SENSORS_N`) accept zero in KVN and model validation. The book
-names counts without a strictly-positive rule. The XML edition uses `xsd:positiveInteger`,
-so zero is rejected at XML input/output. This allows an explicitly empty count in real KVN
-without claiming it is representable by the narrower schema.
+OCM count fields using XSD `positiveInteger` (`DC_MAX_CYCLES`, `ALBEDO_GRID_SIZE`,
+observation/track counts, `SOLVE_N`, `CONSIDER_N`, and `SENSORS_N`) must be positive in every
+notation, following the [shared validation contract](../design/validation-contract.md).
+
+## Numeric XML spellings
+
+`ORB_REVNUM_BASIS` follows the numeric value space of XSD `revNumBasisType`, not literal
+string equality. Integer spellings such as `+01`, `01`, and `-0` denote the allowed values
+one or zero; XML generation writes `1` or `0`. The regression
+`ocm::epochs::revolution_basis_uses_integer_value_equality_in_xml` validates these against the schema.
+
+OCM time offsets use the exact `xsd:double` lexical forms, including `INF`, `-INF`, and
+`NaN`; nonstandard spellings such as `inf` and `+infinity` fail XML input. The unconstrained
+schema time-offset doubles retain these special values in OCM XML/model form; KVN refuses
+them. This differs from ACM's explicit finite-offset rule. No operational meaning is
+certified for a nonfinite time offset. `ocm::epochs::time_offsets_use_xml_double_lexical_forms`
+checks schema-valid output and refusal of nonstandard input spellings.
+
+## Book defaults and producer boundaries
+
+KVN supplies the implicit ODM §6.2.1.3 defaults `TIME_SYSTEM = UTC`, `TRAJ_TYPE = CARTPV`,
+and `COV_TYPE = CARTPV` when omitted. XML still requires those elements under its schema.
+`TRAJ_BASIS` and `COV_BASIS` preserve book free text in KVN/model form; XML uses its closed
+enumerations. `OBJECT_TYPE` preserves open SANA tokens, canonicalizing known values such as
+`ROCKET_BODY` to `ROCKET BODY`; XML refuses extensions outside its enumeration.
+`UNKNOWN` remains valid free text, but cannot stand in for required epochs, `DC_TYPE`,
+`COV_ORDERING`, or a usable `MAN_COMPOSITION`.
+
+`TRAJ_FRAME_EPOCH`, `COV_FRAME_EPOCH`, and `MAN_FRAME_EPOCH` permit relative or calendar
+forms; `OEB_PARENT_FRAME_EPOCH` and `USEABLE_*` remain calendar-only. Maneuver metadata epochs
+can independently use either form; data-line tags follow `MAN_COMPOSITION`.
+
+`ORB_REVNUM` requires `ORB_REVNUM_BASIS` (table 6-4). An OD block requires PERT (table 6-1),
+and `OD_ID`/`OD_METHOD` cannot be blank. `MAN_UNITS`, when present, has one entry for each
+composition element after the time tag. `DEPLOY_MASS` must be nonpositive and `THR_INTERP` /
+`ACC_INTERP` must be `ON` or `OFF`. `OEB_QC` is nonnegative except the book's tumbling sentinel
+`-999`; partial OEB quaternions remain accepted. `OCM_DATA_ELEMENTS` remains descriptive text
+without enforcing an exact block inventory, preserving real producer messages.
+
+KVN comments must follow the version or begin a block; comments between blocks or after the
+last stop are refused, avoiding relocation or loss. `MAN_COMPOSITION` accepts lowercase,
+whitespace separators and continued lines, and writes uppercase comma-separated columns.
+A model using other separators may therefore differ lexically after KVN regeneration.
+EQUINOCTIAL and EQUINOCTIALMOD covariance matrices keep all seven coordinates, but positive
+definiteness covers the six uncertain coordinates: the constant retrograde factor has no variance.
+
+XML text containing embedded newlines in `ORIGINATOR_POSITION` or `ORIGINATOR_ADDRESS`
+(e.g. G20) remains usable as XML but cannot be written as a single-line KVN value. Table 6-7
+and TC1 user-composition examples are illustrative: unsupported or inconsistent column declarations
+are not silently repaired. `KEPLERIANMEANSGP-4` is provisional in the SANA registry; the library
+preserves the token without certifying the external model. The TC1 document is linked above
+because the bundled base ODM text predates it.

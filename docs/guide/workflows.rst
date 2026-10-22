@@ -142,11 +142,18 @@ lexical checks; malformed names there can be accepted. Independently validate th
 when full XML well-formedness or independent schema validation is required. This limit and the common
 preservation policy are recorded in the validation contract linked from the support matrix.
 
-Errors expose stable ``code()``, ``field_path()``, and ``diagnostic()`` accessors; diagnostic
+Rust errors expose ``code()``, ``field_path()``, and ``diagnostic()`` accessors; diagnostic
 wording may improve before 1.0 while codes, enum meanings, and canonical paths are the machine
-interface. Python NDM exceptions additionally expose ``operation``, ``notation``,
+interface. Python NDM exceptions expose attributes (``code`` and ``field_path``, rather than methods),
+plus ``operation``, ``notation``,
 ``message_kind``, source edition, and available source location/token fields.
-Unavailable diagnostic fields are ``None``.
+Unavailable diagnostic fields are ``None``. The :doc:`exception reference <../api/core>` lists
+all codes, diagnostic fields, and Python exception bases.
+
+Constructors and setters parse lexical inputs such as epochs, units, and enum values immediately.
+Some numeric wrapper domains are also checked on assignment. Cross-field conditions and
+complete-message semantics are checked by ``validate()`` and every generation method; successful
+construction or mutation alone does not establish a valid message.
 
 Migrating metadata construction
 -------------------------------

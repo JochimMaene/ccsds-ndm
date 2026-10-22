@@ -40,15 +40,15 @@ use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 ///     The message segment containing metadata and data.
 ///     (Mandatory)
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct Rdm {
-    /// The message identifier.
+    /// Fixed XML root identifier, ``CCSDS_RDM_VERS``; use header.message_id for message identity.
     ///
     /// :type: Optional[str]
     #[pyo3(get)]
     id: Option<String>,
 
-    /// The message version.
+    /// Message edition, ``"1.0"`` (CCSDS 508.1-B-1); read and written in KVN/XML.
     ///
     /// :type: str
     #[pyo3(get)]
@@ -132,21 +132,32 @@ impl Rdm {
                 .object_name
         )
     }
-
-    /// Create an RDM message from a string.
+    /// Parse a RDM document and validate its contents.
     ///
     /// Parameters
     /// ----------
     /// data : str
-    ///     Input string/content.
+    ///     KVN or XML content. Combined NDM requires XML.
     /// format : str, optional
-    ///     Format ('kvn' or 'xml'). Auto-detected if None.
-    ///     (Optional)
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
     ///
     /// Returns
     /// -------
     /// Rdm
-    ///     The parsed RDM object.
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmEpochError
+    ///     Invalid CCSDS epoch.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// ValueError
+    ///     Unsupported format argument.
     #[staticmethod]
     #[pyo3(signature = (data, format=None))]
     fn from_str(
@@ -158,8 +169,34 @@ impl Rdm {
         let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Parse an RDM from a KVN or XML file.
+    /// Read a UTF-8 RDM document from a file and validate it.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Input file.
+    /// format : str, optional
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// Rdm
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmEpochError
+    ///     Invalid CCSDS epoch.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Input file could not be read.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
@@ -172,8 +209,27 @@ impl Rdm {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Atomically write this RDM as KVN or XML.
+    /// Validate this RDM message and atomically replace the destination.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Destination file; existing content is replaced only after successful generation.
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Temporary-file writing or atomic replacement failed.
     fn to_file(
         &self,
         py: Python<'_>,
@@ -189,17 +245,28 @@ impl Rdm {
             format,
         )
     }
-
-    /// Serialize to string (generic).
+    /// Validate and serialize this RDM message, preserving its edition.
     ///
     /// Parameters
     /// ----------
     /// format : str
-    ///     Format ('kvn' or 'xml').
+    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///
     /// Returns
     /// -------
     /// str
-    ///     The serialized string.
+    ///     Generated document, subject to the documented notation normalizations.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
     fn to_str(
         &self,
         py: Python<'_>,
@@ -229,9 +296,8 @@ impl Rdm {
 ///     (Mandatory)
 /// comment : list[str], optional
 ///     Comments.
-///     (Optional)
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct RdmHeader {
     pub inner: core_rdm::RdmHeader,
@@ -335,7 +401,7 @@ impl RdmHeader {
 ///     Segment data.
 ///     (Mandatory)
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct RdmSegment {
     /// The metadata for this RDM segment.
     ///
@@ -408,10 +474,56 @@ impl RdmSegment {
 ///     Time system for all data/metadata (e.g., UTC, TAI).
 /// epoch_tzero : str
 ///     Epoch from which the ORBIT_LIFETIME is calculated.
-///
-///     Optional
+/// catalog_name : str, optional
+///     Satellite catalog assigning the object designator.
+/// object_designator : str, optional
+///     Identifier assigned by that catalog.
+/// object_type : ObjectDescription | str, optional
+///     Object category, such as PAYLOAD, ROCKET BODY, or DEBRIS.
+/// object_owner : str, optional
+///     Owner of the object.
+/// object_operator : str, optional
+///     Operator of the object.
+/// ref_frame : str, optional
+///     Reference frame, required when a state vector is supplied.
+/// ref_frame_epoch : str, optional
+///     CCSDS calendar epoch qualifying a time-dependent frame.
+/// ephemeris_name : str, optional
+///     Source ephemeris name.
+/// gravity_model : str, optional
+///     Gravity model used for propagation.
+/// atmospheric_model : str, optional
+///     Atmospheric density model used for propagation.
+/// solar_flux_prediction : str, optional
+///     Source of the solar-flux prediction.
+/// n_body_perturbations : str, optional
+///     Additional attracting bodies considered.
+/// solar_rad_pressure : str, optional
+///     Solar-radiation-pressure model.
+/// earth_tides : str, optional
+///     Earth-tide model.
+/// intrack_thrust : str, optional
+///     In-track thrust treatment.
+/// drag_parameters_source : str, optional
+///     Source of the drag parameters.
+/// drag_parameters_altitude : float, optional
+///     Altitude for the drag parameters, in km.
+/// reentry_uncertainty_method : str, optional
+///     NONE, ANALYTICAL, STOCHASTIC, or EMPIRICAL.
+/// reentry_disintegration : str, optional
+///     NONE, MASS-LOSS, BREAK-UP, or MASS-LOSS + BREAK-UP.
+/// impact_uncertainty_method : str, optional
+///     NONE, ANALYTICAL, STOCHASTIC, or EMPIRICAL.
+/// previous_message_id : str, optional
+///     Identifier of the preceding message.
+/// previous_message_epoch : str, optional
+///     CCSDS calendar creation epoch of the preceding message.
+/// next_message_epoch : str, optional
+///     CCSDS calendar epoch of the next scheduled message; omit when none is scheduled.
+/// comment : list[str], optional
+///     Leading metadata comments.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct RdmMetadata {
     pub inner: core_rdm::RdmMetadata,
@@ -426,7 +538,7 @@ impl RdmMetadata {
         object_name,
         international_designator,
         epoch_tzero,
-        controlled_reentry=None,
+        controlled_reentry,
         center_name,
         time_system,
         catalog_name=None,
@@ -459,8 +571,8 @@ impl RdmMetadata {
         object_name: String,
         international_designator: String,
         epoch_tzero: String,
-        #[gen_stub(override_type(type_repr = "ControlledType | builtins.str | None", imports = ("builtins")))]
-        controlled_reentry: Option<Bound<'_, PyAny>>,
+        #[gen_stub(override_type(type_repr = "ControlledType | builtins.str", imports = ("builtins")))]
+        controlled_reentry: Bound<'_, PyAny>,
         center_name: String,
         time_system: String,
 
@@ -493,10 +605,7 @@ impl RdmMetadata {
     ) -> PyResult<Self> {
         use std::str::FromStr;
 
-        let controlled_reentry_enum = match controlled_reentry {
-            Some(ref ob) => parse_controlled_type(ob)?,
-            None => ccsds_ndm::types::ControlledType::Unknown,
-        };
+        let controlled_reentry_enum = parse_controlled_type(&controlled_reentry)?;
 
         let object_type_enum = match object_type {
             Some(ref ob) => Some(parse_object_description(ob)?),
@@ -1131,9 +1240,12 @@ impl RdmMetadata {
     }
 
     /// Scheduled UTC epoch of the next RDM for the same object (formatting rules specified in
-    /// 5.3.3.5); N/A if no other message is scheduled.
+    /// 5.3.3.5); the book writes N/A if no other message is scheduled.
     ///
-    /// Examples: 2001-11-06T11:17:33, N/A
+    /// None means "no message scheduled": KVN NEXT_MESSAGE_EPOCH = N/A (or a blank value) reads
+    /// as None, and None is written by omitting the keyword. Assign None, not "N/A".
+    ///
+    /// Examples: 2001-11-06T11:17:33
     ///
     /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
@@ -1191,7 +1303,7 @@ impl RdmMetadata {
 /// comment : list[str], optional
 ///     Comments.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct RdmData {
     /// Comments.
     ///
@@ -1438,8 +1550,27 @@ impl RdmData {
 ///     Remaining time in orbit (days).
 /// reentry_altitude : float
 ///     Defined re-entry altitude (km).
+/// orbit_lifetime_window_start : float, optional
+///     Lower estimate of remaining orbital lifetime, in days; positive when supplied.
+/// orbit_lifetime_window_end : float, optional
+///     Upper estimate of remaining orbital lifetime, in days; positive when supplied.
+/// nominal_reentry_epoch : str, optional
+///     Predicted calendar epoch of atmospheric re-entry.
+/// reentry_window_start : str, optional
+///     Calendar epoch opening the re-entry window.
+/// reentry_window_end : str, optional
+///     Calendar epoch closing the re-entry window.
+/// orbit_lifetime_confidence_level : float, optional
+///     Confidence level for the lifetime window, in percent from 0 through 100.
+/// comment : list[str], optional
+///     Comments at the start of this logical block.
+///
+/// Raises
+/// ------
+/// ValueError
+///     Invalid lifetime, confidence level, or calendar epoch.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct AtmosphericReentryParameters {
     pub inner: core_common::AtmosphericReentryParameters,
@@ -1700,8 +1831,20 @@ impl AtmosphericReentryParameters {
 // ============================================================================
 
 /// RDM spacecraft parameters (rdmSpacecraftParametersType).
+///
+/// Parameters
+/// ----------
+/// wet_mass : float, optional
+///     Mass including consumables, in kg.
+/// dry_mass : float, optional
+///     Mass without consumables, in kg.
+/// comment : list[str], optional
+///     Comments at the start of this logical block.
+///
+/// Other spacecraft fields can be assigned after construction; complete-message validation
+/// checks their domains and dependencies.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct RdmSpacecraftParameters {
     pub inner: core_common::RdmSpacecraftParameters,
@@ -1792,7 +1935,7 @@ impl RdmSpacecraftParameters {
 
     /// Object area exposed to Solar Radiation Pressure (SRP).
     ///
-    /// Units: m²
+    /// Units: m**2
     ///
     /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
@@ -1825,7 +1968,7 @@ impl RdmSpacecraftParameters {
 
     /// Object cross-sectional area.
     ///
-    /// Units: m²
+    /// Units: m**2
     ///
     /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
@@ -1858,7 +2001,7 @@ impl RdmSpacecraftParameters {
 
     /// Object radar cross section.
     ///
-    /// Units: m²
+    /// Units: m**2
     ///
     /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
@@ -1877,7 +2020,7 @@ impl RdmSpacecraftParameters {
 
     /// Object ballistic coefficient.
     ///
-    /// Units: kg/m²
+    /// Units: kg/m**2
     ///
     /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///
@@ -1894,7 +2037,7 @@ impl RdmSpacecraftParameters {
     /// The object’s acceleration due to in-track thrust used to propagate the state vector and
     /// covariance to NOMINAL_RENTRY_EPOCH (if a controlled re-entry).
     ///
-    /// Units: m/s²
+    /// Units: m/s**2
     ///
     /// CCSDS Reference: 508.1-B-1, Section 3.5.
     ///

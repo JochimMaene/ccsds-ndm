@@ -515,7 +515,7 @@ fn strip_tle_parameters(kvn: &str) -> String {
 #[test]
 fn omm_kvn_validation_rules_name_the_offending_field() {
     const FIXTURE: &str = include_str!("../../data/kvn/omm_g7.kvn");
-    // The shipped theory is SGP/SGP4, which imposes no TLE requirements of its own.
+    // Select a specific propagator to exercise its coefficient requirements.
     let sgp4 = |kvn: &str| mutated(kvn, "THEORY = SGP/SGP4", "THEORY = SGP4");
     let sgp = |kvn: &str| mutated(kvn, "THEORY = SGP/SGP4", "THEORY = SGP");
 
@@ -623,5 +623,61 @@ fn omm_kvn_validation_rules_name_the_offending_field() {
             error.to_string().contains(expected),
             "diagnostic did not name {expected}: {error}"
         );
+    }
+}
+
+#[test]
+fn recognized_theory_spellings_keep_conditional_requirements() {
+    for theory in [
+        "SGP/SGP4", "sgp/sgp4", "SGP4", "sgp4", "SGP", "sgp", "PPT3", "ppt3",
+    ] {
+        let source = mutated(
+            crate::KVN,
+            "THEORY = SGP/SGP4",
+            &format!("THEORY = {theory}"),
+        );
+        let mut message = Omm::from_kvn(&source).unwrap();
+        assert_eq!(message.body.segment.metadata.mean_element_theory, theory);
+        message.body.segment.data.tle_parameters = None;
+        crate::common::assert_rejects(&message, "TLE_PARAMETERS");
+        crate::common::assert_validation_field(
+            &Omm::from_kvn(&strip_tle_parameters(&source)).unwrap_err(),
+            "TLE_PARAMETERS",
+        );
+    }
+    let source = mutated(crate::KVN, "THEORY = SGP/SGP4", "THEORY = sgp4");
+    let missing_bstar = source
+        .lines()
+        .filter(|line| !line.starts_with("BSTAR"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    crate::common::assert_validation_field(&Omm::from_kvn(&missing_bstar).unwrap_err(), "BSTAR");
+}
+
+/// MEAN_MOTION_DOT is conditional (table 4-3: SGP and PPT3), so KVN may omit it for other
+/// theories; both XML schemas still require it in every TLE block.
+#[test]
+fn mean_motion_dot_is_required_only_by_its_theories_and_by_xml() {
+    let source = crate::common::mutated(
+        crate::KVN,
+        "MEAN_MOTION_DOT = -0.00000113 [rev/day**2]\n",
+        "",
+    );
+    let message = Omm::from_kvn(&source).unwrap();
+    assert!(message
+        .body
+        .segment
+        .data
+        .tle_parameters
+        .as_ref()
+        .unwrap()
+        .mean_motion_dot
+        .is_none());
+    Omm::from_kvn(&message.to_kvn().unwrap()).unwrap();
+    crate::common::assert_validation_field(&message.to_xml().unwrap_err(), "MEAN_MOTION_DOT");
+    for theory in ["SGP", "PPT3"] {
+        let mut message = message.clone();
+        message.body.segment.metadata.mean_element_theory = theory.into();
+        crate::common::assert_validation_field(&message.validate().unwrap_err(), "MEAN_MOTION_DOT");
     }
 }

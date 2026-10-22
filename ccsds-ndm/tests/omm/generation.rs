@@ -125,6 +125,8 @@ fn omm_generation_rejects_non_finite_values_in_every_numeric_block() {
                 .as_mut()
                 .expect("fixture has TLE parameters")
                 .mean_motion_dot
+                .as_mut()
+                .expect("fixture has MEAN_MOTION_DOT")
                 .value = f64::NAN
         }),
         ("CX_X", |omm| {
@@ -177,9 +179,9 @@ fn omm_kvn_generation_spells_numbers_as_ccsds_numbers() {
 
     let kvn = omm.to_kvn().expect("finite values should generate");
     assert!(kvn.contains("CX_X                 = 1.0e-9\n"), "{kvn}");
-    assert!(kvn.contains("CY_X                 = 3.0e-1\n"), "{kvn}");
+    assert!(kvn.contains("CY_X                 = 0.3\n"), "{kvn}");
     assert!(
-        kvn.contains("CY_Y                 = 1.234567890123457e0\n"),
+        kvn.contains("CY_Y                 = 1.234567890123457\n"),
         "{kvn}"
     );
     Omm::from_kvn(&kvn).expect("generated KVN should reparse");
@@ -401,7 +403,7 @@ fn omm_kvn_numbers_use_odm_spellings_in_every_block() {
     data.mean_elements.eccentricity.value = 0.1 + 0.2;
     data.mean_elements.mean_motion.as_mut().unwrap().value = 0.1 + 0.2;
     let tle = data.tle_parameters.as_mut().unwrap();
-    tle.mean_motion_dot.value = 0.1 + 0.2;
+    tle.mean_motion_dot.as_mut().unwrap().value = 0.1 + 0.2;
 
     let kvn = message.to_kvn().unwrap();
     assert!(
@@ -462,4 +464,22 @@ fn omm_user_defined_names_and_line_endings_are_checked() {
         .unwrap()
         .parameter = "USER_DEFINED_LITERAL".into();
     assert_eq!(Omm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+}
+
+/// ODM 7.7.1 admits only the table spelling in KVN; the uppercase GM unit the XSD also
+/// enumerates is canonicalized on KVN output (as in OPM) and kept for XML.
+#[test]
+fn omm_kvn_canonicalizes_gm_units_to_the_odm_spelling() {
+    let source = crate::common::mutated(
+        include_str!("../../data/kvn/omm_g7.kvn"),
+        "GM = 398600.8",
+        "GM = 398600.8 [KM**3/S**2]",
+    );
+    let message = Omm::from_kvn(&source).unwrap();
+    let kvn = message.to_kvn().unwrap();
+    assert!(
+        kvn.contains("[km**3/s**2]") && !kvn.contains("KM**3"),
+        "{kvn}"
+    );
+    assert!(message.to_xml().unwrap().contains("KM**3/S**2"));
 }

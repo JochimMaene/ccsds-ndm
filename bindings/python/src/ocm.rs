@@ -32,15 +32,15 @@ use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 /// segment : OcmSegment
 ///     The OCM data segment.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct Ocm {
-    /// The message identifier.
+    /// Constant XML root identifier, `CCSDS_OCM_VERS`.
     ///
     /// :type: Optional[str]
     #[pyo3(get)]
     id: Option<String>,
 
-    /// The message version.
+    /// Message edition, `3.0`.
     ///
     /// :type: str
     #[pyo3(get)]
@@ -89,19 +89,32 @@ impl Ocm {
 #[gen_stub_pymethods]
 #[pymethods]
 impl Ocm {
-    /// Create an OCM message from a string.
+    /// Parse a OCM document and validate its contents.
     ///
     /// Parameters
     /// ----------
     /// data : str
-    ///     Input string/content.
+    ///     KVN or XML content. Combined NDM requires XML.
     /// format : str, optional
-    ///     Format ('kvn' or 'xml'). Auto-detected if None.
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
     ///
     /// Returns
     /// -------
     /// Ocm
-    ///     The parsed Ocm object.
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmEpochError
+    ///     Invalid CCSDS epoch.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// ValueError
+    ///     Unsupported format argument.
     #[staticmethod]
     #[pyo3(signature = (data, format=None))]
     fn from_str(
@@ -113,8 +126,34 @@ impl Ocm {
         let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Parse an OCM from a KVN or XML file.
+    /// Read a UTF-8 OCM document from a file and validate it.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Input file.
+    /// format : str, optional
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// Ocm
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmEpochError
+    ///     Invalid CCSDS epoch.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Input file could not be read.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
@@ -127,8 +166,27 @@ impl Ocm {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Atomically write this OCM as KVN or XML.
+    /// Validate this OCM message and atomically replace the destination.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Destination file; existing content is replaced only after successful generation.
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Temporary-file writing or atomic replacement failed.
     fn to_file(
         &self,
         py: Python<'_>,
@@ -182,8 +240,28 @@ impl Ocm {
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
         crate::api::validate_message(py, &self.to_core(py)?)
     }
-
-    /// Serialize to KVN or XML after mandatory CCSDS validation.
+    /// Validate and serialize this OCM message, preserving its edition.
+    ///
+    /// Parameters
+    /// ----------
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     Generated document, subject to the documented notation normalizations.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
     fn to_str(
         &self,
         py: Python<'_>,
@@ -205,7 +283,7 @@ impl Ocm {
 /// data : OcmData
 ///     Segment data blocks.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct OcmSegment {
     /// A single segment of the OCM.
     ///
@@ -269,10 +347,10 @@ impl OcmSegment {
 ///
 /// Parameters
 /// ----------
+/// epoch_tzero : str
+///     Epoch to which all relative times in the message are referenced (CCSDS epoch, ODM 7.5.10).
 /// time_system : str
 ///     Time system that shall be used for all absolute time stamps in the message.
-/// epoch_tzero : str
-///     Epoch to which all relative times in the message are referenced (ISO 8601).
 /// object_name : str, optional
 ///     Name of the space object that the message is associated with.
 /// international_designator : str, optional
@@ -321,6 +399,26 @@ impl OcmSegment {
 ///     Identifier of linked Tracking Data Message.
 /// operator : str, optional
 ///     Operator of the space object.
+/// operator_url : str, optional
+///     URL of the space object operator.
+/// operator_email : str, optional
+///     Operator email address for non-emergencies.
+/// operator_phone : str, optional
+///     Operator phone number for non-emergencies.
+/// operator_automated_url : str, optional
+///     URL of the operator automated coordination service.
+/// emergency_email : str, optional
+///     Email address for emergency coordination.
+/// emergency_phone : str, optional
+///     Phone number for emergency coordination.
+/// emergency_availability : str, optional
+///     Hours of availability of the emergency contact.
+/// ssa_email : str, optional
+///     Email address of the primary external SSA service provider.
+/// ssa_phone : str, optional
+///     Emergency phone number of the primary external SSA service provider.
+/// owner_url : str, optional
+///     URL of the space object owner.
 /// owner : str, optional
 ///     Owner of the space object.
 /// country : str, optional
@@ -340,19 +438,19 @@ impl OcmSegment {
 /// sclk_sec_per_si_sec : float, optional
 ///     Spacecraft clock scale factor (s/SI-s).
 /// previous_message_epoch : str, optional
-///     Epoch of the previous message (ISO 8601).
+///     Epoch of the previous message (CCSDS epoch, ODM 7.5.10).
 /// next_message_epoch : str, optional
-///     Anticipated epoch of the next message (ISO 8601).
+///     Anticipated epoch of the next message (CCSDS epoch, ODM 7.5.10).
 /// start_time : str, optional
-///     Time of the earliest data in the message (ISO 8601).
+///     Time of the earliest data in the message (CCSDS epoch, ODM 7.5.10).
 /// stop_time : str, optional
-///     Time of the latest data in the message (ISO 8601).
+///     Time of the latest data in the message (CCSDS epoch, ODM 7.5.10).
 /// time_span : float, optional
 ///     Approximate time span covered by the data (d).
 /// taimutc_at_tzero : float, optional
 ///     TAI minus UTC difference at EPOCH_TZERO (s).
 /// next_leap_epoch : str, optional
-///     Epoch of the next leap second (ISO 8601).
+///     Epoch of the next leap second (CCSDS epoch, ODM 7.5.10).
 /// next_leap_taimutc : float, optional
 ///     TAI minus UTC difference at NEXT_LEAP_EPOCH (s).
 /// ut1mutc_at_tzero : float, optional
@@ -374,7 +472,7 @@ impl OcmSegment {
 ///     Epoch T-Zero.
 ///     ... (see Parameters for full list)
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct OcmMetadata {
     pub inner: core_ocm::OcmMetadata,
@@ -514,8 +612,12 @@ impl OcmMetadata {
     ) -> PyResult<Self> {
         use ccsds_ndm::types::{DayInterval, TimeOffset};
 
+        // OCM OBJECT_TYPE is an open registry token: strings are kept as given.
         let object_type_enum = match object_type {
-            Some(ref ob) => Some(parse_object_description(ob)?),
+            Some(ref ob) => Some(match ob.extract::<String>() {
+                Ok(value) => value,
+                Err(_) => parse_object_description(ob)?.to_string(),
+            }),
             None => None,
         };
 
@@ -1302,15 +1404,11 @@ impl OcmMetadata {
     /// :type: Optional[str]
     #[getter]
     fn get_object_type(&self) -> Option<String> {
-        self.inner.object_type.as_ref().map(|t| t.to_string())
+        self.inner.object_type.clone()
     }
     #[setter]
-    fn set_object_type(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.object_type = value
-            .map(|s| s.parse())
-            .transpose()
-            .map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?;
-        Ok(())
+    fn set_object_type(&mut self, value: Option<String>) {
+        self.inner.object_type = value;
     }
 
     /// Specification of the operational status of the space object. Select from the accepted
@@ -1649,7 +1747,7 @@ impl OcmMetadata {
 /// different data blocks, such as trajectory, physical properties, covariance,
 /// maneuvers, and other related information.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct OcmData {
     traj: Py<PyList>,
     phys: Option<Py<OcmPhysicalDescription>>,
@@ -1891,7 +1989,7 @@ impl OcmData {
 /// comment : list[str], optional
 ///     Comments.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct OcmTrajState {
     inner: core_ocm::OcmTrajState,
     traj_lines: Py<PyList>,
@@ -1973,11 +2071,8 @@ impl OcmTrajState {
         traj_units: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        // `TrajBasis` and `RevNumBasis` both implement `FromStr`; parse them here so the
-        // constructor cannot silently discard what the caller passed.
-        let traj_basis = traj_basis.map(|value| value.parse()).transpose().map_err(
-            |error: ccsds_ndm::error::EnumParseError| PyValueError::new_err(error.to_string()),
-        )?;
+        // `RevNumBasis` implements `FromStr`; parse it here so the constructor cannot silently
+        // discard what the caller passed.
         let orb_revnum_basis = orb_revnum_basis
             .map(|value| value.parse())
             .transpose()
@@ -1998,9 +2093,7 @@ impl OcmTrajState {
                 propagator,
                 center_name,
                 traj_ref_frame,
-                traj_frame_epoch: traj_frame_epoch
-                    .map(|s| parse_calendar_epoch(&s))
-                    .transpose()?,
+                traj_frame_epoch: traj_frame_epoch.map(|s| parse_epoch(&s)).transpose()?,
                 useable_start_time: useable_start_time
                     .map(|s| parse_calendar_epoch(&s))
                     .transpose()?,
@@ -2190,15 +2283,11 @@ impl OcmTrajState {
     /// :type: Optional[str]
     #[getter]
     fn get_traj_basis(&self) -> Option<String> {
-        self.inner.traj_basis.as_ref().map(|b| b.to_string())
+        self.inner.traj_basis.clone()
     }
     #[setter]
-    fn set_traj_basis(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.traj_basis = value
-            .map(|s| s.parse())
-            .transpose()
-            .map_err(|e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()))?;
-        Ok(())
+    fn set_traj_basis(&mut self, value: Option<String>) {
+        self.inner.traj_basis = value;
     }
 
     /// Free-text field containing the identification number for the telemetry dataset, orbit
@@ -2294,7 +2383,7 @@ impl OcmTrajState {
     }
     #[setter]
     fn set_traj_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.traj_frame_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
+        self.inner.traj_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -2455,7 +2544,7 @@ impl OcmTrajState {
 ///     Trajectory state elements for this epoch.
 ///     (Mandatory)
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct TrajLine {
     pub inner: core_ocm::TrajLine,
@@ -2516,12 +2605,139 @@ impl TrajLine {
 /// ----------
 /// manufacturer : str, optional
 ///     The manufacturer of the space object.
-///     (Optional)
+/// bus_model : str, optional
+///     Free-text field containing the satellite manufacturer's spacecraft bus model name.
+/// docked_with : str, optional
+///     Free-text field containing a comma-separated list of other space objects that this object is
+///     docked to.
+/// drag_const_area : float, optional
+///     Attitude-independent drag cross-sectional area (AD) facing the relative wind vector, not
+///     already incorporated into the attitude-dependent 'AREA_ALONG_OEB' parameters. Units: m²
+/// drag_coeff_nom : float, optional
+///     Nominal drag Coefficient (CD Nom). If the atmospheric drag coefficient, CD, is set to zero, no
+///     atmospheric drag shall be considered.
+/// drag_uncertainty : float, optional
+///     Drag coefficient one sigma (1σ) percent uncertainty, where the actual range of drag
+///     coefficients to within 1σ shall be obtained from [1.0 ± DRAG_UNCERTAINTY/100.0] * (CD Nom).
+///     Units: %
+/// initial_wet_mass : float, optional
+///     Space object total mass at beginning of life. Units: kg
+/// wet_mass : float, optional
+///     Space object total mass (including propellant, i.e., 'wet mass') at the current reference
+///     epoch 'EPOCH_TZERO'. Units: kg
+/// dry_mass : float, optional
+///     Space object dry mass (without propellant). Units: kg
+/// oeb_parent_frame : str, optional
+///     Parent reference frame that maps to the OEB frame via the quaternion-based transformation
+///     defined in annex F, subsection F1.
+/// oeb_parent_frame_epoch : str, optional
+///     Epoch of the OEB parent frame, if OEB_PARENT_FRAME is provided and its epoch is not intrinsic
+///     to the definition of the reference frame. (See 7.5.10 for formatting rules.)
+/// oeb_q1 : float, optional
+///     First vector component of the quaternion from the parent frame to the OEB frame.
+/// oeb_q2 : float, optional
+///     Second vector component of the quaternion from the parent frame to the OEB frame.
+/// oeb_q3 : float, optional
+///     Third vector component of the quaternion from the parent frame to the OEB frame.
+/// oeb_qc : float, optional
+///     Scalar component of the quaternion from the parent frame to the OEB frame.
+/// oeb_max : float, optional
+///     Maximum physical dimension (along Xoeb) of the OEB. Units: m
+/// oeb_int : float, optional
+///     Intermediate physical dimension (along Ŷoeb) of OEB normal to OEB_MAX direction. Units: m
+/// oeb_min : float, optional
+///     Minimum physical dimension (along Ẑoeb) of OEB in direction normal to both OEB_MAX and OEB_INT
+///     directions. Units: m
+/// area_along_oeb_max : float, optional
+///     Attitude-dependent cross-sectional area of space object (not already included in
+///     DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along max OEB (Xoeb) direction as defined in
+///     annex F. Units: m²
+/// area_along_oeb_int : float, optional
+///     Attitude-dependent cross-sectional area of space object (not already included in
+///     DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along intermediate OEB (Ŷoeb) direction as
+///     defined in annex F. Units: m²
+/// area_along_oeb_min : float, optional
+///     Attitude-dependent cross-sectional area of space object (not already included in
+///     DRAG_CONST_AREA and SRP_CONST_AREA) when viewed along minimum OEB (Ẑoeb) direction as defined
+///     in annex F. Units: m²
+/// area_min_for_pc : float, optional
+///     Minimum cross-sectional area for collision probability estimation purposes. Units: m²
+/// area_max_for_pc : float, optional
+///     Maximum cross-sectional area for collision probability estimation purposes. Units: m²
+/// area_typ_for_pc : float, optional
+///     Typical (50th percentile) cross-sectional area sampled over all space object orientations for
+///     collision probability estimation purposes. Units: m²
+/// rcs : float, optional
+///     Typical (50th percentile) effective Radar Cross Section of the space object sampled over all
+///     possible viewing angles. Units: m²
+/// rcs_min : float, optional
+///     Minimum Radar Cross Section observed for this object. Units: m²
+/// rcs_max : float, optional
+///     Maximum Radar Cross Section observed for this object. Units: m²
+/// srp_const_area : float, optional
+///     Attitude-independent solar radiation pressure cross-sectional area (AR) facing the Sun, not
+///     already incorporated into the attitude-dependent ‘AREA_ALONG_OEB’ parameters. Units: m²
+/// solar_rad_coeff : float, optional
+///     Nominal Solar Radiation Pressure Coefficient (CR NOM). If the solar radiation coefficient, CR,
+///     is set to zero, no solar radiation pressure shall be considered.
+/// solar_rad_uncertainty : float, optional
+///     SRP one sigma (1σ) percent uncertainty, where the actual range of SRP coefficients to within
+///     1σ shall be obtained from [1.0 ± 0.01*SRP_UNCERTAINTY] (CR NOM). Units: %
+/// vm_absolute : float, optional
+///     Median visual magnitude normalized to a Sun-to-object distance of 1 AU, phase angle of 0
+///     degrees, and object-to-sensor distance of 40,000 km.
+/// vm_apparent_min : float, optional
+///     Minimum apparent Visual Magnitude observed for this space object.
+/// vm_apparent : float, optional
+///     Typical (50th percentile) apparent Visual Magnitude observed for this space object.
+/// vm_apparent_max : float, optional
+///     Maximum apparent Visual Magnitude observed for this space object. NOTE—The 'MAX' value
+///     represents the brightest observation, which associates with a lower Vmag.
+/// reflectance : float, optional
+///     Typical (50th percentile) coefficient of REFLECTANCE of the space object over all possible
+///     viewing angles, ranging from 0 (none) to 1 (perfect reflectance).
+/// att_control_mode : str, optional
+///     Free-text specification of primary mode of attitude control for the space object. Suggested
+///     examples include: THREE_AXIS, SPIN, DUAL_SPIN, TUMBLING, GRAVITY_GRADIENT
+/// att_actuator_type : str, optional
+///     Free-text specification of type of actuator for attitude control. Suggested examples include:
+///     ATT_THRUSTERS, ACTIVE_MAG_TORQUE, PASSIVE_MAG_TORQUE, REACTION_WHEELS, MOMENTUM_WHEELS,
+///     CONTROL_MOMENT_GYROSCOPE, NONE, OTHER
+/// att_knowledge : float, optional
+///     Accuracy of attitude knowledge. Units: deg
+/// att_control : float, optional
+///     Accuracy of attitude control system (ACS) to maintain attitude, assuming attitude knowledge
+///     was perfect (i.e., deadbands). Units: deg
+/// att_pointing : float, optional
+///     Overall accuracy of spacecraft to maintain attitude, including attitude knowledge errors and
+///     ACS operation. Units: deg
+/// avg_maneuver_freq : float, optional
+///     Average maneuver frequency, measured in the number of orbit- or attitude-adjust maneuvers per
+///     year. Units: #/yr
+/// max_thrust : float, optional
+///     Maximum composite thrust the spacecraft can accomplish in any single body-fixed direction.
+///     Units: N
+/// dv_bol : float, optional
+///     Total ΔV capability of the spacecraft at beginning of life. Units: km/s
+/// dv_remaining : float, optional
+///     Total ΔV remaining for the spacecraft. Units: km/s
+/// ixx : float, optional
+///     Moment of Inertia about the X-axis of the space object's primary body frame (e.g., SC_Body_1)
+///     (see reference `[H1]`). Units: kg·m²
+/// iyy : float, optional
+///     Moment of Inertia about the Y-axis. Units: kg·m²
+/// izz : float, optional
+///     Moment of Inertia about the Z-axis. Units: kg·m²
+/// ixy : float, optional
+///     Inertia Cross Product of the X & Y axes. Units: kg·m²
+/// ixz : float, optional
+///     Inertia Cross Product of the X & Z axes. Units: kg·m²
+/// iyz : float, optional
+///     Inertia Cross Product of the Y & Z axes. Units: kg·m²
 /// comment : list[str], optional
 ///     Comments.
-///     (Optional)
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct OcmPhysicalDescription {
     pub inner: core_ocm::OcmPhysicalDescription,
@@ -3857,47 +4073,41 @@ impl OcmPhysicalDescription {
 ///
 /// Parameters
 /// ----------
-///     epoch : str
-///     Epoch of the covariance matrix.
-///     (Mandatory)
 /// cov_ref_frame : str
 ///     Reference frame for the covariance matrix.
-///     (Mandatory)
 /// cov_type : str
 ///     Specifies the covariance element set type.
-///     (Mandatory)
-///     cov_matrix : list of float
-///     Upper triangular part of the covariance matrix.
-///     (Mandatory)
+/// cov_ordering : str
+///     Covariance element ordering, for example LTM or UTM.
+/// cov_lines : list[CovLine]
+///     Covariance time-history rows in cov_ordering order.
+/// traj_id : str, optional
+///     Corresponding trajectory identifier, required for multiple trajectory or covariance blocks.
 /// cov_id : str, optional
 ///     Identification number for this covariance matrix time history block.
-///     (Optional)
 /// cov_prev_id : str, optional
 ///     Identification number for the previous covariance matrix time history.
-///     (Optional)
 /// cov_next_id : str, optional
 ///     Identification number for the next covariance matrix time history.
-///     (Optional)
 /// cov_basis : str, optional
 ///     Basis of this covariance matrix time history data (PREDICTED, DETERMINED, etc.).
-///     (Optional)
 /// cov_basis_id : str, optional
 ///     Identification number for the telemetry dataset, orbit determination, or simulation.
-///     (Optional)
+/// cov_frame_epoch : str, optional
+///     Epoch of the covariance data reference frame, if not intrinsic to the definition of the
+///     reference frame. (See 7.5.10 for formatting rules.)
+/// cov_scale_min : float, optional
+///     Minimum scale factor to apply to this covariance data to achieve realism.
+/// cov_scale_max : float, optional
+///     Maximum scale factor to apply to this covariance data to achieve realism.
 /// cov_confidence : float, optional
 ///     The confidence level associated with the covariance [0-100].
-///     (Optional)
-///     cov_scale_factor : float, optional
-///     Scale factor to be applied to the covariance matrix.
-///     (Optional)
 /// cov_units : str, optional
 ///     Comma-delimited set of SI unit designations for the covariance elements.
-///     (Optional)
 /// comment : list[str], optional
 ///     Comments.
-///     (Optional)
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct OcmCovarianceMatrix {
     inner: core_ocm::OcmCovarianceMatrix,
     cov_lines: Py<PyList>,
@@ -3960,14 +4170,10 @@ impl OcmCovarianceMatrix {
                 cov_id,
                 cov_prev_id,
                 cov_next_id,
-                cov_basis: cov_basis.map(|s| s.parse()).transpose().map_err(
-                    |e: ccsds_ndm::error::EnumParseError| PyValueError::new_err(e.to_string()),
-                )?,
+                cov_basis,
                 cov_basis_id,
                 cov_ref_frame,
-                cov_frame_epoch: cov_frame_epoch
-                    .map(|s| parse_calendar_epoch(&s))
-                    .transpose()?,
+                cov_frame_epoch: cov_frame_epoch.map(|s| parse_epoch(&s)).transpose()?,
                 cov_scale_min,
                 cov_scale_max,
                 cov_confidence: cov_confidence.map(|v| Percentage {
@@ -4079,18 +4285,11 @@ impl OcmCovarianceMatrix {
     /// :type: Optional[str]
     #[getter]
     fn get_cov_basis(&self) -> Option<String> {
-        self.inner.cov_basis.as_ref().map(|b| b.to_string())
+        self.inner.cov_basis.clone()
     }
     #[setter]
-    fn set_cov_basis(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.cov_basis = value
-            .map(|s| {
-                s.parse().map_err(|e: ccsds_ndm::error::EnumParseError| {
-                    PyValueError::new_err(e.to_string())
-                })
-            })
-            .transpose()?;
-        Ok(())
+    fn set_cov_basis(&mut self, value: Option<String>) {
+        self.inner.cov_basis = value;
     }
     /// Free-text field containing the identification number for the orbit determination,
     /// navigation solution, or simulation upon which this covariance time history block is
@@ -4144,7 +4343,7 @@ impl OcmCovarianceMatrix {
     }
     #[setter]
     fn set_cov_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.cov_frame_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
+        self.inner.cov_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -4307,7 +4506,7 @@ impl OcmCovarianceMatrix {
 /// values : list of float
 ///     Covariance matrix elements for this epoch.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct CovLine {
     pub inner: core_ocm::CovLine,
@@ -4375,7 +4574,7 @@ impl CovLine {
 /// man_device_id : str
 ///     Identifier for the maneuver device (e.g., thruster name).
 /// man_composition : str
-///     Specifies the maneuver composition (e.g., 'VECTOR', 'SCALAR').
+///     Comma-separated row fields beginning with TIME_ABSOLUTE or TIME_RELATIVE.
 /// man_ref_frame : str
 ///     Reference frame for the maneuver data.
 /// man_lines : list of ManLine
@@ -4385,7 +4584,7 @@ impl CovLine {
 /// man_next_id : str, optional
 ///     Identifier for the next maneuver block for this space object.
 /// man_basis : str, optional
-///     Basis of the maneuver data ('Observed', 'Predicted', etc.).
+///     Basis of the maneuver data ('CANDIDATE', 'PLANNED', 'ANTICIPATED', 'TELEMETRY', 'DETERMINED').
 /// man_basis_id : str, optional
 ///     Identifier for the orbit determination or simulation basis.
 /// man_prev_epoch : str, optional
@@ -4401,13 +4600,50 @@ impl CovLine {
 /// grav_assist_name : str, optional
 ///     Name of the gravity assist body.
 /// dc_type : str, optional
-///     Type of duty cycle ('Continuous', 'Impulsive', 'Duration').
+///     Type of duty cycle ('CONTINUOUS', 'TIME', 'TIME_AND_ANGLE').
+/// dc_win_open : str, optional
+///     Start time of the duty cycle-based maneuver window that occurs on or prior to the actual
+///     maneuver execution start time.
+/// dc_win_close : str, optional
+///     End time of the duty cycle-based maneuver window that occurs on or after the actual maneuver
+///     execution end time.
+/// dc_min_cycles : int, optional
+///     Minimum number of 'ON' duty cycles (may override DC_EXEC_STOP). This value is optional even if
+///     DC_TYPE = 'CONTINUOUS'.
+/// dc_max_cycles : int, optional
+///     Maximum number of 'ON' duty cycles (may override DC_EXEC_STOP). This value is optional even if
+///     DC_TYPE = 'CONTINUOUS'.
+/// dc_exec_start : str, optional
+///     Start time of the initial duty cycle-based maneuver sequence execution.
+/// dc_exec_stop : str, optional
+///     End time of the final duty cycle-based maneuver sequence execution.
+/// dc_ref_time : str, optional
+///     Reference time for the THRUST duty cycle, specified as either time in seconds (relative to
+///     EPOCH_TZERO), or as an absolute '`<epoch>`' (see 7.5.10 for formatting rules).
+/// dc_time_pulse_duration : float, optional
+///     Thruster pulse 'ON' duration, initiated at first satisfaction of the burn 'ON' time constraint
+///     or upon completion of the previous DC_TIME_PULSE_PERIOD cycle. This keyword shall be set if
+///     DC_TYPE ≠ 'CONTINUOUS'. Units: s
+/// dc_time_pulse_period : float, optional
+///     Elapsed time between the start of one pulse and the start of the next. Must be greater than or
+///     equal to DC_TIME_PULSE_DURATION. This keyword shall be set if DC_TYPE ≠ 'CONTINUOUS'. Units: s
+/// dc_ref_dir : list[float], optional
+///     Three-component reference direction in MAN_REF_FRAME for TIME_AND_ANGLE duty cycles.
+/// dc_body_frame : str, optional
+///     For phase angle thruster duty cycles (DC_TYPE=TIME_AND_ANGLE); specifies the body reference
+///     frame in which DC_BODY_TRIGGER will be specified.
+/// dc_body_trigger : list[float], optional
+///     Three-component trigger direction in DC_BODY_FRAME for TIME_AND_ANGLE duty cycles.
+/// dc_pa_start_angle : float, optional
+///     Thruster start phase relative to the projected trigger/reference crossing. Units: deg
+/// dc_pa_stop_angle : float, optional
+///     Thruster stop phase relative to the projected trigger/reference crossing. Units: deg
 /// man_units : str, optional
 ///     SI unit designations for the maneuver elements.
 /// comment : list of str, optional
 ///     Comments for this maneuver block.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct OcmManeuverParameters {
     inner: core_ocm::OcmManeuverParameters,
     man_lines: Py<PyList>,
@@ -4561,9 +4797,7 @@ impl OcmManeuverParameters {
                 man_purpose,
                 man_pred_source,
                 man_ref_frame,
-                man_frame_epoch: man_frame_epoch
-                    .map(|s| parse_calendar_epoch(&s))
-                    .transpose()?,
+                man_frame_epoch: man_frame_epoch.map(|s| parse_epoch(&s)).transpose()?,
                 grav_assist_name,
                 dc_type: dc_type
                     .map(|s| s.parse())
@@ -4826,7 +5060,7 @@ impl OcmManeuverParameters {
     }
     #[setter]
     fn set_man_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.man_frame_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
+        self.inner.man_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -5265,7 +5499,7 @@ impl OcmManeuverParameters {
 /// values : list of str
 ///     Maneuver elements for this epoch.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct ManLine {
     pub inner: core_ocm::ManLine,
@@ -5326,13 +5560,9 @@ impl ManLine {
 
 /// OCM Perturbations Parameters.
 ///
-/// Parameters
-/// ----------
-/// comment : list[str], optional
-///     Comments.
-///     (Optional)
+/// Construct with no arguments, then assign the perturbation-model properties.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct OcmPerturbations {
     pub inner: core_ocm::OcmPerturbations,
@@ -5894,12 +6124,10 @@ impl OcmPerturbations {
 ///     (Mandatory)
 /// od_prev_id : str, optional
 ///     Identification number for the previous orbit determination block.
-///     (Optional)
 /// comment : list[str], optional
 ///     Comments.
-///     (Optional)
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct OcmOdParameters {
     pub inner: core_ocm::OcmOdParameters,
@@ -5962,7 +6190,7 @@ impl OcmOdParameters {
 
     /// Comments (see 7.8 for formatting rules).
     ///
-    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: list[str]
     #[getter]
@@ -5977,7 +6205,7 @@ impl OcmOdParameters {
     ///
     /// Examples: 1
     ///
-    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: str
     #[getter]
@@ -5993,7 +6221,7 @@ impl OcmOdParameters {
     ///
     /// Examples: 0
     ///
-    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: Optional[str]
     #[getter]
@@ -6007,9 +6235,7 @@ impl OcmOdParameters {
 
     /// Type of orbit determination method used to produce the orbit estimate.
     ///
-    /// Examples: LEAST_SQUARES, KALMAN_FILTER
-    ///
-    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: str
     #[getter]
@@ -6026,7 +6252,7 @@ impl OcmOdParameters {
     ///
     /// Examples: 2000-01-01T12:00:00Z
     ///
-    /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
+    /// CCSDS Reference: 502.0-B-3, Section 6.2.10.
     ///
     /// :type: str
     #[getter]
@@ -6474,8 +6700,18 @@ impl OcmOdParameters {
 /// OCM user-defined parameter or sequence composition with its opaque ICD-defined rows.
 ///
 /// CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.11.
+///
+/// Parameters
+/// ----------
+/// parameter : str
+///     Parameter name without the ``USER_DEFINED_`` prefix.
+/// value : str
+///     Scalar value, or comma-delimited composition for ``COMPOSITION_<sequence ID>``.
+/// records : list[str], optional
+///     Opaque sequence rows defined by the exchange partners' ICD.
+///
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct OcmUserDefinedParameter {
     inner: core_ocm::OcmUserDefinedParameter,
@@ -6508,7 +6744,7 @@ impl OcmUserDefinedParameter {
         self.inner.parameter = value;
     }
 
-    /// Scalar value, or comma-delimited composition for COMPOSITION_<sequence ID>.
+    /// Scalar value, or comma-delimited composition for ``COMPOSITION_<sequence ID>``.
     ///
     /// :type: str
     #[getter]
@@ -6536,8 +6772,16 @@ impl OcmUserDefinedParameter {
 /// Ordered OCM user-defined parameters and optional ICD-defined sequences.
 ///
 /// CCSDS Reference: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.11.
+///
+/// Parameters
+/// ----------
+/// user_defined : list[OcmUserDefinedParameter], optional
+///     Parameters and optional sequence compositions in their stored order.
+/// comment : list[str], optional
+///     Leading comments; the entries property also permits interleaved comments.
+///
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct OcmUserDefined {
     entries: Py<PyList>,
 }

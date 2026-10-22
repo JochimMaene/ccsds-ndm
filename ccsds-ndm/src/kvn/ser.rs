@@ -113,7 +113,8 @@ impl OdmFloat {
         }
     }
 
-    fn write_rounded_scientific<W: FmtWrite>(value: &str, output: &mut W) -> std::fmt::Result {
+    /// Round a 17-significant-digit spelling to 16 digits and return the double it denotes.
+    fn rounded_to_16_digits(value: &str) -> f64 {
         let (mantissa, exponent) = value.find(['e', 'E']).map_or((value, 0i32), |index| {
             let exponent = &value.as_bytes()[index + 1..];
             let (negative, digits) = match exponent.first() {
@@ -200,10 +201,10 @@ impl OdmFloat {
         }
         formatted[exponent_start..length].reverse();
 
-        output.write_str(
-            std::str::from_utf8(&formatted[..length])
-                .expect("CCSDS numeric formatter produced ASCII"),
-        )
+        std::str::from_utf8(&formatted[..length])
+            .expect("CCSDS numeric formatter produced ASCII")
+            .parse()
+            .expect("rounded CCSDS spelling is a finite number")
     }
 
     fn write_finite<W: FmtWrite>(value: f64, output: &mut W) -> std::fmt::Result {
@@ -228,7 +229,9 @@ impl OdmFloat {
         if Self::significant_digits(shortest) <= 16 {
             Self::write_preformatted(shortest, output)
         } else {
-            Self::write_rounded_scientific(shortest, output)
+            // Write the rounded double's own shortest spelling (at most 16 digits), so writing
+            // what was read back yields the same text.
+            Self::write_finite(Self::rounded_to_16_digits(shortest), output)
         }
     }
 
@@ -255,11 +258,13 @@ enum KvnOutput<'a> {
 pub struct KvnWriter<'a> {
     output: KvnOutput<'a>,
     io_error: Option<std::io::Error>,
-    lexical_error: bool,
+    /// First value-level refusal: non-ASCII text, an empty value, or an out-of-range integer.
+    value_error: Option<crate::error::ValidationError>,
     unrepresentable_number: bool,
     line_length_error: Option<usize>,
     line_len: usize,
     allow_long_records: bool,
+    always_units: bool,
     exact_floats: bool,
     line_buffer: String,
 }
@@ -270,7 +275,9 @@ impl FmtWrite for KvnWriter<'_> {
             if byte == b'\n' {
                 self.finish_line();
             } else {
-                self.lexical_error |= !(b' '..=b'~').contains(&byte);
+                if !(b' '..=b'~').contains(&byte) {
+                    self.reject_text("KVN record");
+                }
                 self.line_len = self.line_len.saturating_add(1);
             }
         }
@@ -291,11 +298,12 @@ impl KvnWriter<'static> {
         Self {
             output: KvnOutput::String(String::new()),
             io_error: None,
-            lexical_error: false,
+            value_error: None,
             unrepresentable_number: false,
             line_length_error: None,
             line_len: 0,
             allow_long_records: false,
+            always_units: false,
             exact_floats: false,
             line_buffer: String::new(),
         }
@@ -305,11 +313,12 @@ impl KvnWriter<'static> {
         Self {
             output: KvnOutput::String(String::with_capacity(capacity)),
             io_error: None,
-            lexical_error: false,
+            value_error: None,
             unrepresentable_number: false,
             line_length_error: None,
             line_len: 0,
             allow_long_records: false,
+            always_units: false,
             exact_floats: false,
             line_buffer: String::new(),
         }
@@ -358,11 +367,12 @@ impl<'a> KvnWriter<'a> {
         Self {
             output: KvnOutput::Io(output),
             io_error: None,
-            lexical_error: false,
+            value_error: None,
             unrepresentable_number: false,
             line_length_error: None,
             line_len: 0,
             allow_long_records: false,
+            always_units: false,
             exact_floats: false,
             line_buffer: String::new(),
         }
@@ -378,6 +388,12 @@ impl<'a> KvnWriter<'a> {
     /// Allow arbitrary line lengths for ACM and OCM, as required by their CCSDS books.
     pub(crate) fn allow_long_records(&mut self) {
         self.allow_long_records = true;
+    }
+
+    /// Write the fixed unit of every measure even when the model holds none (RDM 5.2.4.1:
+    /// applicable units "must be displayed").
+    pub(crate) fn always_write_units(&mut self) {
+        self.always_units = true;
     }
 
     /// Builds and writes one raw line using a reusable growable buffer.
@@ -429,18 +445,50 @@ impl<'a> KvnWriter<'a> {
         std::borrow::Cow::Borrowed(value)
     }
 
-    fn check_text(&mut self, value: &str) {
-        self.lexical_error |= !value.bytes().all(|byte| (b' '..=b'~').contains(&byte));
+    fn reject(&mut self, error: impl FnOnce() -> crate::error::ValidationError) {
+        if self.value_error.is_none() {
+            self.value_error = Some(error());
+        }
+    }
+
+    fn reject_text(&mut self, field: &str) {
+        self.reject(|| crate::error::ValidationError::Generic {
+            message: format!("{field}: KVN output must contain only printable ASCII records")
+                .into(),
+            line: None,
+        });
+    }
+
+    fn check_text(&mut self, field: &str, value: &str) {
+        if !value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            self.reject_text(field);
+        }
     }
 
     /// Writes a simple `KEY = value` line.
+    ///
+    /// Readers trim values, so surrounding whitespace (such as XML text padding) is not written.
+    /// A blank or `N/A` value would read back as an absent keyword, so it is refused: KVN has no
+    /// empty values, and an absent optional keyword is omitted instead.
     pub fn write_pair<V: Display>(&mut self, key: &str, value: V) {
-        self.check_text(key);
+        self.check_text(key, key);
         let mut line = std::mem::take(&mut self.line_buffer);
         line.clear();
         let _ = write!(line, "{key:<20} = ");
         let value_start = line.len();
         let _ = write!(line, "{value}");
+        line.truncate(line.trim_end().len().max(value_start));
+        let padding = line[value_start..].len() - line[value_start..].trim_start().len();
+        line.drain(value_start..value_start + padding);
+        if crate::kvn::parser::value_is_absent(key, &line[value_start..]) {
+            let value = line[value_start..].to_owned();
+            self.reject(|| crate::error::ValidationError::InvalidValue {
+                field: key.to_owned().into(),
+                value,
+                expected: "a non-empty KVN value (omit an absent optional keyword)".into(),
+                line: None,
+            });
+        }
         let invalid = !line[value_start..]
             .bytes()
             .all(|byte| (b' '..=b'~').contains(&byte));
@@ -448,11 +496,26 @@ impl<'a> KvnWriter<'a> {
             let normalized = Self::normalize_inline_value(&line[value_start..]).into_owned();
             line.truncate(value_start);
             line.push_str(&normalized);
-            self.lexical_error = true;
+            self.reject_text(key);
         }
         line.push('\n');
         let _ = self.write_str(&line);
         self.line_buffer = line;
+    }
+
+    /// Writes an integer `KEY = value` line, refusing values outside the KVN integer range of
+    /// −2³¹ through 2³¹−1 (ODM 7.5.4, ADM 6.8.4) that wider model integers can hold.
+    pub(crate) fn write_integer_pair<V: Display>(&mut self, key: &str, value: V) {
+        let text = value.to_string();
+        if text.parse::<i32>().is_err() {
+            self.reject(|| crate::error::ValidationError::OutOfRange {
+                name: key.to_owned().into(),
+                value: text.clone(),
+                expected: "an integer from -2147483648 through 2147483647 for KVN".into(),
+                line: None,
+            });
+        }
+        self.write_pair(key, text);
     }
 
     /// Writes a CCSDS-compatible ODM number without allocating a value string.
@@ -463,16 +526,17 @@ impl<'a> KvnWriter<'a> {
     }
 
     /// Writes a CCSDS-compatible ODM number and optional unit.
-    pub(crate) fn write_odm_float_measure<U: Display>(
+    pub(crate) fn write_odm_float_measure<U: Display + Default>(
         &mut self,
         key: &str,
         measure: &UnitValue<f64, U>,
     ) {
         self.unrepresentable_number |= !OdmFloat::is_valid(measure.value);
         let exact = self.exact_floats;
+        let default_unit = (measure.units.is_none() && self.always_units).then(U::default);
         let build = |line: &mut String| {
             Self::build_odm_float_pair(line, key, measure.value, exact);
-            if let Some(unit) = &measure.units {
+            if let Some(unit) = measure.units.as_ref().or(default_unit.as_ref()) {
                 line.push_str(" [");
                 let _ = write!(line, "{unit}");
                 line.push(']');
@@ -530,20 +594,6 @@ impl<'a> KvnWriter<'a> {
         self.write_built_line(build);
     }
 
-    /// Write a numeric history record without allocating intermediate value strings.
-    pub(crate) fn write_numeric_record(&mut self, values: &[f64]) {
-        self.unrepresentable_number |= values.iter().any(|value| !OdmFloat::is_valid(*value));
-        let build = |line: &mut String| {
-            for (index, value) in values.iter().enumerate() {
-                if index > 0 {
-                    line.push(' ');
-                }
-                let _ = OdmFloat(*value).write_to(line);
-            }
-        };
-        self.write_built_line(build);
-    }
-
     /// Write a numeric vector assignment and optional unit without temporary joins.
     pub(crate) fn write_numeric_vector<U: Display>(
         &mut self,
@@ -575,7 +625,7 @@ impl<'a> KvnWriter<'a> {
         numeric_columns: &[bool],
     ) {
         for (value, numeric) in values.iter().zip(numeric_columns) {
-            self.check_text(value);
+            self.check_text("OCM history record", value);
             if *numeric {
                 self.unrepresentable_number |= value.trim().parse::<f64>().map_or(true, |number| {
                     !OdmFloat::is_valid(number)
@@ -627,8 +677,8 @@ impl<'a> KvnWriter<'a> {
                 continue;
             }
             for line in c.lines() {
-                self.check_text(line);
-                let normalized = Self::normalize_inline_value(line);
+                self.check_text("COMMENT", line);
+                let normalized = Self::normalize_inline_value(line.trim_end());
                 let _ = writeln!(self, "COMMENT {}", normalized);
             }
         }
@@ -667,12 +717,8 @@ impl<'a> KvnWriter<'a> {
             }
             .into());
         }
-        if self.lexical_error {
-            return Err(crate::error::ValidationError::Generic {
-                message: "KVN output must contain only printable ASCII records".into(),
-                line: None,
-            }
-            .into());
+        if let Some(error) = &self.value_error {
+            return Err(error.clone().into());
         }
         if self.unrepresentable_number {
             return Err(crate::error::ValidationError::Generic {
@@ -891,11 +937,16 @@ mod tests {
         );
         assert_eq!(
             OdmFloat(1.234_567_890_123_456_7).to_string(),
-            "1.234567890123457e0"
+            "1.234567890123457"
         );
+        // Rounded spellings are stable: writing what was read back gives the same text.
+        for value in [-3.407_834_585_079_831_4, 1.234_567_890_123_456_7, 0.1 + 0.2] {
+            let once = OdmFloat(value).to_string();
+            assert_eq!(OdmFloat(once.parse().unwrap()).to_string(), once);
+        }
         assert_eq!(
             OdmFloat(f64::from_bits(f64::MAX.to_bits() - 2)).to_string(),
-            "1.797693134862315e308"
+            "1.797693134862315e+308"
         );
     }
 }

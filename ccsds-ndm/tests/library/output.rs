@@ -377,8 +377,10 @@ fn kvn_generation_rejects_non_ascii_and_control_text_before_streaming() {
     apm.header.originator = "GSFC-é".into();
     let error = apm.to_kvn().expect_err("non-ASCII reached KVN generation");
     assert!(
-        error.to_string().contains("only printable ASCII records"),
-        "unexpected diagnostic: {error}"
+        error
+            .to_string()
+            .contains("ORIGINATOR: KVN output must contain only printable ASCII records"),
+        "the refusal names the field: {error}"
     );
 
     let mut output = Vec::new();
@@ -404,6 +406,40 @@ fn kvn_generation_rejects_non_ascii_and_control_text_before_streaming() {
         "ORIGINATOR",
     );
     assert!(output.is_empty(), "streaming KVN wrote bytes for a tab");
+}
+
+#[test]
+fn kvn_generation_writes_canonical_values_and_refuses_unrepresentable_ones() {
+    use ccsds_ndm::error::ValidationError;
+    let tdm = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e18.kvn")).unwrap();
+
+    // Readers trim values, so XML text padding is not written.
+    let mut padded = tdm.clone();
+    padded.header.originator = " NASA ".into();
+    assert!(padded
+        .to_kvn()
+        .unwrap()
+        .contains("ORIGINATOR           = NASA\n"));
+
+    // KVN has no empty values: a blank or N/A value would read back as absent.
+    for value in ["", "  ", "N/A"] {
+        let mut empty = tdm.clone();
+        empty.header.message_id = Some(value.into());
+        let error = empty.to_kvn().unwrap_err();
+        crate::common::assert_validation_field(&error, "MESSAGE_ID");
+        assert!(empty.write_kvn_to(&mut Vec::new()).is_err());
+        empty.to_xml().unwrap();
+    }
+
+    // KVN integers are 32-bit (TDM 4.3.4); wider model integers are refused, XML keeps them.
+    let mut wide = tdm;
+    wide.body.segments[0].metadata.interpolation_degree = Some(u32::MAX);
+    let error = wide.to_kvn().unwrap_err();
+    assert!(matches!(
+        crate::common::validation_error_source(error.as_validation_error().unwrap()),
+        ValidationError::OutOfRange { name, .. } if name == "INTERPOLATION_DEGREE"
+    ));
+    wide.to_xml().unwrap();
 }
 
 #[test]

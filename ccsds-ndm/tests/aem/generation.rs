@@ -157,7 +157,7 @@ fn kvn_generation_rounds_history_numbers_to_the_ccsds_digit_limit() {
         unreachable!()
     };
     state.spin_alpha.value = 1.234_567_890_123_456_7;
-    assert!(message.to_kvn().unwrap().contains("1.234567890123457e0"));
+    assert!(message.to_kvn().unwrap().contains("1.234567890123457"));
 }
 
 #[test]
