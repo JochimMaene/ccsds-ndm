@@ -106,8 +106,13 @@ pub(crate) fn parse_ccsds_number(token: &str) -> Option<f64> {
         return None;
     }
     let value: f64 = fast_float::parse(token).ok()?;
-    let mantissa = token.split(['e', 'E']).next().unwrap_or(token);
-    let underflow = value == 0.0 && mantissa.bytes().any(|byte| matches!(byte, b'1'..=b'9'));
+    let underflow = value == 0.0
+        && token
+            .split(['e', 'E'])
+            .next()
+            .unwrap_or(token)
+            .bytes()
+            .any(|byte| matches!(byte, b'1'..=b'9'));
     (value.is_finite() && !underflow).then_some(value)
 }
 
@@ -614,8 +619,18 @@ pub fn kv_optional<'a, T>(
 /// missing. CDM `MANEUVERABLE` keeps `N/A` because the book lists it as a value (508.0-B-1
 /// table 3-3).
 pub(crate) fn value_is_absent(key: &str, rest: &str) -> bool {
-    let value = rest[..rest.find(['\r', '\n']).unwrap_or(rest.len())].trim();
-    value.is_empty() || (value.eq_ignore_ascii_case("N/A") && key != "MANEUVERABLE")
+    let value = rest.trim_start_matches(|c: char| c != '\r' && c != '\n' && c.is_whitespace());
+    if value.is_empty() || value.starts_with(['\r', '\n']) {
+        return true;
+    }
+    key != "MANEUVERABLE"
+        && value
+            .get(..3)
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("N/A"))
+        && value[3..]
+            .split(['\r', '\n'])
+            .next()
+            .is_some_and(|tail| tail.trim().is_empty())
 }
 
 /// Consume the remainder of the current record and its line ending.
@@ -1530,8 +1545,36 @@ mod tests {
     }
 
     #[test]
+    fn absent_value_checks_stop_at_the_current_record() {
+        for value in [
+            "",
+            " \t",
+            "\nNEXT = 1",
+            " \r\nNEXT = 1",
+            " n/A \t\nNEXT = 1",
+            "\u{a0}N/A\u{a0}\rNEXT = 1",
+        ] {
+            assert!(value_is_absent("X", value), "{value:?}");
+        }
+        for value in ["1", " 1e-20\n", "N/AX", "N/A text\n", "é", "NUMBER\n"] {
+            assert!(!value_is_absent("X", value), "{value:?}");
+        }
+        assert!(!value_is_absent("MANEUVERABLE", " N/A \n"));
+        assert!(value_is_absent("MANEUVERABLE", " \n"));
+    }
+
+    #[test]
     fn numeric_reader_rejects_overflow_underflow_and_malformed_tokens() {
-        for token in [".5", "5.", "1e3", "12.5e-3", "1.2345678901234567", "5e-324"] {
+        for token in [
+            ".5",
+            "5.",
+            "1e3",
+            "12.5e-3",
+            "1.2345678901234567",
+            "5e-324",
+            "0e-999",
+            "-0.0",
+        ] {
             assert!(parse_ccsds_number(token).is_some(), "{token}");
         }
         for token in ["1e999", "1e-999", "1..0", ".", "+", "1e", "NaN", "INF"] {

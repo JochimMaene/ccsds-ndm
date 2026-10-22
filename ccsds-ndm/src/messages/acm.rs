@@ -740,18 +740,23 @@ fn validate_history_time_tags<L>(
                 .into()
         };
     let mut kind = None;
+    let mut previous_key: Option<crate::types::EpochOrderKey<'_>> = None;
+    let mut ascending = true;
+    let mut descending = true;
+    let mut first_non_increasing = None;
     for (index, tag) in lines.iter().map(&epoch).enumerate() {
-        let valid = match tag.kind() {
-            EpochKind::Calendar => tag.calendar_fields_are_valid() == Some(true),
-            EpochKind::Numeric => tag.order_key().is_some(),
-        };
-        if !valid {
-            return Err(invalid(
-                index,
-                tag,
-                "a relative time in seconds or a CCSDS calendar/ordinal epoch (ADM 5.3.4.3)",
-            ));
-        }
+        let key = tag
+            .order_key()
+            .filter(|_| {
+                tag.kind() == EpochKind::Numeric || tag.calendar_fields_are_valid() == Some(true)
+            })
+            .ok_or_else(|| {
+                invalid(
+                    index,
+                    tag,
+                    "a relative time in seconds or a CCSDS calendar/ordinal epoch (ADM 5.3.4.3)",
+                )
+            })?;
         if *kind.get_or_insert(tag.kind()) != tag.kind() {
             return Err(invalid(
                 index,
@@ -760,41 +765,42 @@ fn validate_history_time_tags<L>(
             ));
         }
         crate::validation::epoch_precision(&[(field, tag)])?;
+        if let Some(previous) = previous_key {
+            // Same-branch values always compare; treat an impossible `None` as a duplicate.
+            let ordering = previous.compare(&key).unwrap_or(Ordering::Equal);
+            ascending &= ordering == Ordering::Less;
+            descending &= ordering == Ordering::Greater;
+            if ordering != Ordering::Less {
+                first_non_increasing.get_or_insert(index);
+            }
+        }
+        previous_key = Some(key);
     }
-    // Same-branch values always compare; treat an impossible `None` as a duplicate.
-    let order = |a: &L, b: &L| {
-        epoch(a)
-            .cmp_same_branch(epoch(b))
-            .unwrap_or(Ordering::Equal)
-    };
-    if let Some(index) = lines
-        .windows(2)
-        .position(|pair| order(&pair[0], &pair[1]) != Ordering::Less)
-    {
-        if increasing {
+    if increasing {
+        if let Some(index) = first_non_increasing {
             return Err(invalid(
-                index + 1,
-                epoch(&lines[index + 1]),
+                index,
+                epoch(&lines[index]),
                 "strictly increasing, non-repeated covariance time tags (ADM 5.3.4.4 and 5.3.7.5)",
             ));
         }
-        if !lines
+    } else if !ascending && !descending {
+        let mut keys: Vec<_> = lines
+            .iter()
+            .enumerate()
+            .map(|(index, line)| (index, epoch(line).order_key().unwrap()))
+            .collect();
+        keys.sort_unstable_by(|a, b| a.1.compare(&b.1).unwrap_or(Ordering::Equal));
+        if let Some(pair) = keys
             .windows(2)
-            .all(|pair| order(&pair[0], &pair[1]) == Ordering::Greater)
+            .find(|pair| pair[0].1.compare(&pair[1].1) == Some(Ordering::Equal))
         {
-            let mut indices: Vec<usize> = (0..lines.len()).collect();
-            indices.sort_unstable_by(|a, b| order(&lines[*a], &lines[*b]));
-            if let Some(pair) = indices
-                .windows(2)
-                .find(|pair| order(&lines[pair[0]], &lines[pair[1]]) == Ordering::Equal)
-            {
-                let index = pair[0].max(pair[1]);
-                return Err(invalid(
-                    index,
-                    epoch(&lines[index]),
-                    "non-repeated attitude time tags (ADM 5.3.4.4)",
-                ));
-            }
+            let index = pair[0].0.max(pair[1].0);
+            return Err(invalid(
+                index,
+                epoch(&lines[index]),
+                "non-repeated attitude time tags (ADM 5.3.4.4)",
+            ));
         }
     }
     Ok(())

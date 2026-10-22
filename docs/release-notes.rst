@@ -7,6 +7,10 @@ Unreleased
 Additional conformance corrections
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- History validation reuses timestamp comparison keys. KVN parsing avoids duplicate input
+  normalization, and covariance output revalidates rounded matrices only when values change.
+  Typed Python readers inspect the message header before parsing without a second full-file scan.
+
 - TLE export requires Earth/TEME/UTC metadata and canonicalizes rounded cyclic-angle boundaries.
 - OPM/OMM KVN output refuses empty or comment-only spacecraft blocks before writing.
 - AEM compares adjacent usable bounds only within the same declared time system.

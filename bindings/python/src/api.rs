@@ -63,7 +63,14 @@ fn expect_kind<T: FromMessage>(
     origin: Option<&Path>,
 ) -> PyResult<()> {
     let actual = py
-        .detach(|| ccsds_ndm::detect::detect_message_kind(data, notation))
+        .detach(|| {
+            let actual = ccsds_ndm::detect::detect_message_header(data, notation)?;
+            if actual != T::KIND {
+                // Keep concatenated-input refusals ahead of wrong-family errors.
+                ccsds_ndm::detect::detect_message_kind(data, notation)?;
+            }
+            Ok::<_, ccsds_ndm::error::CcsdsNdmError>(actual)
+        })
         .map_err(ccsds_error_to_pyerr)?;
     if actual == T::KIND {
         return Ok(());

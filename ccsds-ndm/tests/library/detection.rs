@@ -74,7 +74,7 @@ fn detect_failure_unknown_header() {
 #[test]
 fn concatenated_kvn_messages_are_detected_on_reader_record_boundaries() {
     // Detection uses the readers' rules: any terminator, insignificant leading blanks.
-    for separator in ["\n  ", "\r", "\r\n\t"] {
+    for separator in ["\n  ", "\r", "\r\n\t", "\n\r\t"] {
         let input = format!("{}{separator}{OPM_KVN}", OPM_KVN.trim_end());
         assert_eq!(
             from_str(&input).unwrap_err().code(),
@@ -82,6 +82,26 @@ fn concatenated_kvn_messages_are_detected_on_reader_record_boundaries() {
             "{separator:?}"
         );
     }
+}
+
+#[test]
+fn header_detection_identifies_only_the_first_header_or_root() {
+    use ccsds_ndm::detect::{detect_message_header, detect_message_kind};
+    use ccsds_ndm::validation::MessageKind;
+
+    let input = format!("{OPM_KVN}\r\n\t{OPM_KVN}");
+    assert_eq!(
+        detect_message_header(&input, None).unwrap(),
+        MessageKind::Opm
+    );
+    assert_eq!(
+        detect_message_kind(&input, None).unwrap_err().code(),
+        Some("unsupported.notation")
+    );
+    assert_eq!(
+        detect_message_header("<opm><unfinished", None).unwrap(),
+        MessageKind::Opm
+    );
 }
 
 #[test]

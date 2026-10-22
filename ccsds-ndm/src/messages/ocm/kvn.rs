@@ -1947,14 +1947,19 @@ impl Ocm {
             }
         }
         let mut rounded_values = [0.0; 100];
-        let mut number = String::new();
         for (covariance_index, covariance) in self.body.segment.data.cov.iter().enumerate() {
             let kind = super::known_ocm_type(&covariance.cov_type);
             let known = super::covariance_dimension(kind).is_some()
                 || matches!(kind, "SIG3EIGVEC3" | "TSIG3EIGVEC3");
             for (line_index, line) in covariance.cov_lines.iter().enumerate() {
+                let mut changed = false;
                 for (value_index, value) in line.values.iter().enumerate() {
-                    if !crate::kvn::ser::OdmFloat::is_valid(*value) {
+                    let rounded = if known {
+                        crate::kvn::ser::OdmFloat::rounded_value(*value)
+                    } else {
+                        crate::kvn::ser::OdmFloat::is_valid(*value).then_some(*value)
+                    };
+                    let Some(rounded) = rounded else {
                         return Err(crate::validation::unrepresentable_number(
                             "covLine",
                             *value,
@@ -1962,14 +1967,14 @@ impl Ocm {
                                 "body.segment.data.cov[{covariance_index}].cov_lines[{line_index}].values[{value_index}]"
                             ),
                         ));
+                    };
+                    if known {
+                        rounded_values[value_index] = rounded;
+                        changed |= rounded != *value;
                     }
                 }
-                if known {
-                    for (rounded, value) in rounded_values.iter_mut().zip(&line.values) {
-                        number.clear();
-                        crate::kvn::ser::OdmFloat::write_if_valid(*value, &mut number);
-                        *rounded = number.parse::<f64>().unwrap();
-                    }
+                // Root validation already checked unchanged rows; only rounding can invalidate them.
+                if changed {
                     super::validate_covariance_values(
                         &rounded_values[..line.values.len()],
                         kind,

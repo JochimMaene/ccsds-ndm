@@ -106,7 +106,13 @@ fn covariance_times_are_strictly_increasing_on_input_and_after_edits() {
 #[test]
 fn attitude_times_must_be_unique_but_need_not_increase() {
     let original = Acm::from_kvn(include_str!("../../data/kvn/acm_g6.kvn")).unwrap();
-    for times in [["0.5", "0.25", "0.0"], ["0.25", "0.0", "0.5"]] {
+    for times in [
+        ["0.0", "0.25", "0.5"],
+        ["0.5", "0.25", "0.0"],
+        ["0.25", "0.0", "0.5"],
+        ["1.0000000000000001", "0", "1"],
+        ["0", "+0.00001", "-0.00001"],
+    ] {
         let mut value = original.clone();
         for (line, time) in value.body.segment.data.att[0]
             .att_lines

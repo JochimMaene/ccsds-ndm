@@ -35,8 +35,8 @@ fn is_kvn_message_header(line: &str) -> bool {
 
 fn has_multiple_kvn_messages(input: &str) -> bool {
     // Same record boundaries as the readers: all four terminators, insignificant leading blanks.
-    crate::kvn::normalize_line_endings(input)
-        .lines()
+    input
+        .split(['\r', '\n'])
         .filter(|line| is_kvn_message_header(line.trim_start()))
         .nth(1)
         .is_some()
@@ -111,16 +111,37 @@ pub(crate) fn detect_notation_bytes(input: &[u8]) -> Result<Notation> {
 
 /// Identify a document's family from its KVN header or XML root without parsing its body.
 ///
-/// This does not validate the document. An omitted notation is detected automatically.
+/// This does not validate the document, but rejects concatenated KVN messages. An omitted
+/// notation is detected automatically.
 pub fn detect_message_kind(
     input: &str,
     notation: Option<Notation>,
+) -> Result<crate::validation::MessageKind> {
+    detect_kind(input, notation, true)
+}
+
+/// Identify only the first KVN message header or XML root, without scanning the body.
+///
+/// This does not validate the document or reject concatenated KVN messages. Use
+/// [`detect_message_kind`] when concatenated messages must be refused during detection.
+pub fn detect_message_header(
+    input: &str,
+    notation: Option<Notation>,
+) -> Result<crate::validation::MessageKind> {
+    detect_kind(input, notation, false)
+}
+
+fn detect_kind(
+    input: &str,
+    notation: Option<Notation>,
+    check_concatenation: bool,
 ) -> Result<crate::validation::MessageKind> {
     reject_wide_encoding(input.as_bytes())?;
     let input = without_utf8_bom(input);
     let notation = notation.map_or_else(|| detect_notation(input), Ok)?;
     let kind = match notation {
-        Notation::Kvn => detect_kvn_kind(input),
+        Notation::Kvn if check_concatenation => detect_kvn_kind(input),
+        Notation::Kvn => detect_kvn_header(input),
         Notation::Xml => detect_xml_kind(input),
     }
     .map_err(|error| {
@@ -308,16 +329,20 @@ fn parse_kvn_kind(input: &mut &str) -> PResult<NdmKind> {
 }
 
 fn detect_kvn_kind(s: &str) -> Result<NdmKind> {
-    let mut input = s;
-    let kind = parse_kvn_kind
-        .parse_next(&mut input)
-        .map_err(|_| CcsdsNdmError::UnsupportedMessage("Could not identify KVN header".into()))?;
+    let kind = detect_kvn_header(s)?;
 
     if has_multiple_kvn_messages(s) {
         return Err(crate::messages::ndm::combined_kvn_unsupported());
     }
 
     Ok(kind)
+}
+
+fn detect_kvn_header(s: &str) -> Result<NdmKind> {
+    let mut input = s;
+    parse_kvn_kind
+        .parse_next(&mut input)
+        .map_err(|_| CcsdsNdmError::UnsupportedMessage("Could not identify KVN header".into()))
 }
 
 /// Detects and parses KVN message type

@@ -33,6 +33,25 @@ impl OdmFloat {
         Self::write_finite(value, output).is_ok()
     }
 
+    /// Return the value read from the canonical spelling using the formatter's rounding rule.
+    pub(crate) fn rounded_value(value: f64) -> Option<f64> {
+        if !Self::is_valid(value) {
+            return None;
+        }
+        if value == 0.0 {
+            return Some(0.0);
+        }
+        let mut buffer = zmij::Buffer::new();
+        let shortest = buffer.format_finite(value);
+        Some(
+            if shortest.len() <= 16 || Self::significant_digits(shortest) <= 16 {
+                value
+            } else {
+                Self::rounded_to_16_digits(shortest)
+            },
+        )
+    }
+
     fn significant_digits(value: &str) -> usize {
         let mut first = None;
         let mut last = None;
@@ -870,6 +889,40 @@ mod tests {
             let mut output = String::new();
             assert!(!OdmFloat::write_if_valid(value, &mut output));
             assert!(output.is_empty());
+        }
+    }
+
+    #[test]
+    fn rounded_value_matches_the_emitted_number() {
+        let mut bits = 1u64;
+        let generated = (0..10_000).map(|_| {
+            bits = bits.wrapping_mul(6364136223846793005).wrapping_add(1);
+            f64::from_bits(bits)
+        });
+        for value in [
+            0.0,
+            -0.0,
+            f64::from_bits(1),
+            -f64::from_bits(1),
+            f64::MIN_POSITIVE,
+            0.1 + 0.2,
+            1.234_567_890_123_456_7,
+            f64::from_bits(f64::MAX.to_bits() - 2),
+            f64::MAX,
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+        ]
+        .into_iter()
+        .chain(generated)
+        {
+            match OdmFloat::rounded_value(value) {
+                Some(rounded) => {
+                    let emitted: f64 = OdmFloat(value).to_string().parse().unwrap();
+                    assert_eq!(rounded.to_bits(), emitted.to_bits(), "{value:e}");
+                }
+                None => assert!(!OdmFloat::is_valid(value)),
+            }
         }
     }
 

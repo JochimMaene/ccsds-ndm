@@ -431,11 +431,20 @@ def test_model_classes_name_the_public_package():
         assert cls.__module__ == "ccsds_ndm"
 
 
-@pytest.mark.parametrize("cls", [ccsds_ndm.Opm, ccsds_ndm.CombinedNdm])
-def test_typed_detection_refusals_are_parse_operations(cls):
-    source = "CCSDS_OPM_VERS = 3.0\nCCSDS_OPM_VERS = 3.0\n"
+@pytest.mark.parametrize("cls", [ccsds_ndm.Opm, ccsds_ndm.Oem, ccsds_ndm.CombinedNdm])
+@pytest.mark.parametrize("from_file", [False, True])
+@pytest.mark.parametrize("separator", ["\n", "\r", "\r\n", "\n\r"])
+def test_typed_detection_refusals_are_parse_operations(
+    cls, from_file, separator, tmp_path
+):
+    source = f"CCSDS_OPM_VERS = 3.0{separator}CCSDS_OPM_VERS = 3.0{separator}"
     with pytest.raises(ccsds_ndm.NdmUnsupportedNotationError) as caught:
-        cls.from_str(source)
+        if from_file:
+            path = tmp_path / "combined.kvn"
+            path.write_bytes(source.encode())
+            cls.from_file(path)
+        else:
+            cls.from_str(source)
     assert caught.value.operation == "parse"
     assert caught.value.code == "unsupported.notation"
 
