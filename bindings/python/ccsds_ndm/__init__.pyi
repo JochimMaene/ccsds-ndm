@@ -202,12 +202,12 @@ class Acm:
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Acm:
         r"""
-        Parse a ACM document and validate its contents.
+        Parse an ACM document and validate its contents.
 
         Parameters
         ----------
         data : str
-            KVN or XML content. Combined NDM requires XML.
+            KVN or XML content.
         format : str, optional
             ``"kvn"`` or ``"xml"``; detected when omitted.
 
@@ -277,7 +277,7 @@ class Acm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Raises
         ------
@@ -299,7 +299,7 @@ class Acm:
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Returns
         -------
@@ -2054,7 +2054,7 @@ class Aem:
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Returns
         -------
@@ -2077,12 +2077,12 @@ class Aem:
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Aem:
         r"""
-        Parse a AEM document and validate its contents.
+        Parse an AEM document and validate its contents.
 
         Parameters
         ----------
         data : str
-            KVN or XML content. Combined NDM requires XML.
+            KVN or XML content.
         format : str, optional
             ``"kvn"`` or ``"xml"``; detected when omitted.
 
@@ -2152,7 +2152,7 @@ class Aem:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Raises
         ------
@@ -2870,7 +2870,7 @@ class Apm:
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Returns
         -------
@@ -2893,12 +2893,12 @@ class Apm:
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Apm:
         r"""
-        Parse a APM document and validate its contents.
+        Parse an APM document and validate its contents.
 
         Parameters
         ----------
         data : str
-            KVN or XML content. Combined NDM requires XML.
+            KVN or XML content.
         format : str, optional
             ``"kvn"`` or ``"xml"``; detected when omitted.
 
@@ -2968,7 +2968,7 @@ class Apm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Raises
         ------
@@ -3733,7 +3733,7 @@ class Cdm:
         Parameters
         ----------
         data : str
-            KVN or XML content. Combined NDM requires XML.
+            KVN or XML content.
         format : str, optional
             ``"kvn"`` or ``"xml"``; detected when omitted.
 
@@ -3803,7 +3803,7 @@ class Cdm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Raises
         ------
@@ -3825,7 +3825,7 @@ class Cdm:
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Returns
         -------
@@ -5422,7 +5422,7 @@ class CombinedNdm:
         Parameters
         ----------
         data : str
-            KVN or XML content. Combined NDM requires XML.
+            Combined NDM XML content.
         format : str, optional
             ``"kvn"`` or ``"xml"``; detected when omitted.
 
@@ -5492,7 +5492,7 @@ class CombinedNdm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"xml"``; combined NDM has no KVN representation.
 
         Raises
         ------
@@ -5514,7 +5514,7 @@ class CombinedNdm:
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"xml"``; combined NDM has no KVN representation.
 
         Returns
         -------
@@ -7139,12 +7139,12 @@ class Ocm:
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Ocm:
         r"""
-        Parse a OCM document and validate its contents.
+        Parse an OCM document and validate its contents.
 
         Parameters
         ----------
         data : str
-            KVN or XML content. Combined NDM requires XML.
+            KVN or XML content.
         format : str, optional
             ``"kvn"`` or ``"xml"``; detected when omitted.
 
@@ -7214,7 +7214,7 @@ class Ocm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Raises
         ------
@@ -7245,7 +7245,7 @@ class Ocm:
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Returns
         -------
@@ -11959,12 +11959,12 @@ class Oem:
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Oem:
         r"""
-        Parse a OEM document and validate its contents.
+        Parse an OEM document and validate its contents.
 
         Parameters
         ----------
         data : str
-            KVN or XML content. Combined NDM requires XML.
+            KVN or XML content.
         format : str, optional
             ``"kvn"`` or ``"xml"``; detected when omitted.
 
@@ -12034,7 +12034,7 @@ class Oem:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Raises
         ------
@@ -12056,7 +12056,7 @@ class Oem:
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Returns
         -------
@@ -13050,12 +13050,12 @@ class Omm:
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Omm:
         r"""
-        Parse a OMM document and validate its contents.
+        Parse an OMM document and validate its contents.
 
         Parameters
         ----------
         data : str
-            KVN or XML content. Combined NDM requires XML.
+            KVN or XML content.
         format : str, optional
             ``"kvn"`` or ``"xml"``; detected when omitted.
 
@@ -13125,7 +13125,7 @@ class Omm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Raises
         ------
@@ -13147,7 +13147,7 @@ class Omm:
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Returns
         -------
@@ -13591,12 +13591,12 @@ class Opm:
         data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
     ) -> Opm:
         r"""
-        Parse a OPM document and validate its contents.
+        Parse an OPM document and validate its contents.
 
         Parameters
         ----------
         data : str
-            KVN or XML content. Combined NDM requires XML.
+            KVN or XML content.
         format : str, optional
             ``"kvn"`` or ``"xml"``; detected when omitted.
 
@@ -13666,7 +13666,7 @@ class Opm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Raises
         ------
@@ -13688,7 +13688,7 @@ class Opm:
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Returns
         -------
@@ -14787,7 +14787,7 @@ class Rdm:
         Parameters
         ----------
         data : str
-            KVN or XML content. Combined NDM requires XML.
+            KVN or XML content.
         format : str, optional
             ``"kvn"`` or ``"xml"``; detected when omitted.
 
@@ -14857,7 +14857,7 @@ class Rdm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Raises
         ------
@@ -14879,7 +14879,7 @@ class Rdm:
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Returns
         -------
@@ -16986,7 +16986,7 @@ class Tdm:
         Parameters
         ----------
         data : str
-            KVN or XML content. Combined NDM requires XML.
+            KVN or XML content.
         format : str, optional
             ``"kvn"`` or ``"xml"``; detected when omitted.
 
@@ -17056,7 +17056,7 @@ class Tdm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Raises
         ------
@@ -17078,7 +17078,7 @@ class Tdm:
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+            ``"kvn"`` or ``"xml"``.
 
         Returns
         -------

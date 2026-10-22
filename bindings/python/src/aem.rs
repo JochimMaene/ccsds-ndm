@@ -160,7 +160,7 @@ impl Aem {
     /// Parameters
     /// ----------
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///     ``"kvn"`` or ``"xml"``.
     ///
     /// Returns
     /// -------
@@ -185,12 +185,12 @@ impl Aem {
     ) -> PyResult<String> {
         crate::api::generate_string(py, &self.to_core(py)?, format)
     }
-    /// Parse a AEM document and validate its contents.
+    /// Parse an AEM document and validate its contents.
     ///
     /// Parameters
     /// ----------
     /// data : str
-    ///     KVN or XML content. Combined NDM requires XML.
+    ///     KVN or XML content.
     /// format : str, optional
     ///     ``"kvn"`` or ``"xml"``; detected when omitted.
     ///
@@ -269,7 +269,7 @@ impl Aem {
     /// path : str or os.PathLike
     ///     Destination file; existing content is replaced only after successful generation.
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///     ``"kvn"`` or ``"xml"``.
     ///
     /// Raises
     /// ------

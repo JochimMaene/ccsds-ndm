@@ -1272,15 +1272,7 @@ impl crate::traits::Validate for AttManeuverState {
     fn validate(&self) -> Result<()> {
         crate::validation::epoch_precision(&[("MAN_EPOCH_START", &self.man_epoch_start)])?;
         Duration::validate_value(self.man_duration.value, "MAN_DURATION")?;
-        if matches!(self.man_duration.units, Some(TimeUnits::Day)) {
-            return Err(ValidationError::InvalidValue {
-                field: "MAN_DURATION units".into(),
-                value: "d".into(),
-                expected: "s".into(),
-                line: None,
-            }
-            .into());
-        }
+        TimeUnits::validate_seconds(&self.man_duration.units, "MAN_DURATION")?;
         if self.man_ref_frame.trim().is_empty() {
             return Err(ValidationError::missing_required("Maneuver", "MAN_REF_FRAME").into());
         }

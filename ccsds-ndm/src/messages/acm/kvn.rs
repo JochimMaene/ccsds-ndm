@@ -23,7 +23,6 @@ use std::str::FromStr;
 use winnow::combinator::terminated;
 use winnow::error::AddContext;
 use winnow::prelude::*;
-use winnow::stream::Offset;
 
 //----------------------------------------------------------------------
 // ACM Version Parser
@@ -167,16 +166,11 @@ fn parse_att_block(input: &mut &str) -> KvnResult<AcmAttitudeState> {
         if at_block_end("ATT", input) {
             break;
         }
-        let checkpoint = input.checkpoint();
         let (epoch, values) = parse_history_line(
             input,
             "Invalid ATT data line: expected a time tag followed by numbers",
         )?;
-        let res = AttLine { epoch, values };
-        if input.offset_from(&checkpoint) == 0 && input.is_empty() {
-            break;
-        }
-        att_lines.push(res);
+        att_lines.push(AttLine { epoch, values });
     }
 
     expect_block_end("ATT").parse_next(input)?;
@@ -263,16 +257,11 @@ fn parse_cov_block(input: &mut &str) -> KvnResult<AcmCovarianceMatrix> {
         if at_block_end("COV", input) {
             break;
         }
-        let checkpoint = input.checkpoint();
         let (epoch, values) = parse_history_line(
             input,
             "Invalid COV data line: expected a time tag followed by numbers",
         )?;
-        let res = CovLine { epoch, values };
-        if input.offset_from(&checkpoint) == 0 && input.is_empty() {
-            break;
-        }
-        cov_lines.push(res);
+        cov_lines.push(CovLine { epoch, values });
     }
 
     expect_block_end("COV").parse_next(input)?;
@@ -483,9 +472,6 @@ fn parse_user_defined_block(input: &mut &str) -> KvnResult<crate::types::UserDef
     expect_block_start("USER").parse_next(input)?;
 
     loop {
-        let checkpoint = input.checkpoint();
-        let _ = collect_comments.parse_next(input)?;
-        input.reset(&checkpoint);
         let comments = collect_comments.parse_next(input)?;
         block.entries.extend(
             comments

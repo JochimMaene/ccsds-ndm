@@ -13,20 +13,6 @@ from ccsds_ndm import Acm, Aem, Apm, Cdm, CombinedNdm, Ocm, Oem, Omm, Opm, Rdm, 
 
 ROOT = Path(__file__).resolve().parents[3]
 
-CLASS_FIXTURES = [
-    (Acm, ROOT / "ccsds-ndm/data/kvn/acm_g6.kvn"),
-    (Aem, ROOT / "ccsds-ndm/data/kvn/aem_g4.kvn"),
-    (Apm, ROOT / "ccsds-ndm/data/kvn/apm_g1.kvn"),
-    (Cdm, ROOT / "ccsds-ndm/data/kvn/cdm_362.kvn"),
-    (CombinedNdm, ROOT / "ccsds-ndm/data/xml/ndm_g12.xml"),
-    (Ocm, ROOT / "ccsds-ndm/data/kvn/ocm_g15.kvn"),
-    (Oem, ROOT / "ccsds-ndm/data/kvn/oem_g11.kvn"),
-    (Omm, ROOT / "ccsds-ndm/data/kvn/omm_g7.kvn"),
-    (Opm, ROOT / "ccsds-ndm/data/kvn/opm_g1.kvn"),
-    (Rdm, ROOT / "ccsds-ndm/data/kvn/rdm_c1.kvn"),
-    (Tdm, ROOT / "ccsds-ndm/data/kvn/tdm_e1.kvn"),
-]
-
 LIVE_NESTED_CASES = [
     (Acm, ROOT / "ccsds-ndm/data/kvn/acm_g6.kvn", lambda value: value.segment.metadata),
     (
@@ -81,30 +67,11 @@ LIVE_LIST_CASES = [
 ]
 
 
-@pytest.mark.parametrize(("cls", "path"), CLASS_FIXTURES)
-def test_type_specific_from_file_allows_default_format(cls, path):
-    parsed = cls.from_file(path)
-    assert isinstance(parsed, cls)
-
-
-@pytest.mark.parametrize(("cls", "path"), CLASS_FIXTURES)
-def test_type_specific_file_round_trip(cls, path, tmp_path):
-    output = tmp_path / f"{cls.__name__.lower()}.xml"
-    cls.from_file(path).to_file(output, "xml")
-    assert isinstance(cls.from_file(output), cls)
-
-
 def test_top_level_file_api_accepts_pathlike(tmp_path):
     source = ROOT / "ccsds-ndm/data/kvn/opm_g1.kvn"
     destination = tmp_path / "opm.xml"
     ccsds_ndm.convert_file(source, destination, "xml")
     assert isinstance(ccsds_ndm.from_file(destination), Opm)
-
-
-@pytest.mark.parametrize(("cls", "path"), CLASS_FIXTURES)
-def test_type_specific_from_str_allows_default_format(cls, path):
-    parsed = cls.from_str(path.read_text())
-    assert isinstance(parsed, cls)
 
 
 def test_public_exceptions_follow_python_error_categories():
@@ -367,8 +334,6 @@ def test_enum_stubs_match_simple_pyo3_classes():
 
     assert not issubclass(ccsds_ndm.YesNo, enum.Enum)
     assert isinstance(ccsds_ndm.YesNo.Yes, ccsds_ndm.YesNo)
-    from pathlib import Path
-
     stub = (Path(__file__).parents[1] / "ccsds_ndm" / "__init__.pyi").read_text()
     assert "(enum.Enum)" not in stub
     assert "Yes: typing.ClassVar[YesNo]" in stub

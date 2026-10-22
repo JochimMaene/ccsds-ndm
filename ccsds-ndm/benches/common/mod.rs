@@ -317,7 +317,7 @@ pub fn create_test_acm(records: usize) -> Acm {
     message.body.segment.data.att[0].att_lines = (0..records)
         .map(|index| {
             let mut line = line.clone();
-            line.values[0] = index as f64;
+            line.epoch = index.to_string().parse().unwrap();
             line
         })
         .collect();

@@ -78,9 +78,7 @@ pub(crate) fn to_kvn_string<T: GenerationMetadata + ToKvn>(message: &T) -> Resul
     (|| {
         validate_output_version(T::KIND, message.version(), OutputFormat::Kvn)?;
         message.validate_kvn_model()?;
-        // One pass only. The dry run this replaces was a second render into `io::sink()` whose
-        // sole outcome was `finish_io`'s lexical check, and `finish_checked` applies that same
-        // check to the real pass -- returning an error instead of the string, so nothing leaks.
+        // Buffered output checks lexical validity during serialization, before returning bytes.
         let mut writer = crate::kvn::ser::KvnWriter::new();
         ToKvn::write_kvn(message, &mut writer);
         writer.finish_checked()
@@ -93,8 +91,7 @@ pub(crate) fn to_xml_string<T: GenerationMetadata>(message: &T) -> Result<String
         validate_output_version(T::KIND, message.version(), OutputFormat::Xml)?;
         message.validate()?;
         message.validate_xml_model()?;
-        // `to_string` applies the same XML 1.0 character check as the preflight and returns an
-        // error instead of a string, so a second counting pass would only double the work.
+        // Buffered output checks XML characters during serialization, before returning bytes.
         crate::xml::to_string(message)
     })()
     .map_err(|error| generation_error(error, T::KIND, OutputFormat::Xml, message.version()))
@@ -126,11 +123,8 @@ pub(crate) trait GenerationMetadata: Ndm {
 
     /// Model-level KVN checks: semantic validation plus any representability constraint.
     ///
-    /// This deliberately excludes the serialization dry run. Buffered generation runs these
-    /// checks and then serializes exactly once, because `finish_checked` applies the same
-    /// lexical check to the real pass that the dry run applied to a throwaway one. Streaming
-    /// still runs the dry run: it writes to the caller's sink directly, so it needs the
-    /// separate pass to guarantee an invalid message emits zero bytes.
+    /// Buffered generation checks lexical validity during serialization. Streaming separately
+    /// preflights serialization to ensure invalid messages emit zero bytes.
     #[doc(hidden)]
     fn validate_kvn_model(&self) -> Result<()> {
         self.validate()
@@ -144,8 +138,7 @@ pub(crate) fn write_kvn_to<T: GenerationMetadata + ToKvn, W: Write>(
     (|| {
         validate_output_version(T::KIND, message.version(), OutputFormat::Kvn)?;
         message.validate_kvn_model()?;
-        // Streaming writes straight to the caller's sink, so the dry run is what buys the
-        // documented guarantee that an invalid message emits zero bytes.
+        // Preflight serialization so an invalid message emits zero bytes to the caller's sink.
         ToKvn::validate_kvn(message)?;
         let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
         ToKvn::write_kvn(message, &mut writer);
@@ -174,13 +167,9 @@ macro_rules! impl_generation_metadata {
             fn version(&self) -> &str {
                 &self.version
             }
-
-            fn validate_kvn_model(&self) -> Result<()> {
-                self.validate()
-            }
         }
     };
-    ($type:path, $kind:ident, kvn_representability) => {
+    ($type:path, $kind:ident, kvn_representability $(, $xml_check:ident)?) => {
         impl GenerationMetadata for $type {
             const KIND: MessageKind = MessageKind::$kind;
 
@@ -192,95 +181,49 @@ macro_rules! impl_generation_metadata {
                 self.validate()?;
                 self.validate_kvn_representability()
             }
+
+            $(fn validate_xml_model(&self) -> Result<()> {
+                self.$xml_check()
+            })?
         }
     };
 }
 
-impl GenerationMetadata for crate::messages::acm::Acm {
-    const KIND: MessageKind = MessageKind::Acm;
-
-    fn version(&self) -> &str {
-        &self.version
-    }
-
-    fn validate_kvn_model(&self) -> Result<()> {
-        self.validate()?;
-        self.validate_kvn_representability()
-    }
-
-    fn validate_xml_model(&self) -> Result<()> {
-        self.validate_xml_representability()
-    }
-}
+impl_generation_metadata!(
+    crate::messages::acm::Acm,
+    Acm,
+    kvn_representability,
+    validate_xml_representability
+);
 
 impl_generation_metadata!(crate::messages::apm::Apm, Apm);
 
-impl GenerationMetadata for crate::messages::omm::Omm {
-    const KIND: MessageKind = MessageKind::Omm;
-
-    fn version(&self) -> &str {
-        &self.version
-    }
-
-    fn validate_kvn_model(&self) -> Result<()> {
-        self.validate()?;
-        self.validate_kvn_representability()
-    }
-
-    fn validate_xml_model(&self) -> Result<()> {
-        self.validate_xml_representability()
-    }
-}
+impl_generation_metadata!(
+    crate::messages::omm::Omm,
+    Omm,
+    kvn_representability,
+    validate_xml_representability
+);
 impl_generation_metadata!(crate::messages::cdm::Cdm, Cdm, kvn_representability);
 impl_generation_metadata!(crate::messages::aem::Aem, Aem);
-impl GenerationMetadata for crate::messages::ocm::Ocm {
-    const KIND: MessageKind = MessageKind::Ocm;
-
-    fn version(&self) -> &str {
-        &self.version
-    }
-
-    fn validate_kvn_model(&self) -> Result<()> {
-        self.validate()?;
-        self.validate_kvn_representability()
-    }
-
-    fn validate_xml_model(&self) -> Result<()> {
-        self.validate_xml_representability()
-    }
-}
-impl GenerationMetadata for crate::messages::tdm::Tdm {
-    const KIND: MessageKind = MessageKind::Tdm;
-
-    fn version(&self) -> &str {
-        &self.version
-    }
-
-    fn validate_kvn_model(&self) -> Result<()> {
-        self.validate()?;
-        self.validate_kvn_representability()
-    }
-
-    fn validate_xml_model(&self) -> Result<()> {
-        self.validate_xml_representability()
-    }
-}
-impl GenerationMetadata for crate::messages::rdm::Rdm {
-    const KIND: MessageKind = MessageKind::Rdm;
-
-    fn version(&self) -> &str {
-        &self.version
-    }
-
-    fn validate_kvn_model(&self) -> Result<()> {
-        self.validate()?;
-        self.validate_kvn_representability()
-    }
-
-    fn validate_xml_model(&self) -> Result<()> {
-        self.validate_xml_representability()
-    }
-}
+impl_generation_metadata!(
+    crate::messages::ocm::Ocm,
+    Ocm,
+    kvn_representability,
+    validate_xml_representability
+);
+impl_generation_metadata!(
+    crate::messages::tdm::Tdm,
+    Tdm,
+    kvn_representability,
+    validate_xml_representability
+);
+impl_generation_metadata!(
+    crate::messages::rdm::Rdm,
+    Rdm,
+    kvn_representability,
+    validate_xml_representability
+);
 
 impl GenerationMetadata for crate::messages::opm::Opm {
     const KIND: MessageKind = MessageKind::Opm;

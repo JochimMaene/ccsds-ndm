@@ -89,12 +89,12 @@ impl Ocm {
 #[gen_stub_pymethods]
 #[pymethods]
 impl Ocm {
-    /// Parse a OCM document and validate its contents.
+    /// Parse an OCM document and validate its contents.
     ///
     /// Parameters
     /// ----------
     /// data : str
-    ///     KVN or XML content. Combined NDM requires XML.
+    ///     KVN or XML content.
     /// format : str, optional
     ///     ``"kvn"`` or ``"xml"``; detected when omitted.
     ///
@@ -173,7 +173,7 @@ impl Ocm {
     /// path : str or os.PathLike
     ///     Destination file; existing content is replaced only after successful generation.
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///     ``"kvn"`` or ``"xml"``.
     ///
     /// Raises
     /// ------
@@ -245,7 +245,7 @@ impl Ocm {
     /// Parameters
     /// ----------
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///     ``"kvn"`` or ``"xml"``.
     ///
     /// Returns
     /// -------

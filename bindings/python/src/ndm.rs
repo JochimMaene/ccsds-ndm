@@ -148,7 +148,7 @@ impl CombinedNdm {
     /// Parameters
     /// ----------
     /// data : str
-    ///     KVN or XML content. Combined NDM requires XML.
+    ///     Combined NDM XML content.
     /// format : str, optional
     ///     ``"kvn"`` or ``"xml"``; detected when omitted.
     ///
@@ -227,7 +227,7 @@ impl CombinedNdm {
     /// path : str or os.PathLike
     ///     Destination file; existing content is replaced only after successful generation.
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///     ``"xml"``; combined NDM has no KVN representation.
     ///
     /// Raises
     /// ------
@@ -256,7 +256,7 @@ impl CombinedNdm {
     /// Parameters
     /// ----------
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///     ``"xml"``; combined NDM has no KVN representation.
     ///
     /// Returns
     /// -------

@@ -15,17 +15,17 @@ Additional conformance corrections
   equality and standard XML double spellings for time offsets.
 - OMM recognized theory spellings share their conditional checks, without guessing the propagator
   behind ``SGP/SGP4``. Family records now state the remaining book/schema and storage boundaries.
-- Shared KVN reading, in every family: blank lines anywhere, indented records (including the
-  version and header), TABs as blanks, lines over 254 characters, a leading ``+`` on integers,
-  and ``_`` for a blank in ``ROCKET BODY``. A blank or ``N/A`` optional value is absent; a blank
-  mandatory value is missing at its record. Trailing junk after a number is "Invalid ... for KEY"
+- Shared KVN reading, in every family: CR, LF, CRLF, and LFCR line endings, blank lines anywhere,
+  indented records (including the version and header), TABs as blanks, lines over 254 characters,
+  a leading ``+`` on integers, and ``_`` for a blank in ``ROCKET BODY``. A blank or ``N/A`` optional
+  value is absent; a blank mandatory value is missing at its record. Trailing junk after a number is "Invalid ... for KEY"
   at that line; non-ASCII errors name the byte column and code point. The edition is checked
   before the structure, so unsupported editions report ``parse.unsupported_input_version``.
   UTF-16/UTF-32 input is refused as "input must be UTF-8".
-- Mixed-case text values are accepted and preserved in every family; OEM no longer enforces the
-  ODM 7.5.3 single-case rule. A missing ``<?xml ...?>`` declaration is accepted.
+- Mixed-case open text values are accepted and preserved in every family; OEM no longer enforces
+  the ODM 7.5.3 single-case rule. A missing ``<?xml ...?>`` declaration is accepted.
 - KVN writers trim values, refuse empty or ``N/A`` values and integers above 2³¹−1, name the field
-  in non-ASCII refusals, and write rounded 17-digit numbers in their shortest stable spelling.
+  in non-ASCII refusals, and round to 16 significant digits with stable output spellings.
 
 - ACM histories accept absolute calendar tags as well as relative offsets; each block uses one
   form. XML Euler/rate field ordering is corrected. The unused ``cov_confidence``, ``ad_epoch``,
@@ -66,9 +66,9 @@ Interoperability and preservation
 - Combined XML follows the bundled NDM/XML 4.0.0 constituent editions. OPM, OMM, and OEM
   version 2.0 remain supported as standalone XML; combining them in the 4.0.0 envelope is
   explicitly refused on input/output instead of producing schema-invalid XML.
-- All family KVN readers accept CR, LF, CRLF, and LFCR. Numeric readers consistently accept
-  unambiguous decimal/exponent spellings, including ``.5``, ``5.``, ``1e3``, and extra precision;
-  malformed values, overflow, and nonzero underflow are refused. Generation remains canonical.
+- Numeric readers accept unambiguous decimal/exponent spellings, including ``.5``, ``5.``, ``1e3``,
+  and extra precision; malformed values, overflow, and nonzero underflow are refused.
+  Generation remains canonical.
 - Closed KVN enums accept supported uppercase/lowercase spellings, but arbitrary mixed case
   and unknown closed values are rejected. Unknown object types no longer silently become
   ``OTHER``. Open registry/ICD strings retain their supplied spelling.
@@ -97,8 +97,7 @@ Conformance review and compatibility changes
   tolerance. These checks also apply after model edits and before generation.
 - ACM KVN accepts the book's ``RATE_TYPE=NONE`` as an alias for omitted rates;
   canonical output omits the keyword. XML still rejects ``NONE`` because the
-  bundled schema excludes that spelling. ACM also accepts all four book-defined
-  line terminators, including standalone carriage returns.
+  bundled schema excludes that spelling.
 - CDM miss distance and relative speed must be nonnegative, following their
   book-defined norm meanings even though the schema uses unrestricted doubles.
   Exact vector-norm equality is not enforced: the published example itself uses
@@ -106,8 +105,7 @@ Conformance review and compatibility changes
   alongside the remaining physical-validation limits.
 - Typed floating-point KVN fields now consistently use the existing CCSDS 16-digit
   formatter, including shared model blocks and TDM metadata/observations.
-  TDM phase counts retain their exact decimal strings. CDM accepts ordinary
-  computed values under the same rounding policy while preserving its nonnumeric
+  CDM accepts computed values under the same rounding policy while preserving its nonnumeric
   content-loss checks; XML retains full double precision.
   KVN writes floating-point signed zero as ``0.0`` while readers remain permissive.
 - OCM maneuver rows require exactly one token per declared column. Extra values
@@ -121,8 +119,8 @@ Conformance review and compatibility changes
   KVN omissions. RDM revalidates edited confidence percentages and finite altitudes.
 - ADM fields enforce seconds-only units. AEM writes ``ANGVEL_FRAME`` and accepts
   ``RATE_FRAME`` as a compatibility alias; optional frame/sequence metadata stays
-  optional. APM accepts all four book-defined line endings. ACM checks declared
-  data blocks, comparable time ranges, supplied sensor order, known maneuver
+  optional. ACM checks declared data blocks, comparable time ranges, supplied sensor order,
+  known maneuver
   purpose targets, and target quaternions; multiple maneuver targets remain
   available in KVN and are refused by the narrower XML choice.
 - OCM known composition checks also apply to lowercase spellings, including
@@ -132,16 +130,10 @@ Conformance review and compatibility changes
 - TDM validates per-keyword observation chronology, integer Doppler counts, and
   indexed participant references. Comment canonicalization, compatibility aliases,
   the 64-byte epoch limit, and remaining supported-profile limits are documented.
-- The shared preservation contract now states numeric rounding, fixed-unit
-  normalization, comment-position merging, and streaming sink failure behavior
-  explicitly. ACM's relative/absolute history forms and rate-type book/schema
-  conflict, CDM's physical-validation boundary, and the shared XML parser's
-  lexical limits are documented without adding API options.
 - Every current message family now uses the same verification criteria and
   public workflow matrix. Family records cite the publication baseline,
   requirements, decisions, notation limits, and regression evidence. The
-  former shared contract is replaced by a conformance index; validation policy
-  lives in the existing validation contract.
+  conformance index links shared validation and preservation policy in the validation contract.
 - OPM, APM, AEM, TDM, and ACM 1.0 input is rejected. Earlier acceptance reused
   newer-format grammars and did not establish those editions' requirements;
   ACM was introduced in ADM issue 2. OEM 1.0 keeps its explicitly restricted

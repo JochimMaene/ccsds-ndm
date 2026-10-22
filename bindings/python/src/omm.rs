@@ -124,12 +124,12 @@ impl Omm {
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
         crate::api::validate_message(py, &self.to_core(py)?)
     }
-    /// Parse a OMM document and validate its contents.
+    /// Parse an OMM document and validate its contents.
     ///
     /// Parameters
     /// ----------
     /// data : str
-    ///     KVN or XML content. Combined NDM requires XML.
+    ///     KVN or XML content.
     /// format : str, optional
     ///     ``"kvn"`` or ``"xml"``; detected when omitted.
     ///
@@ -208,7 +208,7 @@ impl Omm {
     /// path : str or os.PathLike
     ///     Destination file; existing content is replaced only after successful generation.
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///     ``"kvn"`` or ``"xml"``.
     ///
     /// Raises
     /// ------
@@ -242,7 +242,7 @@ impl Omm {
     /// Parameters
     /// ----------
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``. Combined NDM supports XML only.
+    ///     ``"kvn"`` or ``"xml"``.
     ///
     /// Returns
     /// -------

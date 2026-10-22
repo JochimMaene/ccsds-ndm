@@ -995,7 +995,7 @@ fn is_numeric_man_column(token: &str) -> bool {
 /// as a double and likewise enforces no per-column domain.
 fn validate_man_line_values(
     numeric_columns: &[bool],
-    tokens: &[String],
+    tokens: &[&str],
     line: &ManLine,
 ) -> Result<()> {
     for (index, value) in line.values.iter().enumerate() {
@@ -1036,10 +1036,6 @@ fn validate_man_line_values(
             .into());
         }
         if parsed.map(|number| number.is_finite()) != Ok(true) {
-            let column = tokens
-                .get(index + 1)
-                .map(|token| token.trim())
-                .unwrap_or("value");
             return Err(ValidationError::InvalidValue {
                 field: format!("MAN data line {column}").into(),
                 value: value.clone(),
@@ -1493,21 +1489,14 @@ fn unit_matches_expected(unit: &str, expected: &str) -> bool {
     }
 }
 
-fn parse_units_list(units: &str) -> Vec<String> {
-    let trimmed = units.trim().trim_start_matches('[').trim_end_matches(']');
-    trimmed
-        .split(|c: char| c == ',' || c.is_whitespace())
-        .filter(|s| !s.is_empty())
-        .map(|s| s.trim().to_string())
-        .collect()
+fn parse_units_list(units: &str) -> Vec<&str> {
+    parse_csv_list(units.trim().trim_start_matches('[').trim_end_matches(']'))
 }
 
-fn parse_csv_list(value: &str) -> Vec<String> {
+fn parse_csv_list(value: &str) -> Vec<&str> {
     value
         .split(|c: char| c == ',' || c.is_whitespace())
-        .map(|s| s.trim())
         .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
         .collect()
 }
 
