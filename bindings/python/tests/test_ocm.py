@@ -20,11 +20,34 @@ from ccsds_ndm import (
     OcmMetadata,
     OcmOdParameters,
     OcmPhysicalDescription,
+    OcmPerturbations,
     OcmSegment,
     OcmTrajState,
     OdmHeader,
     TrajLine,
 )
+
+
+@pytest.mark.parametrize(
+    "stop, span, field",
+    [("-1", 1.0, "STOP_TIME"), ("3600", 99.0, "TIME_SPAN")],
+)
+def test_relative_metadata_edits_reach_validation_and_generation(stop, span, field):
+    message = TestOcm()._create_valid_ocm()
+    metadata = message.segment.metadata
+    metadata.start_time = "0"
+    metadata.stop_time = "3600"
+    metadata.time_span = 0.041667
+    message.validate()
+    for notation in ("kvn", "xml"):
+        Ocm.from_str(message.to_str(format=notation), format=notation)
+    metadata.stop_time = stop
+    metadata.time_span = span
+    with pytest.raises(NdmValidationError, match=field):
+        message.validate()
+    for notation in ("kvn", "xml"):
+        with pytest.raises(NdmValidationError, match=field):
+            message.to_str(format=notation)
 
 
 class TestOcm:
@@ -60,6 +83,40 @@ class TestOcm:
 
         seg = OcmSegment(meta, data)
         return Ocm(header, seg)
+
+    @pytest.mark.parametrize("values", [["1", "extra"], [], ["child one"], [""]])
+    def test_maneuver_column_edits_are_rejected_before_generation(self, values):
+        message = self._create_valid_ocm()
+        maneuver = OcmManeuverParameters(
+            man_id="DEPLOY-1",
+            man_device_id="DEPLOYER",
+            man_ref_frame="EME2000",
+            man_composition="TIME_RELATIVE, DEPLOY_ID",
+            man_lines=[ManLine(epoch="0", values=["child"])],
+        )
+        message.segment.data.man = [maneuver]
+        message.validate()
+        maneuver.man_lines[0].values = values
+        with pytest.raises(NdmValidationError):
+            message.validate()
+        for notation in ("kvn", "xml"):
+            with pytest.raises(NdmValidationError):
+                message.to_str(format=notation)
+
+    def test_maneuver_signed_zero_normalizes_only_numeric_kvn_columns(self):
+        message = self._create_valid_ocm()
+        message.segment.data.man = [
+            OcmManeuverParameters(
+                man_id="DEPLOY-1",
+                man_device_id="DEPLOYER",
+                man_ref_frame="EME2000",
+                man_composition="TIME_RELATIVE, DEPLOY_ID, DEPLOY_MASS",
+                man_lines=[ManLine(epoch="0", values=["-0.0", "-0.0"])],
+            )
+        ]
+        for notation, expected in [("kvn", ["-0.0", "0.0"]), ("xml", ["-0.0", "-0.0"])]:
+            parsed = Ocm.from_str(message.to_str(format=notation), format=notation)
+            assert parsed.segment.data.man[0].man_lines[0].values == expected
 
     def test_roundtrip_kvn(self):
         try:
@@ -121,55 +178,37 @@ class TestOcm:
             with pytest.raises(ValueError):
                 setattr(metadata, field, "123.5")
 
-    def test_frame_reference_epochs_require_calendar_form(self):
-        with pytest.raises(ValueError):
-            OcmTrajState(
-                center_name="EARTH",
-                traj_ref_frame="GCRF",
-                traj_type="CARTPV",
-                traj_lines=[TrajLine(epoch="123.5", values=[1.0])],
-                traj_frame_epoch="123.5",
-            )
-
+    def test_frame_reference_epochs_accept_relative_except_calendar_only_fields(self):
+        trajectory = OcmTrajState(
+            center_name="EARTH",
+            traj_ref_frame="GCRF",
+            traj_type="CARTPV",
+            traj_lines=[TrajLine(epoch="123.5", values=[1.0])],
+            traj_frame_epoch="123.5",
+        )
+        assert trajectory.traj_frame_epoch == "123.5"
+        covariance = OcmCovarianceMatrix(
+            cov_ref_frame="GCRF",
+            cov_type="CARTPV",
+            cov_ordering="LTM",
+            cov_lines=[CovLine(epoch="123.5", values=[1.0])],
+            cov_frame_epoch="123.5",
+        )
+        assert covariance.cov_frame_epoch == "123.5"
+        maneuver = OcmManeuverParameters(
+            man_id="MAN-1",
+            man_device_id="THR-1",
+            man_composition="TIME_ABSOLUTE",
+            man_ref_frame="GCRF",
+            man_lines=[ManLine(epoch="123.5", values=["1.0"])],
+            man_frame_epoch="123.5",
+        )
+        assert maneuver.man_frame_epoch == "123.5"
         with pytest.raises(ValueError):
             OcmPhysicalDescription(oeb_parent_frame_epoch="123.5")
-
-        with pytest.raises(ValueError):
-            OcmCovarianceMatrix(
-                cov_ref_frame="GCRF",
-                cov_type="CARTPV",
-                cov_ordering="LTM",
-                cov_lines=[CovLine(epoch="123.5", values=[1.0])],
-                cov_frame_epoch="123.5",
-            )
-
-        with pytest.raises(ValueError):
-            OcmManeuverParameters(
-                man_id="MAN-1",
-                man_device_id="THR-1",
-                man_composition="TIME_ABSOLUTE",
-                man_ref_frame="GCRF",
-                man_lines=[ManLine(epoch="123.5", values=["1.0"])],
-                man_frame_epoch="123.5",
-            )
-
-        with pytest.raises(ValueError):
-            OcmTrajState(
-                center_name="EARTH",
-                traj_ref_frame="GCRF",
-                traj_type="CARTPV",
-                traj_lines=[TrajLine(epoch="123.5", values=[1.0])],
-                useable_start_time="123.5",
-            )
-
-        with pytest.raises(ValueError):
-            OcmTrajState(
-                center_name="EARTH",
-                traj_ref_frame="GCRF",
-                traj_type="CARTPV",
-                traj_lines=[TrajLine(epoch="123.5", values=[1.0])],
-                useable_stop_time="123.5",
-            )
+        for field in ("useable_start_time", "useable_stop_time"):
+            with pytest.raises(ValueError):
+                setattr(trajectory, field, "123.5")
 
     def test_file_io(self, tmp_path):
         ocm = self._create_valid_ocm()
@@ -198,8 +237,8 @@ class TestOcm:
         cov.cov_ordering = "UTM"
         assert cov.cov_ordering.lower().startswith("utm")
 
-        with pytest.raises(ValueError):
-            cov.cov_basis = "NOT_A_BASIS"
+        cov.cov_basis = "NOT_A_BASIS"
+        assert cov.cov_basis == "NOT_A_BASIS"
         with pytest.raises(ValueError):
             cov.cov_ordering = "NOT_A_ORDERING"
 
@@ -260,6 +299,7 @@ class TestOcm:
             od_method="LEAST_SQUARES",
             od_epoch="2023-01-01T00:00:00",
         )
+        ocm.segment.data.pert = OcmPerturbations()
         ocm.segment.data.od.weighted_rms = float("nan")
         with pytest.raises(NdmValidationError, match="WEIGHTED_RMS"):
             ocm.validate()
@@ -275,7 +315,7 @@ class TestOcm:
         ]
         ocm.segment.data.traj = [traj]
 
-        with pytest.raises(NdmValidationError, match="trajLine"):
+        with pytest.raises(NdmValidationError, match="TRAJ data line"):
             ocm.validate()
 
     def test_enum_constructor_arguments_are_not_discarded(self):
@@ -292,14 +332,8 @@ class TestOcm:
         assert traj.traj_basis == "PREDICTED"
         assert traj.orb_revnum_basis == "1"
 
-        with pytest.raises(ValueError):
-            OcmTrajState(
-                center_name="EARTH",
-                traj_ref_frame="EME2000",
-                traj_type="CARTPV",
-                traj_basis="NOT_A_BASIS",
-                traj_lines=[TrajLine(epoch="2023-01-01T00:00:00", values=[1.0])],
-            )
+        traj.traj_basis = "NOT_A_BASIS"
+        assert traj.traj_basis == "NOT_A_BASIS"
 
     def test_enum_getters_return_the_wire_spelling(self):
         """Getters used Rust's `Debug` spelling, so `orb_revnum_basis` read back as `'One'` and
@@ -356,3 +390,67 @@ class TestOcm:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestOcmCorrigendum:
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "operator_url",
+            "operator_email",
+            "operator_phone",
+            "operator_automated_url",
+            "emergency_email",
+            "emergency_phone",
+            "emergency_availability",
+            "ssa_email",
+            "ssa_phone",
+            "owner_url",
+        ],
+    )
+    def test_contacts_survive_parse_and_edit(self, field):
+        message = TestOcm()._create_valid_ocm()
+        setattr(message.segment.metadata, field, "contact")
+        text = message.to_str(format="kvn")
+        parsed = Ocm.from_str(text)
+        assert getattr(parsed.segment.metadata, field) == "contact"
+        with pytest.raises(NdmValidationError, match=field.upper()):
+            parsed.to_str(format="xml")
+
+    def test_sequence_records_and_parameters_are_editable(self):
+        message = TestOcm()._create_valid_ocm()
+        sequence = ccsds_ndm.OcmUserDefinedParameter(
+            parameter="COMPOSITION_EVENTS",
+            value="EVENT, VALUE",
+            records=["1 12", "2 13"],
+        )
+        block = ccsds_ndm.OcmUserDefined(user_defined=[sequence])
+        message.segment.data.user = block
+        assert message.segment.data.user is block
+        assert block.user_defined[0] is sequence
+        sequence.records = ["1 14", "2 15"]
+        block.entries.append(
+            ccsds_ndm.OcmUserDefinedParameter(parameter="AFTER", value="scalar")
+        )
+        parsed = Ocm.from_str(message.to_str(format="kvn"))
+        assert parsed.segment.data.user.user_defined[0].records == ["1 14", "2 15"]
+        assert parsed.segment.data.user.user_defined[1].parameter == "AFTER"
+        with pytest.raises(NdmValidationError, match="USER_DEFINED_COMPOSITION"):
+            message.to_str(format="xml")
+
+    def test_covariance_links_use_live_setters(self):
+        message = TestOcm()._create_valid_ocm()
+        message.segment.data.traj[0].traj_id = "trajectory"
+        covariance = OcmCovarianceMatrix(
+            cov_ref_frame="GCRF",
+            cov_type="CARTP",
+            cov_ordering="LTM",
+            cov_lines=[CovLine(epoch="0", values=[1, 0, 1, 0, 0, 1])],
+            traj_id="trajectory",
+        )
+        message.segment.data.cov = [covariance]
+        parsed = Ocm.from_str(message.to_str(format="kvn"))
+        assert parsed.segment.data.cov[0].traj_id == "trajectory"
+        covariance.traj_id = "missing"
+        with pytest.raises(NdmValidationError, match="TRAJ_ID"):
+            message.validate()

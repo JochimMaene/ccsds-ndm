@@ -31,15 +31,17 @@ use crate::opm::OpmCovarianceMatrix;
 /// segment : OmmSegment
 ///     The data segment.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct Omm {
-    /// The message identifier.
+    /// Root identifier, always ``CCSDS_OMM_VERS`` (the KVN version keyword and XML ``id``
+    /// attribute); it does not identify an individual message (see ``header.message_id``).
     ///
     /// :type: Optional[str]
     #[pyo3(get)]
     id: Option<String>,
 
-    /// The message version.
+    /// Message edition: ``"3.0"`` (CCSDS 502.0-B-3) or ``"2.0"`` (502.0-B-2); both are read
+    /// and written.
     ///
     /// :type: str
     #[pyo3(get)]
@@ -122,7 +124,32 @@ impl Omm {
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
         crate::api::validate_message(py, &self.to_core(py)?)
     }
-
+    /// Parse an OMM document and validate its contents.
+    ///
+    /// Parameters
+    /// ----------
+    /// data : str
+    ///     KVN or XML content.
+    /// format : str, optional
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// Omm
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmEpochError
+    ///     Invalid CCSDS epoch.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// ValueError
+    ///     Unsupported format argument.
     #[staticmethod]
     #[pyo3(signature = (data, format=None))]
     fn from_str(
@@ -134,8 +161,34 @@ impl Omm {
         let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Parse an OMM from a KVN or XML file.
+    /// Read a UTF-8 OMM document from a file and validate it.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Input file.
+    /// format : str, optional
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// Omm
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmEpochError
+    ///     Invalid CCSDS epoch.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Input file could not be read.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
@@ -148,8 +201,27 @@ impl Omm {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Atomically write this OMM as KVN or XML.
+    /// Validate this OMM message and atomically replace the destination.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Destination file; existing content is replaced only after successful generation.
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"``.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Temporary-file writing or atomic replacement failed.
     fn to_file(
         &self,
         py: Python<'_>,
@@ -165,8 +237,28 @@ impl Omm {
             format,
         )
     }
-
-    /// Serialize to validated KVN or XML.
+    /// Validate and serialize this OMM message, preserving its edition.
+    ///
+    /// Parameters
+    /// ----------
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"``.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     Generated document, subject to the documented notation normalizations.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
     fn to_str(
         &self,
         py: Python<'_>,
@@ -177,6 +269,9 @@ impl Omm {
     }
 
     /// Generate canonical NORAD TLE lines (line 1 and line 2) from this OMM.
+    ///
+    /// Requires Earth-centered TEME elements and UTC epochs; no coordinate/time conversion.
+    /// Cyclic angles round to four decimals, with a rounded 360 degrees emitted as zero.
     ///
     /// Returns
     /// -------
@@ -252,7 +347,7 @@ impl Omm {
 /// data : OmmData
 ///     Segment data.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct OmmSegment {
     /// Segment metadata.
     ///
@@ -325,7 +420,7 @@ impl OmmSegment {
 /// comment : list of str, optional
 ///     Comments (allowed at the beginning of the OMM Metadata).
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct OmmMetadata {
     pub inner: core_omm::OmmMetadata,
@@ -342,7 +437,7 @@ impl OmmMetadata {
         center_name,
         ref_frame,
         time_system,
-        mean_element_theory=String::from("SGP4"),
+        mean_element_theory,
         ref_frame_epoch=None,
         comment=None
     ))]
@@ -566,7 +661,7 @@ impl OmmMetadata {
 /// gm : float, optional
 ///     Gravitational Coefficient (Gravitational Constant × Central Mass) in km³/s².
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct MeanElements {
     pub inner: core_omm::MeanElements,
@@ -822,8 +917,15 @@ impl MeanElements {
 }
 
 /// OMM Data section.
+///
+/// Parameters
+/// ----------
+/// mean_elements : MeanElements
+///     Mean orbital elements at their CCSDS epoch.
+/// comment : list[str], optional
+///     Leading data comments.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct OmmData {
     /// Comments.
     ///
@@ -905,6 +1007,8 @@ impl OmmData {
     /// ----------
     /// mean_elements : MeanElements
     ///     Mean elements.
+    /// comment : list[str], optional
+    ///     Leading data comments.
     #[new]
     #[pyo3(signature = (mean_elements, comment=None))]
     fn new(mean_elements: Py<MeanElements>, comment: Option<Vec<String>>) -> Self {
@@ -946,7 +1050,8 @@ impl OmmData {
         self.spacecraft_parameters = value;
     }
 
-    /// TLE Related Parameters (Only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
+    /// TLE-related parameters, required for the edition's recognized TLE theories.
+    /// Field requirements depend on the theory and edition; see ``TleParameters``.
     ///
     /// :type: Optional[TleParameters]
     #[getter]
@@ -997,9 +1102,9 @@ impl OmmData {
 /// Parameters
 /// ----------
 /// ephemeris_type : int, optional
-///     Ephemeris Type, default value = 0.
+///     Ephemeris Type. When omitted, the book's default 0 applies; nothing is stored.
 /// classification_type : str, optional
-///     Classification Type, default value = U.
+///     Classification Type. When omitted, the book's default U applies; nothing is stored.
 /// norad_cat_id : int, optional
 ///     NORAD Catalog Number ('Satellite Number').
 /// element_set_no : int, optional
@@ -1007,17 +1112,26 @@ impl OmmData {
 /// rev_at_epoch : int, optional
 ///     Revolution Number.
 /// bstar : float, optional
-///     B* drag term in 1/ER (Inverse Earth Radii). Required for SGP4.
+///     B* drag term in 1/ER (Inverse Earth Radii). Required for SGP4 (ODM 2.0: SGP, SGP4 and
+///     SGP/SGP4). Mutually exclusive with ``bterm``.
 /// bterm : float, optional
-///     Ballistic coefficient (m²/kg). Required for SGP4-XP.
+///     Ballistic coefficient (m²/kg). Required for SGP4-XP. Mutually exclusive with ``bstar``;
+///     not available in ODM 2.0.
 /// mean_motion_dot : float, optional
-///     First derivative of mean motion (rev/day²). Required when MEAN_ELEMENT_THEORY = SGP or PPT3.
+///     First derivative of mean motion (rev/day²). Required when MEAN_ELEMENT_THEORY = SGP or
+///     PPT3 (ODM 2.0: SGP).
 /// mean_motion_ddot : float, optional
-///     Second derivative of mean motion (rev/day³). Required when MEAN_ELEMENT_THEORY = SGP or PPT3.
+///     Second derivative of mean motion (rev/day³). Required when MEAN_ELEMENT_THEORY = SGP or
+///     PPT3 (ODM 2.0: SGP). Mutually exclusive with ``agom``.
 /// agom : float, optional
-///     Solar radiation pressure coefficient (m²/kg). Required for SGP4-XP.
+///     Solar radiation pressure coefficient (m²/kg). Required for SGP4-XP. Mutually exclusive
+///     with ``mean_motion_ddot``; not available in ODM 2.0.
+///
+/// XML additionally requires ``mean_motion_dot``, one of ``bstar``/``bterm`` and one of
+/// ``mean_motion_ddot``/``agom`` (ODM 2.0 XML: ``norad_cat_id``, ``element_set_no``,
+/// ``rev_at_epoch``, ``bstar`` and ``mean_motion_ddot`` as well).
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct TleParameters {
     pub inner: core_omm::TleParameters,
@@ -1028,12 +1142,10 @@ pub struct TleParameters {
 impl TleParameters {
     #[new]
     #[pyo3(
-        signature = (*, mean_motion_dot, ephemeris_type=None, classification_type=None, norad_cat_id=None, element_set_no=None, rev_at_epoch=None, bstar=None, bterm=None, mean_motion_ddot=None, agom=None),
-        text_signature = "(mean_motion_dot: float, ephemeris_type: Optional[int] = None, classification_type: Optional[str] = None, norad_cat_id: Optional[int] = None, element_set_no: Optional[int] = None, rev_at_epoch: Optional[int] = None, bstar: Optional[float] = None, bterm: Optional[float] = None, mean_motion_ddot: Optional[float] = None, agom: Optional[float] = None)"
+        signature = (*, ephemeris_type=None, classification_type=None, norad_cat_id=None, element_set_no=None, rev_at_epoch=None, bstar=None, bterm=None, mean_motion_dot=None, mean_motion_ddot=None, agom=None)
     )]
     #[allow(clippy::too_many_arguments)]
     fn new(
-        mean_motion_dot: f64,
         ephemeris_type: Option<i32>,
         classification_type: Option<String>,
         norad_cat_id: Option<u32>,
@@ -1041,6 +1153,7 @@ impl TleParameters {
         rev_at_epoch: Option<u32>,
         bstar: Option<f64>,
         bterm: Option<f64>,
+        mean_motion_dot: Option<f64>,
         mean_motion_ddot: Option<f64>,
         agom: Option<f64>,
     ) -> PyResult<Self> {
@@ -1058,7 +1171,7 @@ impl TleParameters {
                 rev_at_epoch,
                 bstar: bstar.map(|v| BStar::new(v, Default::default())),
                 bterm: bterm.map(|v| M2kg::new(v, Default::default())),
-                mean_motion_dot: MeanMotionDot::new(mean_motion_dot, Default::default()),
+                mean_motion_dot: mean_motion_dot.map(|v| MeanMotionDot::new(v, Default::default())),
                 mean_motion_ddot: mean_motion_ddot
                     .map(|v| MeanMotionDDot::new(v, Default::default())),
                 agom: agom.map(|v| M2kg::new(v, Default::default())),
@@ -1085,7 +1198,8 @@ impl TleParameters {
         self.inner.comment = value;
     }
 
-    /// Ephemeris type. Default value = 0. (See 4.2.4.7.)
+    /// Ephemeris type. When omitted, the book's default 0 applies; nothing is stored. (See
+    /// 4.2.4.7.)
     ///
     /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
     ///
@@ -1100,7 +1214,8 @@ impl TleParameters {
         self.inner.ephemeris_type = value;
     }
 
-    /// Classification type. Default value = U. (See 4.2.4.7.)
+    /// Classification type. When omitted, the book's default U applies; nothing is stored.
+    /// (See 4.2.4.7.)
     ///
     /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
     ///
@@ -1206,22 +1321,23 @@ impl TleParameters {
     }
 
     /// First Time Derivative of the Mean Motion (i.e., a drag term, required when
-    /// MEAN_ELEMENT_THEORY = SGP or PPT3). (See 4.2.4.7 for important details).
+    /// MEAN_ELEMENT_THEORY = SGP or PPT3; ODM 2.0: SGP). (See 4.2.4.7 for important details).
+    /// XML requires it in every TLE block.
     ///
     /// Units: rev/day²
     ///
     /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
     ///
-    /// :type: float
+    /// :type: Optional[float]
     #[getter]
-    fn get_mean_motion_dot(&self) -> f64 {
-        self.inner.mean_motion_dot.value
+    fn get_mean_motion_dot(&self) -> Option<f64> {
+        self.inner.mean_motion_dot.as_ref().map(|v| v.value)
     }
 
     #[setter]
-    fn set_mean_motion_dot(&mut self, value: f64) {
+    fn set_mean_motion_dot(&mut self, value: Option<f64>) {
         use ccsds_ndm::messages::omm::MeanMotionDot;
-        self.inner.mean_motion_dot = MeanMotionDot::new(value, Default::default());
+        self.inner.mean_motion_dot = value.map(|v| MeanMotionDot::new(v, Default::default()));
     }
 
     /// Second Time Derivative of Mean Motion (i.e., a drag term). (See 4.2.4.7 for important

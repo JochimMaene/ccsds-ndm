@@ -38,7 +38,7 @@ fn ocm_validation_traj_lines() {
         .build();
     // Missing lines
     ocm.body.segment.data.traj.push(traj);
-    crate::common::assert_rejects(&ocm, "trajLine");
+    crate::common::assert_rejects(&ocm, "TRAJ data line");
 
     // Fix it
     ocm.body.segment.data.traj[0].traj_lines.push(TrajLine {
@@ -54,7 +54,10 @@ fn ocm_validation_traj_lines() {
 
     for value in ["2001-366T00:00:00", "2023-01-01T24:00:00", "+", "123."] {
         ocm.body.segment.data.traj[0].traj_lines[0].epoch = value.parse().unwrap();
-        crate::common::assert_validation_field(&ocm.validate().unwrap_err(), "trajLine epoch");
+        crate::common::assert_validation_field(
+            &ocm.validate().unwrap_err(),
+            "TRAJ data line epoch",
+        );
     }
 }
 

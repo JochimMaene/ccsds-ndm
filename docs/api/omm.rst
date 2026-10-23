@@ -18,3 +18,7 @@ Orbit Mean-Elements Message (OMM)
 .. autoclass:: MeanElements
    :members:
    :undoc-members:
+
+.. autoclass:: TleParameters
+   :members:
+   :undoc-members:

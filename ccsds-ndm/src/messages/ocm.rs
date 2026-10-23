@@ -35,11 +35,15 @@ mod xml;
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "ocm")]
 pub struct Ocm {
+    /// Message provenance and creation epoch.
     pub header: OdmHeader,
+    /// The message segment and its data.
     pub body: OcmBody,
+    /// XML root identifier; when present it must match this family.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_OCM_VERS".to_string()))]
     pub id: Option<String>,
+    /// Supported message edition, "3.0".
     #[serde(rename = "@version")]
     #[builder(default = "3.0".to_string(), into)]
     pub version: String,
@@ -63,7 +67,11 @@ impl Ndm for Ocm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::detect::without_utf8_bom(kvn);
+        let normalized = crate::kvn::prepare_input(
+            crate::detect::without_utf8_bom(kvn),
+            crate::validation::MessageKind::Ocm,
+        )?;
+        let kvn = normalized.as_ref();
         kvn::validate_syntax(kvn)?;
         let ocm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&ocm)?;
@@ -78,6 +86,7 @@ impl Ndm for Ocm {
         xml::validate_sequences(xml)?;
         let ocm: Self = crate::xml::from_str_with_context(xml, "OCM")?;
         crate::traits::Validate::validate(&ocm)?;
+        ocm.validate_xml_representability()?;
         Ok(ocm)
     }
 
@@ -93,13 +102,7 @@ impl Ndm for Ocm {
 impl crate::traits::Validate for OcmSegment {
     fn validate(&self) -> Result<()> {
         self.metadata.validate()?;
-        self.data.validate_with_metadata(&self.metadata)
-    }
-}
-
-impl OcmSegment {
-    pub fn validate(&self, _header: &OdmHeader) -> Result<()> {
-        crate::traits::Validate::validate(self)
+        crate::traits::Validate::validate(&self.data)
     }
 }
 
@@ -107,6 +110,119 @@ impl crate::traits::Validate for OcmData {
     fn validate(&self) -> Result<()> {
         for traj in &self.traj {
             traj.validate()?;
+        }
+        let multiple_trajectories = self.traj.len() > 1;
+        let linked_covariances = multiple_trajectories || self.cov.len() > 1;
+        if multiple_trajectories && !self.cov.is_empty() {
+            let mut ids = std::collections::HashSet::new();
+            for trajectory in &self.traj {
+                let id = trajectory
+                    .traj_id
+                    .as_deref()
+                    .filter(|id| !id.trim().is_empty())
+                    .ok_or_else(|| ValidationError::MissingRequiredField {
+                        block: "OCM trajectory/covariance linkage".into(),
+                        field: "TRAJ_ID".into(),
+                        line: None,
+                    })?;
+                if !ids.insert(id) {
+                    return Err(ValidationError::InvalidValue {
+                        field: "TRAJ_ID".into(),
+                        value: id.into(),
+                        expected:
+                            "unique trajectory identifiers when covariance linkage is required"
+                                .into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+        for covariance in &self.cov {
+            if linked_covariances
+                && covariance
+                    .traj_id
+                    .as_deref()
+                    .is_none_or(|id| id.trim().is_empty())
+            {
+                return Err(ValidationError::MissingRequiredField {
+                    block: "OCM trajectory/covariance linkage".into(),
+                    field: "TRAJ_ID".into(),
+                    line: None,
+                }
+                .into());
+            }
+            // A TRAJ_ID may name a trajectory sent in another OCM; it can only be resolved
+            // when this message carries trajectories.
+            if let Some(id) = covariance
+                .traj_id
+                .as_ref()
+                .filter(|_| !self.traj.is_empty())
+            {
+                if !self
+                    .traj
+                    .iter()
+                    .any(|trajectory| trajectory.traj_id.as_ref() == Some(id))
+                {
+                    return Err(ValidationError::InvalidValue {
+                        field: "TRAJ_ID".into(),
+                        value: id.clone(),
+                        expected: "identifier of a trajectory in this OCM".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+        if let Some(user) = &self.user {
+            for parameter in user.parameters() {
+                let sequence = parameter.parameter.strip_prefix("COMPOSITION_");
+                if sequence.is_some_and(str::is_empty)
+                    || (!parameter.records.is_empty() && sequence.is_none())
+                {
+                    return Err(ValidationError::InvalidValue {
+                        field: "USER_DEFINED_COMPOSITION".into(),
+                        value: parameter.parameter.clone(),
+                        expected: "COMPOSITION_<sequence ID> for sequence records".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+                if sequence.is_some()
+                    && (parameter
+                        .value
+                        .split(',')
+                        .any(|column| column.trim().is_empty())
+                        || parameter.records.is_empty())
+                {
+                    return Err(ValidationError::InvalidValue {
+                        field: "USER_DEFINED_COMPOSITION".into(),
+                        value: parameter.value.clone(),
+                        expected: "nonempty comma-delimited composition and sequence records"
+                            .into(),
+                        line: None,
+                    }
+                    .into());
+                }
+                for record in &parameter.records {
+                    if record.trim().is_empty()
+                        || record.contains(['\n', '\r'])
+                        || record.trim() == "USER_STOP"
+                        || record
+                            .split_once('=')
+                            .is_some_and(|(key, _)| key.trim().starts_with("USER_DEFINED_"))
+                        || !record.bytes().all(|byte| (b' '..=b'~').contains(&byte))
+                    {
+                        return Err(ValidationError::InvalidValue {
+                            field: "USER_DEFINED sequence record".into(),
+                            value: record.clone(),
+                            expected: "one printable ASCII ICD-defined data row".into(),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
+            }
         }
         if let Some(phys) = &self.phys {
             phys.validate()?;
@@ -121,19 +237,13 @@ impl crate::traits::Validate for OcmData {
             pert.validate()?;
         }
         if let Some(od) = &self.od {
+            // ODM table 6-1: the perturbations section is required with an OD section.
+            if self.pert.is_none() {
+                return Err(ValidationError::missing_required("OCM data", "PERT").into());
+            }
             od.validate()?;
         }
         Ok(())
-    }
-}
-
-impl OcmData {
-    pub fn validate_with_metadata(&self, _metadata: &OcmMetadata) -> Result<()> {
-        crate::traits::Validate::validate(self)
-    }
-
-    pub fn validate(&self, metadata: &OcmMetadata) -> Result<()> {
-        self.validate_with_metadata(metadata)
     }
 }
 
@@ -236,6 +346,15 @@ impl OcmPhysicalDescription {
                 require_finite(field, value)?;
             }
         }
+        // Table 6-5: qc "shall be made non-negative by convention"; -999 flags a tumbling object.
+        if let Some(qc) = self.oeb_qc.filter(|qc| *qc < 0.0 && *qc != -999.0) {
+            return Err(ValidationError::invalid_value(
+                "OEB_QC",
+                qc.to_string(),
+                "a non-negative value, or -999 for a tumbling object",
+            )
+            .into());
+        }
         Ok(())
     }
 }
@@ -277,12 +396,13 @@ impl OcmTrajState {
         if self.traj_lines.is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: Cow::Borrowed("TRAJ"),
-                field: Cow::Borrowed("trajLine"),
+                field: Cow::Borrowed("TRAJ data line"),
                 line: None,
             }
             .into());
         }
         if let Some(rev) = self.orb_revnum {
+            require_finite("ORB_REVNUM", rev)?;
             if rev < 0.0 {
                 return Err(ValidationError::Generic {
                     message: Cow::Borrowed("ORB_REVNUM must be non-negative"),
@@ -290,48 +410,59 @@ impl OcmTrajState {
                 }
                 .into());
             }
+            // Table 6-4: ORB_REVNUM_BASIS "shall be provided if ORB_REVNUM is specified".
+            if self.orb_revnum_basis.is_none() {
+                return Err(ValidationError::missing_required("TRAJ", "ORB_REVNUM_BASIS").into());
+            }
+        }
+        // `xsd:positiveInteger`, adopted in every notation so a valid model always converts.
+        if self.interpolation_degree == Some(0) {
+            return Err(ValidationError::invalid_value(
+                "INTERPOLATION_DEGREE",
+                "0",
+                "a positive integer",
+            )
+            .into());
+        }
+        if let Some(epoch) = &self.traj_frame_epoch {
+            validate_ocm_history_epoch(epoch, "TRAJ_FRAME_EPOCH")?;
         }
 
         validate_ocm_history_epoch_sequence(
             self.traj_lines.iter().map(|line| &line.epoch),
-            "trajLine epoch",
+            "TRAJ data line epoch",
             "TRAJ",
         )?;
 
-        validate_ocm_line_values(
-            "TRAJ",
-            "trajLine",
-            self.traj_lines.iter().map(|l| &l.values),
-        )?;
-
-        let traj_type = self.traj_type.trim().to_uppercase();
+        validate_ocm_line_values("TRAJ", self.traj_lines.iter().map(|l| &l.values))?;
+        let traj_type = known_ocm_type(&self.traj_type);
+        if let Some(dimension) = orbital_dimension(traj_type) {
+            for line in &self.traj_lines {
+                if line.values.len() != dimension {
+                    return Err(ValidationError::invalid_value(
+                        "TRAJ data line",
+                        format!("{} values", line.values.len()),
+                        format!("{dimension} values for TRAJ_TYPE {}", self.traj_type),
+                    )
+                    .into());
+                }
+            }
+        }
 
         if let Some(units) = &self.traj_units {
             let unit_list = parse_units_list(units);
-            if let Some(expected_units) = expected_traj_units(&traj_type) {
-                if unit_list.len() == expected_units.len() {
-                    for (unit, expected) in unit_list.iter().zip(expected_units.iter()) {
-                        if !unit_matches_expected(unit, expected) {
-                            return Err(ValidationError::InvalidValue {
-                                field: Cow::Borrowed("TRAJ_UNITS"),
-                                value: units.clone(),
-                                expected: format!("expected {} units", traj_type).into(),
-                                line: None,
-                            }
-                            .into());
-                        }
-                    }
-                }
-            } else if traj_type == "DELAUNAY" {
-                let has_angle_unit = unit_list.iter().any(|u| {
-                    let u = u.to_ascii_lowercase();
-                    u.contains("rad") || u.contains("deg") || u.contains("rev")
-                });
-                if !has_angle_unit {
+            if let Some(expected_units) = expected_traj_units(traj_type) {
+                if unit_list.len() != expected_units.len()
+                    || unit_list
+                        .iter()
+                        .zip(expected_units.iter())
+                        .any(|(unit, expected)| !unit_matches_expected(unit, expected))
+                {
                     return Err(ValidationError::InvalidValue {
                         field: Cow::Borrowed("TRAJ_UNITS"),
                         value: units.clone(),
-                        expected: "expected angular units for DELAUNAY".into(),
+                        expected: format!("{} units: {}", traj_type, expected_units.join(", "))
+                            .into(),
                         line: None,
                     }
                     .into());
@@ -459,37 +590,122 @@ impl OcmCovarianceMatrix {
         if self.cov_lines.is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: Cow::Borrowed("COV"),
-                field: Cow::Borrowed("covLine"),
+                field: Cow::Borrowed("COV data line"),
                 line: None,
             }
             .into());
         }
         validate_ocm_history_epoch_sequence(
             self.cov_lines.iter().map(|line| &line.epoch),
-            "covLine epoch",
+            "COV data line epoch",
             "COV",
         )?;
-        validate_ocm_line_values("COV", "covLine", self.cov_lines.iter().map(|l| &l.values))?;
+        validate_ocm_line_values("COV", self.cov_lines.iter().map(|l| &l.values))?;
+        if let Some(epoch) = &self.cov_frame_epoch {
+            validate_ocm_history_epoch(epoch, "COV_FRAME_EPOCH")?;
+        }
+        for (field, value) in [
+            ("COV_SCALE_MIN", self.cov_scale_min),
+            ("COV_SCALE_MAX", self.cov_scale_max),
+        ] {
+            if let Some(value) = value {
+                require_finite(field, value)?;
+            }
+        }
+        if let Some(confidence) = &self.cov_confidence {
+            Percentage::validate_value(confidence.value, "COV_CONFIDENCE")?;
+        }
+        let cov_type = known_ocm_type(&self.cov_type);
+        if matches!(cov_type, "SIG3EIGVEC3" | "TSIG3EIGVEC3") {
+            let offset = usize::from(cov_type.starts_with('T'));
+            if let Some(units) = &self.cov_units {
+                let expected: &[&str] = if offset == 0 {
+                    &["km", "km", "km"]
+                } else {
+                    &["s", "km", "km", "km"]
+                };
+                let listed = parse_units_list(units);
+                if listed.len() != expected.len()
+                    || listed
+                        .iter()
+                        .zip(expected)
+                        .any(|(actual, expected)| !unit_matches_expected(actual, expected))
+                {
+                    return Err(ValidationError::invalid_value(
+                        "COV_UNITS",
+                        units,
+                        format!("diagonal-element units {}", expected.join(", ")),
+                    )
+                    .into());
+                }
+            }
+        }
+        if let Some(dimension) = covariance_dimension(cov_type) {
+            if let Some(units) = &self.cov_units {
+                let listed = parse_units_list(units);
+                let expected = expected_traj_units(cov_type).or_else(|| {
+                    cov_type
+                        .strip_prefix('T')
+                        .and_then(expected_traj_units)
+                        .map(|mut units| {
+                            units.insert(0, "s");
+                            units
+                        })
+                });
+                if let Some(expected) = expected {
+                    if listed.len() != expected.len()
+                        || listed
+                            .iter()
+                            .zip(expected.iter())
+                            .any(|(actual, expected)| !unit_matches_expected(actual, expected))
+                    {
+                        return Err(ValidationError::invalid_value(
+                            "COV_UNITS",
+                            units,
+                            format!("diagonal-element units {}", expected.join(", ")),
+                        )
+                        .into());
+                    }
+                }
+                if listed.len() != dimension {
+                    return Err(ValidationError::invalid_value(
+                        "COV_UNITS",
+                        units,
+                        format!("{dimension} diagonal-element units"),
+                    )
+                    .into());
+                }
+            }
+        }
+        for line in &self.cov_lines {
+            validate_covariance_values(&line.values, cov_type, &self.cov_ordering)?;
+        }
+
         Ok(())
     }
 }
 
-/// Rejects non-finite numbers in an OCM history line, naming the line and column that failed.
+/// Requires at least one value after the time tag and rejects non-finite numbers in an OCM history
+/// line, naming the line and column that failed. A tag-only line would generate KVN that no
+/// reader can tell from a malformed record.
 fn validate_ocm_line_values<'a>(
     block: &'static str,
-    line_name: &'static str,
     lines: impl Iterator<Item = &'a Vec<f64>>,
 ) -> Result<()> {
     for (line_index, values) in lines.enumerate() {
+        if values.is_empty() {
+            return Err(ValidationError::invalid_value(
+                format!("{block} data line {}", line_index + 1),
+                "time tag only",
+                "at least one value after the time tag",
+            )
+            .into());
+        }
         for (column, value) in values.iter().enumerate() {
             if !value.is_finite() {
                 return Err(ValidationError::InvalidValue {
-                    field: format!(
-                        "{block} {line_name} {} value {}",
-                        line_index + 1,
-                        column + 1
-                    )
-                    .into(),
+                    field: format!("{block} data line {} value {}", line_index + 1, column + 1)
+                        .into(),
                     value: value.to_string(),
                     expected: Cow::Borrowed("a finite number"),
                     line: None,
@@ -543,7 +759,7 @@ impl OcmManeuverParameters {
         if self.man_lines.is_empty() {
             return Err(ValidationError::MissingRequiredField {
                 block: Cow::Borrowed("MAN"),
-                field: Cow::Borrowed("manLine"),
+                field: Cow::Borrowed("MAN data line"),
                 line: None,
             }
             .into());
@@ -576,9 +792,36 @@ impl OcmManeuverParameters {
             .into());
         }
 
+        // ODM 6.2.8.15–16 selects one table in its fixed order, without repeated columns.
+        if ![MAN_PROPULSIVE_COLUMNS, MAN_DEPLOYMENT_COLUMNS]
+            .iter()
+            .any(|table| {
+                let mut previous = None;
+                tokens.iter().skip(1).all(|token| {
+                    let rank = table
+                        .iter()
+                        .position(|known| known.eq_ignore_ascii_case(token));
+                    let valid =
+                        rank.is_some() && previous.is_none_or(|previous| rank.unwrap() > previous);
+                    previous = rank;
+                    valid
+                })
+            })
+        {
+            return Err(ValidationError::invalid_value(
+                "MAN_COMPOSITION",
+                &self.man_composition,
+                "distinct columns from ODM table 6-8 or 6-9, in table order",
+            )
+            .into());
+        }
+
+        // Table 6-7 offers each of these keywords both relative and absolute forms independently
+        // of MAN_COMPOSITION; only the data lines follow the composition's time tag (6.2.8.18).
         for (field, epoch) in [
             ("MAN_PREV_EPOCH", self.man_prev_epoch.as_ref()),
             ("MAN_NEXT_EPOCH", self.man_next_epoch.as_ref()),
+            ("MAN_FRAME_EPOCH", self.man_frame_epoch.as_ref()),
             ("DC_WIN_OPEN", self.dc_win_open.as_ref()),
             ("DC_WIN_CLOSE", self.dc_win_close.as_ref()),
             ("DC_EXEC_START", self.dc_exec_start.as_ref()),
@@ -586,32 +829,43 @@ impl OcmManeuverParameters {
             ("DC_REF_TIME", self.dc_ref_time.as_ref()),
         ] {
             if let Some(epoch) = epoch {
-                validate_man_epoch_field(epoch, time_tag, field)?;
+                validate_ocm_history_epoch(epoch, field)?;
             }
         }
 
         validate_man_duty_cycle(self)?;
+        require_positive_count("DC_MAX_CYCLES", self.dc_max_cycles)?;
 
         let expected = tokens.len().saturating_sub(1);
+        // Table 6-7: every element after the time tag must have a MAN_UNITS entry.
+        if let Some(units) = &self.man_units {
+            let listed = parse_units_list(units).len();
+            if listed != expected {
+                return Err(ValidationError::invalid_value(
+                    "MAN_UNITS",
+                    units,
+                    format!("{expected} units, one per MAN_COMPOSITION element after the time tag"),
+                )
+                .into());
+            }
+        }
         // Built once per maneuver block rather than per line, so history parsing keeps its
         // recorded allocation budget.
         let numeric_columns: Vec<bool> = tokens
             .iter()
             .skip(1)
-            .map(|token| {
-                !NON_NUMERIC_MAN_COLUMNS
-                    .iter()
-                    .any(|known| known.eq_ignore_ascii_case(token.trim()))
-            })
+            .map(|token| is_numeric_man_column(token))
             .collect();
         let mut previous_key: Option<crate::types::EpochOrderKey<'_>> = None;
+        let mut direction = None;
+        let mut monotonic = true;
         for line in &self.man_lines {
             validate_man_history_epoch(&line.epoch, time_tag)?;
             let key = line
                 .epoch
                 .order_key()
                 .ok_or_else(|| ValidationError::InvalidValue {
-                    field: Cow::Borrowed("manLine epoch"),
+                    field: Cow::Borrowed("MAN data line epoch"),
                     value: line.epoch.to_string(),
                     expected: Cow::Borrowed("a comparable calendar or numeric epoch"),
                     line: None,
@@ -621,14 +875,18 @@ impl OcmManeuverParameters {
                     previous
                         .compare(&key)
                         .ok_or_else(|| ValidationError::InvalidValue {
-                            field: Cow::Borrowed("manLine epoch"),
+                            field: Cow::Borrowed("MAN data line epoch"),
                             value: line.epoch.to_string(),
                             expected: Cow::Borrowed("a comparable calendar or numeric epoch"),
                             line: None,
                         })?;
+                if direction.is_some_and(|previous| previous != ordering) {
+                    monotonic = false;
+                }
+                direction = Some(ordering);
                 if ordering == Ordering::Equal {
                     return Err(ValidationError::InvalidValue {
-                        field: Cow::Borrowed("manLine epoch"),
+                        field: Cow::Borrowed("MAN data line epoch"),
                         value: line.epoch.to_string(),
                         expected: Cow::Borrowed("a unique epoch within the MAN block"),
                         line: None,
@@ -637,20 +895,78 @@ impl OcmManeuverParameters {
                 }
             }
             previous_key = Some(key);
-            if line.values.len() < expected {
+            if line.values.len() != expected {
                 return Err(ValidationError::InvalidValue {
-                    field: Cow::Borrowed("MAN_COMPOSITION"),
-                    value: format!("{} ({} values)", self.man_composition, line.values.len()),
-                    expected: format!("{} values per line", expected).into(),
+                    field: Cow::Borrowed("MAN data line"),
+                    value: format!("{} values", line.values.len()),
+                    expected: format!(
+                        "{expected} values per line for MAN_COMPOSITION {}",
+                        self.man_composition
+                    )
+                    .into(),
                     line: None,
                 }
                 .into());
             }
-            validate_man_line_numbers(&numeric_columns, &tokens, line)?;
+            validate_man_line_values(&numeric_columns, &tokens, line)?;
+        }
+        if !monotonic {
+            let mut epochs: Vec<_> = self
+                .man_lines
+                .iter()
+                .map(|line| line.epoch.order_key().unwrap())
+                .collect();
+            epochs.sort_unstable_by(|a, b| a.compare(b).unwrap());
+            if epochs
+                .windows(2)
+                .any(|pair| pair[0].compare(&pair[1]) == Some(Ordering::Equal))
+            {
+                return Err(ValidationError::invalid_value(
+                    "MAN data line epoch",
+                    "repeated",
+                    "a unique epoch within the MAN block",
+                )
+                .into());
+            }
         }
         Ok(())
     }
 }
+
+const MAN_PROPULSIVE_COLUMNS: &[&str] = &[
+    "MAN_DURA",
+    "DELTA_MASS",
+    "ACC_X",
+    "ACC_Y",
+    "ACC_Z",
+    "ACC_INTERP",
+    "ACC_MAG_SIGMA",
+    "ACC_DIR_SIGMA",
+    "DV_X",
+    "DV_Y",
+    "DV_Z",
+    "DV_MAG_SIGMA",
+    "DV_DIR_SIGMA",
+    "THR_X",
+    "THR_Y",
+    "THR_Z",
+    "THR_EFFIC",
+    "THR_INTERP",
+    "THR_ISP",
+    "THR_MAG_SIGMA",
+    "THR_DIR_SIGMA",
+];
+const MAN_DEPLOYMENT_COLUMNS: &[&str] = &[
+    "DEPLOY_ID",
+    "DEPLOY_DV_X",
+    "DEPLOY_DV_Y",
+    "DEPLOY_DV_Z",
+    "DEPLOY_MASS",
+    "DEPLOY_DV_SIGMA",
+    "DEPLOY_DIR_SIGMA",
+    "DEPLOY_DV_RATIO",
+    "DEPLOY_DV_CDA",
+];
 
 /// Composition columns that do not hold a number.
 ///
@@ -665,30 +981,63 @@ const NON_NUMERIC_MAN_COLUMNS: [&str; 5] = [
     "TIME_RELATIVE",
 ];
 
-/// Requires every declared-numeric maneuver column to hold a finite number.
+fn is_numeric_man_column(token: &str) -> bool {
+    !NON_NUMERIC_MAN_COLUMNS
+        .iter()
+        .any(|known| known.eq_ignore_ascii_case(token.trim()))
+}
+
+/// Requires one token per maneuver column and a finite number in declared-numeric columns.
 ///
 /// `ManLine::values` is `Vec<String>` because the columns are heterogeneous, so nothing else stops
-/// text reaching a numeric column: the XSD types the line as a string list, so the schema oracle
+/// text reaching a numeric column: the XSD types `manLine` as `xsd:string`, so the schema oracle
 /// accepts it. This matches Orekit, whose `ManeuverFieldType` parses each declared-numeric column
 /// as a double and likewise enforces no per-column domain.
-fn validate_man_line_numbers(
+fn validate_man_line_values(
     numeric_columns: &[bool],
-    tokens: &[String],
+    tokens: &[&str],
     line: &ManLine,
 ) -> Result<()> {
     for (index, value) in line.values.iter().enumerate() {
+        if value.is_empty() || value.chars().any(char::is_whitespace) {
+            return Err(ValidationError::InvalidValue {
+                field: format!("MAN data line {}", tokens[index + 1].trim()).into(),
+                value: value.clone(),
+                expected: Cow::Borrowed("one nonempty token without whitespace"),
+                line: None,
+            }
+            .into());
+        }
         // `values` excludes the time tag, so column `index` is composition token `index + 1`.
+        let column = tokens[index + 1].trim();
+        // ODM table 6-8: interpolation modes "shall be selected as either 'OFF' or 'ON'".
+        if (column.eq_ignore_ascii_case("ACC_INTERP") || column.eq_ignore_ascii_case("THR_INTERP"))
+            && !value.eq_ignore_ascii_case("ON")
+            && !value.eq_ignore_ascii_case("OFF")
+        {
+            return Err(ValidationError::invalid_value(
+                format!("MAN data line {column}"),
+                value,
+                "ON or OFF",
+            )
+            .into());
+        }
         if numeric_columns.get(index) != Some(&true) {
             continue;
         }
-        let parsed = value.trim().parse::<f64>();
+        let parsed = fast_float::parse::<f64, _>(value);
+        // ODM table 6-9: DEPLOY_MASS is a host-mass decrement and "shall be <= 0.0".
+        if column.eq_ignore_ascii_case("DEPLOY_MASS") && parsed.as_ref().is_ok_and(|v| *v > 0.0) {
+            return Err(ValidationError::invalid_value(
+                "MAN data line DEPLOY_MASS",
+                value,
+                "a mass decrement <= 0",
+            )
+            .into());
+        }
         if parsed.map(|number| number.is_finite()) != Ok(true) {
-            let column = tokens
-                .get(index + 1)
-                .map(|token| token.trim())
-                .unwrap_or("value");
             return Err(ValidationError::InvalidValue {
-                field: format!("manLine {column}").into(),
+                field: format!("MAN data line {column}").into(),
                 value: value.clone(),
                 expected: Cow::Borrowed("a finite number"),
                 line: None,
@@ -714,7 +1063,7 @@ fn man_time_tag(value: &str) -> Option<ManTimeTag> {
 }
 
 fn validate_man_history_epoch(epoch: &Epoch, time_tag: ManTimeTag) -> Result<()> {
-    validate_man_epoch_field(epoch, time_tag, "manLine epoch")
+    validate_man_epoch_field(epoch, time_tag, "MAN data line epoch")
 }
 
 fn validate_man_epoch_field(
@@ -802,17 +1151,6 @@ fn validate_man_duty_cycle(man: &OcmManeuverParameters) -> Result<()> {
         }
     }
 
-    if let Some(max_cycles) = man.dc_max_cycles {
-        if max_cycles == 0 {
-            return Err(ValidationError::invalid_value(
-                "DC_MAX_CYCLES",
-                max_cycles.to_string(),
-                "a positive integer",
-            )
-            .into());
-        }
-    }
-
     // ODM permits any finite phase-angle magnitude; `angleType`'s [-360, 360) is a limit of the
     // XML edition, checked in `validate_xml_representability` instead.
     for (field, angle) in [
@@ -824,47 +1162,33 @@ fn validate_man_duty_cycle(man: &OcmManeuverParameters) -> Result<()> {
         }
     }
 
-    if let (Some(window_open), Some(execution_start)) =
-        (man.dc_win_open.as_ref(), man.dc_exec_start.as_ref())
-    {
-        let ordering = window_open
-            .cmp_same_branch(execution_start)
-            .ok_or_else(|| {
-                ValidationError::invalid_value(
-                    "DC_EXEC_START",
-                    execution_start.to_string(),
-                    "a comparable epoch coincident with or after DC_WIN_OPEN",
-                )
-            })?;
-        if ordering == Ordering::Greater {
-            return Err(ValidationError::invalid_value(
-                "DC_EXEC_START",
-                execution_start.to_string(),
-                "coincident with or after DC_WIN_OPEN",
-            )
-            .into());
-        }
-    }
-
-    if let (Some(execution_stop), Some(window_close)) =
-        (man.dc_exec_stop.as_ref(), man.dc_win_close.as_ref())
-    {
-        let ordering = execution_stop
-            .cmp_same_branch(window_close)
-            .ok_or_else(|| {
-                ValidationError::invalid_value(
-                    "DC_EXEC_STOP",
-                    execution_stop.to_string(),
-                    "a comparable epoch coincident with or before DC_WIN_CLOSE",
-                )
-            })?;
-        if ordering == Ordering::Greater {
-            return Err(ValidationError::invalid_value(
-                "DC_EXEC_STOP",
-                execution_stop.to_string(),
-                "coincident with or before DC_WIN_CLOSE",
-            )
-            .into());
+    // Ordering is checked only between epochs of the same form; relating a relative and an
+    // absolute epoch would need time arithmetic, which stays out of scope.
+    for (earlier, later, field, expected) in [
+        (
+            &man.dc_win_open,
+            &man.dc_exec_start,
+            "DC_EXEC_START",
+            "coincident with or after DC_WIN_OPEN",
+        ),
+        (
+            &man.dc_exec_stop,
+            &man.dc_win_close,
+            "DC_EXEC_STOP",
+            "coincident with or before DC_WIN_CLOSE",
+        ),
+    ] {
+        if let (Some(earlier), Some(later)) = (earlier, later) {
+            if earlier.cmp_same_branch(later) == Some(Ordering::Greater) {
+                let value = if field == "DC_EXEC_START" {
+                    later
+                } else {
+                    earlier
+                };
+                return Err(
+                    ValidationError::invalid_value(field, value.to_string(), expected).into(),
+                );
+            }
         }
     }
 
@@ -898,12 +1222,257 @@ fn validate_man_duty_cycle(man: &OcmManeuverParameters) -> Result<()> {
     Ok(())
 }
 
+// SANA Orbital Elements and Covariance Matrix Types, reviewed 2026-10-15.
+// Unknown registry extensions stay opaque; never infer a dimension from their spelling.
+fn known_ocm_type(kind: &str) -> &str {
+    const KNOWN: &[&str] = &[
+        "CARTP",
+        "CARTPV",
+        "CARTPVA",
+        "ADBARV",
+        "LDBARV",
+        "DELAUNAY",
+        "DELAUNAYMOD",
+        "GEODETIC",
+        "KEPLERIAN",
+        "KEPLERIANMEAN",
+        "ONSTATION",
+        "POINCARE",
+        "EQUINOCTIAL",
+        "EQUINOCTIALMOD",
+        "KEPLERIANMEANSGP-4",
+        "TCARTP",
+        "TCARTPV",
+        "TCARTPVA",
+        "TADBARV",
+        "TDELAUNAY",
+        "TDELAUNAYMOD",
+        "TGEODETIC",
+        "TKEPLERIAN",
+        "TKEPLERIANMEAN",
+        "TLDBARV",
+        "TPOINCARE",
+        "TEQUINOCTIAL_P",
+        "TEQUINOCTIAL_N",
+        "TEQUINOCTIALMOD_P",
+        "TEQUINOCTIALMOD_N",
+        "SIG3EIGVEC3",
+        "TSIG3EIGVEC3",
+    ];
+    KNOWN
+        .iter()
+        .copied()
+        .find(|known| known.eq_ignore_ascii_case(kind.trim()))
+        .unwrap_or(kind)
+}
+
+fn orbital_dimension(kind: &str) -> Option<usize> {
+    match kind {
+        "CARTP" => Some(3),
+        "CARTPV" | "ADBARV" | "LDBARV" | "DELAUNAY" | "DELAUNAYMOD" | "GEODETIC" | "KEPLERIAN"
+        | "KEPLERIANMEAN" | "ONSTATION" | "POINCARE" => Some(6),
+        "EQUINOCTIAL" | "EQUINOCTIALMOD" | "KEPLERIANMEANSGP-4" => Some(7),
+        "CARTPVA" => Some(9),
+        _ => None,
+    }
+}
+
+fn covariance_dimension(kind: &str) -> Option<usize> {
+    match kind {
+        "TCARTP" => Some(4),
+        "TCARTPVA" => Some(10),
+        "TADBARV" | "TCARTPV" | "TDELAUNAY" | "TDELAUNAYMOD" | "TGEODETIC" | "TKEPLERIAN"
+        | "TKEPLERIANMEAN" | "TLDBARV" | "TPOINCARE" | "TEQUINOCTIAL_P" | "TEQUINOCTIAL_N"
+        | "TEQUINOCTIALMOD_P" | "TEQUINOCTIALMOD_N" => Some(7),
+        _ => orbital_dimension(kind),
+    }
+}
+
+fn validate_covariance_values(values: &[f64], kind: &str, ordering: &CovOrder) -> Result<()> {
+    if matches!(kind, "SIG3EIGVEC3" | "TSIG3EIGVEC3") {
+        let offset = usize::from(kind.starts_with('T'));
+        if values.len() != 12 + offset {
+            return Err(ValidationError::invalid_value(
+                "COV data line",
+                format!("{} values", values.len()),
+                format!("{} values for {}", 12 + offset, kind),
+            )
+            .into());
+        }
+        if values[..3 + offset].iter().any(|value| *value <= 0.0) {
+            return Err(ValidationError::invalid_value(
+                "COV data line",
+                "nonpositive dispersion",
+                "positive one-sigma dispersions",
+            )
+            .into());
+        }
+        for i in 0..3 {
+            for j in 0..=i {
+                let dot: f64 = (0..3)
+                    .map(|k| values[offset + 3 + 3 * i + k] * values[offset + 3 + 3 * j + k])
+                    .sum();
+                let expected = if i == j { 1.0 } else { 0.0 };
+                if (dot - expected).abs() > 1e-12 {
+                    return Err(ValidationError::invalid_value(
+                        "COV data line",
+                        "nonorthonormal eigenvectors",
+                        "orthonormal eigenvectors (absolute tolerance 1e-12)",
+                    )
+                    .into());
+                }
+            }
+        }
+    } else if let Some(dimension) = covariance_dimension(kind) {
+        // The seventh EQUINOCTIAL/EQUINOCTIALMOD element is the constant +/-1 retrograde factor,
+        // which has no variance; positive definiteness applies to the six uncertain elements.
+        let uncertain = if matches!(kind, "EQUINOCTIAL" | "EQUINOCTIALMOD") {
+            6
+        } else {
+            dimension
+        };
+        validate_covariance_record(values, dimension, uncertain, ordering)?;
+    }
+    Ok(())
+}
+
+fn validate_covariance_record(
+    values: &[f64],
+    dimension: usize,
+    uncertain: usize,
+    ordering: &CovOrder,
+) -> Result<()> {
+    let expected = match ordering {
+        CovOrder::Ltm | CovOrder::Utm => dimension * (dimension + 1) / 2,
+        _ => dimension * dimension,
+    };
+    if values.len() != expected {
+        return Err(ValidationError::invalid_value(
+            "COV data line",
+            values.len().to_string(),
+            format!("{expected} values for the selected COV_TYPE and COV_ORDERING"),
+        )
+        .into());
+    }
+    let mut matrix = [[0.0; 10]; 10];
+    let mut index = 0;
+    for (row, matrix_row) in matrix.iter_mut().enumerate().take(dimension) {
+        for (column, entry) in matrix_row.iter_mut().enumerate().take(dimension) {
+            let selected = match ordering {
+                CovOrder::Ltm => column <= row,
+                CovOrder::Utm => column >= row,
+                _ => true,
+            };
+            if selected {
+                *entry = values[index];
+                index += 1;
+            }
+        }
+    }
+    for row in 0..dimension {
+        for column in 0..row {
+            match ordering {
+                CovOrder::Ltm | CovOrder::LtmWcc => matrix[column][row] = matrix[row][column],
+                CovOrder::Utm | CovOrder::UtmWcc => matrix[row][column] = matrix[column][row],
+                CovOrder::Full => {
+                    if matrix[row][column] != matrix[column][row] {
+                        return Err(ValidationError::invalid_value(
+                            "COV data line",
+                            "asymmetric",
+                            "a symmetric full covariance matrix",
+                        )
+                        .into());
+                    }
+                }
+            }
+        }
+    }
+    // Normalize to correlation scale before Cholesky: coordinates may use disparate units.
+    let mut scales = [0.0; 10];
+    for row in 0..uncertain {
+        if matrix[row][row] <= 0.0 {
+            return Err(ValidationError::invalid_value(
+                "COV data line",
+                "nonpositive variance",
+                "a positive-definite covariance matrix (ODM 6.2.7.10)",
+            )
+            .into());
+        }
+        scales[row] = matrix[row][row].sqrt();
+    }
+    for row in 0..uncertain {
+        for column in 0..row {
+            let correlation = matrix[row][column] / scales[row] / scales[column];
+            if matches!(ordering, CovOrder::LtmWcc | CovOrder::UtmWcc) {
+                let offset = if matches!(ordering, CovOrder::LtmWcc) {
+                    column * dimension + row
+                } else {
+                    row * dimension + column
+                };
+                if (values[offset] - correlation).abs() > 1e-12 {
+                    return Err(ValidationError::invalid_value("COV data line", values[offset].to_string(), "cross-correlations consistent with covariance entries (absolute tolerance 1e-12)").into());
+                }
+            }
+            matrix[row][column] = correlation;
+        }
+        matrix[row][row] = 1.0;
+    }
+    for row in 0..uncertain {
+        for column in 0..=row {
+            let mut residual = matrix[row][column];
+            for k in 0..column {
+                residual -= matrix[row][k] * matrix[column][k];
+            }
+            if row == column {
+                if residual <= 0.0 || !residual.is_finite() {
+                    return Err(ValidationError::invalid_value(
+                        "COV data line",
+                        "nonpositive Cholesky pivot",
+                        "a positive-definite covariance matrix (ODM 6.2.7.10)",
+                    )
+                    .into());
+                }
+                matrix[row][column] = residual.sqrt();
+            } else {
+                matrix[row][column] = residual / matrix[column][column];
+            }
+        }
+    }
+    Ok(())
+}
+
 fn expected_traj_units(traj_type: &str) -> Option<Vec<&'static str>> {
     match traj_type {
+        "TDELAUNAY" => Some(vec![
+            "s", "deg", "deg", "deg", "km**2/s", "km**2/s", "km**2/s",
+        ]),
+        "TDELAUNAYMOD" => Some(vec![
+            "s", "deg", "deg", "deg", "km**0.5", "km**0.5", "km**0.5",
+        ]),
+        "TEQUINOCTIAL_P" | "TEQUINOCTIAL_N" | "TEQUINOCTIALMOD_P" | "TEQUINOCTIALMOD_N" => {
+            Some(vec!["s", "km", "n/a", "n/a", "n/a", "n/a", "deg"])
+        }
         "CARTP" => Some(vec!["km", "km", "km"]),
         "CARTPV" => Some(vec!["km", "km", "km", "km/s", "km/s", "km/s"]),
         "CARTPVA" => Some(vec![
             "km", "km", "km", "km/s", "km/s", "km/s", "km/s**2", "km/s**2", "km/s**2",
+        ]),
+        "ADBARV" | "LDBARV" | "GEODETIC" => Some(vec!["deg", "deg", "deg", "deg", "km", "km/s"]),
+        "KEPLERIAN" | "KEPLERIANMEAN" => Some(vec!["km", "n/a", "deg", "deg", "deg", "deg"]),
+        "KEPLERIANMEANSGP-4" => Some(vec!["km", "n/a", "deg", "deg", "deg", "deg", "m**2/kg"]),
+        "EQUINOCTIAL" | "EQUINOCTIALMOD" => {
+            Some(vec!["km", "n/a", "n/a", "deg", "n/a", "n/a", "n/a"])
+        }
+        "ONSTATION" => Some(vec!["km", "n/a", "n/a", "n/a", "n/a", "deg"]),
+        "DELAUNAY" => Some(vec!["km**2/s", "km**2/s", "km**2/s", "deg", "deg", "deg"]),
+        "DELAUNAYMOD" => Some(vec!["km**0.5", "km**0.5", "km**0.5", "deg", "deg", "deg"]),
+        "POINCARE" => Some(vec![
+            "deg",
+            "km/s**0.5",
+            "km/s**0.5",
+            "km**2/s",
+            "km/s**0.5",
+            "km/s**0.5",
         ]),
         _ => None,
     }
@@ -915,25 +1484,19 @@ fn unit_matches_expected(unit: &str, expected: &str) -> bool {
         "km" => u == "km",
         "km/s" => u == "km/s",
         "km/s**2" => u == "km/s**2" || u == "km/s^2",
-        _ => false,
+        "s" => u == "s",
+        _ => u.replace('^', "**") == expected,
     }
 }
 
-fn parse_units_list(units: &str) -> Vec<String> {
-    let trimmed = units.trim().trim_start_matches('[').trim_end_matches(']');
-    trimmed
-        .split(|c: char| c == ',' || c.is_whitespace())
-        .filter(|s| !s.is_empty())
-        .map(|s| s.trim().to_string())
-        .collect()
+fn parse_units_list(units: &str) -> Vec<&str> {
+    parse_csv_list(units.trim().trim_start_matches('[').trim_end_matches(']'))
 }
 
-fn parse_csv_list(value: &str) -> Vec<String> {
+fn parse_csv_list(value: &str) -> Vec<&str> {
     value
         .split(|c: char| c == ',' || c.is_whitespace())
-        .map(|s| s.trim())
         .filter(|s| !s.is_empty())
-        .map(|s| s.to_string())
         .collect()
 }
 
@@ -948,6 +1511,7 @@ fn parse_csv_list(value: &str) -> Vec<String> {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct OcmBody {
+    /// The single comprehensive-message segment.
     #[serde(rename = "segment")]
     pub segment: Box<OcmSegment>,
 }
@@ -964,7 +1528,9 @@ impl crate::traits::Validate for OcmBody {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct OcmSegment {
+    /// Object identification, time system and segment interpretation.
     pub metadata: OcmMetadata,
+    /// Comprehensive data blocks interpreted using the segment metadata.
     pub data: OcmData,
 }
 
@@ -1217,6 +1783,66 @@ pub struct OcmMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub operator: Option<String>,
+    /// URL of the space object operator.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub operator_url: Option<String>,
+    /// Operator email address for non-emergencies.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub operator_email: Option<String>,
+    /// Operator phone number for non-emergencies.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub operator_phone: Option<String>,
+    /// URL of the operator automated coordination service.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub operator_automated_url: Option<String>,
+    /// Email address for emergency coordination.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub emergency_email: Option<String>,
+    /// Phone number for emergency coordination.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub emergency_phone: Option<String>,
+    /// Hours of availability of the emergency contact.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub emergency_availability: Option<String>,
+    /// Email address of the primary external SSA service provider.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub ssa_email: Option<String>,
+    /// Emergency phone number of the primary external SSA service provider.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub ssa_phone: Option<String>,
+    /// URL of the space object owner.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.4.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub owner_url: Option<String>,
     /// Free-text field containing the owner of the space object.
     ///
     /// **Examples**: SIRIUS
@@ -1246,16 +1872,25 @@ pub struct OcmMetadata {
     /// Specification of the type of object. Select from the accepted set of values indicated
     /// in annex B, subsection B11.
     ///
+    /// The value is an open token from the SANA Object Types registry and is preserved as
+    /// supplied. KVN input normalizes the five XSD values case-insensitively, with `_` equal to a
+    /// blank (`ROCKET_BODY` reads as `ROCKET BODY`); XML input and output accept only the XSD
+    /// `objectDescriptionType` enumeration.
+    ///
     /// **Examples**: PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, OTHER
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub object_type: Option<ObjectDescription>,
+    #[builder(into)]
+    pub object_type: Option<String>,
     /// Time system for all absolute time stamps in this OCM including EPOCH_TZERO. Select from
     /// the accepted set of values indicated in annex B, subsection B3. This field is used by
     /// all OCM data blocks. If the SCLK timescale is selected, then 'EPOCH_TZERO' shall be
     /// interpreted as the spacecraft clock epoch and both SCLK_OFFSET_AT_EPOCH and
     /// SCLK_SEC_PER_SI_SEC shall be supplied.
+    ///
+    /// **Default**: UTC. KVN input omitting the keyword adopts it (ODM 6.2.1.3); XML requires
+    /// the element.
     ///
     /// **Examples**: UTC
     ///
@@ -1422,6 +2057,14 @@ pub struct OcmMetadata {
     pub celestial_source: Option<String>,
 }
 
+/// XSD `positiveInteger` counts, adopted in every notation so a valid model always converts.
+fn require_positive_count(field: &'static str, count: Option<u64>) -> Result<()> {
+    if count == Some(0) {
+        return Err(ValidationError::invalid_value(field, "0", "a positive integer").into());
+    }
+    Ok(())
+}
+
 fn validate_ocm_time_offset_units(
     field: &'static str,
     offset: &TimeOffset,
@@ -1463,6 +2106,51 @@ fn validate_ocm_metadata(metadata: &OcmMetadata) -> Result<()> {
         ("STOP_TIME", &metadata.stop_time),
         ("NEXT_LEAP_EPOCH", &metadata.next_leap_epoch),
     ])?;
+    if let Some(span) = &metadata.time_span {
+        DayInterval::validate_value(span.value, "TIME_SPAN")?;
+    }
+    if let (Some(start), Some(stop)) = (&metadata.start_time, &metadata.stop_time) {
+        if start.cmp_same_branch(stop) == Some(std::cmp::Ordering::Greater) {
+            return Err(ValidationError::invalid_value(
+                "STOP_TIME",
+                stop.as_str(),
+                "a time at or after START_TIME",
+            )
+            .into());
+        }
+        if start.kind() == EpochKind::Numeric && stop.kind() == EpochKind::Numeric {
+            let seconds = |field, epoch: &Epoch| {
+                epoch
+                    .as_str()
+                    .parse::<f64>()
+                    .ok()
+                    .filter(|value| value.is_finite())
+                    .ok_or_else(|| {
+                        ValidationError::invalid_value(
+                            field,
+                            epoch.as_str(),
+                            "a finite relative time in SI seconds",
+                        )
+                    })
+            };
+            let start = seconds("START_TIME", start)?;
+            let stop = seconds("STOP_TIME", stop)?;
+            if let Some(span) = &metadata.time_span {
+                let expected = (stop - start) / 86_400.0;
+                // Allow rounded day spans and cancellation when large relative tags are subtracted.
+                let tolerance =
+                    (1e-6_f64).max(8.0 * f64::EPSILON * start.abs().max(stop.abs()) / 86_400.0);
+                if (span.value - expected).abs() > tolerance {
+                    return Err(ValidationError::invalid_value(
+                        "TIME_SPAN",
+                        span.value.to_string(),
+                        "(STOP_TIME - START_TIME) / 86400 within the documented rounding tolerance",
+                    )
+                    .into());
+                }
+            }
+        }
+    }
     for (field, missing) in [
         ("TIME_SYSTEM", metadata.time_system.trim().is_empty()),
         ("EPOCH_TZERO", metadata.epoch_tzero.is_empty()),
@@ -1545,7 +2233,70 @@ pub struct OcmData {
     pub od: Option<OcmOdParameters>,
     /// User-defined parameters.
     #[serde(rename = "user", default, skip_serializing_if = "Option::is_none")]
-    pub user: Option<UserDefined>,
+    pub user: Option<OcmUserDefined>,
+}
+
+/// OCM user-defined parameters, including ICD-defined time or event sequences.
+///
+/// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.11.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+pub struct OcmUserDefined {
+    /// Comments and parameters in their original order; composition parameters own their rows.
+    #[serde(rename = "$value", default)]
+    pub entries: Vec<OcmUserDefinedEntry>,
+}
+
+/// One comment or named value in an ordered OCM user-defined block (ODM §6.2.11).
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum OcmUserDefinedEntry {
+    /// Comment text at this position in the block.
+    #[serde(rename = "COMMENT")]
+    Comment(String),
+    /// Named user-defined parameter at this position in the block.
+    #[serde(rename = "USER_DEFINED")]
+    Parameter(OcmUserDefinedParameter),
+}
+
+impl OcmUserDefined {
+    /// Iterate comments in source order, skipping parameters.
+    pub fn comments(&self) -> impl Iterator<Item = &String> {
+        self.entries.iter().filter_map(|entry| match entry {
+            OcmUserDefinedEntry::Comment(value) => Some(value),
+            _ => None,
+        })
+    }
+
+    /// Iterate parameters in source order, skipping comments.
+    pub fn parameters(&self) -> impl Iterator<Item = &OcmUserDefinedParameter> {
+        self.entries.iter().filter_map(|entry| match entry {
+            OcmUserDefinedEntry::Parameter(value) => Some(value),
+            _ => None,
+        })
+    }
+
+    /// Mutably iterate parameters while retaining comment positions.
+    pub fn parameters_mut(&mut self) -> impl Iterator<Item = &mut OcmUserDefinedParameter> {
+        self.entries.iter_mut().filter_map(|entry| match entry {
+            OcmUserDefinedEntry::Parameter(value) => Some(value),
+            _ => None,
+        })
+    }
+}
+
+/// A scalar OCM user-defined parameter or an ICD-defined sequence composition and its rows.
+///
+/// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.11.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct OcmUserDefinedParameter {
+    /// Parameter name without the USER_DEFINED_ prefix.
+    #[serde(rename = "@parameter")]
+    pub parameter: String,
+    /// Scalar value, or comma-delimited composition for `COMPOSITION_<sequence ID>`.
+    #[serde(rename = "$value")]
+    pub value: String,
+    /// Opaque ICD-defined sequence rows, in producer order. Empty for scalar parameters.
+    #[serde(skip)]
+    pub records: Vec<String>,
 }
 
 //----------------------------------------------------------------------
@@ -1606,11 +2357,15 @@ pub struct OcmTrajState {
     /// navigation systems or GNSS data. d) 'SIMULATED' for generic simulations, future mission
     /// design studies, and optimization studies. e) 'OTHER' for other bases of this data.
     ///
+    /// KVN and the model keep the value open; XML input and output accept only the XSD
+    /// `trajBasisType` enumeration of the five suggested values.
+    ///
     /// **Examples**: PREDICTED
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub traj_basis: Option<TrajBasis>,
+    #[builder(into)]
+    pub traj_basis: Option<String>,
     /// Free-text field containing the identification number for the telemetry dataset, orbit
     /// determination, navigation solution, or simulation upon which this trajectory state time
     /// history block is based. When a matching orbit determination block accompanies this
@@ -1663,6 +2418,9 @@ pub struct OcmTrajState {
     /// frame origins, this field is a free-text descriptor which may draw upon other naming
     /// conventions and sources.
     ///
+    /// **Default**: EARTH. KVN input omitting the keyword adopts it (ODM 6.2.1.3); XML
+    /// requires the element.
+    ///
     /// **Examples**: EARTH, MOON, ISS, EROS
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
@@ -1671,19 +2429,23 @@ pub struct OcmTrajState {
     /// Reference frame of the trajectory state time history. Select from the accepted set of
     /// values indicated in annex B, subsection B4.
     ///
+    /// **Default**: ICRF3. KVN input omitting the keyword adopts it (ODM 6.2.1.3); XML
+    /// requires the element.
+    ///
     /// **Examples**: ICRF3, J2000
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[builder(into)]
     pub traj_ref_frame: String,
     /// Epoch of the orbit data reference frame, if not intrinsic to the definition of the
-    /// reference frame. (See 7.5.10 for formatting rules.)
+    /// reference frame. Relative (seconds from EPOCH_TZERO) or absolute, as the XSD
+    /// `epochType` allows. (See 7.5.10 for formatting rules.)
     ///
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub traj_frame_epoch: Option<CalendarEpoch>,
+    pub traj_frame_epoch: Option<Epoch>,
     /// Start time of USEABLE time span covered by ephemeris data immediately following this
     /// metadata block. (For format specification, see 7.5.10.) NOTES 1. This optional keyword
     /// allows the message creator to introduce fictitious (but numerically smooth) data nodes
@@ -1736,6 +2498,9 @@ pub struct OcmTrajState {
     pub orb_revnum_basis: Option<RevNumBasis>,
     /// Specifies the trajectory state type; selected per annex B, subsection B7.
     ///
+    /// **Default**: CARTPV. KVN input omitting the keyword adopts it (ODM 6.2.1.3); XML
+    /// requires the element.
+    ///
     /// **Examples**: CARTP, CARTPV
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
@@ -1778,9 +2543,12 @@ pub struct OcmTrajState {
     pub traj_lines: Vec<TrajLine>,
 }
 
+/// One trajectory record in the layout and units selected by TRAJ_TYPE (ODM §6.2.5).
 #[derive(Debug, PartialEq, Clone)]
 pub struct TrajLine {
+    /// Record time tag, interpreted using EPOCH_TZERO and TIME_SYSTEM.
     pub epoch: Epoch,
+    /// Record components after the time tag, in the block metadata layout and units.
     pub values: Vec<f64>,
 }
 
@@ -1883,6 +2651,9 @@ pub struct OcmPhysicalDescription {
     /// transformation defined in annex F, subsection F1. Select from the accepted set of
     /// values indicated in B, subsections B4 and B5. This keyword shall be provided if
     /// OEB_Q1,2,3,4 are specified.
+    ///
+    /// **Default**: RSW_ROTATING (table 6-5). An omitted value stays absent in the model and
+    /// output; readers apply the default when interpreting the quaternion.
     ///
     /// **Examples**: ITRF1997
     ///
@@ -2260,6 +3031,13 @@ pub struct OcmPhysicalDescription {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmCovarianceMatrix {
+    /// Corresponding trajectory identifier; required when multiple trajectory or covariance
+    /// blocks are supplied.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Technical Corrigendum 1 (June 2026), Section 6.2.7.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub traj_id: Option<String>,
     /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
     /// covariance time history section only immediately after the COV_START keyword; see 7.8
     /// for comment formatting rules).
@@ -2310,11 +3088,15 @@ pub struct OcmCovarianceMatrix {
     /// Monte Carlo) estimations, future mission design studies, and optimization studies. e)
     /// 'OTHER' for other bases of this data.
     ///
+    /// KVN and the model keep the value open; XML input and output accept only the XSD
+    /// `covBasisType` enumeration of the five suggested values.
+    ///
     /// **Examples**: PREDICTED, EMPIRICAL, DETERMINED, SIMULATED, OTHER
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cov_basis: Option<CovBasis>,
+    #[builder(into)]
+    pub cov_basis: Option<String>,
     /// Free-text field containing the identification number for the orbit determination,
     /// navigation solution, or simulation upon which this covariance time history block is
     /// based. When a matching orbit determination block accompanies this covariance time
@@ -2329,19 +3111,23 @@ pub struct OcmCovarianceMatrix {
     /// Reference frame of the covariance time history. Select from the accepted set of values
     /// indicated in annex B, subsection B4 and B5.
     ///
-    /// **Examples**: TNW_INERTIA, J2000
+    /// **Default**: TNW_INERTIAL. KVN input omitting the keyword adopts it (ODM 6.2.1.3); XML
+    /// requires the element.
+    ///
+    /// **Examples**: TNW_INERTIAL, J2000
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[builder(into)]
     pub cov_ref_frame: String,
     /// Epoch of the covariance data reference frame, if not intrinsic to the definition of the
-    /// reference frame. (See 7.5.10 for formatting rules.)
+    /// reference frame. Relative (seconds from EPOCH_TZERO) or absolute, as the XSD
+    /// `epochType` allows. (See 7.5.10 for formatting rules.)
     ///
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cov_frame_epoch: Option<CalendarEpoch>,
+    pub cov_frame_epoch: Option<Epoch>,
     /// Minimum scale factor to apply to this covariance data to achieve realism.
     ///
     /// **Examples**: 0.5
@@ -2368,6 +3154,9 @@ pub struct OcmCovarianceMatrix {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cov_confidence: Option<Percentage>,
     /// Indicates covariance composition. Select from annex B, subsections B7 and B8.
+    ///
+    /// **Default**: CARTPV. KVN input omitting the keyword adopts it (ODM 6.2.1.3); XML
+    /// requires the element.
     ///
     /// **Examples**: CARTP, CARTPV, ADBARV
     ///
@@ -2407,9 +3196,12 @@ pub struct OcmCovarianceMatrix {
     pub cov_lines: Vec<CovLine>,
 }
 
+/// One covariance record in COV_TYPE and COV_ORDERING layout (ODM §6.2.7).
 #[derive(Debug, PartialEq, Clone)]
 pub struct CovLine {
+    /// Record time tag, interpreted using EPOCH_TZERO and TIME_SYSTEM.
     pub epoch: Epoch,
+    /// Record components after the time tag, in the block metadata layout and units.
     pub values: Vec<f64>,
 }
 
@@ -2515,15 +3307,19 @@ pub struct OcmManeuverParameters {
     /// subsections B4 and B5. The reference frame must be the same for all data elements
     /// within a given maneuver time history block.
     ///
+    /// **Default**: TNW_INERTIAL. KVN input omitting the keyword adopts it (ODM 6.2.1.3); XML
+    /// requires the element.
+    ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[builder(into)]
     pub man_ref_frame: String,
     /// Epoch of the maneuver data reference frame, if not intrinsic to the definition of the
-    /// reference frame. (See 7.5.10 for formatting rules.)
+    /// reference frame. Relative (seconds from EPOCH_TZERO) or absolute, as the XSD
+    /// `epochType` allows. (See 7.5.10 for formatting rules.)
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub man_frame_epoch: Option<CalendarEpoch>,
+    pub man_frame_epoch: Option<Epoch>,
     /// Origin of maneuver gravitational assist body, which may be a natural solar system body
     /// (planets, asteroids, comets, and natural satellites), including any planet barycenter
     /// or the solar system barycenter. (See annex B, subsection B2, for acceptable
@@ -2694,9 +3490,12 @@ pub struct OcmManeuverParameters {
     pub man_lines: Vec<ManLine>,
 }
 
+/// One maneuver record in MAN_COMPOSITION order (ODM §6.2.8).
 #[derive(Debug, PartialEq, Clone)]
 pub struct ManLine {
+    /// Record time tag, interpreted using EPOCH_TZERO and TIME_SYSTEM.
     pub epoch: Epoch,
+    /// Record components after the time tag, in the block metadata layout and units.
     pub values: Vec<String>,
 }
 
@@ -2806,10 +3605,14 @@ pub struct OcmPerturbations {
     pub reduction_theory: Option<String>,
     /// Name of the albedo model.
     ///
+    /// **Examples**: STK
+    ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub albedo_model: Option<String>,
-    /// Size of the albedo grid.
+    /// Number of grid points used in the albedo model.
+    ///
+    /// **Examples**: 100
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2823,29 +3626,35 @@ pub struct OcmPerturbations {
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shadow_model: Option<String>,
-    /// List of bodies included in shadow calculations (value(s) to be drawn from the SANA
-    /// registry list of Orbit Centers at <https://sanaregistry.org/r/orbit_centers>).
+    /// Comma-separated list of planetary bodies for which SRP shadowing is modeled, selected
+    /// from annex B for CENTER_NAME values (SANA Orbit Centers registry at
+    /// <https://sanaregistry.org/r/orbit_centers>).
     ///
     /// **Examples**: EARTH, MOON
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shadow_bodies: Option<String>,
-    /// Name of the Solar Radiation Pressure (SRP) model.
+    /// Name of the Solar Radiation Pressure (SRP) model. This is a free-text field, so if the
+    /// examples are insufficient, others may be used.
     ///
-    /// **Examples**: CANNONBALL, FLAT_PLATE, BOX_WING
+    /// **Examples**: GPS_ROCK, BOX_WING, CANNONBALL, COD
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub srp_model: Option<String>,
-    /// Space weather data source.
+    /// Free-text field specifying the source and version of the Space Weather data used in the
+    /// creation of this message. Multiple space weather sources can be specified in a
+    /// comma-delimited fashion.
     ///
-    /// **Examples**: NOAA
+    /// **Examples**: CELESTRAK
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sw_data_source: Option<String>,
-    /// Epoch of the space weather data.
+    /// Epoch of the Space Weather data.
+    ///
+    /// **Examples**: 2001-11-08T00:00:00
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2860,71 +3669,88 @@ pub struct OcmPerturbations {
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sw_interp_method: Option<String>,
-    /// Fixed geomagnetic Kp index.
+    /// A fixed (time invariant) value of the planetary geomagnetic index Kp used to override the normal
+    /// time-varying values (e.g., obtained from SW_DATA_SOURCE).
+    ///
+    /// **Units**: nT
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_geomag_kp: Option<Geomag>,
-    /// Fixed geomagnetic Ap index.
+    /// A fixed (time invariant) value of the geomagnetic index ap used to override the normal
+    /// time-varying values (e.g., obtained from SW_DATA_SOURCE).
+    ///
+    /// **Units**: nT
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_geomag_ap: Option<Geomag>,
-    /// Fixed geomagnetic Dst index.
+    /// A fixed (time invariant) value of the planetary geomagnetic index Dst used to override the normal
+    /// time-varying values (e.g., obtained from SW_DATA_SOURCE).
+    ///
+    /// **Units**: nT
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_geomag_dst: Option<Geomag>,
-    /// Fixed F10.7 solar flux.
+    /// A fixed (time invariant) value of the daily solar flux proxy F10.7 used to override
+    /// the normal time-varying daily F10.7 values (e.g., obtained from SW_DATA_SOURCE).
     ///
     /// **Units**: SFU
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_f10p7: Option<SolarFlux>,
-    /// Fixed 81-day average F10.7 solar flux.
+    /// A fixed (time invariant) value of the solar flux proxy F10.7 used to override the
+    /// normal time-varying averaged F10.7 values (e.g., obtained from SW_DATA_SOURCE).
     ///
     /// **Units**: SFU
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_f10p7_mean: Option<SolarFlux>,
-    /// Fixed M10.7 solar flux.
+    /// A fixed (time invariant) value of the daily solar flux proxy M10.7 used to override
+    /// the normal time-varying daily M10.7 values (e.g., obtained from SW_DATA_SOURCE).
     ///
     /// **Units**: SFU
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_m10p7: Option<SolarFlux>,
-    /// Fixed 81-day average M10.7 solar flux.
+    /// A fixed (time invariant) value of the solar flux proxy M10.7 used to override the
+    /// normal time-varying averaged M10.7 values (e.g., obtained from SW_DATA_SOURCE).
     ///
     /// **Units**: SFU
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_m10p7_mean: Option<SolarFlux>,
-    /// Fixed S10.7 solar flux.
+    /// A fixed (time invariant) value of the daily solar flux proxy S10.7 used to override
+    /// the normal time-varying daily S10.7 values (e.g., obtained from SW_DATA_SOURCE).
     ///
     /// **Units**: SFU
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_s10p7: Option<SolarFlux>,
-    /// Fixed 81-day average S10.7 solar flux.
+    /// A fixed (time invariant) value of the solar flux proxy S10.7 used to override the
+    /// normal time-varying averaged S10.7 values (e.g., obtained from SW_DATA_SOURCE).
     ///
     /// **Units**: SFU
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_s10p7_mean: Option<SolarFlux>,
-    /// Fixed Y10.7 solar flux.
+    /// A fixed (time invariant) value of the daily solar flux proxy Y10.7 used to override
+    /// the normal time-varying daily Y10.7 values (e.g., obtained from SW_DATA_SOURCE).
     ///
     /// **Units**: SFU
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed_y10p7: Option<SolarFlux>,
-    /// Fixed 81-day average Y10.7 solar flux.
+    /// A fixed (time invariant) value of the solar flux proxy Y10.7 used to override the
+    /// normal time-varying averaged Y10.7 values (e.g., obtained from SW_DATA_SOURCE).
     ///
     /// **Units**: SFU
     ///
@@ -2941,49 +3767,54 @@ pub struct OcmPerturbations {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OcmOdParameters {
-    /// Comments (see 7.8 for formatting rules).
+    /// Comments (a contiguous set of one or more comment lines may be provided in the OCM
+    /// Orbit Determination Data section only immediately after the OD_START keyword; see 7.8
+    /// for comment formatting rules).
     ///
-    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.10.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default)]
     pub comment: Vec<String>,
-    /// Identification number for this orbit determination.
+    /// Identification number for this orbit determination. Must not be empty. When these OD
+    /// settings generated a trajectory, covariance, or maneuver history, OD_ID should match its
+    /// TRAJ_BASIS_ID, COV_BASIS_ID, or MAN_BASIS_ID (6.2.10.6).
     ///
-    /// **Examples**: 1
+    /// **Examples**: OD_20160402
     ///
-    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.10.
     #[builder(into)]
     pub od_id: String,
-    /// Optional identification number for the previous orbit determination.
+    /// Optional identification number for the previous orbit determination. If this orbit
+    /// determination is the first one performed on this object, OD_PREV_ID should be omitted.
     ///
-    /// **Examples**: 0
+    /// **Examples**: OD_20160401
     ///
-    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.10.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub od_prev_id: Option<String>,
-    /// Type of orbit determination method used to produce the orbit estimate.
+    /// Type of orbit determination method used to produce the orbit estimate. Free text, must
+    /// not be empty; the book suggests the method, a colon, and the OD tool. Common methods are
+    /// Batch Weighted Least Squares (BWLS), Extended Kalman Filter (EKF), Sequential Filter
+    /// (SF), Square Root Information Filter (SRIF), and Sequential Simultaneous Estimation
+    /// Method (SSEM).
     ///
-    /// **Examples**: LEAST_SQUARES, KALMAN_FILTER
+    /// **Examples**: BWLS: BAHN, BWLS: ODIN, SF: ODTK
     ///
-    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.10.
     #[builder(into)]
     pub od_method: String,
     /// Relative or absolute time tag of the orbit determination solved-for state in the selected OCM
     /// time system recorded by the TIME_SYSTEM keyword.
     ///
-    /// **Examples**: 2000-01-01T12:00:00Z
+    /// **Examples**: 2001-11-06T11:17:33, 27854.239
     ///
-    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
+    /// **CCSDS Reference**: 502.0-B-3, Section 6.2.10.
     pub od_epoch: Epoch,
-    /// Days elapsed between first accepted observation and OD_EPOCH.
-    ///
-    /// **Examples**: 1.5
-    ///
-    /// **Units**: d
-    ///
     /// Days elapsed between first accepted observation and OD_EPOCH. NOTE—May be positive or
     /// negative.
+    ///
+    /// **Examples**: 3.5
     ///
     /// **Units**: d
     ///
@@ -3139,9 +3970,8 @@ pub struct OcmOdParameters {
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.10.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sensors: Option<String>,
-    /// (Useful/valid only for Batch OD systems.) The weighted RMS residual ratio, defined as:
-    /// .. math:: \text{Weighted RMS} = \sqrt{\frac{\sum_{i=1}^{N} w_i(y_i - \hat{y}_i)^2}{N}}
-    /// Where yi is the ith observation measurement, ŷi is the current estimate of yi, wi =
+    /// (Useful/valid only for Batch OD systems.) The weighted RMS residual ratio, defined as
+    /// `sqrt(sum_{i=1..N} w_i (y_i - ŷ_i)^2 / N)`, where yi is the ith observation measurement, ŷi is the current estimate of yi, wi =
     /// 1/σi² is the weight (sigma) associated with the measurement at the ith time and N is
     /// the number of observations. This is a value that can generally identify the quality of
     /// the most recent vector update and is used by the analyst in evaluating the OD process.
@@ -3166,10 +3996,11 @@ pub struct OcmOdParameters {
 impl OcmPerturbations {
     fn validate(&self) -> Result<()> {
         crate::validation::epoch_precision(&[("SW_DATA_EPOCH", &self.sw_data_epoch)])?;
-        // GM is `gmType`, a `positiveDouble`.
+        // GM is `gmType`, a `positiveDouble`, adopted in every notation.
         if let Some(value) = &self.gm {
-            Gm::validate_value(value.value, "GM")?;
+            Gm::validate_xml_value(value.value, "GM")?;
         }
+        require_positive_count("ALBEDO_GRID_SIZE", self.albedo_grid_size)?;
         // `positionTypeUO`, `angleRateType`, `geomagType`, and `solarFluxType` are plain doubles.
         for (field, value) in [
             (
@@ -3232,17 +4063,6 @@ impl OcmPerturbations {
         if let Some(v) = self.oblate_flattening {
             require_positive(v, "OBLATE_FLATTENING")?;
         }
-        if let Some(v) = self.albedo_grid_size {
-            if v == 0 {
-                return Err(ValidationError::OutOfRange {
-                    name: "ALBEDO_GRID_SIZE".into(),
-                    value: v.to_string(),
-                    expected: ">= 1".into(),
-                    line: None,
-                }
-                .into());
-            }
-        }
         Ok(())
     }
 }
@@ -3250,7 +4070,12 @@ impl OcmPerturbations {
 impl OcmOdParameters {
     fn validate(&self) -> Result<()> {
         crate::validation::epoch_precision(&[("OD_EPOCH", &self.od_epoch)])?;
-        for (name, val) in [
+        for (field, value) in [("OD_ID", &self.od_id), ("OD_METHOD", &self.od_method)] {
+            if value.trim().is_empty() {
+                return Err(ValidationError::missing_required("OD", field).into());
+            }
+        }
+        for (field, count) in [
             ("OBS_AVAILABLE", self.obs_available),
             ("OBS_USED", self.obs_used),
             ("TRACKS_AVAILABLE", self.tracks_available),
@@ -3259,19 +4084,8 @@ impl OcmOdParameters {
             ("CONSIDER_N", self.consider_n),
             ("SENSORS_N", self.sensors_n),
         ] {
-            if let Some(v) = val {
-                if v == 0 {
-                    return Err(ValidationError::OutOfRange {
-                        name: name.into(),
-                        value: v.to_string(),
-                        expected: ">= 1".into(),
-                        line: None,
-                    }
-                    .into());
-                }
-            }
+            require_positive_count(field, count)?;
         }
-
         // GDOP and WEIGHTED_RMS are `nonNegativeDouble`; NaN and both infinities are excluded
         // by the shared predicate rather than by the sign comparison alone.
         for (name, val) in [
@@ -3397,7 +4211,7 @@ mod tests {
         traj.traj_lines.clear();
         assert_diagnostic(
             traj.validate(),
-            "Missing required field: trajLine in block TRAJ",
+            "Missing required field: TRAJ data line in block TRAJ",
         );
 
         // 4. OcmCovarianceMatrix::cov_lines empty
@@ -3407,7 +4221,7 @@ mod tests {
             .build();
         assert_diagnostic(
             cov.validate(),
-            "Missing required field: covLine in block COV",
+            "Missing required field: COV data line in block COV",
         );
 
         // 5. OcmManeuverParameters::man_lines empty
@@ -3419,7 +4233,7 @@ mod tests {
             .build();
         assert_diagnostic(
             man.validate(),
-            "Missing required field: manLine in block MAN",
+            "Missing required field: MAN data line in block MAN",
         );
 
         // 6. RevNumBasis::One coverage
@@ -3450,11 +4264,11 @@ mod tests {
             .traj_lines(vec![
                 TrajLine {
                     epoch: "1".parse().unwrap(),
-                    values: vec![1.0],
+                    values: vec![1.0; 6],
                 },
                 TrajLine {
                     epoch: "+1.0".parse().unwrap(),
-                    values: vec![2.0],
+                    values: vec![2.0; 6],
                 },
             ])
             .build();
@@ -3497,11 +4311,11 @@ mod tests {
             .traj_lines(vec![
                 TrajLine {
                     epoch: "2000-01-01T00:00:00".parse().unwrap(),
-                    values: vec![1.0],
+                    values: vec![1.0; 6],
                 },
                 TrajLine {
                     epoch: "1.0".parse().unwrap(),
-                    values: vec![2.0],
+                    values: vec![2.0; 6],
                 },
             ])
             .build();
@@ -3516,11 +4330,17 @@ mod tests {
             .cov_lines(vec![
                 CovLine {
                     epoch: "1.0".parse().unwrap(),
-                    values: vec![1.0],
+                    values: vec![
+                        1., 0., 1., 0., 0., 1., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0.,
+                        0., 1.,
+                    ],
                 },
                 CovLine {
                     epoch: "2000-01-01T00:00:01".parse().unwrap(),
-                    values: vec![2.0],
+                    values: vec![
+                        1., 0., 1., 0., 0., 1., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0.,
+                        0., 1.,
+                    ],
                 },
             ])
             .build();
@@ -3537,7 +4357,10 @@ mod tests {
             .cov_type("CARTPV")
             .cov_lines(vec![CovLine {
                 epoch: "2000-01-01T00:00:00".parse().unwrap(),
-                values: vec![1.0],
+                values: vec![
+                    1., 0., 1., 0., 0., 1., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0.,
+                    1.,
+                ],
             }])
             .build();
         assert!(cov.validate().is_ok());
@@ -3608,9 +4431,11 @@ mod tests {
         assert!(error.contains("DC_BODY_TRIGGER"));
 
         man.dc_body_trigger = Some(Vec3Double::new(0.0, 1.0, 0.0));
+        // Table 6-7 gives duty-cycle epochs both forms independently of MAN_COMPOSITION, and
+        // mixed forms are not ordered (that would need time arithmetic).
         man.dc_win_open = Some("2023-01-01T00:00:00".parse().unwrap());
-        let error = man.validate().unwrap_err().to_string();
-        assert!(error.contains("DC_WIN_OPEN"));
+        man.validate()
+            .expect("an absolute DC_WIN_OPEN may accompany relative maneuver lines");
 
         man.dc_win_open = Some("0".parse().unwrap());
         // ODM permits any finite phase angle, so 360 is semantically valid; the XSD's
@@ -3674,7 +4499,7 @@ mod tests {
         man.dc_exec_stop = Some("2023-01-01T00:50:00".parse().unwrap());
         man.dc_max_cycles = Some(0);
         let error = man.validate().unwrap_err().to_string();
-        assert!(error.contains("DC_MAX_CYCLES"));
+        assert!(error.contains("DC_MAX_CYCLES"), "{error}");
     }
 
     #[test]
@@ -3710,13 +4535,16 @@ mod tests {
             .build();
         traj.traj_lines.push(TrajLine {
             epoch: "2000-01-01T00:00:00".parse().unwrap(),
-            values: vec![1.0],
+            values: vec![1.0; 6],
         });
         traj.orb_revnum = Some(-1.0);
 
         assert!(traj.validate().is_err());
 
         traj.orb_revnum = Some(0.0);
+        let error = traj.validate().unwrap_err().to_string();
+        assert!(error.contains("ORB_REVNUM_BASIS"), "{error}");
+        traj.orb_revnum_basis = Some(RevNumBasis::Zero);
         assert!(traj.validate().is_ok());
     }
 }

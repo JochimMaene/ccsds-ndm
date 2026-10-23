@@ -12,6 +12,46 @@ use std::borrow::Cow;
 mod kvn;
 mod xml;
 
+pub(crate) fn validate_xml_spacecraft_parameters(
+    version: &str,
+    parameters: Option<&SpacecraftParameters>,
+) -> Result<()> {
+    if version == "2.0" {
+        if let Some(parameters) = parameters {
+            for (field, present) in [
+                ("MASS", parameters.mass.is_some()),
+                ("SOLAR_RAD_AREA", parameters.solar_rad_area.is_some()),
+                ("SOLAR_RAD_COEFF", parameters.solar_rad_coeff.is_some()),
+                ("DRAG_AREA", parameters.drag_area.is_some()),
+                ("DRAG_COEFF", parameters.drag_coeff.is_some()),
+            ] {
+                if !present {
+                    return Err(ValidationError::missing_required(
+                        "XML 2.0 spacecraft parameters",
+                        field,
+                    )
+                    .at_path("body.segment.data.spacecraft_parameters")
+                    .into());
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Mandatory OPM/OMM strings must carry a value (ODM 7.5.1). An empty XML element satisfies
+/// `xsd:string` but not the book, so it is reported as empty rather than as missing.
+pub(crate) fn require_text(parent: &'static str, fields: &[(&'static str, &str)]) -> Result<()> {
+    match fields.iter().find(|(_, value)| value.trim().is_empty()) {
+        Some((field, _)) => Err(empty_value(field).at_field_in(parent).into()),
+        None => Ok(()),
+    }
+}
+
+fn empty_value(field: &'static str) -> ValidationError {
+    ValidationError::empty_value(field)
+}
+
 //----------------------------------------------------------------------
 // Root OPM Structure
 //----------------------------------------------------------------------
@@ -28,11 +68,15 @@ mod xml;
 #[derive(Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "opm")]
 pub struct Opm {
+    /// Message creation information and optional classification (ODM section 7.2).
     pub header: OdmHeader,
+    /// The single object's metadata and orbital data.
     pub body: OpmBody,
+    /// Fixed XML root identifier; MESSAGE_ID carries the message identity.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_OPM_VERS".to_string()))]
     pub id: Option<String>,
+    /// Supported edition, `2.0` or `3.0`.
     #[serde(rename = "@version")]
     #[builder(default = "3.0".to_string(), into)]
     pub version: String,
@@ -48,10 +92,9 @@ impl crate::traits::Validate for Opm {
             ),
             "",
         )?;
-        crate::versioning::validate_opm_edition(self)?;
         self.header.validate()?;
         self.body.validate()?;
-        Ok(())
+        crate::versioning::validate_opm_edition(self)
     }
 }
 
@@ -61,8 +104,7 @@ impl Ndm for Opm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::detect::without_utf8_bom(kvn);
-        Self::from_kvn_strict(kvn)
+        Self::from_kvn_strict(crate::detect::without_utf8_bom(kvn))
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -123,6 +165,7 @@ impl From<&'static str> for FieldPath {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct OpmBody {
+    /// Metadata and orbital data for the single object.
     #[serde(rename = "segment")]
     pub segment: OpmSegment,
 }
@@ -139,7 +182,9 @@ impl crate::traits::Validate for OpmBody {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct OpmSegment {
+    /// Object identity, center, reference frame, and time system.
     pub metadata: OpmMetadata,
+    /// Orbital elements and optional physical, covariance, and user-defined data.
     pub data: OpmData,
 }
 
@@ -233,47 +278,16 @@ pub struct OpmMetadata {
 impl crate::traits::Validate for OpmMetadata {
     fn validate(&self) -> Result<()> {
         crate::validation::epoch_precision(&[("REF_FRAME_EPOCH", &self.ref_frame_epoch)])?;
-        if self.object_name.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "OPM Metadata".into(),
-                field: "OBJECT_NAME".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.object_id.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "OPM Metadata".into(),
-                field: "OBJECT_ID".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.center_name.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "OPM Metadata".into(),
-                field: "CENTER_NAME".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.ref_frame.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "OPM Metadata".into(),
-                field: "REF_FRAME".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.time_system.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "OPM Metadata".into(),
-                field: "TIME_SYSTEM".into(),
-                line: None,
-            }
-            .into());
-        }
-        Ok(())
+        require_text(
+            "body.segment.metadata",
+            &[
+                ("OBJECT_NAME", &self.object_name),
+                ("OBJECT_ID", &self.object_id),
+                ("CENTER_NAME", &self.center_name),
+                ("REF_FRAME", &self.ref_frame),
+                ("TIME_SYSTEM", &self.time_system),
+            ],
+        )
     }
 }
 
@@ -534,7 +548,9 @@ impl crate::traits::Validate for KeplerianElements {
                 .into());
             }
         }
+        // The XSD's positive `gmType` applies in every notation, so a valid model always converts.
         Gm::validate_value(self.gm.value, "GM")?;
+        Gm::validate_xml_value(self.gm.value, "GM")?;
         if self.true_anomaly.is_some() == self.mean_anomaly.is_some() {
             let selected = [
                 ("TRUE_ANOMALY", self.true_anomaly.is_some()),
@@ -620,16 +636,10 @@ impl Validate for ManeuverParameters {
     fn validate(&self) -> Result<()> {
         crate::validation::epoch_precision(&[("MAN_EPOCH_IGNITION", &self.man_epoch_ignition)])?;
         if self.man_epoch_ignition.is_empty() {
-            return Err(ValidationError::missing_required(
-                "Maneuver Parameters",
-                "MAN_EPOCH_IGNITION",
-            )
-            .into());
+            return Err(empty_value("MAN_EPOCH_IGNITION").into());
         }
         if self.man_ref_frame.trim().is_empty() {
-            return Err(
-                ValidationError::missing_required("Maneuver Parameters", "MAN_REF_FRAME").into(),
-            );
+            return Err(empty_value("MAN_REF_FRAME").into());
         }
         let duration = self.man_duration.value;
         if !duration.is_finite() {

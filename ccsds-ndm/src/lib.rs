@@ -16,7 +16,7 @@
 //!   CDM, TDM, RDM, AEM, APM, and ACM messages. Model availability does not by itself establish
 //!   conformance for every edition, notation, or operation.
 //! - **Format Agnostic**: Seamlessly convert between KVN and XML formats.
-//! - **Type Safety**: Strictly typed units (e.g., `km`, `deg`, `s`) prevent physical unit errors.
+//! - **Type Safety**: Typed quantities retain supported unit annotations (e.g., `km`, `deg`, `s`); validators check field-specific units.
 //! - **High Performance Parsing**: Utilizes `winnow` and `quick-xml` for efficient, low-allocation parsing.
 //! - **Ergonomic Construction**: Uses the builder pattern (via the [`bon`](https://docs.rs/bon) crate) for safe and easy message creation.
 //! - **Validation Infrastructure**: Shared syntax and semantic validation for CCSDS NDM workflows.
@@ -27,7 +27,7 @@
 //!
 //! - **[`Ndm`] Trait**: The unifying interface for all message types. It defines the standard `to_kvn`, `from_kvn`, `to_xml`, and `from_xml` methods.
 //! - **[`Message`] Enum**: A container that holds any valid NDM. This is the primary return type when parsing files with unknown contents (auto-detection).
-//! - **Strong Typing**: All physical quantities (Distance, Velocity, Mass, etc.) are wrapped in the [`UnitValue`](types::UnitValue) struct, ensuring that units are always tracked and validated.
+//! - **Strong Typing**: Many physical quantities use [`UnitValue`](types::UnitValue) wrappers with optional unit annotations; unitless history rows use the fixed units defined by their message.
 //!
 //! ## Quick Start
 //!
@@ -55,15 +55,17 @@
 //!
 //! If you know the message type in advance, you can parse it directly:
 //!
-//! ```no_run
+//! ```
 //! use ccsds_ndm::messages::opm::Opm;
 //! use ccsds_ndm::Ndm;
 //!
-//! // Parses strict KVN for OPM
-//! let opm = Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...").unwrap();
+//! // Parse the complete OPM fixture shipped with this crate.
+//! let input = include_str!("../data/kvn/opm_g1.kvn");
+//! let opm = Opm::from_kvn(input).unwrap();
 //! ```
 //!
-//! Parsing is strict.
+//! Parsing validates structure and semantics while accepting documented lossless producer deviations.
+//! Generation validates the model and the target notation before emitting canonical output.
 //!
 //! ### 3. Generate a message using the Builder Pattern
 //!
@@ -134,24 +136,30 @@
 //! Complete messages are parsed and generated through [`Ndm`]; notation-specific
 //! parser and writer mechanics remain internal.
 
+#![warn(missing_docs)]
+
 pub mod common;
 pub mod conversion;
+/// Notation and message-family detection without requiring a known message type.
 pub mod detect;
+/// Structured parse, validation, generation and I/O errors.
 pub mod error;
 mod fsutil;
 mod generation;
 pub(crate) mod kvn;
 pub mod messages;
 mod traits;
+/// Shared epoch, numeric, unit and vocabulary types.
 pub mod types;
 mod utils;
+/// Message-family identifiers and common validation rules.
 pub mod validation;
 pub mod versioning;
 pub(crate) mod xml;
 
 pub use conversion::{convert, convert_file};
 pub use detect::Notation;
-use error::{CcsdsNdmError, Result};
+use error::Result;
 pub(crate) use kvn::parser::parse_block;
 use std::fs;
 use std::io::Write;
@@ -165,10 +173,11 @@ pub use traits::{Ndm, Validate};
 ///
 /// # Example
 ///
-/// ```no_run
+/// ```
 /// use ccsds_ndm::{from_str, Message};
 ///
-/// let ndm = from_str("CCSDS_OPM_VERS = 3.0\n...").unwrap();
+/// let input = include_str!("../data/kvn/opm_g1.kvn");
+/// let ndm = from_str(input).unwrap();
 ///
 /// match ndm {
 ///     Message::Opm(opm) => println!("Got OPM"),
@@ -212,6 +221,24 @@ pub enum Message {
     /// Combined Instantiation NDM - container for multiple messages.
     #[serde(rename = "ndm")]
     Ndm(messages::ndm::CombinedNdm),
+}
+
+impl traits::Validate for Message {
+    fn validate(&self) -> Result<()> {
+        match self {
+            Self::Opm(message) => message.validate(),
+            Self::Omm(message) => message.validate(),
+            Self::Oem(message) => message.validate(),
+            Self::Ocm(message) => message.validate(),
+            Self::Acm(message) => message.validate(),
+            Self::Aem(message) => message.validate(),
+            Self::Apm(message) => message.validate(),
+            Self::Cdm(message) => message.validate(),
+            Self::Tdm(message) => message.validate(),
+            Self::Rdm(message) => message.validate(),
+            Self::Ndm(message) => message.validate(),
+        }
+    }
 }
 
 impl Message {
@@ -380,8 +407,8 @@ impl Message {
 
     /// Generate KVN using the stored edition and write the complete document to a file.
     ///
-    /// Generation completes before the destination is opened, so validation errors do not modify
-    /// an existing destination.
+    /// Output is generated into a sibling temporary file and atomically renamed on success.
+    /// Validation or write failures leave an existing destination intact.
     ///
     /// # Errors
     ///
@@ -398,8 +425,8 @@ impl Message {
 
     /// Generate XML using the stored edition and write the complete document to a file.
     ///
-    /// Generation completes before the destination is opened, so validation or serialization
-    /// errors do not modify an existing destination.
+    /// Output is generated into a sibling temporary file and atomically renamed on success.
+    /// Validation, serialization or write failures leave an existing destination intact.
     ///
     /// # Errors
     ///
@@ -499,6 +526,6 @@ pub fn from_file_with_notation<P: AsRef<Path>>(
     path: P,
     notation: Option<Notation>,
 ) -> Result<Message> {
-    let content = fs::read_to_string(path).map_err(CcsdsNdmError::from)?;
-    from_str_with_notation(&content, notation)
+    let content = fs::read(path)?;
+    from_str_with_notation(detect::decode_utf8(&content)?, notation)
 }

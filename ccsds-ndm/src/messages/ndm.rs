@@ -103,6 +103,77 @@ fn validate_combined_child_attributes(start: &quick_xml::events::BytesStart<'_>)
     Ok(())
 }
 
+/// The bundled combined schema fixes its ODM constituent types to edition 3.0.
+fn validate_combined_constituent_edition(message: &Message) -> Result<()> {
+    let version = match message {
+        Message::Opm(value) => &value.version,
+        Message::Omm(value) => &value.version,
+        Message::Oem(value) => &value.version,
+        _ => return Ok(()),
+    };
+    if version != "3.0" {
+        return Err(crate::error::ValidationError::InvalidValue {
+            field: "constituent version".into(),
+            value: version.clone(),
+            expected:
+                "ODM 3.0 in the NDM/XML 4.0.0 combined envelope; use standalone XML for ODM 2.0"
+                    .into(),
+            line: None,
+        }
+        .into());
+    }
+    Ok(())
+}
+
+fn read_envelope_text(
+    reader: &mut quick_xml::Reader<&[u8]>,
+    start: &quick_xml::events::BytesStart<'_>,
+    empty: bool,
+) -> Result<String> {
+    use quick_xml::events::Event;
+
+    for attribute in start.attributes() {
+        let attribute = attribute.map_err(|error| invalid_envelope(error.to_string()))?;
+        if attribute.key.as_namespace_binding().is_none() {
+            return Err(invalid_envelope(
+                "combined NDM text fields cannot carry attributes",
+            ));
+        }
+    }
+    let mut value = String::new();
+    if empty {
+        return Ok(value);
+    }
+    loop {
+        match reader.read_event()? {
+            Event::Text(text) => {
+                value.push_str(&text.xml_content().map_err(quick_xml::Error::from)?)
+            }
+            Event::CData(text) => {
+                value.push_str(&text.xml_content().map_err(quick_xml::Error::from)?)
+            }
+            Event::GeneralRef(reference) => {
+                if let Some(character) = reference.resolve_char_ref()? {
+                    value.push(character);
+                } else {
+                    let name = reference.decode().map_err(quick_xml::Error::from)?;
+                    value.push_str(
+                        quick_xml::escape::resolve_predefined_entity(&name)
+                            .ok_or_else(|| invalid_envelope("unknown XML entity reference"))?,
+                    );
+                }
+            }
+            Event::End(end) if end.name() == start.name() => return Ok(value),
+            Event::Comment(_) | Event::PI(_) => {}
+            _ => {
+                return Err(invalid_envelope(
+                    "combined NDM text fields require text-only content",
+                ))
+            }
+        }
+    }
+}
+
 fn validate_combined_xml_depth(xml: &str) -> Result<()> {
     let mut reader = quick_xml::Reader::from_str(xml);
     let mut depth = 0usize;
@@ -284,6 +355,7 @@ impl CombinedNdm {
         crate::traits::Validate::validate(self)?;
         for message in &self.messages {
             message.validate_for_generation(format)?;
+            validate_combined_constituent_edition(message)?;
         }
         Ok(())
     }
@@ -297,7 +369,7 @@ impl CombinedNdm {
         crate::xml::validate_document_root(xml, b"ndm", "combined NDM")?;
 
         let mut reader = Reader::from_str(xml);
-        reader.config_mut().trim_text(true);
+        reader.config_mut().trim_text(false);
 
         let mut buf = Vec::new();
         let mut id = None;
@@ -329,7 +401,7 @@ impl CombinedNdm {
                                 });
                             }
                             Event::Text(text) if is_ascii_whitespace(text.as_ref()) => {}
-                            Event::Comment(_) => {}
+                            Event::Comment(_) | Event::PI(_) => {}
                             _ => return Err(invalid("trailing content after combined NDM root")),
                         }
                     }
@@ -359,8 +431,10 @@ impl CombinedNdm {
         let mut phase = 0u8;
         loop {
             let event_start_pos = reader.buffer_position() as usize;
-            match reader.read_event_into(&mut buf)? {
-                Event::Start(e) => {
+            let event = reader.read_event_into(&mut buf)?;
+            let empty = matches!(event, Event::Empty(_));
+            match event {
+                Event::Start(e) | Event::Empty(e) => {
                     let name_bytes = e.name();
                     let local_name = e.local_name();
                     let name = local_name.as_ref();
@@ -377,20 +451,21 @@ impl CombinedNdm {
                                     "MESSAGE_ID must occur at most once before comments and messages",
                                 ));
                             }
-                            let val = reader.read_text(name_bytes)?;
-                            id = Some(val.to_string());
+                            id = Some(read_envelope_text(&mut reader, &e, empty)?);
                         }
                         b"COMMENT" => {
                             if phase > 1 {
                                 return Err(invalid("COMMENT must precede contained messages"));
                             }
                             phase = 1;
-                            let val = reader.read_text(name_bytes)?;
-                            comments.push(val.to_string());
+                            comments.push(read_envelope_text(&mut reader, &e, empty)?);
                         }
                         // Extract the outer XML of the current element.
                         b"opm" | b"omm" | b"oem" | b"ocm" | b"cdm" | b"tdm" | b"rdm" | b"acm"
                         | b"aem" | b"apm" => {
+                            if empty {
+                                return Err(invalid("combined NDM constituents cannot be empty"));
+                            }
                             validate_combined_child_attributes(&e)?;
                             phase = 2;
                             reader.read_to_end(name_bytes)?;
@@ -398,9 +473,13 @@ impl CombinedNdm {
                             let full_element = &xml[actual_start_pos..end_pos];
 
                             let msg = parse_constituent(full_element, &e, &root_declarations)?;
+                            validate_combined_constituent_edition(&msg)?;
                             messages.push(msg);
                         }
                         _ => {
+                            if empty {
+                                return Err(invalid("unexpected content in combined NDM envelope"));
+                            }
                             return Err(invalid(&format!(
                                 "unknown combined NDM child <{}>",
                                 String::from_utf8_lossy(name)
@@ -421,7 +500,7 @@ impl CombinedNdm {
                 Event::Text(text) if !is_ascii_whitespace(text.as_ref()) => {
                     return Err(invalid("unexpected text in combined NDM envelope"));
                 }
-                Event::Comment(_) | Event::Text(_) => {}
+                Event::Comment(_) | Event::PI(_) | Event::Text(_) => {}
                 _ => return Err(invalid("unexpected content in combined NDM envelope")),
             }
             buf.clear();
@@ -432,7 +511,7 @@ impl CombinedNdm {
             match reader.read_event_into(&mut buf)? {
                 Event::Eof => break,
                 Event::Text(text) if is_ascii_whitespace(text.as_ref()) => {}
-                Event::Comment(_) => {}
+                Event::Comment(_) | Event::PI(_) => {}
                 _ => return Err(invalid("trailing content after combined NDM root")),
             }
         }

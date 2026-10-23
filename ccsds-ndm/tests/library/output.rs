@@ -6,7 +6,7 @@ use ccsds_ndm::messages::omm::Omm;
 use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::messages::tdm::Tdm;
 use ccsds_ndm::messages::{aem::Aem, oem::Oem, opm::Opm};
-use ccsds_ndm::{convert, convert_file, Message, Ndm, Notation};
+use ccsds_ndm::{convert, convert_file, Message, Ndm, Notation, Validate};
 
 use crate::common::assert_rejects;
 
@@ -28,6 +28,7 @@ fn assert_output_contract<M: Ndm + Clone>(
     valid.write_xml_to(&mut output).unwrap();
     assert_eq!(output, xml.as_bytes());
     let erased = wrap(valid.clone());
+    erased.validate().unwrap();
     assert_eq!(erased.to_kvn().unwrap(), kvn);
     assert_eq!(erased.to_xml().unwrap(), xml);
     output.clear();
@@ -38,6 +39,10 @@ fn assert_output_contract<M: Ndm + Clone>(
     assert_eq!(output, xml.as_bytes());
     let expected = invalid.validate().unwrap_err();
     let invalid_erased = wrap(invalid.clone());
+    assert_eq!(
+        invalid_erased.validate().unwrap_err().as_validation_error(),
+        expected.as_validation_error()
+    );
     output.clear();
     for error in [
         invalid_erased.to_kvn().unwrap_err(),
@@ -289,8 +294,12 @@ fn file_conversion_replaces_destinations_and_preserves_permissions() {
 #[test]
 fn failed_file_conversion_preserves_existing_and_absent_destinations() {
     let legacy = crate::common::mutated_once(
-        include_str!("../../data/kvn/aem_g4.kvn"),
-        "_VERS = 2.0",
+        &include_str!("../../data/kvn/oem_g11.kvn")
+            .lines()
+            .filter(|line| !line.starts_with("MESSAGE_ID"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        "_VERS = 3.0",
         "_VERS = 1.0",
     );
     // A legacy message parses successfully but cannot be generated in either notation.
@@ -347,7 +356,7 @@ fn file_conversion_can_replace_its_own_source() {
 #[test]
 fn xml_generation_rejects_forbidden_xml_1_characters_before_streaming() {
     let mut cdm = Cdm::from_kvn(include_str!("../../data/kvn/cdm_362.kvn")).unwrap();
-    cdm.header.originator = "JS\u{1}POC".into();
+    cdm.body.segments[0].metadata.object_name = "JS\u{1}POC".into();
     let error = cdm.to_xml().expect_err("U+0001 reached XML generation");
     assert!(
         error.to_string().contains("only XML 1.0 characters"),
@@ -368,8 +377,10 @@ fn kvn_generation_rejects_non_ascii_and_control_text_before_streaming() {
     apm.header.originator = "GSFC-é".into();
     let error = apm.to_kvn().expect_err("non-ASCII reached KVN generation");
     assert!(
-        error.to_string().contains("only printable ASCII records"),
-        "unexpected diagnostic: {error}"
+        error
+            .to_string()
+            .contains("ORIGINATOR: KVN output must contain only printable ASCII records"),
+        "the refusal names the field: {error}"
     );
 
     let mut output = Vec::new();
@@ -395,6 +406,40 @@ fn kvn_generation_rejects_non_ascii_and_control_text_before_streaming() {
         "ORIGINATOR",
     );
     assert!(output.is_empty(), "streaming KVN wrote bytes for a tab");
+}
+
+#[test]
+fn kvn_generation_writes_canonical_values_and_refuses_unrepresentable_ones() {
+    use ccsds_ndm::error::ValidationError;
+    let tdm = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e18.kvn")).unwrap();
+
+    // Readers trim values, so XML text padding is not written.
+    let mut padded = tdm.clone();
+    padded.header.originator = " NASA ".into();
+    assert!(padded
+        .to_kvn()
+        .unwrap()
+        .contains("ORIGINATOR           = NASA\n"));
+
+    // KVN has no empty values: a blank or N/A value would read back as absent.
+    for value in ["", "  ", "N/A"] {
+        let mut empty = tdm.clone();
+        empty.header.message_id = Some(value.into());
+        let error = empty.to_kvn().unwrap_err();
+        crate::common::assert_validation_field(&error, "MESSAGE_ID");
+        assert!(empty.write_kvn_to(&mut Vec::new()).is_err());
+        empty.to_xml().unwrap();
+    }
+
+    // KVN integers are 32-bit (TDM 4.3.4); wider model integers are refused, XML keeps them.
+    let mut wide = tdm;
+    wide.body.segments[0].metadata.interpolation_degree = Some(u32::MAX);
+    let error = wide.to_kvn().unwrap_err();
+    assert!(matches!(
+        crate::common::validation_error_source(error.as_validation_error().unwrap()),
+        ValidationError::OutOfRange { name, .. } if name == "INTERPOLATION_DEGREE"
+    ));
+    wide.to_xml().unwrap();
 }
 
 #[test]

@@ -49,6 +49,7 @@ MAN_UNITS = [n/a, km/s, km/s, km/s, kg, %, n/a, m**2]
 590.0 CUBESAT_19 2.8773E-4 -9.3969E-4 -1.8491E-4 -1.0 5.0 -0.005263 0.033
 MAN_STOP
 MAN_START
+COMMENT Adapted G17: table 6-8 uses THR_ISP; MAN_UNITS excludes the time tag.
 COMMENT 100 s of 0.5N +in-track thr w/eta=0.95, Isp=300s, 5% 1-sigma error
 COMMENT NOTE that this OCM specifies a future compound maneuver, with
 COMMENT deployment during low-level host platform thrusting.
@@ -58,8 +59,8 @@ MAN_DEVICE_ID = THR_01
 MAN_PURPOSE = ORBIT
 MAN_REF_FRAME = RSW_ROTATING
 MAN_COMPOSITION = TIME_ABSOLUTE, MAN_DURA, THR_X, THR_Y, THR_Z, THR_EFFIC, THR_INTERP,
-ISP THR_MAG_SIGMA
-MAN_UNITS = [n/a, s, N, N, N, n/a, n/a, s, %]
+THR_ISP THR_MAG_SIGMA
+MAN_UNITS = [s, N, N, N, n/a, n/a, s, %]
 2022-12-18T14:36:35.1172 100.0 0.0 0.5 0.0 0.95 ON 300.0 5.0
 MAN_STOP
 PERT_START

@@ -144,7 +144,7 @@ fn test_acm_cov_block() {
 COV_BASIS = DETERMINED_OBC
 COV_REF_FRAME = EME2000
 COV_TYPE = ANGLE
-0.0 1.0e-6
+0.0 1.0e-6 2.0e-6 3.0e-6
 COV_STOP
 "#;
     let input = format!("{}{}{}", sample_acm_header(), sample_acm_meta(), cov_block);
@@ -154,15 +154,14 @@ COV_STOP
         cov.cov_basis.as_ref().unwrap().to_string(),
         "DETERMINED_OBC"
     );
-    assert_eq!(cov.cov_confidence, None);
-    assert_eq!(cov.cov_lines[0].values[1], 1.0e-6);
+    assert_eq!(cov.cov_lines[0].values[0], 1.0e-6);
 }
 
 #[test]
 fn test_acm_man_block() {
     let man_block = r#"MAN_START
 MAN_ID = MAN_001
-MAN_PURPOSE = ATT_ADJUST
+MAN_PURPOSE = MOM_DESAT
 MAN_BEGIN_TIME = 100.0
 MAN_DURATION = 100.0 [s]
 ACTUATOR_USED = THRUSTER_1
@@ -214,14 +213,14 @@ REF_FRAME_A = A
 REF_FRAME_B = B
 NUMBER_STATES = 4
 ATT_TYPE = QUATERNION
-0 0 0 0 0
+0 0 0 0 1
 ATT_STOP
 ATT_START
 REF_FRAME_A = A
 REF_FRAME_B = B
 NUMBER_STATES = 4
 ATT_TYPE = QUATERNION
-10 0 0 0 0
+10 0 0 0 1
 ATT_STOP
 PHYS_START
 DRAG_COEFF = 1.0
@@ -380,4 +379,189 @@ PHYS_STOP
     let acm = Acm::from_kvn(kvn).unwrap();
     let phys = acm.body.segment.data.phys.as_ref().unwrap();
     assert_eq!(phys.wet_mass.as_ref().unwrap().value, 1000.0);
+}
+
+#[test]
+fn euler_history_preserves_unwrapped_finite_angles() {
+    let input = format!("{}{}ATT_START\nREF_FRAME_A = ICRF\nREF_FRAME_B = SC_BODY_1\nNUMBER_STATES = 3\nATT_TYPE = EULER_ANGLES\nEULER_ROT_SEQ = ZYX\n0.0 999999.0 0.0 0.0\nATT_STOP\n", sample_acm_header(), sample_acm_meta());
+    let message = Acm::from_kvn(&input).unwrap();
+    assert_eq!(
+        message.body.segment.data.att[0].att_lines[0].values[0],
+        999999.0
+    );
+    let xml = message.to_xml().unwrap();
+    crate::common::validate_xml("unwrapped Euler history", &xml);
+    assert_eq!(Acm::from_xml(&xml).unwrap(), message);
+    assert_eq!(Acm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+}
+
+#[test]
+fn history_row_errors_name_the_problem_at_the_row() {
+    let row = "2.000000 0.1153 -0.1424 0.8704 0.4571 2.271e-06 -4.405e-06 -3.785e-06";
+    let error =
+        Acm::from_kvn(&mutated(ATT_KVN, row, &row.replace("0.1153", "0.1x53"))).unwrap_err();
+    let kvn = crate::common::kvn_parse_error(&error).expect("a KVN parse error");
+    assert_eq!(
+        (kvn.line, kvn.message.as_str()),
+        (
+            19,
+            "Invalid ATT data line: expected a time tag followed by numbers"
+        )
+    );
+}
+
+#[test]
+fn orekit_euler_rot_seq_before_number_states_is_read_and_written_in_table_order() {
+    // Orekit writes EULER_ROT_SEQ before NUMBER_STATES in ATT and AD; the order is lossless.
+    let att = mutated(
+        include_str!("../../data/kvn/acm_g6.kvn"),
+        "NUMBER_STATES = 4\nATT_TYPE = QUATERNION\n0.0 0.73566 -0.50547 0.41309 0.180707\n0.25 0.73529 -0.50531 0.41375 0.181158\n0.50 0.73492 -0.50515 0.41441 0.181610",
+        "EULER_ROT_SEQ = XYZ\nNUMBER_STATES = 3\nATT_TYPE = EULER_ANGLES\n0.0 1.0 2.0 3.0",
+    );
+    let ad = mutated(
+        COV_KVN,
+        "ATTITUDE_SOURCE = OBC\n",
+        "ATTITUDE_SOURCE = OBC\nEULER_ROT_SEQ = ZXZ\n",
+    );
+    for (source, canonical) in [
+        (att, "ATT_TYPE = EULER_ANGLES\nEULER_ROT_SEQ = XYZ"),
+        (ad, "ATTITUDE_STATES = QUATERNION\nEULER_ROT_SEQ = ZXZ"),
+    ] {
+        let message = Acm::from_kvn(&source).unwrap();
+        let generated = message.to_kvn().unwrap();
+        let compact: String = generated
+            .lines()
+            .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(compact.contains(canonical), "{generated}");
+        assert_eq!(Acm::from_kvn(&generated).unwrap(), message);
+        let twice = source.replacen("NUMBER_STATES", "EULER_ROT_SEQ = XYZ\nNUMBER_STATES", 1);
+        let anchor = canonical.lines().next().unwrap();
+        let canonical_too = mutated(&source, anchor, &format!("{anchor}\nEULER_ROT_SEQ = XYZ"));
+        for duplicate in [twice, canonical_too] {
+            let error = Acm::from_kvn(&duplicate).unwrap_err().to_string();
+            assert!(error.contains("duplicate"), "{error}");
+        }
+    }
+}
+
+#[test]
+fn user_comments_may_precede_any_parameter_and_keep_their_position() {
+    // ADM 5.3.10.5: each user-defined parameter line may be preceded by comment lines.
+    use ccsds_ndm::types::UserDefinedEntry;
+    let kvn = mutated(
+        include_str!("../../data/kvn/acm_g6.kvn"),
+        "ATT_STOP",
+        "ATT_STOP\nUSER_START\nCOMMENT first\nUSER_DEFINED_A = 1\nCOMMENT second\nUSER_DEFINED_B = 2\nUSER_STOP",
+    );
+    let message = Acm::from_kvn(&kvn).unwrap();
+    let entries = &message.body.segment.data.user.as_ref().unwrap().entries;
+    assert!(matches!(&entries[2], UserDefinedEntry::Comment(text) if text == "second"));
+    let generated = message.to_kvn().unwrap();
+    let compact: String = generated
+        .lines()
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" ") + "\n")
+        .collect();
+    assert!(
+        compact.contains("USER_DEFINED_A = 1\nCOMMENT second\n"),
+        "{generated}"
+    );
+    assert_eq!(Acm::from_kvn(&generated).unwrap(), message);
+    assert_eq!(Acm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+
+    let empty = mutated(&kvn, "USER_DEFINED_A = 1", "USER_DEFINED_ = 1");
+    let error = Acm::from_kvn(&empty).unwrap_err().to_string();
+    assert!(error.contains("parameter name suffix"), "{error}");
+}
+
+#[test]
+fn ad_cov_type_none_normalizes_to_omission() {
+    // ADM table 5-8 lists NONE for AD COV_TYPE; XSD acmCovarianceLineType has no such token.
+    let original = Acm::from_kvn(&mutated(
+        COV_KVN,
+        "COV_TYPE = ANGLE_GYROBIAS\nREF_FRAME_A",
+        "REF_FRAME_A",
+    ))
+    .unwrap();
+    for token in ["NONE", "none"] {
+        let kvn = mutated(
+            COV_KVN,
+            "COV_TYPE = ANGLE_GYROBIAS\nREF_FRAME_A",
+            &format!("COV_TYPE = {token}\nREF_FRAME_A"),
+        );
+        assert_eq!(Acm::from_kvn(&kvn).unwrap(), original);
+    }
+    assert!(Acm::from_kvn(&mutated(
+        COV_KVN,
+        "COV_TYPE = ANGLE_GYROBIAS\nREF_FRAME_A",
+        "COV_TYPE = None\nREF_FRAME_A"
+    ))
+    .is_err());
+    let xml = mutated(
+        &original.to_xml().unwrap(),
+        "</ATTITUDE_STATES>",
+        "</ATTITUDE_STATES><COV_TYPE>NONE</COV_TYPE>",
+    );
+    assert!(Acm::from_xml(&xml).is_err());
+}
+
+#[test]
+fn acm_specific_rejections_name_the_keyword() {
+    let classification = mutated(
+        ATT_KVN,
+        "TIME_SYSTEM",
+        "CLASSIFICATION = PUBLIC\nTIME_SYSTEM",
+    );
+    let error = Acm::from_kvn(&classification).unwrap_err().to_string();
+    assert!(
+        error.contains("CLASSIFICATION is supported only in the ACM header"),
+        "{error}"
+    );
+    let duration = mutated(ATT_KVN, "MAN_DURATION = 450.0", "MAN_DURATION = -1.0");
+    let error = Acm::from_kvn(&duration).unwrap_err().to_string();
+    assert!(error.contains("MAN_DURATION"), "{error}");
+    for (from, to, keyword) in [
+        (
+            "MAN_DURATION = 450.0",
+            "MAN_DURATION = 450.0 [min]",
+            "MAN_DURATION",
+        ),
+        (
+            "TARGET_MOMENTUM = 1.30 -16.400 -11.350",
+            "TARGET_MOMENTUM = 1.30 -16.400 -11.350 [Nms]",
+            "TARGET_MOMENTUM",
+        ),
+    ] {
+        let error = Acm::from_kvn(&mutated(ATT_KVN, from, to))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(keyword), "{error}");
+    }
+}
+
+#[test]
+fn blank_lines_are_insignificant_inside_histories_and_between_sensors() {
+    for source in [crate::ATT_KVN, crate::COV_KVN] {
+        let original = Acm::from_kvn(source).unwrap();
+        assert_eq!(
+            Acm::from_kvn(&source.replace('\n', "\n\n")).unwrap(),
+            original
+        );
+    }
+}
+
+#[test]
+fn xml_history_values_refuse_nonzero_underflow_and_keep_subnormals() {
+    let mut message = Acm::from_kvn(include_str!("../../data/kvn/acm_g6.kvn")).unwrap();
+    for line in &mut message.body.segment.data.att[0].att_lines {
+        line.values = vec![0.0, 0.0, 0.0, 1.0];
+    }
+    let xml = message.to_xml().unwrap();
+    let invalid = mutated(&xml, " 0 0 0 1</attLine>", " 1e-400 0 0 1</attLine>");
+    let error = Acm::from_xml(&invalid).unwrap_err();
+    assert!(error.to_string().contains("underflow"), "{error}");
+    let valid = invalid.replace("1e-400", "1e-320");
+    let parsed = Acm::from_xml(&valid).unwrap();
+    assert!(parsed.body.segment.data.att[0].att_lines[0].values[0] > 0.0);
 }

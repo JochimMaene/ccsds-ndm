@@ -10,8 +10,12 @@ import ccsds_ndm
 
 REPOSITORY_ROOT = Path(__file__).parents[3]
 OPM_KVN = (REPOSITORY_ROOT / "ccsds-ndm/data/kvn/opm_g1.kvn").read_text()
-# 1.0 is readable but withdrawn as an output edition, so it can only be reached by parsing.
-OPM_KVN_V1 = OPM_KVN.replace("CCSDS_OPM_VERS = 3.0", "CCSDS_OPM_VERS = 1.0")
+# OEM 1.0 remains a deliberately scoped KVN reader, with no generation support.
+OEM_KVN_V1 = (
+    (REPOSITORY_ROOT / "ccsds-ndm/data/kvn/oem_g11.kvn")
+    .read_text()
+    .replace("CCSDS_OEM_VERS = 3.0", "CCSDS_OEM_VERS = 1.0")
+)
 COMBINED_XML = (REPOSITORY_ROOT / "ccsds-ndm/data/xml/ndm_g12.xml").read_text()
 PERMISSIVE_XML = (REPOSITORY_ROOT / "ccsds-ndm/data/xml/ndm_g22.xml").read_text()
 
@@ -40,7 +44,7 @@ def test_generation_has_no_misleading_unchecked_mode():
 
 
 def test_unsupported_version_errors_expose_the_common_diagnostic_attributes():
-    message = ccsds_ndm.Opm.from_str(OPM_KVN_V1, format="kvn")
+    message = ccsds_ndm.Oem.from_str(OEM_KVN_V1, format="kvn")
 
     with pytest.raises(ccsds_ndm.NdmValidationError) as unsupported:
         message.to_str("xml")
@@ -73,7 +77,7 @@ def test_format_names_are_case_insensitive(tmp_path):
 
 
 def test_failed_generation_preserves_existing_file(tmp_path):
-    message = ccsds_ndm.Opm.from_str(OPM_KVN_V1, format="kvn")
+    message = ccsds_ndm.Oem.from_str(OEM_KVN_V1, format="kvn")
     output = tmp_path / "output.ndm"
     output.write_text("keep me")
 
@@ -160,3 +164,15 @@ def test_python_conversion_delegates_to_strict_rust_core(tmp_path):
     with pytest.raises(ccsds_ndm.NdmUnsupportedMessageError):
         ccsds_ndm.convert_file(str(source), str(destination), "xml")
     assert destination.read_text() == "sentinel"
+
+
+@pytest.mark.parametrize("format", ["kvn", "xml"])
+def test_opm_1_requires_an_edition_specific_reader(format):
+    text = OPM_KVN if format == "kvn" else ccsds_ndm.Opm.from_str(OPM_KVN).to_str("xml")
+    legacy = text.replace("CCSDS_OPM_VERS = 3.0", "CCSDS_OPM_VERS = 1.0").replace(
+        'version="3.0"', 'version="1.0"'
+    )
+    for parser in (ccsds_ndm.Opm.from_str, ccsds_ndm.from_str):
+        with pytest.raises(ccsds_ndm.NdmError, match="Unsupported.*1.0") as caught:
+            parser(legacy, format=format)
+        assert caught.value.code == "parse.unsupported_input_version"

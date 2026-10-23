@@ -16,6 +16,7 @@ use crate::kvn::parser::*;
 use crate::kvn::ser::KvnWriter;
 use crate::parse_block;
 use crate::traits::ToKvn;
+use winnow::ascii::till_line_ending;
 use winnow::combinator::preceded;
 use winnow::error::{AddContext, ErrMode, FromExternalError, StrContext};
 use winnow::prelude::*;
@@ -46,7 +47,7 @@ pub fn tdm_header(input: &mut &str) -> KvnResult<TdmHeader> {
         let checkpoint = input.checkpoint();
         comment.extend(collect_comments.parse_next(input)?);
 
-        let key = match keyword.parse_next(input) {
+        let key = match preceded(ws, keyword).parse_next(input) {
             Ok(k) => k,
             Err(_) => {
                 input.reset(&checkpoint);
@@ -68,7 +69,7 @@ pub fn tdm_header(input: &mut &str) -> KvnResult<TdmHeader> {
                 originator = Some(kv_string.parse_next(input)?);
             }
             "MESSAGE_ID" => {
-                message_id = Some(kv_string.parse_next(input)?);
+                message_id = kv_optional(kv_string).parse_next(input)?;
             }
             _ => {
                 input.reset(&checkpoint);
@@ -169,9 +170,9 @@ pub fn tdm_metadata(input: &mut &str) -> KvnResult<TdmMetadata> {
         "PARTICIPANT_4" => val: kv_string => { participant_4 = Some(val); },
         "PARTICIPANT_5" => val: kv_string => { participant_5 = Some(val); },
         "MODE" => val: kv_enum => { mode = Some(val); },
-        "PATH" => val: kv_from_kvn_value => { path = Some(val); },
-        "PATH_1" => val: kv_from_kvn_value => { path_1 = Some(val); },
-        "PATH_2" => val: kv_from_kvn_value => { path_2 = Some(val); },
+        "PATH" => val: kv_path => { path = Some(val); },
+        "PATH_1" => val: kv_path => { path_1 = Some(val); },
+        "PATH_2" => val: kv_path => { path_2 = Some(val); },
         "TRANSMIT_BAND" => val: kv_string => { transmit_band = Some(val); },
         "RECEIVE_BAND" => val: kv_string => { receive_band = Some(val); },
         "TURNAROUND_NUMERATOR" => val: kv_i32 => { turnaround_numerator = Some(val); },
@@ -289,6 +290,41 @@ pub fn tdm_metadata(input: &mut &str) -> KvnResult<TdmMetadata> {
     })
 }
 
+/// Reads PATH/PATH_1/PATH_2, accepting blanks around the commas (`2, 1`, written by Orekit)
+/// as the canonical `2,1`. TDM 3.3 forbids the blanks, but dropping them loses nothing.
+fn kv_path(input: &mut &str) -> KvnResult<super::TdmPath> {
+    let value_start = *input;
+    let (value, _) = kv_rest.parse_next(input)?;
+    let canonical = value
+        .split(',')
+        .map(str::trim)
+        .collect::<Vec<_>>()
+        .join(",");
+    canonical.parse::<super::TdmPath>().map_err(|error| {
+        *input = value_start.trim_start_matches(' ');
+        ErrMode::Cut(InternalParserError::from_external_error(
+            input,
+            CcsdsNdmError::from(error),
+        ))
+    })
+}
+
+/// TDM 4.3.11: a KVN phase count "must not contain any alphabetic or special characters", so
+/// the exponent spellings the XSD `xsd:double` allows in XML are not KVN phase counts.
+fn kvn_phase_count_error(data: &TdmObservationData) -> Option<ValidationError> {
+    let value = data.phase_count()?;
+    value
+        .contains(['e', 'E'])
+        .then(|| ValidationError::InvalidValue {
+            field: data.key().into(),
+            value: value.into(),
+            expected: "a KVN phase count without an exponent (TDM 4.3.11 forbids alphabetic \
+                       characters; write the digits out)"
+                .into(),
+            line: None,
+        })
+}
+
 //----------------------------------------------------------------------
 // TDM Observation Parser
 //----------------------------------------------------------------------
@@ -310,14 +346,19 @@ pub fn tdm_observation(input: &mut &str) -> KvnResult<TdmObservation> {
     let (_, epoch, value) = (
         kv_sep,
         kv_calendar_epoch_token,
-        preceded(ws, parse_f64_winnow),
+        preceded(ws, till_line_ending),
     )
         .parse_next(input)?;
 
-    let data = TdmObservationData::from_key_value(key, value).map_err(|error| {
-        input.reset(&checkpoint);
-        ErrMode::Cut(InternalParserError::from_external_error(input, error))
-    })?;
+    let data = TdmObservationData::from_key_val(key, value.trim())
+        .and_then(|data| match kvn_phase_count_error(&data) {
+            Some(error) => Err(error.into()),
+            None => Ok(data),
+        })
+        .map_err(|error| {
+            input.reset(&checkpoint);
+            ErrMode::Cut(InternalParserError::from_external_error(input, error))
+        })?;
 
     opt_line_ending.parse_next(input)?;
 
@@ -478,12 +519,6 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
         let fail = |message: &str| Err(invalid(line_number, offset, message.into()));
         if line.as_bytes().contains(&b'\r') {
             return fail("lone carriage return");
-        }
-        if line.len() > 254 {
-            return fail("line exceeds the normative 254-character limit");
-        }
-        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
-            return fail("non-printable or non-ASCII character");
         }
         let line = line.trim();
         if line.is_empty() {
@@ -714,19 +749,19 @@ impl ToKvn for TdmMetadata {
             writer.write_pair("TIMETAG_REF", v.to_string());
         }
         if let Some(v) = self.integration_interval {
-            writer.write_pair("INTEGRATION_INTERVAL", v);
+            writer.write_odm_float_pair("INTEGRATION_INTERVAL", v);
         }
         if let Some(v) = &self.integration_ref {
             writer.write_pair("INTEGRATION_REF", v.to_string());
         }
         if let Some(v) = self.freq_offset {
-            writer.write_pair("FREQ_OFFSET", v);
+            writer.write_odm_float_pair("FREQ_OFFSET", v);
         }
         if let Some(v) = &self.range_mode {
             writer.write_pair("RANGE_MODE", v.to_string());
         }
         if let Some(v) = self.range_modulus {
-            writer.write_pair("RANGE_MODULUS", v);
+            writer.write_odm_float_pair("RANGE_MODULUS", v);
         }
         if let Some(v) = &self.range_units {
             writer.write_pair("RANGE_UNITS", v.to_string());
@@ -741,79 +776,79 @@ impl ToKvn for TdmMetadata {
             writer.write_pair("INTERPOLATION", v);
         }
         if let Some(v) = self.interpolation_degree {
-            writer.write_pair("INTERPOLATION_DEGREE", v);
+            writer.write_integer_pair("INTERPOLATION_DEGREE", v);
         }
         if let Some(v) = self.doppler_count_bias {
-            writer.write_pair("DOPPLER_COUNT_BIAS", v);
+            writer.write_odm_float_pair("DOPPLER_COUNT_BIAS", v);
         }
         if let Some(v) = self.doppler_count_scale {
-            writer.write_pair("DOPPLER_COUNT_SCALE", v);
+            writer.write_integer_pair("DOPPLER_COUNT_SCALE", v);
         }
         if let Some(v) = &self.doppler_count_rollover {
             writer.write_pair("DOPPLER_COUNT_ROLLOVER", format!("{}", v));
         }
         if let Some(v) = self.transmit_delay_1 {
-            writer.write_pair("TRANSMIT_DELAY_1", v);
+            writer.write_odm_float_pair("TRANSMIT_DELAY_1", v);
         }
         if let Some(v) = self.transmit_delay_2 {
-            writer.write_pair("TRANSMIT_DELAY_2", v);
+            writer.write_odm_float_pair("TRANSMIT_DELAY_2", v);
         }
         if let Some(v) = self.transmit_delay_3 {
-            writer.write_pair("TRANSMIT_DELAY_3", v);
+            writer.write_odm_float_pair("TRANSMIT_DELAY_3", v);
         }
         if let Some(v) = self.transmit_delay_4 {
-            writer.write_pair("TRANSMIT_DELAY_4", v);
+            writer.write_odm_float_pair("TRANSMIT_DELAY_4", v);
         }
         if let Some(v) = self.transmit_delay_5 {
-            writer.write_pair("TRANSMIT_DELAY_5", v);
+            writer.write_odm_float_pair("TRANSMIT_DELAY_5", v);
         }
         if let Some(v) = self.receive_delay_1 {
-            writer.write_pair("RECEIVE_DELAY_1", v);
+            writer.write_odm_float_pair("RECEIVE_DELAY_1", v);
         }
         if let Some(v) = self.receive_delay_2 {
-            writer.write_pair("RECEIVE_DELAY_2", v);
+            writer.write_odm_float_pair("RECEIVE_DELAY_2", v);
         }
         if let Some(v) = self.receive_delay_3 {
-            writer.write_pair("RECEIVE_DELAY_3", v);
+            writer.write_odm_float_pair("RECEIVE_DELAY_3", v);
         }
         if let Some(v) = self.receive_delay_4 {
-            writer.write_pair("RECEIVE_DELAY_4", v);
+            writer.write_odm_float_pair("RECEIVE_DELAY_4", v);
         }
         if let Some(v) = self.receive_delay_5 {
-            writer.write_pair("RECEIVE_DELAY_5", v);
+            writer.write_odm_float_pair("RECEIVE_DELAY_5", v);
         }
         if let Some(v) = &self.data_quality {
             writer.write_pair("DATA_QUALITY", v.to_string());
         }
         if let Some(v) = self.correction_angle_1 {
-            writer.write_pair("CORRECTION_ANGLE_1", v);
+            writer.write_odm_float_pair("CORRECTION_ANGLE_1", v);
         }
         if let Some(v) = self.correction_angle_2 {
-            writer.write_pair("CORRECTION_ANGLE_2", v);
+            writer.write_odm_float_pair("CORRECTION_ANGLE_2", v);
         }
         if let Some(v) = self.correction_doppler {
-            writer.write_pair("CORRECTION_DOPPLER", v);
+            writer.write_odm_float_pair("CORRECTION_DOPPLER", v);
         }
         if let Some(v) = self.correction_mag {
-            writer.write_pair("CORRECTION_MAG", v);
+            writer.write_odm_float_pair("CORRECTION_MAG", v);
         }
         if let Some(v) = self.correction_range {
-            writer.write_pair("CORRECTION_RANGE", v);
+            writer.write_odm_float_pair("CORRECTION_RANGE", v);
         }
         if let Some(v) = self.correction_rcs {
-            writer.write_pair("CORRECTION_RCS", v);
+            writer.write_odm_float_pair("CORRECTION_RCS", v);
         }
         if let Some(v) = self.correction_receive {
-            writer.write_pair("CORRECTION_RECEIVE", v);
+            writer.write_odm_float_pair("CORRECTION_RECEIVE", v);
         }
         if let Some(v) = self.correction_transmit {
-            writer.write_pair("CORRECTION_TRANSMIT", v);
+            writer.write_odm_float_pair("CORRECTION_TRANSMIT", v);
         }
         if let Some(v) = self.correction_aberration_yearly {
-            writer.write_pair("CORRECTION_ABERRATION_YEARLY", v);
+            writer.write_odm_float_pair("CORRECTION_ABERRATION_YEARLY", v);
         }
         if let Some(v) = self.correction_aberration_diurnal {
-            writer.write_pair("CORRECTION_ABERRATION_DIURNAL", v);
+            writer.write_odm_float_pair("CORRECTION_ABERRATION_DIURNAL", v);
         }
         if let Some(v) = &self.corrections_applied {
             writer.write_pair("CORRECTIONS_APPLIED", format!("{}", v));
@@ -827,7 +862,15 @@ impl ToKvn for TdmData {
         writer.write_section("DATA_START");
         writer.write_comments(&self.comment);
         for obs in &self.observations {
-            writer.write_tdm_observation(obs.data.key(), &obs.epoch, obs.data.value());
+            if let Some(value) = obs.data.phase_count() {
+                writer.write_tdm_observation(obs.data.key(), &obs.epoch, value);
+            } else {
+                writer.write_tdm_numeric_observation(
+                    obs.data.key(),
+                    &obs.epoch,
+                    obs.data.value().expect("numeric observation"),
+                );
+            }
         }
         writer.write_section("DATA_STOP");
     }
@@ -835,9 +878,30 @@ impl ToKvn for TdmData {
 
 impl Tdm {
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        // TDM 4.2.1 caps every KVN line at 254 characters and has no continuation lines, so a
+        // longer `KEY = value` record (e.g. a long DATA_TYPES list read from XML or from a
+        // tolerated over-long KVN line) is refused here, naming the keyword.
+        let fits = |field: &str, value_len: usize| -> Result<()> {
+            let prefix = if field == "COMMENT" {
+                8
+            } else {
+                field.len().max(20) + 3
+            };
+            let line_len = prefix + value_len;
+            if line_len <= 254 {
+                return Ok(());
+            }
+            Err(ValidationError::OutOfRange {
+                name: field.to_owned().into(),
+                value: format!("{line_len}-character KVN line"),
+                expected: "a KVN line no longer than 254 characters (TDM 4.2.1)".into(),
+                line: None,
+            }
+            .into())
+        };
         let check = |field: &'static str, value: &str| -> Result<()> {
             if value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
-                Ok(())
+                fits(field, value.trim().len())
             } else {
                 Err(ValidationError::InvalidValue {
                     field: field.into(),
@@ -884,6 +948,17 @@ impl Tdm {
             }
             for comment in &segment.data.comment {
                 check("COMMENT", comment)?;
+            }
+            for observation in &segment.data.observations {
+                if let Some(error) = kvn_phase_count_error(&observation.data) {
+                    return Err(error.into());
+                }
+                if let Some(value) = observation.data.phase_count() {
+                    fits(
+                        observation.data.key(),
+                        observation.epoch.to_string().len() + 1 + value.len(),
+                    )?;
+                }
             }
         }
         Ok(())

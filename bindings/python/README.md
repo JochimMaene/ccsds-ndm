@@ -8,7 +8,10 @@ Python bindings for the `ccsds-ndm` Rust core, for parsing, validating, and gene
 
 ## Implemented Message Families
 
-The package exposes typed models, parsers, and serializers for the message families below. Inclusion in this table does not by itself claim verified support for every edition, notation, or operation. Exact support claims will be published in the project support and conformance matrix.
+The package exposes typed models, parsers, and serializers for the message families below. Supported editions and their documented limits are listed in the
+[support matrix](https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/support-matrix.md).
+All current message families use the same
+[conformance verification criteria](https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/conformance/README.md#verification-criteria).
 
 | Message | Description |
 |---------|-------------|
@@ -22,7 +25,7 @@ The package exposes typed models, parsers, and serializers for the message famil
 | **APM** | Attitude Parameter Message – Single attitude state and attitude parameters |
 | **AEM** | Attitude Ephemeris Message – Attitude state time series |
 | **ACM** | Attitude Comprehensive Message – Detailed attitude data with maneuvers and covariance |
-| **NDM** | Combined NDM Instantiation – Container for multiple CCSDS messages |
+| **NDM** | Combined NDM Instantiation – XML container for multiple CCSDS messages |
 
 ## Installation
 
@@ -61,7 +64,7 @@ ccsds_ndm.convert_file("input.opm", "output.xml", "xml")
 
 - **Type-safe**: Strongly typed structures matching CCSDS XSD schemas
 - **Auto-detection**: Automatically detects message format and type
-- **Strict parsing**: Rejects unknown, duplicate, reordered, and malformed content
+- **Validated parsing**: Rejects malformed or unsupported content; documented producer variations are preserved
 - **Validated output**: Invalid typed models are never silently serialized
 - **Native bindings**: PyO3 + maturin wrapping the Rust core implementation
 

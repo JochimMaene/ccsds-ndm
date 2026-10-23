@@ -25,19 +25,76 @@ pub(crate) mod parser;
 pub mod ser;
 pub(crate) mod strict;
 
-/// Normalize CR, LFCR, and CRLF terminators so line-oriented passes only have to handle LF.
+/// Shared front end of every family's KVN reader.
 ///
-/// Every rewrite is byte-length preserving (`\r` becomes `\n`, `\n\r` becomes `\r\n`). That
-/// invariant is load-bearing: parse diagnostics carry byte offsets into the normalized text, but
-/// are rendered against the caller's original input, so the two must stay aligned.
+/// Expects the caller to have stripped one UTF-8 byte-order mark. Normalizes terminators and TABs, rejects non-printable or
+/// non-ASCII content by line, byte column, and code point, and checks the `CCSDS_xxx_VERS`
+/// edition before any structural parse, so an unsupported edition reports
+/// `parse.unsupported_input_version` rather than a keyword that edition lacks. Line length is not
+/// checked on read: producers commonly exceed the 254-character limit losslessly, and writers
+/// still enforce it.
+pub(crate) fn prepare_input(
+    input: &str,
+    kind: crate::validation::MessageKind,
+) -> crate::error::Result<std::borrow::Cow<'_, str>> {
+    let mut invalid_offset = input
+        .bytes()
+        .position(|byte| !matches!(byte, b' '..=b'~' | b'\n'));
+    // Plain LF input needs one ASCII scan; normalize and rescan only after CR or TAB.
+    let normalized =
+        if invalid_offset.is_some_and(|offset| matches!(input.as_bytes()[offset], b'\r' | b'\t')) {
+            let normalized = normalize_line_endings(input);
+            invalid_offset = normalized
+                .bytes()
+                .position(|byte| !matches!(byte, b' '..=b'~' | b'\n' | b'\r'));
+            normalized
+        } else {
+            std::borrow::Cow::Borrowed(input)
+        };
+    if let Some(offset) = invalid_offset {
+        let character = normalized[offset..].chars().next().unwrap_or_default();
+        // Every earlier byte on the line is ASCII, so the character column is the byte column.
+        let (line, column) = crate::error::line_column(&normalized, offset);
+        return Err(crate::error::CcsdsNdmError::Format(Box::new(
+            crate::error::FormatError::Kvn(Box::new(crate::error::KvnParseError {
+                line,
+                column,
+                message: format!(
+                    "non-printable or non-ASCII character U+{:04X}",
+                    u32::from(character)
+                ),
+                contexts: Vec::new(),
+                offset,
+            })),
+        )));
+    }
+    if let Some(spec) = crate::versioning::spec(kind) {
+        let version = normalized
+            .lines()
+            .map(str::trim)
+            .find(|line| !line.is_empty() && !line.starts_with("COMMENT"))
+            .and_then(|line| line.strip_prefix(spec.id_keyword))
+            .and_then(|rest| rest.trim_start().strip_prefix('='))
+            .map(str::trim);
+        // A malformed version record is left to the structural parser's diagnostics.
+        if let Some(version) =
+            version.filter(|value| !value.is_empty() && !value.contains([' ', '[']))
+        {
+            crate::versioning::check_input_version(kind, version)?;
+        }
+    }
+    Ok(normalized)
+}
+
+/// Normalize CR, LFCR, and CRLF terminators so line-oriented passes only have to handle LF, and
+/// read TAB as the blank it stands for (writers never emit TAB).
 ///
-/// OEM and OPM enable this, which is what lets both accept all four normative terminators; see
-/// `docs/conformance/oem-3.0.md` and `docs/conformance/opm-3.0.md`. The remaining
-/// families never normalize, so [`strict::validate_odm_assignments`] still rejects a lone
-/// carriage return for them — it only ever strips a trailing one, so CRLF parses everywhere.
-/// Widening the other eight is a per-family conformance decision that has not been taken.
+/// Every rewrite is byte-length preserving (`\r` becomes `\n`, `\n\r` becomes `\r\n`, TAB becomes
+/// a blank). That invariant is load-bearing: parse diagnostics carry byte offsets into the
+/// normalized text, but are rendered against the caller's original input, so the two must stay
+/// aligned.
 pub(crate) fn normalize_line_endings(input: &str) -> std::borrow::Cow<'_, str> {
-    if !input.contains('\r') {
+    if !input.contains(['\r', '\t']) {
         return std::borrow::Cow::Borrowed(input);
     }
 
@@ -58,6 +115,10 @@ pub(crate) fn normalize_line_endings(input: &str) -> std::borrow::Cow<'_, str> {
                 normalized.push(b'\n');
                 index += 1;
             }
+            b'\t' => {
+                normalized.push(b' ');
+                index += 1;
+            }
             byte => {
                 normalized.push(byte);
                 index += 1;
@@ -70,4 +131,37 @@ pub(crate) fn normalize_line_endings(input: &str) -> std::borrow::Cow<'_, str> {
         "normalization must preserve byte offsets for diagnostics"
     );
     std::borrow::Cow::Owned(String::from_utf8(normalized).expect("line endings preserve UTF-8"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::prepare_input;
+    use crate::{error::FormatError, validation::MessageKind};
+
+    #[test]
+    fn input_preparation_borrows_plain_text_and_preserves_normalized_error_positions() {
+        let plain = "CCSDS_TDM_VERS = 2.0\nCOMMENT plain\n";
+        assert!(matches!(
+            prepare_input(plain, MessageKind::Tdm).unwrap(),
+            std::borrow::Cow::Borrowed(_)
+        ));
+        for ending in ["\n", "\r", "\r\n", "\n\r"] {
+            let input = format!("CCSDS_TDM_VERS\t=\t2.0{ending}COMMENT\tbad{ending}");
+            let normalized = prepare_input(&input, MessageKind::Tdm).unwrap();
+            assert_eq!(normalized.len(), input.len());
+            assert!(!normalized.contains('\t'));
+            let invalid = input.replace("bad", "badé");
+            let error = prepare_input(&invalid, MessageKind::Tdm).unwrap_err();
+            let Some(FormatError::Kvn(error)) = error.as_format_error() else {
+                panic!("{error}");
+            };
+            assert_eq!((error.line, error.column), (2, 12), "{ending:?}");
+            assert_eq!(error.offset, invalid.find('é').unwrap());
+            assert!(error.message.contains("U+00E9"));
+        }
+        // Invalid text takes precedence over version checks even before a later TAB or CR.
+        let input = "CCSDS_TDM_VERS = 999.0\né\t\r";
+        let error = prepare_input(input, MessageKind::Tdm).unwrap_err();
+        assert!(matches!(error.as_format_error(), Some(FormatError::Kvn(_))));
+    }
 }

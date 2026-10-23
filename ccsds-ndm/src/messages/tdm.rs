@@ -13,7 +13,6 @@ use crate::types::{
     TdmDataQuality, TdmIntegrationRef, TdmMode, TdmPath, TdmRangeMode, TdmRangeUnits,
     TdmReferenceFrame, TdmTimetagRef, YesNo,
 };
-use fast_float;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
@@ -170,11 +169,15 @@ pub(super) fn is_tdm_observation_key_bytes(key: &[u8]) -> bool {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "tdm")]
 pub struct Tdm {
+    /// Message provenance and creation epoch.
     pub header: TdmHeader,
+    /// Message segments and their data.
     pub body: TdmBody,
+    /// XML root identifier; when present it must match this message family.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_TDM_VERS".to_string()))]
     pub id: Option<String>,
+    /// Supported message edition, "2.0".
     #[serde(rename = "@version")]
     #[builder(default = "2.0".to_string(), into)]
     pub version: String,
@@ -198,7 +201,11 @@ impl Ndm for Tdm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::detect::without_utf8_bom(kvn);
+        let kvn = crate::kvn::prepare_input(
+            crate::detect::without_utf8_bom(kvn),
+            crate::validation::MessageKind::Tdm,
+        )?;
+        let kvn = kvn.as_ref();
         kvn::validate_kvn_syntax(kvn)?;
         let tdm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&tdm)?;
@@ -213,6 +220,7 @@ impl Ndm for Tdm {
         xml::validate_xml_sequences(xml)?;
         let tdm: Self = crate::xml::from_str_with_context(xml, "TDM")?;
         crate::traits::Validate::validate(&tdm)?;
+        tdm.validate_xml_representability()?;
         Ok(tdm)
     }
 
@@ -222,6 +230,37 @@ impl Ndm for Tdm {
 
     fn write_xml_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
         crate::generation::write_xml_to(self, output)
+    }
+}
+
+impl Tdm {
+    pub(crate) fn validate_xml_representability(&self) -> Result<()> {
+        for segment in &self.body.segments {
+            let metadata = &segment.metadata;
+            let angle = metadata
+                .angle_type
+                .as_ref()
+                .filter(|value| matches!(value, TdmAngleType::Other(_)))
+                .map(ToString::to_string);
+            let frame = metadata
+                .reference_frame
+                .as_ref()
+                .filter(|value| matches!(value, TdmReferenceFrame::Other(_)))
+                .map(ToString::to_string);
+            for (field, value) in [("ANGLE_TYPE", angle), ("REFERENCE_FRAME", frame)] {
+                if let Some(value) = value {
+                    return Err(ValidationError::InvalidValue {
+                        field: field.into(),
+                        value,
+                        expected: "a value representable by the bundled TDM 2.0 XML enumeration"
+                            .into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -298,6 +337,7 @@ impl crate::traits::Validate for TdmHeader {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct TdmBody {
+    /// Tracking segments in source order (TDM §3.1).
     #[serde(rename = "segment")]
     #[builder(default)]
     pub segments: Vec<TdmSegment>,
@@ -320,6 +360,7 @@ impl crate::traits::Validate for TdmBody {
     }
 }
 
+/// Tracking configuration and its observations (TDM §3.1).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct TdmSegment {
@@ -338,6 +379,7 @@ impl crate::traits::Validate for TdmSegment {
 }
 
 impl TdmSegment {
+    /// Validate this value against the supported CCSDS profile.
     pub fn validate(&self) -> Result<()> {
         crate::traits::Validate::validate(self)
     }
@@ -347,6 +389,7 @@ impl TdmSegment {
 // Metadata
 //----------------------------------------------------------------------
 
+/// Tracking configuration for one segment (TDM table 3-3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct TdmMetadata {
@@ -444,7 +487,8 @@ pub struct TdmMetadata {
     /// The PATH keywords shall reflect the signal path by listing the index of each participant
     /// in order, separated by commas, with no inserted white space. Correlated with the
     /// indices of the PARTICIPANT_n keywords. The first entry in the PATH shall be the
-    /// transmit participant.
+    /// transmit participant. KVN input with blanks around the commas (`PATH = 2, 1`) is
+    /// read as the canonical `2,1`, which is what every writer emits.
     ///
     /// **Examples**: PATH = 1,2,1, PATH_1 = 1,2,1, PATH_2 = 3,1
     ///
@@ -551,7 +595,11 @@ pub struct TdmMetadata {
     /// **Units**: Hz
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "xml::default_zero"
+    )]
     pub freq_offset: Option<f64>,
     /// The value of the RANGE_MODE keyword shall be ‘COHERENT’, in which case the range tones
     /// are coherent with the uplink carrier; ‘CONSTANT’, in which case the range tones have a
@@ -570,7 +618,11 @@ pub struct TdmMetadata {
     /// **Examples**: 32768.0, 2.0e+23, 0.0, 161.6484
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "xml::default_zero"
+    )]
     pub range_modulus: Option<f64>,
     /// The RANGE_UNITS keyword specifies the units for the range observable. ‘km’ shall be
     /// used if the range is measured in kilometers. ‘s’ shall be used if the range is measured
@@ -592,7 +644,8 @@ pub struct TdmMetadata {
     pub angle_type: Option<TdmAngleType>,
     /// The REFERENCE_FRAME keyword shall be used in conjunction with the ‘ANGLE_TYPE=RADEC’
     /// keyword/value combination, indicating the inertial reference frame to which the antenna
-    /// frame is referenced.
+    /// frame is referenced. Validation requires it whenever ANGLE_TYPE is RADEC in any letter
+    /// case, because RADEC angles are meaningless without their inertial frame.
     ///
     /// **Examples**: EME2000, ICRF, ITRF1993, ITRF2000, TOD_EARTH
     ///
@@ -656,31 +709,51 @@ pub struct TdmMetadata {
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "xml::default_zero"
+    )]
     pub transmit_delay_1: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 2.
     ///
     /// **Units**: s
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "xml::default_zero"
+    )]
     pub transmit_delay_2: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 3.
     ///
     /// **Units**: s
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "xml::default_zero"
+    )]
     pub transmit_delay_3: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 4.
     ///
     /// **Units**: s
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "xml::default_zero"
+    )]
     pub transmit_delay_4: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 5.
     ///
     /// **Units**: s
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "xml::default_zero"
+    )]
     pub transmit_delay_5: Option<f64>,
     /// The RECEIVE_DELAY_n keyword shall specify a fixed interval of time, in seconds,
     /// required for the signal to travel from the tracking point to the receiving electronics.
@@ -691,31 +764,51 @@ pub struct TdmMetadata {
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "xml::default_zero"
+    )]
     pub receive_delay_1: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 2.
     ///
     /// **Units**: s
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "xml::default_zero"
+    )]
     pub receive_delay_2: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 3.
     ///
     /// **Units**: s
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "xml::default_zero"
+    )]
     pub receive_delay_3: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 4.
     ///
     /// **Units**: s
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "xml::default_zero"
+    )]
     pub receive_delay_4: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 5.
     ///
     /// **Units**: s
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "xml::default_zero"
+    )]
     pub receive_delay_5: Option<f64>,
     /// Provides an estimate of the quality of the data, based on indicators from the producers
     /// of the data (e.g., bad time synchronization flags, marginal lock status indicators,
@@ -724,7 +817,11 @@ pub struct TdmMetadata {
     /// **Examples**: RAW, VALIDATED, DEGRADED
     ///
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "xml::default_quality"
+    )]
     pub data_quality: Option<TdmDataQuality>,
     /// The set of CORRECTION_* keywords may be used to reflect the values of corrections that
     /// have been added to the data or should be added to the data (e.g., ranging station delay
@@ -735,22 +832,31 @@ pub struct TdmMetadata {
     /// **CCSDS Reference**: 503.0-B-2, Section 3.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_angle_1: Option<f64>,
+    /// Correction for the second angle, in degrees (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_angle_2: Option<f64>,
+    /// Correction for Doppler (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_doppler: Option<f64>,
+    /// Correction for magnitude (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_mag: Option<f64>,
+    /// Correction for range (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_range: Option<f64>,
+    /// Correction for radar cross section (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_rcs: Option<f64>,
+    /// Correction for received frequency (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_receive: Option<f64>,
+    /// Correction for transmitted frequency (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_transmit: Option<f64>,
+    /// Correction for annual aberration (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_aberration_yearly: Option<f64>,
+    /// Correction for diurnal aberration (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_aberration_diurnal: Option<f64>,
     /// This keyword is used to indicate whether or not the values associated with the
@@ -842,7 +948,12 @@ impl crate::traits::Validate for TdmMetadata {
             }
             None => {}
         }
-        if self.angle_type == Some(TdmAngleType::Radec) && self.reference_frame.is_none() {
+        if self
+            .angle_type
+            .as_ref()
+            .is_some_and(|value| value.to_string().eq_ignore_ascii_case("RADEC"))
+            && self.reference_frame.is_none()
+        {
             return Err(ValidationError::MissingRequiredField {
                 block: "TDM Metadata".into(),
                 field: "REFERENCE_FRAME (required when ANGLE_TYPE=RADEC)".into(),
@@ -875,6 +986,40 @@ impl crate::traits::Validate for TdmMetadata {
                 line: None,
             }
             .into());
+        }
+        for (field, value) in [
+            (
+                "ANGLE_TYPE",
+                self.angle_type.as_ref().and_then(|value| match value {
+                    TdmAngleType::Other(value) => Some(value),
+                    _ => None,
+                }),
+            ),
+            (
+                "REFERENCE_FRAME",
+                self.reference_frame.as_ref().and_then(|value| match value {
+                    TdmReferenceFrame::Other(value) => Some(value),
+                    _ => None,
+                }),
+            ),
+        ] {
+            if value.is_some_and(|value| value.trim().is_empty()) {
+                return Err(ValidationError::missing_required("TDM Metadata", field).into());
+            }
+        }
+        if let Some(types) = &self.data_types {
+            for value in types.split(',').map(str::trim) {
+                let indexed = value.strip_suffix("_n").map(|base| format!("{base}_1"));
+                if !is_tdm_observation_key_bytes(indexed.as_deref().unwrap_or(value).as_bytes()) {
+                    return Err(ValidationError::InvalidValue {
+                        field: "DATA_TYPES".into(),
+                        value: value.into(),
+                        expected: "observation keywords from TDM table 3-5".into(),
+                        line: None,
+                    }
+                    .into());
+                }
+            }
         }
         for (field, value) in [
             ("INTEGRATION_INTERVAL", self.integration_interval),
@@ -932,13 +1077,7 @@ impl crate::traits::Validate for TdmMetadata {
                 }
             }
         }
-        let participants = [
-            true,
-            self.participant_2.is_some(),
-            self.participant_3.is_some(),
-            self.participant_4.is_some(),
-            self.participant_5.is_some(),
-        ];
+        let participants = self.populated_participants();
         for (field, path) in [
             ("PATH", &self.path),
             ("PATH_1", &self.path_1),
@@ -993,11 +1132,43 @@ impl crate::traits::Validate for TdmMetadata {
 }
 
 impl TdmMetadata {
+    /// Validate this value against the supported CCSDS profile.
     pub fn validate(&self) -> Result<()> {
         crate::traits::Validate::validate(self)
     }
 
+    /// PARTICIPANT_1..5 that carry a non-blank value; an empty XML element names no participant.
+    fn populated_participants(&self) -> [bool; 5] {
+        [
+            Some(&self.participant_1),
+            self.participant_2.as_ref(),
+            self.participant_3.as_ref(),
+            self.participant_4.as_ref(),
+            self.participant_5.as_ref(),
+        ]
+        .map(|value| value.is_some_and(|value| !value.trim().is_empty()))
+    }
+
     fn validate_for(&self, data: &TdmData) -> Result<()> {
+        let participants = self.populated_participants();
+        for (index, observation) in data.observations.iter().enumerate() {
+            let key = observation.data.key();
+            // §§3.5.2.11-3.5.2.12 index only phase counts by PARTICIPANT_n; the indexed
+            // RECEIVE_FREQ_n/TRANSMIT_FREQ_n/TRANSMIT_FREQ_RATE_n count receivers/transmitters.
+            if observation.data.phase_count().is_some() {
+                let participant = (key.as_bytes()[key.len() - 1] - b'1') as usize;
+                if !participants[participant] {
+                    return Err(ValidationError::InvalidValue {
+                        field: key.into(),
+                        value: format!("PARTICIPANT_{}", participant + 1),
+                        expected: "a populated participant for the indexed observation".into(),
+                        line: None,
+                    }
+                    .at_path(format!("data.observations[{index}]"))
+                    .into());
+                }
+            }
+        }
         let has_differenced_frequency_or_range = data.observations.iter().any(|observation| {
             matches!(
                 observation.data,
@@ -1006,7 +1177,10 @@ impl TdmMetadata {
         });
         if self.mode == Some(TdmMode::SingleDiff)
             && has_differenced_frequency_or_range
-            && self.receive_band.is_none()
+            && self
+                .receive_band
+                .as_ref()
+                .is_none_or(|value| value.trim().is_empty())
         {
             return Err(ValidationError::MissingRequiredField {
                 block: "TDM Metadata".into(),
@@ -1047,14 +1221,46 @@ impl crate::traits::Validate for TdmData {
             }
             .into());
         }
-        for observation in &self.observations {
-            observation.data.validate()?;
+        let mut previous = std::collections::HashMap::new();
+        let mut index = 0;
+        for run in self
+            .observations
+            .chunk_by(|left, right| left.data.key() == right.data.key())
+        {
+            let keyword = run[0].data.key();
+            // Resolve chronology once per consecutive run, retaining borrowed comparison keys.
+            let prior: &mut Option<crate::types::EpochOrderKey<'_>> =
+                previous.entry(keyword).or_insert(None);
+            for observation in run {
+                observation.data.validate()?;
+                let current = observation
+                    .epoch
+                    .as_epoch()
+                    .order_key()
+                    .expect("CalendarEpoch contains a valid calendar epoch");
+                if let Some(epoch) = prior {
+                    if epoch.compare(&current) != Some(std::cmp::Ordering::Less) {
+                        return Err(ValidationError::InvalidValue {
+                            field: keyword.into(),
+                            value: observation.epoch.to_string(),
+                            expected: "strictly increasing epochs for each observation keyword"
+                                .into(),
+                            line: None,
+                        }
+                        .at_path(format!("observations[{index}].epoch"))
+                        .into());
+                    }
+                }
+                *prior = Some(current);
+                index += 1;
+            }
         }
         Ok(())
     }
 }
 
 impl TdmData {
+    /// Validate this value against the supported CCSDS profile.
     pub fn validate(&self) -> Result<()> {
         crate::traits::Validate::validate(self)
     }
@@ -1075,6 +1281,7 @@ pub struct TdmObservation {
     pub data: TdmObservationData,
 }
 
+/// One typed tracking measurement (TDM table 3-5).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum TdmObservationData {
@@ -1142,46 +1349,46 @@ pub enum TdmObservationData {
     ///
     /// Units: Hz
     ReceiveFreq(f64),
-    /// Received frequency for channel 1.
+    /// Received frequency for downlink 1 (index need not name a participant, §3.5.2.8).
     ///
     /// Units: Hz
     #[serde(rename = "RECEIVE_FREQ_1")]
     ReceiveFreq1(f64),
-    /// Received frequency for channel 2.
+    /// Received frequency for downlink 2 (index need not name a participant, §3.5.2.8).
     ///
     /// Units: Hz
     #[serde(rename = "RECEIVE_FREQ_2")]
     ReceiveFreq2(f64),
-    /// Received frequency for channel 3.
+    /// Received frequency for downlink 3 (index need not name a participant, §3.5.2.8).
     ///
     /// Units: Hz
     #[serde(rename = "RECEIVE_FREQ_3")]
     ReceiveFreq3(f64),
-    /// Received frequency for channel 4.
+    /// Received frequency for downlink 4 (index need not name a participant, §3.5.2.8).
     ///
     /// Units: Hz
     #[serde(rename = "RECEIVE_FREQ_4")]
     ReceiveFreq4(f64),
-    /// Received frequency for channel 5.
+    /// Received frequency for downlink 5 (index need not name a participant, §3.5.2.8).
     ///
     /// Units: Hz
     #[serde(rename = "RECEIVE_FREQ_5")]
     ReceiveFreq5(f64),
-    /// Received phase count for channel 1.
+    /// Received phase count for PARTICIPANT_1 (§3.5.2.11).
     #[serde(rename = "RECEIVE_PHASE_CT_1")]
-    ReceivePhaseCt1(f64),
-    /// Received phase count for channel 2.
+    ReceivePhaseCt1(String),
+    /// Received phase count for PARTICIPANT_2 (§3.5.2.11).
     #[serde(rename = "RECEIVE_PHASE_CT_2")]
-    ReceivePhaseCt2(f64),
-    /// Received phase count for channel 3.
+    ReceivePhaseCt2(String),
+    /// Received phase count for PARTICIPANT_3 (§3.5.2.11).
     #[serde(rename = "RECEIVE_PHASE_CT_3")]
-    ReceivePhaseCt3(f64),
-    /// Received phase count for channel 4.
+    ReceivePhaseCt3(String),
+    /// Received phase count for PARTICIPANT_4 (§3.5.2.11).
     #[serde(rename = "RECEIVE_PHASE_CT_4")]
-    ReceivePhaseCt4(f64),
-    /// Received phase count for channel 5.
+    ReceivePhaseCt4(String),
+    /// Received phase count for PARTICIPANT_5 (§3.5.2.11).
     #[serde(rename = "RECEIVE_PHASE_CT_5")]
-    ReceivePhaseCt5(f64),
+    ReceivePhaseCt5(String),
     /// Relative humidity observable.
     ///
     /// Units: %
@@ -1194,71 +1401,71 @@ pub enum TdmObservationData {
     ///
     /// Units: K
     Temperature(f64),
-    /// Transmitted frequency for channel 1.
+    /// Transmitted frequency for transmitter 1 (§3.5.2.9).
     ///
     /// Units: Hz
     #[serde(rename = "TRANSMIT_FREQ_1")]
     TransmitFreq1(f64),
-    /// Transmitted frequency for channel 2.
+    /// Transmitted frequency for transmitter 2 (§3.5.2.9).
     ///
     /// Units: Hz
     #[serde(rename = "TRANSMIT_FREQ_2")]
     TransmitFreq2(f64),
-    /// Transmitted frequency for channel 3.
+    /// Transmitted frequency for transmitter 3 (§3.5.2.9).
     ///
     /// Units: Hz
     #[serde(rename = "TRANSMIT_FREQ_3")]
     TransmitFreq3(f64),
-    /// Transmitted frequency for channel 4.
+    /// Transmitted frequency for transmitter 4 (§3.5.2.9).
     ///
     /// Units: Hz
     #[serde(rename = "TRANSMIT_FREQ_4")]
     TransmitFreq4(f64),
-    /// Transmitted frequency for channel 5.
+    /// Transmitted frequency for transmitter 5 (§3.5.2.9).
     ///
     /// Units: Hz
     #[serde(rename = "TRANSMIT_FREQ_5")]
     TransmitFreq5(f64),
-    /// Linear rate of change of the frequency for channel 1.
+    /// Linear rate of change of the frequency for transmitter 1.
     ///
     /// Units: Hz/s
     #[serde(rename = "TRANSMIT_FREQ_RATE_1")]
     TransmitFreqRate1(f64),
-    /// Linear rate of change of the frequency for channel 2.
+    /// Linear rate of change of the frequency for transmitter 2.
     ///
     /// Units: Hz/s
     #[serde(rename = "TRANSMIT_FREQ_RATE_2")]
     TransmitFreqRate2(f64),
-    /// Linear rate of change of the frequency for channel 3.
+    /// Linear rate of change of the frequency for transmitter 3.
     ///
     /// Units: Hz/s
     #[serde(rename = "TRANSMIT_FREQ_RATE_3")]
     TransmitFreqRate3(f64),
-    /// Linear rate of change of the frequency for channel 4.
+    /// Linear rate of change of the frequency for transmitter 4.
     ///
     /// Units: Hz/s
     #[serde(rename = "TRANSMIT_FREQ_RATE_4")]
     TransmitFreqRate4(f64),
-    /// Linear rate of change of the frequency for channel 5.
+    /// Linear rate of change of the frequency for transmitter 5.
     ///
     /// Units: Hz/s
     #[serde(rename = "TRANSMIT_FREQ_RATE_5")]
     TransmitFreqRate5(f64),
-    /// Transmitted phase count for channel 1.
+    /// Transmitted phase count for PARTICIPANT_1 (§3.5.2.12).
     #[serde(rename = "TRANSMIT_PHASE_CT_1")]
-    TransmitPhaseCt1(f64),
-    /// Transmitted phase count for channel 2.
+    TransmitPhaseCt1(String),
+    /// Transmitted phase count for PARTICIPANT_2 (§3.5.2.12).
     #[serde(rename = "TRANSMIT_PHASE_CT_2")]
-    TransmitPhaseCt2(f64),
-    /// Transmitted phase count for channel 3.
+    TransmitPhaseCt2(String),
+    /// Transmitted phase count for PARTICIPANT_3 (§3.5.2.12).
     #[serde(rename = "TRANSMIT_PHASE_CT_3")]
-    TransmitPhaseCt3(f64),
-    /// Transmitted phase count for channel 4.
+    TransmitPhaseCt3(String),
+    /// Transmitted phase count for PARTICIPANT_4 (§3.5.2.12).
     #[serde(rename = "TRANSMIT_PHASE_CT_4")]
-    TransmitPhaseCt4(f64),
-    /// Transmitted phase count for channel 5.
+    TransmitPhaseCt4(String),
+    /// Transmitted phase count for PARTICIPANT_5 (§3.5.2.12).
     #[serde(rename = "TRANSMIT_PHASE_CT_5")]
-    TransmitPhaseCt5(f64),
+    TransmitPhaseCt5(String),
     /// Dry zenith delay through the troposphere.
     ///
     /// Units: m
@@ -1273,10 +1480,60 @@ pub enum TdmObservationData {
     VlbiDelay(f64),
 }
 
+// TDM 3.5.2.11-12 permit arbitrary precision; validate syntax without conversion to f64.
+fn valid_phase_count(value: &str) -> bool {
+    let mut bytes = value.bytes().peekable();
+    if matches!(bytes.peek(), Some(b'+' | b'-')) {
+        bytes.next();
+    }
+    let mut digits = 0;
+    while bytes.peek().is_some_and(u8::is_ascii_digit) {
+        bytes.next();
+        digits += 1;
+    }
+    if bytes.peek() == Some(&b'.') {
+        bytes.next();
+        while bytes.peek().is_some_and(u8::is_ascii_digit) {
+            bytes.next();
+            digits += 1;
+        }
+    }
+    if digits == 0 {
+        return false;
+    }
+    if matches!(bytes.peek(), Some(b'e' | b'E')) {
+        bytes.next();
+        if matches!(bytes.peek(), Some(b'+' | b'-')) {
+            bytes.next();
+        }
+        let mut exponent_digits = 0;
+        while bytes.peek().is_some_and(u8::is_ascii_digit) {
+            bytes.next();
+            exponent_digits += 1;
+        }
+        if exponent_digits == 0 {
+            return false;
+        }
+    }
+    bytes.next().is_none()
+}
+
 impl TdmObservationData {
-    pub fn value(&self) -> f64 {
+    /// Numeric value, or None for an exact decimal phase count; use value_to_string for either.
+    pub fn value(&self) -> Option<f64> {
         match self {
-            Self::Rhumidity(value) => value.value,
+            Self::ReceivePhaseCt1(_) => None,
+            Self::ReceivePhaseCt2(_) => None,
+            Self::ReceivePhaseCt3(_) => None,
+            Self::ReceivePhaseCt4(_) => None,
+            Self::ReceivePhaseCt5(_) => None,
+            Self::TransmitPhaseCt1(_) => None,
+            Self::TransmitPhaseCt2(_) => None,
+            Self::TransmitPhaseCt3(_) => None,
+            Self::TransmitPhaseCt4(_) => None,
+            Self::TransmitPhaseCt5(_) => None,
+
+            Self::Rhumidity(value) => Some(value.value),
             Self::Angle1(value)
             | Self::Angle2(value)
             | Self::CarrierPower(value)
@@ -1298,11 +1555,6 @@ impl TdmObservationData {
             | Self::ReceiveFreq3(value)
             | Self::ReceiveFreq4(value)
             | Self::ReceiveFreq5(value)
-            | Self::ReceivePhaseCt1(value)
-            | Self::ReceivePhaseCt2(value)
-            | Self::ReceivePhaseCt3(value)
-            | Self::ReceivePhaseCt4(value)
-            | Self::ReceivePhaseCt5(value)
             | Self::Stec(value)
             | Self::Temperature(value)
             | Self::TransmitFreq1(value)
@@ -1315,19 +1567,43 @@ impl TdmObservationData {
             | Self::TransmitFreqRate3(value)
             | Self::TransmitFreqRate4(value)
             | Self::TransmitFreqRate5(value)
+            | Self::TropoDry(value)
+            | Self::TropoWet(value)
+            | Self::VlbiDelay(value) => Some(*value),
+        }
+    }
+
+    /// Exact phase-count text. These values must not be rounded through binary floating point.
+    pub(crate) fn phase_count(&self) -> Option<&str> {
+        match self {
+            Self::ReceivePhaseCt1(value)
+            | Self::ReceivePhaseCt2(value)
+            | Self::ReceivePhaseCt3(value)
+            | Self::ReceivePhaseCt4(value)
+            | Self::ReceivePhaseCt5(value)
             | Self::TransmitPhaseCt1(value)
             | Self::TransmitPhaseCt2(value)
             | Self::TransmitPhaseCt3(value)
             | Self::TransmitPhaseCt4(value)
-            | Self::TransmitPhaseCt5(value)
-            | Self::TropoDry(value)
-            | Self::TropoWet(value)
-            | Self::VlbiDelay(value) => *value,
+            | Self::TransmitPhaseCt5(value) => Some(value),
+            _ => None,
         }
     }
 
     fn validate(&self) -> Result<()> {
-        let value = self.value();
+        if let Some(value) = self.phase_count() {
+            if !valid_phase_count(value) {
+                return Err(ValidationError::InvalidValue {
+                    field: self.key().into(),
+                    value: value.into(),
+                    expected: "a decimal phase-count string".into(),
+                    line: None,
+                }
+                .into());
+            }
+            return Ok(());
+        }
+        let value = self.value().expect("numeric observation");
         if !value.is_finite() {
             return Err(ValidationError::InvalidValue {
                 field: self.key().into(),
@@ -1341,6 +1617,8 @@ impl TdmObservationData {
             Percentage::validate_value(value.value, "RHUMIDITY")?;
         }
         let invalid_range = match self {
+            // §3.5.2.4 requires an integer; positivity is only a recommendation.
+            Self::DopplerCount(value) => (value.fract() != 0.0).then_some("an integer count"),
             Self::TransmitFreq1(value)
             | Self::TransmitFreq2(value)
             | Self::TransmitFreq3(value)
@@ -1374,6 +1652,7 @@ impl TdmObservationData {
         Ok(())
     }
 
+    /// The canonical TDM observation keyword (TDM table 3-5).
     pub fn key(&self) -> &'static str {
         match self {
             Self::Angle1(_) => "ANGLE_1",
@@ -1426,14 +1705,17 @@ impl TdmObservationData {
         }
     }
 
+    /// Format the value, retaining the exact decimal text of phase counts.
     pub fn value_to_string(&self) -> String {
-        self.value().to_string()
+        self.phase_count()
+            .map(str::to_owned)
+            .unwrap_or_else(|| self.value().expect("numeric observation").to_string())
     }
 
     /// Builds an observation from its CCSDS keyword and numeric value.
     ///
-    /// This is the single keyword-to-variant mapping; the KVN, XML and Python paths all
-    /// route through it.
+    /// Numeric construction formats phase counts from the supplied floating-point value.
+    /// Use `from_key_val` with decimal text when all phase-count digits must be retained.
     pub fn from_key_value(key: &str, value: f64) -> Result<Self> {
         match key {
             "ANGLE_1" => Ok(Self::Angle1(value)),
@@ -1457,12 +1739,15 @@ impl TdmObservationData {
             "RECEIVE_FREQ_3" => Ok(Self::ReceiveFreq3(value)),
             "RECEIVE_FREQ_4" => Ok(Self::ReceiveFreq4(value)),
             "RECEIVE_FREQ_5" => Ok(Self::ReceiveFreq5(value)),
-            "RECEIVE_PHASE_CT_1" => Ok(Self::ReceivePhaseCt1(value)),
-            "RECEIVE_PHASE_CT_2" => Ok(Self::ReceivePhaseCt2(value)),
-            "RECEIVE_PHASE_CT_3" => Ok(Self::ReceivePhaseCt3(value)),
-            "RECEIVE_PHASE_CT_4" => Ok(Self::ReceivePhaseCt4(value)),
-            "RECEIVE_PHASE_CT_5" => Ok(Self::ReceivePhaseCt5(value)),
-            "RHUMIDITY" => Ok(Self::Rhumidity(Percentage::new(value, None)?)),
+            "RECEIVE_PHASE_CT_1" => Ok(Self::ReceivePhaseCt1(value.to_string())),
+            "RECEIVE_PHASE_CT_2" => Ok(Self::ReceivePhaseCt2(value.to_string())),
+            "RECEIVE_PHASE_CT_3" => Ok(Self::ReceivePhaseCt3(value.to_string())),
+            "RECEIVE_PHASE_CT_4" => Ok(Self::ReceivePhaseCt4(value.to_string())),
+            "RECEIVE_PHASE_CT_5" => Ok(Self::ReceivePhaseCt5(value.to_string())),
+            "RHUMIDITY" => {
+                Percentage::validate_value(value, "RHUMIDITY")?;
+                Ok(Self::Rhumidity(Percentage { value, units: None }))
+            }
             "STEC" => Ok(Self::Stec(value)),
             "TEMPERATURE" => Ok(Self::Temperature(value)),
             "TRANSMIT_FREQ_1" => Ok(Self::TransmitFreq1(value)),
@@ -1475,11 +1760,11 @@ impl TdmObservationData {
             "TRANSMIT_FREQ_RATE_3" => Ok(Self::TransmitFreqRate3(value)),
             "TRANSMIT_FREQ_RATE_4" => Ok(Self::TransmitFreqRate4(value)),
             "TRANSMIT_FREQ_RATE_5" => Ok(Self::TransmitFreqRate5(value)),
-            "TRANSMIT_PHASE_CT_1" => Ok(Self::TransmitPhaseCt1(value)),
-            "TRANSMIT_PHASE_CT_2" => Ok(Self::TransmitPhaseCt2(value)),
-            "TRANSMIT_PHASE_CT_3" => Ok(Self::TransmitPhaseCt3(value)),
-            "TRANSMIT_PHASE_CT_4" => Ok(Self::TransmitPhaseCt4(value)),
-            "TRANSMIT_PHASE_CT_5" => Ok(Self::TransmitPhaseCt5(value)),
+            "TRANSMIT_PHASE_CT_1" => Ok(Self::TransmitPhaseCt1(value.to_string())),
+            "TRANSMIT_PHASE_CT_2" => Ok(Self::TransmitPhaseCt2(value.to_string())),
+            "TRANSMIT_PHASE_CT_3" => Ok(Self::TransmitPhaseCt3(value.to_string())),
+            "TRANSMIT_PHASE_CT_4" => Ok(Self::TransmitPhaseCt4(value.to_string())),
+            "TRANSMIT_PHASE_CT_5" => Ok(Self::TransmitPhaseCt5(value.to_string())),
             "TROPO_DRY" => Ok(Self::TropoDry(value)),
             "TROPO_WET" => Ok(Self::TropoWet(value)),
             "VLBI_DELAY" => Ok(Self::VlbiDelay(value)),
@@ -1493,8 +1778,26 @@ impl TdmObservationData {
         }
     }
 
+    /// Parse a TDM keyword and value; reject unknown keywords or invalid numeric values.
     pub fn from_key_val(key: &str, val: &str) -> Result<Self> {
-        let value = fast_float::parse(val).map_err(|_| {
+        let phase: Option<fn(String) -> Self> = match key {
+            "RECEIVE_PHASE_CT_1" => Some(Self::ReceivePhaseCt1),
+            "RECEIVE_PHASE_CT_2" => Some(Self::ReceivePhaseCt2),
+            "RECEIVE_PHASE_CT_3" => Some(Self::ReceivePhaseCt3),
+            "RECEIVE_PHASE_CT_4" => Some(Self::ReceivePhaseCt4),
+            "RECEIVE_PHASE_CT_5" => Some(Self::ReceivePhaseCt5),
+            "TRANSMIT_PHASE_CT_1" => Some(Self::TransmitPhaseCt1),
+            "TRANSMIT_PHASE_CT_2" => Some(Self::TransmitPhaseCt2),
+            "TRANSMIT_PHASE_CT_3" => Some(Self::TransmitPhaseCt3),
+            "TRANSMIT_PHASE_CT_4" => Some(Self::TransmitPhaseCt4),
+            "TRANSMIT_PHASE_CT_5" => Some(Self::TransmitPhaseCt5),
+            _ => None,
+        };
+        if let Some(phase) = phase.map(|phase| phase(val.trim().to_owned())) {
+            phase.validate()?;
+            return Ok(phase);
+        }
+        let value = crate::kvn::parser::parse_ccsds_number(val.trim()).ok_or_else(|| {
             CcsdsNdmError::Format(Box::new(crate::error::FormatError::InvalidFormat(format!(
                 "Invalid float: {val}"
             ))))

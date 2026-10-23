@@ -37,17 +37,21 @@ pub fn apm_version(input: &mut &str) -> KvnResult<String> {
 // APM Metadata Parser
 //----------------------------------------------------------------------
 
-pub fn apm_metadata(input: &mut &str) -> KvnResult<ApmMetadata> {
-    let mut comment = Vec::new();
+/// Returns the metadata and any comments that followed it, which (without the non-standard
+/// META_STOP) are the data comments before EPOCH.
+pub fn apm_metadata(input: &mut &str) -> KvnResult<(ApmMetadata, Vec<String>)> {
+    let mut trailing = Vec::new();
     let mut object_name = None;
     let mut object_id = None;
     let mut center_name = None;
     let mut time_system = None;
 
-    // META_START is optional in some APM examples (e.g. apm_g1.kvn)
+    // ADM table 3-2 has no META_START/META_STOP; some producers write them anyway.
     let _ = winnow::combinator::opt(expect_block_start("META")).parse_next(input)?;
+    // The syntax check allows metadata comments only before OBJECT_NAME.
+    let comment = collect_comments.parse_next(input)?;
 
-    parse_block!(input, comment, {
+    parse_block!(input, trailing, {
         "OBJECT_NAME" => object_name: kv_string,
         "OBJECT_ID" => object_id: kv_string,
         "CENTER_NAME" => center_name: kv_string,
@@ -56,13 +60,16 @@ pub fn apm_metadata(input: &mut &str) -> KvnResult<ApmMetadata> {
 
     let _ = winnow::combinator::opt(expect_block_end("META")).parse_next(input)?;
 
-    Ok(ApmMetadata {
-        comment,
-        object_name: require_field(input, "APM Metadata", "OBJECT_NAME", object_name)?,
-        object_id: require_field(input, "APM Metadata", "OBJECT_ID", object_id)?,
-        center_name,
-        time_system: require_field(input, "APM Metadata", "TIME_SYSTEM", time_system)?,
-    })
+    Ok((
+        ApmMetadata {
+            comment,
+            object_name: require_field(input, "APM Metadata", "OBJECT_NAME", object_name)?,
+            object_id: require_field(input, "APM Metadata", "OBJECT_ID", object_id)?,
+            center_name,
+            time_system: require_field(input, "APM Metadata", "TIME_SYSTEM", time_system)?,
+        },
+        trailing,
+    ))
 }
 
 //----------------------------------------------------------------------
@@ -326,11 +333,8 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<AttManeuverState> {
 // APM Segment & Main Parser
 //----------------------------------------------------------------------
 
-pub fn apm_data(input: &mut &str) -> KvnResult<ApmData> {
-    // APM Data Section parsing
-
-    // First, comments are allowed before EPOCH
-    let mut comment = Vec::new();
+pub fn apm_data(input: &mut &str, mut comment: Vec<String>) -> KvnResult<ApmData> {
+    // Comments are allowed before EPOCH
     comment.extend(collect_comments.parse_next(input)?);
 
     // EPOCH is mandatory and usually the first key in data section
@@ -387,9 +391,9 @@ pub fn apm_data(input: &mut &str) -> KvnResult<ApmData> {
 }
 
 pub fn apm_segment(input: &mut &str) -> KvnResult<ApmSegment> {
-    let metadata = apm_metadata.parse_next(input)?;
+    let (metadata, data_comment) = apm_metadata.parse_next(input)?;
     let _ = skip_empty_lines.parse_next(input);
-    let data = apm_data.parse_next(input)?;
+    let data = apm_data(input, data_comment)?;
 
     Ok(ApmSegment { metadata, data })
 }
@@ -527,12 +531,6 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
         if line.as_bytes().contains(&b'\r') {
             return fail("lone carriage return");
         }
-        if line.len() > 254 {
-            return fail("line exceeds the normative 254-character limit");
-        }
-        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
-            return fail("non-printable or non-ASCII character");
-        }
         let line = line.trim();
         if line.is_empty() {
             offset += raw_line.len() + 1;
@@ -661,9 +659,8 @@ impl ToKvn for ApmBody {
 
 impl ToKvn for ApmSegment {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_line("META_START");
+        // APM (ADM table 3-2) has no metadata delimiters; the reader only tolerates them.
         self.metadata.write_kvn(writer);
-        writer.write_line("META_STOP");
         writer.write_line("");
         self.data.write_kvn(writer);
     }

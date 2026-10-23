@@ -51,22 +51,6 @@ pub(crate) fn validate_odm_assignments(kvn: &str, rules: &OdmAssignmentRules) ->
                 "lone carriage return",
             ));
         }
-        if line.len() > 254 {
-            return Err(invalid(
-                rules,
-                line_number,
-                line_offset,
-                "line exceeds the normative 254-character limit",
-            ));
-        }
-        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
-            return Err(invalid(
-                rules,
-                line_number,
-                line_offset,
-                "non-printable or non-ASCII character",
-            ));
-        }
 
         let line = line.trim();
         if line.is_empty() {

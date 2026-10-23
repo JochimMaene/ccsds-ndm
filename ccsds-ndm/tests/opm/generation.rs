@@ -294,7 +294,9 @@ fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
                     .user_defined_parameters
                     .as_mut()
                     .unwrap()
-                    .user_defined[0]
+                    .parameters_mut()
+                    .next()
+                    .unwrap()
                     .parameter
                     .push('\u{1}')
             },
@@ -310,8 +312,8 @@ fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
                     .user_defined_parameters
                     .as_mut()
                     .unwrap()
-                    .comment
-                    .push("\u{1}".into())
+                    .entries
+                    .push(ccsds_ndm::types::UserDefinedEntry::Comment("\u{1}".into()))
             },
         ),
         (
@@ -325,7 +327,9 @@ fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
                     .user_defined_parameters
                     .as_mut()
                     .unwrap()
-                    .user_defined[0]
+                    .parameters_mut()
+                    .next()
+                    .unwrap()
                     .value
                     .push('\u{1}')
             },
@@ -593,7 +597,7 @@ fn opm_kvn_rounds_values_that_need_seventeen_digits() {
     message.body.segment.data.state_vector.x.value = 1.234_567_890_123_456_7;
 
     let generated = message.to_kvn().expect("finite value should be rounded");
-    assert!(generated.contains("X                    = 1.234567890123457e0"));
+    assert!(generated.contains("X                    = 1.234567890123457"));
 
     let mut output = Vec::new();
     message
@@ -676,7 +680,7 @@ fn opm_kvn_rounds_numbers_in_every_optional_numeric_block() {
         assert!(message
             .to_kvn()
             .expect("finite value should be rounded")
-            .contains("1.234567890123457e0"));
+            .contains("1.234567890123457"));
         message
             .to_xml()
             .expect("the KVN-specific precision rule must not affect XML");
@@ -756,7 +760,9 @@ fn opm_kvn_rejects_invalid_user_defined_keyword_suffixes() {
             .user_defined_parameters
             .as_mut()
             .unwrap()
-            .user_defined[0]
+            .parameters_mut()
+            .next()
+            .unwrap()
             .parameter = invalid.to_owned();
 
         let error = message
@@ -789,7 +795,9 @@ fn opm_kvn_accepts_normative_user_defined_keyword_forms() {
             .user_defined_parameters
             .as_mut()
             .unwrap()
-            .user_defined[0]
+            .parameters_mut()
+            .next()
+            .unwrap()
             .parameter = valid.to_owned();
 
         let generated = message.to_kvn().expect("valid KVN keyword should generate");
@@ -849,7 +857,9 @@ fn opm_kvn_attributes_an_oversized_user_defined_keyword_to_its_parameter() {
         .user_defined_parameters
         .as_mut()
         .unwrap()
-        .user_defined[0];
+        .parameters_mut()
+        .next()
+        .unwrap();
     parameter.parameter = "A".repeat(237);
     parameter.value = "V".to_owned();
 
@@ -869,7 +879,9 @@ fn opm_kvn_attributes_an_oversized_user_defined_keyword_to_its_parameter() {
         .user_defined_parameters
         .as_mut()
         .unwrap()
-        .user_defined[0]
+        .parameters_mut()
+        .next()
+        .unwrap()
         .parameter = "A".repeat(239);
     let error = message
         .to_kvn()

@@ -12,35 +12,50 @@ use winnow::stream::Stream;
 /// Public operation that produced a diagnostic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiagnosticOperation {
+    /// Serializing a validated model into a wire notation.
     Generate,
+    /// Reading a wire document into a model.
     Parse,
 }
 
 /// Wire notation selected for an operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiagnosticNotation {
+    /// CCSDS key-value notation.
     Kvn,
+    /// CCSDS XML notation.
     Xml,
 }
 
 /// Context stored only when generation fails.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GenerationErrorContext {
+    /// Wire notation selected for this operation.
     pub notation: DiagnosticNotation,
+    /// CCSDS family being read or written.
     pub message_kind: crate::validation::MessageKind,
+    /// Edition stored on the model being generated.
     pub edition: String,
 }
 
-/// Context stored only when strict parsing fails.
+/// Context stored when parsing fails.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseErrorContext {
+    /// Wire notation selected for this operation.
     pub notation: DiagnosticNotation,
+    /// CCSDS family being read or written.
     pub message_kind: crate::validation::MessageKind,
+    /// Edition read from the source header, when available.
     pub source_edition: Option<String>,
+    /// Zero-based byte offset in the input, when available.
     pub byte_offset: Option<usize>,
+    /// One-based source line, when available.
     pub line: Option<usize>,
+    /// One-based source column, when available.
     pub column: Option<usize>,
+    /// Source record excerpt, limited to 128 Unicode characters.
     pub original_token: Option<String>,
+    /// Expected token supplied by the parser, when available; excludes internal parser labels.
     pub expected: Option<&'static str>,
 }
 
@@ -83,16 +98,25 @@ impl fmt::Display for ParseErrorContext {
 /// Borrowed, machine-readable diagnostic information.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic<'a> {
+    /// Operation that produced the error.
     pub operation: DiagnosticOperation,
+    /// Wire notation selected for this operation.
     pub notation: DiagnosticNotation,
+    /// CCSDS family being read or written.
     pub message_kind: crate::validation::MessageKind,
+    /// Edition read from the source header, when available.
     pub source_edition: Option<&'a str>,
+    /// Stable machine-readable category; wording may change independently.
     pub code: Option<&'static str>,
+    /// Canonical model path, when the containing validator provides one.
     pub field_path: Option<String>,
-    pub requirement: Option<&'static str>,
+    /// One-based line and column in the source document.
     pub source_location: Option<(usize, usize)>,
+    /// Zero-based byte offset in the input, when available.
     pub byte_offset: Option<usize>,
+    /// Source record excerpt, limited to 128 Unicode characters.
     pub original_token: Option<&'a str>,
+    /// Expected token supplied by the parser, when available; excludes internal parser labels.
     pub expected: Option<&'static str>,
 }
 
@@ -106,10 +130,15 @@ pub(crate) fn line_column(input: &str, offset: usize) -> (usize, usize) {
 /// Detailed error information for KVN parsing failures.
 #[derive(Debug, Clone, PartialEq, Error)]
 pub struct KvnParseError {
+    /// One-based source line, when available.
     pub line: usize,
+    /// One-based source column, when available.
     pub column: usize,
+    /// Human-readable explanation of the failure.
     pub message: String,
+    /// Internal parser contexts retained for inspection.
     pub contexts: Vec<&'static str>,
+    /// Zero-based byte offset used to calculate the source location.
     pub offset: usize, // Track raw offset for lazy location calculation
 }
 
@@ -120,10 +149,6 @@ impl std::fmt::Display for KvnParseError {
             "KVN parsing error at line {}, column {}: {}",
             self.line, self.column, self.message
         )?;
-        // A lone context that only repeats the message adds nothing.
-        if !self.contexts.is_empty() && self.contexts != [self.message.as_str()] {
-            write!(f, "\nContext: {}", self.contexts.join(" > "))?;
-        }
         Ok(())
     }
 }
@@ -132,8 +157,11 @@ impl std::fmt::Display for KvnParseError {
 #[derive(Debug, Clone, PartialEq, Error)]
 #[error("Invalid value '{value}' for field '{field}'; expected one of: {expected}")]
 pub struct EnumParseError {
+    /// CCSDS keyword or field whose value failed.
     pub field: &'static str,
+    /// Rejected value as text.
     pub value: String,
+    /// Expected token supplied by the parser, when available; excludes internal parser labels.
     pub expected: &'static str,
 }
 
@@ -196,7 +224,9 @@ pub enum FormatError {
     /// Errors occurring during XML deserialization with added context.
     #[error("{context}: {source}")]
     XmlWithContext {
+        /// Operation or structure in which the error occurred.
         context: String,
+        /// Underlying error, retained for category and source inspection.
         #[source]
         source: quick_xml::DeError,
     },
@@ -209,73 +239,101 @@ pub enum ValidationError {
     /// A required field was missing in the message.
     #[error("Missing required field: {field} in block {block}")]
     MissingRequiredField {
+        /// Logical block containing the required field.
         block: Cow<'static, str>,
+        /// CCSDS keyword or field whose value failed.
         field: Cow<'static, str>,
+        /// One-based source line, when available.
         line: Option<usize>,
     },
 
     /// Two or more fields are in conflict.
     #[error("Conflicting fields: {fields:?}")]
     Conflict {
+        /// Fields participating in the conflicting or exclusive choice.
         fields: Vec<Cow<'static, str>>,
+        /// One-based source line, when available.
         line: Option<usize>,
     },
 
     /// A schema choice selected either none or more than one of its alternatives.
     #[error("Invalid choice: expected exactly one of {fields:?}, selected {selected:?}")]
     InvalidChoice {
+        /// Fields participating in the conflicting or exclusive choice.
         fields: Vec<Cow<'static, str>>,
+        /// Alternatives actually selected in the model.
         selected: Vec<Cow<'static, str>>,
+        /// One-based source line, when available.
         line: Option<usize>,
     },
 
     /// A value was provided that does not match the CCSDS specification.
     #[error("Invalid value for '{field}': '{value}' (expected {expected})")]
     InvalidValue {
+        /// CCSDS keyword or field whose value failed.
         field: Cow<'static, str>,
+        /// Rejected value as text.
         value: String,
+        /// Expected token supplied by the parser, when available; excludes internal parser labels.
         expected: Cow<'static, str>,
+        /// One-based source line, when available.
+        line: Option<usize>,
+    },
+
+    /// A mandatory value is present but empty. The books require a value (ODM 7.5.1) where
+    /// the XSD string and epoch types also admit an empty one; see the validation contract.
+    #[error("{field} is empty")]
+    EmptyValue {
+        /// CCSDS keyword or field whose value failed.
+        field: Cow<'static, str>,
+        /// One-based source line, when available.
         line: Option<usize>,
     },
 
     /// Specific validation error for values out of expected range.
     #[error("Value for '{name}' is out of range: {value} (expected {expected})")]
     OutOfRange {
+        /// CCSDS keyword or numeric domain whose range failed.
         name: Cow<'static, str>,
+        /// Rejected value as text.
         value: String,
+        /// Expected token supplied by the parser, when available; excludes internal parser labels.
         expected: Cow<'static, str>,
+        /// One-based source line, when available.
         line: Option<usize>,
     },
 
     /// General validation errors for cases not covered by specific variants.
     #[error("Validation error: {message}")]
     Generic {
+        /// Human-readable explanation of the failure.
         message: Cow<'static, str>,
+        /// One-based source line, when available.
         line: Option<usize>,
     },
 
     /// An existing validation error enriched with its canonical model path.
-    #[error("{source}")]
+    #[error("{source} (field {path})")]
     AtPath {
+        /// Canonical path relative to the message root.
         path: Cow<'static, str>,
+        /// Underlying error, retained for category and source inspection.
         #[source]
         source: Box<ValidationError>,
     },
 }
 
 impl ValidationError {
-    /// Stable machine-readable code, when this diagnostic category has been stabilized.
-    ///
-    /// Categories return `None` until their code and compatibility behavior are covered by
-    /// conformance tests.
+    /// Stable machine-readable category. Path wrappers retain their source category.
     pub fn code(&self) -> Option<&'static str> {
         match self {
             Self::MissingRequiredField { .. } => Some("validation.missing_required_field"),
             Self::InvalidChoice { .. } => Some("validation.invalid_choice"),
-            Self::InvalidValue { .. } => Some("validation.invalid_value"),
+            Self::InvalidValue { .. } | Self::EmptyValue { .. } => Some("validation.invalid_value"),
             Self::OutOfRange { .. } => Some("validation.out_of_range"),
             Self::AtPath { source, .. } => source.code(),
-            _ => None,
+            Self::Conflict { .. } => Some("validation.conflict"),
+            Self::Generic { .. } => Some("validation.generic"),
         }
     }
 
@@ -317,9 +375,9 @@ impl ValidationError {
             return self;
         }
         let field = match &self {
-            Self::MissingRequiredField { field, .. } | Self::InvalidValue { field, .. } => {
-                field.as_ref()
-            }
+            Self::MissingRequiredField { field, .. }
+            | Self::InvalidValue { field, .. }
+            | Self::EmptyValue { field, .. } => field.as_ref(),
             Self::OutOfRange { name, .. } => name.as_ref(),
             Self::InvalidChoice { .. } => return self.at_path(parent_path),
             Self::Conflict { .. } | Self::Generic { .. } | Self::AtPath { .. } => return self,
@@ -361,12 +419,34 @@ impl ValidationError {
         self.at_path(parent_path)
     }
 
+    /// One-based source line, when a parser located the failing record.
+    pub fn line(&self) -> Option<usize> {
+        match self {
+            Self::AtPath { source, .. } => source.line(),
+            Self::MissingRequiredField { line, .. }
+            | Self::Conflict { line, .. }
+            | Self::InvalidChoice { line, .. }
+            | Self::InvalidValue { line, .. }
+            | Self::EmptyValue { line, .. }
+            | Self::OutOfRange { line, .. }
+            | Self::Generic { line, .. } => *line,
+        }
+    }
+
+    fn line_suffix(&self) -> String {
+        self.line()
+            .map_or_else(String::new, |line| format!(" (line {line})"))
+    }
+
     fn set_line_if_missing(&mut self, line: usize) {
         match self {
             Self::OutOfRange {
                 line: error_line, ..
             }
             | Self::InvalidValue {
+                line: error_line, ..
+            }
+            | Self::EmptyValue {
                 line: error_line, ..
             }
             | Self::MissingRequiredField {
@@ -396,6 +476,14 @@ impl ValidationError {
     ) -> Self {
         Self::MissingRequiredField {
             block: block.into(),
+            field: field.into(),
+            line: None,
+        }
+    }
+
+    /// Convenience constructor for an empty mandatory value.
+    pub(crate) fn empty_value(field: impl Into<Cow<'static, str>>) -> Self {
+        Self::EmptyValue {
             field: field.into(),
             line: None,
         }
@@ -456,15 +544,19 @@ pub enum CcsdsNdmError {
     /// An existing error enriched with public generation context.
     #[error("{context}: {source}")]
     Generation {
+        /// Operation or structure in which the error occurred.
         context: Box<GenerationErrorContext>,
+        /// Underlying error, retained for category and source inspection.
         #[source]
         source: Box<CcsdsNdmError>,
     },
 
-    /// An existing error enriched with strict parsing context.
+    /// An existing error enriched with parsing context.
     #[error("{context}: {source}")]
     Parsing {
+        /// Operation or structure in which the error occurred.
         context: Box<ParseErrorContext>,
+        /// Underlying error, retained for category and source inspection.
         #[source]
         source: Box<CcsdsNdmError>,
     },
@@ -482,7 +574,7 @@ pub enum CcsdsNdmError {
     Format(#[from] Box<FormatError>),
 
     /// Errors related to NDM data validation.
-    #[error(transparent)]
+    #[error("{error}{line}", error = .0, line = .0.line_suffix())]
     Validation(#[from] Box<ValidationError>),
 
     /// Errors related to CCSDS Epochs.
@@ -502,8 +594,11 @@ pub enum CcsdsNdmError {
         "Unsupported input version {version} for {message_type}; supported versions: {supported}"
     )]
     UnsupportedInputVersion {
+        /// CCSDS family abbreviation.
         message_type: &'static str,
+        /// Unsupported edition requested or read.
         version: String,
+        /// Editions supported for this operation.
         supported: String,
     },
 
@@ -512,28 +607,40 @@ pub enum CcsdsNdmError {
         "Unsupported {format} output version {version} for {message_type}; supported versions: {supported}"
     )]
     UnsupportedOutputVersion {
+        /// CCSDS family abbreviation.
         message_type: &'static str,
+        /// Requested output notation.
         format: &'static str,
+        /// Unsupported edition requested or read.
         version: String,
+        /// Editions supported for this operation.
         supported: String,
     },
 
     /// A caller-selected resource policy was exceeded.
     #[error("Resource limit exceeded for {resource}: {actual} (limit: {limit})")]
     ResourceLimitExceeded {
+        /// Resource whose configured limit was exceeded.
         resource: &'static str,
+        /// Maximum permitted resource amount.
         limit: usize,
+        /// Observed resource amount.
         actual: usize,
     },
 
     /// Error when an unexpected end of input is reached.
     #[error("Unexpected end of input: {context}")]
-    UnexpectedEof { context: String },
+    UnexpectedEof {
+        /// Structure or operation interrupted by the end of input.
+        context: String,
+    },
 
     /// Error for a notation in which CCSDS defines no representation of a message family.
     #[error("{message_type} has no CCSDS-defined {requested} representation")]
     UnsupportedNotation {
+        /// CCSDS family abbreviation.
         message_type: &'static str,
+        /// Requested wire notation.
         requested: DiagnosticNotation,
     },
 }
@@ -582,7 +689,9 @@ pub(crate) enum ParserErrorKind {
     #[default]
     Kvn,
     MissingRequiredField {
+        /// Logical block containing the required field.
         block: &'static str,
+        /// CCSDS keyword or field whose value failed.
         field: &'static str,
     },
     Validation(ValidationError),
@@ -690,12 +799,15 @@ impl AddContext<&str, StrContext> for InternalParserError {
     ) -> Self {
         match context {
             StrContext::Label(l) => {
-                if self.contexts.last() != Some(&l) {
+                if !self.message.starts_with("Expected ") && self.contexts.last() != Some(&l) {
                     self.contexts.push(l);
                 }
             }
             StrContext::Expected(e) => {
                 self.message = Cow::Owned(format!("Expected {}", e));
+                if let winnow::error::StrContextValue::Description(expected) = e {
+                    self.contexts.push(expected);
+                }
             }
             _ => {} // Ignore other context types for now
         }
@@ -837,10 +949,34 @@ impl CcsdsNdmError {
                     Some(error.line),
                     Some(error.column),
                     excerpt,
-                    error.contexts.last().copied(),
+                    error
+                        .message
+                        .strip_prefix("Expected ")
+                        .and_then(|expected| {
+                            error
+                                .contexts
+                                .iter()
+                                .copied()
+                                .find(|context| *context == expected)
+                        }),
                 )
             }
-            None => (None, None, None, None, None),
+            None => match source.as_validation_error().and_then(ValidationError::line) {
+                Some(line) => {
+                    let normalized = crate::kvn::normalize_line_endings(input);
+                    let offset = normalized
+                        .split_inclusive('\n')
+                        .take(line.saturating_sub(1))
+                        .map(str::len)
+                        .sum();
+                    let token = input
+                        .get(offset..)
+                        .and_then(|tail| tail.split(['\r', '\n']).next())
+                        .map(|token| token.chars().take(128).collect());
+                    (Some(offset), Some(line), Some(1), token, None)
+                }
+                None => (None, None, None, None, None),
+            },
         };
         Self::Parsing {
             context: Box::new(ParseErrorContext {
@@ -857,7 +993,10 @@ impl CcsdsNdmError {
         }
     }
 
-    /// Return structured context for a public generation failure.
+    /// Return structured context for a public parse or generation failure.
+    ///
+    /// Direct model validation has no wire notation and returns `None`; use `code()` and
+    /// `field_path()` on that error instead.
     pub fn diagnostic(&self) -> Option<Diagnostic<'_>> {
         match self {
             Self::Generation { context, source } => Some(Diagnostic {
@@ -867,7 +1006,6 @@ impl CcsdsNdmError {
                 source_edition: Some(&context.edition),
                 code: source.code(),
                 field_path: source.field_path(),
-                requirement: None,
                 source_location: None,
                 byte_offset: None,
                 original_token: None,
@@ -890,7 +1028,6 @@ impl CcsdsNdmError {
                     source.code()
                 },
                 field_path: source.field_path(),
-                requirement: None,
                 source_location: context.line.zip(context.column),
                 byte_offset: context.byte_offset,
                 original_token: context.original_token.as_deref(),
@@ -900,10 +1037,10 @@ impl CcsdsNdmError {
         }
     }
 
-    /// Stable machine-readable code, when this diagnostic category has been stabilized.
+    /// Stable machine-readable category; wording may improve independently.
     ///
-    /// Validation codes are delegated to the underlying [`ValidationError`]. Categories return
-    /// `None` until their compatibility behavior is covered by conformance tests.
+    /// Validation and operation wrappers retain their underlying category. Invalid-format errors
+    /// wrapped by a parser receive that notation's syntax code.
     pub fn code(&self) -> Option<&'static str> {
         match self {
             Self::Generation { source, .. } => source.code(),
@@ -925,8 +1062,14 @@ impl CcsdsNdmError {
                 FormatError::Xml(_)
                 | FormatError::XmlDe(_)
                 | FormatError::XmlWithContext { .. } => Some("parse.xml.syntax"),
-                _ => None,
+                FormatError::XmlSer(_) => Some("generation.xml.syntax"),
+                FormatError::ParseFloat(_) => Some("parse.invalid_float"),
+                FormatError::ParseInt(_) => Some("parse.invalid_integer"),
+                FormatError::Enum(_) => Some("parse.invalid_enum"),
+                FormatError::InvalidFormat(_) => Some("format.invalid"),
             },
+            Self::Epoch(_) => Some("parse.invalid_epoch"),
+            Self::UnsupportedMessage(_) => Some("parse.unsupported_message_type"),
             Self::Io(_) => Some("io.error"),
             Self::UnsupportedInputVersion { .. } => Some("parse.unsupported_input_version"),
             Self::UnexpectedEof { .. } => Some("parse.unexpected_eof"),
@@ -936,8 +1079,7 @@ impl CcsdsNdmError {
                 resource: "xml_depth",
                 ..
             } => Some("resource.xml_depth_limit_exceeded"),
-            Self::ResourceLimitExceeded { .. } => None,
-            _ => None,
+            Self::ResourceLimitExceeded { .. } => Some("resource.limit_exceeded"),
         }
     }
 
@@ -1058,11 +1200,91 @@ impl CcsdsNdmError {
     }
 }
 
+/// Result returned by parsing, validation, generation, and file operations.
 pub type Result<T> = std::result::Result<T, CcsdsNdmError>;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn semantic_parse_diagnostics_retain_the_record_and_model_path() {
+        for ending in ["\n", "\r", "\r\n", "\n\r"] {
+            let input = format!("HEADER{ending}X = bad{ending}");
+            let mut error = ValidationError::invalid_value("X", "bad", "finite")
+                .at_path("body.segment.data.state_vector.x");
+            error.set_line_if_missing(2);
+            let error: CcsdsNdmError = error.into();
+            let error = error.with_parse_context(
+                crate::validation::MessageKind::Opm,
+                DiagnosticNotation::Kvn,
+                &input,
+                Some("3.0"),
+            );
+            let diagnostic = error.diagnostic().unwrap();
+            assert_eq!(diagnostic.source_location, Some((2, 1)));
+            assert_eq!(diagnostic.byte_offset, Some(6 + ending.len()));
+            assert_eq!(diagnostic.original_token, Some("X = bad"));
+            assert!(error.to_string().contains("line 2"));
+            assert!(error
+                .to_string()
+                .contains("body.segment.data.state_vector.x"));
+        }
+    }
+
+    #[test]
+    fn previously_uncoded_errors_have_machine_categories() {
+        let cases: Vec<(CcsdsNdmError, &str)> = vec![
+            (
+                ValidationError::conflict(["A".into(), "B".into()]).into(),
+                "validation.conflict",
+            ),
+            (
+                ValidationError::generic("cannot represent comments").into(),
+                "validation.generic",
+            ),
+            (
+                FormatError::InvalidFormat("bad".into()).into(),
+                "format.invalid",
+            ),
+            (
+                "bad".parse::<f64>().unwrap_err().into(),
+                "parse.invalid_float",
+            ),
+            (
+                "bad".parse::<i32>().unwrap_err().into(),
+                "parse.invalid_integer",
+            ),
+            (
+                EnumParseError {
+                    field: "KEY",
+                    value: "bad".into(),
+                    expected: "A",
+                }
+                .into(),
+                "parse.invalid_enum",
+            ),
+            (
+                EpochError::InvalidFormat("bad".into()).into(),
+                "parse.invalid_epoch",
+            ),
+            (
+                CcsdsNdmError::UnsupportedMessage("bad".into()),
+                "parse.unsupported_message_type",
+            ),
+            (
+                CcsdsNdmError::ResourceLimitExceeded {
+                    resource: "test",
+                    limit: 1,
+                    actual: 2,
+                },
+                "resource.limit_exceeded",
+            ),
+        ];
+        for (error, code) in cases {
+            assert_eq!(error.code(), Some(code), "{error}");
+        }
+    }
 
     #[test]
     fn public_error_stays_compact_when_diagnostics_are_enriched() {
@@ -1081,7 +1303,7 @@ mod tests {
         let s = format!("{}", err);
         assert!(s.contains("line 10, column 5"));
         assert!(s.contains("Test error"));
-        assert!(s.contains("Header > Version"));
+        assert!(!s.contains("Context:"));
     }
 
     #[test]
@@ -1120,7 +1342,10 @@ mod tests {
             error.field_path().as_deref(),
             Some("body.segment.data.state_vector.x")
         );
-        assert_eq!(error.to_string(), display);
+        assert!(error.to_string().starts_with(&display));
+        assert!(error
+            .to_string()
+            .contains("body.segment.data.state_vector.x"));
         match error {
             ValidationError::AtPath { source, .. } => {
                 assert!(matches!(

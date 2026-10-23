@@ -45,7 +45,7 @@ pub fn rdm_header(input: &mut &str) -> KvnResult<RdmHeader> {
         let checkpoint = input.checkpoint();
         comment.extend(collect_comments.parse_next(input)?);
 
-        let key = match keyword.parse_next(input) {
+        let key = match winnow::combinator::preceded(ws, keyword).parse_next(input) {
             Ok(k) => k,
             Err(_) => {
                 input.reset(&checkpoint);
@@ -441,7 +441,10 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         None
     };
 
-    let have_cov = cx_x.is_some()
+    // A lone COV_REF_FRAME (and its comments) opens the block too, so it is reported as an
+    // incomplete matrix instead of being dropped.
+    let have_cov = cov_ref_frame.is_some()
+        || cx_x.is_some()
         || cy_x.is_some()
         || cy_y.is_some()
         || cz_x.is_some()
@@ -512,19 +515,27 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         let checkpoint = input.checkpoint();
         let loop_comments = collect_comments.parse_next(input)?;
 
-        let key = match key_token.parse_next(input) {
+        let key = match user_defined_key_token.parse_next(input) {
             Ok(k) if k.starts_with("USER_DEFINED_") => k,
             _ => {
                 input.reset(&checkpoint);
                 break;
             }
         };
-        user_defined.comment.extend(loop_comments);
+        user_defined
+            .entries
+            .extend(loop_comments.into_iter().map(UserDefinedEntry::Comment));
+        if value_is_absent(key, input) {
+            skip_record(input);
+            continue;
+        }
         let v = kv_string.parse_next(input)?;
-        user_defined.user_defined.push(UserDefinedParameter {
-            parameter: key.strip_prefix("USER_DEFINED_").unwrap().to_string(),
-            value: v,
-        });
+        user_defined
+            .entries
+            .push(UserDefinedEntry::Parameter(UserDefinedParameter {
+                parameter: key.strip_prefix("USER_DEFINED_").unwrap().to_string(),
+                value: v,
+            }));
 
         if input.offset_from(&checkpoint) == 0 {
             break;
@@ -563,7 +574,7 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
             None
         },
         od_parameters: if have_od { Some(od_params) } else { None },
-        user_defined_parameters: if user_defined.user_defined.is_empty() {
+        user_defined_parameters: if user_defined.entries.is_empty() {
             None
         } else {
             Some(user_defined)
@@ -798,6 +809,7 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
 
 impl ToKvn for Rdm {
     fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.always_write_units();
         writer.write_pair("CCSDS_RDM_VERS", &self.version);
         self.header.write_kvn(writer);
         self.body.write_kvn(writer);
@@ -884,7 +896,7 @@ impl ToKvn for RdmMetadata {
             writer.write_pair("DRAG_PARAMETERS_SOURCE", v);
         }
         if let Some(v) = &self.drag_parameters_altitude {
-            writer.write_pair("DRAG_PARAMETERS_ALTITUDE", v);
+            writer.write_odm_float_measure("DRAG_PARAMETERS_ALTITUDE", v);
         }
         if let Some(v) = &self.reentry_uncertainty_method {
             writer.write_pair("REENTRY_UNCERTAINTY_METHOD", v.to_string());
@@ -908,13 +920,65 @@ impl ToKvn for RdmMetadata {
 }
 
 impl Rdm {
+    /// Refuse model states that flattened KVN cannot hold. XML `<data>` comments need no
+    /// refusal: they are merged into the atmospheric block's leading comments (see
+    /// [`RdmData::comment`]).
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
-        if !self.body.segment.data.comment.is_empty() {
-            return Err(crate::error::ValidationError::Generic {
-                message: "RDM XML data-level COMMENT cannot be represented distinctly from the first KVN logical-block COMMENT".into(),
-                line: None,
+        let data = &self.body.segment.data;
+        // KVN attaches a comment to the block of the keyword that follows it, so the comments of
+        // a block without values would move to the next block or trail the message.
+        let comment_only = [
+            data.ground_impact_parameters.as_ref().is_some_and(|g| {
+                !g.comment.is_empty()
+                    && GroundImpactParameters {
+                        comment: Vec::new(),
+                        ..g.clone()
+                    } == GroundImpactParameters::default()
+            }),
+            data.spacecraft_parameters.as_ref().is_some_and(|p| {
+                !p.comment.is_empty()
+                    && RdmSpacecraftParameters {
+                        comment: Vec::new(),
+                        ..p.clone()
+                    } == RdmSpacecraftParameters::default()
+            }),
+            data.od_parameters.as_ref().is_some_and(|p| {
+                !p.comment.is_empty()
+                    && OdParameters {
+                        comment: Vec::new(),
+                        ..p.clone()
+                    } == OdParameters::default()
+            }),
+        ];
+        for (block, refused) in [
+            "groundImpactParameters",
+            "spacecraftParameters",
+            "odParameters",
+        ]
+        .into_iter()
+        .zip(comment_only)
+        {
+            if refused {
+                return Err(crate::error::ValidationError::Generic {
+                    message: format!(
+                        "RDM KVN cannot retain the COMMENT of a {block} block that has no values"
+                    )
+                    .into(),
+                    line: None,
+                }
+                .into());
             }
-            .into());
+        }
+        if let Some(parameters) = &data.user_defined_parameters {
+            parameters.validate_kvn_representability()?;
+            if parameters.parameters().next().is_none() && !parameters.entries.is_empty() {
+                return Err(crate::error::ValidationError::Generic {
+                    message: "RDM KVN cannot retain the COMMENT of a userDefinedParameters block that has no parameter"
+                        .into(),
+                    line: None,
+                }
+                .into());
+            }
         }
         Ok(())
     }
@@ -942,34 +1006,34 @@ impl RdmData {
         if let Some(sp) = &self.spacecraft_parameters {
             writer.write_comments(&sp.comment);
             if let Some(v) = &sp.wet_mass {
-                writer.write_measure("WET_MASS", &v.to_unit_value());
+                writer.write_odm_float_measure("WET_MASS", &v.to_unit_value());
             }
             if let Some(v) = &sp.dry_mass {
-                writer.write_measure("DRY_MASS", &v.to_unit_value());
+                writer.write_odm_float_measure("DRY_MASS", &v.to_unit_value());
             }
             if let Some(v) = &sp.hazardous_substances {
                 writer.write_pair("HAZARDOUS_SUBSTANCES", v);
             }
             if let Some(v) = &sp.solar_rad_area {
-                writer.write_measure("SOLAR_RAD_AREA", &v.to_unit_value());
+                writer.write_odm_float_measure("SOLAR_RAD_AREA", &v.to_unit_value());
             }
             if let Some(v) = &sp.solar_rad_coeff {
-                writer.write_pair("SOLAR_RAD_COEFF", v);
+                writer.write_odm_float_pair("SOLAR_RAD_COEFF", v.value);
             }
             if let Some(v) = &sp.drag_area {
-                writer.write_measure("DRAG_AREA", &v.to_unit_value());
+                writer.write_odm_float_measure("DRAG_AREA", &v.to_unit_value());
             }
             if let Some(v) = &sp.drag_coeff {
-                writer.write_pair("DRAG_COEFF", v);
+                writer.write_odm_float_pair("DRAG_COEFF", v.value);
             }
             if let Some(v) = &sp.rcs {
-                writer.write_measure("RCS", &v.to_unit_value());
+                writer.write_odm_float_measure("RCS", &v.to_unit_value());
             }
             if let Some(v) = &sp.ballistic_coeff {
-                writer.write_measure("BALLISTIC_COEFF", v);
+                writer.write_odm_float_measure("BALLISTIC_COEFF", v);
             }
             if let Some(v) = &sp.thrust_acceleration {
-                writer.write_measure("THRUST_ACCELERATION", &v.to_unit_value());
+                writer.write_odm_float_measure("THRUST_ACCELERATION", &v.to_unit_value());
             }
         }
         if let Some(od) = &self.od_parameters {
@@ -981,36 +1045,33 @@ impl RdmData {
                 writer.write_pair("TIME_LASTOB_END", v);
             }
             if let Some(v) = &od.recommended_od_span {
-                writer.write_measure("RECOMMENDED_OD_SPAN", &v.to_unit_value());
+                writer.write_odm_float_measure("RECOMMENDED_OD_SPAN", &v.to_unit_value());
             }
             if let Some(v) = &od.actual_od_span {
-                writer.write_measure("ACTUAL_OD_SPAN", &v.to_unit_value());
+                writer.write_odm_float_measure("ACTUAL_OD_SPAN", &v.to_unit_value());
             }
             if let Some(v) = &od.obs_available {
-                writer.write_pair("OBS_AVAILABLE", v);
+                writer.write_integer_pair("OBS_AVAILABLE", v.value);
             }
             if let Some(v) = &od.obs_used {
-                writer.write_pair("OBS_USED", v);
+                writer.write_integer_pair("OBS_USED", v.value);
             }
             if let Some(v) = &od.tracks_available {
-                writer.write_pair("TRACKS_AVAILABLE", v);
+                writer.write_integer_pair("TRACKS_AVAILABLE", v.value);
             }
             if let Some(v) = &od.tracks_used {
-                writer.write_pair("TRACKS_USED", v);
+                writer.write_integer_pair("TRACKS_USED", v.value);
             }
             if let Some(v) = &od.residuals_accepted {
-                writer.write_measure("RESIDUALS_ACCEPTED", &v.to_unit_value());
+                writer.write_odm_float_measure("RESIDUALS_ACCEPTED", &v.to_unit_value());
             }
             if let Some(v) = &od.weighted_rms {
-                writer.write_pair("WEIGHTED_RMS", v);
+                writer.write_odm_float_pair("WEIGHTED_RMS", v.value);
             }
         }
 
         if let Some(ud) = &self.user_defined_parameters {
-            writer.write_comments(&ud.comment);
-            for p in &ud.user_defined {
-                writer.write_user_defined(&p.parameter, &p.value);
-            }
+            ud.write_kvn(writer);
         }
     }
 }

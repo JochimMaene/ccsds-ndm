@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 from ccsds_ndm import (
+    AdditionalParameters,
     Cdm,
     CdmBody,
     CdmCovarianceMatrix,
@@ -21,7 +22,9 @@ from ccsds_ndm import (
     CdmMetadata,
     CdmSegment,
     CdmStateVector,
+    OdParameters,
     RelativeMetadataData,
+    RelativeStateVector,
 )
 
 
@@ -48,12 +51,15 @@ class TestCdm:
 
         # Object 1
         meta1 = CdmMetadata(
+            ephemeris_name="NONE",
             object="OBJECT1",
             object_designator="12345",
             catalog_name="SATCAT",
             object_name="SAT1",
             international_designator="2023-001A",
             ref_frame="EME2000",
+            covariance_method="CALCULATED",
+            maneuverable="YES",
         )
         vector1 = CdmStateVector(
             x=7000.0, y=0.0, z=0.0, x_dot=0.0, y_dot=7.5, z_dot=0.0
@@ -107,12 +113,15 @@ class TestCdm:
 
         # Object 2
         meta2 = CdmMetadata(
+            ephemeris_name="NONE",
             object="OBJECT2",
             object_designator="67890",
             catalog_name="SATCAT",
             object_name="DEBRIS",
             international_designator="UNKNOWN",
             ref_frame="EME2000",
+            covariance_method="CALCULATED",
+            maneuverable="YES",
         )
         vector2 = CdmStateVector(
             x=7100.0, y=0.0, z=0.0, x_dot=0.0, y_dot=7.4, z_dot=0.0
@@ -176,14 +185,78 @@ class TestCdm:
         assert data.covariance_matrix_numpy.shape == (6, 6)
         assert np.allclose(data.state_vector_numpy, state)
 
+        retained = data.state_vector
+        retained.comment = ["Keep state provenance"]
         new_state = state + 1.0
         data.state_vector_numpy = new_state
         assert np.allclose(data.state_vector_numpy, new_state)
+        assert data.state_vector is retained
+        assert retained.comment == ["Keep state provenance"]
 
         # Allow clearing covariance matrix through numpy setter.
         data.covariance_matrix_numpy = None
         with pytest.raises(ValueError, match="COVARIANCE_MATRIX is missing"):
             _ = data.covariance_matrix_numpy
+
+    def test_numpy_construction_keeps_optional_children_live(self):
+        od = OdParameters(obs_available=10, obs_used=5)
+        additional = AdditionalParameters(mass=100.0)
+        data = CdmData.from_numpy(
+            [7000, 0, 0, 0, 7.5, 0],
+            np.eye(6),
+            od_parameters=od,
+            additional_parameters=additional,
+        )
+        assert data.od_parameters is od
+        assert data.additional_parameters is additional
+        od.obs_used = 6
+        additional.mass = 250.0
+
+        message = self._create_valid_cdm()
+        message.body.segments[0].data = data
+        for format in ("kvn", "xml"):
+            written = Cdm.from_str(message.to_str(format))
+            written_data = written.body.segments[0].data
+            assert written_data.od_parameters.obs_used == 6
+            assert written_data.additional_parameters.mass == 250.0
+
+    def test_relative_state_edits_reach_generation(self):
+        message = self._create_valid_cdm()
+        message.body.relative_metadata_data = RelativeMetadataData(
+            tca="2023-01-01T12:00:00",
+            miss_distance=100.0,
+            relative_position=[1, 2, 3],
+            relative_velocity=[4, 5, 6],
+        )
+        for candidate in (message, Cdm.from_str(message.to_str("xml"))):
+            relative = candidate.body.relative_metadata_data
+            state = relative.relative_state_vector
+            assert state is relative.relative_state_vector
+            state.relative_position_r = 100.0
+            written = Cdm.from_str(candidate.to_str("kvn"))
+            assert (
+                written.body.relative_metadata_data.relative_state_vector.relative_position_r
+                == 100.0
+            )
+
+            replacement = RelativeStateVector(10, 20, 30, 40, 50, 60)
+            relative.relative_state_vector = replacement
+            assert relative.relative_state_vector is replacement
+            replacement.relative_velocity_n = 70.0
+            written = Cdm.from_str(candidate.to_str("xml"))
+            assert (
+                written.body.relative_metadata_data.relative_state_vector.relative_velocity_n
+                == 70.0
+            )
+            relative.relative_state_vector = None
+            assert relative.relative_state_vector is None
+
+    @pytest.mark.parametrize("field", ["relative_position", "relative_velocity"])
+    def test_relative_state_requires_position_and_velocity(self, field):
+        with pytest.raises(ValueError, match="must be supplied together"):
+            RelativeMetadataData(
+                tca="2023-01-01T12:00:00", miss_distance=100.0, **{field: [1, 2, 3]}
+            )
 
     def test_epoch_fields_reject_numeric_xsd_branch(self):
         with pytest.raises(ValueError):
@@ -280,31 +353,83 @@ class TestCdm:
 
 
 class TestCdmRealWorldCorpus:
-    """An operational CDM that strict parsing rejects, kept as evidence.
+    """Known empty optional producer placeholders normalize to absence."""
 
-    `test_cdm.xml` is an unedited CSpOC conjunction message. It spells its
-    null-valued elements as a bare `nil="true"` attribute, 35 times, where the
-    NDM XSD requires the namespaced `xsi:nil`. Strict parsing rejects it, and
-    that rejection is the point: the document records what real operator output
-    looks like and pins the cost of the strict-parsing decision, so the choice
-    stays visible rather than being rediscovered against a live feed.
-    """
-
-    def test_operational_cdm_with_bare_nil_is_rejected(self):
+    def test_operational_cdm_empty_nil_placeholders_are_accepted(self):
         path = Path(__file__).resolve().parent / "test_cdm.xml"
-
-        # An unused xmlns:xsi is optional, but a bare nil attribute is still invalid.
-        with pytest.raises(ccsds_ndm.NdmFormatError, match="unknown attribute 'nil'"):
-            ccsds_ndm.from_file(str(path), format="xml")
-
-        # Adding the namespace declaration does not qualify the bare attribute.
-        declared = path.read_text().replace(
-            "<cdm ", '<cdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ', 1
+        message = ccsds_ndm.from_file(str(path), format="xml")
+        assert message.body.relative_metadata_data.start_screen_period is None
+        canonical = message.to_str(format="xml")
+        assert "nil=" not in canonical
+        ccsds_ndm.from_str(canonical, format="xml")
+        meaningful = path.read_text().replace(
+            '<START_SCREEN_PERIOD nil="true"/>',
+            '<START_SCREEN_PERIOD nil="true">2023-01-01T00:00:00</START_SCREEN_PERIOD>',
         )
-        with pytest.raises(ccsds_ndm.NdmFormatError) as excinfo:
-            ccsds_ndm.from_str(declared, format="xml")
-        assert "nil" in str(excinfo.value)
+        with pytest.raises(ccsds_ndm.NdmFormatError):
+            ccsds_ndm.from_str(meaningful, format="xml")
 
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+@pytest.mark.parametrize(
+    "missing", ["covariance_method", "maneuverable", "ephemeris_name"]
+)
+def test_metadata_requires_operational_facts(missing):
+    arguments = dict(
+        ephemeris_name="NONE",
+        object="OBJECT1",
+        object_designator="12345",
+        catalog_name="SATCAT",
+        object_name="SAT1",
+        international_designator="2023-001A",
+        ref_frame="EME2000",
+        covariance_method="CALCULATED",
+        maneuverable="NO",
+    )
+    del arguments[missing]
+    with pytest.raises(TypeError, match=missing):
+        CdmMetadata(**arguments)
+
+
+def test_metadata_preserves_explicit_operational_facts():
+    metadata = CdmMetadata(
+        ephemeris_name="NONE",
+        object=ccsds_ndm.CdmObjectType.Object1,
+        object_designator="12345",
+        catalog_name="SATCAT",
+        object_name="SAT1",
+        international_designator="2023-001A",
+        ref_frame=ccsds_ndm.ReferenceFrameType.Eme2000,
+        covariance_method=ccsds_ndm.CovarianceMethodType.Default,
+        maneuverable=ccsds_ndm.ManeuverableType.No,
+    )
+    assert metadata.covariance_method == ccsds_ndm.CovarianceMethodType.Default
+    assert metadata.maneuverable == ccsds_ndm.ManeuverableType.No
+
+
+@pytest.mark.parametrize("field", ["miss_distance", "relative_speed"])
+def test_distance_and_speed_norms_reject_negative_scalars(field):
+    message = TestCdm()._create_valid_cdm()
+    relative = message.body.relative_metadata_data
+    setattr(relative, field, -1.0)
+    for operation in (
+        message.validate,
+        lambda: message.to_str("kvn"),
+        lambda: message.to_str("xml"),
+    ):
+        with pytest.raises(ccsds_ndm.NdmValidationError, match=field.upper()):
+            operation()
+    setattr(relative, field, 0.0)
+    message.validate()
+
+
+def test_computed_cdm_values_follow_the_shared_numeric_rounding_policy():
+    message = TestCdm()._create_valid_cdm()
+    message.body.relative_metadata_data.miss_distance = 0.1 + 0.2
+    message.validate()
+    for notation, expected in [("kvn", 0.3), ("xml", 0.1 + 0.2)]:
+        parsed = Cdm.from_str(message.to_str(notation), format=notation)
+        assert parsed.body.relative_metadata_data.miss_distance == expected

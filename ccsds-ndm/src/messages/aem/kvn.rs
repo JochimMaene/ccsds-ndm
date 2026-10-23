@@ -14,7 +14,7 @@ use crate::traits::ToKvn;
 use crate::types::{AttitudeTypeType, InterpolationDegree};
 use std::str::FromStr;
 use winnow::combinator::{peek, terminated};
-use winnow::error::{AddContext, ErrMode, FromExternalError};
+use winnow::error::{ErrMode, FromExternalError};
 use winnow::prelude::*;
 use winnow::stream::Offset;
 
@@ -70,7 +70,7 @@ pub fn aem_metadata(input: &mut &str) -> KvnResult<AemMetadata> {
         "STOP_TIME" => stop_time: kv_calendar_epoch,
         "ATTITUDE_TYPE" => attitude_type: kv_enum,
         "EULER_ROT_SEQ" => euler_rot_seq: kv_enum,
-        "RATE_FRAME" => rate_frame: kv_string, // CCSDS 504.0-B-2 says RATE_FRAME in KVN
+        "ANGVEL_FRAME" | "RATE_FRAME" => rate_frame: kv_string,
         "INTERPOLATION_METHOD" => interpolation_method: kv_string,
         "INTERPOLATION_DEGREE" => interpolation_degree: kv_u32,
     }, |i: &mut &str| at_block_end("META", i));
@@ -114,43 +114,66 @@ fn attitude_state_line(
     attitude_type: &AttitudeTypeType,
 ) -> KvnResult<AemAttitudeState> {
     let record_start = input.checkpoint();
+    let record = *input;
     let line = terminated(raw_line, opt_line_ending).parse_next(input)?;
     let mut parts = line.split_whitespace();
 
-    let epoch_str = parts.next().ok_or_else(|| {
-        ErrMode::Cut(InternalParserError::from_input(input).add_context(
-            input,
-            &input.checkpoint(),
-            winnow::error::StrContext::Label("Epoch in data line"),
-        ))
-    })?;
+    // Report row errors at the row itself, not at the line the parser has moved on to.
+    fn fail<'a>(
+        input: &mut &'a str,
+        record: &'a str,
+        label: &'static str,
+    ) -> ErrMode<InternalParserError> {
+        *input = record;
+        cut_err(input, label)
+    }
+    let Some(epoch_str) = parts.next() else {
+        return Err(fail(input, record, "Epoch in data line"));
+    };
 
-    let epoch = crate::types::CalendarEpoch::from_str(epoch_str)
-        .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?;
+    let epoch = match crate::types::CalendarEpoch::from_str(epoch_str) {
+        Ok(epoch) => epoch,
+        Err(e) => {
+            input.reset(&record_start);
+            return Err(ErrMode::Cut(InternalParserError::from_external_error(
+                input, e,
+            )));
+        }
+    };
 
     let expected_values = attitude_type.value_count();
     let mut values = [0.0; 8];
     let mut value_count = 0usize;
     for s in parts {
-        let val = parse_ccsds_number(s).ok_or_else(|| {
-            ErrMode::Cut(InternalParserError::from_input(input).add_context(
-                input,
-                &input.checkpoint(),
-                winnow::error::StrContext::Label("CCSDS number in data line"),
-            ))
-        })?;
+        let Some(val) = parse_ccsds_number(s) else {
+            return Err(fail(input, record, "Invalid CCSDS number in data line"));
+        };
         if value_count == values.len() {
-            return Err(ErrMode::Cut(InternalParserError::from_input(input)));
+            return Err(fail(
+                input,
+                record,
+                "data line has the wrong number of values for ATTITUDE_TYPE",
+            ));
         }
         values[value_count] = val;
         value_count += 1;
     }
     if value_count != expected_values {
-        return Err(ErrMode::Cut(InternalParserError::from_input(input)));
+        return Err(fail(
+            input,
+            record,
+            "data line has the wrong number of values for ATTITUDE_TYPE",
+        ));
     }
 
-    let state = AemAttitudeState::from_values(epoch, &values[..value_count], attitude_type)
-        .ok_or_else(|| ErrMode::Cut(InternalParserError::from_input(input)))?;
+    let Some(state) = AemAttitudeState::from_values(epoch, &values[..value_count], attitude_type)
+    else {
+        return Err(fail(
+            input,
+            record,
+            "data line does not match ATTITUDE_TYPE",
+        ));
+    };
     if let Err(error) = state.validate_values() {
         input.reset(&record_start);
         return Err(ErrMode::Cut(InternalParserError::from_external_error(
@@ -170,6 +193,7 @@ pub fn aem_data(input: &mut &str, attitude_type: &AttitudeTypeType) -> KvnResult
     let mut attitude_states = Vec::new();
 
     loop {
+        blank_lines.parse_next(input)?;
         if at_block_end("DATA", input) {
             break;
         }
@@ -273,7 +297,7 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
         "STOP_TIME",
         "ATTITUDE_TYPE",
         "EULER_ROT_SEQ",
-        "RATE_FRAME",
+        "ANGVEL_FRAME",
         "INTERPOLATION_METHOD",
         "INTERPOLATION_DEGREE",
     ];
@@ -296,18 +320,15 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
         let number = index + 1;
         let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
         let fail = |message: &str| Err(invalid(number, offset, message.into()));
-        if line.len() > 254 {
-            return fail("line exceeds the normative 254-character limit");
-        }
-        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
-            return fail("non-printable or non-ASCII character");
-        }
         let line = line.trim();
         if line.is_empty() {
             offset += raw_line.len() + 1;
             continue;
         }
         if line == "COMMENT" || line.starts_with("COMMENT ") {
+            if block.is_none() && last_block.is_some() {
+                return fail("COMMENT must not follow META_STOP or DATA_STOP (ADM 6.10.3)");
+            }
             if block.is_none() && top_rank != Some(0) {
                 return fail("AEM header COMMENT must immediately follow the version record");
             }
@@ -355,6 +376,11 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
                     return fail("expected one AEM metadata assignment");
                 }
                 let key = line.split_once('=').unwrap().0.trim();
+                let key = if key == "RATE_FRAME" {
+                    "ANGVEL_FRAME"
+                } else {
+                    key
+                };
                 let rank = META
                     .iter()
                     .position(|candidate| *candidate == key)
@@ -462,13 +488,13 @@ impl ToKvn for AemMetadata {
             writer.write_pair("EULER_ROT_SEQ", v);
         }
         if let Some(v) = &self.angvel_frame {
-            writer.write_pair("RATE_FRAME", v);
+            writer.write_pair("ANGVEL_FRAME", v);
         }
         if let Some(v) = &self.interpolation_method {
             writer.write_pair("INTERPOLATION_METHOD", v);
         }
         if let Some(v) = self.interpolation_degree {
-            writer.write_pair("INTERPOLATION_DEGREE", v);
+            writer.write_integer_pair("INTERPOLATION_DEGREE", v.0.get());
         }
     }
 }

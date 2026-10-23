@@ -38,9 +38,12 @@ fn assert_missing_required<T: std::fmt::Debug>(
     expected_path: &str,
 ) {
     let error = result.expect_err(surface);
-    assert_eq!(
-        error.code(),
-        Some("validation.missing_required_field"),
+    // An empty mandatory string is reported as an empty value, an omitted one as missing.
+    assert!(
+        matches!(
+            error.code(),
+            Some("validation.missing_required_field" | "validation.invalid_value")
+        ),
         "{surface} returned an unstable top-level diagnostic code"
     );
     assert_eq!(
@@ -56,7 +59,12 @@ fn assert_missing_required<T: std::fmt::Debug>(
         matches!(
             validation,
             ValidationError::MissingRequiredField { field, .. }
+                | ValidationError::EmptyValue { field, .. }
                 if field.as_ref() == expected_field
+        ) || matches!(
+            validation,
+            ValidationError::InvalidValue { field, value, .. }
+                if field.as_ref() == expected_field && value.is_empty()
         ),
         "{surface} returned the wrong validation error: {validation}"
     );

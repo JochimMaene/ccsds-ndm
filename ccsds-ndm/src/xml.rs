@@ -258,12 +258,15 @@ fn validate_root_start(
             AttributeKind::Declaration => {}
             AttributeKind::SchemaLocation | AttributeKind::Plain(b"id") => {}
             AttributeKind::Plain(b"version") => {
-                *source_edition = Some(
-                    attribute
-                        .unescape_value()
-                        .map_err(|error| invalid(error.to_string()))?
-                        .into_owned(),
-                );
+                let version = attribute
+                    .unescape_value()
+                    .map_err(|error| invalid(error.to_string()))?
+                    .into_owned();
+                // Check the edition before any content that edition may lack is reported.
+                if let Some(kind) = crate::versioning::kind_for_xml_root(root) {
+                    crate::versioning::check_input_version(kind, &version)?;
+                }
+                *source_edition = Some(version);
             }
             AttributeKind::Plain(key) => {
                 unknown_attribute.get_or_insert_with(|| key.to_vec());
@@ -280,7 +283,7 @@ fn validate_root_start(
 }
 
 // Even ignored schema-location/namespace attributes must be well-formed XML.
-fn validate_attribute_value(
+pub(crate) fn validate_attribute_value(
     attribute: &quick_xml::events::attributes::Attribute<'_>,
     invalid: &impl Fn(String) -> CcsdsNdmError,
 ) -> Result<()> {
@@ -449,19 +452,9 @@ fn validate_document(
     let invalid_sequence =
         |message: String| invalid(format!("invalid {type_name} XML sequence: {message}"));
     let document = s.strip_prefix('\u{feff}').unwrap_or(s);
-    // Read equivalent XML 1.0 declarations from ordinary UTF-8 producers. Writing still
-    // emits the exact declaration in NDM/XML 4.2 and ODM 8.2.
-    if rules.root.is_some()
-        && !(document.starts_with("<?xml")
-            && document
-                .as_bytes()
-                .get(5)
-                .is_some_and(|b| matches!(b, b' ' | b'\t' | b'\r' | b'\n')))
-    {
-        return Err(invalid(
-            "an XML instantiation must start with an XML 1.0 declaration".into(),
-        ));
-    }
+    // Read equivalent XML 1.0 declarations from ordinary UTF-8 producers, and accept a missing
+    // one: XML 1.0 makes it optional and UTF-8 is the default, so omitting it loses nothing.
+    // Writing still emits the exact declaration in NDM/XML 4.2 and ODM 8.2.
     let mut reader = quick_xml::Reader::from_str(document);
     reader.config_mut().check_comments = true;
     let mut namespaces = Namespaces::default();

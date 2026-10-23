@@ -16,13 +16,13 @@ use crate::kvn::parser::*;
 use crate::kvn::ser::KvnWriter;
 use crate::parse_block;
 use crate::traits::ToKvn;
+use crate::types::Epoch;
 
 use std::borrow::Cow;
 use std::str::FromStr;
-use winnow::combinator::{peek, terminated};
-use winnow::error::{AddContext, ErrMode, FromExternalError};
+use winnow::combinator::terminated;
+use winnow::error::AddContext;
 use winnow::prelude::*;
-use winnow::stream::Offset;
 
 //----------------------------------------------------------------------
 // ACM Version Parser
@@ -116,17 +116,20 @@ pub fn acm_metadata(input: &mut &str) -> KvnResult<AcmMetadata> {
 // ACM Data Logical Blocks
 //----------------------------------------------------------------------
 
-fn parse_att_line(input: &mut &str) -> KvnResult<AttLine> {
+/// Reads one history data line: a relative or absolute time tag (ADM 5.3.4.3) and numbers.
+fn parse_history_line(input: &mut &str, label: &'static str) -> KvnResult<(Epoch, Vec<f64>)> {
+    let line_start = *input;
     let line = terminated(raw_line, opt_line_ending).parse_next(input)?;
-    let mut values = Vec::with_capacity(line.split_whitespace().count());
-    for value in line.split_whitespace() {
-        values.push(
-            value
-                .parse::<f64>()
-                .map_err(|_| ErrMode::Cut(InternalParserError::from_input(input)))?,
-        );
+    let mut tokens = line.split_whitespace();
+    let epoch = tokens.next().and_then(|token| Epoch::new(token).ok());
+    let values = tokens.map(parse_ccsds_number).collect::<Option<Vec<_>>>();
+    match (epoch, values) {
+        (Some(epoch), Some(values)) => Ok((epoch, values)),
+        _ => {
+            *input = line_start.trim_start_matches(' ');
+            Err(cut_err(input, label))
+        }
     }
-    Ok(AttLine { values })
 }
 
 fn parse_att_block(input: &mut &str) -> KvnResult<AcmAttitudeState> {
@@ -148,26 +151,26 @@ fn parse_att_block(input: &mut &str) -> KvnResult<AcmAttitudeState> {
     parse_block!(input, comment, {
         "ATT_ID" => val: kv_string => { att_id = Some(val); },
         "ATT_PREV_ID" => val: kv_string => { att_prev_id = Some(val); },
-        "ATT_BASIS" => val: kv_enum => { att_basis = Some(val); },
+        "ATT_BASIS" => val: kv_string => { att_basis = Some(val); },
         "ATT_BASIS_ID" => val: kv_string => { att_basis_id = Some(val); },
         "REF_FRAME_A" => val: kv_string => { ref_frame_a = Some(val); },
         "REF_FRAME_B" => val: kv_string => { ref_frame_b = Some(val); },
         "NUMBER_STATES" => val: kv_u32 => { number_states = Some(val); },
         "ATT_TYPE" => val: kv_enum => { att_type = Some(val); },
-        "RATE_TYPE" => val: kv_enum => { rate_type = Some(val); },
         "EULER_ROT_SEQ" => val: kv_enum => { euler_rot_seq = Some(val); },
+        "RATE_TYPE" => val: kv_none_or_enum => { rate_type = val; },
     }, |i: &mut &str| matches!(i.trim_start().chars().next(), Some('0'..='9' | '-' | '+')) || at_block_end("ATT", i));
 
     loop {
+        blank_lines.parse_next(input)?;
         if at_block_end("ATT", input) {
             break;
         }
-        let checkpoint = input.checkpoint();
-        let res = parse_att_line.parse_next(input)?;
-        if input.offset_from(&checkpoint) == 0 && input.is_empty() {
-            break;
-        }
-        att_lines.push(res);
+        let (epoch, values) = parse_history_line(
+            input,
+            "Invalid ATT data line: expected a time tag followed by numbers",
+        )?;
+        att_lines.push(AttLine { epoch, values });
     }
 
     expect_block_end("ATT").parse_next(input)?;
@@ -185,6 +188,24 @@ fn parse_att_block(input: &mut &str) -> KvnResult<AcmAttitudeState> {
         euler_rot_seq,
         att_lines,
     })
+}
+
+fn kv_none_or_enum<T: FromStr>(input: &mut &str) -> KvnResult<Option<T>>
+where
+    crate::error::EnumParseError: From<T::Err>,
+{
+    // ADM tables 5-4 (RATE_TYPE) and 5-8 (AD COV_TYPE) list NONE; the XSD enums represent
+    // "none" by omission.
+    if input
+        .split(['\r', '\n'])
+        .next()
+        .is_some_and(|line| matches!(line.trim(), "NONE" | "none"))
+    {
+        kv_string(input)?;
+        Ok(None)
+    } else {
+        kv_enum(input).map(Some)
+    }
 }
 
 fn parse_phys_block(input: &mut &str) -> KvnResult<AcmPhysicalDescription> {
@@ -210,19 +231,6 @@ fn parse_phys_block(input: &mut &str) -> KvnResult<AcmPhysicalDescription> {
     Ok(block)
 }
 
-fn parse_cov_line(input: &mut &str) -> KvnResult<CovLine> {
-    let line = terminated(raw_line, opt_line_ending).parse_next(input)?;
-    let mut values = Vec::with_capacity(line.split_whitespace().count());
-    for value in line.split_whitespace() {
-        values.push(
-            value
-                .parse::<f64>()
-                .map_err(|_| ErrMode::Cut(InternalParserError::from_input(input)))?,
-        );
-    }
-    Ok(CovLine { values })
-}
-
 fn parse_cov_block(input: &mut &str) -> KvnResult<AcmCovarianceMatrix> {
     let mut comment = Vec::new();
     let mut cov_id = None;
@@ -238,22 +246,22 @@ fn parse_cov_block(input: &mut &str) -> KvnResult<AcmCovarianceMatrix> {
     parse_block!(input, comment, {
         "COV_ID" => val: kv_string => { cov_id = Some(val); },
         "COV_PREV_ID" => val: kv_string => { cov_prev_id = Some(val); },
-        "COV_BASIS" => val: kv_enum => { cov_basis = Some(val); },
+        "COV_BASIS" => val: kv_string => { cov_basis = Some(val); },
         "COV_BASIS_ID" => val: kv_string => { cov_basis_id = Some(val); },
         "COV_REF_FRAME" => val: kv_string => { cov_ref_frame = Some(val); },
         "COV_TYPE" => val: kv_enum => { cov_type = Some(val); },
     }, |i: &mut &str| matches!(i.trim_start().chars().next(), Some('0'..='9' | '-' | '+')) || at_block_end("COV", i));
 
     loop {
+        blank_lines.parse_next(input)?;
         if at_block_end("COV", input) {
             break;
         }
-        let checkpoint = input.checkpoint();
-        let res = parse_cov_line.parse_next(input)?;
-        if input.offset_from(&checkpoint) == 0 && input.is_empty() {
-            break;
-        }
-        cov_lines.push(res);
+        let (epoch, values) = parse_history_line(
+            input,
+            "Invalid COV data line: expected a time tag followed by numbers",
+        )?;
+        cov_lines.push(CovLine { epoch, values });
     }
 
     expect_block_end("COV").parse_next(input)?;
@@ -265,29 +273,17 @@ fn parse_cov_block(input: &mut &str) -> KvnResult<AcmCovarianceMatrix> {
         cov_basis_id,
         cov_ref_frame,
         cov_type: cov_type.ok_or_else(|| missing_field_err(input, "ACM COV", "COV_TYPE"))?,
-        cov_confidence: None,
         cov_lines,
     })
 }
 
 fn kv_target_momentum(input: &mut &str) -> KvnResult<crate::types::TargetMomentum> {
-    let (val_str, unit_str) = terminated(kvn_value, opt_line_ending).parse_next(input)?;
-    let values = val_str
-        .split_whitespace()
-        .map(|s| {
-            s.parse::<f64>()
-                .map_err(|_| ErrMode::Cut(InternalParserError::from_input(input)))
-        })
-        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let (values, unit_str) = kv_float_list(input)?;
 
-    let units = if let Some(u) = unit_str {
-        Some(
-            crate::types::AngMomentumUnits::from_str(u)
-                .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
-        )
-    } else {
-        None
-    };
+    let units = unit_str
+        .map(crate::types::AngMomentumUnits::from_str)
+        .transpose()
+        .map_err(|_| cut_err(input, "Invalid TARGET_MOMENTUM unit; expected N*m*s"))?;
     Ok(crate::types::TargetMomentum {
         elements: values,
         units,
@@ -316,7 +312,7 @@ fn parse_man_block(input: &mut &str) -> KvnResult<AcmManeuverParameters> {
         "MAN_PURPOSE" => val: kv_string => { man_purpose = Some(val); },
         "MAN_BEGIN_TIME" => val: kv_relative_time => { man_begin_time = Some(val); },
         "MAN_END_TIME" => val: kv_relative_time => { man_end_time = Some(val); },
-        "MAN_DURATION" => val: kv_from_kvn => { man_duration = Some(val); },
+        "MAN_DURATION" => val: kv_man_duration => { man_duration = Some(val); },
         "ACTUATOR_USED" => val: kv_string => { actuator_used = Some(val); },
         "TARGET_MOMENTUM" => val: kv_target_momentum => { target_momentum = Some(val); },
         "TARGET_MOM_FRAME" => val: kv_string => { target_mom_frame = Some(val); },
@@ -341,40 +337,32 @@ fn parse_man_block(input: &mut &str) -> KvnResult<AcmManeuverParameters> {
     })
 }
 
-fn kv_sensor_noise(input: &mut &str) -> KvnResult<crate::types::SensorNoise> {
-    let (val_str, unit_str) = terminated(kvn_value, opt_line_ending).parse_next(input)?;
-    let values = val_str
-        .split_whitespace()
-        .map(|s| {
-            s.parse::<f64>()
-                .map_err(|_| ErrMode::Cut(InternalParserError::from_input(input)))
-        })
-        .collect::<std::result::Result<Vec<_>, _>>()?;
+/// Reads MAN_DURATION; its range is checked by model validation, which names the keyword.
+fn kv_man_duration(input: &mut &str) -> KvnResult<crate::types::Duration> {
+    let (value, unit) = kv_float_unit(input)?;
+    let units = unit
+        .map(crate::types::TimeUnits::from_str)
+        .transpose()
+        .map_err(|_| cut_err(input, "Invalid MAN_DURATION unit; expected s"))?;
+    Ok(crate::types::Duration { value, units })
+}
 
-    let units = if let Some(u) = unit_str {
-        Some(
-            crate::types::AngleUnits::from_str(u)
-                .map_err(|e| ErrMode::Cut(InternalParserError::from_external_error(input, e)))?,
-        )
-    } else {
-        None
-    };
+fn kv_sensor_noise(input: &mut &str) -> KvnResult<crate::types::SensorNoise> {
+    let (values, unit_str) = kv_float_list(input)?;
+
+    let units = unit_str
+        .map(crate::types::AngleUnits::from_str)
+        .transpose()
+        .map_err(|_| cut_err(input, "Invalid SENSOR_NOISE_STDDEV unit; expected deg"))?;
     Ok(crate::types::SensorNoise { values, units })
 }
 
 fn kv_cp(input: &mut &str) -> KvnResult<crate::types::Vector3> {
-    let (val_str, unit_str) = terminated(kvn_value, opt_line_ending).parse_next(input)?;
-    let values = val_str
-        .split_whitespace()
-        .map(|s| {
-            s.parse::<f64>()
-                .map_err(|_| ErrMode::Cut(InternalParserError::from_input(input)))
-        })
-        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let (values, unit_str) = kv_float_list(input)?;
     let units = unit_str
         .map(crate::types::LengthUnits::from_str)
         .transpose()
-        .map_err(|error| ErrMode::Cut(InternalParserError::from_external_error(input, error)))?;
+        .map_err(|_| cut_err(input, "Invalid CP unit; expected m"))?;
     Ok(crate::types::Vector3 {
         elements: values,
         units,
@@ -438,20 +426,20 @@ fn parse_ad_block(input: &mut &str) -> KvnResult<AcmAttitudeDetermination> {
         "NUMBER_STATES" => val: kv_u32 => { number_states = Some(val); },
         "ATTITUDE_STATES" => val: kv_enum => { attitude_states = Some(val); },
         "EULER_ROT_SEQ" => val: kv_enum => { euler_rot_seq = Some(val); },
-        "COV_TYPE" => val: kv_enum => { cov_type = Some(val); },
+        "COV_TYPE" => val: kv_none_or_enum => { cov_type = val; },
         "REF_FRAME_A" => val: kv_string => { ref_frame_a = Some(val); },
         "REF_FRAME_B" => val: kv_string => { ref_frame_b = Some(val); },
         "RATE_STATES" => val: kv_enum => { rate_states = Some(val); },
         "SIGMA_U" => val: kv_from_kvn => { sigma_u = Some(val); },
         "SIGMA_V" => val: kv_from_kvn => { sigma_v = Some(val); },
         "RATE_PROCESS_NOISE_STDDEV" => val: kv_from_kvn => { rate_process_noise_stddev = Some(val); },
-    }, |i: &mut &str| peek((ws, "SENSOR_START")).parse_next(i).is_ok() || at_block_end("AD", i), "Unexpected ACM AD key");
+    }, |i: &mut &str| at_block_start("SENSOR", i) || at_block_end("AD", i), "Unexpected ACM AD key");
 
     loop {
         if at_block_end("AD", input) {
             break;
         }
-        if peek((ws, "SENSOR_START")).parse_next(input).is_ok() {
+        if at_block_start("SENSOR", input) {
             sensor.push(parse_sensor_block.parse_next(input)?);
             continue;
         }
@@ -469,10 +457,8 @@ fn parse_ad_block(input: &mut &str) -> KvnResult<AcmAttitudeDetermination> {
         attitude_states,
         euler_rot_seq,
         cov_type,
-        ad_epoch: None,
         ref_frame_a,
         ref_frame_b,
-        attitude_type: None,
         rate_states,
         sigma_u,
         sigma_v,
@@ -486,22 +472,40 @@ fn parse_user_defined_block(input: &mut &str) -> KvnResult<crate::types::UserDef
     expect_block_start("USER").parse_next(input)?;
 
     loop {
-        let checkpoint = input.checkpoint();
-        let _ = collect_comments.parse_next(input)?;
-        input.reset(&checkpoint);
         let comments = collect_comments.parse_next(input)?;
-        block.comment.extend(comments);
+        block.entries.extend(
+            comments
+                .into_iter()
+                .map(crate::types::UserDefinedEntry::Comment),
+        );
 
         if at_block_end("USER", input) {
             break;
         }
 
-        let key = key_token.parse_next(input)?;
+        let key = user_defined_key_token.parse_next(input)?;
+        let Some(parameter) = key
+            .strip_prefix("USER_DEFINED_")
+            .filter(|name| !name.is_empty())
+        else {
+            return Err(cut_err(
+                input,
+                "USER_DEFINED_ keyword needs a parameter name suffix",
+            ));
+        };
+        if value_is_absent(key, input) {
+            skip_record(input);
+            continue;
+        }
         let val = kv_string.parse_next(input)?;
-        block.user_defined.push(crate::types::UserDefinedParameter {
-            parameter: key.strip_prefix("USER_DEFINED_").unwrap_or(key).to_string(),
-            value: val,
-        });
+        block
+            .entries
+            .push(crate::types::UserDefinedEntry::Parameter(
+                crate::types::UserDefinedParameter {
+                    parameter: parameter.to_string(),
+                    value: val,
+                },
+            ));
     }
     expect_block_end("USER").parse_next(input)?;
     Ok(block)
@@ -721,6 +725,7 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
     let mut block_has_content = false;
     let mut history_started = false;
     let mut ad_sensor_started = false;
+    let mut rot_seq_seen = false;
     let mut offset = 0usize;
 
     for (index, raw_line) in kvn.split('\n').enumerate() {
@@ -729,9 +734,6 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
         let fail = |message: &str| Err(invalid(number, offset, message.into()));
         if line.as_bytes().contains(&b'\r') {
             return fail("lone carriage return");
-        }
-        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
-            return fail("non-printable or non-ASCII character");
         }
         let line = line.trim();
         if line.is_empty() {
@@ -742,7 +744,8 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             if block.is_none() && top_rank != Some(0) {
                 return fail("ACM header COMMENT must immediately follow the version record");
             }
-            if block_has_content && block.is_some() {
+            // ADM 5.3.10.5: each user-defined parameter line may be preceded by comments.
+            if block_has_content && block.is_some() && block != Some("USER") {
                 return fail("COMMENT is not at the beginning of an ACM logical block");
             }
             offset += raw_line.len() + 1;
@@ -788,6 +791,7 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             block_has_content = false;
             history_started = false;
             ad_sensor_started = false;
+            rot_seq_seen = false;
             offset += raw_line.len() + 1;
             continue;
         }
@@ -848,15 +852,13 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
                 block_has_content = true;
             }
             Some("USER") => {
-                if !line.contains('=')
-                    || !line
-                        .split_once('=')
-                        .unwrap()
-                        .0
-                        .trim()
-                        .starts_with("USER_DEFINED_")
-                {
+                let Some((key, _)) = line.split_once('=') else {
                     return fail("invalid ACM user-defined assignment");
+                };
+                match key.trim().strip_prefix("USER_DEFINED_") {
+                    Some("") => return fail("USER_DEFINED_ keyword needs a parameter name suffix"),
+                    Some(_) => {}
+                    None => return fail("invalid ACM user-defined assignment"),
                 }
                 block_has_content = true;
             }
@@ -871,12 +873,29 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
                     return fail("expected one ACM block assignment");
                 }
                 let key = line.split_once('=').unwrap().0.trim();
+                if current == "META" && key == "CLASSIFICATION" {
+                    return fail(
+                        "CLASSIFICATION is supported only in the ACM header (ADM table 5-3 repeats it in metadata, but XSD acmMetadata has no such element)",
+                    );
+                }
                 let keys = block_keys(current)
                     .ok_or_else(|| invalid(number, offset, "unknown ACM marked block".into()))?;
-                let rank = keys
-                    .iter()
-                    .position(|candidate| *candidate == key)
+                let position = |name: &str| keys.iter().position(|candidate| *candidate == name);
+                // Ranks are doubled so the tolerated Orekit slot fits between two keywords.
+                let mut rank = 2 * position(key)
                     .ok_or_else(|| invalid(number, offset, "unknown ACM keyword".into()))?;
+                if key == "EULER_ROT_SEQ" && matches!(current, "ATT" | "AD") {
+                    if rot_seq_seen {
+                        return fail("duplicate ACM keyword");
+                    }
+                    rot_seq_seen = true;
+                    // Orekit writes EULER_ROT_SEQ just before NUMBER_STATES. The order carries
+                    // no meaning, so reading accepts that slot; generation writes table order.
+                    let orekit_rank = 2 * position("NUMBER_STATES").expect("ATT/AD keyword") - 1;
+                    if previous_key.is_none_or(|previous| previous < orekit_rank) {
+                        rank = orekit_rank;
+                    }
+                }
                 if previous_key.is_some_and(|previous| rank <= previous) {
                     return fail("duplicate or out-of-order ACM keyword");
                 }
@@ -996,10 +1015,7 @@ impl ToKvn for AcmData {
         }
         if let Some(user) = &self.user {
             writer.write_section("USER_START");
-            writer.write_comments(&user.comment);
-            for p in &user.user_defined {
-                writer.write_user_defined(&p.parameter, &p.value);
-            }
+            user.write_kvn(writer);
             writer.write_section("USER_STOP");
         }
     }
@@ -1023,7 +1039,7 @@ impl ToKvn for AcmAttitudeState {
         }
         writer.write_pair("REF_FRAME_A", &self.ref_frame_a);
         writer.write_pair("REF_FRAME_B", &self.ref_frame_b);
-        writer.write_pair("NUMBER_STATES", self.number_states);
+        writer.write_integer_pair("NUMBER_STATES", self.number_states);
         writer.write_pair("ATT_TYPE", &self.att_type);
         if let Some(v) = &self.euler_rot_seq {
             writer.write_pair("EULER_ROT_SEQ", v);
@@ -1032,7 +1048,7 @@ impl ToKvn for AcmAttitudeState {
             writer.write_pair("RATE_TYPE", v);
         }
         for line in &self.att_lines {
-            writer.write_numeric_record(&line.values);
+            writer.write_ocm_numeric_history(&line.epoch, &line.values);
         }
         writer.write_section("ATT_STOP");
     }
@@ -1103,7 +1119,7 @@ impl ToKvn for AcmCovarianceMatrix {
         }
         writer.write_pair("COV_TYPE", &self.cov_type);
         for line in &self.cov_lines {
-            writer.write_numeric_record(&line.values);
+            writer.write_ocm_numeric_history(&line.epoch, &line.values);
         }
         writer.write_section("COV_STOP");
     }
@@ -1123,10 +1139,16 @@ impl ToKvn for AcmManeuverParameters {
             writer.write_pair("MAN_PURPOSE", v);
         }
         if let Some(v) = &self.man_begin_time {
-            writer.write_pair("MAN_BEGIN_TIME", v);
+            writer.write_odm_float_pair(
+                "MAN_BEGIN_TIME",
+                v.as_str().parse().expect("validated relative time"),
+            );
         }
         if let Some(v) = &self.man_end_time {
-            writer.write_pair("MAN_END_TIME", v);
+            writer.write_odm_float_pair(
+                "MAN_END_TIME",
+                v.as_str().parse().expect("validated relative time"),
+            );
         }
         if let Some(v) = &self.man_duration {
             writer.write_odm_float_measure("MAN_DURATION", &v.to_unit_value());
@@ -1167,7 +1189,7 @@ impl ToKvn for AcmAttitudeDetermination {
             writer.write_pair("ATTITUDE_SOURCE", v);
         }
         if let Some(v) = &self.number_states {
-            writer.write_pair("NUMBER_STATES", v);
+            writer.write_integer_pair("NUMBER_STATES", *v);
         }
         if let Some(v) = &self.attitude_states {
             writer.write_pair("ATTITUDE_STATES", v);
@@ -1208,13 +1230,13 @@ impl ToKvn for AcmSensor {
         writer.write_section("SENSOR_START");
         writer.write_comments(&self.comment);
         if let Some(v) = self.sensor_number {
-            writer.write_pair("SENSOR_NUMBER", v);
+            writer.write_integer_pair("SENSOR_NUMBER", v);
         }
         if let Some(v) = &self.sensor_used {
             writer.write_pair("SENSOR_USED", v);
         }
         if let Some(v) = self.number_sensor_noise_covariance {
-            writer.write_pair("NUMBER_SENSOR_NOISE_COVARIANCE", v);
+            writer.write_integer_pair("NUMBER_SENSOR_NOISE_COVARIANCE", v);
         }
         if let Some(v) = &self.sensor_noise_stddev {
             writer.write_numeric_vector("SENSOR_NOISE_STDDEV", &v.values, v.units.as_ref());
@@ -1229,30 +1251,6 @@ impl ToKvn for AcmSensor {
 impl ParseKvn for Acm {
     fn parse_kvn(input: &mut &str) -> KvnResult<Self> {
         parse_acm(input)
-    }
-}
-
-impl std::fmt::Display for AttLine {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (i, val) in self.values.iter().enumerate() {
-            if i > 0 {
-                write!(f, " ")?;
-            }
-            write!(f, "{}", val)?;
-        }
-        Ok(())
-    }
-}
-
-impl std::fmt::Display for CovLine {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (i, val) in self.values.iter().enumerate() {
-            if i > 0 {
-                write!(f, " ")?;
-            }
-            write!(f, "{}", val)?;
-        }
-        Ok(())
     }
 }
 
@@ -1339,6 +1337,7 @@ impl Acm {
                 [
                     attitude.att_id.as_ref(),
                     attitude.att_prev_id.as_ref(),
+                    attitude.att_basis.as_ref(),
                     attitude.att_basis_id.as_ref(),
                     Some(&attitude.ref_frame_a),
                     Some(&attitude.ref_frame_b),
@@ -1388,6 +1387,7 @@ impl Acm {
                 [
                     covariance.cov_id.as_ref(),
                     covariance.cov_prev_id.as_ref(),
+                    covariance.cov_basis.as_ref(),
                     covariance.cov_basis_id.as_ref(),
                     covariance.cov_ref_frame.as_ref(),
                 ]
@@ -1468,9 +1468,10 @@ impl Acm {
             }
         }
         if let Some(user) = &data.user {
-            for value in user.comment.iter().chain(
-                user.user_defined
-                    .iter()
+            // ADM 5.3.10.5 lets comments precede any parameter, so entry order is KVN-safe.
+            user.validate_kvn_parameter_names()?;
+            for value in user.comments().chain(
+                user.parameters()
                     .flat_map(|parameter| [&parameter.parameter, &parameter.value]),
             ) {
                 check_text(value)?;

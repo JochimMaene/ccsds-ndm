@@ -3,6 +3,55 @@ use crate::{ATT_KVN, COV_KVN};
 use ccsds_ndm::messages::acm::Acm;
 use ccsds_ndm::types::{AngleRate, Vec4Double};
 use ccsds_ndm::Ndm;
+
+#[test]
+fn user_defined_punctuation_survives_generated_kvn() {
+    use ccsds_ndm::types::{UserDefined, UserDefinedEntry, UserDefinedParameter};
+    let mut message = Acm::from_kvn(include_str!("../../data/kvn/acm_g6.kvn")).unwrap();
+    let block = UserDefined {
+        entries: vec![UserDefinedEntry::Parameter(UserDefinedParameter {
+            parameter: "USER_DEFINED_FOO-BAR.X".into(),
+            value: "1".into(),
+        })],
+    };
+    message.body.segment.data.user = Some(block.clone());
+    let parsed = Acm::from_kvn(&message.to_kvn().unwrap()).unwrap();
+    assert_eq!(parsed.body.segment.data.user, Some(block));
+}
+
+#[test]
+fn history_time_tags_are_written_with_their_stored_spelling() {
+    // Time tags are lexical epochs, so 16-digit number rounding cannot merge them.
+    let source = include_str!("../../data/kvn/acm_g6.kvn");
+    let kvn = mutated(source, "0.25 0.73529", "0.12345678901234567 0.73529");
+    let kvn = mutated(&kvn, "0.50 0.73492", "0.12345678901234568 0.73492");
+    let message = Acm::from_kvn(&kvn).unwrap();
+    let generated = message.to_kvn().unwrap();
+    assert!(generated.contains("\n0.12345678901234567 "), "{generated}");
+    assert!(generated.contains("\n0.12345678901234568 "), "{generated}");
+    assert_eq!(Acm::from_kvn(&generated).unwrap(), message);
+    let xml = message.to_xml().unwrap();
+    assert!(xml.contains("<attLine>0.12345678901234568 "), "{xml}");
+    assert_eq!(Acm::from_xml(&xml).unwrap(), message);
+}
+
+#[test]
+fn euler_history_with_rates_writes_schema_order() {
+    // ADM table 5-4 and XSD acmAttitudeStateType: EULER_ROT_SEQ precedes RATE_TYPE.
+    let kvn = mutated(
+        include_str!("../../data/kvn/acm_g6.kvn"),
+        "NUMBER_STATES = 4\nATT_TYPE = QUATERNION\n0.0 0.73566 -0.50547 0.41309 0.180707\n0.25 0.73529 -0.50531 0.41375 0.181158\n0.50 0.73492 -0.50515 0.41441 0.181610",
+        "NUMBER_STATES = 6\nATT_TYPE = EULER_ANGLES\nEULER_ROT_SEQ = XYZ\nRATE_TYPE = ANGVEL\n0.0 1.0 2.0 3.0 0.1 0.2 0.3\n0.5 1.1 2.1 3.1 0.1 0.2 0.3",
+    );
+    let message = Acm::from_kvn(&kvn).unwrap();
+    let xml = message.to_xml().unwrap();
+    validate_xml("ACM Euler history with rates", &xml);
+    assert!(xml.find("<EULER_ROT_SEQ>").unwrap() < xml.find("<RATE_TYPE>").unwrap());
+    assert_eq!(Acm::from_xml(&xml).unwrap(), message);
+    let generated = message.to_kvn().unwrap();
+    assert!(generated.find("EULER_ROT_SEQ").unwrap() < generated.find("RATE_TYPE").unwrap());
+}
+
 #[test]
 fn acm_vectors_and_units_survive_both_notations() {
     let physical = Acm::from_kvn(include_str!("../../data/kvn/acm_g8.kvn")).unwrap();
@@ -163,15 +212,15 @@ fn acm_mass_and_duration_zero_boundaries_generate_valid_xml() {
 #[test]
 fn kvn_generation_rounds_history_numbers_to_the_ccsds_digit_limit() {
     let mut message = Acm::from_kvn(ATT_KVN).unwrap();
-    message.body.segment.data.att[0].att_lines[0].values[1] = 1.234_567_890_123_456_7;
-    assert!(message.to_kvn().unwrap().contains("1.234567890123457e0"));
+    message.body.segment.data.att[0].att_lines[0].values[4] = 1.234_567_890_123_456_7;
+    assert!(message.to_kvn().unwrap().contains("1.234567890123457"));
 
     let mut physical = Acm::from_kvn(include_str!("../../data/kvn/acm_g8.kvn")).unwrap();
     physical.body.segment.data.phys.as_mut().unwrap().drag_coeff = Some(1.234_567_890_123_456_7);
     assert!(physical
         .to_kvn()
         .unwrap()
-        .contains("DRAG_COEFF           = 1.234567890123457e0"));
+        .contains("DRAG_COEFF           = 1.234567890123457"));
 }
 
 #[test]
@@ -238,4 +287,339 @@ AD_STOP
         parsed.body.segment.data.ad.as_ref().unwrap().sensors[0].sensor_number,
         Some(1)
     );
+}
+
+#[test]
+fn declared_history_compositions_are_revalidated_before_output() {
+    use ccsds_ndm::types::{AcmAttitudeType, AcmCovarianceLineType, RotSeq};
+
+    let attitude = Acm::from_kvn(ATT_KVN).unwrap();
+    let mut changed = attitude.clone();
+    changed.body.segment.data.att[0].number_states = 6;
+    for row in &mut changed.body.segment.data.att[0].att_lines {
+        row.values.pop();
+    }
+    assert_rejects(&changed, "NUMBER_STATES");
+
+    let mut changed = attitude.clone();
+    changed.body.segment.data.att[0].att_type = AcmAttitudeType::EulerAngles;
+    changed.body.segment.data.att[0].number_states = 6;
+    for row in &mut changed.body.segment.data.att[0].att_lines {
+        row.values.pop();
+    }
+    assert_rejects(&changed, "EULER_ROT_SEQ");
+    changed.body.segment.data.att[0].euler_rot_seq = Some(RotSeq::XYZ);
+    ccsds_ndm::Validate::validate(&changed).unwrap();
+
+    let mut changed = attitude;
+    changed.body.segment.data.att[0].att_lines[1].values[4] = f64::NAN;
+    assert_rejects(&changed, "ATT data line");
+
+    let covariance = Acm::from_kvn(COV_KVN).unwrap();
+    for cov_type in [
+        AcmCovarianceLineType::Angle,
+        AcmCovarianceLineType::Quaternion,
+        AcmCovarianceLineType::QuaternionGyroBias,
+    ] {
+        let mut changed = covariance.clone();
+        changed.body.segment.data.cov[0].cov_type = cov_type;
+        assert_rejects(&changed, "COV data line");
+    }
+    let mut changed = covariance;
+    changed.body.segment.data.cov[0].cov_lines[1].values[0] = f64::INFINITY;
+    assert_rejects(&changed, "COV data line");
+}
+
+#[test]
+fn sensor_noise_dimensions_and_estimator_conditionals_are_revalidated() {
+    use ccsds_ndm::types::{AcmAttitudeType, AngleUnits, SensorNoise};
+
+    let original = Acm::from_kvn(COV_KVN).unwrap();
+    let mut changed = original.clone();
+    let sensor = &mut changed.body.segment.data.ad.as_mut().unwrap().sensors[0];
+    sensor.number_sensor_noise_covariance = Some(2);
+    sensor.sensor_noise_stddev = Some(SensorNoise {
+        values: vec![0.01],
+        units: Some(AngleUnits::Deg),
+    });
+    assert_rejects(&changed, "SENSOR_NOISE_STDDEV");
+    changed.body.segment.data.ad.as_mut().unwrap().sensors[0]
+        .sensor_noise_stddev
+        .as_mut()
+        .unwrap()
+        .values
+        .push(0.02);
+    ccsds_ndm::Validate::validate(&changed).unwrap();
+    changed.body.segment.data.ad.as_mut().unwrap().sensors[0]
+        .sensor_noise_stddev
+        .as_mut()
+        .unwrap()
+        .values[1] = f64::NAN;
+    assert_rejects(&changed, "SENSOR_NOISE_STDDEV");
+
+    let mut changed = original.clone();
+    changed.body.segment.data.ad.as_mut().unwrap().sigma_u =
+        Some(ccsds_ndm::types::SigmaU::new(f64::NAN, None));
+    assert_rejects(&changed, "SIGMA_U");
+    let mut changed = original.clone();
+    changed.body.segment.data.ad.as_mut().unwrap().number_states = Some(3);
+    assert_rejects(&changed, "NUMBER_STATES");
+    let mut changed = original;
+    changed
+        .body
+        .segment
+        .data
+        .ad
+        .as_mut()
+        .unwrap()
+        .attitude_states = Some(AcmAttitudeType::EulerAngles);
+    assert_rejects(&changed, "EULER_ROT_SEQ");
+}
+
+#[test]
+fn quaternion_histories_reject_nonunit_magnitude_after_mutation() {
+    let mut message = Acm::from_kvn(ATT_KVN).unwrap();
+    for value in &mut message.body.segment.data.att[0].att_lines[1].values[0..4] {
+        *value = 0.0;
+    }
+    assert_rejects(&message, "Quaternion not normalized");
+}
+
+#[test]
+fn acm_seconds_and_time_offsets_are_checked_at_every_boundary() {
+    use ccsds_ndm::types::{TimeOffset, TimeUnits};
+    let base = Acm::from_kvn(ATT_KVN).unwrap();
+    for field in ["MAN_DURATION", "TAIMUTC_AT_TZERO", "NEXT_LEAP_TAIMUTC"] {
+        let mut message = base.clone();
+        match field {
+            "MAN_DURATION" => {
+                message.body.segment.data.man[0]
+                    .man_duration
+                    .as_mut()
+                    .unwrap()
+                    .units = Some(TimeUnits::Day)
+            }
+            "TAIMUTC_AT_TZERO" => {
+                message.body.segment.metadata.taimutc_at_tzero = Some(TimeOffset {
+                    value: 37.0,
+                    units: Some(TimeUnits::Day),
+                })
+            }
+            _ => {
+                message.body.segment.metadata.next_leap_taimutc = Some(TimeOffset {
+                    value: 38.0,
+                    units: Some(TimeUnits::Day),
+                })
+            }
+        }
+        assert_rejects(&message, &format!("{field} units"));
+    }
+    for field in ["TAIMUTC_AT_TZERO", "NEXT_LEAP_TAIMUTC"] {
+        for number in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut message = base.clone();
+            let value = Some(TimeOffset {
+                value: number,
+                units: None,
+            });
+            if field == "TAIMUTC_AT_TZERO" {
+                message.body.segment.metadata.taimutc_at_tzero = value;
+            } else {
+                message.body.segment.metadata.next_leap_taimutc = value;
+            }
+            assert_rejects(&message, field);
+        }
+    }
+    for field in ["MAN_BEGIN_TIME", "MAN_END_TIME", "MAN_DURATION"] {
+        let source = if field == "MAN_END_TIME" {
+            ATT_KVN.replace("MAN_DURATION = 450.0", "MAN_END_TIME = 550.0")
+        } else {
+            ATT_KVN.to_owned()
+        };
+        let value = match field {
+            "MAN_BEGIN_TIME" => "100.0",
+            "MAN_END_TIME" => "550.0",
+            _ => "450.0",
+        };
+        let seconds = source.replace(
+            &format!("{field} = {value}"),
+            &format!("{field} = {value} [s]"),
+        );
+        let control = Acm::from_kvn(&seconds).unwrap();
+        let xml = control
+            .to_xml()
+            .unwrap()
+            .replace(&format!("<{field}>"), &format!("<{field} units=\"s\">"));
+        Acm::from_xml(&xml).unwrap();
+        assert!(
+            Acm::from_xml(&xml.replace("units=\"s\"", "units=\"d\"")).is_err(),
+            "{field}"
+        );
+        assert!(
+            Acm::from_kvn(&seconds.replace("[s]", "[d]")).is_err(),
+            "{field}"
+        );
+    }
+}
+
+#[test]
+fn acm_declared_elements_match_every_actual_block_in_order() {
+    let mut message = Acm::from_kvn(ATT_KVN).unwrap();
+    message
+        .body
+        .segment
+        .data
+        .att
+        .push(message.body.segment.data.att[0].clone());
+    for declaration in ["ATT,ATT,MAN,AD", "att,att,man,ad"] {
+        message.body.segment.metadata.acm_data_elements = Some(declaration.into());
+        let kvn = message.to_kvn().unwrap();
+        assert_eq!(Acm::from_kvn(&kvn).unwrap(), message);
+        assert_eq!(Acm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    }
+    let xml = message.to_xml().unwrap();
+    for declaration in ["BOGUS", "ATT,MAN", "MAN,ATT,ATT", "ATT,ATT,MAN,", ""] {
+        message.body.segment.metadata.acm_data_elements = Some(declaration.into());
+        assert_rejects(&message, "ACM_DATA_ELEMENTS");
+        assert!(Acm::from_xml(&xml.replace("att,att,man,ad", declaration)).is_err());
+    }
+}
+
+#[test]
+fn acm_maneuver_targets_follow_purposes_without_closing_custom_values() {
+    use ccsds_ndm::types::TargetMomentum;
+    let mut message = Acm::from_kvn(ATT_KVN).unwrap();
+    message.body.segment.data.man[0].man_purpose = Some("SCI_OBJ".into());
+    message.body.segment.data.man[0].target_momentum = None;
+    // An unused frame declaration is legal; a supplied vector still requires its frame.
+    assert_eq!(Acm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    for (purpose, field) in [
+        ("MOM_DESAT", "TARGET_MOMENTUM"),
+        ("ATT_ADJUST", "TARGET_ATTITUDE"),
+        ("spin_rate_adjust", "TARGET_SPINRATE"),
+    ] {
+        message.body.segment.data.man[0].man_purpose = Some(purpose.into());
+        assert_rejects(&message, field);
+    }
+    let man = &mut message.body.segment.data.man[0];
+    man.man_purpose = Some("MOM_DESAT, ATT_ADJUST".into());
+    man.target_momentum = Some(TargetMomentum {
+        elements: vec![1.0, 2.0, 3.0],
+        units: None,
+    });
+    man.target_attitude = Some(Vec4Double {
+        values: vec![0.0, 0.0, 0.0, 1.0],
+    });
+    let kvn = message.to_kvn().unwrap();
+    assert_eq!(Acm::from_kvn(&kvn).unwrap(), message);
+    assert!(message.to_xml().is_err());
+    let mut single = message.clone();
+    single.body.segment.data.man[0].man_purpose = Some("MOM_DESAT".into());
+    single.body.segment.data.man[0].target_attitude = None;
+    let invalid_xml = single
+        .to_xml()
+        .unwrap()
+        .replace("</man>", "<TARGET_ATTITUDE>0 0 0 1</TARGET_ATTITUDE></man>");
+    assert!(Acm::from_xml(&invalid_xml).is_err());
+    let mut output = Vec::new();
+    assert!(message.write_xml_to(&mut output).is_err());
+    assert!(output.is_empty());
+    let man = &mut message.body.segment.data.man[0];
+    man.man_purpose = Some("ATT_ADJUST".into());
+    man.target_momentum = None;
+    man.target_mom_frame = None;
+    man.target_attitude.as_mut().unwrap().values = vec![0.0; 4];
+    assert_rejects(&message, "Quaternion");
+}
+
+#[test]
+fn acm_supplied_sensor_numbers_are_in_ascending_order_and_may_be_omitted() {
+    let mut message = Acm::from_kvn(COV_KVN).unwrap();
+    let sensors = &mut message.body.segment.data.ad.as_mut().unwrap().sensors;
+    sensors[0].sensor_number = None;
+    assert_eq!(Acm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    let sensors = &mut message.body.segment.data.ad.as_mut().unwrap().sensors;
+    sensors[0].sensor_number = Some(8);
+    assert_rejects(&message, "SENSOR_NUMBER");
+}
+
+#[test]
+fn sensor_frequency_schema_bound_applies_in_every_notation() {
+    use ccsds_ndm::{types::Frequency, Validate};
+    let mut message = Acm::from_kvn(COV_KVN).unwrap();
+    let sensor = &mut message.body.segment.data.ad.as_mut().unwrap().sensors[0];
+    assert!(Frequency::new(0.0, None).is_err());
+    sensor.sensor_frequency = Some(Frequency {
+        value: 0.0,
+        units: None,
+    });
+    assert!(message.validate().is_err());
+    assert!(message.to_kvn().is_err());
+    assert!(message.to_xml().is_err());
+    let mut output = Vec::new();
+    assert!(message.write_xml_to(&mut output).is_err());
+    assert!(output.is_empty());
+}
+
+#[test]
+fn attitude_determination_method_has_an_xml_enum_but_open_kvn_text() {
+    let source = include_str!("../../data/kvn/acm_g7.kvn");
+    for method in ["EKF", "ekf", "OTHER", "other", "CUSTOM_METHOD", "Ekf"] {
+        let mut message = Acm::from_kvn(source).unwrap();
+        message.body.segment.data.ad.as_mut().unwrap().ad_method = Some(method.into());
+        ccsds_ndm::Validate::validate(&message).unwrap();
+        Acm::from_kvn(&message.to_kvn().unwrap()).unwrap();
+        if matches!(method, "CUSTOM_METHOD" | "Ekf") {
+            let error = message.to_xml().unwrap_err();
+            crate::common::assert_validation_field(&error, "AD_METHOD");
+            assert_eq!(
+                error.field_path().as_deref(),
+                Some("body.segment.data.ad.ad_method")
+            );
+            let mut output = Vec::new();
+            assert!(message.write_xml_to(&mut output).is_err());
+            assert!(output.is_empty());
+            let xml = Acm::from_kvn(source).unwrap().to_xml().unwrap();
+            let invalid = mutated(
+                &xml,
+                "<AD_METHOD>EKF</AD_METHOD>",
+                &format!("<AD_METHOD>{method}</AD_METHOD>"),
+            );
+            assert!(Acm::from_xml(&invalid).is_err());
+        } else {
+            let xml = message.to_xml().unwrap();
+            validate_xml("AD_METHOD", &xml);
+            Acm::from_xml(&xml).unwrap();
+        }
+    }
+}
+
+#[test]
+fn history_basis_has_an_xml_enum_but_open_kvn_text() {
+    // ATT_BASIS/COV_BASIS list "suggested values" (tables 5-4, 5-6); XSD attBasisType is closed.
+    let source = mutated(
+        COV_KVN,
+        "COV_BASIS = DETERMINED_OBC",
+        "COV_BASIS = SMOOTHED",
+    );
+    let message = Acm::from_kvn(&source).unwrap();
+    assert_eq!(
+        message.body.segment.data.cov[0].cov_basis.as_deref(),
+        Some("SMOOTHED")
+    );
+    assert_eq!(Acm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    let error = message.to_xml().unwrap_err();
+    crate::common::assert_validation_field(&error, "COV_BASIS");
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment.data.cov[0].cov_basis")
+    );
+    let xml = Acm::from_kvn(COV_KVN).unwrap().to_xml().unwrap();
+    assert!(Acm::from_xml(&mutated(&xml, ">DETERMINED_OBC<", ">SMOOTHED<")).is_err());
+
+    let mut attitude = Acm::from_kvn(ATT_KVN).unwrap();
+    attitude.body.segment.data.att[0].att_basis = Some("Predicted".into());
+    Acm::from_kvn(&attitude.to_kvn().unwrap()).unwrap();
+    crate::common::assert_validation_field(&attitude.to_xml().unwrap_err(), "ATT_BASIS");
+    attitude.body.segment.data.att[0].att_basis = Some("predicted".into());
+    validate_xml("ATT_BASIS", &attitude.to_xml().unwrap());
 }

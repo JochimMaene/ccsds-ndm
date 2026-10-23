@@ -101,3 +101,61 @@ fn aem_requires_one_object_but_allows_a_time_system_per_segment() {
     mixed_time_systems.body.segment[1].metadata.time_system = "TAI".to_string();
     mixed_time_systems.validate().unwrap();
 }
+
+#[test]
+fn interpolation_recommendations_are_preserved_without_guessing_an_algorithm() {
+    let published = valid_aem();
+    let metadata = &published.body.segment[0].metadata;
+    assert_eq!(metadata.interpolation_method.as_deref(), Some("hermite"));
+    assert_eq!(published.body.segment[0].data.attitude_states.len(), 4);
+    // ADM 4.2.4.8.4 defines no algorithm or universal degree/count relationship. The
+    // published degree-seven example must not acquire an invented degree-plus-one rule.
+    let mut partner_method = published.clone();
+    partner_method.body.segment[0].metadata.interpolation_method = Some("ICD_METHOD".into());
+    for message in [published, partner_method] {
+        message.validate().unwrap();
+        assert_eq!(Aem::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+        assert_eq!(Aem::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    }
+}
+
+#[test]
+fn aem_quaternion_magnitude_is_checked_on_later_records() {
+    let mut message = valid_aem();
+    let AemAttitudeState::QuaternionEphemeris(state) =
+        &mut message.body.segment[0].data.attitude_states[1]
+    else {
+        unreachable!()
+    };
+    state.quaternion.q1 = 0.0;
+    state.quaternion.q2 = 0.0;
+    state.quaternion.q3 = 0.0;
+    state.quaternion.qc = 0.0;
+    assert!(message
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("not normalized"));
+    assert!(message.to_kvn().is_err());
+    assert!(message.to_xml().is_err());
+    let mut output = Vec::new();
+    assert!(message.write_kvn_to(&mut output).is_err());
+    assert!(message.write_xml_to(&mut output).is_err());
+    assert!(output.is_empty());
+}
+
+#[test]
+fn cross_segment_chronology_requires_the_same_time_system() {
+    let mut message = valid_aem();
+    let first = message.body.segment[0].clone();
+    message.body.segment = vec![first.clone(), first];
+    // Equal lexical spans can represent different instants; no time-scale conversion is done.
+    message.body.segment[0].metadata.time_system = "TAI".into();
+    message.body.segment[1].metadata.time_system = "UTC".into();
+    message.validate().unwrap();
+    for output in [message.to_kvn().unwrap(), message.to_xml().unwrap()] {
+        ccsds_ndm::from_str(&output).unwrap();
+    }
+    message.body.segment[1].metadata.time_system = " tai ".into();
+    crate::common::assert_validation_field(&message.validate().unwrap_err(), "USEABLE_START_TIME");
+}

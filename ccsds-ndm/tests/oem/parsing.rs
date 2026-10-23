@@ -55,9 +55,9 @@ fn kvn_interpolation_degree_obeys_signed_integer_grammar() {
     for (value, message) in [
         ("-1", "positive integer"),
         ("0", "positive integer"),
-        ("2147483648", "Invalid integer"),
-        ("5.0", "Invalid integer"),
-        ("7 8", "Invalid integer"),
+        ("2147483648", "Invalid integer for INTERPOLATION_DEGREE"),
+        ("5.0", "Invalid integer for INTERPOLATION_DEGREE"),
+        ("7 8", "Invalid integer for INTERPOLATION_DEGREE"),
     ] {
         let invalid = mutated(
             source,
@@ -110,7 +110,7 @@ fn kvn_rejects_duplicate_trailing_and_non_ascii_content() {
             "non-ASCII content",
             mutated(source, object_name, &format!("{object_name} €")),
             5,
-            "non-printable or non-ASCII character",
+            "non-printable or non-ASCII character U+20AC",
         ),
     ] {
         let error = Oem::from_kvn(&invalid).unwrap_err();
@@ -275,14 +275,17 @@ fn xml_declaration_opens_the_document() {
         );
     }
 
-    for input in [
-        without.to_owned(),
-        format!("<!-- lead-in -->\n{XML}"),
-        format!(" {XML}"),
-    ] {
+    // XML 1.0 makes the declaration optional and UTF-8 the default, so omitting it loses
+    // nothing; one that is present must still open the document.
+    assert_eq!(Oem::from_xml(without).unwrap(), baseline);
+    assert_eq!(
+        ccsds_ndm::from_str(without).unwrap(),
+        ccsds_ndm::Message::Oem(baseline.clone())
+    );
+    for input in [format!("<!-- lead-in -->\n{XML}"), format!(" {XML}")] {
         crate::common::assert_invalid_format(
             &Oem::from_xml(&input).unwrap_err(),
-            "an XML instantiation must start with an XML 1.0 declaration",
+            "an XML declaration, when present, must begin the document",
         );
     }
     for declaration in [
@@ -403,28 +406,28 @@ fn kvn_ephemeris_records_tolerate_padding_and_name_malformed_components() {
         expected,
         "trailing spaces changed the parsed model"
     );
-    // A tab is not a KVN blank; the strict pass rejects it as non-printable before parsing.
-    // The diagnostic points at the offending character, not the start of its line.
-    let line = source.lines().position(|line| line == record).unwrap() + 1;
+    // A tab reads as a blank (lossless producer deviation).
     let (epoch, rest) = record.split_once(' ').unwrap();
-    for (label, invalid, column) in [
-        ("trailing tab", format!("{record}\t"), record.len() + 1),
-        ("inner tab", format!("{epoch}\t{rest}"), epoch.len() + 1),
-        (
-            "non-ASCII",
-            format!("{epoch} \u{e9}{rest}"),
-            epoch.len() + 2,
-        ),
-    ] {
-        let error = Oem::from_kvn(&mutated(source, record, &invalid)).unwrap_err();
-        let located = crate::common::kvn_parse_error(&error)
-            .unwrap_or_else(|| panic!("{label}: expected a KVN parse error, got {error}"));
+    for tabbed in [format!("{record}\t"), format!("{epoch}\t{rest}")] {
         assert_eq!(
-            (located.line, located.column, located.message.as_str()),
-            (line, column, "non-printable or non-ASCII character"),
-            "{label}"
+            Oem::from_kvn(&mutated(source, record, &tabbed)).unwrap(),
+            expected
         );
     }
+    // Non-ASCII content is rejected at the offending character, naming its code point.
+    let line = source.lines().position(|line| line == record).unwrap() + 1;
+    let error =
+        Oem::from_kvn(&mutated(source, record, &format!("{epoch} \u{e9}{rest}"))).unwrap_err();
+    let located = crate::common::kvn_parse_error(&error)
+        .unwrap_or_else(|| panic!("expected a KVN parse error, got {error}"));
+    assert_eq!(
+        (located.line, located.column, located.message.as_str()),
+        (
+            line,
+            epoch.len() + 2,
+            "non-printable or non-ASCII character U+00E9"
+        ),
+    );
 
     // ODM 7.3.7 terminates every line; parsing leniently accepts an unterminated last line.
     let no_final_newline = source.trim_end_matches('\n');
@@ -441,6 +444,10 @@ fn kvn_ephemeris_records_tolerate_padding_and_name_malformed_components() {
     // Parsing drops the 16-digit cap of 7.5.6/7.5.7b and the 7.5.4 integer range for data
     // values, so 17-digit shortest round-trip doubles and large integers still parse.
     for (lenient, value) in [
+        ("1e3", 1000.0),
+        ("12.5e3", 12500.0),
+        ("1.", 1.0),
+        (".5", 0.5),
         ("3000000000.0", 3.0e9),
         ("3000000000", 3.0e9),
         ("-2757.3016318893897", -2757.3016318893897),
@@ -452,7 +459,7 @@ fn kvn_ephemeris_records_tolerate_padding_and_name_malformed_components() {
         assert_eq!(state.y.value, value, "{lenient}");
     }
 
-    for malformed in ["1e3", "12.5e3", "1.", "nan"] {
+    for malformed in ["1e", ".", "1e-9999", "nan"] {
         let invalid = mutated_once(source, "-280.045", malformed);
         assert_eq!(kvn_message(&invalid), "Invalid ODM number", "{malformed}");
     }
@@ -708,13 +715,11 @@ fn kvn_ignores_excess_trailing_padding_but_keeps_payload_limits() {
         .unwrap()
         .lines()
         .all(|line| line.len() <= 254));
-    for replacement in [
-        format!("ORIGINATOR = {}", "x".repeat(254)),
-        format!("ORIGINATOR = JPL{}\t", " ".repeat(300)),
-    ] {
-        let input = mutated_once(original, "ORIGINATOR = NASA/JPL", &replacement);
-        assert!(Oem::from_kvn(&input).is_err());
-    }
+    // Overlong payload is read (lossless producer deviation) but never written.
+    let long = format!("ORIGINATOR = {}", "x".repeat(254));
+    let message = Oem::from_kvn(&mutated_once(original, "ORIGINATOR = NASA/JPL", &long)).unwrap();
+    assert_eq!(message.header.originator, "x".repeat(254));
+    assert!(message.to_kvn().is_err());
     // Comment lines padded beyond column 254 are accepted and normalized like shorter lines.
     let padded_comment = Oem::from_kvn(&format!(
         "CCSDS_OEM_VERS = 3.0\nCOMMENT {}\n{}",
@@ -739,8 +744,9 @@ fn complete_covariance_without_section_markers_is_read() {
 }
 
 #[test]
-fn kvn_rejects_overlong_lines_and_short_covariance_rows() {
-    // ODM 7.3.2 limits lines to 254 characters; 5.2.5.4 fixes the lower-triangular row widths.
+fn kvn_reads_overlong_lines_and_rejects_short_covariance_rows() {
+    // ODM 7.3.2 limits lines to 254 characters; reading accepts longer lines, writing does not.
+    // 5.2.5.4 fixes the lower-triangular row widths.
     let source = KVN_FIXTURES[2];
     let comment = format!("COMMENT {}", "x".repeat(246));
     assert_eq!(comment.len(), 254);
@@ -755,14 +761,7 @@ fn kvn_rejects_overlong_lines_and_short_covariance_rows() {
         "COMMENT This block",
         &format!("{comment}x\nCOMMENT This block"),
     );
-    let error = Oem::from_kvn(&overlong).unwrap_err();
-    let kvn = crate::common::kvn_parse_error(&error)
-        .unwrap_or_else(|| panic!("expected a KVN parse error, got {error}"));
-    assert_eq!(
-        (kvn.column, kvn.message.as_str()),
-        (255, "line exceeds the normative 254-character limit"),
-        "{error}"
-    );
+    assert!(Oem::from_kvn(&overlong).unwrap().to_kvn().is_err());
 
     let short_row = mutated_once(source, "4.6189273e-04 6.7824216e-04\n", "4.6189273e-04\n");
     let error = Oem::from_kvn(&short_row).unwrap_err();
@@ -896,16 +895,28 @@ fn kvn_record_structure_rejections_name_their_reason() {
             "COMMENT is not at the beginning of an allowed OEM block",
         ),
         (
+            // 7.8.9: no block opens after the last matrix, and the model has no place for it.
             mutated_once(
                 covariance,
-                "EPOCH = 2019-12-29T21:00:00",
-                "COMMENT between\nEPOCH = 2019-12-29T21:00:00",
+                "COVARIANCE_STOP",
+                "COMMENT trailing\nCOVARIANCE_STOP",
             ),
-            "COMMENT is not at the beginning of an allowed OEM block",
+            "COMMENT after the last covariance matrix must precede another EPOCH",
         ),
     ] {
         assert_eq!(kvn_message(&input), message, "{input}");
     }
+}
+
+#[test]
+fn covariance_comments_before_a_later_epoch_keep_their_association() {
+    let source = mutated_once(
+        KVN_FIXTURES[2],
+        "EPOCH = 2019-12-29T21:00:00",
+        "COMMENT between\nEPOCH = 2019-12-29T21:00:00",
+    );
+    let message = Oem::from_kvn(&source).unwrap();
+    assert_eq!(Oem::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
 }
 
 #[test]
@@ -1043,6 +1054,36 @@ fn every_mandatory_keyword_is_required_in_both_notations() {
 }
 
 #[test]
+fn xml_empty_mandatory_values_are_reported_as_empty() {
+    // The XSD admits empty strings and epochs; ODM 7.5.1 requires a value (book over XSD).
+    for (from, to, message, path) in [
+        (
+            "<OBJECT_NAME>MARS GLOBAL SURVEYOR</OBJECT_NAME>",
+            "<OBJECT_NAME/>",
+            "OBJECT_NAME is empty",
+            Some("body.segment[0].metadata.object_name"),
+        ),
+        (
+            "<START_TIME>2019-12-18T12:00:00.331</START_TIME>",
+            "<START_TIME></START_TIME>",
+            "START_TIME is empty",
+            Some("body.segment[0].metadata.start_time"),
+        ),
+        (
+            "<X>2789.6</X>",
+            "<X></X>",
+            "an empty element is not a number",
+            None,
+        ),
+    ] {
+        let input = mutated_once(XML, from, to);
+        let error = Oem::from_xml(&input).unwrap_err();
+        assert!(error.to_string().contains(message), "{error}");
+        assert_eq!(error.field_path().as_deref(), path, "{error}");
+    }
+}
+
+#[test]
 fn classification_is_read_between_the_version_and_creation_date() {
     // Table 5-2 places the optional CLASSIFICATION after the header comments.
     let kvn = mutated_once(
@@ -1091,16 +1132,6 @@ fn oem_1_0_is_read_as_kvn_only_without_later_content() {
     let parsed = Oem::from_kvn(&mixed).unwrap();
     assert_eq!(parsed.body.segment[0].metadata.time_system, "Utc");
     assert_eq!(parsed.body.segment[0].metadata.ref_frame, "Eme2000");
-    assert_eq!(
-        Oem::from_kvn(&mutated_once(
-            &mixed,
-            "CCSDS_OEM_VERS = 1.0",
-            "CCSDS_OEM_VERS = 2.0"
-        ))
-        .unwrap_err()
-        .code(),
-        Some("validation.invalid_value")
-    );
 
     let first_state = g11.lines().find(|line| line.starts_with("2019-")).unwrap();
     for (label, input, path) in [
@@ -1189,17 +1220,17 @@ fn documented_xml_readings() {
 
 #[test]
 fn documented_kvn_readings() {
-    // The shared header parser keeps an empty CLASSIFICATION or MESSAGE_ID as "".
+    // Blank or N/A optional header values are absent under the shared KVN rule.
     let source = KVN_FIXTURES[2];
     let message_id = source
         .lines()
         .find(|line| line.starts_with("MESSAGE_ID"))
         .unwrap();
     let empty = mutated_once(source, "CREATION_DATE", "CLASSIFICATION =\nCREATION_DATE");
-    let empty = mutated_once(&empty, message_id, "MESSAGE_ID =");
+    let empty = mutated_once(&empty, message_id, "MESSAGE_ID = n/a");
     let header = Oem::from_kvn(&empty).unwrap().header;
-    assert_eq!(header.classification.as_deref(), Some(""));
-    assert_eq!(header.message_id.as_deref(), Some(""));
+    assert_eq!(header.classification, None);
+    assert_eq!(header.message_id, None);
 
     // The note to ODM 2.0 6.5.5 excludes -0, but producers write it and it loses nothing.
     let negative_zero = mutated_once(KVN_FIXTURES[0], "-280.045", "-0.000000");
@@ -1344,4 +1375,47 @@ fn kvn_covariance_rows_fill_the_lower_triangle_in_table_5_4_order() {
         let expected: Vec<f64> = row.split(' ').map(|value| value.parse().unwrap()).collect();
         assert_eq!(values, expected, "{line}");
     }
+}
+
+#[test]
+fn oem_1_0_requires_increasing_epochs_and_start_at_or_after_previous_stop() {
+    use ccsds_ndm::Validate;
+
+    let input = mutated_once(
+        KVN_FIXTURES[0],
+        "CCSDS_OEM_VERS = 3.0",
+        "CCSDS_OEM_VERS = 1.0",
+    );
+    let original = Oem::from_kvn(&input).unwrap();
+    let mut duplicate = original.clone();
+    duplicate.body.segment[0].data.state_vector[1].epoch =
+        duplicate.body.segment[0].data.state_vector[0].epoch;
+    assert_eq!(
+        duplicate.validate().unwrap_err().field_path().as_deref(),
+        Some("body.segment[0].data.state_vector[1].epoch")
+    );
+    let mut decreasing = original.clone();
+    decreasing.body.segment[0].data.state_vector.swap(0, 1);
+    assert_eq!(
+        decreasing.validate().unwrap_err().field_path().as_deref(),
+        Some("body.segment[0].data.state_vector[1].epoch")
+    );
+    // A malformed epoch is a format error, not an order violation.
+    for value in ["2451534.29812", "2019-02-30T00:00:00"] {
+        let mut malformed = original.clone();
+        malformed.body.segment[0].data.state_vector[1].epoch = value.parse().unwrap();
+        let error = malformed.validate().unwrap_err().to_string();
+        assert!(error.contains("calendar or ordinal time tag"), "{error}");
+    }
+    let mut overlapping = original.clone();
+    overlapping.body.segment[1].metadata.start_time =
+        overlapping.body.segment[0].metadata.start_time;
+    assert_eq!(
+        overlapping.validate().unwrap_err().field_path().as_deref(),
+        Some("body.segment[1].metadata.start_time")
+    );
+    let mut shared_endpoint = original;
+    shared_endpoint.body.segment[1].metadata.start_time =
+        shared_endpoint.body.segment[0].metadata.stop_time;
+    shared_endpoint.validate().unwrap();
 }

@@ -2,8 +2,69 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use super::Acm;
+use super::{Acm, AttLine, CovLine};
 use crate::error::{Result, ValidationError};
+use crate::types::Epoch;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+/// Writes a history line as its stored time-tag spelling followed by the data values.
+fn serialize_history_line<S: Serializer>(
+    epoch: &Epoch,
+    values: &[f64],
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    use std::fmt::Write;
+    let mut line = epoch.as_str().to_owned();
+    for value in values {
+        let _ = write!(line, " {value}");
+    }
+    serializer.serialize_str(&line)
+}
+
+/// Reads `attLine`/`covLine` text (XSD `xsd:string`): a time tag and space-separated numbers.
+fn parse_history_line(text: &str) -> std::result::Result<(Epoch, Vec<f64>), String> {
+    let mut parts = text.split_whitespace();
+    let epoch = parts
+        .next()
+        .ok_or_else(|| "missing time tag".to_string())?
+        .parse::<Epoch>()
+        .map_err(|error| error.to_string())?;
+    let values = parts
+        .map(|value| {
+            crate::kvn::parser::parse_ccsds_number(value)
+                .ok_or_else(|| format!("invalid finite number or double underflow: '{value}'"))
+        })
+        .collect::<std::result::Result<_, _>>()?;
+    Ok((epoch, values))
+}
+
+impl Serialize for AttLine {
+    fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+        serialize_history_line(&self.epoch, &self.values, serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for AttLine {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        crate::utils::deserialize_parsed(deserializer, "an ACM attLine", |text| {
+            parse_history_line(text).map(|(epoch, values)| AttLine { epoch, values })
+        })
+    }
+}
+
+impl Serialize for CovLine {
+    fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+        serialize_history_line(&self.epoch, &self.values, serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for CovLine {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        crate::utils::deserialize_parsed(deserializer, "an ACM covLine", |text| {
+            parse_history_line(text).map(|(epoch, values)| CovLine { epoch, values })
+        })
+    }
+}
 
 pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {
     use crate::xml::XmlSequenceRule;
@@ -48,6 +109,8 @@ pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {
                             | b"IXY"
                             | b"IXZ"
                             | b"IYZ"
+                            | b"MAN_BEGIN_TIME"
+                            | b"MAN_END_TIME"
                             | b"MAN_DURATION"
                             | b"TARGET_MOMENTUM"
                             | b"TARGET_SPINRATE"
@@ -181,6 +244,61 @@ fn acm_xml_children(parent: &[u8]) -> Option<&'static [&'static [u8]]> {
 
 impl Acm {
     pub(crate) fn validate_xml_representability(&self) -> Result<()> {
+        // ATT_BASIS/COV_BASIS are open text in the book (suggested values) but an XSD enum.
+        let data = &self.body.segment.data;
+        let bases = data
+            .att
+            .iter()
+            .enumerate()
+            .filter_map(|(index, att)| {
+                Some((
+                    "ATT_BASIS",
+                    format!("body.segment.data.att[{index}].att_basis"),
+                    att.att_basis.as_ref()?,
+                ))
+            })
+            .chain(data.cov.iter().enumerate().filter_map(|(index, cov)| {
+                Some((
+                    "COV_BASIS",
+                    format!("body.segment.data.cov[{index}].cov_basis"),
+                    cov.cov_basis.as_ref()?,
+                ))
+            }));
+        for (field, path, basis) in bases {
+            basis
+                .parse::<crate::types::AttBasisType>()
+                .map_err(|error| {
+                    ValidationError::invalid_value(field, basis, error.expected).at_path(path)
+                })?;
+        }
+        if let Some(determination) = &self.body.segment.data.ad {
+            if let Some(method) = &determination.ad_method {
+                method.parse::<crate::types::AdMethod>().map_err(|error| {
+                    ValidationError::invalid_value(error.field, method, error.expected)
+                        .at_path("body.segment.data.ad.ad_method")
+                })?;
+            }
+        }
+        for sensor in self.body.segment.data.ad.iter().flat_map(|ad| &ad.sensors) {
+            if let Some(frequency) = &sensor.sensor_frequency {
+                crate::types::Frequency::validate_xml_value(frequency.value, "SENSOR_FREQUENCY")?;
+            }
+        }
+        for maneuver in &self.body.segment.data.man {
+            let targets = usize::from(
+                maneuver.target_momentum.is_some() || maneuver.target_mom_frame.is_some(),
+            ) + usize::from(maneuver.target_attitude.is_some())
+                + usize::from(maneuver.target_spinrate.is_some());
+            if targets > 1 {
+                return Err(ValidationError::invalid_value(
+                    "TARGET_MOMENTUM/TARGET_ATTITUDE/TARGET_SPINRATE",
+                    "multiple target choices",
+                    "one target choice in ACM 2.0 XML; KVN supports multiple-purpose maneuvers",
+                )
+                .into());
+            }
+        }
+
         if self
             .body
             .segment

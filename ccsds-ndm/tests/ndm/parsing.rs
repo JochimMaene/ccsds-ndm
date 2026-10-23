@@ -13,6 +13,50 @@ fn declared(body: &str) -> String {
 }
 
 #[test]
+fn envelope_text_decodes_entities_cdata_and_empty_elements() {
+    let source = declared(
+        "<ndm><?ignored instruction?><MESSAGE_ID>A&amp;B&#32;&lt;C&gt;</MESSAGE_ID>\
+         <COMMENT>first <![CDATA[<&>]]> then &quot;quoted&quot;</COMMENT>\
+         <COMMENT>before<?ignored instruction?> after</COMMENT><COMMENT/></ndm>",
+    );
+    let message = CombinedNdm::from_xml(&source).unwrap();
+    assert_eq!(message.id.as_deref(), Some("A&B <C>"));
+    assert_eq!(
+        message.comments,
+        ["first <&> then \"quoted\"", "before after", ""]
+    );
+    let xml = message.to_xml().unwrap();
+    crate::common::validate_xml("combined text fields", &xml);
+    assert_eq!(CombinedNdm::from_xml(&xml).unwrap(), message);
+    assert_eq!(from_str(&source).unwrap(), Message::Ndm(message));
+
+    let empty = CombinedNdm::from_xml(&declared("<ndm><MESSAGE_ID/><COMMENT/></ndm>")).unwrap();
+    assert_eq!(empty.id.as_deref(), Some(""));
+    assert_eq!(empty.comments, [""]);
+    assert_eq!(
+        CombinedNdm::from_xml(&empty.to_xml().unwrap()).unwrap(),
+        empty
+    );
+    assert!(CombinedNdm::from_xml(&declared("<ndm/><?ignored instruction?>")).is_ok());
+}
+
+#[test]
+fn envelope_text_rejects_attributes_and_nested_elements() {
+    for element in ["MESSAGE_ID", "COMMENT"] {
+        for content in [
+            format!("<{element} bad=\"x\">a</{element}>"),
+            format!("<{element} bad=\"x\"/>"),
+            format!("<{element}><bad>x</bad></{element}>"),
+            format!("<{element}><bad/></{element}>"),
+        ] {
+            let source = declared(&format!("<ndm>{content}</ndm>"));
+            assert!(CombinedNdm::from_xml(&source).is_err(), "{content}");
+            assert!(from_str(&source).is_err(), "{content}");
+        }
+    }
+}
+
+#[test]
 fn combined_xml_parser_enforces_the_normative_envelope() {
     // An unused schema-instance namespace may be omitted, as on standalone roots.
     assert!(CombinedNdm::from_xml(&declared("<ndm/>")).is_ok());

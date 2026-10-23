@@ -8,7 +8,7 @@ use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::{from_str, Ndm};
 
 #[test]
-fn legacy_adm_and_tdm_editions_remain_parse_only() {
+fn unaudited_adm_and_tdm_editions_are_not_advertised_as_supported() {
     let cases = [
         ("AEM", include_str!("../../data/kvn/aem_g4.kvn")),
         ("APM", include_str!("../../data/kvn/apm_g1.kvn")),
@@ -21,24 +21,31 @@ fn legacy_adm_and_tdm_editions_remain_parse_only() {
             .expect("2.0 fixture should parse")
             .to_xml()
             .expect("2.0 fixture should generate XML");
+        // The edition is checked before the structure, so content the later edition lacks
+        // reports the unsupported edition, not an unknown keyword or element.
         let legacy_inputs = [
-            mutated_once(input, "_VERS = 2.0", "_VERS = 1.0"),
-            mutated_once(&xml, "version=\"2.0\"", "version=\"1.0\""),
+            mutated_once(input, "_VERS = 2.0", "_VERS = 1.0\nLEGACY_KEYWORD = 1"),
+            mutated_once(
+                &mutated_once(&xml, "version=\"2.0\"", "version=\"1.0\""),
+                "<header>",
+                "<header><LEGACY/>",
+            ),
         ];
 
         for legacy in legacy_inputs {
-            let message = from_str(&legacy)
-                .unwrap_or_else(|error| panic!("{message_type} 1.0 should parse: {error}"));
-            assert_eq!(message.kind().as_str(), message_type);
-
-            for error in [message.to_kvn().unwrap_err(), message.to_xml().unwrap_err()] {
-                assert_eq!(
-                    error.code(),
-                    Some("generation.unsupported_output_version"),
-                    "{message_type} returned the wrong error: {error}"
-                );
-            }
+            let error = from_str(&legacy).unwrap_err();
+            assert!(error.to_string().contains("1.0"), "{message_type}: {error}");
+            assert_eq!(
+                error.code(),
+                Some("parse.unsupported_input_version"),
+                "{message_type}: {error}"
+            );
         }
+        let kind = from_str(input).unwrap().kind();
+        assert_eq!(
+            ccsds_ndm::versioning::supported_input_versions(kind),
+            Some(&["2.0"][..])
+        );
     }
 }
 
@@ -57,7 +64,9 @@ fn user_defined_values_may_contain_assignment_delimiters() {
             .user_defined_parameters
             .as_ref()
             .unwrap()
-            .user_defined[0]
+            .parameters()
+            .next()
+            .unwrap()
             .value,
         "a=b"
     );
@@ -74,7 +83,9 @@ fn user_defined_values_may_contain_assignment_delimiters() {
             .user_defined_parameters
             .as_ref()
             .unwrap()
-            .user_defined[0]
+            .parameters()
+            .next()
+            .unwrap()
             .value,
         "a=b"
     );
@@ -142,8 +153,8 @@ fn supported_editions_separate_input_from_output() {
         );
     }
 
-    // OPM 1.0 is readable but was withdrawn as an output edition.
-    assert!(supported_input_versions(MessageKind::Opm)
+    // OPM 1.0 is not advertised without an edition-specific implementation.
+    assert!(!supported_input_versions(MessageKind::Opm)
         .unwrap()
         .contains(&"1.0"));
     assert!(!supported_output_versions(MessageKind::Opm)
@@ -153,4 +164,73 @@ fn supported_editions_separate_input_from_output() {
     // The combined envelope carries no edition of its own.
     assert!(supported_input_versions(MessageKind::Ndm).is_none());
     assert!(supported_output_versions(MessageKind::Ndm).is_none());
+}
+
+const OMM_KVN: &str = include_str!("../../data/kvn/omm_g7.kvn");
+const OPM_KVN: &str = include_str!("../../data/kvn/opm_g1.kvn");
+const TDM_KVN: &str = include_str!("../../data/kvn/tdm_e18.kvn");
+
+#[test]
+fn kvn_integers_accept_a_leading_plus_sign() {
+    // Every book allows a sign on integers (ODM 7.5.4); unsigned fields still refuse `-`.
+    let signed = mutated(OMM_KVN, "NORAD_CAT_ID = 23581", "NORAD_CAT_ID = +23581");
+    assert_eq!(from_str(&signed).unwrap(), from_str(OMM_KVN).unwrap());
+    let signed = mutated(
+        TDM_KVN,
+        "INTERPOLATION_DEGREE = 7",
+        "INTERPOLATION_DEGREE = +7",
+    );
+    assert_eq!(from_str(&signed).unwrap(), from_str(TDM_KVN).unwrap());
+    let negative = mutated(OMM_KVN, "NORAD_CAT_ID = 23581", "NORAD_CAT_ID = -23581");
+    assert!(from_str(&negative).is_err());
+}
+
+#[test]
+fn trailing_junk_after_a_value_is_reported_at_its_keyword() {
+    for (from, to, key) in [
+        ("X = 6503.514000", "X = 6503.514000x", "X"),
+        ("MASS = 3000.000000", "MASS = 1D-3", "MASS"),
+        (
+            "SOLAR_RAD_AREA = 18.770000",
+            "SOLAR_RAD_AREA = 18.77x70 [m**2]",
+            "SOLAR_RAD_AREA",
+        ),
+    ] {
+        let line = OPM_KVN.lines().position(|line| line == from).unwrap() + 1;
+        let error = from_str(&mutated(OPM_KVN, from, to)).unwrap_err();
+        let kvn = crate::common::kvn_parse_error(&error)
+            .unwrap_or_else(|| panic!("{to}: expected a KVN parse error, got {error}"));
+        assert_eq!(kvn.line, line, "{to}");
+        assert_eq!(kvn.message, format!("Invalid float for {key}"), "{to}");
+    }
+    let error = from_str(&mutated(
+        OMM_KVN,
+        "NORAD_CAT_ID = 23581",
+        "NORAD_CAT_ID = 5.0",
+    ))
+    .unwrap_err();
+    assert_eq!(
+        crate::common::kvn_parse_error(&error).unwrap().message,
+        "Invalid unsigned integer for NORAD_CAT_ID"
+    );
+}
+
+#[test]
+fn blank_or_na_optional_kvn_values_are_absent() {
+    // One shared rule for every optional KVN value: blank or case-insensitive N/A is absence.
+    let without = mutated(OPM_KVN, "MASS = 3000.000000\n", "");
+    let without = from_str(&without).unwrap();
+    for value in ["", "N/A", "n/a"] {
+        let kvn = mutated(OPM_KVN, "MASS = 3000.000000", &format!("MASS = {value}"));
+        assert_eq!(from_str(&kvn).unwrap(), without, "{value:?}");
+    }
+    let message_id = OMM_KVN
+        .lines()
+        .find(|line| line.starts_with("MESSAGE_ID"))
+        .unwrap();
+    let blank = from_str(&mutated(OMM_KVN, message_id, "MESSAGE_ID = N/A")).unwrap();
+    assert_eq!(
+        blank,
+        from_str(&mutated(OMM_KVN, &format!("{message_id}\n"), "")).unwrap()
+    );
 }

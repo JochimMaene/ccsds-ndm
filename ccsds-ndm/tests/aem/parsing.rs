@@ -40,14 +40,6 @@ fn aem_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
         ("mismatched block", mutated(KVN, "META_STOP", "DATA_STOP")),
         ("unknown block", mutated(KVN, "DATA_START", "UNKNOWN_START")),
         (
-            "XML-only metadata keyword in KVN",
-            mutated(
-                KVN,
-                "ATTITUDE_TYPE = QUATERNION",
-                "ATTITUDE_TYPE = QUATERNION\nANGVEL_FRAME = A",
-            ),
-        ),
-        (
             "zero interpolation degree",
             mutated(
                 SPIN_KVN,
@@ -73,15 +65,16 @@ fn aem_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
 }
 
 #[test]
-fn aem_kvn_rejects_non_ccsds_history_number_spellings() {
-    for value in [".5", "1e0", "12.5e3"] {
+fn aem_kvn_preserves_unambiguous_history_number_variations() {
+    for value in [".5", "5.", "1e0", "12.5e1", "268.62511000000001"] {
         let source = mutated_once(SPIN_KVN, "2.6862511e+002", value);
-        let error = Aem::from_kvn(&source).unwrap_err();
-        assert_eq!(error.code(), Some("parse.kvn.syntax"), "{value}: {error}");
+        let message = Aem::from_kvn(&source).unwrap();
+        Aem::from_kvn(&message.to_kvn().unwrap()).unwrap();
     }
-    // Reading does not apply the book's 16-digit cap: 17-digit doubles are common and lossless.
-    let source = mutated_once(SPIN_KVN, "2.6862511e+002", "268.62511000000001");
-    Aem::from_kvn(&source).unwrap();
+    for value in ["1D0", "5.e", "1_0", "NaN", "Inf", "1e999", "1e-9999"] {
+        let source = mutated_once(SPIN_KVN, "2.6862511e+002", value);
+        assert!(Aem::from_kvn(&source).is_err(), "{value}");
+    }
 }
 
 #[test]
@@ -109,14 +102,6 @@ fn aem_xml_rejects_unknown_choice_content_attributes_and_ordering_errors() {
             mutated(XML, "<Q1>-0.005068</Q1>", "<Q1 units=\"1\">-0.005068</Q1>"),
         ),
         (
-            "missing Euler rotation sequence",
-            mutated(XML, "<EULER_ROT_SEQ>XYZ</EULER_ROT_SEQ>", ""),
-        ),
-        (
-            "missing angular velocity frame",
-            mutated(XML, "<ANGVEL_FRAME>REF_FRAME_B</ANGVEL_FRAME>", ""),
-        ),
-        (
             "duplicate epoch",
             mutated(XML, epoch, &format!("{epoch}{epoch}")),
         ),
@@ -133,8 +118,6 @@ fn aem_xml_rejects_unknown_choice_content_attributes_and_ordering_errors() {
                 assert_eq!(error.code(), Some("parse.xml.syntax"), "{error}");
                 assert!(error.to_string().contains("attitudeState requires exactly one attitude choice"), "{error}");
             }
-            "missing Euler rotation sequence" => crate::common::assert_validation_field(&error, "EULER_ROT_SEQ (required for EULER_ANGLE types)"),
-            "missing angular velocity frame" => crate::common::assert_validation_field(&error, "ANGVEL_FRAME (required for ANGVEL types)"),
             _ => assert!(matches!(error.as_format_error(), Some(FormatError::InvalidFormat(_))), "{label}: {error}"),
         }
     }
@@ -436,23 +419,16 @@ fn test_parse_aem_attitude_types() {
 }
 
 #[test]
-fn test_parse_aem_quaternion_angvel_requires_angvel_frame() {
+fn test_parse_aem_quaternion_angvel_keeps_optional_frame_absent() {
     let qr_meta = sample_aem_meta().replace("QUATERNION", "QUATERNION/ANGVEL");
     let input = format!(
-        "{}{}\nDATA_START\n2002-11-04T17:22:31 0.1 0.2 0.3 0.4 0.01 0.02 0.03\nDATA_STOP\n",
+        "{}{}\nDATA_START\n2002-11-04T17:22:31 0 0 0 1 0.01 0.02 0.03\nDATA_STOP\n",
         sample_aem_header(),
         qr_meta
     );
-    let err = Aem::from_kvn(&input).unwrap_err();
-    match err {
-        CcsdsNdmError::Validation(boxed_err) => match *boxed_err {
-            ValidationError::MissingRequiredField { field, .. } => {
-                assert_eq!(field, "ANGVEL_FRAME (required for ANGVEL types)");
-            }
-            _ => panic!("Expected missing field error, got {:?}", boxed_err),
-        },
-        _ => panic!("Expected Validation error, got {:?}", err),
-    }
+    let message = Aem::from_kvn(&input).unwrap();
+    assert!(message.body.segment[0].metadata.angvel_frame.is_none());
+    assert_eq!(Aem::from_xml(&message.to_xml().unwrap()).unwrap(), message);
 }
 
 #[test]
@@ -629,4 +605,79 @@ fn test_aem_no_segments() {
         },
         _ => panic!("Expected Format error, got {:?}", err),
     }
+}
+
+#[test]
+fn aem_uses_canonical_angular_velocity_frame_and_preserves_optional_metadata() {
+    let meta = sample_aem_meta().replace("QUATERNION", "QUATERNION/ANGVEL");
+    let source = format!(
+        "{}{}\nDATA_START\n2002-11-04T17:22:31 0 0 0 1 0.01 0.02 0.03\nDATA_STOP\n",
+        sample_aem_header(),
+        meta
+    );
+    for keyword in ["ANGVEL_FRAME", "RATE_FRAME"] {
+        let input = source.replace("META_STOP", &format!("{keyword} = SC_BODY_1\nMETA_STOP"));
+        let message = Aem::from_kvn(&input).unwrap();
+        let output = message.to_kvn().unwrap();
+        assert!(output.contains("ANGVEL_FRAME"));
+        assert!(!output.contains("RATE_FRAME"));
+        assert_eq!(Aem::from_kvn(&output).unwrap(), message);
+        assert!(
+            Aem::from_kvn(&input.replace("META_STOP", "RATE_FRAME = OTHER\nMETA_STOP")).is_err()
+        );
+    }
+    for element in [
+        "<ANGVEL_FRAME>REF_FRAME_B</ANGVEL_FRAME>",
+        "<EULER_ROT_SEQ>XYZ</EULER_ROT_SEQ>",
+    ] {
+        let message = Aem::from_xml(&mutated(XML, element, "")).unwrap();
+        assert_eq!(Aem::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+        let normalized = Aem::from_kvn(&message.to_kvn().unwrap()).unwrap();
+        for (actual, expected) in normalized.body.segment.iter().zip(&message.body.segment) {
+            assert_eq!(actual.metadata, expected.metadata);
+        }
+    }
+}
+
+#[test]
+fn data_row_shape_errors_name_the_problem_at_the_row() {
+    let row = "1996-11-28T22:08:03.5555 0.42319 -0.45697 0.23784 0.74533";
+    for (bad, message) in [
+        (
+            row.replace(" 0.74533", ""),
+            "data line has the wrong number of values for ATTITUDE_TYPE",
+        ),
+        (
+            row.replace("0.42319", "0.4x"),
+            "Invalid CCSDS number in data line",
+        ),
+        (
+            format!("{row} 0"),
+            "data line has the wrong number of values for ATTITUDE_TYPE",
+        ),
+        (
+            format!("{row} 0 0 0 0 0"),
+            "data line has the wrong number of values for ATTITUDE_TYPE",
+        ),
+        (
+            format!("{row} 0 0 0 0 bad"),
+            "Invalid CCSDS number in data line",
+        ),
+    ] {
+        let error = Aem::from_kvn(&crate::common::mutated(crate::KVN, row, &bad)).unwrap_err();
+        let kvn = crate::common::kvn_parse_error(&error).expect("a KVN parse error");
+        assert_eq!((kvn.line, kvn.message.as_str()), (25, message));
+    }
+}
+
+/// ADM 6.10.3 forbids comments after DATA_STOP; the diagnostic used to blame the header.
+#[test]
+fn aem_comment_after_data_stop_names_the_rule() {
+    let error = Aem::from_kvn(&format!("{KVN}COMMENT trailing\n")).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("must not follow META_STOP or DATA_STOP"),
+        "{error}"
+    );
 }

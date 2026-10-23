@@ -26,16 +26,11 @@ fn minimal_kvn_parses() {
 }
 
 #[test]
-fn rejects_missing_cp_kvn() {
+fn frame_without_optional_cp_is_preserved() {
     let mut input = KVN.to_owned();
     input.push_str("PHYS_START\nCP_REF_FRAME = SC_BODY\nPHYS_STOP\n");
-    let error = Acm::from_kvn(&input).unwrap_err();
-    assert_eq!(
-        error.code(),
-        Some("validation.missing_required_field"),
-        "{error}"
-    );
-    crate::common::assert_validation_field(&error, "CP");
+    let message = Acm::from_kvn(&input).unwrap();
+    assert_eq!(Acm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
 }
 
 #[test]
@@ -56,10 +51,9 @@ fn rejects_number_format_kvn() {
 fn rejects_duplicate_sensor_kvn() {
     let mut input = KVN.to_owned();
     input.push_str("AD_START\nATTITUDE_STATES = QUATERNION\nREF_FRAME_A = GCRF\nREF_FRAME_B = SC_BODY\nSENSOR_START\nSENSOR_NUMBER = 1\nSENSOR_USED = STAR_TRACKER\nSENSOR_STOP\nSENSOR_START\nSENSOR_NUMBER = 1\nSENSOR_USED = GYRO\nSENSOR_STOP\nAD_STOP\n");
-    Acm::from_kvn(&crate::common::mutated_once(
-        &input,
-        "SENSOR_NUMBER = 1",
-        "SENSOR_NUMBER = 2",
+    Acm::from_kvn(&input.replace(
+        "SENSOR_NUMBER = 1\nSENSOR_USED = GYRO",
+        "SENSOR_NUMBER = 2\nSENSOR_USED = GYRO",
     ))
     .expect("valid control");
     let error = Acm::from_kvn(&input).unwrap_err();
@@ -70,7 +64,7 @@ fn rejects_duplicate_sensor_kvn() {
 #[test]
 fn rejects_conflict_kvn() {
     let mut input = KVN.to_owned();
-    input.push_str("MAN_START\nMAN_PURPOSE = ATT_ADJUST\nMAN_BEGIN_TIME = 0\nMAN_END_TIME = 10\nMAN_DURATION = 10\nMAN_STOP\n");
+    input.push_str("MAN_START\nMAN_PURPOSE = SCI_OBJ\nMAN_BEGIN_TIME = 0\nMAN_END_TIME = 10\nMAN_DURATION = 10\nMAN_STOP\n");
     Acm::from_kvn(&mutated(&input, "MAN_DURATION = 10\n", "")).expect("valid control");
     let error = Acm::from_kvn(&input).unwrap_err();
     assert!(
