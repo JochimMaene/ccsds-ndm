@@ -1189,7 +1189,7 @@ impl ToKvn for AcmAttitudeDetermination {
             writer.write_pair("ATTITUDE_SOURCE", v);
         }
         if let Some(v) = &self.number_states {
-            writer.write_integer_pair("NUMBER_STATES", v);
+            writer.write_integer_pair("NUMBER_STATES", *v);
         }
         if let Some(v) = &self.attitude_states {
             writer.write_pair("ATTITUDE_STATES", v);

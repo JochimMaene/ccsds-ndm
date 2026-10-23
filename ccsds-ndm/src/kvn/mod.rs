@@ -37,11 +37,21 @@ pub(crate) fn prepare_input(
     input: &str,
     kind: crate::validation::MessageKind,
 ) -> crate::error::Result<std::borrow::Cow<'_, str>> {
-    let normalized = normalize_line_endings(input);
-    if let Some(offset) = normalized
+    let mut invalid_offset = input
         .bytes()
-        .position(|byte| !matches!(byte, b' '..=b'~' | b'\n' | b'\r'))
-    {
+        .position(|byte| !matches!(byte, b' '..=b'~' | b'\n'));
+    // Plain LF input needs one ASCII scan; normalize and rescan only after CR or TAB.
+    let normalized =
+        if invalid_offset.is_some_and(|offset| matches!(input.as_bytes()[offset], b'\r' | b'\t')) {
+            let normalized = normalize_line_endings(input);
+            invalid_offset = normalized
+                .bytes()
+                .position(|byte| !matches!(byte, b' '..=b'~' | b'\n' | b'\r'));
+            normalized
+        } else {
+            std::borrow::Cow::Borrowed(input)
+        };
+    if let Some(offset) = invalid_offset {
         let character = normalized[offset..].chars().next().unwrap_or_default();
         // Every earlier byte on the line is ASCII, so the character column is the byte column.
         let (line, column) = crate::error::line_column(&normalized, offset);
@@ -121,4 +131,37 @@ pub(crate) fn normalize_line_endings(input: &str) -> std::borrow::Cow<'_, str> {
         "normalization must preserve byte offsets for diagnostics"
     );
     std::borrow::Cow::Owned(String::from_utf8(normalized).expect("line endings preserve UTF-8"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::prepare_input;
+    use crate::{error::FormatError, validation::MessageKind};
+
+    #[test]
+    fn input_preparation_borrows_plain_text_and_preserves_normalized_error_positions() {
+        let plain = "CCSDS_TDM_VERS = 2.0\nCOMMENT plain\n";
+        assert!(matches!(
+            prepare_input(plain, MessageKind::Tdm).unwrap(),
+            std::borrow::Cow::Borrowed(_)
+        ));
+        for ending in ["\n", "\r", "\r\n", "\n\r"] {
+            let input = format!("CCSDS_TDM_VERS\t=\t2.0{ending}COMMENT\tbad{ending}");
+            let normalized = prepare_input(&input, MessageKind::Tdm).unwrap();
+            assert_eq!(normalized.len(), input.len());
+            assert!(!normalized.contains('\t'));
+            let invalid = input.replace("bad", "badé");
+            let error = prepare_input(&invalid, MessageKind::Tdm).unwrap_err();
+            let Some(FormatError::Kvn(error)) = error.as_format_error() else {
+                panic!("{error}");
+            };
+            assert_eq!((error.line, error.column), (2, 12), "{ending:?}");
+            assert_eq!(error.offset, invalid.find('é').unwrap());
+            assert!(error.message.contains("U+00E9"));
+        }
+        // Invalid text takes precedence over version checks even before a later TAB or CR.
+        let input = "CCSDS_TDM_VERS = 999.0\né\t\r";
+        let error = prepare_input(input, MessageKind::Tdm).unwrap_err();
+        assert!(matches!(error.as_format_error(), Some(FormatError::Kvn(_))));
+    }
 }

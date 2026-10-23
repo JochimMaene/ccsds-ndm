@@ -470,7 +470,7 @@ impl ToKvn for TleParameters {
             writer.write_integer_pair("NORAD_CAT_ID", v);
         }
         if let Some(v) = self.element_set_no {
-            writer.write_integer_pair("ELEMENT_SET_NO", v);
+            writer.write_integer_pair("ELEMENT_SET_NO", v.value);
         }
         if let Some(v) = self.rev_at_epoch {
             writer.write_integer_pair("REV_AT_EPOCH", v);

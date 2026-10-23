@@ -524,17 +524,20 @@ impl<'a> KvnWriter<'a> {
 
     /// Writes an integer `KEY = value` line, refusing values outside the KVN integer range of
     /// −2³¹ through 2³¹−1 (ODM 7.5.4, ADM 6.8.4) that wider model integers can hold.
-    pub(crate) fn write_integer_pair<V: Display>(&mut self, key: &str, value: V) {
-        let text = value.to_string();
-        if text.parse::<i32>().is_err() {
+    pub(crate) fn write_integer_pair<V: Copy + Display + TryInto<i32>>(
+        &mut self,
+        key: &str,
+        value: V,
+    ) {
+        if value.try_into().is_err() {
             self.reject(|| crate::error::ValidationError::OutOfRange {
                 name: key.to_owned().into(),
-                value: text.clone(),
+                value: value.to_string(),
                 expected: "an integer from -2147483648 through 2147483647 for KVN".into(),
                 line: None,
             });
         }
-        self.write_pair(key, text);
+        self.write_pair(key, value);
     }
 
     /// Writes a CCSDS-compatible ODM number without allocating a value string.
@@ -1027,5 +1030,34 @@ mod tests {
             OdmFloat(f64::from_bits(f64::MAX.to_bits() - 2)).to_string(),
             "1.797693134862315e+308"
         );
+    }
+
+    #[test]
+    fn integer_pairs_preserve_values_and_reject_out_of_range_numbers() {
+        for value in [
+            i64::MIN,
+            i64::from(i32::MIN) - 1,
+            i64::from(i32::MIN),
+            0,
+            i64::from(i32::MAX),
+            i64::from(i32::MAX) + 1,
+            i64::MAX,
+        ] {
+            let mut writer = KvnWriter::new();
+            writer.write_integer_pair("N", value);
+            match writer.finish_checked() {
+                Ok(output) => {
+                    assert!(i32::try_from(value).is_ok());
+                    assert_eq!(output.split_once('=').unwrap().1.trim(), value.to_string());
+                }
+                Err(error) => {
+                    assert!(i32::try_from(value).is_err());
+                    assert!(error.to_string().contains(&value.to_string()));
+                }
+            }
+        }
+        let mut writer = KvnWriter::new();
+        writer.write_integer_pair("N", u64::MAX);
+        assert!(writer.finish_checked().is_err());
     }
 }

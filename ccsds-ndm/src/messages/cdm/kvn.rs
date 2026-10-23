@@ -1120,16 +1120,16 @@ impl ToKvn for CdmData {
                 writer.write_odm_float_measure("ACTUAL_OD_SPAN", &v.to_unit_value());
             }
             if let Some(v) = &od.obs_available {
-                writer.write_integer_pair("OBS_AVAILABLE", v);
+                writer.write_integer_pair("OBS_AVAILABLE", v.value);
             }
             if let Some(v) = &od.obs_used {
-                writer.write_integer_pair("OBS_USED", v);
+                writer.write_integer_pair("OBS_USED", v.value);
             }
             if let Some(v) = &od.tracks_available {
-                writer.write_integer_pair("TRACKS_AVAILABLE", v);
+                writer.write_integer_pair("TRACKS_AVAILABLE", v.value);
             }
             if let Some(v) = &od.tracks_used {
-                writer.write_integer_pair("TRACKS_USED", v);
+                writer.write_integer_pair("TRACKS_USED", v.value);
             }
             if let Some(v) = &od.residuals_accepted {
                 writer.write_odm_float_measure("RESIDUALS_ACCEPTED", &v.to_unit_value());

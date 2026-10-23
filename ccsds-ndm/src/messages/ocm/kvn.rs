@@ -2256,7 +2256,7 @@ impl ToKvn for OcmTrajState {
             writer.write_pair("INTERPOLATION", v);
         }
         if let Some(v) = &self.interpolation_degree {
-            writer.write_integer_pair("INTERPOLATION_DEGREE", v);
+            writer.write_integer_pair("INTERPOLATION_DEGREE", *v);
         }
         if let Some(v) = &self.propagator {
             writer.write_pair("PROPAGATOR", v);
@@ -2548,10 +2548,10 @@ impl ToKvn for OcmManeuverParameters {
             writer.write_pair("DC_WIN_CLOSE", v);
         }
         if let Some(v) = &self.dc_min_cycles {
-            writer.write_integer_pair("DC_MIN_CYCLES", v);
+            writer.write_integer_pair("DC_MIN_CYCLES", *v);
         }
         if let Some(v) = &self.dc_max_cycles {
-            writer.write_integer_pair("DC_MAX_CYCLES", v);
+            writer.write_integer_pair("DC_MAX_CYCLES", *v);
         }
         if let Some(v) = &self.dc_exec_start {
             writer.write_pair("DC_EXEC_START", v);
@@ -2641,7 +2641,7 @@ impl ToKvn for OcmPerturbations {
             writer.write_pair("ALBEDO_MODEL", v);
         }
         if let Some(v) = &self.albedo_grid_size {
-            writer.write_integer_pair("ALBEDO_GRID_SIZE", v);
+            writer.write_integer_pair("ALBEDO_GRID_SIZE", *v);
         }
         if let Some(v) = &self.shadow_model {
             writer.write_pair("SHADOW_MODEL", v);
@@ -2721,16 +2721,16 @@ impl ToKvn for OcmOdParameters {
             writer.write_odm_float_measure("ACTUAL_OD_SPAN", &v.to_unit_value());
         }
         if let Some(v) = &self.obs_available {
-            writer.write_integer_pair("OBS_AVAILABLE", v);
+            writer.write_integer_pair("OBS_AVAILABLE", *v);
         }
         if let Some(v) = &self.obs_used {
-            writer.write_integer_pair("OBS_USED", v);
+            writer.write_integer_pair("OBS_USED", *v);
         }
         if let Some(v) = &self.tracks_available {
-            writer.write_integer_pair("TRACKS_AVAILABLE", v);
+            writer.write_integer_pair("TRACKS_AVAILABLE", *v);
         }
         if let Some(v) = &self.tracks_used {
-            writer.write_integer_pair("TRACKS_USED", v);
+            writer.write_integer_pair("TRACKS_USED", *v);
         }
         if let Some(v) = &self.maximum_obs_gap {
             writer.write_odm_float_measure("MAXIMUM_OBS_GAP", &v.to_unit_value());
@@ -2757,13 +2757,13 @@ impl ToKvn for OcmOdParameters {
             writer.write_odm_float_pair("GDOP", *v);
         }
         if let Some(v) = &self.solve_n {
-            writer.write_integer_pair("SOLVE_N", v);
+            writer.write_integer_pair("SOLVE_N", *v);
         }
         if let Some(v) = &self.solve_states {
             writer.write_pair("SOLVE_STATES", v);
         }
         if let Some(v) = &self.consider_n {
-            writer.write_integer_pair("CONSIDER_N", v);
+            writer.write_integer_pair("CONSIDER_N", *v);
         }
         if let Some(v) = &self.consider_params {
             writer.write_pair("CONSIDER_PARAMS", v);
@@ -2772,7 +2772,7 @@ impl ToKvn for OcmOdParameters {
             writer.write_odm_float_measure("SEDR", &v.to_unit_value());
         }
         if let Some(v) = &self.sensors_n {
-            writer.write_integer_pair("SENSORS_N", v);
+            writer.write_integer_pair("SENSORS_N", *v);
         }
         if let Some(v) = &self.sensors {
             writer.write_pair("SENSORS", v);

@@ -866,7 +866,7 @@ impl ToKvn for OemMetadata {
             writer.write_pair("INTERPOLATION", xml_trimmed(v));
         }
         if let Some(v) = &self.interpolation_degree {
-            writer.write_integer_pair("INTERPOLATION_DEGREE", v);
+            writer.write_integer_pair("INTERPOLATION_DEGREE", v.0.get());
         }
     }
 }

@@ -347,11 +347,25 @@ fn ocm_block_value_boundaries_generate_valid_xml() {
 /// imposes no per-column domain.
 #[test]
 fn maneuver_line_numeric_columns_must_hold_numbers() {
-    for bad in ["abc", "", "NaN", "inf", "1.0e"] {
+    for bad in [
+        "abc", "", "NaN", "inf", "1.0e", "1e400", "1_000", "0x1p0", "1junk", " 1", "1 ",
+    ] {
         let mut message = Ocm::from_kvn(KVN).unwrap();
         // Column 1 of this fixture's composition after the time tag is THR_X.
         message.body.segment.data.man[0].man_lines[0].values[1] = bad.to_owned();
         assert_rejects(&message, "MAN data line THR_X");
+    }
+
+    for value in [
+        "-0.0",
+        "+1.25",
+        "1e-400",
+        "5e-324",
+        "1.7976931348623157e308",
+    ] {
+        let mut message = Ocm::from_kvn(KVN).unwrap();
+        message.body.segment.data.man[0].man_lines[0].values[1] = value.into();
+        message.validate().unwrap();
     }
 
     // A non-numeric column keeps accepting its flag value.

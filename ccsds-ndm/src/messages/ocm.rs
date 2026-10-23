@@ -1025,7 +1025,7 @@ fn validate_man_line_values(
         if numeric_columns.get(index) != Some(&true) {
             continue;
         }
-        let parsed = value.trim().parse::<f64>();
+        let parsed = fast_float::parse::<f64, _>(value);
         // ODM table 6-9: DEPLOY_MASS is a host-mass decrement and "shall be <= 0.0".
         if column.eq_ignore_ascii_case("DEPLOY_MASS") && parsed.as_ref().is_ok_and(|v| *v > 0.0) {
             return Err(ValidationError::invalid_value(

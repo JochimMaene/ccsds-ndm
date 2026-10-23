@@ -494,7 +494,7 @@ impl ToKvn for AemMetadata {
             writer.write_pair("INTERPOLATION_METHOD", v);
         }
         if let Some(v) = self.interpolation_degree {
-            writer.write_integer_pair("INTERPOLATION_DEGREE", v);
+            writer.write_integer_pair("INTERPOLATION_DEGREE", v.0.get());
         }
     }
 }
