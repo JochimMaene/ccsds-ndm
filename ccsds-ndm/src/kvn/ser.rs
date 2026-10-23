@@ -537,7 +537,10 @@ impl<'a> KvnWriter<'a> {
                 line: None,
             });
         }
-        self.write_pair(key, value);
+        self.check_text(key, key);
+        self.write_built_line(|line| {
+            let _ = write!(line, "{key:<20} = {value}");
+        });
     }
 
     /// Writes a CCSDS-compatible ODM number without allocating a value string.
@@ -1034,24 +1037,29 @@ mod tests {
 
     #[test]
     fn integer_pairs_preserve_values_and_reject_out_of_range_numbers() {
-        for value in [
-            i64::MIN,
-            i64::from(i32::MIN) - 1,
-            i64::from(i32::MIN),
-            0,
-            i64::from(i32::MAX),
-            i64::from(i32::MAX) + 1,
-            i64::MAX,
+        for (value, fits) in [
+            (i64::MIN, false),
+            (i64::from(i32::MIN) - 1, false),
+            (i64::from(i32::MIN), true),
+            (0, true),
+            (i64::from(i32::MAX), true),
+            (i64::from(i32::MAX) + 1, false),
+            (i64::MAX, false),
         ] {
             let mut writer = KvnWriter::new();
             writer.write_integer_pair("N", value);
-            match writer.finish_checked() {
+            let output = writer.finish_checked();
+            assert_eq!(output.is_ok(), fits, "{value}");
+            match output {
                 Ok(output) => {
-                    assert!(i32::try_from(value).is_ok());
-                    assert_eq!(output.split_once('=').unwrap().1.trim(), value.to_string());
+                    assert_eq!(output, format!("N                    = {value}\n"));
+                    let mut streamed = Vec::new();
+                    let mut writer = KvnWriter::from_io(&mut streamed);
+                    writer.write_integer_pair("N", value);
+                    writer.finish_io().unwrap();
+                    assert_eq!(streamed, output.as_bytes());
                 }
                 Err(error) => {
-                    assert!(i32::try_from(value).is_err());
                     assert!(error.to_string().contains(&value.to_string()));
                 }
             }
@@ -1059,5 +1067,10 @@ mod tests {
         let mut writer = KvnWriter::new();
         writer.write_integer_pair("N", u64::MAX);
         assert!(writer.finish_checked().is_err());
+        for key in ["bad\u{1}".to_owned(), "X".repeat(255)] {
+            let mut writer = KvnWriter::new();
+            writer.write_integer_pair(&key, 1);
+            assert!(writer.finish_checked().is_err());
+        }
     }
 }

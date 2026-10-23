@@ -74,13 +74,18 @@ fn detect_failure_unknown_header() {
 #[test]
 fn concatenated_kvn_messages_are_detected_on_reader_record_boundaries() {
     // Detection uses the readers' rules: any terminator, insignificant leading blanks.
-    for separator in ["\n  ", "\r", "\r\n\t", "\n\r\t"] {
-        let input = format!("{}{separator}{OPM_KVN}", OPM_KVN.trim_end());
-        assert_eq!(
-            from_str(&input).unwrap_err().code(),
-            Some("unsupported.notation"),
-            "{separator:?}"
-        );
+    let expected = from_str(OPM_KVN).unwrap();
+    for ending in ["\n", "\r", "\r\n", "\n\r"] {
+        let single = OPM_KVN.replace('\n', ending);
+        assert_eq!(from_str(&single).unwrap(), expected);
+        for separator in ["\n  ", "\r", "\r\n\t", "\n\r\t", "\r\r\n", "\n\u{a0}"] {
+            let input = format!("{}{separator}{single}", single.trim_end());
+            assert_eq!(
+                from_str(&input).unwrap_err().code(),
+                Some("unsupported.notation"),
+                "{ending:?} {separator:?}"
+            );
+        }
     }
 }
 

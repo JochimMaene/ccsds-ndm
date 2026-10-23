@@ -8,7 +8,8 @@ Additional conformance corrections
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - KVN input preparation combines text checks with normalization detection. Integer output
-  checks numeric bounds directly, and maneuver validation reuses the fast numeric parser.
+  checks numeric bounds directly without text cleanup, and maneuver validation reuses the fast
+  numeric parser. Message detection uses fast LF/CR record scans.
 - KVN numeric parsing and AEM row parsing avoid duplicate scans. TDM reuses per-keyword
   timestamp state, OCM maneuver output parses each numeric token once per write, and CDM
   normalization/preflight avoids unnecessary allocations and identical-output reparsing.
