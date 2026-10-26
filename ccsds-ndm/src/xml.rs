@@ -53,7 +53,7 @@ pub(crate) fn validate_document_root(s: &str, root: &[u8], type_name: &str) -> R
 /// root, if anywhere, so only tags whose attributes mention `xmlns` are inspected; every other
 /// element costs one short byte scan.
 #[derive(Default)]
-struct Namespaces {
+pub(crate) struct Namespaces {
     /// Prefix (empty for the default namespace), namespace name, and declaring element depth.
     bindings: Vec<(Vec<u8>, Vec<u8>, usize)>,
     /// Whether a default namespace declaration is in scope.
@@ -80,7 +80,7 @@ enum Resolved<'a> {
 }
 
 impl Namespaces {
-    fn enter(
+    pub(crate) fn enter(
         &mut self,
         start: &quick_xml::events::BytesStart<'_>,
         depth: usize,
@@ -112,7 +112,7 @@ impl Namespaces {
     }
 
     /// Drop the declarations of elements deeper than `depth`, which have closed.
-    fn leave(&mut self, depth: usize) {
+    pub(crate) fn leave(&mut self, depth: usize) {
         let mut popped = false;
         while self
             .bindings
@@ -153,12 +153,12 @@ impl Namespaces {
 
 /// Whether an element uses the unqualified or the qualified NDM/XML schema set.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum ElementForm {
+pub(crate) enum ElementForm {
     Unqualified,
     Qualified,
 }
 
-fn element_form(
+pub(crate) fn element_form(
     namespaces: &Namespaces,
     name: quick_xml::name::QName<'_>,
     invalid: &impl Fn(String) -> CcsdsNdmError,

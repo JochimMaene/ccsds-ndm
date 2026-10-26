@@ -7,6 +7,13 @@ use crate::common::mutated;
 use ccsds_ndm::messages::cdm::Cdm;
 use ccsds_ndm::Ndm;
 
+fn qualified(xml: &str) -> String {
+    xml.replace("</", "</ndm:")
+        .replace('<', "<ndm:")
+        .replace("<ndm:?", "<?")
+        .replace("<ndm:/ndm:", "</ndm:")
+}
+
 #[test]
 fn empty_optional_kvn_values_are_none() {
     let kvn = mutated(
@@ -92,6 +99,7 @@ fn operational_xml_missing_leaves_are_absent_without_erasing_text() {
         ("AREA_PC", "<AREA_PC units=\"m**2\" nil=\"1\"/>"),
         ("OBJECT_TYPE", "<OBJECT_TYPE/>"),
         ("MESSAGE_FOR", "<MESSAGE_FOR nil=\"true\"/>"),
+        ("MESSAGE_FOR", "<MESSAGE_FOR/>"),
     ] {
         let mut expected = Cdm::from_xml(&original).unwrap();
         match field {
@@ -121,6 +129,19 @@ fn operational_xml_missing_leaves_are_absent_without_erasing_text() {
         input.replace_range(start..end, missing);
         let parsed = Cdm::from_xml(&input).unwrap();
         assert_eq!(parsed, expected, "{field}");
+        let prefixed = qualified(&input);
+        assert_eq!(Cdm::from_xml(&prefixed).unwrap(), expected, "{field}");
+        let aliased_leaf = qualified(missing).replace("ndm:", "alias:").replacen(
+            &format!("<alias:{field}"),
+            &format!("<alias:{field} xmlns:alias=\"urn:ccsds:schema:ndmxml\""),
+            1,
+        );
+        let aliased = prefixed.replacen(&qualified(missing), &aliased_leaf, 1);
+        assert_eq!(Cdm::from_xml(&aliased).unwrap(), expected, "{field}");
+        for declaration in ["", "xmlns:alias=\"urn:other\""] {
+            let invalid = aliased.replace("xmlns:alias=\"urn:ccsds:schema:ndmxml\"", declaration);
+            assert!(Cdm::from_xml(&invalid).is_err(), "{field}: {declaration}");
+        }
         let output = parsed.to_xml().unwrap();
         crate::common::validate_xml("CDM operational missing leaves", &output);
         assert_eq!(Cdm::from_kvn(&parsed.to_kvn().unwrap()).unwrap(), parsed);
@@ -220,6 +241,14 @@ fn nil_cannot_hide_required_values_content_or_unknown_attributes() {
         ),
         ("RELATIVE_SPEED", "<RELATIVE_SPEED unexpected=\"value\"/>"),
         ("RELATIVE_SPEED", "<RELATIVE_SPEED nil=\"false\"/>"),
+        ("RELATIVE_SPEED", "<RELATIVE_SPEED xsi:nil=\"true\"/>"),
+        (
+            "RELATIVE_SPEED",
+            "<foreign:RELATIVE_SPEED xmlns:foreign=\"urn:other\"/>",
+        ),
+        ("RELATIVE_SPEED", "<unknown:RELATIVE_SPEED/>"),
+        ("RELATIVE_SPEED", "<RELATIVE_SPEED xmlns=\"urn:other\"/>"),
+        ("RELATIVE_SPEED", "<ndm:RELATIVE_SPEED/>"),
         ("RELATIVE_SPEED", "<RELATIVE_SPEED>\u{c}</RELATIVE_SPEED>"),
         (
             "RELATIVE_SPEED",

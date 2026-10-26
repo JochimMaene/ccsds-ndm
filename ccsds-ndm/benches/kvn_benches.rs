@@ -78,6 +78,13 @@ fn bench_ocm_kvn_history_scaling(c: &mut Criterion) {
     );
 }
 
+fn bench_kvn_auto_history(c: &mut Criterion) {
+    let input = create_test_tdm(10_000).to_kvn().unwrap();
+    c.bench_function("kvn_auto_parse_tdm_10000", |b| {
+        b.iter(|| ccsds_ndm::from_str(black_box(&input)).unwrap())
+    });
+}
+
 fn bench_kvn_message_matrix(c: &mut Criterion) {
     let cases = [
         ("opm", include_str!("../data/kvn/opm_g4.kvn")),
@@ -114,6 +121,7 @@ fn bench_kvn_message_matrix(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_kvn_message_matrix,
+    bench_kvn_auto_history,
     bench_oem_kvn_history_scaling,
     bench_ocm_kvn_history_scaling,
     bench_tdm_kvn_history_scaling,

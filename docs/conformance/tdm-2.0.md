@@ -194,7 +194,7 @@ byte-position-preserving normalization.
 ## Stricter than XSD
 
 These TDM 2.0 book domains are narrower than the bundled TDM 2.0 XSD. The book rule applies in
-KVN, XML, and model validation alike, so a valid model always converts:
+KVN, XML, and model validation alike, to keep that value domain compatible across notations:
 
 | Field | Book (503.0-B-2) | XSD (`ndmxml-4.0.0-tdm-2.0.xsd`) |
 | --- | --- | --- |

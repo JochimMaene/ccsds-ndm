@@ -16,6 +16,9 @@ pub(super) fn normalize_missing_values(xml: &str) -> Result<Cow<'_, str>> {
     let mut reader = Reader::from_str(xml);
     // Reader events borrow the input; retaining them keeps ancestor names available without copies.
     let mut parents: Vec<BytesStart<'_>> = Vec::new();
+    let mut namespaces = crate::xml::Namespaces::default();
+    let mut child_form = None;
+    let invalid = |message| FormatError::InvalidFormat(message).into();
     let mut missing = Vec::new();
     let mut candidate = None;
     loop {
@@ -24,15 +27,25 @@ pub(super) fn normalize_missing_values(xml: &str) -> Result<Cow<'_, str>> {
         let is_start = matches!(event, Event::Start(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
+                // Validate namespace meaning before normalization can erase an empty leaf.
+                namespaces.enter(&element, parents.len() + 1, &invalid)?;
+                if !parents.is_empty() {
+                    let form = crate::xml::element_form(&namespaces, element.name(), &invalid)?;
+                    if *child_form.get_or_insert(form) != form {
+                        return Err(invalid(
+                            "qualified and unqualified NDM/XML elements cannot be mixed".into(),
+                        ));
+                    }
+                }
                 // A nested element is content, never an unavailable scalar.
                 if let Some((_, _, ref mut empty)) = candidate {
                     *empty = false;
                 }
                 let parent = parents
                     .last()
-                    .map(|element| element.name().into_inner())
+                    .map(|element| element.local_name().into_inner())
                     .unwrap_or_default();
-                let name = element.name().into_inner();
+                let name = element.local_name().into_inner();
                 let leaf = classify_leaf(parent, name);
                 if leaf == Leaf::Required {
                     for attribute in element.attributes().flatten() {
@@ -57,6 +70,7 @@ pub(super) fn normalize_missing_values(xml: &str) -> Result<Cow<'_, str>> {
                         match attribute.key.as_ref() {
                             b"nil" if matches!(attribute.value.as_ref(), b"true" | b"1") => {}
                             b"units" if allows_units(name) => {}
+                            _ if attribute.key.as_namespace_binding().is_some() => {}
                             _ => supported_attributes = false,
                         }
                     }
@@ -70,10 +84,13 @@ pub(super) fn normalize_missing_values(xml: &str) -> Result<Cow<'_, str>> {
                 }
                 if is_start {
                     parents.push(element);
+                } else {
+                    namespaces.leave(parents.len());
                 }
             }
             Event::End(_) => {
                 parents.pop();
+                namespaces.leave(parents.len());
                 if candidate
                     .as_ref()
                     .is_some_and(|(_, depth, _)| *depth == parents.len())

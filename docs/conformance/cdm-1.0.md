@@ -95,11 +95,12 @@ artifact checks are indexed once in the [common evidence table](README.md#shared
 
 Operational CDM XML sometimes encodes unavailable optional scalar values as empty elements
 or with the non-XSD attribute `nil="true"` (also `nil="1"`). For known optional numeric,
-epoch and enumeration leaves, an empty element or one containing only literal XML whitespace
-(space, tab, CR, LF) means absent; entity references and CDATA are treated as content. An explicit
-nil marker also means absent for an optional text leaf with no meaningful content. Ordinary
-empty text elements remain populated empty strings. This is a deliberate producer-compatibility
-exception to the XSD, not a claim that those original documents validate against it. Generated
+epoch, enumeration, and text leaves, an empty element or one containing only literal XML whitespace
+(space, tab, CR, LF) means absent, with or without the nil marker. Entity references and CDATA
+are treated as content. This applies equally to unqualified and namespace-qualified CCSDS elements;
+foreign, unbound, and mixed namespaces are rejected before a missing leaf can be removed.
+This is a deliberate producer-compatibility exception to the XSD, not a claim that those
+original documents validate against it. Generated
 XML omits absent leaves and uses the normal schema form.
 
 Only the unqualified `nil` producer attribute is accepted; `nil="false"`, nil on required
@@ -130,8 +131,8 @@ Shared `OBS_AVAILABLE`, `OBS_USED`, `TRACKS_AVAILABLE`, and `TRACKS_USED` use po
 The book's table calls these integer counts without separately requiring positivity.
 This is a deliberate shared CDM/RDM profile choice: a supplied count must also fit XML;
 zero is rejected even in KVN/model form, rather than being silently omitted on conversion.
-This follows the shared policy of adopting XSD facets in all notations so a valid model
-can convert to XML.
+This follows the shared policy of adopting XSD facets in all notations to keep those
+value domains compatible with XML.
 
 ## KVN comment merge
 

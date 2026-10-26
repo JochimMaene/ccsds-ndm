@@ -7,6 +7,9 @@ Unreleased
 Additional conformance corrections
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- CDM missing-value compatibility also applies to namespace-qualified XML. Empty optional
+  leaves cannot conceal foreign, unbound, or mixed namespaces.
+
 - KVN input preparation combines text checks with normalization detection. Integer output
   checks numeric bounds directly without text cleanup, and maneuver validation reuses the fast
   numeric parser.

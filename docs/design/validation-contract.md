@@ -59,9 +59,10 @@ narrower domain always wins. Some conflicts require a notation-specific refusal;
 explicit edition change. See the [family decision records](../conformance/README.md#family-records).
 
 XSD value facets (bounds, patterns, enumerations, positivity) apply in every notation and to
-model validation, P1 through P4, so that a valid model always converts. The one exception is a
-value the book explicitly permits and the XSD forbids: the model preserves it, and XML generation
-refuses it; the family record names each such field.
+model validation, P1 through P4, to keep those value domains compatible across notations.
+This does not guarantee conversion: target structure, lexical limits, and preservation checks
+still apply. When the book explicitly permits a value the XSD forbids, the model preserves it
+and XML generation refuses it; the family record names each such field.
 
 The books win over the XSD in one shared case: XML epochs with a timezone offset (`+hh:mm`),
 bare numeric epochs, and empty epochs are rejected although `epochType` admits them, because the
@@ -97,7 +98,8 @@ producer deviations, and writing always emits the canonical form.
   TDM phase counts remain decimal strings.
 - **XML values:** blanks around an XML number are ignored; blanks around an epoch are not. `NaN`
   and `INF` are rejected as non-finite despite `xsd:double`, except where a family record accepts
-  them (OEM states and covariance). `xsi:nil` is rejected except where the CDM record documents it.
+  them (OEM states and covariance). `xsi:nil` is rejected; CDM separately accepts the unqualified
+  producer attribute `nil` on empty optional leaves, as documented in its family record.
   A missing `<?xml ...?>` declaration is accepted (XML 1.0 makes it optional and UTF-8 is the
   default); a declaration that is present must open the document, and writers always emit it.
   Element nesting is limited to 16 levels.
@@ -128,8 +130,8 @@ producer deviations, and writing always emits the canonical form.
   book default to interpret them; writers may emit that default when the target requires it, as a
   documented normalization. Present, empty XML elements with an explicit schema default use that
   default (TDM numeric defaults and `DATA_QUALITY=RAW`); this does not populate omitted optional
-  fields. CDM's documented producer compatibility accepts empty/nil optional numeric, epoch, and
-  enum XML leaves only when they carry no meaningful payload; generation omits absent values.
+  fields. CDM's documented producer compatibility accepts empty/nil optional numeric, epoch,
+  enum, and text XML leaves only when they carry no meaningful payload; generation omits absent values.
 
 Each rule is implemented at the narrowest shared boundary. Family records identify exceptions,
 book defaults, and edition-specific restrictions; callers do not select a stricter or looser mode.

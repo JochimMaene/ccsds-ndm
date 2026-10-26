@@ -142,7 +142,7 @@ re-entry and gives no zero or negative value a meaning. Following the shared rul
 apply in every notation (see the
 [validation contract](../design/validation-contract.md#authority-and-representability)), the
 `dayIntervalTypeUR` positivity is enforced in KVN, XML, and model validation for all three
-lifetime fields, so a valid model always converts. Errors name the keyword. Existing
+lifetime fields, to keep that value domain compatible across notations. Errors name the keyword. Existing
 lifetime-window start/end ordering checks still apply.
 `generation::orbit_lifetime_rule_is_enforced_at_every_public_boundary` and
 `generation::lifetime_window_offsets_are_positive_in_every_notation` cover the rule.

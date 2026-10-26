@@ -59,7 +59,7 @@ They are not missing self-contained behavior and are not guessed; see
 - **GM must be positive in every notation.** The book does not state a range; `gmType` requires
   a positive value, and under the shared
   [facet rule](../design/validation-contract.md#authority-and-representability) that bound
-  applies to KVN, the model, and XML alike so a valid model always converts.
+  applies to KVN, the model, and XML alike to keep that value domain compatible across notations.
 - **Empty mandatory XML strings are rejected** as empty values (book over XSD), per the
   [shared rule](../design/validation-contract.md#authority-and-representability).
 
@@ -91,7 +91,7 @@ identify these model-relevant differences:
 | Difference | Decision and evidence |
 | --- | --- |
 | `CLASSIFICATION` and `MESSAGE_ID` are not in the 2.0 header | Reject their presence in both parsed notations and mutated models; `conformance::odm2::opm_and_omm_2_reject_new_header_fields_in_both_notations`. |
-| 2.0 `angleRange` is [-180, 360), while 3.0's is [-360, 360) | `RA_OF_ASC_NODE`, `ARG_OF_PERICENTER`, `TRUE_ANOMALY`, and `MEAN_ANOMALY` use the 2.0 range for 2.0 in every notation, so a valid 2.0 model always converts; `conformance::odm2::odm_2_angles_use_the_2_0_range`. |
+| 2.0 `angleRange` is [-180, 360), while 3.0's is [-360, 360) | `RA_OF_ASC_NODE`, `ARG_OF_PERICENTER`, `TRUE_ANOMALY`, and `MEAN_ANOMALY` use the 2.0 range for 2.0 in every notation, to keep the 2.0 angle domain compatible across notations; `conformance::odm2::odm_2_angles_use_the_2_0_range`. |
 | Maneuver delta mass uses 2.0 `negativeDouble`, while 3.0 uses `deltamassTypeZ` | Zero remains accepted only for 3.0. The 2.0 root gate rejects zero, including KVN/XML input and output; `conformance::odm2::opm_2_requires_negative_maneuver_delta_mass_in_every_route`. |
 | A present XML spacecraft block requires all five spacecraft fields | The 2.0 common schema makes these fields required; 3.0 makes them optional. Partial blocks remain valid KVN/model content, but 2.0 XML input/output refuses them. `conformance::odm2::odm_2_partial_spacecraft_is_kvn_valid_but_not_xml_representable`. |
 | Other logical blocks retain their typed structure | Every shipped OPM KVN fixture, with only its new header removed and edition changed, passes 2.0 KVN/XML preservation and the official 2.0 XSD; `conformance::odm2::opm_2_generation_is_schema_valid_and_round_trips`. |

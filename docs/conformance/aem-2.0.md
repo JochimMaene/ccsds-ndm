@@ -105,7 +105,7 @@ artifact checks are indexed once in the [common evidence table](README.md#shared
 
 **Angle domain.** ADM §6.8.1 gives angles in degrees "between −360 and 360"; the XSD
 `angleRange` makes this `[-360, 360)` (upper bound exclusive). The XSD interval applies in KVN,
-XML and model validation alike, so a valid model always converts (the shared rule on
+XML and model validation alike, to keep that value domain compatible across notations (the shared rule on
 [XSD facets](../design/validation-contract.md#authority-and-representability)).
 Radian-valued data requires an exchange-partner ICD and is outside this supported profile.
 
