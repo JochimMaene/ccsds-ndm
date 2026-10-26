@@ -36,8 +36,7 @@ fn is_kvn_message_header(line: &str) -> bool {
 fn has_multiple_kvn_messages(input: &str) -> bool {
     // Same record boundaries as the readers: all four terminators, insignificant leading blanks.
     input
-        .lines()
-        .flat_map(|line| line.split('\r'))
+        .split(['\r', '\n'])
         .filter(|line| is_kvn_message_header(line.trim_start()))
         .nth(1)
         .is_some()
