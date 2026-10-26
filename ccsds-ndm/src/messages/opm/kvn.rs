@@ -178,6 +178,7 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<Option<ManeuverParamet
 
     loop {
         let checkpoint = input.checkpoint();
+        blank_lines.parse_next(input)?;
         let key = match key_token.parse_next(input) {
             Ok(key) => key,
             Err(_) => {
@@ -673,9 +674,12 @@ MAN_DV_3 = 0.0
             .parse_next(&mut input)
             .unwrap()
             .unwrap();
-        assert_eq!(ud.comment, vec!["user comment"]);
-        assert_eq!(ud.user_defined.len(), 2);
-        assert_eq!(ud.user_defined[0].parameter, "FOO");
+        assert_eq!(
+            ud.comments().cloned().collect::<Vec<_>>(),
+            vec!["user comment"]
+        );
+        assert_eq!(ud.parameters().count(), 2);
+        assert_eq!(ud.parameters().next().unwrap().parameter, "FOO");
     }
 
     #[test]
@@ -1018,7 +1022,7 @@ impl Opm {
                 .map(|(_, value)| value.trim())
         });
         (|| {
-            let normalized = crate::kvn::normalize_line_endings(kvn);
+            let normalized = crate::kvn::prepare_input(kvn, crate::validation::MessageKind::Opm)?;
             validate_kvn_syntax(&normalized)?;
             let opm = Self::from_kvn_str(&normalized)?;
             crate::traits::Validate::validate(&opm)?;
@@ -1293,6 +1297,7 @@ impl Opm {
             )?;
         }
         if let Some(parameters) = &data.spacecraft_parameters {
+            parameters.validate_kvn_representability()?;
             comments(
                 &parameters.comment,
                 "body.segment.data.spacecraft_parameters.comment",
@@ -1322,15 +1327,23 @@ impl Opm {
             )?;
         }
         if let Some(user_defined) = &data.user_defined_parameters {
-            comments(
-                &user_defined.comment,
-                "body.segment.data.user_defined_parameters.comment",
-            )?;
-            for parameter in &user_defined.user_defined {
-                let suffix = parameter
-                    .parameter
-                    .strip_prefix("USER_DEFINED_")
-                    .unwrap_or(&parameter.parameter);
+            if user_defined.parameters().next().is_none() {
+                return Err(crate::error::ValidationError::invalid_value(
+                    "userDefinedParameters",
+                    "no parameters",
+                    "at least one parameter to preserve the block in KVN",
+                )
+                .at_path("body.segment.data.user_defined_parameters")
+                .into());
+            }
+            for comment in user_defined.comments() {
+                comments(
+                    std::slice::from_ref(comment),
+                    "body.segment.data.user_defined_parameters.comment",
+                )?;
+            }
+            for parameter in user_defined.parameters() {
+                let suffix = parameter.parameter.as_str();
                 invalid_text(
                     "USER_DEFINED parameter",
                     suffix,
@@ -1370,6 +1383,7 @@ impl Opm {
                     key_len,
                 )?;
             }
+            user_defined.validate_kvn_representability()?;
         }
         Ok(())
     }
@@ -1460,10 +1474,7 @@ impl ToKvn for OpmData {
 
         // User Defined
         if let Some(ud) = &self.user_defined_parameters {
-            writer.write_comments(&ud.comment);
-            for p in &ud.user_defined {
-                writer.write_user_defined(&p.parameter, &p.value);
-            }
+            ud.write_kvn(writer);
         }
     }
 }

@@ -142,3 +142,121 @@ fn version_lines_and_epochs_carry_no_units() {
         );
     }
 }
+
+#[test]
+fn opm_and_omm_elapsed_time_profile_is_explicit() {
+    for fixture in ["opm_g1.kvn", "omm_g9.kvn"] {
+        let input = std::fs::read_to_string(data_dir().join("kvn").join(fixture)).unwrap();
+        let epoch_line = input
+            .lines()
+            .find(|line| line.starts_with("EPOCH ="))
+            .unwrap();
+        for system in ["MET", "MRT"] {
+            let input = mutated_once(
+                &input,
+                "TIME_SYSTEM = UTC",
+                &format!("TIME_SYSTEM = {system}"),
+            );
+            from_str(&input).unwrap();
+            for value in ["0001-000T01:00:00", "0001-999T01:00:00"] {
+                let invalid = mutated_once(&input, epoch_line, &format!("EPOCH = {value}"));
+                crate::common::assert_invalid_epoch(&from_str(&invalid).unwrap_err(), value);
+                let xml = from_str(&input).unwrap().to_xml().unwrap();
+                let old = epoch_line.strip_prefix("EPOCH = ").unwrap().trim();
+                let invalid_xml = mutated_once(
+                    &xml,
+                    &format!("<EPOCH>{old}</EPOCH>"),
+                    &format!("<EPOCH>{value}</EPOCH>"),
+                );
+                crate::common::validate_xml("elapsed time profile", &invalid_xml);
+                crate::common::assert_invalid_epoch(&from_str(&invalid_xml).unwrap_err(), value);
+            }
+        }
+    }
+}
+
+/// `gmType` is positive. Decision 5 applies XSD facets in every notation, so KVN input, the
+/// model, and both writers refuse a zero GM rather than only XML.
+#[test]
+fn opm_and_omm_gm_must_be_positive_in_every_notation() {
+    use ccsds_ndm::messages::{omm::Omm, opm::Opm};
+    use ccsds_ndm::Ndm;
+    let opm = mutated_once(
+        include_str!("../../data/kvn/opm_g2.kvn"),
+        "GM = 398600.4415",
+        "GM = 0.0",
+    );
+    let omm = mutated_once(
+        include_str!("../../data/kvn/omm_g7.kvn"),
+        "GM = 398600.8",
+        "GM = -1.0",
+    );
+    for error in [
+        Opm::from_kvn(&opm).unwrap_err(),
+        Omm::from_kvn(&omm).unwrap_err(),
+    ] {
+        crate::common::assert_validation_field(&error, "GM");
+    }
+    let mut message = Omm::from_kvn(include_str!("../../data/kvn/omm_g7.kvn")).unwrap();
+    message
+        .body
+        .segment
+        .data
+        .mean_elements
+        .gm
+        .as_mut()
+        .unwrap()
+        .value = 0.0;
+    assert_eq!(
+        message.validate().unwrap_err().field_path().as_deref(),
+        Some("body.segment.data.mean_elements.gm")
+    );
+    assert!(message.to_kvn().is_err());
+}
+
+/// Typed constructors name their Rust type; a KVN range error names the keyword instead.
+#[test]
+fn opm_and_omm_kvn_range_errors_name_the_keyword() {
+    use ccsds_ndm::messages::{omm::Omm, opm::Opm};
+    use ccsds_ndm::Ndm;
+    let opm = mutated_once(
+        include_str!("../../data/kvn/opm_g2.kvn"),
+        "RA_OF_ASC_NODE = 17.604721",
+        "RA_OF_ASC_NODE = 400",
+    );
+    let omm = mutated_once(
+        include_str!("../../data/kvn/omm_g7.kvn"),
+        "INCLINATION = 3.0539",
+        "INCLINATION = 181",
+    );
+    for (error, field) in [
+        (Opm::from_kvn(&opm).unwrap_err(), "RA_OF_ASC_NODE"),
+        (Omm::from_kvn(&omm).unwrap_err(), "INCLINATION"),
+    ] {
+        crate::common::assert_validation_field(&error, field);
+        assert!(error.to_string().contains(field), "{error}");
+    }
+}
+
+/// An empty mandatory XML string is schema-valid but not book-valid (ODM 7.5.1); it is
+/// reported as empty, not missing, with its model path.
+#[test]
+fn opm_and_omm_report_empty_mandatory_xml_strings_as_empty() {
+    use ccsds_ndm::messages::omm::Omm;
+    use ccsds_ndm::Ndm;
+    let xml = mutated_once(
+        include_str!("../../data/xml/omm_g10.xml"),
+        "<OBJECT_ID>1995-025A</OBJECT_ID>",
+        "<OBJECT_ID/>",
+    );
+    let error = Omm::from_xml(&xml).unwrap_err();
+    crate::common::assert_validation_field(&error, "OBJECT_ID");
+    assert!(error.to_string().contains("is empty"), "{error}");
+    assert_eq!(
+        error
+            .as_validation_error()
+            .and_then(|error| error.field_path())
+            .as_deref(),
+        Some("body.segment.metadata.object_id")
+    );
+}

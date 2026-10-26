@@ -157,7 +157,7 @@ fn kvn_generation_rounds_history_numbers_to_the_ccsds_digit_limit() {
         unreachable!()
     };
     state.spin_alpha.value = 1.234_567_890_123_456_7;
-    assert!(message.to_kvn().unwrap().contains("1.234567890123457e0"));
+    assert!(message.to_kvn().unwrap().contains("1.234567890123457"));
 }
 
 #[test]
@@ -174,4 +174,38 @@ fn aem_overlong_records_are_rejected_before_streaming() {
         Some("validation.out_of_range")
     );
     assert!(output.is_empty());
+}
+
+#[test]
+fn aem_nutation_periods_reject_day_units_before_values_are_flattened() {
+    use ccsds_ndm::types::TimeUnits;
+    let mut message = Aem::from_xml(crate::XML).unwrap();
+    let state = message
+        .body
+        .segment
+        .iter_mut()
+        .flat_map(|segment| &mut segment.data.attitude_states)
+        .find_map(|state| match state {
+            AemAttitudeState::SpinNutation(value) => Some(value),
+            _ => None,
+        })
+        .unwrap();
+    state.nutation_per.units = Some(TimeUnits::Seconds);
+    let xml = message.to_xml().unwrap();
+    assert!(
+        Aem::from_xml(&xml.replace("NUTATION_PER units=\"s\"", "NUTATION_PER units=\"d\""))
+            .is_err()
+    );
+    let state = message
+        .body
+        .segment
+        .iter_mut()
+        .flat_map(|segment| &mut segment.data.attitude_states)
+        .find_map(|state| match state {
+            AemAttitudeState::SpinNutation(value) => Some(value),
+            _ => None,
+        })
+        .unwrap();
+    state.nutation_per.units = Some(TimeUnits::Day);
+    assert_rejects(&message, "NUTATION_PER units");
 }

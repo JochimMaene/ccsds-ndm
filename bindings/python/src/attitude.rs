@@ -11,8 +11,44 @@ use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
+/// The four quaternion derivative components must be supplied together or all omitted.
+///
+/// Parameters
+/// ----------
+/// ref_frame_a : str
+///     Name of the reference frame that defines the starting point of the transformation. The set of
+///     allowed values is described in annex B, subsection B3.
+/// ref_frame_b : str
+///     Name of the reference frame that defines the end point of the transformation. The set of
+///     allowed values is described in annex B, subsection B3.
+/// q1 : float
+///     Q1 = e1 * sin(phi/2), where phi is the rotation angle and e1 the first component of the
+///     rotation axis.
+/// q2 : float
+///     Q2 = e2 * sin(phi/2), where phi is the rotation angle and e2 the second component of the
+///     rotation axis.
+/// q3 : float
+///     Q3 = e3 * sin(phi/2), where phi is the rotation angle and e3 the third component of the
+///     rotation axis.
+/// qc : float
+///     QC = cos(phi/2), the scalar component, where phi is the rotation angle.
+/// q1_dot : float, optional
+///     Time derivative of Q1, in 1/s; provide all four derivatives together.
+/// q2_dot : float, optional
+///     Time derivative of Q2, in 1/s; provide all four derivatives together.
+/// q3_dot : float, optional
+///     Time derivative of Q3, in 1/s; provide all four derivatives together.
+/// qc_dot : float, optional
+///     Time derivative of QC, in 1/s; provide all four derivatives together.
+/// comment : list[str], optional
+///     One or more comment line(s). Each comment line shall begin with this keyword.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If a component is outside [-1, 1], or only some quaternion derivatives are supplied.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct QuaternionState {
     pub inner: core_common::QuaternionState,
@@ -22,6 +58,7 @@ pub struct QuaternionState {
 #[pymethods]
 impl QuaternionState {
     #[new]
+    #[pyo3(signature = (ref_frame_a, ref_frame_b, q1, q2, q3, qc, q1_dot=None, q2_dot=None, q3_dot=None, qc_dot=None, comment=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         ref_frame_a: String,
@@ -35,44 +72,53 @@ impl QuaternionState {
         q3_dot: Option<f64>,
         qc_dot: Option<f64>,
         comment: Option<Vec<String>>,
-    ) -> Self {
+    ) -> PyResult<Self> {
         use ccsds_ndm::common::{Quaternion, QuaternionDot};
         use ccsds_ndm::types::QuaternionDotComponent;
-        Self {
+        let quaternion_dot = match (q1_dot, q2_dot, q3_dot, qc_dot) {
+            (Some(q1_dot), Some(q2_dot), Some(q3_dot), Some(qc_dot)) => Some(QuaternionDot {
+                q1_dot: QuaternionDotComponent {
+                    value: q1_dot,
+                    units: None,
+                },
+                q2_dot: QuaternionDotComponent {
+                    value: q2_dot,
+                    units: None,
+                },
+                q3_dot: QuaternionDotComponent {
+                    value: q3_dot,
+                    units: None,
+                },
+                qc_dot: QuaternionDotComponent {
+                    value: qc_dot,
+                    units: None,
+                },
+            }),
+            (None, None, None, None) => None,
+            _ => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "q1_dot, q2_dot, q3_dot and qc_dot must be supplied together",
+                ))
+            }
+        };
+        Ok(Self {
             inner: core_common::QuaternionState {
                 comment: comment.unwrap_or_default(),
                 ref_frame_a,
                 ref_frame_b,
                 quaternion: Quaternion { q1, q2, q3, qc },
-                quaternion_dot: q1_dot.and_then(|q1d| {
-                    Some(QuaternionDot {
-                        q1_dot: QuaternionDotComponent {
-                            value: q1d,
-                            units: None,
-                        },
-                        q2_dot: QuaternionDotComponent {
-                            value: q2_dot?,
-                            units: None,
-                        },
-                        q3_dot: QuaternionDotComponent {
-                            value: q3_dot?,
-                            units: None,
-                        },
-                        qc_dot: QuaternionDotComponent {
-                            value: qc_dot?,
-                            units: None,
-                        },
-                    })
-                }),
+                quaternion_dot,
             },
-        }
+        })
     }
 
-    /// Quaternion components Q1, Q2, Q3, QC.
+    /// Q1 = e1 * sin(phi/2), where phi is the rotation angle and e1 the first component of the
+    /// rotation axis.
     ///
     /// Units: dimensionless
     ///
     /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    /// See table 3-3 for the component convention.
     ///
     /// :type: float
     #[getter]
@@ -85,11 +131,13 @@ impl QuaternionState {
         self.inner.quaternion.q1 = value;
     }
 
-    /// Quaternion components Q1, Q2, Q3, QC.
+    /// Q2 = e2 * sin(phi/2), where phi is the rotation angle and e2 the second component of the
+    /// rotation axis.
     ///
     /// Units: dimensionless
     ///
     /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    /// See table 3-3 for the component convention.
     ///
     /// :type: float
     #[getter]
@@ -102,11 +150,13 @@ impl QuaternionState {
         self.inner.quaternion.q2 = value;
     }
 
-    /// Quaternion components Q1, Q2, Q3, QC.
+    /// Q3 = e3 * sin(phi/2), where phi is the rotation angle and e3 the third component of the
+    /// rotation axis.
     ///
     /// Units: dimensionless
     ///
     /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    /// See table 3-3 for the component convention.
     ///
     /// :type: float
     #[getter]
@@ -119,11 +169,12 @@ impl QuaternionState {
         self.inner.quaternion.q3 = value;
     }
 
-    /// Quaternion components Q1, Q2, Q3, QC.
+    /// QC = cos(phi/2), the scalar component, where phi is the rotation angle.
     ///
     /// Units: dimensionless
     ///
     /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
+    /// See table 3-3 for the component convention.
     ///
     /// :type: float
     #[getter]
@@ -136,7 +187,8 @@ impl QuaternionState {
         self.inner.quaternion.qc = value;
     }
 
-    /// Quaternion derivative components [Q1_DOT, Q2_DOT, Q3_DOT, QC_DOT].
+    /// Time derivatives of Q1, Q2, Q3 and QC, as [Q1_DOT, Q2_DOT, Q3_DOT, QC_DOT]. Table 3-3
+    /// marks each optional; the XSD makes them all-or-none, which this library follows.
     ///
     /// Units: 1/s
     ///
@@ -237,8 +289,44 @@ impl QuaternionState {
 ///
 /// All mandatory elements of the logical block are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
+///
+/// Parameters
+/// ----------
+/// ref_frame_a : str
+///     Name of the reference frame that defines the starting point of the transformation. The set of
+///     allowed values is described in annex B, subsection B3.
+/// ref_frame_b : str
+///     Name of the reference frame that defines the end point of the transformation. The set of
+///     allowed values is described in annex B, subsection B3.
+/// euler_rot_seq : str
+///     Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of the
+///     transformation is from left to right, where the leftmost letter (X, Y, or Z) represents the
+///     rotation axis of the first rotation, the second letter (X, Y, or Z) represents the rotation
+///     axis of the second rotation, and the third letter (X, Y, or Z) represents the rotation axis of
+///     the third rotation. Accepts the twelve letter sequences in either case and the ADM 1.0 numeric
+///     spellings (``"313"`` for ``ZXZ``) as a legacy alias; the getter and all output use uppercase
+///     letters.
+/// angle_1 : float
+///     Angle of the first rotation.
+/// angle_2 : float
+///     Angle of the second rotation.
+/// angle_3 : float
+///     Angle of the third rotation.
+/// angle_1_dot : float, optional
+///     Time derivative of angle of the first rotation.
+/// angle_2_dot : float, optional
+///     Time derivative of angle of the second rotation.
+/// angle_3_dot : float, optional
+///     Time derivative of angle of the third rotation.
+/// comment : list[str], optional
+///     One or more comment line(s). Each comment line shall begin with this keyword.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If the rotation sequence is unknown or an angle is outside [-360, 360).
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct EulerAngleState {
     pub inner: core_common::EulerAngleState,
@@ -248,6 +336,7 @@ pub struct EulerAngleState {
 #[pymethods]
 impl EulerAngleState {
     #[new]
+    #[pyo3(signature = (ref_frame_a, ref_frame_b, euler_rot_seq, angle_1, angle_2, angle_3, angle_1_dot=None, angle_2_dot=None, angle_3_dot=None, comment=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         ref_frame_a: String,
@@ -326,6 +415,8 @@ impl EulerAngleState {
     /// the rotation axis of the first rotation, the second letter (X, Y, or Z) represents the
     /// rotation axis of the second rotation, and the third letter (X, Y, or Z) represents the
     /// rotation axis of the third rotation.
+    /// Accepts the twelve letter sequences in either case and the ADM 1.0 numeric spellings
+    /// (``"313"`` for ``ZXZ``) as a legacy alias; the getter and all output use uppercase letters.
     ///
     /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///
@@ -466,8 +557,28 @@ impl EulerAngleState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
+///
+/// Parameters
+/// ----------
+/// ref_frame_a : str
+///     Name of the reference frame that defines the starting point of the transformation. The set of
+///     allowed values is described in annex B, subsection B3.
+/// ref_frame_b : str
+///     Name of the reference frame that defines the end point of the transformation. The set of
+///     allowed values is described in annex B, subsection B3.
+/// angvel_frame : str
+///     Reference frame in which the components of the angular velocity vector are given. The set of
+///     allowed values is described in annex B, subsection B3.
+/// angvel_x : float
+///     Component of the angular velocity vector on the X axis.
+/// angvel_y : float
+///     Component of the angular velocity vector on the Y axis.
+/// angvel_z : float
+///     Component of the angular velocity vector on the Z axis.
+/// comment : list[str], optional
+///     One or more comment line(s). Each comment line shall begin with this keyword.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct AngVelState {
     pub inner: core_common::AngVelState,
@@ -477,6 +588,7 @@ pub struct AngVelState {
 #[pymethods]
 impl AngVelState {
     #[new]
+    #[pyo3(signature = (ref_frame_a, ref_frame_b, angvel_frame, angvel_x, angvel_y, angvel_z, comment=None))]
     fn new(
         ref_frame_a: String,
         ref_frame_b: String,
@@ -620,8 +732,44 @@ impl AngVelState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
+///
+/// Parameters
+/// ----------
+/// ref_frame_a : str
+///     Name of the reference frame that defines the starting point of the transformation. The set of
+///     allowed values is described in annex B, subsection B3.
+/// ref_frame_b : str
+///     Name of the reference frame that defines the end point of the transformation. The set of
+///     allowed values is described in annex B, subsection B3.
+/// spin_alpha : float
+///     Right ascension of spin axis vector in frame A.
+/// spin_delta : float
+///     Declination of the spin axis vector in frame A.
+/// spin_angle : float
+///     Phase of the satellite about the spin axis.
+/// spin_angle_vel : float
+///     Angular velocity of satellite around spin axis.
+/// nutation : float, optional
+///     Nutation angle of spin axis.
+/// nutation_per : float, optional
+///     Body nutation period of the spin axis.
+/// nutation_phase : float, optional
+///     Inertial nutation phase.
+/// momentum_alpha : float, optional
+///     Right ascension of angular momentum vector in frame A.
+/// momentum_delta : float, optional
+///     Declination of angular momentum vector in frame A.
+/// nutation_vel : float, optional
+///     Angular velocity of spin vector around the angular momentum vector.
+/// comment : list[str], optional
+///     One or more comment line(s). Each comment line shall begin with this keyword.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If an angle is outside [-360, 360). Other spin constraints are checked by validate().
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct SpinState {
     pub inner: core_common::SpinState,
@@ -631,6 +779,7 @@ pub struct SpinState {
 #[pymethods]
 impl SpinState {
     #[new]
+    #[pyo3(signature = (ref_frame_a, ref_frame_b, spin_alpha, spin_delta, spin_angle, spin_angle_vel, nutation=None, nutation_per=None, nutation_phase=None, momentum_alpha=None, momentum_delta=None, nutation_vel=None, comment=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         ref_frame_a: String,
@@ -908,8 +1057,28 @@ impl SpinState {
 ///
 /// All mandatory elements are to be provided if the block is present.
 /// (See annex F for conventions and further detail.)
+///
+/// Parameters
+/// ----------
+/// inertia_ref_frame : str
+///     Coordinate system for the inertia tensor. The set of allowed values is described in annex B,
+///     subsection B3.
+/// ixx : float
+///     Moment of Inertia about the X-axis.
+/// iyy : float
+///     Moment of Inertia about the Y-axis.
+/// izz : float
+///     Moment of Inertia about the Z-axis.
+/// ixy : float
+///     Inertia Cross Product of the X and Y axes.
+/// ixz : float
+///     Inertia Cross Product of the X and Z axes.
+/// iyz : float
+///     Inertia Cross Product of the Y and Z axes.
+/// comment : list[str], optional
+///     One or more comment line(s). Each comment line shall begin with this keyword.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct InertiaState {
     pub inner: core_common::InertiaState,
@@ -919,6 +1088,7 @@ pub struct InertiaState {
 #[pymethods]
 impl InertiaState {
     #[new]
+    #[pyo3(signature = (inertia_ref_frame, ixx, iyy, izz, ixy, ixz, iyz, comment=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         inertia_ref_frame: String,

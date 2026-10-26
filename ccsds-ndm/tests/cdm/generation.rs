@@ -103,20 +103,11 @@ fn edited_cdm_numeric_values_are_validated_before_any_output() {
 #[test]
 fn every_kvn_generation_gate_rejects_loss_or_ambiguity_before_output() {
     type CdmMutation = fn(&mut Cdm);
-    let cases: [(&str, CdmMutation); 3] = [
-        ("first nested logical-block COMMENT", |message| {
-            message.body.segments[0]
-                .data
-                .od_parameters
-                .as_mut()
-                .unwrap()
-                .comment
-                .push("nested".to_owned());
-        }),
-        ("non-printable or non-ASCII character", |message| {
+    let cases: [(&str, CdmMutation); 2] = [
+        ("only printable ASCII records", |message| {
             message.body.segments[0].metadata.object_name = "SATELLITE €".to_owned();
         }),
-        ("without changing typed content", |message| {
+        ("only printable ASCII records", |message| {
             message.body.segments[0].metadata.object_name = "SATELLITE\nA".to_owned();
         }),
     ];
@@ -129,6 +120,76 @@ fn every_kvn_generation_gate_rejects_loss_or_ambiguity_before_output() {
         let streamed = message.write_kvn_to(&mut output).unwrap_err();
         assert_eq!(streamed.to_string(), error.to_string(), "{label}");
         assert!(output.is_empty(), "streaming wrote bytes for {label}");
+    }
+}
+
+#[test]
+fn cdm_kvn_rounds_computed_numbers_while_xml_retains_the_value() {
+    let mut control = Cdm::from_kvn(KVN).unwrap();
+    control.body.relative_metadata_data.miss_distance.value = 0.123_456_789_012_345_6;
+    assert_eq!(Cdm::from_kvn(&control.to_kvn().unwrap()).unwrap(), control);
+
+    for field in ["MISS_DISTANCE", "COLLISION_PROBABILITY", "X", "CR_R"] {
+        let mut message = Cdm::from_kvn(KVN).unwrap();
+        let value = 0.300_000_000_000_000_04;
+        match field {
+            "MISS_DISTANCE" => message.body.relative_metadata_data.miss_distance.value = value,
+            "COLLISION_PROBABILITY" => {
+                message
+                    .body
+                    .relative_metadata_data
+                    .collision_probability
+                    .as_mut()
+                    .unwrap()
+                    .value = value
+            }
+            "X" => message.body.segments[1].data.state_vector.x.value = value,
+            _ => {
+                message.body.segments[1]
+                    .data
+                    .covariance_matrix
+                    .as_mut()
+                    .unwrap()
+                    .cr_r
+                    .value = value
+            }
+        }
+        message.validate().unwrap();
+        let xml = message.to_xml().unwrap();
+        assert_eq!(Cdm::from_xml(&xml).unwrap(), message);
+        validate_xml("CDM full-precision double", &xml);
+        let kvn = message.to_kvn().unwrap();
+        let reparsed = Cdm::from_kvn(&kvn).unwrap();
+        let rounded = match field {
+            "MISS_DISTANCE" => reparsed.body.relative_metadata_data.miss_distance.value,
+            "COLLISION_PROBABILITY" => {
+                reparsed
+                    .body
+                    .relative_metadata_data
+                    .collision_probability
+                    .as_ref()
+                    .unwrap()
+                    .value
+            }
+            "X" => reparsed.body.segments[1].data.state_vector.x.value,
+            _ => {
+                reparsed.body.segments[1]
+                    .data
+                    .covariance_matrix
+                    .as_ref()
+                    .unwrap()
+                    .cr_r
+                    .value
+            }
+        };
+        assert_eq!(rounded, 0.3, "{field}");
+        let mut output = Vec::new();
+        message.write_kvn_to(&mut output).unwrap();
+        assert_eq!(output, kvn.as_bytes(), "{field}");
+        assert_eq!(
+            ccsds_ndm::Message::Cdm(message.clone()).to_kvn().unwrap(),
+            kvn
+        );
     }
 }
 
@@ -149,7 +210,7 @@ fn generation_rejects_partial_optional_covariance_rows() {
     assert!(error.to_string().contains("CDRG_T"));
 }
 
-/// The relative metadata numbers are plain doubles, so only finiteness constrains them. Before
+/// Every relative metadata number must be finite. Before
 /// this was routed, `validate` and the XML writer accepted a non-finite value while the KVN
 /// writer rejected it, and an infinity reached the document as the lexical `inf`, which `xmllint`
 /// rejects as "not a valid value of the atomic type 'xs:double'".
@@ -253,6 +314,61 @@ fn cdm_kvn_comments_keep_their_normative_block_association() {
 
     let regenerated = cdm.to_kvn().unwrap();
     assert_eq!(Cdm::from_kvn(&regenerated).unwrap(), cdm);
+}
+
+#[test]
+fn xml_nested_comments_merge_canonically_into_kvn() {
+    // Space-Track layout: empty <data> COMMENT, a comment-only odParameters (all leaves nil),
+    // then commented additionalParameters. KVN has one leading run for all of them.
+    let mut xml = Cdm::from_kvn(KVN).unwrap();
+    let data = &mut xml.body.segments[0].data;
+    data.comment.clear();
+    data.od_parameters = Some(ccsds_ndm::common::OdParameters {
+        comment: vec!["od".into()],
+        ..Default::default()
+    });
+    data.additional_parameters.as_mut().unwrap().comment = vec!["additional".into()];
+    data.state_vector.comment = vec!["state".into()];
+    // Second segment: comments after a valued first block stay with their own block.
+    let second = &mut xml.body.segments[1].data;
+    second.comment = vec!["outer".into()];
+    second.od_parameters.as_mut().unwrap().comment = vec!["od2".into()];
+    second.additional_parameters = None;
+    second.state_vector.comment = vec!["state2".into()];
+    let xml = Cdm::from_xml(&xml.to_xml().unwrap()).unwrap();
+
+    let kvn = xml.to_kvn().unwrap();
+    let merged = Cdm::from_kvn(&kvn).unwrap();
+    let first = &merged.body.segments[0].data;
+    assert_eq!(first.comment, ["od", "additional"]);
+    assert!(first.od_parameters.is_none());
+    assert!(first
+        .additional_parameters
+        .as_ref()
+        .unwrap()
+        .comment
+        .is_empty());
+    assert_eq!(first.state_vector.comment, ["state"]);
+    let second = &merged.body.segments[1].data;
+    assert_eq!(second.comment, ["outer", "od2"]);
+    assert!(second.od_parameters.as_ref().unwrap().comment.is_empty());
+    assert_eq!(second.state_vector.comment, ["state2"]);
+    assert_eq!(merged.to_kvn().unwrap(), kvn, "the merge is idempotent");
+}
+
+#[test]
+fn kvn_comment_lines_are_written_without_trailing_blanks() {
+    let mut message = Cdm::from_kvn(KVN).unwrap();
+    message.header.comment = vec!["padded   ".into()];
+    message.body.relative_metadata_data.miss_distance.value = 0.300_000_000_000_000_04;
+    let kvn = message.to_kvn().unwrap();
+    assert!(kvn.contains("COMMENT padded\n"), "{kvn}");
+    let parsed = Cdm::from_kvn(&kvn).unwrap();
+    assert_eq!(parsed.body.relative_metadata_data.miss_distance.value, 0.3);
+    assert_eq!(parsed.to_kvn().unwrap(), kvn);
+    let mut streamed = Vec::new();
+    message.write_kvn_to(&mut streamed).unwrap();
+    assert_eq!(streamed, kvn.as_bytes());
 }
 
 #[test]

@@ -5,7 +5,34 @@
 use crate::common::AdmHeader;
 use crate::types::{parse_calendar_epoch, parse_epoch, parse_relative_time};
 use ccsds_ndm::messages::acm as core_acm;
-use ccsds_ndm::types::{AcmAttitudeType, AcmCovarianceLineType, AttBasisType, AttRateType, RotSeq};
+use ccsds_ndm::types::{AcmAttitudeType, AcmCovarianceLineType, AttRateType, RotSeq};
+
+/// A history line as exposed to Python: `(time_tag, values)`.
+type HistoryLine = (String, Vec<f64>);
+
+fn att_lines_from_py(lines: Vec<HistoryLine>) -> PyResult<Vec<core_acm::AttLine>> {
+    lines
+        .into_iter()
+        .map(|(epoch, values)| {
+            Ok(core_acm::AttLine {
+                epoch: parse_epoch(&epoch)?,
+                values,
+            })
+        })
+        .collect()
+}
+
+fn cov_lines_from_py(lines: Vec<HistoryLine>) -> PyResult<Vec<core_acm::CovLine>> {
+    lines
+        .into_iter()
+        .map(|(epoch, values)| {
+            Ok(core_acm::CovLine {
+                epoch: parse_epoch(&epoch)?,
+                values,
+            })
+        })
+        .collect()
+}
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -24,16 +51,23 @@ use std::str::FromStr;
 /// - Optional covariance elements
 /// - Optional maneuver parameters
 /// - Optional estimator information
+///
+/// Parameters
+/// ----------
+/// header : AdmHeader
+///     Creation epoch and message provenance.
+/// segment : AcmSegment
+///     Comprehensive attitude segment.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct Acm {
-    /// The message identifier.
+    /// Constant XML root identifier, `CCSDS_ACM_VERS`.
     ///
     /// :type: Optional[str]
     #[pyo3(get)]
     id: Option<String>,
 
-    /// The message version.
+    /// Message edition, `2.0`.
     ///
     /// :type: str
     #[pyo3(get)]
@@ -116,7 +150,32 @@ impl Acm {
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
         crate::api::validate_message(py, &self.to_core(py)?)
     }
-
+    /// Parse an ACM document and validate its contents.
+    ///
+    /// Parameters
+    /// ----------
+    /// data : str
+    ///     KVN or XML content.
+    /// format : str, optional
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// Acm
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmEpochError
+    ///     Invalid CCSDS epoch.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// ValueError
+    ///     Unsupported format argument.
     #[staticmethod]
     #[pyo3(signature = (data, format=None))]
     fn from_str(
@@ -128,8 +187,34 @@ impl Acm {
         let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Parse an ACM from a KVN or XML file.
+    /// Read a UTF-8 ACM document from a file and validate it.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Input file.
+    /// format : str, optional
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// Acm
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmEpochError
+    ///     Invalid CCSDS epoch.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Input file could not be read.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
@@ -142,8 +227,27 @@ impl Acm {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Atomically write this ACM as KVN or XML.
+    /// Validate this ACM message and atomically replace the destination.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Destination file; existing content is replaced only after successful generation.
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"``.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Temporary-file writing or atomic replacement failed.
     fn to_file(
         &self,
         py: Python<'_>,
@@ -159,8 +263,28 @@ impl Acm {
             format,
         )
     }
-
-    /// Serialize to validated KVN or XML.
+    /// Validate and serialize this ACM message, preserving its edition.
+    ///
+    /// Parameters
+    /// ----------
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"``.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     Generated document, subject to the documented notation normalizations.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
     fn to_str(
         &self,
         py: Python<'_>,
@@ -171,8 +295,16 @@ impl Acm {
     }
 }
 
+/// ACM metadata and comprehensive attitude data.
+///
+/// Parameters
+/// ----------
+/// metadata : AcmMetadata
+///     Object identification, reference epoch and time system.
+/// data : AcmData
+///     Attitude histories and optional comprehensive data blocks.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct AcmSegment {
     /// ACM Metadata Section.
     ///
@@ -217,16 +349,33 @@ impl AcmSegment {
     }
 
     /// Validate the segment against CCSDS rules.
-    fn validate(&self, py: Python<'_>, header: AdmHeader) -> PyResult<()> {
-        self.to_core(py)?
-            .validate(&header.inner)
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
+        ccsds_ndm::Validate::validate(&self.to_core(py)?)
             .map_err(crate::errors::ccsds_error_to_pyerr)
     }
 }
 
 /// ACM Metadata Section.
+///
+/// Parameters
+/// ----------
+/// object_name : str
+///     Space-object name (ADM table 5-3).
+/// epoch_tzero : str
+///     CCSDS calendar reference epoch for relative history tags, in TIME_SYSTEM.
+/// time_system : str
+///     Time system used by the reference epoch and data time tags.
+/// international_designator : str, optional
+///     International designator of the space object.
+/// comment : list[str], optional
+///     Metadata comment lines in source order.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If epoch_tzero is not a CCSDS calendar epoch.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct AcmMetadata {
     pub inner: core_acm::AcmMetadata,
@@ -634,8 +783,23 @@ impl AcmMetadata {
 }
 
 /// ACM Data Section.
+///
+/// Parameters
+/// ----------
+/// att : list[AcmAttitudeState], optional
+///     Attitude history blocks in source order.
+/// phys : AcmPhysicalDescription, optional
+///     Spacecraft physical characteristics.
+/// cov : list[AcmCovarianceMatrix], optional
+///     Covariance histories in source order.
+/// man : list[AcmManeuverParameters], optional
+///     Maneuver blocks in source order.
+/// ad : AcmAttitudeDetermination, optional
+///     Attitude determination information and sensor descriptions.
+/// user : UserDefined, optional
+///     Ordered user-defined comments and named values.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct AcmData {
     att: Py<PyList>,
     phys: Option<Py<AcmPhysicalDescription>>,
@@ -841,8 +1005,28 @@ impl AcmData {
 }
 
 /// ACM Data: Attitude State Time History Section.
+///
+/// Parameters
+/// ----------
+/// ref_frame_a : str
+///     Reference frame at the start of the attitude transformation.
+/// ref_frame_b : str
+///     Reference frame at the end of the attitude transformation.
+/// att_type : str
+///     Attitude representation (ADM table 5-4), for example QUATERNION.
+/// att_lines : list[tuple[str, list[float]]]
+///     Time tags and state components in ATT_TYPE order. Tags may be relative offsets or CCSDS
+///     calendar epochs; each block uses one form. Every row must have the same nonzero number of
+///     components.
+/// comment : list[str], optional
+///     Comments immediately after ATT_START.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If att_type or a time tag is invalid, the history is empty, or row widths differ.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct AcmAttitudeState {
     pub inner: core_acm::AcmAttitudeState,
@@ -857,20 +1041,21 @@ impl AcmAttitudeState {
         ref_frame_a: String,
         ref_frame_b: String,
         att_type: String,
-        att_lines: Vec<Vec<f64>>,
+        att_lines: Vec<HistoryLine>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         let att_type = AcmAttitudeType::from_str(&att_type)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         let number_states = att_lines
             .first()
-            .and_then(|line| line.len().checked_sub(1))
+            .map(|line| line.1.len())
+            .filter(|count| *count > 0)
             .ok_or_else(|| {
                 PyValueError::new_err(
-                    "att_lines must contain relative time followed by at least one state",
+                    "att_lines must contain a time tag followed by at least one state",
                 )
             })?;
-        if att_lines.iter().any(|line| line.len() != number_states + 1) {
+        if att_lines.iter().any(|line| line.1.len() != number_states) {
             return Err(PyValueError::new_err(
                 "all att_lines must contain the same number of states",
             ));
@@ -884,10 +1069,7 @@ impl AcmAttitudeState {
                 ref_frame_b,
                 number_states,
                 att_type,
-                att_lines: att_lines
-                    .into_iter()
-                    .map(|values| core_acm::AttLine { values })
-                    .collect(),
+                att_lines: att_lines_from_py(att_lines)?,
                 att_id: None,
                 att_prev_id: None,
                 att_basis: None,
@@ -945,23 +1127,21 @@ impl AcmAttitudeState {
         self.inner.att_prev_id = value;
     }
 
-    /// Basis of this attitude state data.
+    /// Basis of this attitude state time history data. Suggested values: PREDICTED,
+    /// DETERMINED_GND, DETERMINED_OBC, SIMULATED. Any text is kept for KVN; XML input and output
+    /// require one of the suggested values (XSD ``attBasisType``).
     ///
     /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
     ///
     /// :type: str | None
     #[getter]
     fn get_att_basis(&self) -> Option<String> {
-        self.inner.att_basis.as_ref().map(|v| v.to_string())
+        self.inner.att_basis.clone()
     }
 
     #[setter]
-    fn set_att_basis(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.att_basis = value
-            .map(|s| AttBasisType::from_str(&s))
-            .transpose()
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(())
+    fn set_att_basis(&mut self, value: Option<String>) {
+        self.inner.att_basis = value;
     }
 
     /// Basis dataset identifier.
@@ -1096,28 +1276,36 @@ impl AcmAttitudeState {
     ///
     /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
     ///
-    /// :type: list[list[float]]
+    /// Each line is ``(time_tag, values)``. The time tag is a relative time in seconds from
+    /// EPOCH_TZERO (e.g. ``"20157.26"``) or an absolute CCSDS epoch, one form per block
+    /// (ADM 5.3.4.3 and 5.3.4.5); its spelling is preserved.
+    ///
+    /// :type: list[tuple[str, list[float]]]
     #[getter]
-    fn get_att_lines(&self) -> Vec<Vec<f64>> {
+    fn get_att_lines(&self) -> Vec<HistoryLine> {
         self.inner
             .att_lines
             .iter()
-            .map(|l| l.values.clone())
+            .map(|l| (l.epoch.to_string(), l.values.clone()))
             .collect()
     }
 
     #[setter]
-    fn set_att_lines(&mut self, value: Vec<Vec<f64>>) {
-        self.inner.att_lines = value
-            .into_iter()
-            .map(|values| core_acm::AttLine { values })
-            .collect();
+    fn set_att_lines(&mut self, value: Vec<HistoryLine>) -> PyResult<()> {
+        self.inner.att_lines = att_lines_from_py(value)?;
+        Ok(())
     }
 }
 
 /// ACM Data: Space Object Physical Characteristics Section.
+///
+/// Parameters
+/// ----------
+/// comment : list[str], optional
+///     Comments immediately after PHYS_START. Set the physical properties before validating or
+///     generating the message.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct AcmPhysicalDescription {
     pub inner: core_acm::AcmPhysicalDescription,
@@ -1387,8 +1575,27 @@ impl AcmPhysicalDescription {
 }
 
 /// ACM Data: Covariance Time History Section.
+///
+/// Parameters
+/// ----------
+/// cov_basis : str
+///     Covariance provenance, for example PREDICTED or DETERMINED.
+/// cov_ref_frame : str
+///     Reference frame for the covariance components.
+/// cov_type : str
+///     Covariance representation (ADM table 5-6), for example ANGLE.
+/// cov_lines : list[tuple[str, list[float]]]
+///     Time tags and covariance components in COV_TYPE order. Tags may be relative offsets or CCSDS
+///     calendar epochs; each block uses one form.
+/// comment : list[str], optional
+///     Comments immediately after COV_START.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If cov_type or a time tag is invalid.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct AcmCovarianceMatrix {
     pub inner: core_acm::AcmCovarianceMatrix,
@@ -1403,7 +1610,7 @@ impl AcmCovarianceMatrix {
         cov_basis: String,
         cov_ref_frame: String,
         cov_type: String,
-        cov_lines: Vec<Vec<f64>>,
+        cov_lines: Vec<HistoryLine>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         let cov_type = AcmCovarianceLineType::from_str(&cov_type)
@@ -1413,18 +1620,11 @@ impl AcmCovarianceMatrix {
                 comment: comment.unwrap_or_default(),
                 cov_id: None,
                 cov_prev_id: None,
-                cov_basis: Some(
-                    AttBasisType::from_str(&cov_basis)
-                        .map_err(|e| PyValueError::new_err(e.to_string()))?,
-                ),
+                cov_basis: Some(cov_basis),
                 cov_basis_id: None,
                 cov_ref_frame: Some(cov_ref_frame),
                 cov_type,
-                cov_lines: cov_lines
-                    .into_iter()
-                    .map(|values| core_acm::CovLine { values })
-                    .collect(),
-                cov_confidence: None,
+                cov_lines: cov_lines_from_py(cov_lines)?,
             },
         })
     }
@@ -1463,6 +1663,8 @@ impl AcmCovarianceMatrix {
 
     /// Previous covariance history identifier.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
+    ///
     /// :type: str | None
     #[getter]
     fn get_cov_prev_id(&self) -> Option<String> {
@@ -1474,26 +1676,28 @@ impl AcmCovarianceMatrix {
         self.inner.cov_prev_id = value;
     }
 
-    /// Basis of this covariance time history data.
+    /// Basis of this covariance time history data. Suggested values: PREDICTED,
+    /// DETERMINED_GND, DETERMINED_OBC, SIMULATED. Any text is kept for KVN; XML input and output
+    /// require one of the suggested values (XSD ``attBasisType``).
     ///
     /// Examples: PREDICTED, DETERMINED_GND, DETERMINED_OBC, SIMULATED
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
     ///
     /// :type: str | None
     #[getter]
     fn get_cov_basis(&self) -> Option<String> {
-        self.inner.cov_basis.as_ref().map(ToString::to_string)
+        self.inner.cov_basis.clone()
     }
 
     #[setter]
-    fn set_cov_basis(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.cov_basis = value
-            .map(|value| AttBasisType::from_str(&value))
-            .transpose()
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(())
+    fn set_cov_basis(&mut self, value: Option<String>) {
+        self.inner.cov_basis = value;
     }
 
     /// Identifier for the covariance basis.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
     ///
     /// :type: str | None
     #[getter]
@@ -1543,48 +1747,43 @@ impl AcmCovarianceMatrix {
         Ok(())
     }
 
-    /// Optional confidence level of the covariance matrix.
-    ///
-    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
-    ///
-    /// :type: float | None
-    #[getter]
-    fn get_cov_confidence(&self) -> Option<f64> {
-        self.inner.cov_confidence
-    }
-
-    #[setter]
-    fn set_cov_confidence(&mut self, value: Option<f64>) {
-        self.inner.cov_confidence = value;
-    }
-
     /// Covariance data lines (diagonal terms only). (For the data units, see annex B, subsection
     /// B6.)
     ///
     /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
     ///
-    /// :type: list[list[float]]
+    /// Each line is ``(time_tag, values)``. The time tag is a relative time in seconds from
+    /// EPOCH_TZERO or an absolute CCSDS epoch, one form per block, strictly increasing
+    /// (ADM 5.3.4.3 to 5.3.4.5 and 5.3.7.5); its spelling is preserved.
+    ///
+    /// :type: list[tuple[str, list[float]]]
     #[getter]
-    fn get_cov_lines(&self) -> Vec<Vec<f64>> {
+    fn get_cov_lines(&self) -> Vec<HistoryLine> {
         self.inner
             .cov_lines
             .iter()
-            .map(|l| l.values.clone())
+            .map(|l| (l.epoch.to_string(), l.values.clone()))
             .collect()
     }
 
     #[setter]
-    fn set_cov_lines(&mut self, value: Vec<Vec<f64>>) {
-        self.inner.cov_lines = value
-            .into_iter()
-            .map(|values| core_acm::CovLine { values })
-            .collect();
+    fn set_cov_lines(&mut self, value: Vec<HistoryLine>) -> PyResult<()> {
+        self.inner.cov_lines = cov_lines_from_py(value)?;
+        Ok(())
     }
 }
 
 /// ACM Data: Maneuver Specification Section.
+///
+/// Parameters
+/// ----------
+/// man_id : str, optional
+///     Identifier for the maneuver.
+/// comment : list[str], optional
+///     Comments immediately after MAN_START. Set required maneuver properties before validating or
+///     generating the message.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct AcmManeuverParameters {
     pub inner: core_acm::AcmManeuverParameters,
@@ -1843,8 +2042,21 @@ impl AcmManeuverParameters {
 }
 
 /// ACM Data: Sensor Data Section.
+///
+/// Parameters
+/// ----------
+/// sensor_number : int, optional
+///     Sensor index, unique and ascending within the attitude determination block.
+/// sensor_used : str, optional
+///     Sensor name or type.
+/// sensor_noise_stddev : list[float], optional
+///     Sensor noise standard deviations in degrees.
+/// sensor_frequency : float, optional
+///     Sensor sampling frequency in hertz.
+/// comment : list[str], optional
+///     Producer-extension comments after SENSOR_START; XML generation refuses them.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct AcmSensor {
     pub inner: core_acm::AcmSensor,
@@ -1880,7 +2092,7 @@ impl AcmSensor {
         }
     }
 
-    /// Comments allowed only immediately after the SENSOR_START keyword.
+    /// Producer-extension comments immediately after SENSOR_START; XML generation refuses them.
     ///
     /// Examples: This is a comment.
     ///
@@ -1931,6 +2143,8 @@ impl AcmSensor {
     }
 
     /// Number of sensor-noise covariance elements.
+    ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: int | None
     #[getter]
@@ -1985,8 +2199,16 @@ impl AcmSensor {
 }
 
 /// ACM Data: Attitude Determination Data Section.
+///
+/// Parameters
+/// ----------
+/// ad_id : str, optional
+///     Identifier for the attitude determination data.
+/// comment : list[str], optional
+///     Comments immediately after AD_START. Set determination fields and sensors before validation or
+///     generation.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct AcmAttitudeDetermination {
     inner: core_acm::AcmAttitudeDetermination,
     sensors: Py<PyList>,
@@ -2033,10 +2255,8 @@ impl AcmAttitudeDetermination {
                 attitude_states: None,
                 euler_rot_seq: None,
                 cov_type: None,
-                ad_epoch: None,
                 ref_frame_a: None,
                 ref_frame_b: None,
-                attitude_type: None,
                 rate_states: None,
                 sigma_u: None,
                 sigma_v: None,
@@ -2124,7 +2344,8 @@ impl AcmAttitudeDetermination {
         self.inner.attitude_source = value;
     }
 
-    /// Number of estimator states.
+    /// Number of states if EKF, BATCH, or FILTER SMOOTHER is specified; at least 6 when
+    /// RATE_STATES is present.
     ///
     /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
@@ -2139,7 +2360,8 @@ impl AcmAttitudeDetermination {
         self.inner.number_states = value;
     }
 
-    /// Attitude state type for estimator.
+    /// Type of attitude data in the estimator, selected per annex B, subsection B4 (mandatory in
+    /// the AD block). Attitude states are listed before rate states.
     ///
     /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
@@ -2160,6 +2382,8 @@ impl AcmAttitudeDetermination {
 
     /// Euler rotation sequence used by Euler-angle attitude states.
     ///
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
+    ///
     /// :type: str | None
     #[getter]
     fn get_euler_rot_seq(&self) -> Option<String> {
@@ -2175,9 +2399,10 @@ impl AcmAttitudeDetermination {
         Ok(())
     }
 
-    /// Covariance type for estimator.
+    /// Type of attitude error state included in the estimator (annex B, subsection B6). KVN
+    /// ``COV_TYPE = NONE`` is read as omission.
     ///
-    /// CCSDS Reference: 504.0-B-2, Section 5.3.7.
+    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///
     /// :type: str | None
     #[getter]
@@ -2191,22 +2416,6 @@ impl AcmAttitudeDetermination {
             .map(|s| AcmCovarianceLineType::from_str(&s))
             .transpose()
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(())
-    }
-
-    /// Epoch of the attitude determination.
-    ///
-    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
-    ///
-    /// :type: str | None
-    #[getter]
-    fn get_ad_epoch(&self) -> Option<String> {
-        self.inner.ad_epoch.as_ref().map(|e| e.as_str().to_string())
-    }
-
-    #[setter]
-    fn set_ad_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.ad_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -2240,25 +2449,8 @@ impl AcmAttitudeDetermination {
         self.inner.ref_frame_b = value;
     }
 
-    /// Type of attitude data, selected per annex B, subsection B4. Attitude states must always be
-    /// listed before rate states.
-    ///
-    /// Examples: QUATERNION
-    ///
-    /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
-    ///
-    /// :type: str | None
-    #[getter]
-    fn get_attitude_type(&self) -> Option<String> {
-        self.inner.attitude_type.clone()
-    }
-
-    #[setter]
-    fn set_attitude_type(&mut self, value: Option<String>) {
-        self.inner.attitude_type = value;
-    }
-
-    /// Rate states type.
+    /// Type of rate state included in the estimator (e.g. ANGVEL, GYRO_BIAS). If rate states are
+    /// included, NUMBER_STATES must be at least 6.
     ///
     /// CCSDS Reference: 504.0-B-2, Section 5.3.9.
     ///

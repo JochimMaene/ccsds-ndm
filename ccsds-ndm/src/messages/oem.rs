@@ -14,9 +14,9 @@ use serde::{Deserialize, Serialize};
 mod kvn;
 mod xml;
 
-// ODM 7.5.9: underscores and runs of blanks denote the same text value; 7.5.3 admits the
-// all-uppercase and all-lowercase spellings of one value. XML whitespace around the value is
-// padding (see `xml_trimmed`).
+// ODM 7.5.9: underscores and runs of blanks denote the same text value. Case is ignored, since
+// mixed case is accepted and kept as written (shared lexical decisions in the validation
+// contract). XML whitespace around the value is padding (see `xml_trimmed`).
 fn text_value_eq(left: &str, right: &str) -> bool {
     let words =
         |value| str::split(xml_trimmed(value), [' ', '_']).filter(|word: &&str| !word.is_empty());
@@ -45,6 +45,9 @@ fn is_elapsed_time_system(time_system: &str) -> bool {
 /// ODM 7.5.10 time tags: calendar or ordinal layout with at most 16 fractional digits, the
 /// fixed-point maximum. MET and MRT durations use three-digit days (3.2.3.2).
 fn epoch_error(epoch: &Epoch, field: &'static str, time_system: &str) -> Option<ValidationError> {
+    if epoch.is_empty() {
+        return Some(ValidationError::empty_value(field));
+    }
     let valid_layout = epoch.kind() == EpochKind::Calendar
         && (epoch.calendar_fields_are_valid() == Some(true)
             || is_elapsed_time_system(time_system) && epoch.is_elapsed_time());
@@ -81,13 +84,17 @@ fn validate_within_path(
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "oem")]
 pub struct Oem {
+    /// XML root identifier; when present it must match this message family.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_OEM_VERS".to_string()))]
     pub id: Option<String>,
+    /// Input edition (1.0, 2.0 or 3.0); generation supports 2.0 and 3.0.
     #[serde(rename = "@version")]
     #[builder(default = "3.0".to_string(), into)]
     pub version: String,
+    /// Message provenance and creation epoch.
     pub header: OdmHeader,
+    /// Message segments and their data.
     pub body: OemBody,
 }
 
@@ -98,9 +105,10 @@ impl crate::traits::Validate for Oem {
             &self.id,
             &self.version,
         )?;
-        crate::versioning::validate_oem_edition(self)?;
         self.header.validate()?;
-        validate_within_path(self.body.validate(), || "body".into())
+        validate_within_path(self.body.validate(), || "body".into())?;
+        // Edition rules compare epochs, so they run after the epoch format checks.
+        crate::versioning::validate_oem_edition(self)
     }
 }
 
@@ -127,8 +135,7 @@ impl OemBody {
         };
         let metadata = &first.metadata;
         for (index, segment) in self.segment.iter().enumerate().skip(1) {
-            // ODM 5.2.4.5: one time system throughout, in either permitted case (7.5.3) and
-            // regardless of XML padding.
+            // ODM 5.2.4.5: one time system throughout, ignoring case and XML padding.
             if !xml_trimmed(&segment.metadata.time_system)
                 .eq_ignore_ascii_case(xml_trimmed(&metadata.time_system))
             {
@@ -373,9 +380,7 @@ impl crate::traits::Validate for OemMetadata {
             ("TIME_SYSTEM", "time_system", &self.time_system),
         ] {
             if value.trim().is_empty() {
-                return Err(ValidationError::missing_required("OEM Metadata", field)
-                    .at_path(member)
-                    .into());
+                return Err(ValidationError::empty_value(field).at_path(member).into());
             }
         }
         for (field, member, epoch) in [
@@ -512,8 +517,7 @@ impl Ndm for Oem {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::detect::without_utf8_bom(kvn);
-        Self::from_kvn_strict(kvn)
+        Self::from_kvn_strict(crate::detect::without_utf8_bom(kvn))
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -541,6 +545,7 @@ impl Ndm for Oem {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct OemBody {
+    /// Segments in source order.
     #[serde(rename = "segment")]
     #[builder(default)]
     pub segment: Vec<OemSegment>,
@@ -552,7 +557,9 @@ pub struct OemBody {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct OemSegment {
+    /// Object, reference-frame and time-system interpretation for this segment.
     pub metadata: OemMetadata,
+    /// Records interpreted using this segment metadata.
     pub data: OemData,
 }
 
@@ -651,6 +658,10 @@ pub struct OemMetadata {
     /// (e.g., pure higher-order Lagrange interpolation methods). The use of this keyword and
     /// introduction of fictitious node points are optional and may not be necessary.
     ///
+    /// Enforced: within `start_time`..=`stop_time` and no later than `useable_stop_time`.
+    /// Complete useable spans of consecutive segments may touch but not overlap (5.2.4.4); in
+    /// OEM 2.0 a useable start may not precede the previous segment's useable stop.
+    ///
     /// **Examples**: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 5.2.3.
@@ -662,6 +673,10 @@ pub struct OemMetadata {
     /// the actual data time history to support interpolation methods requiring more than two
     /// nodes (e.g., pure higher-order Lagrange interpolation methods). The use of this keyword
     /// and introduction of fictitious node points are optional and may not be necessary.
+    ///
+    /// Enforced: within `start_time`..=`stop_time` and no earlier than `useable_start_time`.
+    /// Complete useable spans of consecutive segments may touch but not overlap (5.2.4.4); in
+    /// OEM 2.0 a useable start may not precede the previous segment's useable stop.
     ///
     /// **Examples**: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
@@ -687,6 +702,10 @@ pub struct OemMetadata {
     /// Recommended interpolation degree for ephemeris data in the immediately following set of
     /// ephemeris lines. Must be an integer value. This keyword must be used if the
     /// ‘INTERPOLATION’ keyword is used.
+    ///
+    /// Enforced: required when `interpolation` is present, and positive (the XSD's
+    /// `positiveInteger`; table 5-3 only says "integer"). KVN reads and writes 1 to `i32::MAX`
+    /// (7.5.4); XML reads up to `u32::MAX`.
     ///
     /// **Examples**: 5, 8
     ///

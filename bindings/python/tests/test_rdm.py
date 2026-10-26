@@ -32,6 +32,7 @@ class TestRdm:
             object_name="SAT1",
             international_designator="2023-001A",
             epoch_tzero="2023-01-01T00:00:00",
+            controlled_reentry="NO",
             center_name="EARTH",
             time_system="UTC",
         )
@@ -89,6 +90,17 @@ class TestRdm:
         rdm2 = ccsds_ndm.from_file(str(path), format="kvn")
         assert rdm2.header.originator == "TEST"
 
+    def test_metadata_requires_controlled_reentry(self):
+        # CONTROLLED_REENTRY is mandatory (RDM 3.4); it must not default to UNKNOWN.
+        with pytest.raises(TypeError, match="controlled_reentry"):
+            RdmMetadata(
+                object_name="SAT1",
+                international_designator="2023-001A",
+                epoch_tzero="2023-01-01T00:00:00",
+                center_name="EARTH",
+                time_system="UTC",
+            )
+
     def test_epoch_fields_reject_numeric_xsd_branch(self):
         with pytest.raises(ValueError):
             RdmHeader(originator="TEST", creation_date="123.5", message_id="ID")
@@ -98,6 +110,7 @@ class TestRdm:
                 object_name="SAT1",
                 international_designator="2023-001A",
                 epoch_tzero="123.5",
+                controlled_reentry="NO",
                 center_name="EARTH",
                 time_system="UTC",
             )

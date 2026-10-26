@@ -11,6 +11,59 @@
 use ccsds_ndm::error::{CcsdsNdmError, DiagnosticNotation, FormatError};
 use ccsds_ndm::validation::MessageKind;
 use ccsds_ndm::Notation;
+use pyo3_stub_gen::{type_info::MemberInfo, PyStubType};
+
+const fn diagnostic_field<T: PyStubType>(name: &'static str, doc: &'static str) -> MemberInfo {
+    MemberInfo {
+        name,
+        r#type: T::type_output,
+        doc,
+        default: None,
+        deprecated: None,
+    }
+}
+
+const DIAGNOSTIC_FIELDS: &[MemberInfo] = &[
+    diagnostic_field::<Option<String>>(
+        "operation",
+        "Operation: parse, validate, or generate; None when unavailable.",
+    ),
+    diagnostic_field::<Option<String>>(
+        "notation",
+        "Lowercase wire notation: kvn or xml; None when unavailable.",
+    ),
+    diagnostic_field::<Option<String>>(
+        "message_kind",
+        "Lowercase message family, such as opm; None when unavailable.",
+    ),
+    diagnostic_field::<Option<String>>(
+        "source_edition",
+        "Source edition, or the requested model edition on output failure.",
+    ),
+    diagnostic_field::<Option<String>>(
+        "code",
+        "Stable machine-readable error category; None for manually created exceptions.",
+    ),
+    diagnostic_field::<Option<String>>(
+        "field_path",
+        "Canonical model path, when the containing validator provides one.",
+    ),
+    diagnostic_field::<Option<usize>>("line", "One-based source line, when available."),
+    diagnostic_field::<Option<usize>>("column", "One-based source column, when available."),
+    diagnostic_field::<Option<usize>>(
+        "byte_offset",
+        "Zero-based input byte position, when available.",
+    ),
+    diagnostic_field::<Option<String>>(
+        "original_token",
+        "Source excerpt limited to 128 characters, when available.",
+    ),
+    diagnostic_field::<Option<String>>(
+        "expected",
+        "Expected parser token, when available; excludes internal labels.",
+    ),
+];
+
 /// Declares a custom exception with stub metadata.
 ///
 /// `pyo3_stub_gen::create_exception!` renders a custom exception's `PyStubType` as
@@ -18,10 +71,13 @@ use ccsds_ndm::Notation;
 /// and fails type checking. Same expansion, but the name is unqualified.
 ///
 /// Tracked upstream as Jij-Inc/pyo3-stub-gen#384, "create_exception! treats non-builtin
-/// base exceptions as builtins in stubs" (open against 0.23.0). Drop this macro and go
-/// back to `pyo3_stub_gen::create_exception!` once that is released.
+/// base exceptions as builtins in stubs" (open against 0.23.0). Replace the naming workaround
+/// with the upstream macro once fixed, retaining the diagnostic member metadata.
 macro_rules! create_exception {
     ($module:expr, $name:ident, $base:ty, $doc:expr) => {
+        create_exception!($module, $name, $base, $doc, &[]);
+    };
+    ($module:expr, $name:ident, $base:ty, $doc:expr, $fields:expr) => {
         ::pyo3::create_exception!($module, $name, $base, $doc);
 
         impl ::pyo3_stub_gen::PyStubType for $name {
@@ -48,20 +104,40 @@ macro_rules! create_exception {
                 subclass: true,
             }
         }
+
+        ::pyo3_stub_gen::inventory::submit! {
+            ::pyo3_stub_gen::type_info::PyMethodsInfo {
+                struct_id: std::any::TypeId::of::<$name>,
+                attrs: $fields,
+                getters: &[],
+                setters: &[],
+                methods: &[],
+                file: file!(),
+                line: line!(),
+                column: column!(),
+            }
+        }
     };
 }
 use pyo3::exceptions::{PyException, PyOSError, PyValueError};
 use pyo3::prelude::*;
 
 // Generic library error for failures without a more useful built-in category.
-create_exception!(ccsds_ndm, NdmError, PyException, "Generic CCSDS NDM error.");
+create_exception!(
+    ccsds_ndm,
+    NdmError,
+    PyException,
+    "Generic CCSDS NDM error.",
+    DIAGNOSTIC_FIELDS
+);
 
 // Format/parsing errors.
 create_exception!(
     ccsds_ndm,
     NdmFormatError,
     PyValueError,
-    "Error during parsing of NDM data (KVN or XML)."
+    "Error during parsing of NDM data (KVN or XML).",
+    DIAGNOSTIC_FIELDS
 );
 create_exception!(
     ccsds_ndm,
@@ -89,7 +165,8 @@ create_exception!(
     ccsds_ndm,
     NdmEpochError,
     PyValueError,
-    "Error parsing a CCSDS epoch string."
+    "Error parsing a CCSDS epoch string.",
+    DIAGNOSTIC_FIELDS
 );
 
 // I/O errors.
@@ -97,7 +174,8 @@ create_exception!(
     ccsds_ndm,
     NdmIoError,
     PyOSError,
-    "I/O error during file operations."
+    "I/O error during file operations.",
+    DIAGNOSTIC_FIELDS
 );
 
 // Unsupported message type.
@@ -121,7 +199,8 @@ create_exception!(
 /// This function maps each variant of the Rust error enum to the corresponding
 /// Python exception type.
 pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
-    match e {
+    let code = e.code();
+    let error = match e {
         CcsdsNdmError::Generation { context, source } => {
             let code = source.code();
             let field_path = source.field_path();
@@ -279,13 +358,7 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
         }
         error @ CcsdsNdmError::ResourceLimitExceeded { .. } => {
             let code = error.code();
-            let operation = match &error {
-                CcsdsNdmError::ResourceLimitExceeded {
-                    resource: "generated_document",
-                    ..
-                } => "generate",
-                _ => "parse",
-            };
+            let operation = "parse";
             enrich_exception(
                 NdmError::new_err(error.to_string()),
                 operation,
@@ -302,18 +375,30 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
             )
         }
         _ => NdmError::new_err(e.to_string()),
-    }
+    };
+    Python::attach(|py| {
+        if let Some(code) = code {
+            let _ = error.value(py).setattr("code", code);
+        }
+    });
+    error
 }
 
 /// Map a file operation's error, giving I/O failures the `errno` and `filename` of an
 /// `OSError` so callers can tell which file failed and why.
 pub fn file_error_to_pyerr(error: CcsdsNdmError, path: &std::path::Path) -> PyErr {
     match error.as_io_error() {
-        Some(io) => NdmIoError::new_err((
-            io.raw_os_error().unwrap_or(0),
-            io.to_string(),
-            path.display().to_string(),
-        )),
+        Some(io) => {
+            let exception = NdmIoError::new_err((
+                io.raw_os_error().unwrap_or(0),
+                io.to_string(),
+                path.display().to_string(),
+            ));
+            Python::attach(|py| {
+                let _ = exception.value(py).setattr("code", "io.error");
+            });
+            exception
+        }
         None => ccsds_error_to_pyerr(error),
     }
 }
@@ -353,7 +438,7 @@ pub fn file_parse_error_to_pyerr(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn enrich_exception(
+pub(crate) fn enrich_exception(
     error: PyErr,
     operation: &'static str,
     notation: Option<DiagnosticNotation>,
@@ -387,13 +472,23 @@ fn enrich_exception(
         let _ = value.setattr("byte_offset", byte_offset);
         let _ = value.setattr("original_token", original_token);
         let _ = value.setattr("expected", expected);
-        let _ = value.setattr("requirement", Option::<&str>::None);
     });
     error
 }
 
 /// Registers the exception classes with the Python module.
 pub fn register_exceptions(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    // Defaults also cover failures raised before parsing or field validation can add context.
+    for exception in [
+        m.py().get_type::<NdmError>(),
+        m.py().get_type::<NdmFormatError>(),
+        m.py().get_type::<NdmEpochError>(),
+        m.py().get_type::<NdmIoError>(),
+    ] {
+        for field in DIAGNOSTIC_FIELDS {
+            exception.setattr(field.name, m.py().None())?;
+        }
+    }
     m.add("NdmError", m.py().get_type::<NdmError>())?;
     m.add("NdmFormatError", m.py().get_type::<NdmFormatError>())?;
     m.add("NdmKvnParseError", m.py().get_type::<NdmKvnParseError>())?;

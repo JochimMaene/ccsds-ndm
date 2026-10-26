@@ -9,7 +9,7 @@
 use super::{
     CovLine, ManLine, Ocm, OcmBody, OcmCovarianceMatrix, OcmData, OcmManeuverParameters,
     OcmMetadata, OcmOdParameters, OcmPerturbations, OcmPhysicalDescription, OcmSegment,
-    OcmTrajState, TrajLine,
+    OcmTrajState, OcmUserDefined, OcmUserDefinedEntry, OcmUserDefinedParameter, TrajLine,
 };
 use crate::common::OdmHeader;
 use crate::error::{CcsdsNdmError, FormatError, InternalParserError, KvnParseError, Result};
@@ -18,11 +18,98 @@ use crate::kvn::ser::KvnWriter;
 use crate::parse_block;
 use crate::traits::ToKvn;
 use crate::types::*;
+use std::str::FromStr;
 use winnow::ascii::{space1, till_line_ending};
-use winnow::combinator::{peek, repeat};
-use winnow::error::{AddContext, ErrMode};
+use winnow::combinator::{peek, repeat, terminated};
+use winnow::error::{AddContext, ErrMode, FromExternalError};
 use winnow::prelude::*;
 use winnow::stream::Offset;
+
+// These two ODM fields have wider KVN domains than their XML measure types.
+fn kv_phase_angle(input: &mut &str) -> KvnResult<Angle> {
+    let value: UnitValue<f64, AngleUnits> = kv_from_kvn.parse_next(input)?;
+    Ok(Angle {
+        value: value.value,
+        units: value.units,
+    })
+}
+
+fn kv_days_since_obs(input: &mut &str) -> KvnResult<DayInterval> {
+    let value: UnitValue<f64, DayIntervalUnits> = kv_from_kvn.parse_next(input)?;
+    Ok(DayInterval {
+        value: value.value,
+        units: value.units,
+    })
+}
+
+/// Rewrites an exponent relative time tag (`1.5e3`) as the plain decimal (`1500`) that the XSD
+/// `epochType` can represent. ODM 6.2.2.3 defines relative tags as doubles and 7.5.6 allows
+/// exponents; shifting the decimal point is exact, so no value changes.
+fn expand_exponent(token: &str) -> Option<String> {
+    let (mantissa, exponent) = token.split_once(['e', 'E'])?;
+    let exponent: i32 = exponent
+        .parse()
+        .ok()
+        .filter(|e: &i32| e.unsigned_abs() <= 64)?;
+    let (sign, unsigned) = match mantissa.as_bytes().first()? {
+        b'+' | b'-' => mantissa.split_at(1),
+        _ => ("", mantissa),
+    };
+    let (integer, fraction) = unsigned.split_once('.').unwrap_or((unsigned, ""));
+    let digits = format!("{integer}{fraction}");
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    let point = integer.len() as i32 + exponent;
+    let plain = if point <= 0 {
+        format!("0.{}{digits}", "0".repeat(point.unsigned_abs() as usize))
+    } else if point as usize >= digits.len() {
+        format!("{digits}{}", "0".repeat(point as usize - digits.len()))
+    } else {
+        let (whole, part) = digits.split_at(point as usize);
+        format!("{whole}.{part}")
+    };
+    Some(format!("{sign}{plain}"))
+}
+
+fn ocm_epoch(value: &str) -> std::result::Result<Epoch, EpochError> {
+    Epoch::from_str(value).or_else(|error| {
+        expand_exponent(value)
+            .ok_or(error)
+            .and_then(|plain| Epoch::from_str(&plain))
+    })
+}
+
+fn epoch_error<'a>(
+    input: &mut &'a str,
+    start: &'a str,
+    error: EpochError,
+) -> ErrMode<InternalParserError> {
+    *input = start.trim_start_matches([' ', '\t']);
+    ErrMode::Cut(InternalParserError::from_external_error(input, error))
+}
+
+/// OCM epoch value: either `epochType` branch, plus exponent relative tags.
+fn kv_ocm_epoch(input: &mut &str) -> KvnResult<Epoch> {
+    let start = *input;
+    let value = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
+    ocm_epoch(value.trim()).map_err(|error| epoch_error(input, start, error))
+}
+
+fn kv_ocm_epoch_token(input: &mut &str) -> KvnResult<Epoch> {
+    let start = *input;
+    let value = till_space.parse_next(input)?;
+    ocm_epoch(value).map_err(|error| epoch_error(input, start, error))
+}
+
+/// OBJECT_TYPE is an open SANA token; the five XSD values are normalized case-insensitively with
+/// `_` equal to a blank (ODM 7.5.9), everything else is kept as supplied.
+fn kv_object_type(input: &mut &str) -> KvnResult<String> {
+    let value = kv_string.parse_next(input)?;
+    Ok(value
+        .parse::<ObjectDescription>()
+        .map_or(value, |known| known.to_string()))
+}
 
 //----------------------------------------------------------------------
 // OCM Version Parser
@@ -74,6 +161,17 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
     let mut rdm_msg_link = None;
     let mut tdm_msg_link = None;
     let mut operator = None;
+    let mut operator_url = None;
+    let mut operator_email = None;
+    let mut operator_phone = None;
+    let mut operator_automated_url = None;
+    let mut emergency_email = None;
+    let mut emergency_phone = None;
+    let mut emergency_availability = None;
+    let mut ssa_email = None;
+    let mut ssa_phone = None;
+    let mut owner_url = None;
+
     let mut owner = None;
     let mut country = None;
     let mut constellation = None;
@@ -123,10 +221,21 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
         "RDM_MSG_LINK" => rdm_msg_link: kv_string,
         "TDM_MSG_LINK" => tdm_msg_link: kv_string,
         "OPERATOR" => operator: kv_string,
+        "OPERATOR_URL" => operator_url: kv_string,
+        "OPERATOR_EMAIL" => operator_email: kv_string,
+        "OPERATOR_PHONE" => operator_phone: kv_string,
+        "OPERATOR_AUTOMATED_URL" => operator_automated_url: kv_string,
+        "EMERGENCY_EMAIL" => emergency_email: kv_string,
+        "EMERGENCY_PHONE" => emergency_phone: kv_string,
+        "EMERGENCY_AVAILABILITY" => emergency_availability: kv_string,
+        "SSA_EMAIL" => ssa_email: kv_string,
+        "SSA_PHONE" => ssa_phone: kv_string,
+        "OWNER_URL" => owner_url: kv_string,
+
         "OWNER" => owner: kv_string,
         "COUNTRY" => country: kv_string,
         "CONSTELLATION" => constellation: kv_string,
-        "OBJECT_TYPE" => object_type: kv_enum,
+        "OBJECT_TYPE" => object_type: kv_object_type,
         "TIME_SYSTEM" => time_system: kv_string,
         "EPOCH_TZERO" => epoch_tzero: kv_calendar_epoch,
         "OPS_STATUS" => ops_status: kv_string,
@@ -136,8 +245,8 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
         "SCLK_SEC_PER_SI_SEC" => sclk_sec_per_si_sec: kv_from_kvn,
         "PREVIOUS_MESSAGE_EPOCH" => previous_message_epoch: kv_calendar_epoch,
         "NEXT_MESSAGE_EPOCH" => next_message_epoch: kv_calendar_epoch,
-        "START_TIME" => start_time: kv_epoch,
-        "STOP_TIME" => stop_time: kv_epoch,
+        "START_TIME" => start_time: kv_ocm_epoch,
+        "STOP_TIME" => stop_time: kv_ocm_epoch,
         "TIME_SPAN" => time_span: kv_from_kvn,
         "TAIMUTC_AT_TZERO" => taimutc_at_tzero: kv_from_kvn,
         "NEXT_LEAP_EPOCH" => next_leap_epoch: kv_calendar_epoch,
@@ -178,12 +287,22 @@ pub fn ocm_metadata(input: &mut &str) -> KvnResult<OcmMetadata> {
         rdm_msg_link,
         tdm_msg_link,
         operator,
+        operator_url,
+        operator_email,
+        operator_phone,
+        operator_automated_url,
+        emergency_email,
+        emergency_phone,
+        emergency_availability,
+        ssa_email,
+        ssa_phone,
+        owner_url,
         owner,
         country,
         constellation,
         object_type,
-        time_system: time_system
-            .ok_or_else(|| missing_field_err(input, "Metadata", "TIME_SYSTEM"))?,
+        // ODM 6.2.1.3 / table 6-3 default; the XSD requires the element.
+        time_system: time_system.unwrap_or_else(|| "UTC".to_string()),
         epoch_tzero: epoch_tzero
             .ok_or_else(|| missing_field_err(input, "Metadata", "EPOCH_TZERO"))?,
         ops_status,
@@ -219,15 +338,17 @@ pub fn ocm_traj_line(input: &mut &str) -> KvnResult<TrajLine> {
     {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
-    let epoch = kv_epoch_token.parse_next(input)?;
+    let epoch = kv_ocm_epoch_token.parse_next(input)?;
     space1.parse_next(input)?;
     let raw_values = till_line_ending.parse_next(input)?;
     let mut values = Vec::with_capacity(raw_values.split_whitespace().count());
     for value in raw_values.split_whitespace() {
-        values.push(
-            fast_float::parse(value)
-                .map_err(|_| cut_err(input, "Malformed OCM trajectory numeric value"))?,
-        );
+        values.push(parse_ccsds_number(value).ok_or_else(|| {
+            cut_err(
+                input,
+                "Malformed or unrepresentable OCM trajectory numeric value",
+            )
+        })?);
     }
     if values.is_empty() {
         return Err(cut_err(input, "Missing OCM trajectory values"));
@@ -236,7 +357,7 @@ pub fn ocm_traj_line(input: &mut &str) -> KvnResult<TrajLine> {
     Ok(TrajLine { epoch, values })
 }
 
-pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
+pub fn ocm_traj_state(input: &mut &str) -> KvnResult<Option<OcmTrajState>> {
     ws.parse_next(input)?;
     expect_block_start("TRAJ").parse_next(input)?;
 
@@ -265,14 +386,14 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
         "TRAJ_ID" => traj_id: kv_string,
         "TRAJ_PREV_ID" => traj_prev_id: kv_string,
         "TRAJ_NEXT_ID" => traj_next_id: kv_string,
-        "TRAJ_BASIS" => traj_basis: kv_enum,
+        "TRAJ_BASIS" => traj_basis: kv_string,
         "TRAJ_BASIS_ID" => traj_basis_id: kv_string,
         "INTERPOLATION" => interpolation: kv_string,
         "INTERPOLATION_DEGREE" => interpolation_degree: kv_u32,
         "PROPAGATOR" => propagator: kv_string,
         "CENTER_NAME" => center_name: kv_string,
         "TRAJ_REF_FRAME" => traj_ref_frame: kv_string,
-        "TRAJ_FRAME_EPOCH" => traj_frame_epoch: kv_calendar_epoch,
+        "TRAJ_FRAME_EPOCH" => traj_frame_epoch: kv_ocm_epoch,
         "USEABLE_START_TIME" => useable_start_time: kv_calendar_epoch,
         "USEABLE_STOP_TIME" => useable_stop_time: kv_calendar_epoch,
         "ORB_REVNUM" => orb_revnum: kv_float,
@@ -313,14 +434,41 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
         }
     }
 
+    // An empty, comment-free block carries no data and is read as absent.
+    if traj_lines.is_empty()
+        && comment.is_empty()
+        && [
+            &traj_id,
+            &traj_prev_id,
+            &traj_next_id,
+            &traj_basis,
+            &traj_basis_id,
+        ]
+        .iter()
+        .all(|value| value.is_none())
+        && [&interpolation, &propagator, &center_name, &traj_ref_frame]
+            .iter()
+            .all(|value| value.is_none())
+        && [&traj_type, &orb_averaging, &traj_units]
+            .iter()
+            .all(|value| value.is_none())
+        && interpolation_degree.is_none()
+        && traj_frame_epoch.is_none()
+        && useable_start_time.is_none()
+        && useable_stop_time.is_none()
+        && orb_revnum.is_none()
+        && orb_revnum_basis.is_none()
+    {
+        return Ok(None);
+    }
     if traj_lines.is_empty() {
         return Err(cut_err(
             input,
-            "OCM Trajectory block must contain at least one state vector (trajLine)",
+            "OCM Trajectory block must contain at least one TRAJ data line",
         ));
     }
 
-    Ok(OcmTrajState {
+    Ok(Some(OcmTrajState {
         comment,
         traj_id,
         traj_prev_id,
@@ -328,7 +476,7 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
         traj_basis,
         traj_basis_id,
         interpolation,
-        interpolation_degree: interpolation_degree.or(Some(3)),
+        interpolation_degree,
         propagator,
         center_name: center_name.unwrap_or_else(|| "EARTH".to_string()),
         traj_ref_frame: traj_ref_frame.unwrap_or_else(|| "ICRF3".to_string()),
@@ -336,13 +484,13 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<OcmTrajState> {
         useable_start_time,
         useable_stop_time,
         orb_revnum,
-        orb_revnum_basis: orb_revnum_basis.or(Some(RevNumBasis::Zero)),
-        traj_type: traj_type
-            .ok_or_else(|| missing_field_err(input, "Trajectory State", "TRAJ_TYPE"))?,
-        orb_averaging: orb_averaging.or(Some("OSCULATING".to_string())),
+        orb_revnum_basis,
+        // ODM 6.2.1.3 / table 6-4 default; the XSD requires the element.
+        traj_type: traj_type.unwrap_or_else(|| "CARTPV".to_string()),
+        orb_averaging,
         traj_units,
         traj_lines,
-    })
+    }))
 }
 
 //----------------------------------------------------------------------
@@ -525,15 +673,17 @@ pub fn ocm_cov_line(input: &mut &str) -> KvnResult<CovLine> {
     {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
-    let epoch = kv_epoch_token.parse_next(input)?;
+    let epoch = kv_ocm_epoch_token.parse_next(input)?;
     space1.parse_next(input)?;
     let raw_values = till_line_ending.parse_next(input)?;
     let mut values = Vec::with_capacity(raw_values.split_whitespace().count());
     for value in raw_values.split_whitespace() {
-        values.push(
-            fast_float::parse(value)
-                .map_err(|_| cut_err(input, "Malformed OCM covariance numeric value"))?,
-        );
+        values.push(parse_ccsds_number(value).ok_or_else(|| {
+            cut_err(
+                input,
+                "Malformed or unrepresentable OCM covariance numeric value",
+            )
+        })?);
     }
     if values.is_empty() {
         return Err(cut_err(input, "Missing OCM covariance values"));
@@ -542,7 +692,8 @@ pub fn ocm_cov_line(input: &mut &str) -> KvnResult<CovLine> {
     Ok(CovLine { epoch, values })
 }
 
-pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
+pub fn ocm_cov(input: &mut &str) -> KvnResult<Option<OcmCovarianceMatrix>> {
+    let mut traj_id = None;
     ws.parse_next(input)?;
     expect_block_start("COV").parse_next(input)?;
 
@@ -563,13 +714,14 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
     let mut cov_lines = Vec::new();
 
     parse_block!(input, comment, {
+        "TRAJ_ID" => traj_id: kv_string,
         "COV_ID" => cov_id: kv_string,
         "COV_PREV_ID" => cov_prev_id: kv_string,
         "COV_NEXT_ID" => cov_next_id: kv_string,
-        "COV_BASIS" => cov_basis: kv_enum,
+        "COV_BASIS" => cov_basis: kv_string,
         "COV_BASIS_ID" => cov_basis_id: kv_string,
         "COV_REF_FRAME" => cov_ref_frame: kv_string,
-        "COV_FRAME_EPOCH" => cov_frame_epoch: kv_calendar_epoch,
+        "COV_FRAME_EPOCH" => cov_frame_epoch: kv_ocm_epoch,
         "COV_TYPE" => cov_type: kv_string,
         "COV_UNITS" => cov_units: kv_string,
         "COV_ORDERING" => cov_ordering: kv_enum,
@@ -599,7 +751,33 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
         }
     }
 
-    Ok(OcmCovarianceMatrix {
+    // An empty, comment-free block carries no data and is read as absent.
+    if cov_lines.is_empty()
+        && comment.is_empty()
+        && [
+            &traj_id,
+            &cov_id,
+            &cov_prev_id,
+            &cov_next_id,
+            &cov_basis,
+            &cov_basis_id,
+            &cov_ref_frame,
+            &cov_type,
+            &cov_units,
+        ]
+        .iter()
+        .all(|value| value.is_none())
+        && cov_frame_epoch.is_none()
+        && cov_scale_min.is_none()
+        && cov_scale_max.is_none()
+        && cov_confidence.is_none()
+        && cov_ordering.is_none()
+    {
+        return Ok(None);
+    }
+
+    Ok(Some(OcmCovarianceMatrix {
+        traj_id,
         comment,
         cov_id,
         cov_prev_id,
@@ -611,11 +789,12 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<OcmCovarianceMatrix> {
         cov_scale_min,
         cov_scale_max,
         cov_confidence,
-        cov_type: cov_type.ok_or_else(|| missing_field_err(input, "Covariance", "COV_TYPE"))?,
+        // ODM 6.2.1.3 / table 6-6 default; the XSD requires the element.
+        cov_type: cov_type.unwrap_or_else(|| "CARTPV".to_string()),
         cov_ordering: cov_ordering.unwrap_or(CovOrder::Ltm),
         cov_units,
         cov_lines,
-    })
+    }))
 }
 
 pub fn ocm_man_line(input: &mut &str) -> KvnResult<ManLine> {
@@ -624,8 +803,8 @@ pub fn ocm_man_line(input: &mut &str) -> KvnResult<ManLine> {
     if input.starts_with(|c: char| c.is_ascii_uppercase()) {
         return Err(ErrMode::Backtrack(InternalParserError::from_input(input)));
     }
-    let epoch = kv_epoch_token.parse_next(input)?;
-    let values = repeat(1.., (space1, till_space).map(|(_, v)| v.to_string())).parse_next(input)?;
+    let epoch = kv_ocm_epoch_token.parse_next(input)?;
+    let values = repeat(0.., (space1, till_space).map(|(_, v)| v.to_string())).parse_next(input)?;
     opt_line_ending.parse_next(input)?;
     Ok(ManLine { epoch, values })
 }
@@ -638,6 +817,7 @@ fn kv_man_composition(input: &mut &str) -> KvnResult<String> {
             break;
         }
 
+        blank_lines.parse_next(input)?;
         let continuation = peek(till_line_ending).parse_next(input)?.trim();
         if continuation.is_empty() || continuation.contains('=') || at_block_end("MAN", input) {
             return Err(cut_err(input, "Malformed MAN_COMPOSITION continuation"));
@@ -650,7 +830,17 @@ fn kv_man_composition(input: &mut &str) -> KvnResult<String> {
             .trim_end();
         composition = format!("{prefix} {continuation}");
     }
-    Ok(composition)
+    Ok(canonical_man_composition(&composition))
+}
+
+/// Canonical MAN_COMPOSITION spelling: uppercase keywords separated by ", ". Reading accepts any
+/// case and blanks instead of commas (table 6-7 asks for a comma-separated list).
+pub(super) fn canonical_man_composition(composition: &str) -> String {
+    super::parse_csv_list(composition)
+        .iter()
+        .map(|column| column.to_ascii_uppercase())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
@@ -697,28 +887,28 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
         "MAN_BASIS" => man_basis: kv_enum,
         "MAN_BASIS_ID" => man_basis_id: kv_string,
         "MAN_DEVICE_ID" => man_device_id: kv_string,
-        "MAN_PREV_EPOCH" => man_prev_epoch: kv_epoch,
-        "MAN_NEXT_EPOCH" => man_next_epoch: kv_epoch,
+        "MAN_PREV_EPOCH" => man_prev_epoch: kv_ocm_epoch,
+        "MAN_NEXT_EPOCH" => man_next_epoch: kv_ocm_epoch,
         "MAN_PURPOSE" => man_purpose: kv_string,
         "MAN_PRED_SOURCE" => man_pred_source: kv_string,
         "MAN_REF_FRAME" => man_ref_frame: kv_string,
-        "MAN_FRAME_EPOCH" => man_frame_epoch: kv_calendar_epoch,
+        "MAN_FRAME_EPOCH" => man_frame_epoch: kv_ocm_epoch,
         "GRAV_ASSIST_NAME" => grav_assist_name: kv_string,
         "DC_TYPE" => dc_type: kv_enum,
-        "DC_WIN_OPEN" => dc_win_open: kv_epoch,
-        "DC_WIN_CLOSE" => dc_win_close: kv_epoch,
+        "DC_WIN_OPEN" => dc_win_open: kv_ocm_epoch,
+        "DC_WIN_CLOSE" => dc_win_close: kv_ocm_epoch,
         "DC_MIN_CYCLES" => dc_min_cycles: kv_u64,
         "DC_MAX_CYCLES" => dc_max_cycles: kv_u64,
-        "DC_EXEC_START" => dc_exec_start: kv_epoch,
-        "DC_EXEC_STOP" => dc_exec_stop: kv_epoch,
-        "DC_REF_TIME" => dc_ref_time: kv_epoch,
+        "DC_EXEC_START" => dc_exec_start: kv_ocm_epoch,
+        "DC_EXEC_STOP" => dc_exec_stop: kv_ocm_epoch,
+        "DC_REF_TIME" => dc_ref_time: kv_ocm_epoch,
         "DC_TIME_PULSE_DURATION" => dc_time_pulse_duration: kv_from_kvn,
         "DC_TIME_PULSE_PERIOD" => dc_time_pulse_period: kv_from_kvn,
         "DC_REF_DIR" => dc_ref_dir: kv_from_kvn_value,
         "DC_BODY_FRAME" => dc_body_frame: kv_string,
         "DC_BODY_TRIGGER" => dc_body_trigger: kv_from_kvn_value,
-        "DC_PA_START_ANGLE" => dc_pa_start_angle: kv_from_kvn,
-        "DC_PA_STOP_ANGLE" => dc_pa_stop_angle: kv_from_kvn,
+        "DC_PA_START_ANGLE" => dc_pa_start_angle: kv_phase_angle,
+        "DC_PA_STOP_ANGLE" => dc_pa_stop_angle: kv_phase_angle,
         "MAN_COMPOSITION" => man_composition: kv_man_composition,
         "MAN_UNITS" => man_units: kv_string,
     }, |i| at_block_end("MAN", i), "Unexpected OCM Maneuver key");
@@ -845,7 +1035,7 @@ pub fn ocm_pert(input: &mut &str) -> KvnResult<OcmPerturbations> {
         "SHADOW_BODIES" => shadow_bodies: kv_string,
         "SRP_MODEL" => srp_model: kv_string,
         "SW_DATA_SOURCE" => sw_data_source: kv_string,
-        "SW_DATA_EPOCH" => sw_data_epoch: kv_epoch,
+        "SW_DATA_EPOCH" => sw_data_epoch: kv_ocm_epoch,
         "SW_INTERP_METHOD" => sw_interp_method: kv_string,
         "FIXED_GEOMAG_KP" => fixed_geomag_kp: kv_from_kvn,
         "FIXED_GEOMAG_AP" => fixed_geomag_ap: kv_from_kvn,
@@ -937,9 +1127,9 @@ pub fn ocm_od(input: &mut &str) -> KvnResult<OcmOdParameters> {
         "OD_ID" => od_id: kv_string,
         "OD_PREV_ID" => od_prev_id: kv_string,
         "OD_METHOD" => od_method: kv_string,
-        "OD_EPOCH" => od_epoch: kv_epoch,
-        "DAYS_SINCE_FIRST_OBS" => days_since_first_obs: kv_from_kvn,
-        "DAYS_SINCE_LAST_OBS" => days_since_last_obs: kv_from_kvn,
+        "OD_EPOCH" => od_epoch: kv_ocm_epoch,
+        "DAYS_SINCE_FIRST_OBS" => days_since_first_obs: kv_days_since_obs,
+        "DAYS_SINCE_LAST_OBS" => days_since_last_obs: kv_days_since_obs,
         "RECOMMENDED_OD_SPAN" => recommended_od_span: kv_from_kvn,
         "ACTUAL_OD_SPAN" => actual_od_span: kv_from_kvn,
         "OBS_AVAILABLE" => obs_available: kv_u64,
@@ -1009,31 +1199,55 @@ pub fn ocm_od(input: &mut &str) -> KvnResult<OcmOdParameters> {
 // OCM User Parser
 //----------------------------------------------------------------------
 
-pub fn ocm_user(input: &mut &str) -> KvnResult<UserDefined> {
+pub fn ocm_user(input: &mut &str) -> KvnResult<OcmUserDefined> {
     ws.parse_next(input)?;
     expect_block_start("USER").parse_next(input)?;
 
-    let mut comment = Vec::new();
-    let mut user_defined = Vec::new();
+    let mut entries = Vec::new();
 
     loop {
         let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
 
         if at_block_end("USER", input) {
-            comment.extend(comments);
+            entries.extend(comments.into_iter().map(OcmUserDefinedEntry::Comment));
             expect_block_end("USER").parse_next(input)?;
             break;
         }
 
-        match key_token.parse_next(input) {
+        match user_defined_key_token.parse_next(input) {
             Ok(k) => {
-                comment.extend(comments);
+                entries.extend(comments.into_iter().map(OcmUserDefinedEntry::Comment));
+                if !k.starts_with("USER_DEFINED_COMPOSITION_") && value_is_absent(k, input) {
+                    skip_record(input);
+                    continue;
+                }
                 let v = kv_string.parse_next(input)?;
-                user_defined.push(UserDefinedParameter {
+                let mut records = Vec::new();
+                if k.starts_with("USER_DEFINED_COMPOSITION_") {
+                    loop {
+                        let remaining = input.trim_start();
+                        let first_line = remaining.lines().next().unwrap_or("").trim();
+                        if first_line == "USER_STOP"
+                            || first_line
+                                .split_once('=')
+                                .is_some_and(|(key, _)| key.trim().starts_with("USER_DEFINED_"))
+                            || remaining.is_empty()
+                        {
+                            break;
+                        }
+                        let row = till_line_ending.parse_next(input)?;
+                        if !row.trim().is_empty() {
+                            records.push(row.trim().to_owned());
+                        }
+                        opt_line_ending.parse_next(input)?;
+                    }
+                }
+                entries.push(OcmUserDefinedEntry::Parameter(OcmUserDefinedParameter {
+                    records,
                     parameter: k.strip_prefix("USER_DEFINED_").unwrap_or(k).to_string(),
                     value: v,
-                });
+                }));
             }
             Err(_) => {
                 input.reset(&checkpoint);
@@ -1042,10 +1256,7 @@ pub fn ocm_user(input: &mut &str) -> KvnResult<UserDefined> {
         }
     }
 
-    Ok(UserDefined {
-        comment,
-        user_defined,
-    })
+    Ok(OcmUserDefined { entries })
 }
 
 //----------------------------------------------------------------------
@@ -1057,13 +1268,13 @@ pub fn ocm_user(input: &mut &str) -> KvnResult<UserDefined> {
 // heap allocation for every parsed block, which is worse for the hot KVN path.
 #[allow(clippy::large_enum_variant)]
 enum OcmBlock {
-    Traj(OcmTrajState),
+    Traj(Option<OcmTrajState>),
     Phys(OcmPhysicalDescription),
-    Cov(OcmCovarianceMatrix),
+    Cov(Option<OcmCovarianceMatrix>),
     Man(OcmManeuverParameters),
     Pert(OcmPerturbations),
     Od(OcmOdParameters),
-    User(UserDefined),
+    User(OcmUserDefined),
 }
 
 fn ocm_data_block(input: &mut &str) -> KvnResult<OcmBlock> {
@@ -1101,15 +1312,16 @@ fn ocm_data_block(input: &mut &str) -> KvnResult<OcmBlock> {
 
     // Prepend comments collected before the block start
     match &mut block {
-        OcmBlock::Traj(x) => {
+        OcmBlock::Traj(Some(x)) => {
             x.comment.splice(0..0, comments);
         }
         OcmBlock::Phys(x) => {
             x.comment.splice(0..0, comments);
         }
-        OcmBlock::Cov(x) => {
+        OcmBlock::Cov(Some(x)) => {
             x.comment.splice(0..0, comments);
         }
+        OcmBlock::Traj(None) | OcmBlock::Cov(None) => {}
         OcmBlock::Man(x) => {
             x.comment.splice(0..0, comments);
         }
@@ -1120,7 +1332,8 @@ fn ocm_data_block(input: &mut &str) -> KvnResult<OcmBlock> {
             x.comment.splice(0..0, comments);
         }
         OcmBlock::User(x) => {
-            x.comment.splice(0..0, comments);
+            x.entries
+                .splice(0..0, comments.into_iter().map(OcmUserDefinedEntry::Comment));
         }
     }
 
@@ -1134,9 +1347,9 @@ pub fn ocm_data(input: &mut &str) -> KvnResult<OcmData> {
         let checkpoint = input.checkpoint();
         match ocm_data_block.parse_next(input) {
             Ok(block) => match block {
-                OcmBlock::Traj(x) => data.traj.push(x),
+                OcmBlock::Traj(x) => data.traj.extend(x),
                 OcmBlock::Phys(x) => data.phys = Some(x),
-                OcmBlock::Cov(x) => data.cov.push(x),
+                OcmBlock::Cov(x) => data.cov.extend(x),
                 OcmBlock::Man(x) => data.man.push(x),
                 OcmBlock::Pert(x) => data.pert = Some(x),
                 OcmBlock::Od(x) => data.od = Some(x),
@@ -1180,7 +1393,7 @@ pub fn ocm_header(input: &mut &str) -> KvnResult<OdmHeader> {
             break;
         }
 
-        let key = match keyword.parse_next(input) {
+        let key = match winnow::combinator::preceded(ws, keyword).parse_next(input) {
             Ok(k) => k,
             Err(_) => {
                 input.reset(&checkpoint);
@@ -1199,7 +1412,7 @@ pub fn ocm_header(input: &mut &str) -> KvnResult<OdmHeader> {
         kv_sep.parse_next(input)?;
         match key {
             "CLASSIFICATION" => {
-                classification = Some(kv_string.parse_next(input)?);
+                classification = kv_optional(kv_string).parse_next(input)?;
             }
             "CREATION_DATE" => {
                 creation_date = Some(kv_calendar_epoch.parse_next(input)?);
@@ -1208,7 +1421,7 @@ pub fn ocm_header(input: &mut &str) -> KvnResult<OdmHeader> {
                 originator = Some(kv_string.parse_next(input)?);
             }
             "MESSAGE_ID" => {
-                message_id = Some(kv_string.parse_next(input)?);
+                message_id = kv_optional(kv_string).parse_next(input)?;
             }
             _ => unreachable!(),
         }
@@ -1280,6 +1493,16 @@ fn ocm_kvn_keys(block: &str) -> Option<&'static [&'static str]> {
             "RDM_MSG_LINK",
             "TDM_MSG_LINK",
             "OPERATOR",
+            "OPERATOR_URL",
+            "OPERATOR_EMAIL",
+            "OPERATOR_PHONE",
+            "OPERATOR_AUTOMATED_URL",
+            "EMERGENCY_EMAIL",
+            "EMERGENCY_PHONE",
+            "EMERGENCY_AVAILABILITY",
+            "SSA_EMAIL",
+            "SSA_PHONE",
+            "OWNER_URL",
             "OWNER",
             "COUNTRY",
             "CONSTELLATION",
@@ -1377,6 +1600,7 @@ fn ocm_kvn_keys(block: &str) -> Option<&'static [&'static str]> {
             "IYZ",
         ],
         "COV" => &[
+            "TRAJ_ID",
             "COV_ID",
             "COV_PREV_ID",
             "COV_NEXT_ID",
@@ -1516,8 +1740,8 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
     let mut last_block_rank = None;
     let mut block_has_content = false;
     let mut history_started = false;
-    let mut pending_block_comment = false;
     let mut top_rank = None;
+    let mut user_sequence = false;
     let mut offset = 0usize;
 
     for (index, raw_line) in kvn.split('\n').enumerate() {
@@ -1527,11 +1751,18 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
         if line.as_bytes().contains(&b'\r') {
             return fail("lone carriage return");
         }
-        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
-            return fail("non-printable or non-ASCII character");
-        }
         let line = line.trim();
         if line.is_empty() {
+            offset += raw_line.len() + 1;
+            continue;
+        }
+        if current_block == Some("USER")
+            && user_sequence
+            && line != "USER_STOP"
+            && !line
+                .split_once('=')
+                .is_some_and(|(key, _)| key.trim().starts_with("USER_DEFINED_"))
+        {
             offset += raw_line.len() + 1;
             continue;
         }
@@ -1539,14 +1770,14 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
             if block_has_content {
                 return fail("COMMENT is not at the beginning of a logical block");
             }
-            if current_block.is_none()
-                && top_rank != Some(0)
-                && top_rank.is_none_or(|rank| rank < 3)
-            {
-                return fail("COMMENT is not at the beginning of the header or a data block");
+            // Tables 6-2 to 6-11 allow comments only immediately after CCSDS_OCM_VERS or a
+            // block's *_START. Anything else (after ORIGINATOR, between or after blocks) has no
+            // place in the model, so it is refused rather than moved or dropped.
+            if current_block.is_none() && (top_rank != Some(0) || last_block_rank.is_some()) {
+                return fail(
+                    "COMMENT is only allowed after CCSDS_OCM_VERS or at the beginning of a block",
+                );
             }
-            pending_block_comment =
-                current_block.is_none() && top_rank.is_some_and(|rank| rank >= 3);
             offset += raw_line.len() + 1;
             continue;
         }
@@ -1570,7 +1801,7 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
             previous_key = None;
             block_has_content = false;
             history_started = false;
-            pending_block_comment = false;
+            user_sequence = false;
             last_block_rank = Some(rank);
             offset += raw_line.len() + 1;
             continue;
@@ -1588,8 +1819,12 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
         }
 
         if let Some(block) = current_block {
-            if !line.contains('=') {
-                if !matches!(block, "TRAJ" | "COV" | "MAN") {
+            let history_record = block == "MAN"
+                && line.as_bytes().first().is_some_and(|byte| {
+                    byte.is_ascii_digit() || matches!(byte, b'+' | b'-' | b'.')
+                });
+            if !line.contains('=') || history_record {
+                if !(matches!(block, "TRAJ" | "COV" | "MAN") || block == "USER" && user_sequence) {
                     return fail("unexpected non-assignment in OCM logical block");
                 }
                 block_has_content = true;
@@ -1605,6 +1840,7 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
                 if !key.starts_with("USER_DEFINED_") || key.len() == "USER_DEFINED_".len() {
                     return fail("unknown OCM USER keyword");
                 }
+                user_sequence = key.starts_with("USER_DEFINED_COMPOSITION_");
                 block_has_content = true;
                 offset += raw_line.len() + 1;
                 continue;
@@ -1635,9 +1871,6 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
             previous_key = Some(rank);
             block_has_content = true;
         } else {
-            if pending_block_comment {
-                return fail("Unexpected OCM Data key");
-            }
             if !line.contains('=') {
                 return fail("expected exactly one top-level assignment");
             }
@@ -1670,6 +1903,34 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
 
 impl Ocm {
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        if let Some(user) = &self.body.segment.data.user {
+            let mut parameter_seen = false;
+            for entry in &user.entries {
+                match entry {
+                    OcmUserDefinedEntry::Parameter(value) => {
+                        if value.parameter.is_empty()
+                            || !value.parameter.bytes().all(|byte| {
+                                byte.is_ascii_graphic()
+                                    && !byte.is_ascii_lowercase()
+                                    && byte != b'='
+                            })
+                        {
+                            return Err(crate::error::ValidationError::invalid_value("USER_DEFINED parameter", &value.parameter, "a nonempty uppercase printable ASCII suffix without whitespace or =").into());
+                        }
+                        parameter_seen = true;
+                    }
+                    OcmUserDefinedEntry::Comment(_) if parameter_seen => {
+                        return Err(crate::error::ValidationError::invalid_value(
+                            "COMMENT",
+                            "after user-defined parameter",
+                            "leading comments for OCM KVN",
+                        )
+                        .into())
+                    }
+                    _ => {}
+                }
+            }
+        }
         for (trajectory_index, trajectory) in self.body.segment.data.traj.iter().enumerate() {
             for (line_index, line) in trajectory.traj_lines.iter().enumerate() {
                 for (value_index, value) in line.values.iter().enumerate() {
@@ -1685,10 +1946,20 @@ impl Ocm {
                 }
             }
         }
+        let mut rounded_values = [0.0; 100];
         for (covariance_index, covariance) in self.body.segment.data.cov.iter().enumerate() {
+            let kind = super::known_ocm_type(&covariance.cov_type);
+            let known = super::covariance_dimension(kind).is_some()
+                || matches!(kind, "SIG3EIGVEC3" | "TSIG3EIGVEC3");
             for (line_index, line) in covariance.cov_lines.iter().enumerate() {
+                let mut changed = false;
                 for (value_index, value) in line.values.iter().enumerate() {
-                    if !crate::kvn::ser::OdmFloat::is_valid(*value) {
+                    let rounded = if known {
+                        crate::kvn::ser::OdmFloat::rounded_value(*value)
+                    } else {
+                        crate::kvn::ser::OdmFloat::is_valid(*value).then_some(*value)
+                    };
+                    let Some(rounded) = rounded else {
                         return Err(crate::validation::unrepresentable_number(
                             "covLine",
                             *value,
@@ -1696,7 +1967,27 @@ impl Ocm {
                                 "body.segment.data.cov[{covariance_index}].cov_lines[{line_index}].values[{value_index}]"
                             ),
                         ));
+                    };
+                    if known {
+                        rounded_values[value_index] = rounded;
+                        changed |= rounded != *value;
                     }
+                }
+                // Root validation already checked unchanged rows; only rounding can invalidate them.
+                if changed {
+                    super::validate_covariance_values(
+                        &rounded_values[..line.values.len()],
+                        kind,
+                        &covariance.cov_ordering,
+                    )
+                    .map_err(|error| match error {
+                        crate::error::CcsdsNdmError::Validation(error) => {
+                            crate::error::CcsdsNdmError::from((*error).at_path(format!(
+                                "body.segment.data.cov[{covariance_index}].cov_lines[{line_index}]"
+                            )))
+                        }
+                        error => error,
+                    })?;
                 }
             }
         }
@@ -1803,6 +2094,36 @@ impl ToKvn for OcmMetadata {
         if let Some(v) = &self.operator {
             writer.write_pair("OPERATOR", v);
         }
+        if let Some(v) = &self.operator_url {
+            writer.write_pair("OPERATOR_URL", v);
+        }
+        if let Some(v) = &self.operator_email {
+            writer.write_pair("OPERATOR_EMAIL", v);
+        }
+        if let Some(v) = &self.operator_phone {
+            writer.write_pair("OPERATOR_PHONE", v);
+        }
+        if let Some(v) = &self.operator_automated_url {
+            writer.write_pair("OPERATOR_AUTOMATED_URL", v);
+        }
+        if let Some(v) = &self.emergency_email {
+            writer.write_pair("EMERGENCY_EMAIL", v);
+        }
+        if let Some(v) = &self.emergency_phone {
+            writer.write_pair("EMERGENCY_PHONE", v);
+        }
+        if let Some(v) = &self.emergency_availability {
+            writer.write_pair("EMERGENCY_AVAILABILITY", v);
+        }
+        if let Some(v) = &self.ssa_email {
+            writer.write_pair("SSA_EMAIL", v);
+        }
+        if let Some(v) = &self.ssa_phone {
+            writer.write_pair("SSA_PHONE", v);
+        }
+        if let Some(v) = &self.owner_url {
+            writer.write_pair("OWNER_URL", v);
+        }
         if let Some(v) = &self.owner {
             writer.write_pair("OWNER", v);
         }
@@ -1813,7 +2134,7 @@ impl ToKvn for OcmMetadata {
             writer.write_pair("CONSTELLATION", v);
         }
         if let Some(v) = &self.object_type {
-            writer.write_pair("OBJECT_TYPE", v.to_string());
+            writer.write_pair("OBJECT_TYPE", v);
         }
         writer.write_pair("TIME_SYSTEM", &self.time_system);
         writer.write_pair("EPOCH_TZERO", self.epoch_tzero);
@@ -1827,10 +2148,10 @@ impl ToKvn for OcmMetadata {
             writer.write_pair("OCM_DATA_ELEMENTS", v);
         }
         if let Some(v) = &self.sclk_offset_at_epoch {
-            writer.write_measure("SCLK_OFFSET_AT_EPOCH", &v.to_unit_value());
+            writer.write_odm_float_measure("SCLK_OFFSET_AT_EPOCH", &v.to_unit_value());
         }
         if let Some(v) = &self.sclk_sec_per_si_sec {
-            writer.write_measure("SCLK_SEC_PER_SI_SEC", &v.to_unit_value());
+            writer.write_odm_float_measure("SCLK_SEC_PER_SI_SEC", &v.to_unit_value());
         }
         if let Some(v) = &self.previous_message_epoch {
             writer.write_pair("PREVIOUS_MESSAGE_EPOCH", v);
@@ -1845,19 +2166,19 @@ impl ToKvn for OcmMetadata {
             writer.write_pair("STOP_TIME", v);
         }
         if let Some(v) = &self.time_span {
-            writer.write_measure("TIME_SPAN", &v.to_unit_value());
+            writer.write_odm_float_measure("TIME_SPAN", &v.to_unit_value());
         }
         if let Some(v) = &self.taimutc_at_tzero {
-            writer.write_measure("TAIMUTC_AT_TZERO", &v.to_unit_value());
+            writer.write_odm_float_measure("TAIMUTC_AT_TZERO", &v.to_unit_value());
         }
         if let Some(v) = &self.next_leap_epoch {
             writer.write_pair("NEXT_LEAP_EPOCH", v);
         }
         if let Some(v) = &self.next_leap_taimutc {
-            writer.write_measure("NEXT_LEAP_TAIMUTC", &v.to_unit_value());
+            writer.write_odm_float_measure("NEXT_LEAP_TAIMUTC", &v.to_unit_value());
         }
         if let Some(v) = &self.ut1mutc_at_tzero {
-            writer.write_measure("UT1MUTC_AT_TZERO", &v.to_unit_value());
+            writer.write_odm_float_measure("UT1MUTC_AT_TZERO", &v.to_unit_value());
         }
         if let Some(v) = &self.eop_source {
             writer.write_pair("EOP_SOURCE", v);
@@ -1894,9 +2215,18 @@ impl ToKvn for OcmData {
         }
         if let Some(u) = &self.user {
             writer.write_section("USER_START");
-            writer.write_comments(&u.comment);
-            for p in &u.user_defined {
-                writer.write_user_defined(&p.parameter, &p.value);
+            for entry in &u.entries {
+                match entry {
+                    OcmUserDefinedEntry::Comment(value) => {
+                        writer.write_comments(std::slice::from_ref(value))
+                    }
+                    OcmUserDefinedEntry::Parameter(p) => {
+                        writer.write_user_defined(&p.parameter, &p.value);
+                        for record in &p.records {
+                            writer.write_line(record);
+                        }
+                    }
+                }
             }
             writer.write_section("USER_STOP");
         }
@@ -1917,7 +2247,7 @@ impl ToKvn for OcmTrajState {
             writer.write_pair("TRAJ_NEXT_ID", v);
         }
         if let Some(v) = &self.traj_basis {
-            writer.write_pair("TRAJ_BASIS", v.to_string());
+            writer.write_pair("TRAJ_BASIS", v);
         }
         if let Some(v) = &self.traj_basis_id {
             writer.write_pair("TRAJ_BASIS_ID", v);
@@ -1926,7 +2256,7 @@ impl ToKvn for OcmTrajState {
             writer.write_pair("INTERPOLATION", v);
         }
         if let Some(v) = &self.interpolation_degree {
-            writer.write_pair("INTERPOLATION_DEGREE", v);
+            writer.write_integer_pair("INTERPOLATION_DEGREE", *v);
         }
         if let Some(v) = &self.propagator {
             writer.write_pair("PROPAGATOR", v);
@@ -1943,7 +2273,7 @@ impl ToKvn for OcmTrajState {
             writer.write_pair("USEABLE_STOP_TIME", v);
         }
         if let Some(v) = &self.orb_revnum {
-            writer.write_pair("ORB_REVNUM", v);
+            writer.write_odm_float_pair("ORB_REVNUM", *v);
         }
         if let Some(v) = &self.orb_revnum_basis {
             writer.write_pair(
@@ -1982,22 +2312,22 @@ impl ToKvn for OcmPhysicalDescription {
             writer.write_pair("DOCKED_WITH", v);
         }
         if let Some(v) = &self.drag_const_area {
-            writer.write_measure("DRAG_CONST_AREA", &v.to_unit_value());
+            writer.write_odm_float_measure("DRAG_CONST_AREA", &v.to_unit_value());
         }
         if let Some(v) = &self.drag_coeff_nom {
-            writer.write_pair("DRAG_COEFF_NOM", v);
+            writer.write_odm_float_pair("DRAG_COEFF_NOM", *v);
         }
         if let Some(v) = &self.drag_uncertainty {
-            writer.write_measure("DRAG_UNCERTAINTY", &v.to_unit_value());
+            writer.write_odm_float_measure("DRAG_UNCERTAINTY", &v.to_unit_value());
         }
         if let Some(v) = &self.initial_wet_mass {
-            writer.write_measure("INITIAL_WET_MASS", &v.to_unit_value());
+            writer.write_odm_float_measure("INITIAL_WET_MASS", &v.to_unit_value());
         }
         if let Some(v) = &self.wet_mass {
-            writer.write_measure("WET_MASS", &v.to_unit_value());
+            writer.write_odm_float_measure("WET_MASS", &v.to_unit_value());
         }
         if let Some(v) = &self.dry_mass {
-            writer.write_measure("DRY_MASS", &v.to_unit_value());
+            writer.write_odm_float_measure("DRY_MASS", &v.to_unit_value());
         }
         if let Some(v) = &self.oeb_parent_frame {
             writer.write_pair("OEB_PARENT_FRAME", v);
@@ -2006,76 +2336,76 @@ impl ToKvn for OcmPhysicalDescription {
             writer.write_pair("OEB_PARENT_FRAME_EPOCH", v);
         }
         if let Some(v) = &self.oeb_q1 {
-            writer.write_pair("OEB_Q1", v);
+            writer.write_odm_float_pair("OEB_Q1", *v);
         }
         if let Some(v) = &self.oeb_q2 {
-            writer.write_pair("OEB_Q2", v);
+            writer.write_odm_float_pair("OEB_Q2", *v);
         }
         if let Some(v) = &self.oeb_q3 {
-            writer.write_pair("OEB_Q3", v);
+            writer.write_odm_float_pair("OEB_Q3", *v);
         }
         if let Some(v) = &self.oeb_qc {
-            writer.write_pair("OEB_QC", v);
+            writer.write_odm_float_pair("OEB_QC", *v);
         }
         if let Some(v) = &self.oeb_max {
-            writer.write_measure("OEB_MAX", v);
+            writer.write_odm_float_measure("OEB_MAX", v);
         }
         if let Some(v) = &self.oeb_int {
-            writer.write_measure("OEB_INT", v);
+            writer.write_odm_float_measure("OEB_INT", v);
         }
         if let Some(v) = &self.oeb_min {
-            writer.write_measure("OEB_MIN", v);
+            writer.write_odm_float_measure("OEB_MIN", v);
         }
         if let Some(v) = &self.area_along_oeb_max {
-            writer.write_measure("AREA_ALONG_OEB_MAX", &v.to_unit_value());
+            writer.write_odm_float_measure("AREA_ALONG_OEB_MAX", &v.to_unit_value());
         }
         if let Some(v) = &self.area_along_oeb_int {
-            writer.write_measure("AREA_ALONG_OEB_INT", &v.to_unit_value());
+            writer.write_odm_float_measure("AREA_ALONG_OEB_INT", &v.to_unit_value());
         }
         if let Some(v) = &self.area_along_oeb_min {
-            writer.write_measure("AREA_ALONG_OEB_MIN", &v.to_unit_value());
+            writer.write_odm_float_measure("AREA_ALONG_OEB_MIN", &v.to_unit_value());
         }
         if let Some(v) = &self.area_min_for_pc {
-            writer.write_measure("AREA_MIN_FOR_PC", &v.to_unit_value());
+            writer.write_odm_float_measure("AREA_MIN_FOR_PC", &v.to_unit_value());
         }
         if let Some(v) = &self.area_max_for_pc {
-            writer.write_measure("AREA_MAX_FOR_PC", &v.to_unit_value());
+            writer.write_odm_float_measure("AREA_MAX_FOR_PC", &v.to_unit_value());
         }
         if let Some(v) = &self.area_typ_for_pc {
-            writer.write_measure("AREA_TYP_FOR_PC", &v.to_unit_value());
+            writer.write_odm_float_measure("AREA_TYP_FOR_PC", &v.to_unit_value());
         }
         if let Some(v) = &self.rcs {
-            writer.write_measure("RCS", &v.to_unit_value());
+            writer.write_odm_float_measure("RCS", &v.to_unit_value());
         }
         if let Some(v) = &self.rcs_min {
-            writer.write_measure("RCS_MIN", &v.to_unit_value());
+            writer.write_odm_float_measure("RCS_MIN", &v.to_unit_value());
         }
         if let Some(v) = &self.rcs_max {
-            writer.write_measure("RCS_MAX", &v.to_unit_value());
+            writer.write_odm_float_measure("RCS_MAX", &v.to_unit_value());
         }
         if let Some(v) = &self.srp_const_area {
-            writer.write_measure("SRP_CONST_AREA", &v.to_unit_value());
+            writer.write_odm_float_measure("SRP_CONST_AREA", &v.to_unit_value());
         }
         if let Some(v) = &self.solar_rad_coeff {
-            writer.write_pair("SOLAR_RAD_COEFF", v);
+            writer.write_odm_float_pair("SOLAR_RAD_COEFF", *v);
         }
         if let Some(v) = &self.solar_rad_uncertainty {
-            writer.write_measure("SOLAR_RAD_UNCERTAINTY", &v.to_unit_value());
+            writer.write_odm_float_measure("SOLAR_RAD_UNCERTAINTY", &v.to_unit_value());
         }
         if let Some(v) = &self.vm_absolute {
-            writer.write_pair("VM_ABSOLUTE", v);
+            writer.write_odm_float_pair("VM_ABSOLUTE", *v);
         }
         if let Some(v) = &self.vm_apparent_min {
-            writer.write_pair("VM_APPARENT_MIN", v);
+            writer.write_odm_float_pair("VM_APPARENT_MIN", *v);
         }
         if let Some(v) = &self.vm_apparent {
-            writer.write_pair("VM_APPARENT", v);
+            writer.write_odm_float_pair("VM_APPARENT", *v);
         }
         if let Some(v) = &self.vm_apparent_max {
-            writer.write_pair("VM_APPARENT_MAX", v);
+            writer.write_odm_float_pair("VM_APPARENT_MAX", *v);
         }
         if let Some(v) = &self.reflectance {
-            writer.write_pair("REFLECTANCE", v);
+            writer.write_odm_float_pair("REFLECTANCE", v.value);
         }
         if let Some(v) = &self.att_control_mode {
             writer.write_pair("ATT_CONTROL_MODE", v);
@@ -2084,43 +2414,43 @@ impl ToKvn for OcmPhysicalDescription {
             writer.write_pair("ATT_ACTUATOR_TYPE", v);
         }
         if let Some(v) = &self.att_knowledge {
-            writer.write_measure("ATT_KNOWLEDGE", &v.to_unit_value());
+            writer.write_odm_float_measure("ATT_KNOWLEDGE", &v.to_unit_value());
         }
         if let Some(v) = &self.att_control {
-            writer.write_measure("ATT_CONTROL", &v.to_unit_value());
+            writer.write_odm_float_measure("ATT_CONTROL", &v.to_unit_value());
         }
         if let Some(v) = &self.att_pointing {
-            writer.write_measure("ATT_POINTING", &v.to_unit_value());
+            writer.write_odm_float_measure("ATT_POINTING", &v.to_unit_value());
         }
         if let Some(v) = &self.avg_maneuver_freq {
-            writer.write_measure("AVG_MANEUVER_FREQ", v);
+            writer.write_odm_float_measure("AVG_MANEUVER_FREQ", v);
         }
         if let Some(v) = &self.max_thrust {
-            writer.write_measure("MAX_THRUST", v);
+            writer.write_odm_float_measure("MAX_THRUST", v);
         }
         if let Some(v) = &self.dv_bol {
-            writer.write_measure("DV_BOL", v);
+            writer.write_odm_float_measure("DV_BOL", v);
         }
         if let Some(v) = &self.dv_remaining {
-            writer.write_measure("DV_REMAINING", v);
+            writer.write_odm_float_measure("DV_REMAINING", v);
         }
         if let Some(v) = &self.ixx {
-            writer.write_measure("IXX", v);
+            writer.write_odm_float_measure("IXX", v);
         }
         if let Some(v) = &self.iyy {
-            writer.write_measure("IYY", v);
+            writer.write_odm_float_measure("IYY", v);
         }
         if let Some(v) = &self.izz {
-            writer.write_measure("IZZ", v);
+            writer.write_odm_float_measure("IZZ", v);
         }
         if let Some(v) = &self.ixy {
-            writer.write_measure("IXY", v);
+            writer.write_odm_float_measure("IXY", v);
         }
         if let Some(v) = &self.ixz {
-            writer.write_measure("IXZ", v);
+            writer.write_odm_float_measure("IXZ", v);
         }
         if let Some(v) = &self.iyz {
-            writer.write_measure("IYZ", v);
+            writer.write_odm_float_measure("IYZ", v);
         }
         writer.write_section("PHYS_STOP");
     }
@@ -2130,6 +2460,9 @@ impl ToKvn for OcmCovarianceMatrix {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_section("COV_START");
         writer.write_comments(&self.comment);
+        if let Some(v) = &self.traj_id {
+            writer.write_pair("TRAJ_ID", v);
+        }
         if let Some(v) = &self.cov_id {
             writer.write_pair("COV_ID", v);
         }
@@ -2140,7 +2473,7 @@ impl ToKvn for OcmCovarianceMatrix {
             writer.write_pair("COV_NEXT_ID", v);
         }
         if let Some(v) = &self.cov_basis {
-            writer.write_pair("COV_BASIS", v.to_string());
+            writer.write_pair("COV_BASIS", v);
         }
         if let Some(v) = &self.cov_basis_id {
             writer.write_pair("COV_BASIS_ID", v);
@@ -2150,13 +2483,13 @@ impl ToKvn for OcmCovarianceMatrix {
             writer.write_pair("COV_FRAME_EPOCH", v);
         }
         if let Some(v) = &self.cov_scale_min {
-            writer.write_pair("COV_SCALE_MIN", v);
+            writer.write_odm_float_pair("COV_SCALE_MIN", *v);
         }
         if let Some(v) = &self.cov_scale_max {
-            writer.write_pair("COV_SCALE_MAX", v);
+            writer.write_odm_float_pair("COV_SCALE_MAX", *v);
         }
         if let Some(v) = &self.cov_confidence {
-            writer.write_measure("COV_CONFIDENCE", &v.to_unit_value());
+            writer.write_odm_float_measure("COV_CONFIDENCE", &v.to_unit_value());
         }
         writer.write_pair("COV_TYPE", &self.cov_type);
         writer.write_pair("COV_ORDERING", self.cov_ordering.to_string());
@@ -2215,10 +2548,10 @@ impl ToKvn for OcmManeuverParameters {
             writer.write_pair("DC_WIN_CLOSE", v);
         }
         if let Some(v) = &self.dc_min_cycles {
-            writer.write_pair("DC_MIN_CYCLES", v);
+            writer.write_integer_pair("DC_MIN_CYCLES", *v);
         }
         if let Some(v) = &self.dc_max_cycles {
-            writer.write_pair("DC_MAX_CYCLES", v);
+            writer.write_integer_pair("DC_MAX_CYCLES", *v);
         }
         if let Some(v) = &self.dc_exec_start {
             writer.write_pair("DC_EXEC_START", v);
@@ -2230,32 +2563,41 @@ impl ToKvn for OcmManeuverParameters {
             writer.write_pair("DC_REF_TIME", v);
         }
         if let Some(v) = &self.dc_time_pulse_duration {
-            writer.write_measure("DC_TIME_PULSE_DURATION", &v.to_unit_value());
+            writer.write_odm_float_measure("DC_TIME_PULSE_DURATION", &v.to_unit_value());
         }
         if let Some(v) = &self.dc_time_pulse_period {
-            writer.write_measure("DC_TIME_PULSE_PERIOD", &v.to_unit_value());
+            writer.write_odm_float_measure("DC_TIME_PULSE_PERIOD", &v.to_unit_value());
         }
         if let Some(v) = &self.dc_ref_dir {
-            writer.write_pair("DC_REF_DIR", format!("{} {} {}", v.x, v.y, v.z));
+            writer.write_numeric_vector("DC_REF_DIR", &[v.x, v.y, v.z], None::<&&str>);
         }
         if let Some(v) = &self.dc_body_frame {
             writer.write_pair("DC_BODY_FRAME", v);
         }
         if let Some(v) = &self.dc_body_trigger {
-            writer.write_pair("DC_BODY_TRIGGER", format!("{} {} {}", v.x, v.y, v.z));
+            writer.write_numeric_vector("DC_BODY_TRIGGER", &[v.x, v.y, v.z], None::<&&str>);
         }
         if let Some(v) = &self.dc_pa_start_angle {
-            writer.write_measure("DC_PA_START_ANGLE", &v.to_unit_value());
+            writer.write_odm_float_measure("DC_PA_START_ANGLE", &v.to_unit_value());
         }
         if let Some(v) = &self.dc_pa_stop_angle {
-            writer.write_measure("DC_PA_STOP_ANGLE", &v.to_unit_value());
+            writer.write_odm_float_measure("DC_PA_STOP_ANGLE", &v.to_unit_value());
         }
-        writer.write_pair("MAN_COMPOSITION", &self.man_composition);
+        let composition = super::parse_csv_list(&self.man_composition);
+        writer.write_pair(
+            "MAN_COMPOSITION",
+            canonical_man_composition(&self.man_composition),
+        );
         if let Some(v) = &self.man_units {
             writer.write_pair("MAN_UNITS", v);
         }
+        let numeric_columns: Vec<_> = composition
+            .iter()
+            .skip(1)
+            .map(|column| super::is_numeric_man_column(column))
+            .collect();
         for line in &self.man_lines {
-            writer.write_ocm_text_history(&line.epoch, &line.values);
+            writer.write_ocm_text_history(&line.epoch, &line.values, &numeric_columns);
         }
         writer.write_section("MAN_STOP");
     }
@@ -2272,19 +2614,19 @@ impl ToKvn for OcmPerturbations {
             writer.write_pair("GRAVITY_MODEL", v);
         }
         if let Some(v) = &self.equatorial_radius {
-            writer.write_measure("EQUATORIAL_RADIUS", v);
+            writer.write_odm_float_measure("EQUATORIAL_RADIUS", v);
         }
         if let Some(v) = &self.gm {
-            writer.write_measure("GM", &v.to_unit_value());
+            writer.write_odm_float_measure("GM", &v.to_unit_value());
         }
         if let Some(v) = &self.n_body_perturbations {
             writer.write_pair("N_BODY_PERTURBATIONS", v);
         }
         if let Some(v) = &self.central_body_rotation {
-            writer.write_measure("CENTRAL_BODY_ROTATION", v);
+            writer.write_odm_float_measure("CENTRAL_BODY_ROTATION", v);
         }
         if let Some(v) = &self.oblate_flattening {
-            writer.write_pair("OBLATE_FLATTENING", v);
+            writer.write_odm_float_pair("OBLATE_FLATTENING", *v);
         }
         if let Some(v) = &self.ocean_tides_model {
             writer.write_pair("OCEAN_TIDES_MODEL", v);
@@ -2299,7 +2641,7 @@ impl ToKvn for OcmPerturbations {
             writer.write_pair("ALBEDO_MODEL", v);
         }
         if let Some(v) = &self.albedo_grid_size {
-            writer.write_pair("ALBEDO_GRID_SIZE", v);
+            writer.write_integer_pair("ALBEDO_GRID_SIZE", *v);
         }
         if let Some(v) = &self.shadow_model {
             writer.write_pair("SHADOW_MODEL", v);
@@ -2320,37 +2662,37 @@ impl ToKvn for OcmPerturbations {
             writer.write_pair("SW_INTERP_METHOD", v);
         }
         if let Some(v) = &self.fixed_geomag_kp {
-            writer.write_measure("FIXED_GEOMAG_KP", v);
+            writer.write_odm_float_measure("FIXED_GEOMAG_KP", v);
         }
         if let Some(v) = &self.fixed_geomag_ap {
-            writer.write_measure("FIXED_GEOMAG_AP", v);
+            writer.write_odm_float_measure("FIXED_GEOMAG_AP", v);
         }
         if let Some(v) = &self.fixed_geomag_dst {
-            writer.write_measure("FIXED_GEOMAG_DST", v);
+            writer.write_odm_float_measure("FIXED_GEOMAG_DST", v);
         }
         if let Some(v) = &self.fixed_f10p7 {
-            writer.write_measure("FIXED_F10P7", v);
+            writer.write_odm_float_measure("FIXED_F10P7", v);
         }
         if let Some(v) = &self.fixed_f10p7_mean {
-            writer.write_measure("FIXED_F10P7_MEAN", v);
+            writer.write_odm_float_measure("FIXED_F10P7_MEAN", v);
         }
         if let Some(v) = &self.fixed_m10p7 {
-            writer.write_measure("FIXED_M10P7", v);
+            writer.write_odm_float_measure("FIXED_M10P7", v);
         }
         if let Some(v) = &self.fixed_m10p7_mean {
-            writer.write_measure("FIXED_M10P7_MEAN", v);
+            writer.write_odm_float_measure("FIXED_M10P7_MEAN", v);
         }
         if let Some(v) = &self.fixed_s10p7 {
-            writer.write_measure("FIXED_S10P7", v);
+            writer.write_odm_float_measure("FIXED_S10P7", v);
         }
         if let Some(v) = &self.fixed_s10p7_mean {
-            writer.write_measure("FIXED_S10P7_MEAN", v);
+            writer.write_odm_float_measure("FIXED_S10P7_MEAN", v);
         }
         if let Some(v) = &self.fixed_y10p7 {
-            writer.write_measure("FIXED_Y10P7", v);
+            writer.write_odm_float_measure("FIXED_Y10P7", v);
         }
         if let Some(v) = &self.fixed_y10p7_mean {
-            writer.write_measure("FIXED_Y10P7_MEAN", v);
+            writer.write_odm_float_measure("FIXED_Y10P7_MEAN", v);
         }
         writer.write_section("PERT_STOP");
     }
@@ -2367,76 +2709,76 @@ impl ToKvn for OcmOdParameters {
         writer.write_pair("OD_METHOD", &self.od_method);
         writer.write_pair("OD_EPOCH", self.od_epoch);
         if let Some(v) = &self.days_since_first_obs {
-            writer.write_measure("DAYS_SINCE_FIRST_OBS", &v.to_unit_value());
+            writer.write_odm_float_measure("DAYS_SINCE_FIRST_OBS", &v.to_unit_value());
         }
         if let Some(v) = &self.days_since_last_obs {
-            writer.write_measure("DAYS_SINCE_LAST_OBS", &v.to_unit_value());
+            writer.write_odm_float_measure("DAYS_SINCE_LAST_OBS", &v.to_unit_value());
         }
         if let Some(v) = &self.recommended_od_span {
-            writer.write_measure("RECOMMENDED_OD_SPAN", &v.to_unit_value());
+            writer.write_odm_float_measure("RECOMMENDED_OD_SPAN", &v.to_unit_value());
         }
         if let Some(v) = &self.actual_od_span {
-            writer.write_measure("ACTUAL_OD_SPAN", &v.to_unit_value());
+            writer.write_odm_float_measure("ACTUAL_OD_SPAN", &v.to_unit_value());
         }
         if let Some(v) = &self.obs_available {
-            writer.write_pair("OBS_AVAILABLE", v);
+            writer.write_integer_pair("OBS_AVAILABLE", *v);
         }
         if let Some(v) = &self.obs_used {
-            writer.write_pair("OBS_USED", v);
+            writer.write_integer_pair("OBS_USED", *v);
         }
         if let Some(v) = &self.tracks_available {
-            writer.write_pair("TRACKS_AVAILABLE", v);
+            writer.write_integer_pair("TRACKS_AVAILABLE", *v);
         }
         if let Some(v) = &self.tracks_used {
-            writer.write_pair("TRACKS_USED", v);
+            writer.write_integer_pair("TRACKS_USED", *v);
         }
         if let Some(v) = &self.maximum_obs_gap {
-            writer.write_measure("MAXIMUM_OBS_GAP", &v.to_unit_value());
+            writer.write_odm_float_measure("MAXIMUM_OBS_GAP", &v.to_unit_value());
         }
         if let Some(v) = &self.od_epoch_eigmaj {
-            writer.write_measure("OD_EPOCH_EIGMAJ", v);
+            writer.write_odm_float_measure("OD_EPOCH_EIGMAJ", v);
         }
         if let Some(v) = &self.od_epoch_eigint {
-            writer.write_measure("OD_EPOCH_EIGINT", v);
+            writer.write_odm_float_measure("OD_EPOCH_EIGINT", v);
         }
         if let Some(v) = &self.od_epoch_eigmin {
-            writer.write_measure("OD_EPOCH_EIGMIN", v);
+            writer.write_odm_float_measure("OD_EPOCH_EIGMIN", v);
         }
         if let Some(v) = &self.od_max_pred_eigmaj {
-            writer.write_measure("OD_MAX_PRED_EIGMAJ", v);
+            writer.write_odm_float_measure("OD_MAX_PRED_EIGMAJ", v);
         }
         if let Some(v) = &self.od_min_pred_eigmin {
-            writer.write_measure("OD_MIN_PRED_EIGMIN", v);
+            writer.write_odm_float_measure("OD_MIN_PRED_EIGMIN", v);
         }
         if let Some(v) = &self.od_confidence {
-            writer.write_measure("OD_CONFIDENCE", &v.to_unit_value());
+            writer.write_odm_float_measure("OD_CONFIDENCE", &v.to_unit_value());
         }
         if let Some(v) = &self.gdop {
-            writer.write_pair("GDOP", v);
+            writer.write_odm_float_pair("GDOP", *v);
         }
         if let Some(v) = &self.solve_n {
-            writer.write_pair("SOLVE_N", v);
+            writer.write_integer_pair("SOLVE_N", *v);
         }
         if let Some(v) = &self.solve_states {
             writer.write_pair("SOLVE_STATES", v);
         }
         if let Some(v) = &self.consider_n {
-            writer.write_pair("CONSIDER_N", v);
+            writer.write_integer_pair("CONSIDER_N", *v);
         }
         if let Some(v) = &self.consider_params {
             writer.write_pair("CONSIDER_PARAMS", v);
         }
         if let Some(v) = &self.sedr {
-            writer.write_measure("SEDR", &v.to_unit_value());
+            writer.write_odm_float_measure("SEDR", &v.to_unit_value());
         }
         if let Some(v) = &self.sensors_n {
-            writer.write_pair("SENSORS_N", v);
+            writer.write_integer_pair("SENSORS_N", *v);
         }
         if let Some(v) = &self.sensors {
             writer.write_pair("SENSORS", v);
         }
         if let Some(v) = &self.weighted_rms {
-            writer.write_pair("WEIGHTED_RMS", v);
+            writer.write_odm_float_pair("WEIGHTED_RMS", v.value);
         }
         if let Some(v) = &self.data_types {
             writer.write_pair("DATA_TYPES", v);

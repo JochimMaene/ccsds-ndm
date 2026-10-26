@@ -8,8 +8,32 @@ Unit tests for Orbit Mean-Elements Message (OMM) Python bindings.
 
 import ccsds_ndm
 import pytest
+from pathlib import Path
 
 from ccsds_ndm import MeanElements, OdmHeader, Omm, OmmData, OmmMetadata, OmmSegment
+
+
+@pytest.mark.parametrize("element", ["BSTAR", "MEAN_MOTION_DOT", "MEAN_MOTION_DDOT"])
+def test_tle_choices_are_required_only_at_xml_boundaries(element):
+    source = (
+        Path(__file__).resolve().parents[3] / "ccsds-ndm/data/kvn/omm_g9.kvn"
+    ).read_text()
+    source = "\n".join(
+        line for line in source.splitlines() if not line.startswith(element)
+    )
+    message = Omm.from_str(source, format="kvn")
+    message.validate()
+    Omm.from_str(message.to_str("kvn"), format="kvn")
+    with pytest.raises(ccsds_ndm.NdmValidationError, match=element):
+        message.to_str("xml")
+
+
+def test_tle_parameters_mean_motion_dot_is_optional():
+    import inspect
+
+    tle = ccsds_ndm.TleParameters(bstar=0.0001)
+    assert tle.mean_motion_dot is None
+    assert "mean_motion_dot" in inspect.signature(ccsds_ndm.TleParameters).parameters
 
 
 class TestOmm:

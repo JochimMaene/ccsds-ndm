@@ -1,4 +1,4 @@
-# OPM 3.0 Core Conformance Inventory
+# OPM 3.0 and 2.0 conformance
 
 This inventory covers the core CCSDS OPM 3.0 behavior: strict KVN and XML parsing, typed-model
 validation, KVN and XML generation, conversion in both notation directions, and the Python
@@ -10,14 +10,14 @@ schema artifact, so its wire requirements come from ODM sections 3.2 and 7.3–7
 Checks that need information outside a self-contained OPM — an exchange-partner ICD, registry
 membership, or the physical definition of a reference frame or time system — are caller context.
 They are not missing self-contained behavior and are not guessed; see
-[externally governed values](family-shared-contract.md#externally-governed-values).
+[externally governed values](../design/validation-contract.md#registry-governed-values).
 
 ## Requirement map
 
 | Area | Normative source | Implemented behavior | Executable evidence |
 | --- | --- | --- | --- |
 | Message identity and structure | ODM 3.1.5, 3.2.1, 8.2–8.3 | One OPM root describing one object, ordered header/metadata/data, an XML 1.0 UTF-8 declaration with the shared producer-compatible spellings, `id="CCSDS_OPM_VERS"`/`version="3.0"` root attributes, and the supported-edition generation gate | `opm::parsing`, `opm::generation`, `library::xml` |
-| KVN lexical and record structure | ODM 7.3.2–7.3.4, 7.4.3–7.4.7 | Printable ASCII, 254-character lines, all four normative terminators, one uppercase assignment per line, and the `USER_DEFINED_` suffix repertoire accepted per table 3-3 rather than Annex F's narrower informative regex | `opm::parsing`, `opm::generation` |
+| KVN lexical and record structure | ODM 7.3.2–7.3.4, 7.4.3–7.4.7 | Printable ASCII (TAB reads as a blank), 254-character lines on output (longer lines are read), all four normative terminators, one uppercase assignment per line, and the `USER_DEFINED_` suffix repertoire accepted per table 3-3 rather than Annex F's narrower informative regex | `opm::parsing`, `opm::generation` |
 | KVN keyword order and blocks | ODM 3.2.2–3.2.4, 7.4.8 | Fixed keyword order with unknown, duplicate, reordered, trailing, and incomplete content rejected; `TRUE_ANOMALY`/`MEAN_ANOMALY` share an ordering rank, so either fills the anomaly slot while a repeat is still a duplicate and both present is a choice violation | `opm::parsing`, `opm::generation` |
 | XML structure | ODM 8.4–8.7; `ndmxml-4.0.0-opm-3.0.xsd` and common schema | Exact root and attributes, ordered known elements, no DTD or trailing document, fixed nesting limit of 16, and `units`/`parameter` attributes permitted only where the schema declares them | `opm::parsing` |
 | Time semantics | ODM 3.2.3.2, 7.5.10–7.5.11 | `CREATION_DATE`, `REF_FRAME_EPOCH`, state-vector `EPOCH`, and `MAN_EPOCH_IGNITION` require the calendar or ordinal spelling, rejecting the XSD union's numeric branch, impossible fields, empty fractions, non-`YYYY` years, timezone offsets, and tokens past the 64-byte epoch bound | `opm::parsing`, `opm::validation` |
@@ -50,12 +50,19 @@ They are not missing self-contained behavior and are not guessed; see
   other families.
 - **GM unit spelling is canonicalized in KVN.** ODM 7.7.1 admits only the table spelling, so the
   uppercase `KM**3/S**2` that the XSD also permits is written as `km**3/s**2` rather than failing
-  generation. XML output keeps the spelling held by the model.
-- **`userDefinedParameters` interleaving is not accepted.** The XSD permits `COMMENT` and
-  `USER_DEFINED` to interleave, but the typed model stores them separately, so accepting that
-  order would silently relocate comments on regeneration. Comments before parameters are accepted
-  and a later `COMMENT` is rejected; arbitrary interleaving would need a breaking ordered-entry
-  model.
+  generation. XML output keeps the spelling held by the model. KVN reading accepts that
+  uppercase alias (`[KM**3/S**2]`); no other unit alias is accepted.
+- **User-defined entry order.** `UserDefined.entries` retains XML comments and parameters in
+  their original order, including interleaving. XML regeneration preserves that order. KVN
+  requires leading comments, so conversion refuses an interleaved model before output. Parameter
+  names are exact suffixes: a stored `USER_DEFINED_FOO` generates `USER_DEFINED_USER_DEFINED_FOO`.
+- **GM must be positive in every notation.** The book does not state a range; `gmType` requires
+  a positive value, and under the shared
+  [facet rule](../design/validation-contract.md#authority-and-representability) that bound
+  applies to KVN, the model, and XML alike so a valid model always converts.
+- **Empty mandatory XML strings are rejected** as empty values (book over XSD), per the
+  [shared rule](../design/validation-contract.md#authority-and-representability).
+
 - **Zero delta mass is accepted.** 3.2.4.7 describes delta mass as negative, but the XSD's
   `deltamassTypeZ` permits zero; the schema governs the wire form.
 - **`nil` and `xsi:nil` are rejected.** The OPM schema declares no nillable element, so an
@@ -71,9 +78,51 @@ They are not missing self-contained behavior and are not guessed; see
 OPM 3.0 is verified on the Rust and Python surfaces: strict parsing, self-contained validation,
 both generation notations, conversion, diagnostics, allocation budgets, and packaged artifacts
 have received message-level review, and no known requirement gap remains. "Verified" means that
-review, not exhaustive mutation of every editable value. OPM 2.0 remains available — explicit
-edition conversion is tested, but it has not received this edition-specific review.
+review, not exhaustive mutation of every editable value. OPM 2.0 has also received the edition-specific review below and meets the same criteria.
+
+## Edition 2.0 reconciliation
+
+The edition-specific authority is `data/odm_502x0b2s.pdf` and the official
+`ndmxml-2.0.0-opm-2.0.xsd` with its common schema. The 3.0 inventory above is shared only
+where those sources agree. ODM 3.0 annex J and a comparison of the header, metadata,
+state, Keplerian, spacecraft, covariance, maneuver, and user-defined schema sequences
+identify these model-relevant differences:
+
+| Difference | Decision and evidence |
+| --- | --- |
+| `CLASSIFICATION` and `MESSAGE_ID` are not in the 2.0 header | Reject their presence in both parsed notations and mutated models; `conformance::odm2::opm_and_omm_2_reject_new_header_fields_in_both_notations`. |
+| 2.0 `angleRange` is [-180, 360), while 3.0's is [-360, 360) | `RA_OF_ASC_NODE`, `ARG_OF_PERICENTER`, `TRUE_ANOMALY`, and `MEAN_ANOMALY` use the 2.0 range for 2.0 in every notation, so a valid 2.0 model always converts; `conformance::odm2::odm_2_angles_use_the_2_0_range`. |
+| Maneuver delta mass uses 2.0 `negativeDouble`, while 3.0 uses `deltamassTypeZ` | Zero remains accepted only for 3.0. The 2.0 root gate rejects zero, including KVN/XML input and output; `conformance::odm2::opm_2_requires_negative_maneuver_delta_mass_in_every_route`. |
+| A present XML spacecraft block requires all five spacecraft fields | The 2.0 common schema makes these fields required; 3.0 makes them optional. Partial blocks remain valid KVN/model content, but 2.0 XML input/output refuses them. `conformance::odm2::odm_2_partial_spacecraft_is_kvn_valid_but_not_xml_representable`. |
+| Other logical blocks retain their typed structure | Every shipped OPM KVN fixture, with only its new header removed and edition changed, passes 2.0 KVN/XML preservation and the official 2.0 XSD; `conformance::odm2::opm_2_generation_is_schema_valid_and_round_trips`. |
+| Public adapters retain edition | Python's shared conformance matrix covers both notations and all string/file/conversion routes separately for 2.0 and 3.0. |
+
+**OPM 1.0 is not supported.** Its actual required-block and field rules differ from the
+later grammar: ODM 502.0-B-1 tables 3-1/3-3 and §3.3 require edition-specific spacecraft
+content and do not introduce the newer header. Relabelling a 3.0 fixture had accepted
+later-only fields and omissions instead of implementing those rules. Input 1.0 is now
+rejected until its own grammar and semantics are implemented and reviewed.
 
 ## Reproduction
 
 Run `just verify` for the full quality checks plus the packaged-artifact gates.
+
+Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
+artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
+
+An XML `userDefinedParameters` block with no parameters may be retained and regenerated as XML.
+KVN generation refuses that empty or comment-only block: without delimiters, KVN cannot preserve
+its presence or distinguish those comments from the previous logical block.
+
+## Empty spacecraft blocks and elapsed-time profile
+
+The 3.0 XSD permits empty or comment-only `spacecraftParameters`. These remain available
+in XML; KVN generation refuses them because a flattened block with no spacecraft value
+cannot preserve its presence or comment association. It neither drops the block nor
+moves its comments. The shared regression
+`conformance::generation::empty_spacecraft_blocks_are_xml_only_and_kvn_refuses_before_output`
+checks OPM and OMM, including zero-byte streaming refusal.
+
+OPM retains the shared [OPM/OMM elapsed-time profile](../design/validation-contract.md#opm-and-omm-elapsed-time-profile):
+calendar-field-valid tokens are required even for MET/MRT. The full elapsed ordinal day
+range in ODM §3.2.3.2 is not implemented by its public `CalendarEpoch` fields.

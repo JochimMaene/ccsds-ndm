@@ -11,7 +11,10 @@ A high-performance Rust library with Python bindings for parsing, validating, an
 
 ## Implemented Message Families
 
-The repository contains typed models, parsers, and serializers for the message families below. Inclusion in this table does not by itself claim that every edition, notation, operation, or public surface has completed the project's conformance quality bar. Exact support claims will be published in the support and conformance matrix.
+The repository contains typed models, parsers, and serializers for the message families below. Supported editions and their documented limits are listed in the
+[support matrix](https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/support-matrix.md).
+All current message families use the same
+[conformance verification criteria](https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/conformance/README.md#verification-criteria).
 
 | Message | Description |
 |---------|-------------|

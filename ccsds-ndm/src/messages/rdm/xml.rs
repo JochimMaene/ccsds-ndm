@@ -266,10 +266,8 @@ pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {
 }
 
 impl Rdm {
-    /// XML-only representability: `NOMINAL_IMPACT_ALT` is unbounded in RDM but the common 4.0
-    /// XSD's `altRange` is Earth-derived, so a book-valid altitude for a non-Earth body cannot be
-    /// expressed in this XML edition. The model keeps the value; conversion is refused rather
-    /// than the value being altered to fit.
+    /// Apply the XML-only Earth-derived impact-altitude bounds without imposing that schema
+    /// facet on the book's finite-double KVN domain.
     pub(crate) fn validate_xml_representability(&self) -> Result<()> {
         let Some(parameters) = &self.body.segment.data.ground_impact_parameters else {
             return Ok(());

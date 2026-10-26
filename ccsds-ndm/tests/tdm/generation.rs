@@ -92,12 +92,14 @@ fn tdm_paths_and_single_diff_receive_band_use_segment_context() {
     }
 
     let single_diff = include_str!("../../data/kvn/tdm_e10.kvn");
-    for data in [
-        TdmObservationData::ReceiveFreq(1.0),
-        TdmObservationData::Range(1.0),
+    // An empty XML RECEIVE_BAND names no band, so it does not satisfy the rule either.
+    for (data, band) in [
+        (TdmObservationData::ReceiveFreq(1.0), None),
+        (TdmObservationData::Range(1.0), None),
+        (TdmObservationData::Range(1.0), Some(String::new())),
     ] {
         let mut message = Tdm::from_kvn(single_diff).unwrap();
-        message.body.segments[0].metadata.receive_band = None;
+        message.body.segments[0].metadata.receive_band = band;
         message.body.segments[0].data.observations.truncate(1);
         message.body.segments[0].data.observations[0].data = data;
         assert_rejects(
@@ -332,4 +334,124 @@ DATA_STOP
 
     let parsed = Tdm::from_xml(&xml).expect("failed to parse TDM XML");
     assert_eq!(parsed, tdm);
+}
+
+#[test]
+fn kvn_numbers_follow_the_digit_limit_without_rounding_phase_counts() {
+    let mut message = Tdm::from_kvn(KVN).unwrap();
+    let metadata = &mut message.body.segments[0].metadata;
+    for field in [
+        &mut metadata.integration_interval,
+        &mut metadata.freq_offset,
+        &mut metadata.range_modulus,
+        &mut metadata.doppler_count_bias,
+        &mut metadata.transmit_delay_1,
+        &mut metadata.transmit_delay_2,
+        &mut metadata.transmit_delay_3,
+        &mut metadata.transmit_delay_4,
+        &mut metadata.transmit_delay_5,
+        &mut metadata.receive_delay_1,
+        &mut metadata.receive_delay_2,
+        &mut metadata.receive_delay_3,
+        &mut metadata.receive_delay_4,
+        &mut metadata.receive_delay_5,
+        &mut metadata.correction_angle_1,
+        &mut metadata.correction_angle_2,
+        &mut metadata.correction_doppler,
+        &mut metadata.correction_mag,
+        &mut metadata.correction_range,
+        &mut metadata.correction_rcs,
+        &mut metadata.correction_receive,
+        &mut metadata.correction_transmit,
+        &mut metadata.correction_aberration_yearly,
+        &mut metadata.correction_aberration_diurnal,
+    ] {
+        *field = Some(1.234_567_890_123_456_7);
+    }
+    metadata.corrections_applied = Some(ccsds_ndm::types::YesNo::Yes);
+    let observation = message.body.segments[0].data.observations[0].clone();
+    message.body.segments[0].data.observations = [
+        TdmObservationData::Range(1.234_567_890_123_456_7),
+        TdmObservationData::ReceivePhaseCt1("9007199254740993.1234567890123456789".into()),
+    ]
+    .into_iter()
+    .map(|data| {
+        let mut observation = observation.clone();
+        observation.data = data;
+        observation
+    })
+    .collect();
+    let xml = message.to_xml().unwrap();
+    assert_eq!(Tdm::from_xml(&xml).unwrap(), message);
+    let kvn = message.to_kvn().unwrap();
+    assert!(
+        !kvn.contains("1.2345678901234567"),
+        "unrounded number: {kvn}"
+    );
+    assert!(kvn.contains("1.234567890123457"));
+    let reparsed = Tdm::from_kvn(&kvn).unwrap();
+    assert_eq!(
+        reparsed.body.segments[0].metadata.freq_offset,
+        Some(1.234_567_890_123_457)
+    );
+    assert_eq!(
+        reparsed.body.segments[0].data.observations[0].data.value(),
+        Some(1.234_567_890_123_457)
+    );
+    assert_eq!(
+        reparsed.body.segments[0].data.observations[1].data,
+        message.body.segments[0].data.observations[1].data
+    );
+    let mut streamed = Vec::new();
+    message.write_kvn_to(&mut streamed).unwrap();
+    assert_eq!(streamed, kvn.as_bytes());
+}
+
+#[test]
+fn kvn_refuses_numbers_whose_rounded_spelling_overflows_before_output() {
+    for field in ["FREQ_OFFSET", "RANGE"] {
+        let mut message = Tdm::from_kvn(KVN).unwrap();
+        if field == "FREQ_OFFSET" {
+            message.body.segments[0].metadata.freq_offset = Some(f64::MAX);
+        } else {
+            message.body.segments[0].data.observations[0].data =
+                TdmObservationData::Range(f64::MAX);
+        }
+        message.validate().unwrap();
+        let xml = message.to_xml().unwrap();
+        assert_eq!(Tdm::from_xml(&xml).unwrap(), message);
+        assert!(message.to_kvn().unwrap_err().to_string().contains("number"));
+        let mut output = Vec::new();
+        assert!(message
+            .write_kvn_to(&mut output)
+            .unwrap_err()
+            .to_string()
+            .contains("number"));
+        assert!(output.is_empty());
+    }
+}
+
+#[test]
+fn kvn_output_refuses_integers_and_lines_beyond_the_kvn_limits() {
+    // DOPPLER_COUNT_SCALE is u64 (XSD positiveInteger), but a KVN integer stops at 2^31-1.
+    let mut message = Tdm::from_kvn(KVN).unwrap();
+    message.body.segments[0].metadata.doppler_count_scale = Some(i32::MAX as u64 + 1);
+    message.validate().unwrap();
+    Tdm::from_xml(&message.to_xml().unwrap()).unwrap();
+    let error = message.to_kvn().unwrap_err();
+    assert!(error.to_string().contains("DOPPLER_COUNT_SCALE"), "{error}");
+
+    // A long DATA_TYPES line (Orekit) is read, but TDM 4.2.1 has no continuation lines,
+    // so output is refused and names the keyword.
+    let types = vec!["RANGE"; 60].join(",");
+    let long = KVN.replacen(
+        "TIME_SYSTEM = UTC\n",
+        &format!("DATA_TYPES = {types}\nTIME_SYSTEM = UTC\n"),
+        1,
+    );
+    let message = Tdm::from_kvn(&long).unwrap();
+    Tdm::from_xml(&message.to_xml().unwrap()).unwrap();
+    let error = message.to_kvn().unwrap_err();
+    assert!(error.to_string().contains("DATA_TYPES"), "{error}");
+    assert!(error.to_string().contains("254"), "{error}");
 }

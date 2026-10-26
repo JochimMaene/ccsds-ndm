@@ -33,6 +33,29 @@ from ccsds_ndm import (
 )
 
 
+def test_combined_envelope_preserves_decoded_text_and_empty_fields():
+    source = (
+        '<?xml version="1.0" encoding="UTF-8"?><ndm>'
+        "<MESSAGE_ID>A&amp;B</MESSAGE_ID><COMMENT><![CDATA[A<B]]></COMMENT>"
+        "<?ignored instruction?><COMMENT/></ndm>"
+    )
+    message = CombinedNdm.from_str(source, format="xml")
+    text = message.to_str("xml")
+    assert "<MESSAGE_ID>A&amp;B</MESSAGE_ID>" in text
+    assert "amp;amp" not in text
+    assert "<COMMENT>A&lt;B</COMMENT>" in text
+    assert CombinedNdm.from_str(text, format="xml").to_str("xml") == text
+
+
+@pytest.mark.parametrize(
+    "content", ['<COMMENT bad="x">a</COMMENT>', "<COMMENT><bad>x</bad></COMMENT>"]
+)
+def test_combined_envelope_rejects_unsupported_text_structure(content):
+    source = f'<?xml version="1.0" encoding="UTF-8"?><ndm>{content}</ndm>'
+    with pytest.raises(ccsds_ndm.NdmFormatError):
+        CombinedNdm.from_str(source, format="xml")
+
+
 class TestNdm:
     """Tests for NDM bindings."""
 
@@ -95,12 +118,15 @@ class TestNdm:
         )
 
         meta1 = CdmMetadata(
+            ephemeris_name="NONE",
             object="OBJECT1",
             object_designator="12345",
             catalog_name="SATCAT",
             object_name="SAT1",
             international_designator="2023-001A",
             ref_frame="EME2000",
+            covariance_method="CALCULATED",
+            maneuverable="YES",
         )
         vector1 = CdmStateVector(7000.0, 0.0, 0.0, 0.0, 7.5, 0.0)
         cov_args = (
@@ -135,12 +161,15 @@ class TestNdm:
         seg1 = CdmSegment(meta1, data1)
 
         meta2 = CdmMetadata(
+            ephemeris_name="NONE",
             object="OBJECT2",
             object_designator="67890",
             catalog_name="SATCAT",
             object_name="DEBRIS",
             international_designator="UNKNOWN",
             ref_frame="EME2000",
+            covariance_method="CALCULATED",
+            maneuverable="YES",
         )
         vector2 = CdmStateVector(7100.0, 0.0, 0.0, 0.0, 7.4, 0.0)
         cov2 = CdmCovarianceMatrix(*cov_args)

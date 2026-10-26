@@ -18,9 +18,9 @@
 //! | **CDM** | [Conjunction Data Message](cdm) | Collision assessment data between two space objects. | CCSDS 508.0-B-1 |
 //! | **TDM** | [Tracking Data Message](tdm) | Ground station tracking data (ranges, doppler, angles). | CCSDS 503.0-B-2 |
 //! | **RDM** | [Reentry Data Message](rdm) | Reentry prediction information and impact windows. | CCSDS 508.1-B-1 |
-//! | **APM** | [Attitude Parameter Message](apm) | Single attitude state (quaternion/Euler) at an epoch. | CCSDS 504.0-B-1 |
-//! | **AEM** | [Attitude Ephemeris Message](aem) | Attitude state time series. | CCSDS 504.0-B-1 |
-//! | **ACM** | [Attitude Comprehensive Message](acm) | detailed attitude data including maneuvers. | CCSDS 504.0-B-1 |
+//! | **APM** | [Attitude Parameter Message](apm) | Single attitude state (quaternion/Euler) at an epoch. | CCSDS 504.0-B-2 |
+//! | **AEM** | [Attitude Ephemeris Message](aem) | Attitude state time series. | CCSDS 504.0-B-2 |
+//! | **ACM** | [Attitude Comprehensive Message](acm) | detailed attitude data including maneuvers. | CCSDS 504.0-B-2 |
 //!
 //! # Common Structures
 //!
@@ -31,14 +31,25 @@
 //!     - **Metadata**: Contextual info (object name, reference frames, time system).
 //!     - **Data**: The actual navigation data (state vectors, covariance, parameters).
 
+/// Attitude Comprehensive Message.
 pub mod acm;
+/// Attitude Ephemeris Message.
 pub mod aem;
+/// Attitude Parameter Message.
 pub mod apm;
+/// Conjunction Data Message.
 pub mod cdm;
+/// Combined Navigation Data Message container.
 pub mod ndm;
+/// Orbit Comprehensive Message.
 pub mod ocm;
+/// Orbit Ephemeris Message.
 pub mod oem;
+/// Orbit Mean-Elements Message.
 pub mod omm;
+/// Orbit Parameter Message.
 pub mod opm;
+/// Reentry Data Message.
 pub mod rdm;
+/// Tracking Data Message.
 pub mod tdm;

@@ -124,7 +124,7 @@ where
 /// comment : list of str, optional
 ///     Comments.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct OdmHeader {
     pub inner: core_common::OdmHeader,
@@ -255,8 +255,31 @@ impl OdmHeader {
 }
 
 /// Represents the `admHeader` complex type from the XSD.
+///
+/// Parameters
+/// ----------
+/// creation_date : str
+///     File creation date/time in UTC. (For format specification, see 6.8.9.)
+/// originator : str
+///     Creating agency or operator. Select from the accepted set of values indicated in annex B,
+///     subsection B1 from the ‘Abbreviation’ column (when present), or the ‘Name’ column when an
+///     Abbreviation column is not populated. If desired organization is not listed there, follow
+///     procedures to request that originator be added to SANA registry.
+/// classification : str, optional
+///     User-defined free-text message classification/caveats of this ADM. It is recommended that
+///     selected values be pre-coordinated between exchanging entities by mutual agreement.
+/// message_id : str, optional
+///     ID that uniquely identifies a message from a given originator. The format and content of the
+///     message identifier value are at the discretion of the originator.
+/// comment : list[str], optional
+///     User-defined comments. (See ADM 6.10 for formatting and placement rules.)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If creation_date is not a CCSDS calendar epoch.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct AdmHeader {
     pub inner: core_common::AdmHeader,
@@ -297,7 +320,7 @@ impl AdmHeader {
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
-    /// CCSDS Reference: 504.0-B-2, Section 3.2.2.
+    /// CCSDS Reference: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
     ///
     /// :type: str
     #[getter]
@@ -318,7 +341,7 @@ impl AdmHeader {
     ///
     /// Examples: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
     ///
-    /// CCSDS Reference: 504.0-B-2, Section 3.2.2.
+    /// CCSDS Reference: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
     ///
     /// :type: str
     #[getter]
@@ -334,9 +357,9 @@ impl AdmHeader {
     /// ID that uniquely identifies a message from a given originator. The format and content of
     /// the message identifier value are at the discretion of the originator.
     ///
-    /// Examples: APM_201113719185, ABC-12_34
+    /// Examples: 201113719185, ABC-12_34
     ///
-    /// CCSDS Reference: 504.0-B-2, Section 3.2.2.
+    /// CCSDS Reference: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
     ///
     /// :type: Optional[str]
     #[getter]
@@ -354,7 +377,7 @@ impl AdmHeader {
     ///
     /// Examples: SBU, ‘Operator-proprietary data; secondary distribution not permitted’
     ///
-    /// CCSDS Reference: 504.0-B-2, Section 3.2.2.
+    /// CCSDS Reference: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
     ///
     /// :type: Optional[str]
     #[getter]
@@ -367,11 +390,11 @@ impl AdmHeader {
         self.inner.classification = value;
     }
 
-    /// User-defined comments. (See 7.8 for formatting rules.)
+    /// User-defined comments. (See ADM 6.10 for formatting and placement rules.)
     ///
     /// Examples: This is a comment
     ///
-    /// CCSDS Reference: 504.0-B-2, Section 3.2.2.
+    /// CCSDS Reference: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
     ///
     /// :type: list[str]
     #[getter]
@@ -383,6 +406,16 @@ impl AdmHeader {
     fn set_comment(&mut self, value: Vec<String>) {
         self.inner.comment = value;
     }
+}
+
+pub(crate) fn enum_token(value: &str) -> PyResult<String> {
+    let upper = value.to_ascii_uppercase();
+    if value != upper && value != value.to_ascii_lowercase() {
+        return Err(PyValueError::new_err(
+            "Enum strings must be all uppercase or all lowercase",
+        ));
+    }
+    Ok(upper)
 }
 
 /// Write an acceleration value, keeping any explicit XML units already on the record.
@@ -417,8 +450,13 @@ pub(crate) fn set_acceleration(slot: &mut Option<Acc>, value: Option<f64>) {
 ///     Acceleration vector Y-component (km/s²).
 /// z_ddot : float, optional
 ///     Acceleration vector Z-component (km/s²).
+///
+/// Raises
+/// ------
+/// ValueError
+///     Invalid CCSDS epoch.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object, name = "StateVectorAcc")]
+#[pyclass(module = "ccsds_ndm", from_py_object, name = "StateVectorAcc")]
 #[derive(Clone)]
 pub struct StateVectorAcc {
     pub inner: core_common::StateVectorAcc,
@@ -686,8 +724,15 @@ impl StateVectorAcc {
 ///     Velocity vector Y-component (km/s).
 /// z_dot : float
 ///     Velocity vector Z-component (km/s).
+/// comment : list[str], optional
+///     Comments before this state vector.
+///
+/// Raises
+/// ------
+/// ValueError
+///     Invalid CCSDS epoch.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct StateVector {
     pub inner: core_common::StateVector,
@@ -906,7 +951,7 @@ impl StateVector {
 /// drag_coeff : float, optional
 ///     Drag coefficient.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct SpacecraftParameters {
     pub inner: core_common::SpacecraftParameters,
@@ -1101,7 +1146,7 @@ impl SpacecraftParameters {
 /// comment : list of str, optional
 ///     Comments.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct OdParameters {
     pub inner: core_common::OdParameters,
@@ -1374,7 +1419,7 @@ impl OdParameters {
 /// nominal_impact_lat : float, optional
 ///     Nominal impact latitude. Units: deg
 /// nominal_impact_alt : float, optional
-///     Nominal impact altitude. Units: km
+///     Nominal impact altitude. Units: m
 /// impact_1_confidence : float, optional
 ///     Impact 1 confidence. Units: %
 /// impact_1_start_lon : float, optional
@@ -1414,7 +1459,7 @@ impl OdParameters {
 /// comment : list of str, optional
 ///     Comments.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct GroundImpactParameters {
     pub inner: core_common::GroundImpactParameters,
@@ -1648,8 +1693,12 @@ impl GroundImpactParameters {
         self.inner.probability_of_impact.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_probability_of_impact(&mut self, v: Option<f64>) {
-        self.inner.probability_of_impact = v.map(|value| ccsds_ndm::types::Probability { value });
+    fn set_probability_of_impact(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.probability_of_impact = v
+            .map(ccsds_ndm::types::Probability::new)
+            .transpose()
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        Ok(())
     }
 
     /// Probability that the entire object and any fragments will burn up during atmospheric
@@ -1663,8 +1712,12 @@ impl GroundImpactParameters {
         self.inner.probability_of_burn_up.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_probability_of_burn_up(&mut self, v: Option<f64>) {
-        self.inner.probability_of_burn_up = v.map(|value| ccsds_ndm::types::Probability { value });
+    fn set_probability_of_burn_up(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.probability_of_burn_up =
+            v.map(ccsds_ndm::types::Probability::new)
+                .transpose()
+                .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        Ok(())
     }
 
     /// Probability that the object will break up during re-entry (0 to 1).
@@ -1677,8 +1730,12 @@ impl GroundImpactParameters {
         self.inner.probability_of_break_up.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_probability_of_break_up(&mut self, v: Option<f64>) {
-        self.inner.probability_of_break_up = v.map(|value| ccsds_ndm::types::Probability { value });
+    fn set_probability_of_break_up(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.probability_of_break_up = v
+            .map(ccsds_ndm::types::Probability::new)
+            .transpose()
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        Ok(())
     }
 
     /// Probability that any fragment will impact solid ground (0 to 1).
@@ -1694,9 +1751,12 @@ impl GroundImpactParameters {
             .map(|v| v.value)
     }
     #[setter]
-    fn set_probability_of_land_impact(&mut self, v: Option<f64>) {
-        self.inner.probability_of_land_impact =
-            v.map(|value| ccsds_ndm::types::Probability { value });
+    fn set_probability_of_land_impact(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.probability_of_land_impact = v
+            .map(ccsds_ndm::types::Probability::new)
+            .transpose()
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        Ok(())
     }
 
     /// Probability that the re-entry event will cause any casualties (severe injuries or
@@ -1710,8 +1770,12 @@ impl GroundImpactParameters {
         self.inner.probability_of_casualty.as_ref().map(|v| v.value)
     }
     #[setter]
-    fn set_probability_of_casualty(&mut self, v: Option<f64>) {
-        self.inner.probability_of_casualty = v.map(|value| ccsds_ndm::types::Probability { value });
+    fn set_probability_of_casualty(&mut self, v: Option<f64>) -> PyResult<()> {
+        self.inner.probability_of_casualty = v
+            .map(ccsds_ndm::types::Probability::new)
+            .transpose()
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        Ok(())
     }
 
     /// Epoch of the predicted impact (formatting rules specified in 5.3.3.5).
@@ -2204,7 +2268,7 @@ impl GroundImpactParameters {
 }
 
 #[gen_stub_pyclass_enum]
-#[pyclass(from_py_object, eq, eq_int)]
+#[pyclass(module = "ccsds_ndm", from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq)]
 pub enum YesNo {
     Yes,
@@ -2251,7 +2315,7 @@ pub fn parse_yes_no(ob: &Bound<'_, PyAny>) -> PyResult<ccsds_ndm::types::YesNo> 
 }
 
 #[gen_stub_pyclass_enum]
-#[pyclass(from_py_object, eq, eq_int)]
+#[pyclass(module = "ccsds_ndm", from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq, Copy)]
 pub enum ObjectDescription {
     Payload,
@@ -2314,7 +2378,7 @@ pub fn parse_object_description(
 }
 
 #[gen_stub_pyclass_enum]
-#[pyclass(from_py_object, eq, eq_int)]
+#[pyclass(module = "ccsds_ndm", from_py_object, eq, eq_int)]
 #[derive(Clone, PartialEq, Copy)]
 pub enum ControlledType {
     Yes,

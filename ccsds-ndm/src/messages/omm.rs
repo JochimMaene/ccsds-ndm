@@ -19,11 +19,12 @@ mod tle;
 // OMM Specific Units
 //----------------------------------------------------------------------
 
-// 1/ER (Inverse Earth Radii) for BSTAR
+/// Inverse Earth-radius unit for BSTAR (ODM table 4-3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum InvErUnits {
     #[serde(rename = "1/ER")]
     #[default]
+    /// Inverse Earth radii, `1/ER`.
     InvEr,
 }
 impl std::fmt::Display for InvErUnits {
@@ -44,13 +45,15 @@ impl FromStr for InvErUnits {
         }
     }
 }
+/// SGP4 drag coefficient in inverse Earth radii (ODM table 4-3).
 pub type BStar = UnitValue<f64, InvErUnits>;
 
-// rev/day for MEAN_MOTION
+/// Revolutions per day for mean motion (ODM table 4-2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum RevPerDayUnits {
     #[serde(rename = "rev/day", alias = "REV/DAY")]
     #[default]
+    /// Revolutions per day, `rev/day`.
     RevPerDay,
 }
 impl std::fmt::Display for RevPerDayUnits {
@@ -71,13 +74,15 @@ impl FromStr for RevPerDayUnits {
         }
     }
 }
+/// Mean motion in revolutions per day (ODM table 4-2).
 pub type MeanMotion = UnitValue<f64, RevPerDayUnits>;
 
-// rev/day**2 for MEAN_MOTION_DOT
+/// Revolutions per day squared for the first mean-motion derivative (ODM table 4-3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum RevPerDay2Units {
     #[serde(rename = "rev/day**2", alias = "REV/DAY**2")]
     #[default]
+    /// Revolutions per day squared, `rev/day**2`.
     RevPerDay2,
 }
 impl std::fmt::Display for RevPerDay2Units {
@@ -98,13 +103,15 @@ impl FromStr for RevPerDay2Units {
         }
     }
 }
+/// First derivative of mean motion in revolutions per day squared (ODM table 4-3).
 pub type MeanMotionDot = UnitValue<f64, RevPerDay2Units>;
 
-// rev/day**3 for MEAN_MOTION_DDOT
+/// Revolutions per day cubed for the second mean-motion derivative (ODM table 4-3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum RevPerDay3Units {
     #[serde(rename = "rev/day**3", alias = "REV/DAY**3")]
     #[default]
+    /// Revolutions per day cubed, `rev/day**3`.
     RevPerDay3,
 }
 impl std::fmt::Display for RevPerDay3Units {
@@ -125,6 +132,7 @@ impl FromStr for RevPerDay3Units {
         }
     }
 }
+/// Second derivative of mean motion in revolutions per day cubed (ODM table 4-3).
 pub type MeanMotionDDot = UnitValue<f64, RevPerDay3Units>;
 
 //----------------------------------------------------------------------
@@ -146,11 +154,15 @@ pub type MeanMotionDDot = UnitValue<f64, RevPerDay3Units>;
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "omm")]
 pub struct Omm {
+    /// Message creation information and optional classification (ODM section 7.2).
     pub header: OdmHeader,
+    /// The single object's metadata and orbital data.
     pub body: OmmBody,
+    /// Fixed XML root identifier; MESSAGE_ID carries the message identity.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_OMM_VERS".to_string()))]
     pub id: Option<String>,
+    /// Supported edition, `2.0` or `3.0`.
     #[serde(rename = "@version")]
     #[builder(default = "3.0".to_string(), into)]
     pub version: String,
@@ -175,14 +187,21 @@ pub struct TleToOmmOptions {
 
 impl crate::traits::Validate for Omm {
     fn validate(&self) -> Result<()> {
-        crate::versioning::validate_root(
-            crate::validation::MessageKind::Omm,
-            &self.id,
-            &self.version,
+        crate::validation::validate_at_field_path(
+            crate::versioning::validate_root(
+                crate::validation::MessageKind::Omm,
+                &self.id,
+                &self.version,
+            ),
+            "",
         )?;
-        crate::versioning::validate_omm_edition(self)?;
         self.header.validate()?;
-        self.body.validate()
+        let segment = &self.body.segment;
+        segment.metadata.validate()?;
+        segment
+            .data
+            .validate_with_metadata(&segment.metadata, &self.version)?;
+        crate::versioning::validate_omm_edition(self)
     }
 }
 
@@ -192,7 +211,11 @@ impl Ndm for Omm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::detect::without_utf8_bom(kvn);
+        let normalized = crate::kvn::prepare_input(
+            crate::detect::without_utf8_bom(kvn),
+            crate::validation::MessageKind::Omm,
+        )?;
+        let kvn = normalized.as_ref();
         kvn::validate_kvn_syntax(kvn)?;
         let omm = Self::from_kvn_str(kvn)?;
         crate::traits::Validate::validate(&omm)?;
@@ -207,6 +230,7 @@ impl Ndm for Omm {
         xml::validate_xml_sequences(xml)?;
         let omm: Self = crate::xml::from_str_with_context(xml, "OMM")?;
         crate::traits::Validate::validate(&omm)?;
+        omm.validate_xml_representability()?;
         Ok(omm)
     }
 
@@ -223,31 +247,23 @@ impl Ndm for Omm {
 // Body & Segment
 //----------------------------------------------------------------------
 
+/// Single mean-elements segment carried by an OMM (ODM section 4.2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct OmmBody {
+    /// Metadata and orbital data for the single object.
     #[serde(rename = "segment")]
     pub segment: OmmSegment,
 }
 
-impl crate::traits::Validate for OmmBody {
-    fn validate(&self) -> Result<()> {
-        self.segment.validate()
-    }
-}
-
+/// Metadata and mean-elements data for one object (ODM section 4.2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct OmmSegment {
+    /// Object identity, center, reference frame, and time system.
     pub metadata: OmmMetadata,
+    /// Orbital elements and optional physical, covariance, and user-defined data.
     pub data: OmmData,
-}
-
-impl crate::traits::Validate for OmmSegment {
-    fn validate(&self) -> Result<()> {
-        self.metadata.validate()?;
-        self.data.validate_with_metadata(&self.metadata)
-    }
 }
 
 //----------------------------------------------------------------------
@@ -346,55 +362,17 @@ pub struct OmmMetadata {
 impl crate::traits::Validate for OmmMetadata {
     fn validate(&self) -> Result<()> {
         crate::validation::epoch_precision(&[("REF_FRAME_EPOCH", &self.ref_frame_epoch)])?;
-        if self.object_name.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "OMM Metadata".into(),
-                field: "OBJECT_NAME".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.object_id.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "OMM Metadata".into(),
-                field: "OBJECT_ID".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.center_name.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "OMM Metadata".into(),
-                field: "CENTER_NAME".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.ref_frame.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "OMM Metadata".into(),
-                field: "REF_FRAME".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.time_system.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "OMM Metadata".into(),
-                field: "TIME_SYSTEM".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.mean_element_theory.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "OMM Metadata".into(),
-                field: "MEAN_ELEMENT_THEORY".into(),
-                line: None,
-            }
-            .into());
-        }
-        Ok(())
+        crate::messages::opm::require_text(
+            "body.segment.metadata",
+            &[
+                ("OBJECT_NAME", &self.object_name),
+                ("OBJECT_ID", &self.object_id),
+                ("CENTER_NAME", &self.center_name),
+                ("REF_FRAME", &self.ref_frame),
+                ("TIME_SYSTEM", &self.time_system),
+                ("MEAN_ELEMENT_THEORY", &self.mean_element_theory),
+            ],
+        )
     }
 }
 
@@ -474,39 +452,45 @@ impl crate::traits::Validate for OmmData {
 }
 
 impl OmmData {
-    pub fn validate_with_metadata(&self, metadata: &OmmMetadata) -> Result<()> {
-        let theory = metadata.mean_element_theory.as_str();
+    /// Validate the data block together with the theory-dependent requirements of the message
+    /// edition `version` (ODM 502.0-B-3 or 502.0-B-2 table 4-3; see [`TleParameters::validate`]).
+    pub fn validate_with_metadata(&self, metadata: &OmmMetadata, version: &str) -> Result<()> {
+        let normalized_theory = metadata.mean_element_theory.trim().to_ascii_uppercase();
+        let theory = normalized_theory.as_str();
 
         self.validate()?;
 
-        // 1. Validate TLE Parameters presence based on theory
-        match theory {
-            "SGP" | "SGP4" | "PPT3" | "SGP4-XP" => {
-                let tle =
-                    self.tle_parameters
-                        .as_ref()
-                        .ok_or(ValidationError::MissingRequiredField {
-                            block: Cow::Borrowed("OMM Data"),
-                            field: Cow::Borrowed("TLE_PARAMETERS"),
-                            line: None,
-                        })?;
-                tle.validate(theory)?;
-            }
-            _ => {
-                if let Some(tle) = &self.tle_parameters {
-                    tle.validate(theory)?;
+        // Theories whose required keywords live in the TLE block need that block. ODM 2.0 knows
+        // only SGP and SGP4; PPT3 and SGP4-XP are 3.0 additions.
+        let tle_theory = match version {
+            "2.0" => matches!(theory, "SGP" | "SGP4" | "SGP/SGP4"),
+            _ => matches!(theory, "SGP" | "SGP4" | "SGP/SGP4" | "PPT3" | "SGP4-XP"),
+        };
+        match &self.tle_parameters {
+            Some(tle) => crate::validation::validate_at_field_path(
+                tle.validate(theory, version),
+                "body.segment.data.tle_parameters",
+            )?,
+            None if tle_theory => {
+                return Err(ValidationError::MissingRequiredField {
+                    block: Cow::Borrowed("OMM Data"),
+                    field: Cow::Borrowed("TLE_PARAMETERS"),
+                    line: None,
                 }
+                .into())
             }
+            None => {}
         }
 
-        // 2. Validate Mean Motion vs Semi Major Axis
-        // If SGP/SGP4, MEAN_MOTION is preferred/required.
-        if matches!(theory, "SGP" | "SGP4") && self.mean_elements.mean_motion.is_none() {
+        // ODM 4.2.4.6: a TLE-based (SGP/SGP4) OMM uses MEAN_MOTION, not SEMI_MAJOR_AXIS.
+        if matches!(theory, "SGP" | "SGP4" | "SGP/SGP4") && self.mean_elements.mean_motion.is_none()
+        {
             return Err(ValidationError::MissingRequiredField {
                 block: Cow::Borrowed("Mean Elements"),
                 field: Cow::Borrowed("MEAN_MOTION"),
                 line: None,
             }
+            .at_path("body.segment.data.mean_elements.mean_motion")
             .into());
         }
 
@@ -685,8 +669,10 @@ impl crate::traits::Validate for MeanElements {
             }
         }
 
+        // The XSD's positive `gmType` applies in every notation, so a valid model always converts.
         if let Some(gm) = &self.gm {
             Gm::validate_value(gm.value, "GM")?;
+            Gm::validate_xml_value(gm.value, "GM")?;
         }
         Ok(())
     }
@@ -701,7 +687,10 @@ impl TleParameters {
         for (field, value) in [
             ("BSTAR", self.bstar.as_ref().map(|value| value.value)),
             ("BTERM", self.bterm.as_ref().map(|value| value.value)),
-            ("MEAN_MOTION_DOT", Some(self.mean_motion_dot.value)),
+            (
+                "MEAN_MOTION_DOT",
+                self.mean_motion_dot.as_ref().map(|value| value.value),
+            ),
             (
                 "MEAN_MOTION_DDOT",
                 self.mean_motion_ddot.as_ref().map(|value| value.value),
@@ -788,12 +777,15 @@ pub struct TleParameters {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bterm: Option<M2kg>,
     /// First Time Derivative of the Mean Motion (i.e., a drag term, required when
-    /// MEAN_ELEMENT_THEORY = SGP or PPT3). (See 4.2.4.7 for important details).
+    /// MEAN_ELEMENT_THEORY = SGP or PPT3; ODM 2.0: SGP). (See 4.2.4.7 for important details).
+    /// Both OMM XML schemas require it in every `tleParameters` element, so XML input and
+    /// output refuse a TLE block without it.
     ///
     /// **Units**: rev/day²
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
-    pub mean_motion_dot: MeanMotionDot,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mean_motion_dot: Option<MeanMotionDot>,
     /// Second Time Derivative of Mean Motion (i.e., a drag term). (See 4.2.4.7 for important
     /// details). Required when MEAN_ELEMENT_THEORY= SGP or PPT3.
     ///
@@ -815,7 +807,19 @@ pub struct TleParameters {
 }
 
 impl TleParameters {
-    pub fn validate(&self, theory: &str) -> Result<()> {
+    /// Check the mutually exclusive coefficient pairs and the keywords that the upper-case
+    /// `theory` makes conditional in edition `version`:
+    ///
+    /// | Theory | ODM 3.0 (502.0-B-3 table 4-3) | ODM 2.0 (502.0-B-2 table 4-3) |
+    /// | --- | --- | --- |
+    /// | `SGP` | `MEAN_MOTION_DOT`, `MEAN_MOTION_DDOT` | `NORAD_CAT_ID`, `BSTAR`, `MEAN_MOTION_DOT`, `MEAN_MOTION_DDOT` |
+    /// | `SGP4` | `BSTAR` | `NORAD_CAT_ID`, `BSTAR` |
+    /// | `SGP/SGP4` | none | `NORAD_CAT_ID`, `BSTAR` |
+    /// | `PPT3` | `MEAN_MOTION_DOT`, `MEAN_MOTION_DDOT` | none (not a 2.0 theory) |
+    /// | `SGP4-XP` | `BTERM`, `AGOM` | none (not a 2.0 theory) |
+    ///
+    /// Any other theory requires nothing here.
+    pub fn validate(&self, theory: &str, version: &str) -> Result<()> {
         if self.bstar.is_some() && self.bterm.is_some() {
             return Err(ValidationError::Conflict {
                 fields: vec![Cow::Borrowed("BSTAR"), Cow::Borrowed("BTERM")],
@@ -831,46 +835,38 @@ impl TleParameters {
             .into());
         }
 
-        match theory {
-            "SGP" | "PPT3" => {
-                if self.mean_motion_ddot.is_none() {
-                    return Err(ValidationError::MissingRequiredField {
-                        block: Cow::Borrowed("TLE Parameters"),
-                        field: Cow::Borrowed("MEAN_MOTION_DDOT"),
-                        line: None,
-                    }
-                    .into());
+        const DOTS: &[&str] = &["MEAN_MOTION_DOT", "MEAN_MOTION_DDOT"];
+        let required: &[&str] = match (version, theory) {
+            ("2.0", "SGP") => &[
+                "NORAD_CAT_ID",
+                "BSTAR",
+                "MEAN_MOTION_DOT",
+                "MEAN_MOTION_DDOT",
+            ],
+            ("2.0", "SGP4" | "SGP/SGP4") => &["NORAD_CAT_ID", "BSTAR"],
+            ("2.0", _) => &[],
+            (_, "SGP" | "PPT3") => DOTS,
+            (_, "SGP4") => &["BSTAR"],
+            (_, "SGP4-XP") => &["BTERM", "AGOM"],
+            _ => &[],
+        };
+        for &field in required {
+            let present = match field {
+                "NORAD_CAT_ID" => self.norad_cat_id.is_some(),
+                "BSTAR" => self.bstar.is_some(),
+                "BTERM" => self.bterm.is_some(),
+                "MEAN_MOTION_DOT" => self.mean_motion_dot.is_some(),
+                "MEAN_MOTION_DDOT" => self.mean_motion_ddot.is_some(),
+                _ => self.agom.is_some(),
+            };
+            if !present {
+                return Err(ValidationError::MissingRequiredField {
+                    block: Cow::Borrowed("TLE Parameters"),
+                    field: Cow::Borrowed(field),
+                    line: None,
                 }
+                .into());
             }
-            "SGP4" => {
-                if self.bstar.is_none() {
-                    return Err(ValidationError::MissingRequiredField {
-                        block: Cow::Borrowed("TLE Parameters"),
-                        field: Cow::Borrowed("BSTAR"),
-                        line: None,
-                    }
-                    .into());
-                }
-            }
-            "SGP4-XP" => {
-                if self.bterm.is_none() {
-                    return Err(ValidationError::MissingRequiredField {
-                        block: Cow::Borrowed("TLE Parameters"),
-                        field: Cow::Borrowed("BTERM"),
-                        line: None,
-                    }
-                    .into());
-                }
-                if self.agom.is_none() {
-                    return Err(ValidationError::MissingRequiredField {
-                        block: Cow::Borrowed("TLE Parameters"),
-                        field: Cow::Borrowed("AGOM"),
-                        line: None,
-                    }
-                    .into());
-                }
-            }
-            _ => {}
         }
         Ok(())
     }

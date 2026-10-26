@@ -21,7 +21,7 @@ pub(crate) fn spec(kind: MessageKind) -> Option<VersionSpec> {
     match kind {
         MessageKind::Opm => Some(VersionSpec {
             id_keyword: "CCSDS_OPM_VERS",
-            input_versions: &["1.0", "2.0", "3.0"],
+            input_versions: &["2.0", "3.0"],
             output_versions: &["2.0", "3.0"],
         }),
         MessageKind::Omm => Some(VersionSpec {
@@ -32,7 +32,7 @@ pub(crate) fn spec(kind: MessageKind) -> Option<VersionSpec> {
         MessageKind::Oem => Some(VersionSpec {
             id_keyword: "CCSDS_OEM_VERS",
             // OEM 1.0 (ODM Silver Book 1.0, 7.9.1) is read like 2.0; no audited 1.0 book or
-            // schema backs a writer, so it is parse-only, like OPM 1.0.
+            // schema backs a writer, so it is parse-only.
             input_versions: &["1.0", "2.0", "3.0"],
             output_versions: &["2.0", "3.0"],
         }),
@@ -43,17 +43,17 @@ pub(crate) fn spec(kind: MessageKind) -> Option<VersionSpec> {
         }),
         MessageKind::Aem => Some(VersionSpec {
             id_keyword: "CCSDS_AEM_VERS",
-            input_versions: &["1.0", "2.0"],
+            input_versions: &["2.0"],
             output_versions: &["2.0"],
         }),
         MessageKind::Apm => Some(VersionSpec {
             id_keyword: "CCSDS_APM_VERS",
-            input_versions: &["1.0", "2.0"],
+            input_versions: &["2.0"],
             output_versions: &["2.0"],
         }),
         MessageKind::Acm => Some(VersionSpec {
             id_keyword: "CCSDS_ACM_VERS",
-            input_versions: &["1.0", "2.0"],
+            input_versions: &["2.0"],
             output_versions: &["2.0"],
         }),
         MessageKind::Cdm => Some(VersionSpec {
@@ -63,7 +63,7 @@ pub(crate) fn spec(kind: MessageKind) -> Option<VersionSpec> {
         }),
         MessageKind::Tdm => Some(VersionSpec {
             id_keyword: "CCSDS_TDM_VERS",
-            input_versions: &["1.0", "2.0"],
+            input_versions: &["2.0"],
             output_versions: &["2.0"],
         }),
         MessageKind::Rdm => Some(VersionSpec {
@@ -112,15 +112,29 @@ pub(crate) fn validate_root(kind: MessageKind, id: &Option<String>, version: &st
         }
     }
 
-    if !spec.input_versions.contains(&version) {
-        return Err(CcsdsNdmError::UnsupportedInputVersion {
-            message_type: kind.as_str(),
-            version: version.to_string(),
-            supported: spec.input_versions.join(", "),
-        });
-    }
+    check_input_version(kind, version)
+}
 
-    Ok(())
+/// Reject an edition this library cannot read. Readers call this before the structural parse.
+pub(crate) fn check_input_version(kind: MessageKind, version: &str) -> Result<()> {
+    match spec(kind) {
+        Some(spec) if !spec.input_versions.contains(&version) => {
+            Err(CcsdsNdmError::UnsupportedInputVersion {
+                message_type: kind.as_str(),
+                version: version.to_string(),
+                supported: spec.input_versions.join(", "),
+            })
+        }
+        _ => Ok(()),
+    }
+}
+
+/// The message family whose standalone XML root element is `root` (`<opm>`, `<tdm>`, ...).
+pub(crate) fn kind_for_xml_root(root: &[u8]) -> Option<MessageKind> {
+    use MessageKind::*;
+    [Opm, Omm, Oem, Ocm, Acm, Aem, Apm, Cdm, Tdm, Rdm]
+        .into_iter()
+        .find(|kind| kind.as_str().as_bytes().eq_ignore_ascii_case(root))
 }
 
 fn invalid_edition_value(
@@ -159,11 +173,49 @@ fn validate_odm_2_header(header: &crate::common::OdmHeader) -> Result<()> {
     Ok(())
 }
 
+/// The ODM 2.0 common schema's `angleRange` is [-180, 360), narrower than 3.0's [-360, 360).
+/// Like every XSD facet it applies in all notations, so a valid 2.0 model always converts.
+fn validate_odm_2_angles(
+    parent: &'static str,
+    angles: &[(&'static str, Option<f64>)],
+) -> Result<()> {
+    for (field, value) in angles {
+        if let Some(value) = value.filter(|value| !(-180.0..360.0).contains(value)) {
+            return Err(ValidationError::OutOfRange {
+                name: (*field).into(),
+                value: value.to_string(),
+                expected: "[-180, 360) for CCSDS 502.0-B-2".into(),
+                line: None,
+            }
+            .at_field_in(parent)
+            .into());
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_opm_edition(message: &crate::messages::opm::Opm) -> Result<()> {
     if message.version != "2.0" {
         return Ok(());
     }
     validate_odm_2_header(&message.header)?;
+    if let Some(elements) = &message.body.segment.data.keplerian_elements {
+        validate_odm_2_angles(
+            "body.segment.data.keplerian_elements",
+            &[
+                ("RA_OF_ASC_NODE", Some(elements.ra_of_asc_node.value)),
+                ("ARG_OF_PERICENTER", Some(elements.arg_of_pericenter.value)),
+                (
+                    "TRUE_ANOMALY",
+                    elements.true_anomaly.as_ref().map(|a| a.value),
+                ),
+                (
+                    "MEAN_ANOMALY",
+                    elements.mean_anomaly.as_ref().map(|a| a.value),
+                ),
+            ],
+        )?;
+    }
     for (index, maneuver) in message
         .body
         .segment
@@ -240,6 +292,43 @@ fn validate_oem_1_content(message: &crate::messages::oem::Oem) -> Result<()> {
                 format!("body.segment[{index}].data.state_vector[{state}]"),
             ));
         }
+        // 502.0-B-1, 4.3.5c requires strictly increasing epochs within each segment.
+        for (state, pair) in segment.data.state_vector.windows(2).enumerate() {
+            if matches!(
+                pair[0].epoch.cmp_same_branch(&pair[1].epoch),
+                Some(std::cmp::Ordering::Greater | std::cmp::Ordering::Equal)
+            ) {
+                return Err(ValidationError::InvalidValue {
+                    field: "EPOCH".into(),
+                    value: pair[1].epoch.to_string(),
+                    expected: "strictly after the preceding ephemeris epoch (CCSDS 502.0-B-1)"
+                        .into(),
+                    line: None,
+                }
+                .at_path(format!(
+                    "body.segment[{index}].data.state_vector[{}].epoch",
+                    state + 1
+                ))
+                .into());
+            }
+        }
+        // 502.0-B-1, table 4-3 permits a shared endpoint, but no overlapping total spans.
+        if index > 0
+            && segment
+                .metadata
+                .start_time
+                .cmp_same_branch(&message.body.segment[index - 1].metadata.stop_time)
+                == Some(std::cmp::Ordering::Less)
+        {
+            return Err(ValidationError::InvalidValue {
+                field: "START_TIME".into(),
+                value: segment.metadata.start_time.to_string(),
+                expected: "at or after the preceding segment's STOP_TIME (CCSDS 502.0-B-1)".into(),
+                line: None,
+            }
+            .at_path(format!("body.segment[{index}].metadata.start_time"))
+            .into());
+        }
     }
     Ok(())
 }
@@ -249,6 +338,42 @@ pub(crate) fn validate_omm_edition(message: &crate::messages::omm::Omm) -> Resul
         return Ok(());
     }
     validate_odm_2_header(&message.header)?;
+    let elements = &message.body.segment.data.mean_elements;
+    validate_odm_2_angles(
+        "body.segment.data.mean_elements",
+        &[
+            ("RA_OF_ASC_NODE", Some(elements.ra_of_asc_node.value)),
+            ("ARG_OF_PERICENTER", Some(elements.arg_of_pericenter.value)),
+            ("MEAN_ANOMALY", Some(elements.mean_anomaly.value)),
+        ],
+    )?;
+    let Some(tle) = &message.body.segment.data.tle_parameters else {
+        return Ok(());
+    };
+    if tle.bterm.is_some() {
+        return Err(invalid_edition_value(
+            "BTERM",
+            "present",
+            "absent in CCSDS 502.0-B-2",
+            "body.segment.data.tle_parameters.bterm",
+        ));
+    }
+    if tle.agom.is_some() {
+        return Err(invalid_edition_value(
+            "AGOM",
+            "present",
+            "absent in CCSDS 502.0-B-2",
+            "body.segment.data.tle_parameters.agom",
+        ));
+    }
+    Ok(())
+}
+
+// The 2.0 XSD requires a complete TLE block even where the book makes fields conditional.
+pub(crate) fn validate_omm_xml_edition(message: &crate::messages::omm::Omm) -> Result<()> {
+    if message.version != "2.0" {
+        return Ok(());
+    }
     let Some(tle) = &message.body.segment.data.tle_parameters else {
         return Ok(());
     };
@@ -288,22 +413,6 @@ pub(crate) fn validate_omm_edition(message: &crate::messages::omm::Omm) -> Resul
             .at_path(path)
             .into());
         }
-    }
-    if tle.bterm.is_some() {
-        return Err(invalid_edition_value(
-            "BTERM",
-            "present",
-            "absent in CCSDS 502.0-B-2",
-            "body.segment.data.tle_parameters.bterm",
-        ));
-    }
-    if tle.agom.is_some() {
-        return Err(invalid_edition_value(
-            "AGOM",
-            "present",
-            "absent in CCSDS 502.0-B-2",
-            "body.segment.data.tle_parameters.agom",
-        ));
     }
     Ok(())
 }

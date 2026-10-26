@@ -28,6 +28,79 @@ from ccsds_ndm import (
 KVN_DIR = Path(__file__).resolve().parents[3] / "ccsds-ndm" / "data" / "kvn"
 
 
+@pytest.mark.parametrize(
+    "fixture, block, row, time, field",
+    [
+        ("acm_g6.kvn", "att", 2, "0.0", "ATT time tag"),
+        ("acm_g9.kvn", "cov", 1, "0.0", "COV time tag"),
+        ("acm_g9.kvn", "cov", 1, "-1.0", "COV time tag"),
+    ],
+)
+def test_history_time_edits_reach_validation_and_generation(
+    fixture, block, row, time, field
+):
+    message = Acm.from_file(str(KVN_DIR / fixture))
+    history = getattr(message.segment.data, block)[0]
+    records = getattr(history, f"{block}_lines")
+    records[row] = (time, records[row][1])
+    setattr(history, f"{block}_lines", records)
+    with pytest.raises(ccsds_ndm.NdmValidationError, match=field):
+        message.validate()
+    for notation in ("kvn", "xml"):
+        with pytest.raises(ccsds_ndm.NdmValidationError, match=field):
+            message.to_str(format=notation)
+
+
+def test_kvn_none_rate_type_is_normalized_to_omission():
+    source = (KVN_DIR / "acm_g6.kvn").read_text()
+    source = source.replace(
+        "ATT_TYPE = QUATERNION", "ATT_TYPE = QUATERNION\nRATE_TYPE = NONE"
+    )
+    message = Acm.from_str(source, format="kvn")
+    assert message.segment.data.att[0].rate_type is None
+    assert "RATE_TYPE" not in message.to_str(format="kvn")
+    xml = message.to_str(format="xml")
+    assert Acm.from_str(xml, format="xml").segment.data.att[0].rate_type is None
+
+
+def test_declared_blocks_are_checked_after_live_metadata_edits():
+    message = Acm.from_file(KVN_DIR / "acm_g6.kvn")
+    metadata = message.segment.metadata
+    metadata.acm_data_elements = "ATT"
+    message.validate()
+    for notation in ("kvn", "xml"):
+        encoded = message.to_str(format=notation)
+        assert (
+            Acm.from_str(encoded, format=notation).segment.metadata.acm_data_elements
+            == "ATT"
+        )
+
+    metadata.acm_data_elements = "ATT,COV"
+    with pytest.raises(ccsds_ndm.NdmValidationError, match="ACM_DATA_ELEMENTS"):
+        message.validate()
+    for notation in ("kvn", "xml"):
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="ACM_DATA_ELEMENTS"):
+            message.to_str(format=notation)
+
+
+def test_maneuver_targets_follow_purposes_and_keep_multiple_targets_in_kvn():
+    message = Acm.from_file(KVN_DIR / "acm_g7.kvn")
+    maneuver = message.segment.data.man[0]
+    maneuver.man_purpose = "ATT_ADJUST"
+    with pytest.raises(ccsds_ndm.NdmValidationError, match="TARGET_ATTITUDE"):
+        message.validate()
+
+    maneuver.man_purpose = "MOM_DESAT, ATT_ADJUST"
+    maneuver.target_attitude = [0.0, 0.0, 0.0, 1.0]
+    message.validate()
+    reparsed = Acm.from_str(message.to_str(format="kvn"), format="kvn")
+    actual = reparsed.segment.data.man[0]
+    assert actual.target_momentum == maneuver.target_momentum
+    assert actual.target_attitude == maneuver.target_attitude
+    with pytest.raises(ccsds_ndm.NdmValidationError, match="one target choice"):
+        message.to_str(format="xml")
+
+
 class TestAcm:
     """Tests for ACM bindings."""
 
@@ -104,7 +177,7 @@ class TestAcm:
                 ref_frame_a="EME2000",
                 ref_frame_b="SC_BODY_1",
                 att_type="NOT_IN_XSD_ENUM",
-                att_lines=[[0.0, 0.0, 0.0, 1.0]],
+                att_lines=[("0.0", [0.0, 0.0, 0.0, 1.0])],
                 comment=[],
             )
 
@@ -113,7 +186,7 @@ class TestAcm:
             ref_frame_a="EME2000",
             ref_frame_b="SC_BODY_1",
             att_type="QUATERNION",
-            att_lines=[[0.0, 0.0, 0.0, 1.0]],
+            att_lines=[("0.0", [0.0, 0.0, 0.0, 1.0])],
             comment=[],
         )
         state.comment = ["att comment"]
@@ -127,7 +200,10 @@ class TestAcm:
         state.att_type = "EULER_ANGLES"
         state.rate_type = "ANGVEL"
         state.euler_rot_seq = "XYZ"
-        state.att_lines = [[1.0, 2.0, 3.0, 4.0], [4.0, 5.0, 6.0, 7.0]]
+        state.att_lines = [
+            ("1.0", [2.0, 3.0, 4.0]),
+            ("2017-001T00:00:00", [5.0, 6.0, 7.0]),
+        ]
 
         assert state.comment == ["att comment"]
         assert state.att_id == "ATT_1"
@@ -140,12 +216,18 @@ class TestAcm:
         assert state.att_type == "EULER_ANGLES"
         assert state.rate_type == "ANGVEL"
         assert state.euler_rot_seq == "XYZ"
-        assert state.att_lines == [[1.0, 2.0, 3.0, 4.0], [4.0, 5.0, 6.0, 7.0]]
+        assert state.att_lines == [
+            ("1.0", [2.0, 3.0, 4.0]),
+            ("2017-001T00:00:00", [5.0, 6.0, 7.0]),
+        ]
 
         with pytest.raises(ValueError):
             state.att_type = "NOT_IN_XSD_ENUM"
-        with pytest.raises(ValueError):
-            state.att_basis = "NOT_IN_XSD_ENUM"
+        # ATT_BASIS is open text (table 5-4 suggested values); XML output enforces the XSD enum.
+        state.att_basis = "CUSTOM_BASIS"
+        assert state.att_basis == "CUSTOM_BASIS"
+        with pytest.raises(ccsds_ndm.NdmEpochError):
+            state.att_lines = [("not-an-epoch", [1.0])]
         with pytest.raises(ValueError):
             state.rate_type = "NOT_IN_XSD_ENUM"
         with pytest.raises(ValueError):
@@ -157,7 +239,7 @@ class TestAcm:
                 cov_basis="SIMULATION",
                 cov_ref_frame="EME2000",
                 cov_type="NOT_IN_XSD_ENUM",
-                cov_lines=[[1.0]],
+                cov_lines=[("0.0", [1.0])],
                 comment=[],
             )
 
@@ -201,22 +283,20 @@ class TestAcm:
             cov_basis="PREDICTED",
             cov_ref_frame="EME2000",
             cov_type="QUATERNION",
-            cov_lines=[[1.0, 0.0, 0.0, 1.0]],
+            cov_lines=[("0.0", [0.0, 0.0, 1.0])],
             comment=[],
         )
         cov.comment = ["cov comment"]
         cov.cov_basis = "DETERMINED_GND"
         cov.cov_ref_frame = "SC_BODY_1"
         cov.cov_type = "ANGLE"
-        cov.cov_confidence = 80.0
-        cov.cov_lines = [[1.0, 2.0], [3.0, 4.0]]
+        cov.cov_lines = [("1.0", [2.0]), ("3.0", [4.0])]
 
         assert cov.comment == ["cov comment"]
         assert cov.cov_basis == "DETERMINED_GND"
         assert cov.cov_ref_frame == "SC_BODY_1"
         assert cov.cov_type == "ANGLE"
-        assert cov.cov_confidence == pytest.approx(80.0)
-        assert cov.cov_lines == [[1.0, 2.0], [3.0, 4.0]]
+        assert cov.cov_lines == [("1.0", [2.0]), ("3.0", [4.0])]
 
         with pytest.raises(ValueError):
             cov.cov_type = "NOT_IN_XSD_ENUM"
@@ -285,10 +365,8 @@ class TestAcm:
         ad.number_states = 7
         ad.attitude_states = "QUATERNION"
         ad.cov_type = "QUATERNION"
-        ad.ad_epoch = "2023-01-01T00:00:00"
         ad.ref_frame_a = "J2000"
         ad.ref_frame_b = "SC_BODY_1"
-        ad.attitude_type = "QUATERNION"
         ad.rate_states = "ANGVEL"
         ad.sigma_u = 3.7e-7
         ad.sigma_v = 1.3e-5
@@ -303,10 +381,8 @@ class TestAcm:
         assert ad.number_states == 7
         assert ad.attitude_states == "QUATERNION"
         assert ad.cov_type == "QUATERNION"
-        assert ad.ad_epoch == "2023-01-01T00:00:00"
         assert ad.ref_frame_a == "J2000"
         assert ad.ref_frame_b == "SC_BODY_1"
-        assert ad.attitude_type == "QUATERNION"
         assert ad.rate_states == "ANGVEL"
         assert ad.sigma_u == pytest.approx(3.7e-7)
         assert ad.sigma_v == pytest.approx(1.3e-5)
@@ -320,8 +396,6 @@ class TestAcm:
             ad.cov_type = "NOT_IN_XSD_ENUM"
         with pytest.raises(ValueError):
             ad.rate_states = "NOT_IN_XSD_ENUM"
-        with pytest.raises(ValueError):
-            ad.ad_epoch = "not-an-epoch"
 
     def _create_valid_acm(self):
         # Create a minimal valid ACM
@@ -340,14 +414,14 @@ class TestAcm:
         )
 
         # AcmAttitudeState: ref_frame_a, ref_frame_b, att_type, att_lines, comment
-        # att_lines is Vec<Vec<f64>> (each inner vec is values for AttLine)
+        # Each att_lines entry is (time tag, attitude/rate values).
         # AttLine values depend on type. Simplified context.
         state = AcmAttitudeState(
             ref_frame_a="EME2000",
             ref_frame_b="SC_BODY_1",
             att_type="QUATERNION",
-            # Relative time followed by the four quaternion states.
-            att_lines=[[0.0, 0.0, 0.0, 0.0, 1.0]],
+            # Relative time tag and the four quaternion states.
+            att_lines=[("0.0", [0.0, 0.0, 0.0, 1.0])],
             comment=[],
         )
 
@@ -387,14 +461,14 @@ class TestAcm:
         segment = acm.segment
         attitude = segment.data.att[0]
         attitude.number_states = attitude.number_states + 1
-        with pytest.raises(ccsds_ndm.NdmValidationError, match="attLine"):
+        with pytest.raises(ccsds_ndm.NdmValidationError, match="NUMBER_STATES"):
             segment.data.validate(segment.metadata)
 
         segment.metadata.object_name = ""
         with pytest.raises(ccsds_ndm.NdmValidationError, match="OBJECT_NAME"):
             segment.metadata.validate()
         with pytest.raises(ccsds_ndm.NdmValidationError, match="OBJECT_NAME"):
-            segment.validate(acm.header)
+            segment.validate()
 
     def test_file_io(self, tmp_path):
         acm = self._create_valid_acm()
@@ -439,7 +513,7 @@ class TestAcm:
             ref_frame_a="EME2000",
             ref_frame_b="SC_BODY_1",
             att_type="QUATERNION",
-            att_lines=[[0.0, 0.0, 0.0, 1.0]],
+            att_lines=[("0.0", [0.0, 0.0, 0.0, 1.0])],
             comment=[],
         )
         data = segment.data
@@ -456,7 +530,7 @@ class TestAcm:
                 cov_basis="PREDICTED",
                 cov_ref_frame="EME2000",
                 cov_type="QUATERNION",
-                cov_lines=[[1.0, 0.0, 0.0, 1.0]],
+                cov_lines=[("0.0", [0.0, 0.0, 1.0])],
                 comment=[],
             )
         ]

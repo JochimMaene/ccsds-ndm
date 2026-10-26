@@ -15,7 +15,10 @@ cargo add ccsds-ndm
 
 ## Implemented Message Families
 
-The crate contains typed models, parsers, and serializers for the message families below. Inclusion in this table does not by itself claim verified support for every edition, notation, or operation. Exact support claims will be published in the project support and conformance matrix.
+The crate contains typed models, parsers, and serializers for the message families below. Supported editions and their documented limits are listed in the
+[support matrix](https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/support-matrix.md).
+All current message families use the same
+[conformance verification criteria](https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/conformance/README.md#verification-criteria).
 
 | Message | Description |
 |---------|-------------|
