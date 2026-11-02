@@ -8,12 +8,11 @@ use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::{from_str, Ndm};
 
 #[test]
-fn unaudited_adm_and_tdm_editions_are_not_advertised_as_supported() {
+fn unaudited_adm_editions_are_not_advertised_as_supported() {
     let cases = [
         ("AEM", include_str!("../../data/kvn/aem_g4.kvn")),
         ("APM", include_str!("../../data/kvn/apm_g1.kvn")),
         ("ACM", include_str!("../../data/kvn/acm_g6.kvn")),
-        ("TDM", include_str!("../../data/kvn/tdm_e1.kvn")),
     ];
 
     for (message_type, input) in cases {

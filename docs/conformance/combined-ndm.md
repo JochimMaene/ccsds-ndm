@@ -5,7 +5,7 @@ and `ccsds-ndm/data/xsd/ndmxml-4.0.0-master-4.0.xsd`. It is the only representat
 parses or writes.
 
 CCSDS defines no KVN combined instantiation. Section 4.11 lives in the XML specification and
-requires the `<ndm></ndm>` root element tags (NDM/XML §§4.11.4–4.11.5;
+requires the `<ndm></ndm>` root element tags (NDM/XML §§4.11.3–4.11.5;
 ODM §§8.12.6–8.12.7), while each KVN family section requires the message
 header line to be the first non-blank line in the file (CDM 508.0-B-1 section 6.3.1.2, ODM
 502.0-B-3 section 7.3.6, ADM 504.0-B-2 sections 3.2.2.3/4.2.2.3/5.3.2.3, RDM 508.1-B-1 section
@@ -19,7 +19,8 @@ The combined-NDM suites establish:
 - exact root and constituent attribute contracts, document-root/trailing-content checks, schema
   child ordering, and rejection of unknown or nested message structure;
 - envelope text decoding for XML entities, character references and CDATA, preservation of empty
-  `MESSAGE_ID`/`COMMENT` strings, and rejection of attributes or nested elements in those fields;
+  `MESSAGE_ID`/`COMMENT` strings, namespace-aware schema-location hints on those fields, and
+  rejection of other attributes or nested elements;
 - processing instructions and XML comments ignored throughout the envelope, including within
   text fields, consistently with the shared XML contract;
 - ordered typed preservation of the `ndm_g12.xml` and `ndm_g21.xml` constituents, followed by
@@ -57,7 +58,7 @@ are inconsistent: G12 includes the `ndm` namespace and G21/G22 omit it. Parsing 
 both schema-valid spellings and generation is judged against the official master XSD instead of
 requiring a namespace spelling absent from official examples.
 
-Python combined construction/identity and aggregate limits are exercised by
+Python combined construction/identity and the fixed XML nesting limit are exercised by
 `bindings/python/tests/test_ndm.py` and `test_parse_and_generation_options.py`. `package-python`
 and `package-rust` are the shared built-artifact gates.
 
@@ -81,3 +82,15 @@ constituent consistently with standalone OPM.
 
 Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
+
+Space-Track ODM 2.0 `<ndm>` exports are rejected before parsing constituent content,
+so an edition mismatch takes precedence over later content errors. Extract the constituent
+as standalone XML with its namespace bindings or request an ODM 3.0 export. CelesTrak
+OMM with empty creation/originator fields is also rejected under ODM 7.5.1; obtain real
+provenance rather than filling dummy values.
+
+Namespace declarations on constituents are accepted because XML Namespaces does not
+class them as ordinary application attributes. Constituent schema-location hints,
+including `xsi:noNamespaceSchemaLocation`, are rejected under ODM 8.12.7. Empty `<ndm/>`
+can be read and generated. The published G22 OCM constituent independently violates
+MAN_COMPOSITION table order (6.2.8.16), in addition to the OPM MASS issue recorded above.

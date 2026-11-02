@@ -18,7 +18,6 @@ use crate::kvn::ser::KvnWriter;
 use crate::parse_block;
 use crate::traits::ToKvn;
 use crate::types::*;
-use std::str::FromStr;
 use winnow::ascii::{space1, till_line_ending};
 use winnow::combinator::{peek, repeat, terminated};
 use winnow::error::{AddContext, ErrMode, FromExternalError};
@@ -42,44 +41,6 @@ fn kv_days_since_obs(input: &mut &str) -> KvnResult<DayInterval> {
     })
 }
 
-/// Rewrites an exponent relative time tag (`1.5e3`) as the plain decimal (`1500`) that the XSD
-/// `epochType` can represent. ODM 6.2.2.3 defines relative tags as doubles and 7.5.6 allows
-/// exponents; shifting the decimal point is exact, so no value changes.
-fn expand_exponent(token: &str) -> Option<String> {
-    let (mantissa, exponent) = token.split_once(['e', 'E'])?;
-    let exponent: i32 = exponent
-        .parse()
-        .ok()
-        .filter(|e: &i32| e.unsigned_abs() <= 64)?;
-    let (sign, unsigned) = match mantissa.as_bytes().first()? {
-        b'+' | b'-' => mantissa.split_at(1),
-        _ => ("", mantissa),
-    };
-    let (integer, fraction) = unsigned.split_once('.').unwrap_or((unsigned, ""));
-    let digits = format!("{integer}{fraction}");
-    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
-        return None;
-    }
-    let point = integer.len() as i32 + exponent;
-    let plain = if point <= 0 {
-        format!("0.{}{digits}", "0".repeat(point.unsigned_abs() as usize))
-    } else if point as usize >= digits.len() {
-        format!("{digits}{}", "0".repeat(point as usize - digits.len()))
-    } else {
-        let (whole, part) = digits.split_at(point as usize);
-        format!("{whole}.{part}")
-    };
-    Some(format!("{sign}{plain}"))
-}
-
-fn ocm_epoch(value: &str) -> std::result::Result<Epoch, EpochError> {
-    Epoch::from_str(value).or_else(|error| {
-        expand_exponent(value)
-            .ok_or(error)
-            .and_then(|plain| Epoch::from_str(&plain))
-    })
-}
-
 fn epoch_error<'a>(
     input: &mut &'a str,
     start: &'a str,
@@ -93,13 +54,13 @@ fn epoch_error<'a>(
 fn kv_ocm_epoch(input: &mut &str) -> KvnResult<Epoch> {
     let start = *input;
     let value = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    ocm_epoch(value.trim()).map_err(|error| epoch_error(input, start, error))
+    Epoch::new(value.trim()).map_err(|error| epoch_error(input, start, error))
 }
 
 fn kv_ocm_epoch_token(input: &mut &str) -> KvnResult<Epoch> {
     let start = *input;
     let value = till_space.parse_next(input)?;
-    ocm_epoch(value).map_err(|error| epoch_error(input, start, error))
+    Epoch::new(value).map_err(|error| epoch_error(input, start, error))
 }
 
 /// OBJECT_TYPE is an open SANA token; the five XSD values are normalized case-insensitively with
@@ -394,8 +355,8 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<Option<OcmTrajState>> {
         "CENTER_NAME" => center_name: kv_string,
         "TRAJ_REF_FRAME" => traj_ref_frame: kv_string,
         "TRAJ_FRAME_EPOCH" => traj_frame_epoch: kv_ocm_epoch,
-        "USEABLE_START_TIME" => useable_start_time: kv_calendar_epoch,
-        "USEABLE_STOP_TIME" => useable_stop_time: kv_calendar_epoch,
+        "USEABLE_START_TIME" => useable_start_time: kv_epoch,
+        "USEABLE_STOP_TIME" => useable_stop_time: kv_epoch,
         "ORB_REVNUM" => orb_revnum: kv_float,
         "ORB_REVNUM_BASIS" => orb_revnum_basis: kv_enum,
         "TRAJ_TYPE" => traj_type: kv_string,
@@ -565,7 +526,7 @@ pub fn ocm_phys(input: &mut &str) -> KvnResult<OcmPhysicalDescription> {
         "WET_MASS" => wet_mass: kv_from_kvn,
         "DRY_MASS" => dry_mass: kv_from_kvn,
         "OEB_PARENT_FRAME" => oeb_parent_frame: kv_string,
-        "OEB_PARENT_FRAME_EPOCH" => oeb_parent_frame_epoch: kv_calendar_epoch,
+        "OEB_PARENT_FRAME_EPOCH" => oeb_parent_frame_epoch: kv_epoch,
         "OEB_Q1" => oeb_q1: kv_float,
         "OEB_Q2" => oeb_q2: kv_float,
         "OEB_Q3" => oeb_q3: kv_float,
@@ -1218,13 +1179,25 @@ pub fn ocm_user(input: &mut &str) -> KvnResult<OcmUserDefined> {
         match user_defined_key_token.parse_next(input) {
             Ok(k) => {
                 entries.extend(comments.into_iter().map(OcmUserDefinedEntry::Comment));
-                if !k.starts_with("USER_DEFINED_COMPOSITION_") && value_is_absent(k, input) {
-                    skip_record(input);
-                    continue;
-                }
-                let v = kv_string.parse_next(input)?;
+                let mut v = kv_string.parse_next(input)?;
                 let mut records = Vec::new();
                 if k.starts_with("USER_DEFINED_COMPOSITION_") {
+                    while v.trim_end().ends_with(',') {
+                        let continuation = peek(till_line_ending).parse_next(input)?.trim();
+                        if continuation.is_empty()
+                            || continuation.contains('=')
+                            || continuation == "USER_STOP"
+                        {
+                            return Err(cut_err(
+                                input,
+                                "Malformed USER_DEFINED_COMPOSITION continuation",
+                            ));
+                        }
+                        let continuation = till_line_ending.parse_next(input)?;
+                        v.push(' ');
+                        v.push_str(continuation.trim());
+                        opt_line_ending.parse_next(input)?;
+                    }
                     loop {
                         let remaining = input.trim_start();
                         let first_line = remaining.lines().next().unwrap_or("").trim();
@@ -1740,6 +1713,7 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
     let mut last_block_rank = None;
     let mut block_has_content = false;
     let mut history_started = false;
+    let mut tc1_seen = std::collections::HashSet::new();
     let mut top_rank = None;
     let mut user_sequence = false;
     let mut offset = 0usize;
@@ -1799,6 +1773,7 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
             }
             current_block = Some(marker);
             previous_key = None;
+            tc1_seen.clear();
             block_has_content = false;
             history_started = false;
             user_sequence = false;
@@ -1812,6 +1787,7 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
             }
             current_block = None;
             previous_key = None;
+            tc1_seen.clear();
             block_has_content = false;
             history_started = false;
             offset += raw_line.len() + 1;
@@ -1862,13 +1838,20 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
                     };
                     invalid(number, offset, format!("Unexpected OCM {block_name} key"))
                 })?;
-            if previous_key.is_some_and(|previous| rank <= previous) {
+            let tc1 =
+                (block == "META" && key == "OWNER_URL") || (block == "COV" && key == "TRAJ_ID");
+            if tc1 && !tc1_seen.insert(key) {
+                return fail("duplicate OCM TC1 keyword");
+            }
+            if !tc1 && previous_key.is_some_and(|previous| rank <= previous) {
                 return fail("duplicate or out-of-order OCM block keyword");
             }
             if history_started && !(block == "MAN" && key == "MAN_UNITS") {
                 return fail("assignment after OCM history data");
             }
-            previous_key = Some(rank);
+            if !tc1 {
+                previous_key = Some(rank);
+            }
             block_has_content = true;
         } else {
             if !line.contains('=') {

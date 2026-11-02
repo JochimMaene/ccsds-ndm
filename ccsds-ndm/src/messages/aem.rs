@@ -61,6 +61,26 @@ impl crate::traits::Validate for Aem {
     }
 }
 
+impl Aem {
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        for state in self
+            .body
+            .segment
+            .iter()
+            .flat_map(|segment| &segment.data.attitude_states)
+        {
+            let quaternion = match state {
+                AemAttitudeState::QuaternionEphemeris(state) => &state.quaternion,
+                AemAttitudeState::QuaternionDerivative(state) => &state.quaternion,
+                AemAttitudeState::QuaternionAngVel(state) => &state.quaternion,
+                _ => continue,
+            };
+            quaternion.validate_kvn_rounding()?;
+        }
+        Ok(())
+    }
+}
+
 impl Ndm for Aem {
     fn to_kvn(&self) -> Result<String> {
         crate::generation::to_kvn_string(self)

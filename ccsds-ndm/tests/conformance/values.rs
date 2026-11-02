@@ -63,10 +63,15 @@ fn optional_xml_values_keep_their_schema_types_in_every_family() {
         let end = start + input[start..].find(&format!("</{element}>")).unwrap();
         let open_end = start + input[start..].find('>').unwrap() + 1;
         let invalid = format!("{}{value}{}", &input[..open_end], &input[end..]);
-        assert!(
-            from_str(&invalid).is_err(),
-            "{fixture}: accepted {element}={value:?}"
-        );
+        if value.eq_ignore_ascii_case("N/A") && element == "NEXT_MESSAGE_EPOCH" {
+            let parsed = from_str(&invalid).unwrap();
+            assert!(!parsed.to_xml().unwrap().contains(&format!("<{element}")));
+        } else {
+            assert!(
+                from_str(&invalid).is_err(),
+                "{fixture}: accepted {element}={value:?}"
+            );
+        }
     }
     for (fixture, element) in [
         ("rdm_c4.xml", "GRAVITY_MODEL"),
@@ -79,8 +84,8 @@ fn optional_xml_values_keep_their_schema_types_in_every_family() {
         let literal = format!("{}n/a{}", &input[..start], &input[end..]);
         let xml = from_str(&literal).unwrap().to_xml().unwrap();
         assert!(
-            xml.contains(&format!("<{element}>n/a</{element}>")),
-            "{fixture}: {element} lost its literal text"
+            !xml.contains(&format!("<{element}>")),
+            "{fixture}: {element} did not omit the unavailable value"
         );
     }
 }
@@ -251,7 +256,7 @@ fn opm_and_omm_report_empty_mandatory_xml_strings_as_empty() {
     );
     let error = Omm::from_xml(&xml).unwrap_err();
     crate::common::assert_validation_field(&error, "OBJECT_ID");
-    assert!(error.to_string().contains("is empty"), "{error}");
+    assert_eq!(error.code(), Some("validation.missing_required_field"));
     assert_eq!(
         error
             .as_validation_error()
@@ -259,4 +264,119 @@ fn opm_and_omm_report_empty_mandatory_xml_strings_as_empty() {
             .as_deref(),
         Some("body.segment.metadata.object_id")
     );
+}
+
+#[test]
+fn mandatory_header_na_is_missing_in_every_family() {
+    for fixture in [
+        "opm_g1.kvn",
+        "omm_g7.kvn",
+        "oem_g11.kvn",
+        "ocm_g15.kvn",
+        "cdm_362.kvn",
+        "tdm_e1.kvn",
+        "rdm_c1.kvn",
+        "apm_g1.kvn",
+        "aem_g4.kvn",
+        "acm_g6.kvn",
+    ] {
+        let source =
+            std::fs::read_to_string(crate::common::data_dir().join("kvn").join(fixture)).unwrap();
+        for field in ["CREATION_DATE", "ORIGINATOR"] {
+            let record = source
+                .lines()
+                .find(|line| {
+                    line.split_once('=')
+                        .is_some_and(|(key, _)| key.trim() == field)
+                })
+                .unwrap();
+            let invalid = source.replacen(record, &format!("{field} = N/A"), 1);
+            let error = from_str(&invalid).unwrap_err();
+            assert_eq!(
+                error.code(),
+                Some("validation.missing_required_field"),
+                "{fixture}: {error}"
+            );
+            assert!(error.to_string().contains(field));
+        }
+    }
+}
+
+#[test]
+fn user_defined_na_and_blank_values_are_opaque_in_both_notations() {
+    use ccsds_ndm::{messages::opm::Opm, Ndm};
+    let source = format!(
+        "{}\nUSER_DEFINED_NA = N/A\nUSER_DEFINED_BLANK = \n",
+        include_str!("../../data/kvn/opm_g1.kvn")
+    );
+    let message = Opm::from_kvn(&source).unwrap();
+    let parameters: Vec<_> = message
+        .body
+        .segment
+        .data
+        .user_defined_parameters
+        .as_ref()
+        .unwrap()
+        .parameters()
+        .collect();
+    assert_eq!(parameters[0].value, "N/A");
+    assert_eq!(parameters[1].value, "");
+    assert_eq!(Opm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    assert_eq!(Opm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+}
+
+#[test]
+fn comment_text_that_looks_like_an_unavailable_assignment_is_opaque() {
+    use ccsds_ndm::{messages::opm::Opm, Ndm};
+    for comment in ["= N/A", "status = N/A"] {
+        let source = include_str!("../../data/kvn/opm_g1.kvn").replacen(
+            "CREATION_DATE",
+            &format!("COMMENT {comment}\nCREATION_DATE"),
+            1,
+        );
+        let message = Opm::from_kvn(&source).unwrap();
+        assert_eq!(message.header.comment, [comment]);
+        assert_eq!(Opm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+        assert_eq!(Opm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    }
+}
+
+#[test]
+fn xml_unavailable_values_use_decoded_text_including_cdata_and_character_references() {
+    use ccsds_ndm::{messages::opm::Opm, Ndm};
+    let source = Opm::from_kvn(include_str!("../../data/kvn/opm_g1.kvn"))
+        .unwrap()
+        .to_xml()
+        .unwrap();
+    let start = source.find("<ORIGINATOR>").unwrap() + "<ORIGINATOR>".len();
+    let end = start + source[start..].find("</ORIGINATOR>").unwrap();
+    for value in ["N/A", "<![CDATA[N/A]]>", "N&#47;A", "N<!-- separator -->/A"] {
+        let invalid = format!("{}{value}{}", &source[..start], &source[end..]);
+        assert_eq!(
+            Opm::from_xml(&invalid).unwrap_err().code(),
+            Some("validation.missing_required_field"),
+            "{value}"
+        );
+    }
+}
+
+#[test]
+fn acm_and_rdm_preserve_opaque_user_defined_missing_value_spellings() {
+    for source in [
+        format!(
+            "{}\nUSER_START\nUSER_DEFINED_NA = N/A\nUSER_DEFINED_BLANK = \nUSER_STOP\n",
+            include_str!("../../data/kvn/acm_g6.kvn")
+        ),
+        format!(
+            "{}\nUSER_DEFINED_NA = N/A\nUSER_DEFINED_BLANK = \n",
+            include_str!("../../data/kvn/rdm_c1.kvn")
+        ),
+    ] {
+        let message = from_str(&source).unwrap();
+        let xml = message.to_xml().unwrap();
+        assert!(xml.contains("parameter=\"NA\">N/A</USER_DEFINED>"));
+        assert!(xml.contains("parameter=\"BLANK\""));
+        assert_eq!(from_str(&xml).unwrap(), message);
+        assert_eq!(from_str(&message.to_kvn().unwrap()).unwrap(), message);
+    }
 }

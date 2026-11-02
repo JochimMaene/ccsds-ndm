@@ -594,6 +594,12 @@ pub struct Quaternion {
 }
 
 impl Quaternion {
+    pub(crate) fn validate_kvn_rounding(&self) -> Result<()> {
+        let [q1, q2, q3, qc] = [self.q1, self.q2, self.q3, self.qc]
+            .map(|value| crate::kvn::ser::OdmFloat::rounded_value(value).unwrap_or(value));
+        crate::traits::Validate::validate(&Self { q1, q2, q3, qc })
+    }
+
     /// Construct a quaternion with finite components in [-1, 1]; full validation also checks its norm.
     pub fn new(q1: f64, q2: f64, q3: f64, qc: f64) -> crate::error::Result<Self> {
         let quaternion = Self { q1, q2, q3, qc };
@@ -626,9 +632,11 @@ impl crate::traits::Validate for Quaternion {
     fn validate(&self) -> Result<()> {
         self.validate_components()?;
         let sum_sq = self.q1 * self.q1 + self.q2 * self.q2 + self.q3 * self.q3 + self.qc * self.qc;
-        if !(0.999..=1.001).contains(&sum_sq) {
-            return Err(crate::error::ValidationError::Generic {
-                message: format!("Quaternion not normalized: sum of squares = {}", sum_sq).into(),
+        if !(0.99..=1.01).contains(&sum_sq) {
+            return Err(crate::error::ValidationError::OutOfRange {
+                name: "QUATERNION".into(),
+                value: sum_sq.to_string(),
+                expected: "squared norm in [0.99, 1.01]".into(),
                 line: None,
             }
             .into());
@@ -667,7 +675,7 @@ pub struct AngularVelocity {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct StateVector {
-    /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
+    /// Comments (allowed at the beginning of the state-vector block). (See 7.8 for formatting rules.)
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -2301,6 +2309,7 @@ pub struct AtmosphericReentryParameters {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Time until re-entry: from the EPOCH_TZERO epoch in the metadata (days—double precision
     /// values allowed; integer values assumed to have .0 fractional part) to permanently
@@ -2436,6 +2445,7 @@ pub struct GroundImpactParameters {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Probability that any fragment will impact the Earth (either land or sea; 0 to 1).
     ///
@@ -2954,6 +2964,7 @@ pub struct RdmSpacecraftParameters {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Total object mass at EPOCH_TZERO.
     ///
@@ -3531,5 +3542,24 @@ mod tests {
         let w: Wrapper = quick_xml::de::from_str(xml).expect("Failed to parse Wrapper");
         assert!(w.qe.is_some());
         assert_eq!(w.qe.unwrap().quaternion.q1, -0.005068);
+    }
+}
+
+#[cfg(test)]
+mod rounded_quaternion_tests {
+    use super::Quaternion;
+    use crate::Validate;
+
+    #[test]
+    fn three_decimal_unit_quaternions_pass_without_normalization() {
+        let q = Quaternion::new(0.552, 0.432, -0.437, -0.562).unwrap();
+        q.validate().unwrap();
+        q.validate_kvn_rounding().unwrap();
+        let error = Quaternion::new(0.0, 0.0, 0.0, 0.0)
+            .unwrap()
+            .validate()
+            .unwrap_err();
+        assert_eq!(error.code(), Some("validation.out_of_range"));
+        assert!(error.to_string().contains("QUATERNION"));
     }
 }

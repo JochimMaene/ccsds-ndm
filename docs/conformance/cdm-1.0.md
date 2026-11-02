@@ -75,7 +75,7 @@ shared built-artifact gates.
 
 CDM table 3-3 requires both objects to use the same `REF_FRAME`; section 4.3.7.2 orders
 `OBJECT1` before `OBJECT2`. Root validation checks both conditions, not merely that two different
-object tags exist. Section 5.2.9 restricts `ORIGINATOR`, `MESSAGE_ID`, `OBJECT_DESIGNATOR`,
+object tags exist. Section 5.2.9 restricts `MESSAGE_ID`, `OBJECT_DESIGNATOR`,
 `CATALOG_NAME`, and `INTERNATIONAL_DESIGNATOR` to ASCII letters/digits, `_`, and `-`; other
 free-text fields retain their own domains. `cdm::model` mutates each identifier and the second
 object's frame and order, checking the root and generation gates. Python construction requires
@@ -150,3 +150,29 @@ book-over-XSD policy for empty mandatory values and epoch lexical forms.
 `INTERNATIONAL_DESIGNATOR` enforces its character repertoire but not its external layout,
 and `TIME_LASTOB_START`/`TIME_LASTOB_END` are not compared. Covariance is optional only
 during incremental construction: validation and generation require it.
+
+KVN reading tolerates lines longer than the book's 254-character limit where applicable;
+writing enforces that limit, so an accepted overlong record can require shortening before
+regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
+are specified in the [validation contract](../design/validation-contract.md).
+
+ORIGINATOR accepts embedded blanks, including `ESA SST`, following table 3-1 Cor.1.
+That example conflicts with 5.2.9's narrower repertoire; XSD is xsd:string, so input follows
+the lenient reading. Other identifier repertoires remain unchanged.
+Optional numeric NaN/INF leaves remain invalid; they do not denote unavailable values.
+DOY and a trailing Z are accepted and retained, although 6.3.2.6 says Z should be omitted.
+Fractional seconds keep the shared 16-digit cap. Closed categorical aliases include
+OBJECT_TYPE and YES/NO values and read lowercase in KVN (6.2.3.3); free text retains
+internal blank runs despite 6.3.2.5's text equivalence rule, avoiding changes to names.
+Any incomplete subset of relative-state components is rejected.
+
+Python covariance arrays must be square, symmetric, and 6x6 through 9x9. The added
+Drag/SRP/Thrust rows must be complete (5.2.8); from_numpy and the convenience setter use
+one checked constructor. All entries carry the existing CDM field units; the six state-vector
+entries are kilometres and km/s, while relative miss geometry is in metres. No unit conversion
+or implicit averaging of asymmetric entries occurs.
+
+The shared YES/NO KVN/Python lookup also accepts mixed case, extending CDM 6.2.3.3's
+all-uppercase/all-lowercase vocabulary losslessly through the common TDM 4.3.7 boolean
+reader. XML still follows its schema spelling; writers emit uppercase. The shared categorical
+alias regression exercises this lookup.

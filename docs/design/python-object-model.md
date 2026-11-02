@@ -91,3 +91,22 @@ AEM attitude type, OMM mean-element theory, CDM ephemeris name, or missing covar
 `OpmCovarianceMatrix` requires all 21 lower-triangle values, including explicit zeroes.
 The exposed PyO3 categorical classes have named members but are not Python `enum.Enum`
 subclasses; the generated stubs describe their actual class/member surface.
+
+Model objects use Python identity equality and identity hashing. Two independent parses
+compare unequal even when their content matches; mutable live graphs do not currently expose
+Rust PartialEq as Python content equality. Compare the specific fields relevant to the task,
+or canonical generated documents when their documented normalizations are acceptable.
+Enum equality remains value-based.
+
+CDM OBJECT_TYPE returns ObjectDescription; OCM/RDM OBJECT_TYPE and the
+controlled_reentry/corrections_applied properties expose text. These are the current family
+representations. CDM's constructor and setter both accept the enum or a string; callers
+can use str(value) for a common category token. Exported YesNo/ControlledType enums are
+constructor helpers rather than a promise that every getter returns them.
+
+Rust opm::ManeuverParameters is named OpmManeuverParameters in Python to distinguish it
+from attitude maneuvers. CDM exposes objects under body.segments; TDM offers both body
+and segments; CombinedNdm uses comments. These names reflect existing schema wrappers.
+Root id is Optional in stubs because incomplete editable models may hold None; valid
+messages require the family id. Constructor comment defaults shown as Ellipsis by introspection
+mean an omitted empty list, as stated in the generated stubs, not a stored Ellipsis value.

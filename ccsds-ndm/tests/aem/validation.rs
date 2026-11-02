@@ -135,7 +135,7 @@ fn aem_quaternion_magnitude_is_checked_on_later_records() {
         .validate()
         .unwrap_err()
         .to_string()
-        .contains("not normalized"));
+        .contains("QUATERNION"));
     assert!(message.to_kvn().is_err());
     assert!(message.to_xml().is_err());
     let mut output = Vec::new();

@@ -20,6 +20,7 @@ from ccsds_ndm import (
     AemSegment,
     AttitudeState,
 )
+from ccsds_ndm import NdmEpochError
 
 KVN_DIR = Path(__file__).resolve().parents[3] / "ccsds-ndm" / "data" / "kvn"
 
@@ -67,10 +68,10 @@ class TestAem:
         assert state.epoch == "2023-01-01T00:01:00"
         assert state.values == [0.1, 0.2, 0.3, 0.4]
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             state.epoch = "not-an-epoch"
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             AttitudeState("123.5", [0.0, 0.0, 0.0, 1.0])
 
         meta = AemMetadata(
@@ -83,7 +84,7 @@ class TestAem:
             stop_time="2023-01-01T01:00:00",
             time_system="UTC",
         )
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             meta.start_time = "123.5"
 
     def test_aem_data_numpy(self):
@@ -179,7 +180,7 @@ class TestAem:
         )
         original = data.attitude_states[0].epoch
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             data.attitude_states_epochs = [
                 "2024-01-01T00:00:00",
                 "not-a-timestamp",

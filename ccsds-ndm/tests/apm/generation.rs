@@ -4,6 +4,26 @@ use ccsds_ndm::messages::apm::Apm;
 use ccsds_ndm::Ndm;
 
 #[test]
+fn kvn_refuses_rounding_that_invalidates_a_later_quaternion() {
+    let mut message = Apm::from_kvn(crate::KVN).unwrap();
+    let mut later = message.body.segment.data.quaternion_state[0].clone();
+    later.quaternion =
+        ccsds_ndm::common::Quaternion::new(0.47047595604435294, 0.8767282217335952, 0.0, 0.0)
+            .unwrap();
+    message.body.segment.data.quaternion_state.push(later);
+    ccsds_ndm::Validate::validate(&message).unwrap();
+    assert_eq!(Apm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    assert!(message
+        .to_kvn()
+        .unwrap_err()
+        .to_string()
+        .contains("QUATERNION"));
+    let mut output = Vec::new();
+    assert!(message.write_kvn_to(&mut output).is_err());
+    assert!(output.is_empty());
+}
+
+#[test]
 fn apm_shared_measures_use_kvn_precision_without_changing_xml() {
     let mut message = Apm::from_kvn(SPIN_KVN).unwrap();
     message.body.segment.data.spin[0].spin_angle_vel.value = 0.300_000_000_000_000_04;

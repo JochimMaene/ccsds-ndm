@@ -7,6 +7,31 @@ Unreleased
 Additional conformance corrections
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- Restricted TDM 1.0 KVN input is supported; XML 1.0 and generation remain unsupported.
+  TDM closed categories ignore case, and shared categorical lookup accepts blank/underscore runs.
+- XML and KVN treat standard-field ``N/A`` values as absent. Comments, user-defined
+  values, and CDM ``MANEUVERABLE=N/A`` retain their content.
+- Quaternion validation accepts squared norms in [0.99, 1.01] and reports a field-named
+  out-of-range error. CDM originators may contain blanks, including ``ESA SST``.
+- OCM accepts omitted orbit-counter basis and SCLK parameters with the book's implicit defaults.
+  ``USEABLE_START_TIME``, ``USEABLE_STOP_TIME``, and ``OEB_PARENT_FRAME_EPOCH`` now use
+  Rust ``Epoch`` rather than ``CalendarEpoch`` (breaking). XML input omits the TC1 covariance
+  linkage check that its schema cannot represent; validation and generation still enforce it.
+- Python errors now share ``NdmError`` as their base; ``NdmFormatError`` and ``NdmEpochError``
+  no longer derive from ``ValueError``, and ``NdmIoError`` no longer derives from ``OSError``
+  (breaking). I/O errors retain file and errno attributes. ``AcmCovarianceMatrix`` now takes
+  ``(cov_type, cov_lines, cov_basis=None, cov_ref_frame=None, comment=None)`` (breaking).
+- APM, AEM, and ACM KVN generation checks quaternion magnitude after numeric rounding,
+  including ACM maneuver targets, and refuses invalid rounded output before writing bytes.
+- OCM validates each metadata time bound independently and rejects negative nominal drag
+  coefficients while retaining the documented zero-drag exception.
+- Shared vector readers reject nonzero numeric underflow instead of replacing components
+  with zero; representable subnormal values remain accepted.
+- Combined XML rejects forbidden XML characters throughout the document and accepts
+  namespace-aware schema-location hints on envelope text fields.
+- Conformance records clarify RDM's intentional international-designator compatibility,
+  TDM/RDM time-window checks left to callers, and OCM numeric exceptions.
+
 - CDM missing-value compatibility also applies to namespace-qualified XML. Empty optional
   leaves cannot conceal foreign, unbound, or mixed namespaces.
 
@@ -37,7 +62,7 @@ Additional conformance corrections
   UTF-16/UTF-32 input is refused as "input must be UTF-8".
 - Mixed-case open text values are accepted and preserved in every family; OEM no longer enforces
   the ODM 7.5.3 single-case rule. A missing ``<?xml ...?>`` declaration is accepted.
-- KVN writers trim values, refuse empty or ``N/A`` values and integers above 2³¹−1, name the field
+- KVN writers trim values, refuse empty or ``N/A`` standard-field values and integers above 2³¹−1, name the field
   in non-ASCII refusals, and round to 16 significant digits with stable output spellings.
 
 - ACM histories accept absolute calendar tags as well as relative offsets; each block uses one
@@ -82,8 +107,8 @@ Interoperability and preservation
 - Numeric readers accept unambiguous decimal/exponent spellings, including ``.5``, ``5.``, ``1e3``,
   and extra precision; malformed values, overflow, and nonzero underflow are refused.
   Generation remains canonical.
-- Closed KVN enums accept supported uppercase/lowercase spellings, but arbitrary mixed case
-  and unknown closed values are rejected. Unknown object types no longer silently become
+- Closed KVN enums accept supported uppercase/lowercase spellings; TDM categories and shared
+  YES/NO lookup also accept mixed case. Unknown closed values are rejected. Unknown object types no longer silently become
   ``OTHER``. Open registry/ICD strings retain their supplied spelling.
 - Schema numeric facets now apply in all notations: GM, sensor frequency, and RDM day
   intervals must be positive. Explicit book/schema conflicts are recorded per family.
@@ -147,7 +172,7 @@ Conformance review and compatibility changes
   public workflow matrix. Family records cite the publication baseline,
   requirements, decisions, notation limits, and regression evidence. The
   conformance index links shared validation and preservation policy in the validation contract.
-- OPM, APM, AEM, TDM, and ACM 1.0 input is rejected. Earlier acceptance reused
+- OPM, APM, AEM, and ACM 1.0 input is rejected. Earlier acceptance reused
   newer-format grammars and did not establish those editions' requirements;
   ACM was introduced in ADM issue 2. OEM 1.0 keeps its explicitly restricted
   KVN reader, now checking increasing epochs and nonoverlapping segment spans.
@@ -275,7 +300,7 @@ Python threading and parsing fixes
   ``ValueError`` (breaking). Reading a file of another family raises
   ``NdmUnsupportedMessageError`` naming the file instead of ``ValueError``
   (breaking). Epoch strings rejected by constructors and setters raise
-  ``NdmEpochError``, still a ``ValueError``. ``NdmIoError`` carries ``errno``
+  ``NdmEpochError``, a subclass of ``NdmError``. ``NdmIoError`` carries ``errno``
   and ``filename`` (and ``filename2`` for ``convert_file``).
 
 Book-aligned OEM and XML parsing (breaking change)
@@ -305,9 +330,9 @@ Newly rejected:
 - OEM KVN covariance rows of the wrong width.
 - Time tags with more than 16 fractional-second digits, in every family except
   TDM (ODM 7.5.10 and the matching ADM, CDM and RDM rules).
-- Empty or ``n/a`` XML values for optional numbers, epochs and enumerations in
-  every family, which were silently treated as absent; the schema types do not
-  allow them. Optional XML strings keep ``n/a`` and empty text literally. A
+- Empty XML values for optional numbers, epochs and enumerations, except the documented
+  CDM compatibility and schema defaults. Standard-field ``n/a`` is treated as absent;
+  optional XML strings retain empty text literally. A
   malformed optional value can no longer silently drop its ``units`` attribute.
 - XML special values spelled other than ``INF``, ``-INF`` or ``NaN`` (for
   example ``inf`` or ``+INF``), in every family.

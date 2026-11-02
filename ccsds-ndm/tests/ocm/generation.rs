@@ -298,6 +298,48 @@ fn edited_ocm_block_values_are_revalidated_before_output() {
 }
 
 #[test]
+fn negative_drag_coefficients_are_rejected_in_all_routes() {
+    let mut message = Ocm::from_kvn(KVN).unwrap();
+    message
+        .body
+        .segment
+        .data
+        .phys
+        .as_mut()
+        .unwrap()
+        .drag_coeff_nom = Some(1.0);
+    let kvn = message.to_kvn().unwrap();
+    let xml = message.to_xml().unwrap();
+    let record = kvn
+        .lines()
+        .find(|line| line.starts_with("DRAG_COEFF_NOM"))
+        .unwrap();
+    let invalid_kvn = mutated(&kvn, record, "DRAG_COEFF_NOM = -1");
+    crate::common::assert_validation_field(
+        &Ocm::from_kvn(&invalid_kvn).unwrap_err(),
+        "DRAG_COEFF_NOM",
+    );
+    let invalid_xml = mutated(
+        &xml,
+        "<DRAG_COEFF_NOM>1</DRAG_COEFF_NOM>",
+        "<DRAG_COEFF_NOM>-1</DRAG_COEFF_NOM>",
+    );
+    crate::common::assert_validation_field(
+        &Ocm::from_xml(&invalid_xml).unwrap_err(),
+        "DRAG_COEFF_NOM",
+    );
+    message
+        .body
+        .segment
+        .data
+        .phys
+        .as_mut()
+        .unwrap()
+        .drag_coeff_nom = Some(-1.0);
+    assert_rejects(&message, "DRAG_COEFF_NOM");
+}
+
+#[test]
 fn ocm_block_value_boundaries_generate_valid_xml() {
     let mut message = Ocm::from_kvn(KVN).unwrap();
     let data = &mut message.body.segment.data;
@@ -1358,7 +1400,8 @@ fn required_companion_fields_and_maneuver_domains_are_checked_after_edits() {
     let mut message = original.clone();
     message.body.segment.data.traj[0].orb_revnum = Some(1.0);
     message.body.segment.data.traj[0].orb_revnum_basis = None;
-    assert_rejects(&message, "ORB_REVNUM_BASIS");
+    message.validate().unwrap();
+    assert!(!message.to_kvn().unwrap().contains("ORB_REVNUM_BASIS"));
     for field in ["OD_ID", "OD_METHOD"] {
         let mut message = original.clone();
         let od = message.body.segment.data.od.as_mut().unwrap();

@@ -168,8 +168,6 @@ impl Acm {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -181,7 +179,7 @@ impl Acm {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed(py, data, format)?;
@@ -205,8 +203,6 @@ impl Acm {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -221,7 +217,7 @@ impl Acm {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
@@ -234,7 +230,7 @@ impl Acm {
     /// path : str or os.PathLike
     ///     Destination file; existing content is replaced only after successful generation.
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Raises
     /// ------
@@ -253,8 +249,7 @@ impl Acm {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<()> {
         crate::api::generate_file(
             py,
@@ -268,7 +263,7 @@ impl Acm {
     /// Parameters
     /// ----------
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Returns
     /// -------
@@ -288,8 +283,7 @@ impl Acm {
     fn to_str(
         &self,
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<String> {
         crate::api::generate_string(py, &self.to_core(py)?, format)
     }
@@ -372,7 +366,7 @@ impl AcmSegment {
 ///
 /// Raises
 /// ------
-/// ValueError
+/// NdmEpochError
 ///     If epoch_tzero is not a CCSDS calendar epoch.
 #[gen_stub_pyclass]
 #[pyclass(module = "ccsds_ndm", from_py_object)]
@@ -1006,6 +1000,8 @@ impl AcmData {
 
 /// ACM Data: Attitude State Time History Section.
 ///
+/// NUMBER_STATES is derived from the first row. An omitted rate_type means attitude-only rows.
+///
 /// Parameters
 /// ----------
 /// ref_frame_a : str
@@ -1024,7 +1020,9 @@ impl AcmData {
 /// Raises
 /// ------
 /// ValueError
-///     If att_type or a time tag is invalid, the history is empty, or row widths differ.
+///     If att_type is invalid, the history is empty, or row widths differ.
+/// NdmEpochError
+///     If a CCSDS epoch or time tag is invalid.
 #[gen_stub_pyclass]
 #[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
@@ -1578,9 +1576,9 @@ impl AcmPhysicalDescription {
 ///
 /// Parameters
 /// ----------
-/// cov_basis : str
-///     Covariance provenance, for example PREDICTED or DETERMINED.
-/// cov_ref_frame : str
+/// cov_basis : str, optional
+///     Covariance provenance, for example PREDICTED or DETERMINED_GND.
+/// cov_ref_frame : str, optional
 ///     Reference frame for the covariance components.
 /// cov_type : str
 ///     Covariance representation (ADM table 5-6), for example ANGLE.
@@ -1593,7 +1591,9 @@ impl AcmPhysicalDescription {
 /// Raises
 /// ------
 /// ValueError
-///     If cov_type or a time tag is invalid.
+///     If cov_type is invalid.
+/// NdmEpochError
+///     If a CCSDS epoch or time tag is invalid.
 #[gen_stub_pyclass]
 #[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
@@ -1605,12 +1605,12 @@ pub struct AcmCovarianceMatrix {
 #[pymethods]
 impl AcmCovarianceMatrix {
     #[new]
-    #[pyo3(signature = (cov_basis, cov_ref_frame, cov_type, cov_lines, comment=None))]
+    #[pyo3(signature = (cov_type, cov_lines, cov_basis=None, cov_ref_frame=None, comment=None))]
     fn new(
-        cov_basis: String,
-        cov_ref_frame: String,
         cov_type: String,
         cov_lines: Vec<HistoryLine>,
+        cov_basis: Option<String>,
+        cov_ref_frame: Option<String>,
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         let cov_type = AcmCovarianceLineType::from_str(&cov_type)
@@ -1620,9 +1620,9 @@ impl AcmCovarianceMatrix {
                 comment: comment.unwrap_or_default(),
                 cov_id: None,
                 cov_prev_id: None,
-                cov_basis: Some(cov_basis),
+                cov_basis,
                 cov_basis_id: None,
-                cov_ref_frame: Some(cov_ref_frame),
+                cov_ref_frame,
                 cov_type,
                 cov_lines: cov_lines_from_py(cov_lines)?,
             },

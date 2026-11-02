@@ -48,7 +48,7 @@ impl FromStr for InvErUnits {
 /// SGP4 drag coefficient in inverse Earth radii (ODM table 4-3).
 pub type BStar = UnitValue<f64, InvErUnits>;
 
-/// Revolutions per day for mean motion (ODM table 4-2).
+/// Revolutions per day for mean motion (ODM table 4-3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum RevPerDayUnits {
     #[serde(rename = "rev/day", alias = "REV/DAY")]
@@ -74,7 +74,7 @@ impl FromStr for RevPerDayUnits {
         }
     }
 }
-/// Mean motion in revolutions per day (ODM table 4-2).
+/// Mean motion in revolutions per day (ODM table 4-3).
 pub type MeanMotion = UnitValue<f64, RevPerDayUnits>;
 
 /// Revolutions per day squared for the first mean-motion derivative (ODM table 4-3).
@@ -211,15 +211,28 @@ impl Ndm for Omm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let normalized = crate::kvn::prepare_input(
-            crate::detect::without_utf8_bom(kvn),
-            crate::validation::MessageKind::Omm,
-        )?;
-        let kvn = normalized.as_ref();
-        kvn::validate_kvn_syntax(kvn)?;
-        let omm = Self::from_kvn_str(kvn)?;
-        crate::traits::Validate::validate(&omm)?;
-        Ok(omm)
+        let kvn = crate::detect::without_utf8_bom(kvn);
+        let source_edition = kvn.lines().find_map(|line| {
+            line.split_once('=')
+                .filter(|(key, _)| key.trim() == "CCSDS_OMM_VERS")
+                .map(|(_, value)| value.trim())
+        });
+        (|| {
+            let normalized = crate::kvn::prepare_input(kvn, crate::validation::MessageKind::Omm)?;
+            let kvn = normalized.as_ref();
+            kvn::validate_kvn_syntax(kvn)?;
+            let omm = Self::from_kvn_str(kvn)?;
+            crate::traits::Validate::validate(&omm)?;
+            Ok(omm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Omm,
+                crate::error::DiagnosticNotation::Kvn,
+                kvn,
+                source_edition,
+            )
+        })
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -389,9 +402,12 @@ pub struct OmmData {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default)]
+    /// **CCSDS Reference**: 502.0-B-3, Section 4.2.
+    /// Flattened KVN data comments merge with the first represented logical block.
     pub comment: Vec<String>,
     /// Mean Keplerian Elements in the Specified Reference Frame.
     #[serde(rename = "meanElements")]
+    /// **CCSDS Reference**: 502.0-B-3, Section 4.2.
     pub mean_elements: MeanElements,
     /// Spacecraft Parameters.
     #[serde(
@@ -399,13 +415,15 @@ pub struct OmmData {
         default,
         skip_serializing_if = "Option::is_none"
     )]
+    /// **CCSDS Reference**: 502.0-B-3, Section 4.2.
     pub spacecraft_parameters: Option<SpacecraftParameters>,
-    /// TLE Related Parameters (Only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
+    /// TLE Related Parameters (required for SGP/SGP4; also PPT3 and SGP4-XP in 3.0).
     #[serde(
         rename = "tleParameters",
         default,
         skip_serializing_if = "Option::is_none"
     )]
+    /// **CCSDS Reference**: 502.0-B-3, Section 4.2.
     pub tle_parameters: Option<TleParameters>,
     /// Position/Velocity Covariance Matrix (6x6 Lower Triangular Form).
     #[serde(
@@ -413,6 +431,7 @@ pub struct OmmData {
         default,
         skip_serializing_if = "Option::is_none"
     )]
+    /// **CCSDS Reference**: 502.0-B-3, Section 4.2.
     pub covariance_matrix: Option<OpmCovarianceMatrix>,
     /// User-Defined Parameters.
     #[serde(
@@ -420,6 +439,7 @@ pub struct OmmData {
         default,
         skip_serializing_if = "Option::is_none"
     )]
+    /// **CCSDS Reference**: 502.0-B-3, Section 4.2.
     pub user_defined_parameters: Option<UserDefined>,
 }
 
@@ -717,7 +737,7 @@ impl TleParameters {
 // TLE Parameters
 //----------------------------------------------------------------------
 
-/// TLE Related Parameters (This section is only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
+/// TLE Related Parameters (required for SGP/SGP4; also PPT3 and SGP4-XP in 3.0).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct TleParameters {

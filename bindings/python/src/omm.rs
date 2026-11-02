@@ -142,8 +142,6 @@ impl Omm {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -155,7 +153,7 @@ impl Omm {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed(py, data, format)?;
@@ -179,8 +177,6 @@ impl Omm {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -195,7 +191,7 @@ impl Omm {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
@@ -208,7 +204,7 @@ impl Omm {
     /// path : str or os.PathLike
     ///     Destination file; existing content is replaced only after successful generation.
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Raises
     /// ------
@@ -227,8 +223,7 @@ impl Omm {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<()> {
         crate::api::generate_file(
             py,
@@ -242,7 +237,7 @@ impl Omm {
     /// Parameters
     /// ----------
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Returns
     /// -------
@@ -262,12 +257,14 @@ impl Omm {
     fn to_str(
         &self,
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<String> {
         crate::api::generate_string(py, &self.to_core(py)?, format)
     }
 
+    /// MEAN_MOTION_DOT/DDOT are the stored TLE fields (already n-dot/2 and n-double-dot/6),
+    /// without additional scaling (ODM 4.2.4.7 note 2).
+    ///
     /// Generate canonical NORAD TLE lines (line 1 and line 2) from this OMM.
     ///
     /// Requires Earth-centered TEME elements and UTC epochs; no coordinate/time conversion.
@@ -930,12 +927,16 @@ pub struct OmmData {
     /// Comments.
     ///
     /// :type: list[str]
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.
     #[pyo3(get, set)]
     comment: Vec<String>,
 
     /// Mean Keplerian Elements in the Specified Reference Frame.
     ///
     /// :type: MeanElements
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.
     #[pyo3(get, set)]
     mean_elements: Py<MeanElements>,
 
@@ -1032,6 +1033,8 @@ impl OmmData {
     /// Spacecraft Parameters.
     ///
     /// :type: Optional[SpacecraftParameters]
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.
     #[getter]
     fn get_spacecraft_parameters(
         &self,
@@ -1054,6 +1057,8 @@ impl OmmData {
     /// Field requirements depend on the theory and edition; see ``TleParameters``.
     ///
     /// :type: Optional[TleParameters]
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.
     #[getter]
     fn get_tle_parameters(&self, py: Python<'_>) -> Option<Py<TleParameters>> {
         self.tle_parameters
@@ -1069,6 +1074,8 @@ impl OmmData {
     /// Position/Velocity Covariance Matrix (6x6 Lower Triangular Form).
     ///
     /// :type: Optional[OpmCovarianceMatrix]
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.
     #[getter]
     fn get_covariance_matrix(&self, py: Python<'_>) -> Option<Py<OpmCovarianceMatrix>> {
         self.covariance_matrix
@@ -1084,6 +1091,8 @@ impl OmmData {
     /// User-Defined Parameters.
     ///
     /// :type: UserDefined | None
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 4.2.
     #[getter]
     fn get_user_defined_parameters(&self, py: Python<'_>) -> Option<Py<crate::types::UserDefined>> {
         self.user_defined_parameters
@@ -1097,7 +1106,7 @@ impl OmmData {
     }
 }
 
-/// TLE Related Parameters (This section is only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
+/// TLE Related Parameters (required for SGP/SGP4; also PPT3 and SGP4-XP in 3.0).
 ///
 /// Parameters
 /// ----------

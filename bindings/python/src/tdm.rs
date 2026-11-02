@@ -152,8 +152,6 @@ impl Tdm {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -165,7 +163,7 @@ impl Tdm {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed(py, data, format)?;
@@ -189,8 +187,6 @@ impl Tdm {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -205,7 +201,7 @@ impl Tdm {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
@@ -218,7 +214,7 @@ impl Tdm {
     /// path : str or os.PathLike
     ///     Destination file; existing content is replaced only after successful generation.
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Raises
     /// ------
@@ -237,8 +233,7 @@ impl Tdm {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<()> {
         crate::api::generate_file(
             py,
@@ -252,7 +247,7 @@ impl Tdm {
     /// Parameters
     /// ----------
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Returns
     /// -------
@@ -272,8 +267,7 @@ impl Tdm {
     fn to_str(
         &self,
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<String> {
         crate::api::generate_string(py, &self.to_core(py)?, format)
     }
@@ -300,7 +294,7 @@ impl Tdm {
 ///
 /// Raises
 /// ------
-/// ValueError
+/// NdmEpochError
 ///     If creation_date is not a CCSDS calendar epoch.
 #[gen_stub_pyclass]
 #[pyclass(module = "ccsds_ndm", from_py_object)]
@@ -759,7 +753,9 @@ impl TdmSegment {
 /// Raises
 /// ------
 /// ValueError
-///     If an epoch, enumeration, integer, or unit-bearing metadata value is invalid.
+///     If an enumeration, integer, or unit-bearing metadata value is invalid.
+/// NdmEpochError
+///     If a CCSDS epoch or time tag is invalid.
 #[gen_stub_pyclass]
 #[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
@@ -1041,6 +1037,8 @@ impl TdmMetadata {
     /// Comments.
     ///
     /// :type: list[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -1174,6 +1172,8 @@ impl TdmMetadata {
     /// The second participant in a tracking data session.
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_participant_2(&self) -> Option<String> {
         self.inner.participant_2.clone()
@@ -1186,6 +1186,8 @@ impl TdmMetadata {
     /// The third participant in a tracking data session.
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_participant_3(&self) -> Option<String> {
         self.inner.participant_3.clone()
@@ -1198,6 +1200,8 @@ impl TdmMetadata {
     /// The fourth participant in a tracking data session.
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_participant_4(&self) -> Option<String> {
         self.inner.participant_4.clone()
@@ -1210,6 +1214,8 @@ impl TdmMetadata {
     /// The fifth participant in a tracking data session.
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_participant_5(&self) -> Option<String> {
         self.inner.participant_5.clone()
@@ -1269,7 +1275,11 @@ impl TdmMetadata {
 
     /// The first signal path where the MODE is 'SINGLE_DIFF'.
     ///
+    /// PATH_1 and PATH_2 must be supplied together; every index names a supplied participant.
+    ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_path_1(&self) -> Option<String> {
         self.inner.path_1.as_ref().map(|v| v.to_string())
@@ -1286,7 +1296,11 @@ impl TdmMetadata {
 
     /// The second signal path where the MODE is 'SINGLE_DIFF'.
     ///
+    /// PATH_1 and PATH_2 must be supplied together; every index names a supplied participant.
+    ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_path_2(&self) -> Option<String> {
         self.inner.path_2.as_ref().map(|v| v.to_string())
@@ -1306,6 +1320,8 @@ impl TdmMetadata {
     /// Examples: SATELLITE_A_EPHEM27
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_ephemeris_name_1(&self) -> Option<String> {
         self.inner.ephemeris_name_1.clone()
@@ -1320,6 +1336,8 @@ impl TdmMetadata {
     /// Examples: SATELLITE_A_EPHEM27
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_ephemeris_name_2(&self) -> Option<String> {
         self.inner.ephemeris_name_2.clone()
@@ -1334,6 +1352,8 @@ impl TdmMetadata {
     /// Examples: SATELLITE_A_EPHEMERIS
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_ephemeris_name_3(&self) -> Option<String> {
         self.inner.ephemeris_name_3.clone()
@@ -1348,6 +1368,8 @@ impl TdmMetadata {
     /// Examples: SATELLITE_A_EPHEMERIS
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_ephemeris_name_4(&self) -> Option<String> {
         self.inner.ephemeris_name_4.clone()
@@ -1362,6 +1384,8 @@ impl TdmMetadata {
     /// Examples: SATELLITE_A_EPHEMERIS
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_ephemeris_name_5(&self) -> Option<String> {
         self.inner.ephemeris_name_5.clone()
@@ -1769,6 +1793,8 @@ impl TdmMetadata {
     /// Units: s
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_transmit_delay_2(&self) -> Option<f64> {
         self.inner.transmit_delay_2
@@ -1784,6 +1810,8 @@ impl TdmMetadata {
     /// Units: s
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_transmit_delay_3(&self) -> Option<f64> {
         self.inner.transmit_delay_3
@@ -1799,6 +1827,8 @@ impl TdmMetadata {
     /// Units: s
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_transmit_delay_4(&self) -> Option<f64> {
         self.inner.transmit_delay_4
@@ -1814,6 +1844,8 @@ impl TdmMetadata {
     /// Units: s
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_transmit_delay_5(&self) -> Option<f64> {
         self.inner.transmit_delay_5
@@ -1849,6 +1881,8 @@ impl TdmMetadata {
     /// Units: s
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_receive_delay_2(&self) -> Option<f64> {
         self.inner.receive_delay_2
@@ -1864,6 +1898,8 @@ impl TdmMetadata {
     /// Units: s
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_receive_delay_3(&self) -> Option<f64> {
         self.inner.receive_delay_3
@@ -1879,6 +1915,8 @@ impl TdmMetadata {
     /// Units: s
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_receive_delay_4(&self) -> Option<f64> {
         self.inner.receive_delay_4
@@ -1894,6 +1932,8 @@ impl TdmMetadata {
     /// Units: s
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_receive_delay_5(&self) -> Option<f64> {
         self.inner.receive_delay_5
@@ -1949,6 +1989,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_correction_angle_2(&self) -> Option<f64> {
         self.inner.correction_angle_2
@@ -1963,6 +2005,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_correction_doppler(&self) -> Option<f64> {
         self.inner.correction_doppler
@@ -1977,6 +2021,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_correction_mag(&self) -> Option<f64> {
         self.inner.correction_mag
@@ -1991,6 +2037,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_correction_range(&self) -> Option<f64> {
         self.inner.correction_range
@@ -2005,6 +2053,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_correction_rcs(&self) -> Option<f64> {
         self.inner.correction_rcs
@@ -2019,6 +2069,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_correction_receive(&self) -> Option<f64> {
         self.inner.correction_receive
@@ -2033,6 +2085,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_correction_transmit(&self) -> Option<f64> {
         self.inner.correction_transmit
@@ -2047,6 +2101,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_correction_aberration_yearly(&self) -> Option<f64> {
         self.inner.correction_aberration_yearly
@@ -2061,6 +2117,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_correction_aberration_diurnal(&self) -> Option<f64> {
         self.inner.correction_aberration_diurnal
@@ -2116,6 +2174,8 @@ pub struct TdmData {
     /// Comments.
     ///
     /// :type: list[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[pyo3(get, set)]
     comment: Vec<String>,
 
@@ -2170,6 +2230,7 @@ impl TdmData {
 
     /// Tracking data records.
     ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     /// :type: list[TdmObservation]
     #[gen_stub(override_return_type(type_repr = "list[TdmObservation]"))]
     #[getter]
@@ -2248,6 +2309,8 @@ impl TdmObservation {
     /// Time associated with the tracking observable.
     ///
     /// :type: str
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_epoch(&self) -> String {
         self.inner.epoch.as_str().to_string()
@@ -2262,6 +2325,8 @@ impl TdmObservation {
     /// Keyword of the observation (e.g., "RANGE").
     ///
     /// :type: str
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_keyword(&self) -> String {
         self.inner.data.key().to_string()
@@ -2291,6 +2356,8 @@ impl TdmObservation {
     /// Useful for phase counts which may require high precision.
     ///
     /// :type: str
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
     #[getter]
     fn get_value_str(&self) -> String {
         self.inner.data.value_to_string()

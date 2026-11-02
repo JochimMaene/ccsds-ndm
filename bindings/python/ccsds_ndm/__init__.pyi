@@ -199,7 +199,7 @@ class Acm:
         """
     @staticmethod
     def from_str(
-        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
+        data: builtins.str, format: typing.Optional[builtins.str] = None
     ) -> Acm:
         r"""
         Parse an ACM document and validate its contents.
@@ -220,8 +220,6 @@ class Acm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -232,7 +230,7 @@ class Acm:
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
+        format: typing.Optional[builtins.str] = None,
     ) -> Acm:
         r"""
         Read a UTF-8 ACM document from a file and validate it.
@@ -253,8 +251,6 @@ class Acm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -265,9 +261,7 @@ class Acm:
             Input file could not be read.
         """
     def to_file(
-        self,
-        path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Literal["kvn", "xml"],
+        self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
     ) -> None:
         r"""
         Validate this ACM message and atomically replace the destination.
@@ -277,7 +271,7 @@ class Acm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Raises
         ------
@@ -292,14 +286,14 @@ class Acm:
         NdmIoError
             Temporary-file writing or atomic replacement failed.
         """
-    def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
+    def to_str(self, format: builtins.str) -> builtins.str:
         r"""
         Validate and serialize this ACM message, preserving its edition.
 
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Returns
         -------
@@ -526,6 +520,8 @@ class AcmAttitudeState:
     r"""
     ACM Data: Attitude State Time History Section.
 
+    NUMBER_STATES is derived from the first row. An omitted rate_type means attitude-only rows.
+
     Parameters
     ----------
     ref_frame_a : str
@@ -544,7 +540,9 @@ class AcmAttitudeState:
     Raises
     ------
     ValueError
-        If att_type or a time tag is invalid, the history is empty, or row widths differ.
+        If att_type is invalid, the history is empty, or row widths differ.
+    NdmEpochError
+        If a CCSDS epoch or time tag is invalid.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -722,9 +720,9 @@ class AcmCovarianceMatrix:
 
     Parameters
     ----------
-    cov_basis : str
-        Covariance provenance, for example PREDICTED or DETERMINED.
-    cov_ref_frame : str
+    cov_basis : str, optional
+        Covariance provenance, for example PREDICTED or DETERMINED_GND.
+    cov_ref_frame : str, optional
         Reference frame for the covariance components.
     cov_type : str
         Covariance representation (ADM table 5-6), for example ANGLE.
@@ -737,7 +735,9 @@ class AcmCovarianceMatrix:
     Raises
     ------
     ValueError
-        If cov_type or a time tag is invalid.
+        If cov_type is invalid.
+    NdmEpochError
+        If a CCSDS epoch or time tag is invalid.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -850,12 +850,12 @@ class AcmCovarianceMatrix:
     ) -> None: ...
     def __new__(
         cls,
-        cov_basis: builtins.str,
-        cov_ref_frame: builtins.str,
         cov_type: builtins.str,
         cov_lines: typing.Sequence[
             tuple[builtins.str, typing.Sequence[builtins.float]]
         ],
+        cov_basis: typing.Optional[builtins.str] = None,
+        cov_ref_frame: typing.Optional[builtins.str] = None,
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> AcmCovarianceMatrix: ...
 
@@ -1138,7 +1138,7 @@ class AcmMetadata:
 
     Raises
     ------
-    ValueError
+    NdmEpochError
         If epoch_tzero is not a CCSDS calendar epoch.
     """
     @property
@@ -1896,7 +1896,7 @@ class AdmHeader:
 
     Raises
     ------
-    ValueError
+    NdmEpochError
         If creation_date is not a CCSDS calendar epoch.
     """
     @property
@@ -2047,14 +2047,14 @@ class Aem:
         r"""
         Validate the message against CCSDS rules.
         """
-    def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
+    def to_str(self, format: builtins.str) -> builtins.str:
         r"""
         Validate and serialize this AEM message, preserving its edition.
 
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Returns
         -------
@@ -2074,7 +2074,7 @@ class Aem:
         """
     @staticmethod
     def from_str(
-        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
+        data: builtins.str, format: typing.Optional[builtins.str] = None
     ) -> Aem:
         r"""
         Parse an AEM document and validate its contents.
@@ -2095,8 +2095,6 @@ class Aem:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -2107,7 +2105,7 @@ class Aem:
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
+        format: typing.Optional[builtins.str] = None,
     ) -> Aem:
         r"""
         Read a UTF-8 AEM document from a file and validate it.
@@ -2128,8 +2126,6 @@ class Aem:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -2140,9 +2136,7 @@ class Aem:
             Input file could not be read.
         """
     def to_file(
-        self,
-        path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Literal["kvn", "xml"],
+        self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
     ) -> None:
         r"""
         Validate this AEM message and atomically replace the destination.
@@ -2152,7 +2146,7 @@ class Aem:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Raises
         ------
@@ -2263,7 +2257,12 @@ class AemData:
         array: numpy.typing.ArrayLike,
         attitude_type: builtins.str,
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
-    ) -> AemData: ...
+    ) -> AemData:
+        r"""
+        Build rows matching epochs and ATTITUDE_TYPE, in ADM table 4-4 column order and fixed units.
+        The array shape is (len(epochs), number of components); shape errors raise ValueError.
+        CCSDS Reference: 504.0-B-2, Table 4-4.
+        """
 
 @typing.final
 class AemMetadata:
@@ -2348,7 +2347,9 @@ class AemMetadata:
     Raises
     ------
     ValueError
-        If an epoch, attitude type, rotation sequence or interpolation degree is invalid.
+        If an attitude type, rotation sequence or interpolation degree is invalid.
+    NdmEpochError
+        If a CCSDS epoch or time tag is invalid.
     """
     @property
     def object_name(self) -> builtins.str:
@@ -2863,14 +2864,14 @@ class Apm:
         r"""
         Validate the message against CCSDS rules.
         """
-    def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
+    def to_str(self, format: builtins.str) -> builtins.str:
         r"""
         Validate and serialize this APM message, preserving its edition.
 
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Returns
         -------
@@ -2890,7 +2891,7 @@ class Apm:
         """
     @staticmethod
     def from_str(
-        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
+        data: builtins.str, format: typing.Optional[builtins.str] = None
     ) -> Apm:
         r"""
         Parse an APM document and validate its contents.
@@ -2911,8 +2912,6 @@ class Apm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -2923,7 +2922,7 @@ class Apm:
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
+        format: typing.Optional[builtins.str] = None,
     ) -> Apm:
         r"""
         Read a UTF-8 APM document from a file and validate it.
@@ -2944,8 +2943,6 @@ class Apm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -2956,9 +2953,7 @@ class Apm:
             Input file could not be read.
         """
     def to_file(
-        self,
-        path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Literal["kvn", "xml"],
+        self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
     ) -> None:
         r"""
         Validate this APM message and atomically replace the destination.
@@ -2968,7 +2963,7 @@ class Apm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Raises
         ------
@@ -3014,7 +3009,7 @@ class ApmData:
 
     Raises
     ------
-    ValueError
+    NdmEpochError
         If epoch is not a CCSDS calendar epoch.
     """
     @property
@@ -3162,7 +3157,7 @@ class ApmManeuverParameters:
 
     Raises
     ------
-    ValueError
+    NdmEpochError
         If man_epoch_start is not a CCSDS calendar epoch.
     """
     @property
@@ -3474,7 +3469,9 @@ class AtmosphericReentryParameters:
     Raises
     ------
     ValueError
-        Invalid lifetime, confidence level, or calendar epoch.
+        Invalid lifetime or confidence level.
+    NdmEpochError
+        If a CCSDS epoch or time tag is invalid.
     """
     @property
     def orbit_lifetime(self) -> builtins.float:
@@ -3637,13 +3634,19 @@ class AttitudeState:
 
     Raises
     ------
-    ValueError
+    NdmEpochError
         If epoch is not a CCSDS calendar epoch.
     """
     @property
-    def values(self) -> builtins.list[builtins.float]: ...
+    def values(self) -> builtins.list[builtins.float]:
+        r"""
+        Components in ATTITUDE_TYPE column order and fixed units (ADM table 4-4).
+        """
     @values.setter
-    def values(self, value: typing.Sequence[builtins.float]) -> None: ...
+    def values(self, value: typing.Sequence[builtins.float]) -> None:
+        r"""
+        Components in ATTITUDE_TYPE column order and fixed units (ADM table 4-4).
+        """
     @property
     def epoch(self) -> builtins.str: ...
     @epoch.setter
@@ -3725,7 +3728,7 @@ class Cdm:
         """
     @staticmethod
     def from_str(
-        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
+        data: builtins.str, format: typing.Optional[builtins.str] = None
     ) -> Cdm:
         r"""
         Parse a CDM document and validate its contents.
@@ -3746,8 +3749,6 @@ class Cdm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -3758,7 +3759,7 @@ class Cdm:
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
+        format: typing.Optional[builtins.str] = None,
     ) -> Cdm:
         r"""
         Read a UTF-8 CDM document from a file and validate it.
@@ -3779,8 +3780,6 @@ class Cdm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -3791,9 +3790,7 @@ class Cdm:
             Input file could not be read.
         """
     def to_file(
-        self,
-        path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Literal["kvn", "xml"],
+        self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
     ) -> None:
         r"""
         Validate this CDM message and atomically replace the destination.
@@ -3803,7 +3800,7 @@ class Cdm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Raises
         ------
@@ -3818,14 +3815,14 @@ class Cdm:
         NdmIoError
             Temporary-file writing or atomic replacement failed.
         """
-    def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
+    def to_str(self, format: builtins.str) -> builtins.str:
         r"""
         Validate and serialize this CDM message, preserving its edition.
 
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Returns
         -------
@@ -3893,7 +3890,7 @@ class CdmCovarianceMatrix:
     r"""
     Covariance Matrix.
 
-    The optional rows 7 (CDRG_*), 8 (CSRP_*) and 9 (CTHR_*) follow CDM 3.5.2: a row that is
+    The optional rows 7 (CDRG_*), 8 (CSRP_*) and 9 (CTHR_*) follow CDM 5.2.8: a row that is
     given must be complete, and every preceding optional row must be given too.
 
     Parameters
@@ -4548,7 +4545,14 @@ class CdmCovarianceMatrix:
     def from_numpy(
         array: numpy.typing.ArrayLike,
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
-    ) -> CdmCovarianceMatrix: ...
+    ) -> CdmCovarianceMatrix:
+        r"""
+        Build a symmetric 6x6, 7x7, 8x8 or 9x9 covariance in R, T, N, Rdot, Tdot, Ndot,
+        Drag, SRP, Thrust order. Position covariance uses m², position/velocity m²/s,
+        velocity covariance m²/s²; extended rows use the documented per-field units.
+        Input is not rescaled to the km and km/s used by CDM state vectors.
+        CCSDS Reference: 508.0-B-1, Section 5.2.8.
+        """
     def to_numpy(self) -> numpy.typing.NDArray[numpy.float64]:
         r"""
         Returns the covariance matrix as a NumPy array.
@@ -4569,7 +4573,7 @@ class CdmData:
     state_vector : CdmStateVector
         Object position and velocity at TCA.
     covariance_matrix : CdmCovarianceMatrix, optional
-        Object covariance at TCA. Required (CDM 3.5.2): validation and generation reject
+        Object covariance at TCA. Required (CDM 5.2.8): validation and generation reject
         ``None``; it may be omitted only while a message is being built incrementally.
     od_parameters : OdParameters, optional
         Orbit-determination spans, counts, and residual statistics.
@@ -4609,7 +4613,7 @@ class CdmData:
     @property
     def covariance_matrix(self) -> typing.Optional[CdmCovarianceMatrix]:
         r"""
-        Covariance Matrix (CDM 3.5.2). Required: validation and generation reject ``None``;
+        Covariance Matrix (CDM 5.2.8). Required: validation and generation reject ``None``;
         ``None`` is allowed only while a message is being built incrementally.
 
         :type: Optional[CdmCovarianceMatrix]
@@ -4659,7 +4663,7 @@ class CdmData:
         Covariance matrix as a NumPy array (convenience method).
 
         Returns:
-            numpy.ndarray: 9x9 covariance matrix.
+            numpy.ndarray: symmetric 6x6, 7x7, 8x8 or 9x9 covariance matrix.
 
         :type: numpy.ndarray
         """
@@ -4682,7 +4686,12 @@ class CdmData:
         od_parameters: typing.Optional[OdParameters] = None,
         additional_parameters: typing.Optional[AdditionalParameters] = None,
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
-    ) -> CdmData: ...
+    ) -> CdmData:
+        r"""
+        Build CDM state and optional covariance arrays. State columns are X, Y, Z (km),
+        X_DOT, Y_DOT, Z_DOT (km/s); covariance uses the fixed CDM units and must be symmetric.
+        CCSDS Reference: 508.0-B-1, Sections 3.4–3.5.
+        """
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
@@ -5060,7 +5069,7 @@ class CdmMetadata:
         :type: Optional[ObjectDescription]
         """
     @object_type.setter
-    def object_type(self, value: typing.Optional[ObjectDescription]) -> None: ...
+    def object_type(self, value: ObjectDescription | builtins.str | None) -> None: ...
     @property
     def covariance_method(self) -> CovarianceMethodType:
         r"""
@@ -5328,7 +5337,11 @@ class CdmStateVector:
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> CdmStateVector: ...
     @staticmethod
-    def from_numpy(array: numpy.typing.ArrayLike) -> CdmStateVector: ...
+    def from_numpy(array: numpy.typing.ArrayLike) -> CdmStateVector:
+        r"""
+        Build from shape (6,) or (1, 6): X, Y, Z in km, then X_DOT, Y_DOT, Z_DOT in km/s.
+        CCSDS Reference: 508.0-B-1, Section 3.4.
+        """
     def __repr__(self) -> builtins.str: ...
     def to_numpy(self) -> numpy.typing.NDArray[numpy.float64]:
         r"""
@@ -5414,7 +5427,7 @@ class CombinedNdm:
         """
     @staticmethod
     def from_str(
-        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
+        data: builtins.str, format: typing.Optional[builtins.str] = None
     ) -> CombinedNdm:
         r"""
         Parse a NDM document and validate its contents.
@@ -5435,8 +5448,6 @@ class CombinedNdm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -5447,7 +5458,7 @@ class CombinedNdm:
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
+        format: typing.Optional[builtins.str] = None,
     ) -> CombinedNdm:
         r"""
         Read a UTF-8 NDM document from a file and validate it.
@@ -5468,8 +5479,6 @@ class CombinedNdm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -5480,9 +5489,7 @@ class CombinedNdm:
             Input file could not be read.
         """
     def to_file(
-        self,
-        path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Literal["kvn", "xml"],
+        self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
     ) -> None:
         r"""
         Validate this NDM message and atomically replace the destination.
@@ -5507,7 +5514,7 @@ class CombinedNdm:
         NdmIoError
             Temporary-file writing or atomic replacement failed.
         """
-    def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
+    def to_str(self, format: builtins.str) -> builtins.str:
         r"""
         Validate and serialize this NDM message, preserving its edition.
 
@@ -6832,7 +6839,7 @@ class MeanElements:
     ) -> MeanElements: ...
     def __repr__(self) -> builtins.str: ...
 
-class NdmEpochError(builtins.ValueError):
+class NdmEpochError(NdmError):
     r"""
     Error parsing a CCSDS epoch string.
     """
@@ -6932,7 +6939,7 @@ class NdmError(builtins.Exception):
     Expected parser token, when available; excludes internal labels.
     """
 
-class NdmFormatError(builtins.ValueError):
+class NdmFormatError(NdmError):
     r"""
     Error during parsing of NDM data (KVN or XML).
     """
@@ -6982,7 +6989,7 @@ class NdmFormatError(builtins.ValueError):
     Expected parser token, when available; excludes internal labels.
     """
 
-class NdmIoError(builtins.OSError):
+class NdmIoError(NdmError):
     r"""
     I/O error during file operations.
     """
@@ -7136,7 +7143,7 @@ class Ocm:
         """
     @staticmethod
     def from_str(
-        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
+        data: builtins.str, format: typing.Optional[builtins.str] = None
     ) -> Ocm:
         r"""
         Parse an OCM document and validate its contents.
@@ -7157,8 +7164,6 @@ class Ocm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -7169,7 +7174,7 @@ class Ocm:
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
+        format: typing.Optional[builtins.str] = None,
     ) -> Ocm:
         r"""
         Read a UTF-8 OCM document from a file and validate it.
@@ -7190,8 +7195,6 @@ class Ocm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -7202,9 +7205,7 @@ class Ocm:
             Input file could not be read.
         """
     def to_file(
-        self,
-        path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Literal["kvn", "xml"],
+        self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
     ) -> None:
         r"""
         Validate this OCM message and atomically replace the destination.
@@ -7214,7 +7215,7 @@ class Ocm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Raises
         ------
@@ -7238,14 +7239,14 @@ class Ocm:
         r"""
         Validate the message against CCSDS rules.
         """
-    def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
+    def to_str(self, format: builtins.str) -> builtins.str:
         r"""
         Validate and serialize this OCM message, preserving its edition.
 
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Returns
         -------
@@ -7411,6 +7412,8 @@ class OcmCovarianceMatrix:
         CCSDS Reference: 502.0-B-3, Section 6.2.7.
 
         :type: str
+
+        Default: TNW_INERTIAL when omitted on KVN input.
         """
     @cov_ref_frame.setter
     def cov_ref_frame(self, value: builtins.str) -> None: ...
@@ -7497,6 +7500,8 @@ class OcmCovarianceMatrix:
         CCSDS Reference: 502.0-B-3, Section 6.2.7.
 
         :type: str
+
+        Default: LTM when omitted on KVN input.
         """
     @cov_ordering.setter
     def cov_ordering(self, value: builtins.str) -> None: ...
@@ -7912,6 +7917,8 @@ class OcmManeuverParameters:
         CCSDS Reference: 502.0-B-3, Section 6.2.8.
 
         :type: str
+
+        Default: CONTINUOUS when omitted.
         """
     @dc_type.setter
     def dc_type(self, value: builtins.str) -> None: ...
@@ -8979,6 +8986,8 @@ class OcmMetadata:
         CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[float]
+
+        Default: omitted means 0.0 SI seconds, including TIME_SYSTEM=SCLK (ODM 6.2.1.3).
         """
     @sclk_offset_at_epoch.setter
     def sclk_offset_at_epoch(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -8994,6 +9003,8 @@ class OcmMetadata:
         CCSDS Reference: 502.0-B-3, Section 6.2.4.
 
         :type: Optional[float]
+
+        Default: omitted means 1.0, including TIME_SYSTEM=SCLK (ODM 6.2.1.3).
         """
     @sclk_sec_per_si_sec.setter
     def sclk_sec_per_si_sec(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -10433,6 +10444,8 @@ class OcmPhysicalDescription:
         CCSDS Reference: 502.0-B-3, Section 6.2.6.
 
         :type: Optional[str]
+
+        Accepts a relative SI-second tag or a calendar/ordinal epoch (ODM 6.2.2.3).
         """
     @oeb_parent_frame_epoch.setter
     def oeb_parent_frame_epoch(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -11131,7 +11144,7 @@ class OcmTrajState:
     useable_stop_time : str, optional
         Stop time of the useable time span covered by the ephemeris data.
     orb_revnum : float, optional
-        The integer orbit revolution number associated with the first trajectory state.
+        The orbit revolution number (fractional values are accepted) associated with the first trajectory state.
     orb_revnum_basis : str, optional
         Specifies the message creator’s basis for their orbit revolution counter (0 or 1).
     orb_averaging : str, optional
@@ -11160,6 +11173,8 @@ class OcmTrajState:
         CCSDS Reference: 502.0-B-3, Section 6.2.5.
 
         :type: str
+
+        Default: EARTH when omitted on KVN input.
         """
     @center_name.setter
     def center_name(self, value: builtins.str) -> None: ...
@@ -11174,6 +11189,8 @@ class OcmTrajState:
         CCSDS Reference: 502.0-B-3, Section 6.2.5.
 
         :type: str
+
+        Default: ICRF3 when omitted on KVN input.
         """
     @traj_ref_frame.setter
     def traj_ref_frame(self, value: builtins.str) -> None: ...
@@ -11317,8 +11334,8 @@ class OcmTrajState:
     def interpolation_degree(self) -> typing.Optional[builtins.int]:
         r"""
         Recommended interpolation degree for ephemeris data in the immediately following set of
-        ephemeris lines. Must be an integer value. This keyword must be provided if the
-        'INTERPOLATION' keyword is used and set to anything other than PROPAGATE.
+        ephemeris lines. A supplied value must be a positive integer. Omission adopts the
+        implicit book default (6.2.1.3) and stays absent in the model and output.
 
         Examples: 5, 1
 
@@ -11372,6 +11389,8 @@ class OcmTrajState:
         CCSDS Reference: 502.0-B-3, Section 6.2.5.
 
         :type: Optional[str]
+
+        Accepts a relative SI-second tag or a calendar/ordinal epoch (ODM 6.2.2.3).
         """
     @useable_start_time.setter
     def useable_start_time(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -11391,13 +11410,15 @@ class OcmTrajState:
         CCSDS Reference: 502.0-B-3, Section 6.2.5.
 
         :type: Optional[str]
+
+        Accepts a relative SI-second tag or a calendar/ordinal epoch (ODM 6.2.2.3).
         """
     @useable_stop_time.setter
     def useable_stop_time(self, value: typing.Optional[builtins.str]) -> None: ...
     @property
     def orb_revnum(self) -> typing.Optional[builtins.float]:
         r"""
-        The integer orbit revolution number associated with the first trajectory state in this
+        The orbit revolution number (fractional values are accepted) associated with the first trajectory state in this
         trajectory state time history block. NOTE—The first ascending node crossing that occurs
         AFTER launch or deployment is designated to be the beginning of orbit revolution number
         = one ('1').
@@ -11427,6 +11448,8 @@ class OcmTrajState:
         CCSDS Reference: 502.0-B-3, Section 6.2.5.
 
         :type: Optional[str]
+
+        Default: omitted means 0; the model/output retains omission (ODM 6.2.1.3).
         """
     @orb_revnum_basis.setter
     def orb_revnum_basis(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -11908,7 +11931,8 @@ class Oem:
     def version(self) -> builtins.str:
         r"""
         The OEM edition: ``"3.0"`` or ``"2.0"`` can be set and written. A parsed ``"1.0"``
-        message keeps ``"1.0"`` but is read-only; setting ``"1.0"`` raises ``ValueError``.
+        message keeps ``"1.0"`` and cannot be written until deliberately relabelled to 2.0/3.0
+        and validated. Setting the version to 1.0 is refused.
 
         :type: str
         """
@@ -11956,7 +11980,7 @@ class Oem:
         """
     @staticmethod
     def from_str(
-        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
+        data: builtins.str, format: typing.Optional[builtins.str] = None
     ) -> Oem:
         r"""
         Parse an OEM document and validate its contents.
@@ -11977,8 +12001,6 @@ class Oem:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -11989,7 +12011,7 @@ class Oem:
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
+        format: typing.Optional[builtins.str] = None,
     ) -> Oem:
         r"""
         Read a UTF-8 OEM document from a file and validate it.
@@ -12010,8 +12032,6 @@ class Oem:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -12022,9 +12042,7 @@ class Oem:
             Input file could not be read.
         """
     def to_file(
-        self,
-        path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Literal["kvn", "xml"],
+        self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
     ) -> None:
         r"""
         Validate this OEM message and atomically replace the destination.
@@ -12034,7 +12052,7 @@ class Oem:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Raises
         ------
@@ -12049,14 +12067,14 @@ class Oem:
         NdmIoError
             Temporary-file writing or atomic replacement failed.
         """
-    def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
+    def to_str(self, format: builtins.str) -> builtins.str:
         r"""
         Validate and serialize this OEM message, preserving its edition.
 
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Returns
         -------
@@ -12840,6 +12858,8 @@ class OemMetadata:
         CCSDS Reference: 502.0-B-3, Section 5.2.3.
 
         :type: Optional[str]
+
+        Enforced: inside start_time..stop_time and no later than useable_stop_time; consecutive useable spans may touch but not overlap (ODM 5.2.4.4).
         """
     @useable_start_time.setter
     def useable_start_time(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -12858,6 +12878,8 @@ class OemMetadata:
         CCSDS Reference: 502.0-B-3, Section 5.2.3.
 
         :type: Optional[str]
+
+        Enforced: inside start_time..stop_time and no earlier than useable_start_time (ODM table 5-3).
         """
     @useable_stop_time.setter
     def useable_stop_time(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -12887,6 +12909,8 @@ class OemMetadata:
         CCSDS Reference: 502.0-B-3, Section 5.2.3.
 
         :type: Optional[int]
+
+        Enforced: positive integer, required with INTERPOLATION; known methods require the documented minimum node count (ODM 5.2.3).
         """
     @interpolation_degree.setter
     def interpolation_degree(self, value: typing.Optional[builtins.int]) -> None: ...
@@ -13047,7 +13071,7 @@ class Omm:
         """
     @staticmethod
     def from_str(
-        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
+        data: builtins.str, format: typing.Optional[builtins.str] = None
     ) -> Omm:
         r"""
         Parse an OMM document and validate its contents.
@@ -13068,8 +13092,6 @@ class Omm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -13080,7 +13102,7 @@ class Omm:
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
+        format: typing.Optional[builtins.str] = None,
     ) -> Omm:
         r"""
         Read a UTF-8 OMM document from a file and validate it.
@@ -13101,8 +13123,6 @@ class Omm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -13113,9 +13133,7 @@ class Omm:
             Input file could not be read.
         """
     def to_file(
-        self,
-        path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Literal["kvn", "xml"],
+        self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
     ) -> None:
         r"""
         Validate this OMM message and atomically replace the destination.
@@ -13125,7 +13143,7 @@ class Omm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Raises
         ------
@@ -13140,14 +13158,14 @@ class Omm:
         NdmIoError
             Temporary-file writing or atomic replacement failed.
         """
-    def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
+    def to_str(self, format: builtins.str) -> builtins.str:
         r"""
         Validate and serialize this OMM message, preserving its edition.
 
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Returns
         -------
@@ -13167,6 +13185,9 @@ class Omm:
         """
     def to_tle_lines(self) -> tuple[builtins.str, builtins.str]:
         r"""
+        MEAN_MOTION_DOT/DDOT are the stored TLE fields (already n-dot/2 and n-double-dot/6),
+        without additional scaling (ODM 4.2.4.7 note 2).
+
         Generate canonical NORAD TLE lines (line 1 and line 2) from this OMM.
 
         Requires Earth-centered TEME elements and UTC epochs; no coordinate/time conversion.
@@ -13226,6 +13247,8 @@ class OmmData:
         Comments.
 
         :type: list[str]
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.
         """
     @comment.setter
     def comment(self, value: typing.Sequence[builtins.str]) -> None:
@@ -13233,6 +13256,8 @@ class OmmData:
         Comments.
 
         :type: list[str]
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.
         """
     @property
     def mean_elements(self) -> MeanElements:
@@ -13240,6 +13265,8 @@ class OmmData:
         Mean Keplerian Elements in the Specified Reference Frame.
 
         :type: MeanElements
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.
         """
     @mean_elements.setter
     def mean_elements(self, value: MeanElements) -> None:
@@ -13247,6 +13274,8 @@ class OmmData:
         Mean Keplerian Elements in the Specified Reference Frame.
 
         :type: MeanElements
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.
         """
     @property
     def spacecraft_parameters(self) -> typing.Optional[SpacecraftParameters]:
@@ -13254,6 +13283,8 @@ class OmmData:
         Spacecraft Parameters.
 
         :type: Optional[SpacecraftParameters]
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.
         """
     @spacecraft_parameters.setter
     def spacecraft_parameters(
@@ -13266,6 +13297,8 @@ class OmmData:
         Field requirements depend on the theory and edition; see ``TleParameters``.
 
         :type: Optional[TleParameters]
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.
         """
     @tle_parameters.setter
     def tle_parameters(self, value: typing.Optional[TleParameters]) -> None: ...
@@ -13275,6 +13308,8 @@ class OmmData:
         Position/Velocity Covariance Matrix (6x6 Lower Triangular Form).
 
         :type: Optional[OpmCovarianceMatrix]
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.
         """
     @covariance_matrix.setter
     def covariance_matrix(
@@ -13286,6 +13321,8 @@ class OmmData:
         User-Defined Parameters.
 
         :type: UserDefined | None
+
+        CCSDS Reference: 502.0-B-3, Section 4.2.
         """
     @user_defined_parameters.setter
     def user_defined_parameters(self, value: typing.Optional[UserDefined]) -> None: ...
@@ -13588,7 +13625,7 @@ class Opm:
         """
     @staticmethod
     def from_str(
-        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
+        data: builtins.str, format: typing.Optional[builtins.str] = None
     ) -> Opm:
         r"""
         Parse an OPM document and validate its contents.
@@ -13609,8 +13646,6 @@ class Opm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -13621,7 +13656,7 @@ class Opm:
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
+        format: typing.Optional[builtins.str] = None,
     ) -> Opm:
         r"""
         Read a UTF-8 OPM document from a file and validate it.
@@ -13642,8 +13677,6 @@ class Opm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -13654,9 +13687,7 @@ class Opm:
             Input file could not be read.
         """
     def to_file(
-        self,
-        path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Literal["kvn", "xml"],
+        self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
     ) -> None:
         r"""
         Validate this OPM message and atomically replace the destination.
@@ -13666,7 +13697,7 @@ class Opm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Raises
         ------
@@ -13681,14 +13712,14 @@ class Opm:
         NdmIoError
             Temporary-file writing or atomic replacement failed.
         """
-    def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
+    def to_str(self, format: builtins.str) -> builtins.str:
         r"""
         Validate and serialize this OPM message, preserving its edition.
 
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Returns
         -------
@@ -14110,6 +14141,8 @@ class OpmData:
         Comments (see 7.8 for formatting rules).
 
         :type: list[str]
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.
         """
     @comment.setter
     def comment(self, value: typing.Sequence[builtins.str]) -> None:
@@ -14117,6 +14150,8 @@ class OpmData:
         Comments (see 7.8 for formatting rules).
 
         :type: list[str]
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.
         """
     @property
     def state_vector(self) -> StateVector:
@@ -14124,6 +14159,8 @@ class OpmData:
         State vector components (position and velocity).
 
         :type: StateVector
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.
         """
     @state_vector.setter
     def state_vector(self, value: StateVector) -> None:
@@ -14131,6 +14168,8 @@ class OpmData:
         State vector components (position and velocity).
 
         :type: StateVector
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.
         """
     @property
     def keplerian_elements(self) -> typing.Optional[KeplerianElements]:
@@ -14138,6 +14177,8 @@ class OpmData:
         Keplerian elements.
 
         :type: Optional[KeplerianElements]
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.
         """
     @keplerian_elements.setter
     def keplerian_elements(self, value: typing.Optional[KeplerianElements]) -> None: ...
@@ -14147,6 +14188,8 @@ class OpmData:
         Spacecraft parameters.
 
         :type: Optional[SpacecraftParameters]
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.
         """
     @spacecraft_parameters.setter
     def spacecraft_parameters(
@@ -14158,6 +14201,8 @@ class OpmData:
         Covariance matrix.
 
         :type: Optional[OpmCovarianceMatrix]
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.
         """
     @covariance_matrix.setter
     def covariance_matrix(
@@ -14169,6 +14214,8 @@ class OpmData:
         Maneuver parameters.
 
         :type: list[OpmManeuverParameters]
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.
         """
     @maneuver_parameters.setter
     def maneuver_parameters(
@@ -14180,6 +14227,8 @@ class OpmData:
         User defined parameters.
 
         :type: UserDefined | None
+
+        CCSDS Reference: 502.0-B-3, Section 3.2.
         """
     @user_defined_parameters.setter
     def user_defined_parameters(self, value: typing.Optional[UserDefined]) -> None: ...
@@ -14263,6 +14312,8 @@ class OpmManeuverParameters:
         CCSDS Reference: 502.0-B-3, Section 3.2.4.
 
         :type: float
+
+        Edition 2.0 excludes zero; edition 3.0 permits zero (ODM 3.2.4).
         """
     @man_delta_mass.setter
     def man_delta_mass(self, value: builtins.float) -> None: ...
@@ -14576,7 +14627,9 @@ class QuaternionState:
     Raises
     ------
     ValueError
-        If a component is outside [-1, 1], or only some quaternion derivatives are supplied.
+        If only some quaternion derivatives are supplied.
+    NdmValidationError
+        If a quaternion component is outside [-1, 1].
     """
     @property
     def q1(self) -> builtins.float:
@@ -14779,7 +14832,7 @@ class Rdm:
     def __repr__(self) -> builtins.str: ...
     @staticmethod
     def from_str(
-        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
+        data: builtins.str, format: typing.Optional[builtins.str] = None
     ) -> Rdm:
         r"""
         Parse a RDM document and validate its contents.
@@ -14800,8 +14853,6 @@ class Rdm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -14812,7 +14863,7 @@ class Rdm:
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
+        format: typing.Optional[builtins.str] = None,
     ) -> Rdm:
         r"""
         Read a UTF-8 RDM document from a file and validate it.
@@ -14833,8 +14884,6 @@ class Rdm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -14845,9 +14894,7 @@ class Rdm:
             Input file could not be read.
         """
     def to_file(
-        self,
-        path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Literal["kvn", "xml"],
+        self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
     ) -> None:
         r"""
         Validate this RDM message and atomically replace the destination.
@@ -14857,7 +14904,7 @@ class Rdm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Raises
         ------
@@ -14872,14 +14919,14 @@ class Rdm:
         NdmIoError
             Temporary-file writing or atomic replacement failed.
         """
-    def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
+    def to_str(self, format: builtins.str) -> builtins.str:
         r"""
         Validate and serialize this RDM message, preserving its edition.
 
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Returns
         -------
@@ -14925,14 +14972,14 @@ class RdmData:
     @property
     def comment(self) -> builtins.list[builtins.str]:
         r"""
-        Comments.
+        Leading data comments; KVN merges these into the first represented logical block.
 
         :type: list[str]
         """
     @comment.setter
     def comment(self, value: typing.Sequence[builtins.str]) -> None:
         r"""
-        Comments.
+        Leading data comments; KVN merges these into the first represented logical block.
 
         :type: list[str]
         """
@@ -15587,6 +15634,8 @@ class RdmMetadata:
         CCSDS Reference: 508.1-B-1, Section 3.4.
 
         :type: Optional[str]
+
+        Use None to omit the field; N/A is a document-input sentinel.
         """
     @next_message_epoch.setter
     def next_message_epoch(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -16600,7 +16649,7 @@ class StateVector:
 
     Raises
     ------
-    ValueError
+    NdmEpochError
         Invalid CCSDS epoch.
     """
     @property
@@ -16746,7 +16795,7 @@ class StateVectorAcc:
 
     Raises
     ------
-    ValueError
+    NdmEpochError
         Invalid CCSDS epoch.
     """
     @property
@@ -16978,7 +17027,7 @@ class Tdm:
     def __repr__(self) -> builtins.str: ...
     @staticmethod
     def from_str(
-        data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
+        data: builtins.str, format: typing.Optional[builtins.str] = None
     ) -> Tdm:
         r"""
         Parse a TDM document and validate its contents.
@@ -16999,8 +17048,6 @@ class Tdm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -17011,7 +17058,7 @@ class Tdm:
     @staticmethod
     def from_file(
         path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
+        format: typing.Optional[builtins.str] = None,
     ) -> Tdm:
         r"""
         Read a UTF-8 TDM document from a file and validate it.
@@ -17032,8 +17079,6 @@ class Tdm:
         ------
         NdmFormatError
             Malformed KVN/XML content.
-        NdmEpochError
-            Invalid CCSDS epoch.
         NdmValidationError
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
@@ -17044,9 +17089,7 @@ class Tdm:
             Input file could not be read.
         """
     def to_file(
-        self,
-        path: builtins.str | os.PathLike[builtins.str],
-        format: typing.Literal["kvn", "xml"],
+        self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
     ) -> None:
         r"""
         Validate this TDM message and atomically replace the destination.
@@ -17056,7 +17099,7 @@ class Tdm:
         path : str or os.PathLike
             Destination file; existing content is replaced only after successful generation.
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Raises
         ------
@@ -17071,14 +17114,14 @@ class Tdm:
         NdmIoError
             Temporary-file writing or atomic replacement failed.
         """
-    def to_str(self, format: typing.Literal["kvn", "xml"]) -> builtins.str:
+    def to_str(self, format: builtins.str) -> builtins.str:
         r"""
         Validate and serialize this TDM message, preserving its edition.
 
         Parameters
         ----------
         format : str
-            ``"kvn"`` or ``"xml"``.
+            ``"kvn"`` or ``"xml"`` (case-insensitive).
 
         Returns
         -------
@@ -17139,6 +17182,8 @@ class TdmData:
         Comments.
 
         :type: list[str]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @comment.setter
     def comment(self, value: typing.Sequence[builtins.str]) -> None:
@@ -17146,12 +17191,15 @@ class TdmData:
         Comments.
 
         :type: list[str]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @property
     def observations(self) -> list[TdmObservation]:
         r"""
         Tracking data records.
 
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         :type: list[TdmObservation]
         """
     @observations.setter
@@ -17183,7 +17231,7 @@ class TdmHeader:
 
     Raises
     ------
-    ValueError
+    NdmEpochError
         If creation_date is not a CCSDS calendar epoch.
     """
     @property
@@ -17457,7 +17505,9 @@ class TdmMetadata:
     Raises
     ------
     ValueError
-        If an epoch, enumeration, integer, or unit-bearing metadata value is invalid.
+        If an enumeration, integer, or unit-bearing metadata value is invalid.
+    NdmEpochError
+        If a CCSDS epoch or time tag is invalid.
     """
     @property
     def comment(self) -> builtins.list[builtins.str]:
@@ -17465,6 +17515,8 @@ class TdmMetadata:
         Comments.
 
         :type: list[str]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @comment.setter
     def comment(self, value: typing.Sequence[builtins.str]) -> None: ...
@@ -17569,6 +17621,8 @@ class TdmMetadata:
         The second participant in a tracking data session.
 
         :type: Optional[str]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @participant_2.setter
     def participant_2(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17578,6 +17632,8 @@ class TdmMetadata:
         The third participant in a tracking data session.
 
         :type: Optional[str]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @participant_3.setter
     def participant_3(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17587,6 +17643,8 @@ class TdmMetadata:
         The fourth participant in a tracking data session.
 
         :type: Optional[str]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @participant_4.setter
     def participant_4(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17596,6 +17654,8 @@ class TdmMetadata:
         The fifth participant in a tracking data session.
 
         :type: Optional[str]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @participant_5.setter
     def participant_5(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17636,7 +17696,11 @@ class TdmMetadata:
         r"""
         The first signal path where the MODE is 'SINGLE_DIFF'.
 
+        PATH_1 and PATH_2 must be supplied together; every index names a supplied participant.
+
         :type: Optional[str]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @path_1.setter
     def path_1(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17645,7 +17709,11 @@ class TdmMetadata:
         r"""
         The second signal path where the MODE is 'SINGLE_DIFF'.
 
+        PATH_1 and PATH_2 must be supplied together; every index names a supplied participant.
+
         :type: Optional[str]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @path_2.setter
     def path_2(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17657,6 +17725,8 @@ class TdmMetadata:
         Examples: SATELLITE_A_EPHEM27
 
         :type: Optional[str]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @ephemeris_name_1.setter
     def ephemeris_name_1(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17668,6 +17738,8 @@ class TdmMetadata:
         Examples: SATELLITE_A_EPHEM27
 
         :type: Optional[str]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @ephemeris_name_2.setter
     def ephemeris_name_2(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17679,6 +17751,8 @@ class TdmMetadata:
         Examples: SATELLITE_A_EPHEMERIS
 
         :type: Optional[str]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @ephemeris_name_3.setter
     def ephemeris_name_3(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17690,6 +17764,8 @@ class TdmMetadata:
         Examples: SATELLITE_A_EPHEMERIS
 
         :type: Optional[str]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @ephemeris_name_4.setter
     def ephemeris_name_4(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17701,6 +17777,8 @@ class TdmMetadata:
         Examples: SATELLITE_A_EPHEMERIS
 
         :type: Optional[str]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @ephemeris_name_5.setter
     def ephemeris_name_5(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -18005,6 +18083,8 @@ class TdmMetadata:
         Units: s
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @transmit_delay_2.setter
     def transmit_delay_2(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18017,6 +18097,8 @@ class TdmMetadata:
         Units: s
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @transmit_delay_3.setter
     def transmit_delay_3(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18029,6 +18111,8 @@ class TdmMetadata:
         Units: s
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @transmit_delay_4.setter
     def transmit_delay_4(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18041,6 +18125,8 @@ class TdmMetadata:
         Units: s
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @transmit_delay_5.setter
     def transmit_delay_5(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18070,6 +18156,8 @@ class TdmMetadata:
         Units: s
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @receive_delay_2.setter
     def receive_delay_2(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18082,6 +18170,8 @@ class TdmMetadata:
         Units: s
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @receive_delay_3.setter
     def receive_delay_3(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18094,6 +18184,8 @@ class TdmMetadata:
         Units: s
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @receive_delay_4.setter
     def receive_delay_4(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18106,6 +18198,8 @@ class TdmMetadata:
         Units: s
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @receive_delay_5.setter
     def receive_delay_5(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18147,6 +18241,8 @@ class TdmMetadata:
         Examples: -1.35, 0.23, -3.0e-1, 150000.0
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @correction_angle_2.setter
     def correction_angle_2(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18158,6 +18254,8 @@ class TdmMetadata:
         Examples: -1.35, 0.23, -3.0e-1, 150000.0
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @correction_doppler.setter
     def correction_doppler(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18169,6 +18267,8 @@ class TdmMetadata:
         Examples: -1.35, 0.23, -3.0e-1, 150000.0
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @correction_mag.setter
     def correction_mag(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18180,6 +18280,8 @@ class TdmMetadata:
         Examples: -1.35, 0.23, -3.0e-1, 150000.0
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @correction_range.setter
     def correction_range(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18191,6 +18293,8 @@ class TdmMetadata:
         Examples: -1.35, 0.23, -3.0e-1, 150000.0
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @correction_rcs.setter
     def correction_rcs(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18202,6 +18306,8 @@ class TdmMetadata:
         Examples: -1.35, 0.23, -3.0e-1, 150000.0
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @correction_receive.setter
     def correction_receive(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18213,6 +18319,8 @@ class TdmMetadata:
         Examples: -1.35, 0.23, -3.0e-1, 150000.0
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @correction_transmit.setter
     def correction_transmit(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18224,6 +18332,8 @@ class TdmMetadata:
         Examples: -1.35, 0.23, -3.0e-1, 150000.0
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @correction_aberration_yearly.setter
     def correction_aberration_yearly(
@@ -18237,6 +18347,8 @@ class TdmMetadata:
         Examples: -1.35, 0.23, -3.0e-1, 150000.0
 
         :type: Optional[float]
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @correction_aberration_diurnal.setter
     def correction_aberration_diurnal(
@@ -18343,6 +18455,8 @@ class TdmObservation:
         Time associated with the tracking observable.
 
         :type: str
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @epoch.setter
     def epoch(self, value: builtins.str) -> None: ...
@@ -18352,6 +18466,8 @@ class TdmObservation:
         Keyword of the observation (e.g., "RANGE").
 
         :type: str
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     @property
     def value(self) -> builtins.float | builtins.str:
@@ -18368,6 +18484,8 @@ class TdmObservation:
         Useful for phase counts which may require high precision.
 
         :type: str
+
+        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
         """
     def __new__(
         cls,
@@ -18429,7 +18547,7 @@ class TdmSegment:
 @typing.final
 class TleParameters:
     r"""
-    TLE Related Parameters (This section is only required if MEAN_ELEMENT_THEORY=SGP/SGP4).
+    TLE Related Parameters (required for SGP/SGP4; also PPT3 and SGP4-XP in 3.0).
 
     Parameters
     ----------
@@ -18719,10 +18837,9 @@ class UserDefined:
 @typing.final
 class CdmObjectType:
     r"""
-    Covariance Matrix at TCA.
+    CDM object identifiers, OBJECT1 and OBJECT2.
 
-    Provides uncertainty information for the state vector.
-    Can be converted to a NumPy array using `to_numpy()`.
+    CCSDS Reference: 508.0-B-1, Sections 3.3–3.4.
     """
 
     Object1: typing.ClassVar[CdmObjectType]
@@ -18733,6 +18850,12 @@ class CdmObjectType:
 
 @typing.final
 class ControlledType:
+    r"""
+    ControlledType categorical vocabulary.
+
+    CCSDS Reference: 508.1-B-1, Table 3-3.
+    """
+
     Yes: typing.ClassVar[ControlledType]
     No: typing.ClassVar[ControlledType]
     Unknown: typing.ClassVar[ControlledType]
@@ -18742,6 +18865,12 @@ class ControlledType:
 
 @typing.final
 class CovarianceMethodType:
+    r"""
+    CDM covariance calculation provenance.
+
+    CCSDS Reference: 508.0-B-1, Sections 3.3–3.4.
+    """
+
     Calculated: typing.ClassVar[CovarianceMethodType]
     Default: typing.ClassVar[CovarianceMethodType]
 
@@ -18750,6 +18879,12 @@ class CovarianceMethodType:
 
 @typing.final
 class ManeuverableType:
+    r"""
+    CDM maneuverability including N/A.
+
+    CCSDS Reference: 508.0-B-1, Sections 3.3–3.4.
+    """
+
     Yes: typing.ClassVar[ManeuverableType]
     No: typing.ClassVar[ManeuverableType]
     NA: typing.ClassVar[ManeuverableType]
@@ -18759,6 +18894,12 @@ class ManeuverableType:
 
 @typing.final
 class ObjectDescription:
+    r"""
+    ObjectDescription categorical vocabulary.
+
+    CCSDS Reference: 508.0-B-1, Table 3-3; 502.0-B-3, Table 6-3.
+    """
+
     Payload: typing.ClassVar[ObjectDescription]
     RocketBody: typing.ClassVar[ObjectDescription]
     Debris: typing.ClassVar[ObjectDescription]
@@ -18770,6 +18911,12 @@ class ObjectDescription:
 
 @typing.final
 class ReferenceFrameType:
+    r"""
+    CDM state reference frames.
+
+    CCSDS Reference: 508.0-B-1, Sections 3.3–3.4.
+    """
+
     Eme2000: typing.ClassVar[ReferenceFrameType]
     Gcrf: typing.ClassVar[ReferenceFrameType]
     Itrf: typing.ClassVar[ReferenceFrameType]
@@ -18779,6 +18926,12 @@ class ReferenceFrameType:
 
 @typing.final
 class ScreenVolumeFrameType:
+    r"""
+    CDM screening-volume reference frames.
+
+    CCSDS Reference: 508.0-B-1, Sections 3.3–3.4.
+    """
+
     Rtn: typing.ClassVar[ScreenVolumeFrameType]
     Tvn: typing.ClassVar[ScreenVolumeFrameType]
 
@@ -18787,6 +18940,12 @@ class ScreenVolumeFrameType:
 
 @typing.final
 class ScreenVolumeShapeType:
+    r"""
+    CDM screening-volume shapes.
+
+    CCSDS Reference: 508.0-B-1, Sections 3.3–3.4.
+    """
+
     Ellipsoid: typing.ClassVar[ScreenVolumeShapeType]
     Box: typing.ClassVar[ScreenVolumeShapeType]
 
@@ -18795,15 +18954,19 @@ class ScreenVolumeShapeType:
 
 @typing.final
 class YesNo:
+    r"""
+    YesNo categorical vocabulary.
+
+    CCSDS Reference: 503.0-B-2, Table 3-3.
+    """
+
     Yes: typing.ClassVar[YesNo]
     No: typing.ClassVar[YesNo]
 
     def __str__(self) -> builtins.str: ...
     def __repr__(self) -> builtins.str: ...
 
-def convert(
-    data: builtins.str, to_format: typing.Literal["kvn", "xml"]
-) -> builtins.str:
+def convert(data: builtins.str, to_format: builtins.str) -> builtins.str:
     r"""
     Convert any recognized NDM message between KVN and XML through the shared generation gate.
 
@@ -18812,7 +18975,7 @@ def convert(
     data : str
         Input KVN or XML; notation is detected automatically.
     to_format : str
-        ``"kvn"`` or ``"xml"``. The message's edition is preserved.
+        ``"kvn"`` or ``"xml"`` (case-insensitive). The message's edition is preserved.
 
     Returns
     -------
@@ -18823,8 +18986,6 @@ def convert(
     ------
     NdmFormatError
         Malformed input or content unrepresentable in the target notation.
-    NdmEpochError
-        Invalid epoch.
     NdmValidationError
         Invalid message or unsupported edition.
     NdmUnsupportedMessageError
@@ -18838,7 +18999,7 @@ def convert(
 def convert_file(
     source_path: builtins.str | os.PathLike[builtins.str],
     destination_path: builtins.str | os.PathLike[builtins.str],
-    to_format: typing.Literal["kvn", "xml"],
+    to_format: builtins.str,
 ) -> None:
     r"""
     Convert any recognized NDM file and atomically replace the destination on success.
@@ -18858,8 +19019,6 @@ def convert_file(
         File read, write, or replacement failed; filename and filename2 name both paths.
     NdmFormatError
         Malformed input or content unrepresentable in the target notation.
-    NdmEpochError
-        Invalid epoch.
     NdmValidationError
         Invalid message or unsupported edition.
     NdmUnsupportedMessageError
@@ -18872,7 +19031,7 @@ def convert_file(
 
 def from_file(
     path: builtins.str | os.PathLike[builtins.str],
-    format: typing.Optional[typing.Literal["kvn", "xml"]] = None,
+    format: typing.Optional[builtins.str] = None,
 ) -> typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]:
     r"""
     Parse from a file path (KVN or XML).
@@ -18890,8 +19049,6 @@ def from_file(
         The file could not be read.
     NdmFormatError
         Malformed document or invalid text encoding.
-    NdmEpochError
-        Invalid CCSDS epoch.
     NdmValidationError
         Validation failed or the edition is unsupported.
     NdmUnsupportedMessageError
@@ -18906,7 +19063,7 @@ def from_file(
     """
 
 def from_str(
-    data: builtins.str, format: typing.Optional[typing.Literal["kvn", "xml"]] = None
+    data: builtins.str, format: typing.Optional[builtins.str] = None
 ) -> typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]:
     r"""
     Parse a string containing KVN or XML.
@@ -18916,7 +19073,7 @@ def from_str(
     data : str
         The content to parse.
     format : str, optional
-        ``"kvn"`` or ``"xml"``. Detected automatically when omitted.
+        ``"kvn"`` or ``"xml"`` (case-insensitive). Detected automatically when omitted.
 
     Returns
     -------
@@ -18927,8 +19084,6 @@ def from_str(
     ------
     NdmFormatError
         If the input is malformed.
-    NdmEpochError
-        If a CCSDS epoch is invalid.
     NdmValidationError
         If the message fails validation or uses an unsupported edition.
     NdmUnsupportedMessageError

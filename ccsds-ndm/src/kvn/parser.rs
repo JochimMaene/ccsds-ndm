@@ -134,7 +134,12 @@ pub fn to_ccsds_error(
                 },
             ))))
         }
-        crate::error::ParserErrorKind::Enum(e) => {
+        crate::error::ParserErrorKind::Enum(mut e) => {
+            if let Some(key) = assignment_key(input, offset) {
+                if e.field == "RATE_TYPE" && key == "RATE_STATES" {
+                    e.field = "RATE_STATES";
+                }
+            }
             CcsdsNdmError::Format(Box::new(FormatError::Enum(e)))
         }
         crate::error::ParserErrorKind::ParseInt(e) => {
@@ -183,7 +188,42 @@ pub fn to_ccsds_error(
         }
     };
 
-    base_err.with_location(input, offset)
+    let error = base_err.with_location(input, offset);
+    if error.as_enum_error().is_some() {
+        if let Some((kind, version)) = input.lines().find_map(|line| {
+            let (key, version) = line.split_once('=')?;
+            let root = key.trim().strip_prefix("CCSDS_")?.strip_suffix("_VERS")?;
+            Some((
+                crate::versioning::kind_for_xml_root(root.as_bytes())?,
+                version.trim(),
+            ))
+        }) {
+            let error = error.with_parse_context(
+                kind,
+                crate::error::DiagnosticNotation::Kvn,
+                input,
+                Some(version),
+            );
+            if let CcsdsNdmError::Parsing {
+                mut context,
+                source,
+            } = error
+            {
+                let (line, column) = crate::error::line_column(input, offset);
+                context.line = Some(line);
+                context.column = Some(column);
+                context.byte_offset = Some(offset);
+                context.original_token = input
+                    .get(offset..)
+                    .and_then(|tail| tail.lines().next())
+                    .map(|token| token.chars().take(128).collect());
+                context.expected = source.as_enum_error().map(|error| error.expected);
+                return CcsdsNdmError::Parsing { context, source };
+            }
+            return error;
+        }
+    }
+    error
 }
 
 /// Offset of the first `field =` record whose value is absent under [`value_is_absent`].
@@ -274,7 +314,7 @@ pub fn kv_unit<'a>(input: &mut &'a str) -> KvnResult<Option<&'a str>> {
         let u = delimited('[', take_till(0.., |c: char| c == ']'), ']')
             .context(StrContext::Label("unit in brackets"))
             .parse_next(input)?;
-        Ok(Some(u))
+        Ok(Some(u.trim()))
     } else {
         Ok(None)
     }
@@ -660,13 +700,10 @@ pub fn kv_enum<T: FromStr>(input: &mut &str) -> KvnResult<T>
 where
     EnumParseError: From<T::Err>,
 {
+    let value_start = *input;
     let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    T::from_str(v.trim()).map_err(|e| {
-        ErrMode::Cut(InternalParserError::from_external_error(
-            input,
-            EnumParseError::from(e),
-        ))
-    })
+    T::from_str(v.trim())
+        .map_err(|error| external_error_at(input, value_start, EnumParseError::from(error)))
 }
 
 /// Parses an optional type that implements FromStr from a KVN line.
@@ -1466,10 +1503,6 @@ pub fn user_defined_parameters(input: &mut &str) -> KvnResult<Option<UserDefined
             break;
         };
         entries.extend(comments.into_iter().map(UserDefinedEntry::Comment));
-        if value_is_absent(key, input) {
-            skip_record(input);
-            continue;
-        }
         let value = kv_string.parse_next(input)?;
         entries.push(UserDefinedEntry::Parameter(UserDefinedParameter {
             parameter: parameter.to_string(),

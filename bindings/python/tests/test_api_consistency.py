@@ -81,10 +81,10 @@ def test_public_exceptions_follow_python_error_categories():
         ccsds_ndm.NdmXmlError,
         ccsds_ndm.NdmEpochError,
     ]
-    assert all(issubclass(exception, ValueError) for exception in value_errors)
+    assert all(issubclass(exception, ccsds_ndm.NdmError) for exception in value_errors)
     assert issubclass(ccsds_ndm.NdmValidationError, ccsds_ndm.NdmError)
     assert issubclass(ccsds_ndm.NdmUnsupportedMessageError, ccsds_ndm.NdmError)
-    assert issubclass(ccsds_ndm.NdmIoError, OSError)
+    assert issubclass(ccsds_ndm.NdmIoError, ccsds_ndm.NdmError)
     assert not issubclass(ccsds_ndm.NdmIoError, ValueError)
 
 
@@ -487,3 +487,68 @@ def test_semantic_input_errors_keep_the_parse_operation(cls):
         cls.from_str(source)
     assert caught.value.operation == "parse"
     assert caught.value.message_kind == "acm"
+
+
+def test_release_error_hierarchy_and_epoch_codes():
+    for kind in (
+        ccsds_ndm.NdmFormatError,
+        ccsds_ndm.NdmEpochError,
+        ccsds_ndm.NdmIoError,
+    ):
+        assert issubclass(kind, ccsds_ndm.NdmError)
+    with pytest.raises(ccsds_ndm.NdmEpochError) as caught:
+        ccsds_ndm.AdmHeader("bad", "TEST")
+    assert caught.value.code == "parse.invalid_epoch"
+
+
+def test_cdm_numpy_refuses_asymmetry_in_constructor_and_setter():
+    import numpy as np
+
+    matrix = np.eye(6)
+    covariance = ccsds_ndm.CdmCovarianceMatrix.from_numpy(matrix)
+    matrix[0, 1] = 1
+    with pytest.raises(ValueError, match="symmetric"):
+        ccsds_ndm.CdmCovarianceMatrix.from_numpy(matrix)
+    data = ccsds_ndm.CdmData.from_numpy(np.zeros(6), covariance_matrix=np.eye(6))
+    with pytest.raises(ValueError, match="symmetric"):
+        data.covariance_matrix_numpy = matrix
+    assert np.array_equal(data.covariance_matrix_numpy, covariance.to_numpy())
+
+
+def test_acm_covariance_optional_metadata_and_enum_repr():
+    covariance = ccsds_ndm.AcmCovarianceMatrix(
+        cov_type="ANGLE", cov_lines=[("0", [1.0])]
+    )
+    assert covariance.cov_basis is None
+    assert covariance.cov_ref_frame is None
+    for member in (ccsds_ndm.ObjectDescription.Debris, ccsds_ndm.YesNo.Yes):
+        assert eval(repr(member), vars(ccsds_ndm)) == member
+
+
+def test_tdm_legacy_kvn_is_readable_and_output_remains_current_only():
+    source = (
+        (ROOT / "ccsds-ndm/data/kvn/tdm_e1.kvn")
+        .read_text()
+        .replace("= 2.0", "= 1.0", 1)
+    )
+    message = ccsds_ndm.Tdm.from_str(source)
+    assert message.version == "1.0"
+    with pytest.raises(ccsds_ndm.NdmError):
+        message.to_str("kvn")
+
+
+def test_quaternion_constructor_checks_components_before_building_a_message():
+    with pytest.raises(ccsds_ndm.NdmValidationError, match="Q1"):
+        ccsds_ndm.QuaternionState("GCRF", "SC_BODY_1", 2.0, 0.0, 0.0, 0.0)
+
+
+def test_python_aem_rows_normalize_optional_fixed_unit_annotations():
+    source = (ROOT / "ccsds-ndm/data/xml/aem_g11.xml").read_text()
+    annotated = source.replace("<SPIN_ALPHA>", '<SPIN_ALPHA units="deg">', 1)
+    message = ccsds_ndm.Aem.from_str(annotated)
+    control = ccsds_ndm.Aem.from_str(source)
+    assert (
+        message.segments[0].data.attitude_states[0].values
+        == control.segments[0].data.attitude_states[0].values
+    )
+    assert 'units="deg"' not in message.to_str("xml")

@@ -4,13 +4,38 @@ use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::Ndm;
 
 #[test]
+fn unavailable_values_cannot_hide_invalid_xml_structure() {
+    let original = "<MESSAGE_ID>OEM 201113719185</MESSAGE_ID>";
+    for leaf in [
+        "<MESSAGE_ID bad='value'>N/A</MESSAGE_ID>",
+        "<MESSAGE_ID ghost:x='value'>N/A</MESSAGE_ID>",
+        "<MESSAGE_ID xmlns='urn:foreign'>N/A</MESSAGE_ID>",
+        "<UNKNOWN>N/A</UNKNOWN>",
+    ] {
+        let invalid = mutated_once(XML, original, leaf);
+        assert!(Oem::from_xml(&invalid).is_err(), "{leaf}");
+        assert!(ccsds_ndm::from_str(&invalid).is_err(), "{leaf}");
+    }
+    let valid = mutated_once(XML, original, "<MESSAGE_ID>N/A</MESSAGE_ID>");
+    let message = Oem::from_xml(&valid).unwrap();
+    assert!(message.header.message_id.is_none());
+}
+
+#[test]
 fn xml_optional_fields_keep_their_declared_types() {
     for (tag, value, code) in [
         ("INTERPOLATION_DEGREE", "", "parse.xml.syntax"),
-        ("INTERPOLATION_DEGREE", "n/a", "parse.xml.syntax"),
+        (
+            "INTERPOLATION_DEGREE",
+            "n/a",
+            "validation.missing_required_field",
+        ),
         ("X_DDOT", "", "parse.xml.syntax"),
-        ("X_DDOT", "n/a", "parse.xml.syntax"),
-        ("USEABLE_START_TIME", "", "validation.invalid_value"),
+        (
+            "USEABLE_START_TIME",
+            "",
+            "validation.missing_required_field",
+        ),
     ] {
         let start = XML.find(&format!("<{tag}")).unwrap();
         let end = start + XML[start..].find(&format!("</{tag}>")).unwrap() + tag.len() + 3;
@@ -19,7 +44,7 @@ fn xml_optional_fields_keep_their_declared_types() {
         assert_eq!(error.code(), Some(code), "{tag}={value:?}: {error}");
     }
     // Optional strings are XML strings, not JSON or a nullable sentinel.
-    for value in ["n/a", "&quot;CUSTOM&quot;", "", " ", "\t\n", "  HERMITE  "] {
+    for value in ["&quot;CUSTOM&quot;", "", " ", "\t\n", "  HERMITE  "] {
         let input = mutated_once(
             XML,
             "<INTERPOLATION>HERMITE</INTERPOLATION>",
@@ -35,7 +60,7 @@ fn xml_optional_fields_keep_their_declared_types() {
     }
     let mut message = Oem::from_xml(XML).unwrap();
     message.header.classification = Some("\"quoted classification\"".into());
-    message.header.message_id = Some("n/a".into());
+    message.header.message_id = Some("CUSTOM".into());
     assert_eq!(Oem::from_xml(&message.to_xml().unwrap()).unwrap(), message);
 }
 
@@ -1043,7 +1068,7 @@ fn every_mandatory_keyword_is_required_in_both_notations() {
         let error = Oem::from_xml(&format!("{}{}", &XML[..start], &XML[end..])).unwrap_err();
         assert_eq!(
             error.code(),
-            Some("parse.xml.syntax"),
+            Some("validation.missing_required_field"),
             "XML {keyword}: {error}"
         );
         assert!(
@@ -1060,13 +1085,13 @@ fn xml_empty_mandatory_values_are_reported_as_empty() {
         (
             "<OBJECT_NAME>MARS GLOBAL SURVEYOR</OBJECT_NAME>",
             "<OBJECT_NAME/>",
-            "OBJECT_NAME is empty",
+            "Missing required field: OBJECT_NAME",
             Some("body.segment[0].metadata.object_name"),
         ),
         (
             "<START_TIME>2019-12-18T12:00:00.331</START_TIME>",
             "<START_TIME></START_TIME>",
-            "START_TIME is empty",
+            "Missing required field: START_TIME",
             Some("body.segment[0].metadata.start_time"),
         ),
         (
@@ -1418,4 +1443,20 @@ fn oem_1_0_requires_increasing_epochs_and_start_at_or_after_previous_stop() {
     shared_endpoint.body.segment[1].metadata.start_time =
         shared_endpoint.body.segment[0].metadata.stop_time;
     shared_endpoint.validate().unwrap();
+}
+
+#[test]
+fn xml_text_padding_and_inner_tabs_are_writable_as_kvn() {
+    let source = XML.replace(
+        "<OBJECT_NAME>MARS GLOBAL SURVEYOR</OBJECT_NAME>",
+        "<OBJECT_NAME>MARS\tGLOBAL SURVEYOR\n</OBJECT_NAME>",
+    );
+    assert_ne!(source, XML);
+    let message = Oem::from_xml(&source).unwrap();
+    let output = message.to_kvn().unwrap();
+    let reread = Oem::from_kvn(&output).unwrap();
+    assert_eq!(
+        reread.body.segment[0].metadata.object_name,
+        "MARS GLOBAL SURVEYOR"
+    );
 }

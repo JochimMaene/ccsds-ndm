@@ -17,7 +17,7 @@ The `aem`, `aem_kvn_allocations`, and `library::output` suites establish:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN structure | The family-local marked-block scanner rejects non-ASCII/control input, malformed/unknown/duplicate/reordered metadata, misplaced history comments, unknown/nested/mismatched blocks, invalid META/DATA sequencing, assignments in history data, and trailing content. It emits and accepts the table 4-3 keyword `ANGVEL_FRAME` in both notations. The previously emitted KVN `RATE_FRAME` remains a read alias; supplying both spellings is a duplicate, not two independent fields. |
+| KVN structure | The family-local marked-block scanner rejects non-ASCII or control input other than TAB, malformed/unknown/duplicate/reordered metadata, misplaced history comments, unknown/nested/mismatched blocks, invalid META/DATA sequencing, assignments in history data, and trailing content. It emits and accepts the table 4-3 keyword `ANGVEL_FRAME` in both notations. The previously emitted KVN `RATE_FRAME` remains a read alias; supplying both spellings is a duplicate, not two independent fields. |
 | XML structure and choices | The shared XML sequence engine covers the complete root/header/body/segment hierarchy and every nested quaternion, derivative, angular-velocity, Euler, spin, nutation, and momentum structure. It rejects unknown, duplicate, reordered, multi-choice, and non-schema attribute content. |
 | Fixture and typed-state preservation | Both KVN fixtures preserve their complete typed model through KVN and XML. Both XML fixtures preserve their XML model; the all-types fixture covers all nine attitude-state choices. Generated XML validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
 | Optional fixed units | AEM KVN history records forbid unit annotations (504.0-B-2 section 6.9.2) while the fixed XML unit attributes are optional (section 7.6.10). Optional fixed XML units on derivative, angle, rate, nutation, and momentum values are therefore deliberately normalized to omission on an XML-to-KVN-to-XML hop, while values, choices, and record counts remain preserved. A dedicated regression verifies the output stays schema-valid. |
@@ -82,7 +82,7 @@ until its actual grammar and semantics receive an edition-specific implementatio
 
 ADM annex F defines a rotation quaternion through sine/cosine components of a rotation axis and
 angle, implying unit magnitude. APM, AEM, and known quaternion ACM histories use the same shared
-validator: finite components in `[-1, 1]` and squared norm in `[0.999, 1.001]`. The book gives no
+validator: finite components in `[-1, 1]` and squared norm in `[0.99, 1.01]`. The book gives no
 numeric tolerance; this interval is an implementation choice to allow rounded published samples.
 The library rejects values outside it and never silently normalizes caller data. The common
 policy and its source are recorded in the [validation contract](../design/validation-contract.md).
@@ -142,3 +142,15 @@ Adjacent usable bounds are compared only when the segments declare the same time
 systems as if they represented the same clock. Cross-system ordering and non-overlap remain
 the caller's responsibility; no leap-second table or time-scale conversion is introduced.
 `aem::validation::cross_segment_chronology_requires_the_same_time_system` covers the distinction.
+
+KVN reading tolerates lines longer than the book's 254-character limit where applicable;
+writing enforces that limit, so an accepted overlong record can require shortening before
+regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
+are specified in the [validation contract](../design/validation-contract.md).
+
+State epochs must fall inside START_TIME..STOP_TIME, derived from table 4-3's span
+definitions. EULER_ROT_SEQ and ANGVEL_FRAME are retained even on QUATERNION metadata;
+'applicable only if' is treated as descriptive relevance, without dropping supplied values.
+Python's compact epoch/value rows omit optional XML unit attributes on rewriting; their
+ATTITUDE_TYPE fixes the units (table 4-4), so numeric values are unchanged. Rust retains
+those optional annotations. This is a documented Python representation normalization.

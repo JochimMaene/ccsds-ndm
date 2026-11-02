@@ -4,7 +4,6 @@
 
 use crate::error::{CcsdsNdmError, Result};
 use crate::traits::{FromKvnFloat, FromKvnValue};
-use fast_float;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::str::FromStr;
@@ -89,6 +88,36 @@ pub enum EpochError {
         /// Maximum retained length in bytes.
         maximum: usize,
     },
+}
+
+/// Rewrites an exponent relative time tag (`1.5e3`) as the plain decimal (`1500`) that the XSD
+/// `epochType` can represent. ODM 6.2.2.3 defines relative tags as doubles and 7.5.6 allows
+/// exponents; shifting the decimal point is exact, so no value changes.
+fn expand_exponent(token: &str) -> Option<String> {
+    let (mantissa, exponent) = token.split_once(['e', 'E'])?;
+    let exponent: i32 = exponent
+        .parse()
+        .ok()
+        .filter(|e: &i32| e.unsigned_abs() <= 64)?;
+    let (sign, unsigned) = match mantissa.as_bytes().first()? {
+        b'+' | b'-' => mantissa.split_at(1),
+        _ => ("", mantissa),
+    };
+    let (integer, fraction) = unsigned.split_once('.').unwrap_or((unsigned, ""));
+    let digits = format!("{integer}{fraction}");
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    let point = integer.len() as i32 + exponent;
+    let plain = if point <= 0 {
+        format!("0.{}{digits}", "0".repeat(point.unsigned_abs() as usize))
+    } else if point as usize >= digits.len() {
+        format!("{digits}{}", "0".repeat(point as usize - digits.len()))
+    } else {
+        let (whole, part) = digits.split_at(point as usize);
+        format!("{whole}.{part}")
+    };
+    Some(format!("{sign}{plain}"))
 }
 
 fn classify_epoch(s: &str) -> Option<EpochClassification> {
@@ -401,6 +430,8 @@ impl Epoch {
                 len: value.len() as u8,
                 classification,
             })
+        } else if let Some(plain) = expand_exponent(value) {
+            Self::new(&plain)
         } else {
             Err(EpochError::InvalidFormat(value.to_string()))
         }
@@ -3317,15 +3348,24 @@ impl TargetMomentum {
     }
 }
 
-/// Closed KVN enum aliases permit upper- or lowercase tokens, never arbitrary mixed case.
-fn enum_token(value: &str) -> std::borrow::Cow<'_, str> {
-    if value.bytes().any(|byte| byte.is_ascii_lowercase())
-        && !value.bytes().any(|byte| byte.is_ascii_uppercase())
-    {
-        std::borrow::Cow::Owned(value.to_ascii_uppercase())
-    } else {
-        std::borrow::Cow::Borrowed(value)
+/// KVN text aliases: ODM 7.5.9, CDM 6.3.2.5, RDM 5.3.3.4, TDM 4.3.8, ADM 6.8.8.
+pub(crate) fn enum_token(value: &str) -> std::borrow::Cow<'_, str> {
+    let mut token = std::borrow::Cow::Borrowed(value);
+    if value.contains([' ', '\t']) || value.contains("__") {
+        token = std::borrow::Cow::Owned(
+            value
+                .split([' ', '\t', '_'])
+                .filter(|part| !part.is_empty())
+                .collect::<Vec<_>>()
+                .join("_"),
+        );
     }
+    if token.bytes().any(|byte| byte.is_ascii_lowercase())
+        && !token.bytes().any(|byte| byte.is_ascii_uppercase())
+    {
+        token = std::borrow::Cow::Owned(token.to_ascii_uppercase());
+    }
+    token
 }
 
 // Categorical Enums
@@ -3551,7 +3591,7 @@ impl std::fmt::Display for YesNo {
 impl std::str::FromStr for YesNo {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
+        match s.to_ascii_uppercase().as_str() {
             "YES" | "yes" => Ok(YesNo::Yes),
             "NO" | "no" => Ok(YesNo::No),
             _ => Err(crate::error::EnumParseError {
@@ -3800,7 +3840,7 @@ impl std::fmt::Display for ControlledType {
 impl std::str::FromStr for ControlledType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
+        match enum_token(s).as_ref() {
             "YES" | "yes" => Ok(ControlledType::Yes),
             "NO" | "no" => Ok(ControlledType::No),
             "UNKNOWN" | "unknown" => Ok(ControlledType::Unknown),
@@ -3998,7 +4038,7 @@ pub enum AcmAttitudeType {
 impl std::str::FromStr for AcmAttitudeType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
+        match enum_token(s).as_ref() {
             "QUATERNION" | "quaternion" => Ok(Self::Quaternion),
             "EULER_ANGLES" | "euler_angles" => Ok(Self::EulerAngles),
             "DCM" | "dcm" => Ok(Self::Dcm),
@@ -4050,7 +4090,7 @@ pub enum AttRateType {
 impl std::str::FromStr for AttRateType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
+        match enum_token(s).as_ref() {
             "ANGVEL" | "angvel" => Ok(Self::AngVel),
             "Q_DOT" | "q_dot" => Ok(Self::QDot),
             "EULER_RATE" | "euler_rate" => Ok(Self::EulerRate),
@@ -4096,7 +4136,7 @@ pub enum AttBasisType {
 impl std::str::FromStr for AttBasisType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
+        match enum_token(s).as_ref() {
             "PREDICTED" | "predicted" => Ok(Self::Predicted),
             "DETERMINED_GND" | "determined_gnd" => Ok(Self::DeterminedGnd),
             "DETERMINED_OBC" | "determined_obc" => Ok(Self::DeterminedObc),
@@ -4148,7 +4188,7 @@ pub enum AcmCovarianceLineType {
 impl std::str::FromStr for AcmCovarianceLineType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
+        match enum_token(s).as_ref() {
             "ANGLE" | "angle" => Ok(Self::Angle),
             "ANGLE_GYROBIAS" | "angle_gyrobias" => Ok(Self::AngleGyroBias),
             "ANGLE_ANGVEL" | "angle_angvel" => Ok(Self::AngleAngVel),
@@ -4345,12 +4385,7 @@ impl DisintegrationType {
 impl std::str::FromStr for DisintegrationType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let lower_only = s.bytes().all(|b| !b.is_ascii_uppercase());
-        let canonical = if lower_only {
-            s.to_ascii_uppercase()
-        } else {
-            s.to_string()
-        };
+        let canonical = enum_token(s).replace('_', " ");
         Self::from_upper(&canonical).ok_or_else(|| Self::parse_error(s))
     }
 }
@@ -4920,19 +4955,19 @@ impl FromKvnValue for Vec3Double {
             ))
             .into());
         }
-        let x = fast_float::parse(parts[0]).map_err(|_| {
+        let x = crate::kvn::parser::parse_ccsds_number(parts[0]).ok_or_else(|| {
             CcsdsNdmError::Validation(Box::new(crate::error::ValidationError::Generic {
-                message: "Invalid X component".into(),
+                message: "Invalid X component (expected three space-delimited numbers)".into(),
                 line: None,
             }))
         })?;
-        let y = fast_float::parse(parts[1]).map_err(|_| {
+        let y = crate::kvn::parser::parse_ccsds_number(parts[1]).ok_or_else(|| {
             CcsdsNdmError::Validation(Box::new(crate::error::ValidationError::Generic {
                 message: "Invalid Y component".into(),
                 line: None,
             }))
         })?;
-        let z = fast_float::parse(parts[2]).map_err(|_| {
+        let z = crate::kvn::parser::parse_ccsds_number(parts[2]).ok_or_else(|| {
             CcsdsNdmError::Validation(Box::new(crate::error::ValidationError::Generic {
                 message: "Invalid Z component".into(),
                 line: None,
@@ -4978,7 +5013,7 @@ impl FromKvnValue for Vec4Double {
         }
         let mut values = Vec::with_capacity(4);
         for p in parts {
-            let v = fast_float::parse(p).map_err(|_| {
+            let v = crate::kvn::parser::parse_ccsds_number(p).ok_or_else(|| {
                 crate::error::FormatError::InvalidFormat(format!(
                     "Vec4Double value parse failed: {}",
                     p
@@ -5029,7 +5064,7 @@ pub enum TdmAngleType {
 impl std::str::FromStr for TdmAngleType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match enum_token(s).as_ref() {
+        match enum_token(&s.to_ascii_uppercase()).as_ref() {
             "AZEL" => Ok(Self::Azel),
             "RADEC" => Ok(Self::Radec),
             "XEYN" => Ok(Self::Xeyn),
@@ -5094,7 +5129,7 @@ pub enum TdmDataQuality {
 impl std::str::FromStr for TdmDataQuality {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match enum_token(s).as_ref() {
+        match enum_token(&s.to_ascii_uppercase()).as_ref() {
             "RAW" => Ok(Self::Raw),
             "VALIDATED" => Ok(Self::Validated),
             "DEGRADED" => Ok(Self::Degraded),
@@ -5134,7 +5169,7 @@ pub enum TdmIntegrationRef {
 impl std::str::FromStr for TdmIntegrationRef {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match enum_token(s).as_ref() {
+        match enum_token(&s.to_ascii_uppercase()).as_ref() {
             "START" => Ok(Self::Start),
             "MIDDLE" => Ok(Self::Middle),
             "END" => Ok(Self::End),
@@ -5174,7 +5209,7 @@ pub enum TdmMode {
 impl std::str::FromStr for TdmMode {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match enum_token(s).as_ref() {
+        match enum_token(&s.to_ascii_uppercase()).as_ref() {
             "SEQUENTIAL" => Ok(Self::Sequential),
             "SINGLE_DIFF" => Ok(Self::SingleDiff),
             _ => Err(crate::error::EnumParseError {
@@ -5212,7 +5247,7 @@ pub enum TdmRangeMode {
 impl std::str::FromStr for TdmRangeMode {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match enum_token(s).as_ref() {
+        match enum_token(&s.to_ascii_uppercase()).as_ref() {
             "COHERENT" => Ok(Self::Coherent),
             "CONSTANT" => Ok(Self::Constant),
             "ONE_WAY" => Ok(Self::OneWay),
@@ -5304,7 +5339,7 @@ pub enum TdmReferenceFrame {
 impl std::str::FromStr for TdmReferenceFrame {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match enum_token(s).as_ref() {
+        match enum_token(&s.to_ascii_uppercase()).as_ref() {
             "EME2000" => Ok(Self::Eme2000),
             "ICRF" => Ok(Self::Icrf),
             "ITRF2000" | "ITRF-2000" => Ok(Self::Itrf2000),
@@ -5377,7 +5412,7 @@ pub enum TdmTimetagRef {
 impl std::str::FromStr for TdmTimetagRef {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match enum_token(s).as_ref() {
+        match enum_token(&s.to_ascii_uppercase()).as_ref() {
             "TRANSMIT" => Ok(Self::Transmit),
             "RECEIVE" => Ok(Self::Receive),
             _ => Err(crate::error::EnumParseError {
@@ -5822,6 +5857,38 @@ mod extra_tests {
     }
 
     #[test]
+    fn fixed_vectors_reject_underflow_and_keep_subnormal_components() {
+        for index in 0..4 {
+            let mut tokens = ["0"; 4];
+            for invalid in ["1e-999", "-1e-999", "1e999", "NaN"] {
+                tokens[index] = invalid;
+                assert!(Vec4Double::from_kvn_value(&tokens.join(" ")).is_err());
+                if index < 3 {
+                    let text = tokens[..3].join(" ");
+                    assert!(Vec3Double::from_kvn_value(&text).is_err());
+                    assert!(crate::xml::from_str::<Vec3Double>(&format!(
+                        "<vector>{text}</vector>"
+                    ))
+                    .is_err());
+                }
+            }
+            tokens[index] = "5e-324";
+            let vector = Vec4Double::from_kvn_value(&tokens.join(" ")).unwrap();
+            assert_eq!(vector.values[index], f64::from_bits(1));
+            if index < 3 {
+                let text = tokens[..3].join(" ");
+                let vector = Vec3Double::from_kvn_value(&text).unwrap();
+                assert_eq!([vector.x, vector.y, vector.z][index], f64::from_bits(1));
+                assert_eq!(
+                    crate::xml::from_str::<Vec3Double>(&format!("<vector>{text}</vector>"))
+                        .unwrap(),
+                    vector
+                );
+            }
+        }
+    }
+
+    #[test]
     fn test_vec3double_display() {
         let v = Vec3Double::new(1.1, 2.2, 3.3);
         assert_eq!(format!("{}", v), "1.1 2.2 3.3");
@@ -6027,5 +6094,45 @@ mod extra_tests {
         assert!("1,2,1".parse::<TdmPath>().is_ok());
         assert!("1,6".parse::<TdmPath>().is_err());
         assert!("0,2".parse::<TdmPath>().is_err());
+    }
+}
+
+#[cfg(test)]
+mod text_alias_regressions {
+    use super::*;
+
+    #[test]
+    fn categorical_aliases_collapse_blanks_and_underscores() {
+        assert_eq!(
+            "ROCKET  BODY".parse::<ObjectDescription>().unwrap(),
+            ObjectDescription::RocketBody
+        );
+        assert_eq!(
+            "ROCKET__BODY".parse::<ObjectDescription>().unwrap(),
+            ObjectDescription::RocketBody
+        );
+        assert_eq!(
+            "EULER ANGLES".parse::<AcmAttitudeType>().unwrap(),
+            AcmAttitudeType::EulerAngles
+        );
+        assert_eq!(
+            "ANGLE GYROBIAS".parse::<AcmCovarianceLineType>().unwrap(),
+            AcmCovarianceLineType::AngleGyroBias
+        );
+        assert_eq!(
+            "MASS-LOSS_+_BREAK-UP"
+                .parse::<DisintegrationType>()
+                .unwrap(),
+            DisintegrationType::MassLossAndBreakUp
+        );
+    }
+
+    #[test]
+    fn history_exponents_expand_without_binary_rounding() {
+        assert_eq!(
+            Epoch::new("1.234567890123456789e2").unwrap().as_str(),
+            "123.4567890123456789"
+        );
+        assert_eq!(Epoch::new("-2.5e-2").unwrap().as_str(), "-0.025");
     }
 }

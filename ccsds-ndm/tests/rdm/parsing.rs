@@ -1026,7 +1026,7 @@ fn rdm_conditional_rules_name_the_offending_field() {
                 mutated(FIXTURE, "REENTRY_ALTITUDE = 80.0 [km]",
                     "REENTRY_ALTITUDE = 80.0 [km]\nORBIT_LIFETIME_WINDOW_START = 6.0 [d]\nORBIT_LIFETIME_WINDOW_END = 5.0 [d]",
                 ),
-                "ORBIT_LIFETIME_WINDOW_START must be <= ORBIT_LIFETIME_WINDOW_END",
+                "ORBIT_LIFETIME_WINDOW_START",
             ),
             (
                 mutated(FIXTURE, "REF_FRAME = EME2000\n", ""),
@@ -1111,9 +1111,15 @@ fn rdm_empty_mandatory_xml_strings_are_reported_as_empty() {
         let mut xml = original.clone();
         xml.replace_range(start..end, &format!("<{keyword}/>"));
         let error = Rdm::from_xml(&xml).unwrap_err();
-        assert_eq!(error.code(), Some("validation.invalid_value"), "{error}");
+        assert_eq!(
+            error.code(),
+            Some("validation.missing_required_field"),
+            "{error}"
+        );
         assert!(
-            error.to_string().contains(&format!("{keyword} is empty")),
+            error
+                .to_string()
+                .contains(&format!("Missing required field: {keyword}")),
             "{error}"
         );
     }

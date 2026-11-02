@@ -515,7 +515,10 @@ impl Oem {
     fn write_validated_kvn(&self, writer: &mut KvnWriter<'_>) -> Result<()> {
         // Paths are built only on failure: the checks run once per record at scale.
         fn text(field: &'static str, value: &str, path: impl FnOnce() -> String) -> Result<()> {
-            if !value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            if !value
+                .bytes()
+                .all(|byte| (b' '..=b'~').contains(&byte) || byte == b'\t')
+            {
                 return Err(ValidationError::InvalidValue {
                     field: field.into(),
                     value: value.into(),

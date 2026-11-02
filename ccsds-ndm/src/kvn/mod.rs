@@ -41,7 +41,7 @@ pub(crate) fn prepare_input(
         .bytes()
         .position(|byte| !matches!(byte, b' '..=b'~' | b'\n'));
     // Plain LF input needs one ASCII scan; normalize and rescan only after CR or TAB.
-    let normalized =
+    let mut normalized =
         if invalid_offset.is_some_and(|offset| matches!(input.as_bytes()[offset], b'\r' | b'\t')) {
             let normalized = normalize_line_endings(input);
             invalid_offset = normalized
@@ -82,6 +82,68 @@ pub(crate) fn prepare_input(
         {
             crate::versioning::check_input_version(kind, version)?;
         }
+    }
+    let mut record_offset = 0;
+    for line in normalized.split_inclusive('\n') {
+        if line.trim() == "META_START" {
+            break;
+        }
+        if let Some((key, value)) = line.split_once('=') {
+            let key = key.trim();
+            if !matches!(
+                key,
+                "CREATION_DATE" | "ORIGINATOR" | "CLASSIFICATION" | "MESSAGE_ID"
+            ) && !key.ends_with("_VERS")
+            {
+                break;
+            }
+            if matches!(key, "CREATION_DATE" | "ORIGINATOR") && parser::value_is_absent(key, value)
+            {
+                let error: crate::error::CcsdsNdmError =
+                    crate::error::ValidationError::missing_required("Header", key.to_owned())
+                        .into();
+                return Err(error.with_location(input, record_offset));
+            }
+        }
+        record_offset += line.len();
+    }
+    // N/A denotes an unavailable standard field; user-defined payload is opaque.
+    let mut offset = 0;
+    let mut absent = Vec::new();
+    let mut user_block = false;
+    for line in normalized.split_inclusive('\n') {
+        if line.trim() == "USER_START" {
+            user_block = true;
+        }
+        if line.trim() == "USER_STOP" {
+            user_block = false;
+        }
+        if user_block || line.trim_start().starts_with("COMMENT ") {
+            offset += line.len();
+            continue;
+        }
+        if let Some((key, value)) = line.split_once('=') {
+            let key = key.trim();
+            if !key.starts_with("USER_DEFINED_")
+                && key != "MANEUVERABLE"
+                && value.trim().eq_ignore_ascii_case("N/A")
+            {
+                absent.push(
+                    offset + line.find('=').unwrap() + 1
+                        ..offset + line.trim_end_matches(['\r', '\n']).len(),
+                );
+            }
+        }
+        offset += line.len();
+    }
+    if !absent.is_empty() {
+        let mut bytes = normalized.into_owned().into_bytes();
+        for range in absent {
+            bytes[range].fill(b' ');
+        }
+        normalized = std::borrow::Cow::Owned(
+            String::from_utf8(bytes).expect("ASCII replacement preserves UTF-8"),
+        );
     }
     Ok(normalized)
 }

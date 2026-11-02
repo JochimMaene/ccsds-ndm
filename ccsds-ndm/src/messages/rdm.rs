@@ -584,11 +584,12 @@ impl crate::traits::Validate for RdmData {
             &arp.orbit_lifetime_window_end,
         ) {
             if start.value > end.value {
-                return Err(crate::error::ValidationError::Generic {
-                    message: "ORBIT_LIFETIME_WINDOW_START must be <= ORBIT_LIFETIME_WINDOW_END"
-                        .into(),
-                    line: None,
-                }
+                return Err(crate::error::ValidationError::invalid_value(
+                    "ORBIT_LIFETIME_WINDOW_START",
+                    start.value.to_string(),
+                    "no later than ORBIT_LIFETIME_WINDOW_END",
+                )
+                .at_field_in("body.segment.data.atmospheric_reentry_parameters")
                 .into());
             }
         }

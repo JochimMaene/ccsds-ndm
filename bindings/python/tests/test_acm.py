@@ -24,6 +24,7 @@ from ccsds_ndm import (
     AcmSensor,
     AdmHeader,
 )
+from ccsds_ndm import NdmEpochError
 
 KVN_DIR = Path(__file__).resolve().parents[3] / "ccsds-ndm" / "data" / "kvn"
 
@@ -164,11 +165,11 @@ class TestAcm:
         assert meta.next_leap_epoch is None
         assert meta.next_leap_taimutc is None
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             meta.epoch_tzero = "not-an-epoch"
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             meta.epoch_tzero = "123.5"
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             meta.next_leap_epoch = "123.5"
 
     def test_acm_attitude_state_invalid_att_type_raises(self):
@@ -332,9 +333,9 @@ class TestAcm:
             man.target_momentum = [1.0, 2.0]
         with pytest.raises(ValueError):
             man.target_attitude = [0.0, 0.0, 1.0]
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             man.man_begin_time = "2023-01-01T00:00:00"
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             man.man_end_time = "NaN"
 
     def test_acm_attitude_determination_and_sensor_setters(self):

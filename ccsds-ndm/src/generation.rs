@@ -160,15 +160,6 @@ pub(crate) fn write_xml_to<T: GenerationMetadata, W: Write>(
 }
 
 macro_rules! impl_generation_metadata {
-    ($type:path, $kind:ident) => {
-        impl GenerationMetadata for $type {
-            const KIND: MessageKind = MessageKind::$kind;
-
-            fn version(&self) -> &str {
-                &self.version
-            }
-        }
-    };
     ($type:path, $kind:ident, kvn_representability $(, $xml_check:ident)?) => {
         impl GenerationMetadata for $type {
             const KIND: MessageKind = MessageKind::$kind;
@@ -196,7 +187,7 @@ impl_generation_metadata!(
     validate_xml_representability
 );
 
-impl_generation_metadata!(crate::messages::apm::Apm, Apm);
+impl_generation_metadata!(crate::messages::apm::Apm, Apm, kvn_representability);
 
 impl_generation_metadata!(
     crate::messages::omm::Omm,
@@ -205,7 +196,7 @@ impl_generation_metadata!(
     validate_xml_representability
 );
 impl_generation_metadata!(crate::messages::cdm::Cdm, Cdm, kvn_representability);
-impl_generation_metadata!(crate::messages::aem::Aem, Aem);
+impl_generation_metadata!(crate::messages::aem::Aem, Aem, kvn_representability);
 impl_generation_metadata!(
     crate::messages::ocm::Ocm,
     Ocm,

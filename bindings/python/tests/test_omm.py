@@ -11,6 +11,7 @@ import pytest
 from pathlib import Path
 
 from ccsds_ndm import MeanElements, OdmHeader, Omm, OmmData, OmmMetadata, OmmSegment
+from ccsds_ndm import NdmEpochError
 
 
 @pytest.mark.parametrize("element", ["BSTAR", "MEAN_MOTION_DOT", "MEAN_MOTION_DDOT"])
@@ -97,7 +98,7 @@ class TestOmm:
         assert omm2.segment.data.mean_elements.eccentricity == 0.001
 
     def test_ref_frame_epoch_requires_calendar_form(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             OmmMetadata(
                 object_name="SAT1",
                 object_id="2023-001A",
@@ -109,7 +110,7 @@ class TestOmm:
             )
 
         omm = self._create_valid_omm()
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             omm.segment.data.mean_elements.epoch = "123.5"
 
     def test_file_io(self, tmp_path):

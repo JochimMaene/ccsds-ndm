@@ -276,7 +276,7 @@ impl OdmHeader {
 ///
 /// Raises
 /// ------
-/// ValueError
+/// NdmEpochError
 ///     If creation_date is not a CCSDS calendar epoch.
 #[gen_stub_pyclass]
 #[pyclass(module = "ccsds_ndm", from_py_object)]
@@ -453,7 +453,7 @@ pub(crate) fn set_acceleration(slot: &mut Option<Acc>, value: Option<f64>) {
 ///
 /// Raises
 /// ------
-/// ValueError
+/// NdmEpochError
 ///     Invalid CCSDS epoch.
 #[gen_stub_pyclass]
 #[pyclass(module = "ccsds_ndm", from_py_object, name = "StateVectorAcc")]
@@ -729,7 +729,7 @@ impl StateVectorAcc {
 ///
 /// Raises
 /// ------
-/// ValueError
+/// NdmEpochError
 ///     Invalid CCSDS epoch.
 #[gen_stub_pyclass]
 #[pyclass(module = "ccsds_ndm", from_py_object)]
@@ -2267,9 +2267,12 @@ impl GroundImpactParameters {
     }
 }
 
+/// YesNo categorical vocabulary.
+///
+/// CCSDS Reference: 503.0-B-2, Table 3-3.
 #[gen_stub_pyclass_enum]
 #[pyclass(module = "ccsds_ndm", from_py_object, eq, eq_int)]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum YesNo {
     Yes,
     No,
@@ -2285,7 +2288,7 @@ impl YesNo {
         }
     }
     fn __repr__(&self) -> String {
-        format!("YesNo.{}", self.__str__())
+        format!("YesNo.{self:?}")
     }
 }
 
@@ -2314,9 +2317,12 @@ pub fn parse_yes_no(ob: &Bound<'_, PyAny>) -> PyResult<ccsds_ndm::types::YesNo> 
     }
 }
 
+/// ObjectDescription categorical vocabulary.
+///
+/// CCSDS Reference: 508.0-B-1, Table 3-3; 502.0-B-3, Table 6-3.
 #[gen_stub_pyclass_enum]
 #[pyclass(module = "ccsds_ndm", from_py_object, eq, eq_int)]
-#[derive(Clone, PartialEq, Copy)]
+#[derive(Clone, PartialEq, Copy, Debug)]
 pub enum ObjectDescription {
     Payload,
     RocketBody,
@@ -2338,7 +2344,7 @@ impl ObjectDescription {
         }
     }
     fn __repr__(&self) -> String {
-        format!("ObjectDescription.{}", self.__str__())
+        format!("ObjectDescription.{self:?}")
     }
 }
 
@@ -2377,9 +2383,12 @@ pub fn parse_object_description(
     }
 }
 
+/// ControlledType categorical vocabulary.
+///
+/// CCSDS Reference: 508.1-B-1, Table 3-3.
 #[gen_stub_pyclass_enum]
 #[pyclass(module = "ccsds_ndm", from_py_object, eq, eq_int)]
-#[derive(Clone, PartialEq, Copy)]
+#[derive(Clone, PartialEq, Copy, Debug)]
 pub enum ControlledType {
     Yes,
     No,
@@ -2397,7 +2406,7 @@ impl ControlledType {
         }
     }
     fn __repr__(&self) -> String {
-        format!("ControlledType.{}", self.__str__())
+        format!("ControlledType.{self:?}")
     }
 }
 

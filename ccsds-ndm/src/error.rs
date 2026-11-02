@@ -483,10 +483,7 @@ impl ValidationError {
 
     /// Convenience constructor for an empty mandatory value.
     pub(crate) fn empty_value(field: impl Into<Cow<'static, str>>) -> Self {
-        Self::EmptyValue {
-            field: field.into(),
-            line: None,
-        }
+        Self::missing_required("mandatory value", field)
     }
 
     /// Convenience constructor for an invalid value error.
@@ -933,6 +930,16 @@ impl CcsdsNdmError {
         input: &str,
         source_edition: Option<&str>,
     ) -> Self {
+        if let Self::Parsing {
+            mut context,
+            source,
+        } = self
+        {
+            if context.source_edition.is_none() {
+                context.source_edition = source_edition.map(str::to_owned);
+            }
+            return Self::Parsing { context, source };
+        }
         let source = match self {
             Self::Generation { source, .. } | Self::Parsing { source, .. } => source,
             error => Box::new(error),
@@ -1091,6 +1098,10 @@ impl CcsdsNdmError {
         match self {
             Self::Generation { source, .. } | Self::Parsing { source, .. } => source.field_path(),
             Self::Validation(error) => error.field_path(),
+            Self::Format(error) => match error.as_ref() {
+                FormatError::Enum(error) => Some(error.field.to_ascii_lowercase()),
+                _ => None,
+            },
             _ => None,
         }
     }
@@ -1155,7 +1166,6 @@ impl CcsdsNdmError {
     }
 
     /// Returns the inner EnumParseError if this is a FormatError::Enum.
-    #[cfg(test)]
     pub(crate) fn as_enum_error(&self) -> Option<&EnumParseError> {
         match self {
             CcsdsNdmError::Format(e) => match **e {

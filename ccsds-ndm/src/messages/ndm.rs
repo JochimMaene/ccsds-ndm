@@ -46,6 +46,25 @@ fn parse_constituent(
     start: &quick_xml::events::BytesStart<'_>,
     root_declarations: &[(Vec<u8>, Vec<u8>)],
 ) -> Result<Message> {
+    if matches!(start.local_name().as_ref(), b"opm" | b"omm" | b"oem") {
+        for attribute in start.attributes() {
+            let attribute = attribute.map_err(|error| invalid_envelope(error.to_string()))?;
+            if attribute.key.as_ref() == b"version" {
+                let version = attribute
+                    .unescape_value()
+                    .map_err(|error| invalid_envelope(error.to_string()))?;
+                if version == "3.0" {
+                    continue;
+                }
+                return Err(crate::error::ValidationError::InvalidValue {
+                    field: "constituent version".into(),
+                    value: version.into_owned(),
+                    expected: "ODM 3.0 in the NDM/XML 4.0.0 combined envelope; use standalone XML for ODM 2.0".into(),
+                    line: None,
+                }.into());
+            }
+        }
+    }
     let inherited = root_declarations
         .iter()
         .filter(|(key, _)| {
@@ -129,17 +148,19 @@ fn read_envelope_text(
     reader: &mut quick_xml::Reader<&[u8]>,
     start: &quick_xml::events::BytesStart<'_>,
     empty: bool,
+    namespaces: &mut crate::xml::Namespaces,
 ) -> Result<String> {
     use quick_xml::events::Event;
 
-    for attribute in start.attributes() {
-        let attribute = attribute.map_err(|error| invalid_envelope(error.to_string()))?;
-        if attribute.key.as_namespace_binding().is_none() {
-            return Err(invalid_envelope(
-                "combined NDM text fields cannot carry attributes",
-            ));
-        }
-    }
+    namespaces.enter(start, 2, &invalid_envelope)?;
+    crate::xml::validate_attributes(
+        namespaces,
+        start,
+        start.local_name().as_ref(),
+        &|_, _| false,
+        &invalid_envelope,
+    )?;
+    namespaces.leave(1);
     let mut value = String::new();
     if empty {
         return Ok(value);
@@ -365,6 +386,9 @@ impl CombinedNdm {
         use quick_xml::events::Event;
         use quick_xml::reader::Reader;
 
+        if let Some(error) = crate::validation::xml_text_error("XML document", xml) {
+            return Err(invalid_envelope(error.to_string()));
+        }
         validate_combined_xml_depth(xml)?;
         crate::xml::validate_document_root(xml, b"ndm", "combined NDM")?;
 
@@ -375,6 +399,7 @@ impl CombinedNdm {
         let mut id = None;
         let mut comments = Vec::new();
         let mut messages = Vec::new();
+        let mut namespaces = crate::xml::Namespaces::default();
         let root_declarations;
 
         let invalid = |message: &str| {
@@ -385,6 +410,7 @@ impl CombinedNdm {
         loop {
             match reader.read_event_into(&mut buf)? {
                 Event::Start(e) if e.local_name().as_ref() == b"ndm" => {
+                    namespaces.enter(&e, 1, &invalid_envelope)?;
                     root_declarations = validate_combined_root_attributes(&e)?;
                     break;
                 }
@@ -451,14 +477,19 @@ impl CombinedNdm {
                                     "MESSAGE_ID must occur at most once before comments and messages",
                                 ));
                             }
-                            id = Some(read_envelope_text(&mut reader, &e, empty)?);
+                            id = Some(read_envelope_text(&mut reader, &e, empty, &mut namespaces)?);
                         }
                         b"COMMENT" => {
                             if phase > 1 {
                                 return Err(invalid("COMMENT must precede contained messages"));
                             }
                             phase = 1;
-                            comments.push(read_envelope_text(&mut reader, &e, empty)?);
+                            comments.push(read_envelope_text(
+                                &mut reader,
+                                &e,
+                                empty,
+                                &mut namespaces,
+                            )?);
                         }
                         // Extract the outer XML of the current element.
                         b"opm" | b"omm" | b"oem" | b"ocm" | b"cdm" | b"tdm" | b"rdm" | b"acm"

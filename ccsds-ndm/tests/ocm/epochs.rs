@@ -17,6 +17,49 @@ fn relative_metadata_message() -> Ocm {
 }
 
 #[test]
+fn individual_metadata_bounds_require_valid_epochs_in_all_routes() {
+    for field in ["START_TIME", "STOP_TIME"] {
+        let mut valid = Ocm::from_kvn(include_str!("../../data/kvn/ocm_g15.kvn")).unwrap();
+        let metadata = &mut valid.body.segment.metadata;
+        let bound = if field == "START_TIME" {
+            &mut metadata.start_time
+        } else {
+            &mut metadata.stop_time
+        };
+        *bound = Some("0".parse().unwrap());
+        let kvn = valid.to_kvn().unwrap();
+        let xml = valid.to_xml().unwrap();
+        for value in ["2023-02-31T00:00:00", "2023-01-01T25:00:00", "+", ".", ""] {
+            let mut edited = valid.clone();
+            let metadata = &mut edited.body.segment.metadata;
+            if field == "START_TIME" {
+                metadata.start_time = Some(value.parse().unwrap());
+            } else {
+                metadata.stop_time = Some(value.parse().unwrap());
+            }
+            crate::common::assert_rejects(&edited, field);
+            let invalid_xml = mutated(
+                &xml,
+                &format!(">0</{field}>"),
+                &format!(">{value}</{field}>"),
+            );
+            crate::common::assert_validation_field(
+                &Ocm::from_xml(&invalid_xml).unwrap_err(),
+                field,
+            );
+            if !value.is_empty() {
+                let record = kvn.lines().find(|line| line.starts_with(field)).unwrap();
+                let invalid_kvn = mutated(&kvn, record, &format!("{field} = {value}"));
+                crate::common::assert_validation_field(
+                    &Ocm::from_kvn(&invalid_kvn).unwrap_err(),
+                    field,
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn relative_metadata_bounds_and_span_are_checked_in_all_routes() {
     let valid = relative_metadata_message();
     let kvn = valid.to_kvn().unwrap();
@@ -265,7 +308,7 @@ fn xml_parsing_rejects_numeric_optional_reference_epochs() {
 }
 
 #[test]
-fn xml_frame_epochs_accept_relative_tags_except_oeb_parent() {
+fn xml_frame_epochs_accept_relative_tags_including_oeb_parent() {
     let xml = Ocm::from_kvn(OCM_FRAME_EPOCH_KVN)
         .expect("frame-reference KVN fixture should parse")
         .to_xml()
@@ -273,10 +316,10 @@ fn xml_frame_epochs_accept_relative_tags_except_oeb_parent() {
     Ocm::from_xml(&xml).expect("generated frame-reference XML should parse");
 
     // TRAJ/COV/MAN_FRAME_EPOCH are XSD `epochType` and table 6-4/6-6/6-7 frame epochs, which
-    // ODM 6.2.2.3 lets be relative; OEB_PARENT_FRAME_EPOCH stays calendar-only.
+    // ODM 6.2.2.3 lets be relative; OEB_PARENT_FRAME_EPOCH uses the same relative branch.
     for (tag, relative_ok) in [
         ("TRAJ_FRAME_EPOCH", true),
-        ("OEB_PARENT_FRAME_EPOCH", false),
+        ("OEB_PARENT_FRAME_EPOCH", true),
         ("COV_FRAME_EPOCH", true),
         ("MAN_FRAME_EPOCH", true),
     ] {
@@ -307,16 +350,14 @@ fn xml_empty_optional_physical_block_remains_supported() {
 }
 
 #[test]
-fn sclk_requires_both_reference_parameters_on_kvn_and_xml_paths() {
+fn sclk_defaults_omitted_reference_parameters_on_kvn_and_xml_paths() {
     let invalid_xml = mutated(
         OCM_XML,
         "<TIME_SYSTEM>UT1</TIME_SYSTEM>",
         "<TIME_SYSTEM>SCLK</TIME_SYSTEM>",
     );
-    crate::common::assert_validation_field(
-        &Ocm::from_xml(&invalid_xml).unwrap_err(),
-        "SCLK_OFFSET_AT_EPOCH",
-    );
+    let parsed = Ocm::from_xml(&invalid_xml).unwrap();
+    assert!(parsed.body.segment.metadata.sclk_offset_at_epoch.is_none());
 
     let invalid_kvn = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -332,10 +373,8 @@ TRAJ_TYPE = CARTPV
 0.0 1 2 3 4 5 6
 TRAJ_STOP
 "#;
-    crate::common::assert_validation_field(
-        &Ocm::from_kvn(invalid_kvn).unwrap_err(),
-        "SCLK_OFFSET_AT_EPOCH",
-    );
+    let parsed = Ocm::from_kvn(invalid_kvn).unwrap();
+    assert!(parsed.body.segment.metadata.sclk_sec_per_si_sec.is_none());
 
     let valid_xml = mutated(&invalid_xml, "</EPOCH_TZERO>",
         "</EPOCH_TZERO><SCLK_OFFSET_AT_EPOCH units=\"s\">0</SCLK_OFFSET_AT_EPOCH><SCLK_SEC_PER_SI_SEC units=\"s\">1</SCLK_SEC_PER_SI_SEC>",
@@ -349,7 +388,7 @@ TRAJ_STOP
 }
 
 #[test]
-fn trajectory_useable_times_require_calendar_or_ordinal_form() {
+fn trajectory_useable_times_accept_relative_tags() {
     let ocm =
         Ocm::from_kvn(OCM_TRAJ_USEABLE_KVN).expect("trajectory useable-time fixture should parse");
     let trajectory = &ocm.body.segment.data.traj[0];
@@ -369,7 +408,7 @@ fn trajectory_useable_times_require_calendar_or_ordinal_form() {
             format!("{tag} = 2023-01-01T00:02:00")
         };
         let invalid = mutated(OCM_TRAJ_USEABLE_KVN, &needle, &format!("{tag} = 123.5"));
-        crate::common::assert_invalid_epoch(&Ocm::from_kvn(&invalid).unwrap_err(), "123.5");
+        Ocm::from_kvn(&invalid).unwrap();
     }
 
     let xml = ocm
@@ -386,7 +425,7 @@ fn trajectory_useable_times_require_calendar_or_ordinal_form() {
             &format!("<{tag}>{needle}</{tag}>"),
             &format!("<{tag}>123.5</{tag}>"),
         );
-        crate::common::assert_invalid_epoch(&Ocm::from_xml(&invalid).unwrap_err(), "123.5");
+        Ocm::from_xml(&invalid).unwrap();
     }
 }
 
@@ -457,7 +496,7 @@ META_STOP
 }
 
 #[test]
-fn frame_epochs_accept_relative_tags_except_oeb_parent_in_kvn() {
+fn frame_epochs_accept_relative_tags_including_oeb_parent_in_kvn() {
     let kvn = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -520,7 +559,7 @@ MAN_STOP
 
     for (key, relative_ok) in [
         ("TRAJ_FRAME_EPOCH", true),
-        ("OEB_PARENT_FRAME_EPOCH", false),
+        ("OEB_PARENT_FRAME_EPOCH", true),
         ("COV_FRAME_EPOCH", true),
         ("MAN_FRAME_EPOCH", true),
     ] {

@@ -1766,3 +1766,53 @@ fn phase_count_exponents_are_xml_double_spellings_but_not_kvn_phase_counts() {
     crate::common::assert_validation_field(&error, "TRANSMIT_PHASE_CT_1");
     assert!(error.to_string().contains("without an exponent"), "{error}");
 }
+
+#[test]
+fn legacy_kvn_is_input_only_and_rejects_version_two_content() {
+    let legacy = include_str!("../../data/kvn/tdm_e1.kvn").replacen("= 2.0", "= 1.0", 1);
+    let message = Tdm::from_kvn(&legacy).unwrap();
+    assert_eq!(message.version, "1.0");
+    assert!(ccsds_ndm::from_str(&legacy).is_ok());
+    assert_eq!(
+        message.to_kvn().unwrap_err().code(),
+        Some("generation.unsupported_output_version")
+    );
+    assert!(message.to_xml().is_err());
+    let later = legacy.replace("TIME_SYSTEM = UTC", "TRACK_ID = LATER\nTIME_SYSTEM = UTC");
+    assert!(Tdm::from_kvn(&later)
+        .unwrap_err()
+        .to_string()
+        .contains("TRACK_ID"));
+    let xml = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e1.kvn"))
+        .unwrap()
+        .to_xml()
+        .unwrap()
+        .replace("version=\"2.0\"", "version=\"1.0\"");
+    assert_eq!(
+        Tdm::from_xml(&xml).unwrap_err().code(),
+        Some("parse.unsupported_input_version")
+    );
+}
+
+#[test]
+fn categorical_values_ignore_case_and_blank_aliases_in_kvn() {
+    let source = include_str!("../../data/kvn/tdm_e1.kvn")
+        .replace("SEQUENTIAL", "Sequential")
+        .replace("DEGRADED", "Degraded");
+    let message = Tdm::from_kvn(&source).unwrap();
+    assert!(message.to_xml().unwrap().contains("SEQUENTIAL"));
+    assert_eq!(
+        "Single  Diff".parse::<TdmMode>().unwrap(),
+        TdmMode::SingleDiff
+    );
+    assert_eq!(
+        "One Way".parse::<TdmRangeMode>().unwrap(),
+        TdmRangeMode::OneWay
+    );
+    assert_eq!("Azel".parse::<TdmAngleType>().unwrap(), TdmAngleType::Azel);
+    assert_eq!(
+        "Eme2000".parse::<TdmReferenceFrame>().unwrap(),
+        TdmReferenceFrame::Eme2000
+    );
+    assert_eq!("Yes".parse::<YesNo>().unwrap(), YesNo::Yes);
+}

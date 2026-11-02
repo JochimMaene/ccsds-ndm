@@ -94,6 +94,27 @@ impl crate::traits::Validate for Opm {
         )?;
         self.header.validate()?;
         self.body.validate()?;
+        let data = &self.body.segment.data;
+        if !data.maneuver_parameters.is_empty() {
+            let field = if self.version == "2.0" {
+                data.spacecraft_parameters
+                    .is_none()
+                    .then_some("spacecraft_parameters")
+            } else {
+                data.spacecraft_parameters
+                    .as_ref()
+                    .and_then(|parameters| parameters.mass.as_ref())
+                    .is_none()
+                    .then_some("MASS")
+            };
+            if let Some(field) = field {
+                return Err(
+                    ValidationError::missing_required("Spacecraft Parameters", field)
+                        .at_field_in("body.segment.data.spacecraft_parameters")
+                        .into(),
+                );
+            }
+        }
         crate::versioning::validate_opm_edition(self)
     }
 }
@@ -302,10 +323,13 @@ pub struct OpmData {
     /// Comments (see 7.8 for formatting rules).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default)]
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.
+    /// Flattened KVN data comments merge with the first represented logical block.
     pub comment: Vec<String>,
 
     /// State vector components (position and velocity).
     #[serde(rename = "stateVector")]
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.
     pub state_vector: StateVector,
 
     /// Osculating Keplerian elements.
@@ -314,6 +338,7 @@ pub struct OpmData {
         default,
         skip_serializing_if = "Option::is_none"
     )]
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.
     pub keplerian_elements: Option<KeplerianElements>,
 
     /// Spacecraft physical parameters (mass, area, coefficients).
@@ -322,6 +347,7 @@ pub struct OpmData {
         default,
         skip_serializing_if = "Option::is_none"
     )]
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.
     pub spacecraft_parameters: Option<SpacecraftParameters>,
 
     /// Position/velocity covariance matrix.
@@ -330,6 +356,7 @@ pub struct OpmData {
         default,
         skip_serializing_if = "Option::is_none"
     )]
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.
     pub covariance_matrix: Option<OpmCovarianceMatrix>,
 
     /// Maneuver parameters.
@@ -339,6 +366,7 @@ pub struct OpmData {
         skip_serializing_if = "Vec::is_empty"
     )]
     #[builder(default)]
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.
     pub maneuver_parameters: Vec<ManeuverParameters>,
 
     /// User-defined parameters.
@@ -347,6 +375,7 @@ pub struct OpmData {
         default,
         skip_serializing_if = "Option::is_none"
     )]
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.
     pub user_defined_parameters: Option<UserDefined>,
 }
 
@@ -383,20 +412,6 @@ impl Validate for OpmData {
                     FieldPath::ManeuverBlock(index).resolve(),
                 )?,
             }
-        }
-        if !self.maneuver_parameters.is_empty()
-            && self
-                .spacecraft_parameters
-                .as_ref()
-                .and_then(|sp| sp.mass.as_ref())
-                .is_none()
-        {
-            return Err(ValidationError::MissingRequiredField {
-                block: Cow::Borrowed("Spacecraft Parameters"),
-                field: Cow::Borrowed("MASS"),
-                line: None,
-            }
-            .into());
         }
         Ok(())
     }
@@ -605,6 +620,7 @@ pub struct ManeuverParameters {
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     ///
     /// The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
+    /// In edition 2.0 the negativeDouble domain excludes zero; 3.0 permits zero.
     pub man_delta_mass: DeltaMassZ,
     /// Reference frame in which the velocity increment vector data are given. The user must
     /// select from the accepted set of values indicated in 3.2.4.11.

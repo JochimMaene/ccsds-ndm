@@ -130,8 +130,8 @@ pub struct CdmHeader {
     /// organization that has the Role of 'Conjunction Data Message Originator'. (See 5.2.9
     /// for formatting rules.)
     ///
-    /// **Examples**: JSPOC, CAESAR, JPL, SDC. (Table 3-1 also lists `ESA SST`, but its blank is
-    /// outside the 5.2.9 repertoire, so the library rejects it; use e.g. `ESA_SST`.)
+    /// **Examples**: JSPOC, ESA SST, CAESAR, JPL, SDC. Blanks are accepted following
+    /// table 3-1 Cor.1 despite the narrower repertoire in section 5.2.9.
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
     #[builder(into)]
@@ -170,14 +170,20 @@ fn empty_required(field: &'static str) -> crate::error::CcsdsNdmError {
 
 // CDM 5.2.9 defines this closed lexical repertoire for five identifier fields.
 fn validate_identifier(field: &'static str, value: &str) -> Result<()> {
-    if !value
-        .bytes()
-        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
-    {
+    if !value.bytes().all(|byte| {
+        byte.is_ascii_alphanumeric()
+            || matches!(byte, b'_' | b'-')
+            || (field == "ORIGINATOR" && byte == b' ')
+    }) {
         return Err(ValidationError::InvalidValue {
             field: field.into(),
             value: value.into(),
-            expected: "ASCII letters, digits, underscores or dashes".into(),
+            expected: if field == "ORIGINATOR" {
+                "ASCII letters, digits, underscores, dashes or blanks"
+            } else {
+                "ASCII letters, digits, underscores or dashes"
+            }
+            .into(),
             line: None,
         }
         .into());
@@ -279,7 +285,7 @@ impl crate::traits::Validate for CdmBody {
 
 /// Conjunction geometry, screening conditions, and collision probability (CDM section 3.3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct RelativeMetadataData {
     /// Comments (see 6.3.4 for formatting rules).
     ///
@@ -429,24 +435,13 @@ impl crate::traits::Validate for RelativeMetadataData {
         for (field, value) in numbers {
             require_finite(field, value)?;
         }
-        if let Some(prob) = &self.collision_probability {
-            if !(0.0..=1.0).contains(&prob.value) {
-                return Err(crate::error::ValidationError::OutOfRange {
-                    name: "COLLISION_PROBABILITY".into(),
-                    value: prob.value.to_string(),
-                    expected: "0.0 <= p <= 1.0".into(),
-                    line: None,
-                }
-                .into());
-            }
-        }
         Ok(())
     }
 }
 
 /// Object2 relative to Object1 in the RTN frame at TCA (CDM table 3-2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct RelativeStateVector {
     /// Relative radial position in metres (CDM table 3-2).
     pub relative_position_r: Length,
@@ -727,7 +722,7 @@ pub struct CdmData {
     /// State Vector.
     #[serde(rename = "stateVector")]
     pub state_vector: CdmStateVector,
-    /// Covariance Matrix (CDM 3.5.2). Required: validation and generation reject `None`; the
+    /// Covariance Matrix (CDM 5.2.8). Required: validation and generation reject `None`; the
     /// `Option` exists only so a message can be constructed incrementally.
     #[serde(
         rename = "covarianceMatrix",
@@ -824,7 +819,7 @@ impl crate::traits::Validate for CdmData {
 
 /// Physical properties used for conjunction assessment and propagation (CDM table 3-4).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct AdditionalParameters {
     /// Comments (see 6.3.4 for formatting rules).
     ///
@@ -949,7 +944,7 @@ impl Validate for AdditionalParameters {
 
 /// Object position and velocity at TCA in its metadata reference frame (CDM section 3.5.2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct CdmStateVector {
     /// Comments (see 6.3.4 for formatting rules).
     ///
@@ -1019,7 +1014,8 @@ impl CdmStateVector {
 
 /// Lower-triangular RTN covariance, optionally extended by drag, SRP, and thrust (CDM section 3.5.2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
+/// Extended rows must be complete in order through Drag/SRP/Thrust (CDM 5.2.8).
 pub struct CdmCovarianceMatrix {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

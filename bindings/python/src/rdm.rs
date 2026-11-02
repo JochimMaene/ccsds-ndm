@@ -150,8 +150,6 @@ impl Rdm {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -163,7 +161,7 @@ impl Rdm {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed(py, data, format)?;
@@ -187,8 +185,6 @@ impl Rdm {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -203,7 +199,7 @@ impl Rdm {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
@@ -216,7 +212,7 @@ impl Rdm {
     /// path : str or os.PathLike
     ///     Destination file; existing content is replaced only after successful generation.
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Raises
     /// ------
@@ -235,8 +231,7 @@ impl Rdm {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<()> {
         crate::api::generate_file(
             py,
@@ -250,7 +245,7 @@ impl Rdm {
     /// Parameters
     /// ----------
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Returns
     /// -------
@@ -270,8 +265,7 @@ impl Rdm {
     fn to_str(
         &self,
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<String> {
         crate::api::generate_string(py, &self.to_core(py)?, format)
     }
@@ -1250,6 +1244,8 @@ impl RdmMetadata {
     /// CCSDS Reference: 508.1-B-1, Section 3.4.
     ///
     /// :type: Optional[str]
+    ///
+    /// Use None to omit the field; N/A is a document-input sentinel.
     #[getter]
     fn get_next_message_epoch(&self) -> Option<String> {
         self.inner
@@ -1305,7 +1301,7 @@ impl RdmMetadata {
 #[gen_stub_pyclass]
 #[pyclass(module = "ccsds_ndm")]
 pub struct RdmData {
-    /// Comments.
+    /// Leading data comments; KVN merges these into the first represented logical block.
     ///
     /// :type: list[str]
     #[pyo3(get, set)]
@@ -1568,7 +1564,9 @@ impl RdmData {
 /// Raises
 /// ------
 /// ValueError
-///     Invalid lifetime, confidence level, or calendar epoch.
+///     Invalid lifetime or confidence level.
+/// NdmEpochError
+///     If a CCSDS epoch or time tag is invalid.
 #[gen_stub_pyclass]
 #[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]

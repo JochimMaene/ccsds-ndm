@@ -50,7 +50,7 @@ guessing missing values, dropping content, or accepting inconsistent message sem
 exception to a clear book rule is recorded in the family conformance document and tested
 alongside nearby invalid cases; this policy is not a blanket relaxation of the grammar.
 Generation follows the clear rules and writes a form satisfying both sources where possible
-(for example, OEM XML always declares `xmlns:ndm`). A family that keeps a stricter reading lists it as a deliberate exception in its
+(for example, every generated XML root declares `xmlns:ndm`). A family that keeps a stricter reading lists it as a deliberate exception in its
 conformance document; OEM's are under "Stricter than required" in [oem-3.0.md](../conformance/oem-3.0.md).
 
 A conflict is resolved for the specific field and edition, with both authorities recorded in
@@ -64,9 +64,17 @@ This does not guarantee conversion: target structure, lexical limits, and preser
 still apply. When the book explicitly permits a value the XSD forbids, the model preserves it
 and XML generation refuses it; the family record names each such field.
 
-The books win over the XSD in one shared case: XML epochs with a timezone offset (`+hh:mm`),
-bare numeric epochs, and empty epochs are rejected although `epochType` admits them, because the
-books define only calendar and ordinal forms without a numeric offset (for example ODM 7.5.10). Empty mandatory
+Book-over-XSD epoch constraints are explicit: absolute epoch fields use four-digit,
+nonnegative years and calendar or ordinal dates, without timezone offsets (`+hh:mm`),
+empty fractional seconds (`15.`), or empty values. ODM 7.5.10, ADM 6.8.9 and their
+CDM/RDM counterparts limit fractional seconds to 16 digits; this cap remains enforced
+rather than broadening the shared validation and generation contract in this release.
+TDM has no fractional-digit cap. Negative OPM/OMM/OEM MET/MRT elapsed epochs remain unsupported; OCM/ACM SI-second
+relative offsets may be negative.
+OCM and ACM relative fields and histories accept numeric SI-second tags, including
+exponents expanded exactly to plain decimal; their absolute reference anchors remain
+calendar/ordinal. These limits are narrower than the XSD epoch union. The 64-byte
+lexical storage limit applies independently and never truncates a token. Empty mandatory
 XML strings (`<OBJECT_ID/>`) are likewise rejected although `xsd:string` admits them, because the
 books require mandatory values to be present (ODM 7.5.1, ADM 6.8.7). Family records link here
 rather than restating this rule.
@@ -96,9 +104,13 @@ producer deviations, and writing always emits the canonical form.
   using the shortest spelling of the rounded value, so rewriting what was read is stable. KVN
   integers are written only within −2³¹ through 2³¹−1; wider model integers are refused. Exact
   TDM phase counts remain decimal strings.
+  OCM maneuver columns retain numeric text rather than parsing it into model doubles; nonzero
+  underflow text remains available in the model/XML, and KVN generation refuses it as
+  unrepresentable. Shared three-component vectors and KVN four-component vectors use the
+  checked double reader and reject nonzero underflow, retaining representable subnormals.
 - **XML values:** blanks around an XML number are ignored; blanks around an epoch are not. `NaN`
   and `INF` are rejected as non-finite despite `xsd:double`, except where a family record accepts
-  them (OEM states and covariance). `xsi:nil` is rejected; CDM separately accepts the unqualified
+  them (OEM states/covariance and OCM time offsets). `xsi:nil` is rejected; CDM separately accepts the unqualified
   producer attribute `nil` on empty optional leaves, as documented in its family record.
   A missing `<?xml ...?>` declaration is accepted (XML 1.0 makes it optional and UTF-8 is the
   default); a declaration that is present must open the document, and writers always emit it.
@@ -107,19 +119,25 @@ producer deviations, and writing always emits the canonical form.
   number, epoch, enum, or string: a blank value or case-insensitive `N/A` means the keyword is
   absent. CDM `MANEUVERABLE` keeps `N/A` as the value the book lists for it. RDM
   `NEXT_MESSAGE_EPOCH = N/A` ("no other message is scheduled") is therefore read as absent and
-  written by omission. A blank mandatory value is reported as missing at its record. Writers never
+  written by omission. A blank or `N/A` mandatory value is reported as missing at its record. Writers never
   emit an empty or `N/A` value: an optional value that would read back as absent, such as an empty
   string from XML, is refused at KVN generation, naming the keyword. XML optional strings keep
-  empty values. Values are trimmed when written to KVN, as readers trim them.
+  empty values. In XML, case-insensitive `N/A` leaves are absent too, except `MANEUVERABLE`.
+  User-defined values and comments are opaque: blank and `N/A` payloads are retained. XML whitespace around scalar text is trimmed on KVN output and inner TABs become blanks;
+  embedded CR/LF remains unrepresentable. Values are trimmed as KVN readers trim them.
 - **Case:** `EULER_ROT_SEQ` reads lowercase letters and legacy ADM 1.0 numeric sequences
   in KVN/Python, writing canonical uppercase letters; XML requires its exact enum spelling.
   Keywords are uppercase. Closed enumeration values accept all-uppercase or
-  all-lowercase spellings and documented aliases, but not arbitrary mixed case. Free text and
+  all-lowercase spellings and documented aliases, but not arbitrary mixed case. TDM KVN/Python
+  closed categories are case-insensitive under TDM 4.3.7; XML retains schema spellings.
+  The shared YES/NO KVN/Python lookup is also case-insensitive: this lossless extension
+  keeps boolean construction and parsing consistent without family-specific copies of the helper. Free text and
   open or ICD-defined values (frames, time systems, names) are accepted and preserved in any case,
   in every notation; the ODM 7.5.3 single-case rule is not enforced.
-- **Underscore:** in a multi-word enumeration value, `_` is equivalent to a blank (CDM 6.3.2.5,
-  RDM 5.3.3.4, ODM 7.5.9), so `OBJECT_TYPE = ROCKET_BODY` reads as `ROCKET BODY`. Writers emit the
-  blank spelling. Free text keeps its underscores.
+- **Underscore:** `_` and a blank are interchangeable in categorical lookup, and runs of
+  blanks collapse to one (ODM 7.5.9, CDM 6.3.2.5, RDM 5.3.3.4, TDM 4.3.8, ADM 6.8.8).
+  Writers emit each category's canonical spelling (`ROCKET BODY`, `SINGLE_DIFF`, etc.).
+  Free text retains underscores and internal blank runs; normalization is not applied to names.
 - **Comments:** trailing blanks on a comment line are trimmed (including fixed-width padding),
   although 7.8.5 calls them significant; leading text is kept as written.
 - **Units:** check any supplied annotation against the field's allowed unit, including XML fields
@@ -203,10 +221,12 @@ token absent from the selected bundled XSD.
 
 ADM 504.0-B-2 annex F defines quaternion components from a rotation axis and angle, implying unit
 magnitude. The shared quaternion validator used by APM, AEM and known quaternion ACM histories
-checks each component in `[-1, 1]` and squared norm in `[0.999, 1.001]`. The book specifies no
+checks each component in `[-1, 1]` and squared norm in `[0.99, 1.01]`. The book specifies no
 numeric tolerance; this is an explicit implementation choice accommodating rounded examples,
 not a new adjustable parser option. Data outside the interval is rejected rather than normalized.
 The common constructor checks component domains; complete-message validation checks magnitude.
+KVN generation checks the magnitude again after its 16-digit component rounding and refuses
+output that would fail the same validation when read back; this includes ACM maneuver targets.
 
 ## Evidence required for a constraint
 
@@ -273,3 +293,23 @@ This is a library profile restriction, not an XSD restriction. Keeping the calen
 contract avoids changing the shared state-vector and mean-elements APIs in this release.
 OEM separately supports contextual MET/MRT elapsed fields. The regression
 `conformance::values::opm_and_omm_elapsed_time_profile_is_explicit` records the OPM/OMM boundary.
+
+The shared XML input policy follows NDM/XML 3.6.1: application element names are
+case-sensitive. Qualified and unqualified schema forms are accepted; foreign namespaces
+and mixed element forms are rejected. Missing `xmlns:xsi` is harmless when no prefix uses
+it; undeclared prefixes remain invalid. XSI schema hints may use any correctly bound prefix.
+`xml:lang`, `xsi:type`, XML 1.1, non-UTF-8 declarations, DOCTYPE, and whitespace before an
+XML declaration are refused. Every generated root declares its namespaces. OEM's XML
+namespace/root regressions and `library::xml` cover these common rules.
+
+ODM 7.8.5 calls comment whitespace significant, while 7.4.7 says trailing whitespace is
+insignificant. The library follows 7.4.7 for fixed-width padding and trims trailing blanks;
+leading comment text is preserved. This is an explicit resolution of conflicting clauses.
+
+XML deserializer failures retain structured line, column, byte offset and family context.
+Missing XML leaves use `validation.missing_required_field`, matching KVN. Other serde
+value-conversion failures may retain schema/type wording and `parse.xml.syntax`;
+converting every serde message into a stable semantic category by matching English text
+would be brittle. Consumers should use the code and location rather than parse message text.
+The lexical source spelling may be normalized in value-error messages (for example `INF`
+becomes `inf`); `original_token` is the source excerpt when available.

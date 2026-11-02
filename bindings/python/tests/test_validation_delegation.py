@@ -59,7 +59,7 @@ class TestRoutingShapes:
         # In range per component, so the norm check is what rejects this.
         broken[0] = 0.5  # destroys quaternion normalisation
         states[1].values = broken
-        assert_all_surfaces_reject(aem, "Quaternion not normalized")
+        assert_all_surfaces_reject(aem, "QUATERNION")
 
     def test_required_scalar_on_a_required_block(self):
         """CDM relative metadata is required, not optional, and its numbers must be finite.

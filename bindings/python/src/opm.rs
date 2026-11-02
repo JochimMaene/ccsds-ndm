@@ -136,8 +136,6 @@ impl Opm {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -149,7 +147,7 @@ impl Opm {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed(py, data, format)?;
@@ -173,8 +171,6 @@ impl Opm {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -189,7 +185,7 @@ impl Opm {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
@@ -202,7 +198,7 @@ impl Opm {
     /// path : str or os.PathLike
     ///     Destination file; existing content is replaced only after successful generation.
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Raises
     /// ------
@@ -221,8 +217,7 @@ impl Opm {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<()> {
         crate::api::generate_file(
             py,
@@ -236,7 +231,7 @@ impl Opm {
     /// Parameters
     /// ----------
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Returns
     /// -------
@@ -256,8 +251,7 @@ impl Opm {
     fn to_str(
         &self,
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<String> {
         crate::api::generate_string(py, &self.to_core(py)?, format)
     }
@@ -1371,12 +1365,16 @@ pub struct OpmData {
     /// Comments (see 7.8 for formatting rules).
     ///
     /// :type: list[str]
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.
     #[pyo3(get, set)]
     comment: Vec<String>,
 
     /// State vector components (position and velocity).
     ///
     /// :type: StateVector
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.
     #[pyo3(get, set)]
     state_vector: Py<StateVector>,
 
@@ -1484,6 +1482,8 @@ impl OpmData {
     /// Keplerian elements.
     ///
     /// :type: Optional[KeplerianElements]
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.
     #[getter]
     fn get_keplerian_elements(&self, py: Python<'_>) -> Option<Py<KeplerianElements>> {
         self.keplerian_elements
@@ -1499,6 +1499,8 @@ impl OpmData {
     /// Spacecraft parameters.
     ///
     /// :type: Optional[SpacecraftParameters]
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.
     #[getter]
     fn get_spacecraft_parameters(
         &self,
@@ -1520,6 +1522,8 @@ impl OpmData {
     /// Covariance matrix.
     ///
     /// :type: Optional[OpmCovarianceMatrix]
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.
     #[getter]
     fn get_covariance_matrix(&self, py: Python<'_>) -> Option<Py<OpmCovarianceMatrix>> {
         self.covariance_matrix
@@ -1535,6 +1539,8 @@ impl OpmData {
     /// Maneuver parameters.
     ///
     /// :type: list[OpmManeuverParameters]
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.
     #[gen_stub(override_return_type(type_repr = "list[OpmManeuverParameters]"))]
     #[getter]
     fn get_maneuver_parameters(&self, py: Python<'_>) -> Py<PyList> {
@@ -1552,6 +1558,8 @@ impl OpmData {
     /// User defined parameters.
     ///
     /// :type: UserDefined | None
+    ///
+    /// CCSDS Reference: 502.0-B-3, Section 3.2.
     #[getter]
     fn get_user_defined_parameters(&self, py: Python<'_>) -> Option<Py<crate::types::UserDefined>> {
         self.user_defined_parameters
@@ -1689,6 +1697,8 @@ impl OpmManeuverParameters {
     /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
     /// :type: float
+    ///
+    /// Edition 2.0 excludes zero; edition 3.0 permits zero (ODM 3.2.4).
     #[getter]
     fn get_man_delta_mass(&self) -> f64 {
         self.inner.man_delta_mass.value

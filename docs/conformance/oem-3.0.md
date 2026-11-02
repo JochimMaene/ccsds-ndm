@@ -260,7 +260,7 @@ follows the book, so everything the library writes is valid.
 | --- | --- | --- |
 | 1–7 | Header | Version, creation date and originator are required. Comments, classification and message ID are optional, subject to edition rules. The KVN version record must come first; other unique header fields may be read in any order. Writing uses the book's order. Optional XML strings are kept exactly as written; separated comment groups remain unsupported (see [Limits](#limits)). |
 | 8–16, 23 | Metadata | Identity, frame and time fields are required. Frame epoch and comments are optional. Block markers must be exact. Object and time system must match across segments. Text values keep their case. Frame-specific rules depend on the agreement between the parties. |
-| 17–20 | Time bounds | Total and useable times must be in order, and useable times must fall inside the total span (the table 5-3 reading of TOTAL and USEABLE). State records must fall inside the total span. Complete useable spans of consecutive segments may touch but not overlap. In 2.0, a useable start may not precede the previous segment's useable stop (see [OEM 2.0](#oem-20)). |
+| 17–20 | Time bounds | Total and useable times must be in order, and useable times must fall inside the total span (the TOTAL/USEABLE wording in B-2 table 5-3 and B-1 table 4-3). State records must fall inside the total span. Complete useable spans of consecutive segments may touch but not overlap. In 2.0, a useable start may not precede the previous segment's useable stop (see [OEM 2.0](#oem-20)). |
 | 21–22 | Interpolation | A method requires a degree, in Rust, Python and both notations. The degree must be positive (see [Stricter than required](#stricter-than-required)). Whether there are enough records is not checked, because the book doesn't define it (see [Where the book is unclear](#where-the-book-is-unclear)). |
 | 24–25 | Ephemeris | At least one state record per segment, epochs valid for the time system, position and velocity with optional acceleration, and fixed units. KVN lines must have exactly 7 or 10 fields. In XML each acceleration component is optional on its own. Unlike AEM, OEM doesn't require increasing epochs. |
 | 26–31 | Covariance | Optional section, which may be empty (row 30). Each matrix has all 21 lower-triangle values, an epoch, an optional frame and comments. KVN rows must have the right number of values. Epochs increase; they are not bounded by the total span. XML units are optional. Python accepts a full 6×6 matrix and uses its lower triangle. |
@@ -348,3 +348,21 @@ These edition-specific rules do not impose an invented epoch-order requirement o
 This reader is a restricted legacy compatibility path, separate from the current verified
 editions. It cannot write or convert 1.0 messages; construct a supported edition explicitly
 instead of changing the version string on a parsed legacy message.
+
+KVN reading tolerates lines longer than the book's 254-character limit where applicable;
+writing enforces that limit, so an accepted overlong record can require shortening before
+regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
+are specified in the [validation contract](../design/validation-contract.md).
+
+The covariance-marker tolerance covers the unmarked form only when both markers are
+absent; a lone marker is rejected. This deliberately avoids guessing whether the producer
+intended the marked or unmarked grammar. A leading covariance COMMENT needs an explicit
+COVARIANCE_START so that it has an unambiguous block owner; later comments follow the
+existing matrix rules. Marker generation is always explicit (ODM 5.4).
+
+OEM 1.0 is input-only while its version remains 1.0. The public version field is mutable:
+a caller may deliberately relabel to 2.0/3.0, validate, and generate, with the documented
+comment merging/movement. Relabelling is an explicit caller action, not automatic conversion.
+The legacy reader uses the shared epoch syntax, which is looser than B-1's six fractional
+digits and no-Z spelling. TAB is accepted as a blank despite B-1 4.3.1b. Negative MET/MRT
+elapsed-time durations remain outside the supported profile.

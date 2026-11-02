@@ -5,6 +5,40 @@ use ccsds_ndm::types::{AngleRate, Vec4Double};
 use ccsds_ndm::Ndm;
 
 #[test]
+fn kvn_refuses_rounding_that_invalidates_history_or_target_quaternions() {
+    use ccsds_ndm::messages::acm::AcmManeuverParameters;
+    let values = [0.47047595604435294, 0.8767282217335952, 0.0, 0.0];
+    let original = Acm::from_kvn(ATT_KVN).unwrap();
+    for target in [false, true] {
+        let mut message = original.clone();
+        if target {
+            message.body.segment.data.man.push(AcmManeuverParameters {
+                man_purpose: Some("ATT_ADJUST".into()),
+                man_begin_time: Some("0".parse().unwrap()),
+                man_duration: Some(ccsds_ndm::types::Duration::new(10.0, None).unwrap()),
+                target_attitude: Some(Vec4Double {
+                    values: values.to_vec(),
+                }),
+                ..Default::default()
+            });
+            message.body.segment.metadata.acm_data_elements = None;
+        } else {
+            message.body.segment.data.att[0].att_lines[1].values[..4].copy_from_slice(&values);
+        }
+        ccsds_ndm::Validate::validate(&message).unwrap();
+        message.to_xml().unwrap();
+        assert!(message
+            .to_kvn()
+            .unwrap_err()
+            .to_string()
+            .contains("QUATERNION"));
+        let mut output = Vec::new();
+        assert!(message.write_kvn_to(&mut output).is_err());
+        assert!(output.is_empty());
+    }
+}
+
+#[test]
 fn user_defined_punctuation_survives_generated_kvn() {
     use ccsds_ndm::types::{UserDefined, UserDefinedEntry, UserDefinedParameter};
     let mut message = Acm::from_kvn(include_str!("../../data/kvn/acm_g6.kvn")).unwrap();
@@ -382,7 +416,7 @@ fn quaternion_histories_reject_nonunit_magnitude_after_mutation() {
     for value in &mut message.body.segment.data.att[0].att_lines[1].values[0..4] {
         *value = 0.0;
     }
-    assert_rejects(&message, "Quaternion not normalized");
+    assert_rejects(&message, "QUATERNION");
 }
 
 #[test]
@@ -528,7 +562,7 @@ fn acm_maneuver_targets_follow_purposes_without_closing_custom_values() {
     man.target_momentum = None;
     man.target_mom_frame = None;
     man.target_attitude.as_mut().unwrap().values = vec![0.0; 4];
-    assert_rejects(&message, "Quaternion");
+    assert_rejects(&message, "QUATERNION");
 }
 
 #[test]

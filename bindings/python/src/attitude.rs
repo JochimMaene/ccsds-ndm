@@ -46,7 +46,9 @@ use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 /// Raises
 /// ------
 /// ValueError
-///     If a component is outside [-1, 1], or only some quaternion derivatives are supplied.
+///     If only some quaternion derivatives are supplied.
+/// NdmValidationError
+///     If a quaternion component is outside [-1, 1].
 #[gen_stub_pyclass]
 #[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
@@ -106,7 +108,8 @@ impl QuaternionState {
                 comment: comment.unwrap_or_default(),
                 ref_frame_a,
                 ref_frame_b,
-                quaternion: Quaternion { q1, q2, q3, qc },
+                quaternion: Quaternion::new(q1, q2, q3, qc)
+                    .map_err(crate::errors::ccsds_error_to_pyerr)?,
                 quaternion_dot,
             },
         })

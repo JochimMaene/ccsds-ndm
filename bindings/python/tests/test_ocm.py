@@ -26,6 +26,7 @@ from ccsds_ndm import (
     OdmHeader,
     TrajLine,
 )
+from ccsds_ndm import NdmEpochError
 
 
 @pytest.mark.parametrize(
@@ -165,7 +166,7 @@ class TestOcm:
             ocm.validate()
 
     def test_metadata_reference_epochs_require_calendar_form(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             OcmMetadata(epoch_tzero="123.5", time_system="UTC")
 
         metadata = OcmMetadata(epoch_tzero="2023-01-01T00:00:00", time_system="UTC")
@@ -175,10 +176,10 @@ class TestOcm:
             "next_message_epoch",
             "next_leap_epoch",
         ):
-            with pytest.raises(ValueError):
+            with pytest.raises(NdmEpochError):
                 setattr(metadata, field, "123.5")
 
-    def test_frame_reference_epochs_accept_relative_except_calendar_only_fields(self):
+    def test_frame_reference_and_useable_epochs_accept_relative_tags(self):
         trajectory = OcmTrajState(
             center_name="EARTH",
             traj_ref_frame="GCRF",
@@ -204,11 +205,11 @@ class TestOcm:
             man_frame_epoch="123.5",
         )
         assert maneuver.man_frame_epoch == "123.5"
-        with pytest.raises(ValueError):
-            OcmPhysicalDescription(oeb_parent_frame_epoch="123.5")
+        physical = OcmPhysicalDescription(oeb_parent_frame_epoch="123.5")
+        assert physical.oeb_parent_frame_epoch == "123.5"
         for field in ("useable_start_time", "useable_stop_time"):
-            with pytest.raises(ValueError):
-                setattr(trajectory, field, "123.5")
+            setattr(trajectory, field, "123.5")
+            assert getattr(trajectory, field) == "123.5"
 
     def test_file_io(self, tmp_path):
         ocm = self._create_valid_ocm()
@@ -358,9 +359,9 @@ class TestOcm:
         line.epoch = "123.5"
         assert line.epoch == "123.5"
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             TrajLine(epoch="not-an-epoch", values=[1.0])
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             line.epoch = "not-an-epoch"
 
     def test_cov_line_epoch_is_validated_without_changing_string_api(self):
@@ -370,9 +371,9 @@ class TestOcm:
         line.epoch = "123.5"
         assert line.epoch == "123.5"
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             CovLine(epoch="not-an-epoch", values=[1.0])
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             line.epoch = "not-an-epoch"
 
     def test_man_line_epoch_is_validated_without_changing_string_api(self):
@@ -382,9 +383,9 @@ class TestOcm:
         line.epoch = "123.5"
         assert line.epoch == "123.5"
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             ManLine(epoch="not-an-epoch", values=["1.0"])
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             line.epoch = "not-an-epoch"
 
 

@@ -1768,10 +1768,10 @@ fn enum_error_is_preserved() {
     let kvn = "CCSDS_OCM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\nMETA_START\nOBJECT_TYPE = PAYLOAD\nTIME_SYSTEM = UTC\nEPOCH_TZERO = 2023-01-01T00:00:00\nMETA_STOP\nCOV_START\nCOV_REF_FRAME = EME2000\nCOV_TYPE = POSITION_COVARIANCE\nCOV_ORDERING = INVALID_ORDERING\nCOV_STOP\n";
     let err = Ocm::from_kvn(kvn).unwrap_err();
 
-    let CcsdsNdmError::Format(format_error) = err else {
+    let Some(format_error) = err.as_format_error() else {
         panic!("Expected FormatError");
     };
-    if let ccsds_ndm::error::FormatError::Enum(enum_err) = *format_error {
+    if let ccsds_ndm::error::FormatError::Enum(enum_err) = format_error {
         assert_eq!(enum_err.value, "INVALID_ORDERING");
         assert_eq!(enum_err.field, "COV_ORDERING");
     } else {
@@ -1882,4 +1882,22 @@ fn xml_covariance_history_rejects_underflow_and_empty_unknown_rows() {
         let invalid = mutated(&xml, "<covLine>0 1</covLine>", replacement);
         assert!(Ocm::from_xml(&invalid).is_err());
     }
+}
+
+#[test]
+fn schema_valid_xml_covariances_do_not_require_tc1_linkage() {
+    let source = "CCSDS_OCM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\nMETA_START\nTIME_SYSTEM = UTC\nEPOCH_TZERO = 2023-01-01T00:00:00\nMETA_STOP\nCOV_START\nCOV_REF_FRAME = GCRF\nCOV_TYPE = CARTP\nCOV_ORDERING = LTM\n0 1 0 1 0 0 1\nCOV_STOP\n";
+    let base = Ocm::from_kvn(source).unwrap().to_xml().unwrap();
+    let start = base.find("<cov>").expect("fixture covariance");
+    let end = start + base[start..].find("</cov>").unwrap() + "</cov>".len();
+    let source = format!("{}{}{}", &base[..end], &base[start..end], &base[end..]);
+    crate::common::validate_xml("OCM repeated covariance without XML TRAJ_ID", &source);
+    let message = Ocm::from_xml(&source).unwrap();
+    assert_eq!(message.body.segment.data.cov.len(), 2);
+    assert!(message
+        .to_kvn()
+        .unwrap_err()
+        .to_string()
+        .contains("TRAJ_ID"));
+    assert!(message.to_xml().is_err());
 }

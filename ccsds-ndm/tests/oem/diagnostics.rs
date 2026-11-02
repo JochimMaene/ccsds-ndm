@@ -124,11 +124,15 @@ fn missing_xml_covariance_epoch_reports_where_deserialization_failed() {
         let line = input[..end].bytes().filter(|&byte| byte == b'\n').count() + 1;
         let error = Oem::from_xml(&input).unwrap_err();
         assert!(
-            error.to_string().contains("missing field `EPOCH`"),
+            error.to_string().contains("Missing required field: EPOCH"),
             "{error}"
         );
         assert!(
-            error.to_string().contains(&format!("near line {line},")),
+            error
+                .diagnostic()
+                .and_then(|diagnostic| diagnostic.source_location)
+                .map(|location| location.0)
+                == Some(line),
             "{error}"
         );
     }

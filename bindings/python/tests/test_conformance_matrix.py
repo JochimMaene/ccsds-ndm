@@ -94,7 +94,6 @@ def test_public_workflow_is_consistent_in_every_supported_notation(
         (ccsds_ndm.Acm, "acm_g6.kvn"),
         (ccsds_ndm.Aem, "aem_g4.kvn"),
         (ccsds_ndm.Apm, "apm_g1.kvn"),
-        (ccsds_ndm.Tdm, "tdm_e1.kvn"),
     ],
 )
 def test_unverified_legacy_editions_fail_explicitly(cls, fixture):

@@ -55,6 +55,15 @@ impl crate::traits::Validate for Apm {
     }
 }
 
+impl Apm {
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        for state in &self.body.segment.data.quaternion_state {
+            state.quaternion.validate_kvn_rounding()?;
+        }
+        Ok(())
+    }
+}
+
 impl Ndm for Apm {
     fn to_kvn(&self) -> Result<String> {
         crate::generation::to_kvn_string(self)

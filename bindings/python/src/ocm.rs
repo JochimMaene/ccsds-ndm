@@ -107,8 +107,6 @@ impl Ocm {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -120,7 +118,7 @@ impl Ocm {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed(py, data, format)?;
@@ -144,8 +142,6 @@ impl Ocm {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -160,7 +156,7 @@ impl Ocm {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
@@ -173,7 +169,7 @@ impl Ocm {
     /// path : str or os.PathLike
     ///     Destination file; existing content is replaced only after successful generation.
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Raises
     /// ------
@@ -192,8 +188,7 @@ impl Ocm {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<()> {
         crate::api::generate_file(
             py,
@@ -245,7 +240,7 @@ impl Ocm {
     /// Parameters
     /// ----------
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Returns
     /// -------
@@ -265,8 +260,7 @@ impl Ocm {
     fn to_str(
         &self,
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<String> {
         crate::api::generate_string(py, &self.to_core(py)?, format)
     }
@@ -1474,6 +1468,8 @@ impl OcmMetadata {
     /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[float]
+    ///
+    /// Default: omitted means 0.0 SI seconds, including TIME_SYSTEM=SCLK (ODM 6.2.1.3).
     #[getter]
     fn get_sclk_offset_at_epoch(&self) -> Option<f64> {
         self.inner.sclk_offset_at_epoch.as_ref().map(|t| t.value)
@@ -1495,6 +1491,8 @@ impl OcmMetadata {
     /// CCSDS Reference: 502.0-B-3, Section 6.2.4.
     ///
     /// :type: Optional[float]
+    ///
+    /// Default: omitted means 1.0, including TIME_SYSTEM=SCLK (ODM 6.2.1.3).
     #[getter]
     fn get_sclk_sec_per_si_sec(&self) -> Option<f64> {
         self.inner.sclk_sec_per_si_sec.as_ref().map(|d| d.value)
@@ -1979,7 +1977,7 @@ impl OcmData {
 /// useable_stop_time : str, optional
 ///     Stop time of the useable time span covered by the ephemeris data.
 /// orb_revnum : float, optional
-///     The integer orbit revolution number associated with the first trajectory state.
+///     The orbit revolution number (fractional values are accepted) associated with the first trajectory state.
 /// orb_revnum_basis : str, optional
 ///     Specifies the message creator’s basis for their orbit revolution counter (0 or 1).
 /// orb_averaging : str, optional
@@ -2094,12 +2092,8 @@ impl OcmTrajState {
                 center_name,
                 traj_ref_frame,
                 traj_frame_epoch: traj_frame_epoch.map(|s| parse_epoch(&s)).transpose()?,
-                useable_start_time: useable_start_time
-                    .map(|s| parse_calendar_epoch(&s))
-                    .transpose()?,
-                useable_stop_time: useable_stop_time
-                    .map(|s| parse_calendar_epoch(&s))
-                    .transpose()?,
+                useable_start_time: useable_start_time.map(|s| parse_epoch(&s)).transpose()?,
+                useable_stop_time: useable_stop_time.map(|s| parse_epoch(&s)).transpose()?,
                 orb_revnum,
                 orb_revnum_basis,
                 traj_type,
@@ -2135,6 +2129,8 @@ impl OcmTrajState {
     /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
     ///
     /// :type: str
+    ///
+    /// Default: EARTH when omitted on KVN input.
     #[getter]
     fn get_center_name(&self) -> String {
         self.inner.center_name.clone()
@@ -2152,6 +2148,8 @@ impl OcmTrajState {
     /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
     ///
     /// :type: str
+    ///
+    /// Default: ICRF3 when omitted on KVN input.
     #[getter]
     fn get_traj_ref_frame(&self) -> String {
         self.inner.traj_ref_frame.clone()
@@ -2331,8 +2329,8 @@ impl OcmTrajState {
     }
 
     /// Recommended interpolation degree for ephemeris data in the immediately following set of
-    /// ephemeris lines. Must be an integer value. This keyword must be provided if the
-    /// 'INTERPOLATION' keyword is used and set to anything other than PROPAGATE.
+    /// ephemeris lines. A supplied value must be a positive integer. Omission adopts the
+    /// implicit book default (6.2.1.3) and stays absent in the model and output.
     ///
     /// Examples: 5, 1
     ///
@@ -2400,6 +2398,8 @@ impl OcmTrajState {
     /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
     ///
     /// :type: Optional[str]
+    ///
+    /// Accepts a relative SI-second tag or a calendar/ordinal epoch (ODM 6.2.2.3).
     #[getter]
     fn get_useable_start_time(&self) -> Option<String> {
         self.inner
@@ -2409,7 +2409,7 @@ impl OcmTrajState {
     }
     #[setter]
     fn set_useable_start_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.useable_start_time = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
+        self.inner.useable_start_time = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
 
@@ -2426,6 +2426,8 @@ impl OcmTrajState {
     /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
     ///
     /// :type: Optional[str]
+    ///
+    /// Accepts a relative SI-second tag or a calendar/ordinal epoch (ODM 6.2.2.3).
     #[getter]
     fn get_useable_stop_time(&self) -> Option<String> {
         self.inner
@@ -2435,12 +2437,12 @@ impl OcmTrajState {
     }
     #[setter]
     fn set_useable_stop_time(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.useable_stop_time = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
+        self.inner.useable_stop_time = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
 
     // === Orbit Revolution Fields ===
-    /// The integer orbit revolution number associated with the first trajectory state in this
+    /// The orbit revolution number (fractional values are accepted) associated with the first trajectory state in this
     /// trajectory state time history block. NOTE—The first ascending node crossing that occurs
     /// AFTER launch or deployment is designated to be the beginning of orbit revolution number
     /// = one ('1').
@@ -2473,6 +2475,8 @@ impl OcmTrajState {
     /// CCSDS Reference: 502.0-B-3, Section 6.2.5.
     ///
     /// :type: Optional[str]
+    ///
+    /// Default: omitted means 0; the model/output retains omission (ODM 6.2.1.3).
     #[getter]
     fn get_orb_revnum_basis(&self) -> Option<String> {
         self.inner.orb_revnum_basis.as_ref().map(|b| b.to_string())
@@ -2890,7 +2894,7 @@ impl OcmPhysicalDescription {
                 }),
                 oeb_parent_frame,
                 oeb_parent_frame_epoch: oeb_parent_frame_epoch
-                    .map(|s| parse_calendar_epoch(&s))
+                    .map(|s| parse_epoch(&s))
                     .transpose()?,
                 oeb_q1,
                 oeb_q2,
@@ -3309,6 +3313,8 @@ impl OcmPhysicalDescription {
     /// CCSDS Reference: 502.0-B-3, Section 6.2.6.
     ///
     /// :type: Optional[str]
+    ///
+    /// Accepts a relative SI-second tag or a calendar/ordinal epoch (ODM 6.2.2.3).
     #[getter]
     fn get_oeb_parent_frame_epoch(&self) -> Option<String> {
         self.inner
@@ -3318,7 +3324,7 @@ impl OcmPhysicalDescription {
     }
     #[setter]
     fn set_oeb_parent_frame_epoch(&mut self, value: Option<String>) -> PyResult<()> {
-        self.inner.oeb_parent_frame_epoch = value.map(|s| parse_calendar_epoch(&s)).transpose()?;
+        self.inner.oeb_parent_frame_epoch = value.map(|s| parse_epoch(&s)).transpose()?;
         Ok(())
     }
     /// q1 = e1 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e1 = 1st
@@ -4317,6 +4323,8 @@ impl OcmCovarianceMatrix {
     /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
     ///
     /// :type: str
+    ///
+    /// Default: TNW_INERTIAL when omitted on KVN input.
     #[getter]
     fn get_cov_ref_frame(&self) -> String {
         self.inner.cov_ref_frame.clone()
@@ -4427,6 +4435,8 @@ impl OcmCovarianceMatrix {
     /// CCSDS Reference: 502.0-B-3, Section 6.2.7.
     ///
     /// :type: str
+    ///
+    /// Default: LTM when omitted on KVN input.
     #[getter]
     fn get_cov_ordering(&self) -> String {
         self.inner.cov_ordering.to_string()
@@ -5090,6 +5100,8 @@ impl OcmManeuverParameters {
     /// CCSDS Reference: 502.0-B-3, Section 6.2.8.
     ///
     /// :type: str
+    ///
+    /// Default: CONTINUOUS when omitted.
     #[getter]
     fn get_dc_type(&self) -> String {
         self.inner.dc_type.to_string()

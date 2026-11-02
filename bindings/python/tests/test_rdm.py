@@ -18,6 +18,7 @@ from ccsds_ndm import (
     RdmMetadata,
     RdmSegment,
 )
+from ccsds_ndm import NdmEpochError
 
 
 class TestRdm:
@@ -102,10 +103,10 @@ class TestRdm:
             )
 
     def test_epoch_fields_reject_numeric_xsd_branch(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             RdmHeader(originator="TEST", creation_date="123.5", message_id="ID")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             RdmMetadata(
                 object_name="SAT1",
                 international_designator="2023-001A",
@@ -115,7 +116,7 @@ class TestRdm:
                 time_system="UTC",
             )
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             AtmosphericReentryParameters(
                 orbit_lifetime=5.0,
                 reentry_altitude=120.0,

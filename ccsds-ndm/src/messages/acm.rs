@@ -186,7 +186,7 @@ pub struct AcmMetadata {
     pub catalog_name: Option<String>,
     /// Free text field specification of the unique satellite identification designator for the
     /// object, as reflected in the catalog whose name is ‘CATALOG_NAME’. If the ID is not known,
-    /// ‘UNKNOWN’ may be used (or this keyword omitted).
+    /// ‘UNKNOWN’ may be used (with a required nonempty value).
     ///
     /// **Examples**: 22444, 18SPCS 18571, UNKNOWN
     ///
@@ -570,6 +570,7 @@ pub struct AcmAttitudeState {
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
     #[builder(into)]
+    /// Rate-only representations are refused in ATT histories (ADM table 5-4).
     pub att_type: AcmAttitudeType,
     /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
     /// the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
@@ -1433,6 +1434,7 @@ pub struct AcmAttitudeDetermination {
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
+    /// XML permits only the schema AD_METHOD enumeration; KVN retains open text.
     pub ad_method: Option<String>,
     /// Source of attitude estimate, whether from a ground based estimator or onboard estimator.
     ///

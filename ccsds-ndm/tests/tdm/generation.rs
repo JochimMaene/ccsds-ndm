@@ -455,3 +455,38 @@ fn kvn_output_refuses_integers_and_lines_beyond_the_kvn_limits() {
     assert!(error.to_string().contains("DATA_TYPES"), "{error}");
     assert!(error.to_string().contains("254"), "{error}");
 }
+
+#[test]
+fn doppler_counts_are_plain_integer_digits_even_for_large_values() {
+    let source = include_str!("../../data/kvn/tdm_e1.kvn");
+    for value in [5.0, 1.234567890123457e20] {
+        let mut message = Tdm::from_kvn(source).unwrap();
+        message.body.segments[0].data.observations[0].data =
+            TdmObservationData::DopplerCount(value);
+        let kvn = message.to_kvn().unwrap();
+        let line = kvn
+            .lines()
+            .find(|line| line.starts_with("DOPPLER_COUNT "))
+            .unwrap();
+        let token = line.split_whitespace().last().unwrap();
+        assert!(token.bytes().all(|byte| byte.is_ascii_digit()), "{token}");
+        assert_eq!(token.parse::<f64>().unwrap(), value);
+        Tdm::from_kvn(&kvn).unwrap();
+    }
+}
+
+#[test]
+fn phase_counts_fill_missing_digits_on_either_side_of_the_decimal_point() {
+    for (value, expected) in [(".5", "0.5"), ("5.", "5.0"), ("-.5", "-0.5")] {
+        let mut message = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e1.kvn")).unwrap();
+        message.body.segments[0].data.observations[0].data =
+            TdmObservationData::ReceivePhaseCt1(value.into());
+        let kvn = message.to_kvn().unwrap();
+        let line = kvn
+            .lines()
+            .find(|line| line.starts_with("RECEIVE_PHASE_CT_1 "))
+            .unwrap();
+        assert_eq!(line.split_whitespace().last().unwrap(), expected);
+        Tdm::from_kvn(&kvn).unwrap();
+    }
+}

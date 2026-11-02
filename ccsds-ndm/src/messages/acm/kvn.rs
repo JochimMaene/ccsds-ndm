@@ -116,6 +116,21 @@ pub fn acm_metadata(input: &mut &str) -> KvnResult<AcmMetadata> {
 // ACM Data Logical Blocks
 //----------------------------------------------------------------------
 
+fn kv_basis(input: &mut &str) -> KvnResult<String> {
+    let value = kv_string.parse_next(input)?;
+    Ok(value
+        .parse::<crate::types::AttBasisType>()
+        .map_or(value, |known| known.to_string()))
+}
+
+fn kv_ad_method(input: &mut &str) -> KvnResult<String> {
+    let value = kv_string.parse_next(input)?;
+    Ok(match value.parse::<crate::types::AdMethod>() {
+        Ok(_) => crate::types::enum_token(&value).into_owned(),
+        Err(_) => value,
+    })
+}
+
 /// Reads one history data line: a relative or absolute time tag (ADM 5.3.4.3) and numbers.
 fn parse_history_line(input: &mut &str, label: &'static str) -> KvnResult<(Epoch, Vec<f64>)> {
     let line_start = *input;
@@ -151,7 +166,7 @@ fn parse_att_block(input: &mut &str) -> KvnResult<AcmAttitudeState> {
     parse_block!(input, comment, {
         "ATT_ID" => val: kv_string => { att_id = Some(val); },
         "ATT_PREV_ID" => val: kv_string => { att_prev_id = Some(val); },
-        "ATT_BASIS" => val: kv_string => { att_basis = Some(val); },
+        "ATT_BASIS" => val: kv_basis => { att_basis = Some(val); },
         "ATT_BASIS_ID" => val: kv_string => { att_basis_id = Some(val); },
         "REF_FRAME_A" => val: kv_string => { ref_frame_a = Some(val); },
         "REF_FRAME_B" => val: kv_string => { ref_frame_b = Some(val); },
@@ -246,7 +261,7 @@ fn parse_cov_block(input: &mut &str) -> KvnResult<AcmCovarianceMatrix> {
     parse_block!(input, comment, {
         "COV_ID" => val: kv_string => { cov_id = Some(val); },
         "COV_PREV_ID" => val: kv_string => { cov_prev_id = Some(val); },
-        "COV_BASIS" => val: kv_string => { cov_basis = Some(val); },
+        "COV_BASIS" => val: kv_basis => { cov_basis = Some(val); },
         "COV_BASIS_ID" => val: kv_string => { cov_basis_id = Some(val); },
         "COV_REF_FRAME" => val: kv_string => { cov_ref_frame = Some(val); },
         "COV_TYPE" => val: kv_enum => { cov_type = Some(val); },
@@ -421,7 +436,7 @@ fn parse_ad_block(input: &mut &str) -> KvnResult<AcmAttitudeDetermination> {
     parse_block!(input, comment, {
         "AD_ID" => val: kv_string => { ad_id = Some(val); },
         "AD_PREV_ID" => val: kv_string => { ad_prev_id = Some(val); },
-        "AD_METHOD" => val: kv_string => { ad_method = Some(val); },
+        "AD_METHOD" => val: kv_ad_method => { ad_method = Some(val); },
         "ATTITUDE_SOURCE" => val: kv_string => { attitude_source = Some(val); },
         "NUMBER_STATES" => val: kv_u32 => { number_states = Some(val); },
         "ATTITUDE_STATES" => val: kv_enum => { attitude_states = Some(val); },
@@ -493,10 +508,6 @@ fn parse_user_defined_block(input: &mut &str) -> KvnResult<crate::types::UserDef
                 "USER_DEFINED_ keyword needs a parameter name suffix",
             ));
         };
-        if value_is_absent(key, input) {
-            skip_record(input);
-            continue;
-        }
         let val = kv_string.parse_next(input)?;
         block
             .entries
@@ -742,7 +753,7 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
         }
         if line == "COMMENT" || line.starts_with("COMMENT ") {
             if block.is_none() && top_rank != Some(0) {
-                return fail("ACM header COMMENT must immediately follow the version record");
+                return fail("COMMENT must follow the version record or begin a logical block; comments between blocks are not allowed");
             }
             // ADM 5.3.10.5: each user-defined parameter line may be preceded by comments.
             if block_has_content && block.is_some() && block != Some("USER") {
@@ -1349,6 +1360,15 @@ impl Acm {
             }
             for line in &attitude.att_lines {
                 check_values(&line.values)?;
+                if attitude.att_type == crate::types::AcmAttitudeType::Quaternion {
+                    crate::common::Quaternion {
+                        q1: line.values[0],
+                        q2: line.values[1],
+                        q3: line.values[2],
+                        qc: line.values[3],
+                    }
+                    .validate_kvn_rounding()?;
+                }
             }
         }
         if let Some(physical) = &data.phys {
@@ -1422,6 +1442,13 @@ impl Acm {
             }
             if let Some(value) = &maneuver.target_attitude {
                 check_values(&value.values)?;
+                crate::common::Quaternion {
+                    q1: value.values[0],
+                    q2: value.values[1],
+                    q3: value.values[2],
+                    qc: value.values[3],
+                }
+                .validate_kvn_rounding()?;
             }
             if let Some(value) = &maneuver.target_spinrate {
                 check_number(value.value)?;

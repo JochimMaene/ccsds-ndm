@@ -75,6 +75,19 @@ fn expect_kind<T: FromMessage>(
     if actual == T::KIND {
         return Ok(());
     }
+    if T::KIND == ccsds_ndm::validation::MessageKind::Ndm
+        && matches!(
+            notation.or_else(|| ccsds_ndm::detect::detect_notation(data).ok()),
+            Some(Notation::Kvn)
+        )
+    {
+        let error = ccsds_error_to_pyerr(ccsds_ndm::error::CcsdsNdmError::UnsupportedNotation {
+            message_type: "NDM",
+            requested: ccsds_ndm::error::DiagnosticNotation::Kvn,
+        });
+        error.value(py).setattr("operation", "parse")?;
+        return Err(error);
+    }
     let found = format!("expected {}, found {}", T::KIND.as_str(), actual.as_str());
     let error = crate::errors::NdmUnsupportedMessageError::new_err(match origin {
         Some(path) => format!("{}: {found}", path.display()),

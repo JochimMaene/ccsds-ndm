@@ -499,7 +499,9 @@ impl<'a> KvnWriter<'a> {
         line.truncate(line.trim_end().len().max(value_start));
         let padding = line[value_start..].len() - line[value_start..].trim_start().len();
         line.drain(value_start..value_start + padding);
-        if crate::kvn::parser::value_is_absent(key, &line[value_start..]) {
+        if !key.starts_with("USER_DEFINED_")
+            && crate::kvn::parser::value_is_absent(key, &line[value_start..])
+        {
             let value = line[value_start..].to_owned();
             self.reject(|| crate::error::ValidationError::InvalidValue {
                 field: key.to_owned().into(),
@@ -507,6 +509,11 @@ impl<'a> KvnWriter<'a> {
                 expected: "a non-empty KVN value (omit an absent optional keyword)".into(),
                 line: None,
             });
+        }
+        if line[value_start..].contains('\t') {
+            let value = line[value_start..].replace('\t', " ");
+            line.truncate(value_start);
+            line.push_str(&value);
         }
         let invalid = !line[value_start..]
             .bytes()

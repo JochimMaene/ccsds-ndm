@@ -18,6 +18,7 @@ from ccsds_ndm import (
     TdmObservation,
     TdmSegment,
 )
+from ccsds_ndm import NdmEpochError
 
 
 class TestTdm:
@@ -87,10 +88,10 @@ class TestTdm:
         assert tdm2.header.originator == "TEST"
 
     def test_epoch_fields_reject_numeric_xsd_branch(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             TdmHeader(originator="TEST", creation_date="123.5")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             TdmObservation(epoch="123.5", keyword="RANGE", value=1.0)
 
     def test_out_of_range_rhumidity_is_rejected(self):

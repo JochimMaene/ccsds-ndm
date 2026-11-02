@@ -93,6 +93,10 @@ Use the same generic API for every recognized message family:
 
 .. code-block:: python
 
+   import ccsds_ndm
+
+   message = ccsds_ndm.from_file("input.opm")
+   kvn = message.to_str("kvn")
    xml = ccsds_ndm.convert(kvn, "xml")
    ccsds_ndm.convert_file("input.opm", "output.xml", "xml")
 
@@ -101,7 +105,7 @@ The input notation is detected automatically.
 OPM, OEM, and OMM support edition-correct ODM 2.0 and 3.0 output. The message's ``version``
 attribute selects the edition, for example ``message.version = "2.0"`` before ``to_file``. The 2.0 checks use the official `SANA NDM/XML schema
 archive <https://sanaregistry.org/r/ndmxml_unqualified/>`_. OEM 1.0 has a restricted KVN input-only compatibility reader; stored 1.0 messages cannot be
-generated. OPM, APM, AEM, and TDM 1.0 input is rejected because their older syntax and requirements
+generated. TDM 1.0 also has a restricted KVN input-only reader. OPM, APM, and AEM 1.0 input is rejected because their older syntax and requirements
 are not implemented as separate editions. See the project support matrix for the precise scope.
 
 CCSDS units

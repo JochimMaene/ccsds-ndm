@@ -256,7 +256,8 @@ pub struct Oem {
     id: Option<String>,
 
     /// The OEM edition: ``"3.0"`` or ``"2.0"`` can be set and written. A parsed ``"1.0"``
-    /// message keeps ``"1.0"`` but is read-only; setting ``"1.0"`` raises ``ValueError``.
+    /// message keeps ``"1.0"`` and cannot be written until deliberately relabelled to 2.0/3.0
+    /// and validated. Setting the version to 1.0 is refused.
     ///
     /// :type: str
     #[pyo3(get)]
@@ -608,8 +609,6 @@ impl Oem {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -621,7 +620,7 @@ impl Oem {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed(py, data, format)?;
@@ -645,8 +644,6 @@ impl Oem {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -661,7 +658,7 @@ impl Oem {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
@@ -674,7 +671,7 @@ impl Oem {
     /// path : str or os.PathLike
     ///     Destination file; existing content is replaced only after successful generation.
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Raises
     /// ------
@@ -693,8 +690,7 @@ impl Oem {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<()> {
         crate::api::generate_file(
             py,
@@ -708,7 +704,7 @@ impl Oem {
     /// Parameters
     /// ----------
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Returns
     /// -------
@@ -728,8 +724,7 @@ impl Oem {
     fn to_str(
         &self,
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<String> {
         crate::api::generate_string(py, &self.to_core(py)?, format)
     }
@@ -1002,6 +997,8 @@ impl OemMetadata {
     /// CCSDS Reference: 502.0-B-3, Section 5.2.3.
     ///
     /// :type: Optional[str]
+    ///
+    /// Enforced: inside start_time..stop_time and no later than useable_stop_time; consecutive useable spans may touch but not overlap (ODM 5.2.4.4).
     #[getter]
     fn get_useable_start_time(&self) -> Option<String> {
         self.inner
@@ -1028,6 +1025,8 @@ impl OemMetadata {
     /// CCSDS Reference: 502.0-B-3, Section 5.2.3.
     ///
     /// :type: Optional[str]
+    ///
+    /// Enforced: inside start_time..stop_time and no earlier than useable_start_time (ODM table 5-3).
     #[getter]
     fn get_useable_stop_time(&self) -> Option<String> {
         self.inner
@@ -1069,6 +1068,8 @@ impl OemMetadata {
     /// CCSDS Reference: 502.0-B-3, Section 5.2.3.
     ///
     /// :type: Optional[int]
+    ///
+    /// Enforced: positive integer, required with INTERPOLATION; known methods require the documented minimum node count (ODM 5.2.3).
     #[getter]
     fn get_interpolation_degree(&self) -> Option<u32> {
         self.inner.interpolation_degree.map(|d| d.0.get())

@@ -7,7 +7,7 @@
 [![crates.io](https://img.shields.io/crates/v/ccsds-ndm)](https://crates.io/crates/ccsds-ndm)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 
-A high-performance Rust library with Python bindings for parsing, validating, and generating [CCSDS Navigation Data Messages (NDM)](https://public.ccsds.org/Pubs/500x0g4.pdf) in both KVN (Key-Value Notation) and XML formats.
+A high-performance Rust library with Python bindings for parsing, validating, and generating [CCSDS Navigation Data Messages (NDM)](https://public.ccsds.org/Pubs/500x2g3.pdf) in both KVN (Key-Value Notation) and XML formats.
 
 ## Implemented Message Families
 
@@ -24,7 +24,7 @@ All current message families use the same
 | **OCM** | Orbit Comprehensive Message – Detailed orbit data with maneuvers |
 | **CDM** | Conjunction Data Message – Collision assessment data |
 | **TDM** | Tracking Data Message – Ground station tracking measurements |
-| **RDM** | Reentry Data Message – Reentry prediction information |
+| **RDM** | Re-entry Data Message – Re-entry prediction information |
 | **APM** | Attitude Parameter Message – Single attitude state and attitude parameters |
 | **AEM** | Attitude Ephemeris Message – Attitude state time series |
 | **ACM** | Attitude Comprehensive Message – Detailed attitude data with maneuvers and covariance |

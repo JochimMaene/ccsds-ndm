@@ -57,6 +57,77 @@ fn envelope_text_rejects_attributes_and_nested_elements() {
 }
 
 #[test]
+fn envelope_text_accepts_only_namespace_resolved_schema_hints() {
+    for element in ["MESSAGE_ID", "COMMENT"] {
+        for hint in ["schemaLocation", "noNamespaceSchemaLocation"] {
+            let location = if hint == "schemaLocation" {
+                "urn:ccsds:schema:ndmxml schema.xsd"
+            } else {
+                "schema.xsd"
+            };
+            for (declarations, attributes) in [
+                (
+                    "xmlns:hint='http://www.w3.org/2001/XMLSchema-instance'",
+                    format!("hint:{hint}='{location}'"),
+                ),
+                (
+                    "",
+                    format!("xmlns:local='http://www.w3.org/2001/XMLSchema-instance' local:{hint}='{location}'"),
+                ),
+            ] {
+                for content in [
+                    format!("<{element} {attributes}>value</{element}>"),
+                    format!("<{element} {attributes}/>"),
+                ] {
+                    let source = declared(&format!("<ndm {declarations}>{content}</ndm>"));
+                    crate::common::validate_xml("combined envelope schema hints", &source);
+                    let message = CombinedNdm::from_xml(&source).unwrap();
+                    assert_eq!(from_str(&source).unwrap(), Message::Ndm(message.clone()));
+                    assert_eq!(CombinedNdm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+                }
+            }
+        }
+        for attributes in [
+            "hint:schemaLocation='urn:ccsds:schema:ndmxml schema.xsd'",
+            "xmlns:hint='urn:foreign' hint:schemaLocation='urn:ccsds:schema:ndmxml schema.xsd'",
+            "xmlns:hint='http://www.w3.org/2001/XMLSchema-instance' hint:unknown='value'",
+            "schemaLocation='urn:ccsds:schema:ndmxml schema.xsd'",
+            "xmlns:a='http://www.w3.org/2001/XMLSchema-instance' xmlns:b='http://www.w3.org/2001/XMLSchema-instance' a:schemaLocation='urn:a a.xsd' b:schemaLocation='urn:b b.xsd'",
+        ] {
+            let source = declared(&format!("<ndm><{element} {attributes}/></ndm>"));
+            assert!(CombinedNdm::from_xml(&source).is_err(), "{source}");
+            assert!(from_str(&source).is_err(), "{source}");
+        }
+    }
+    let source = declared(
+        "<ndm><COMMENT xmlns:hint='http://www.w3.org/2001/XMLSchema-instance' hint:schemaLocation='urn:ccsds:schema:ndmxml schema.xsd'/><COMMENT hint:schemaLocation='urn:ccsds:schema:ndmxml schema.xsd'/></ndm>",
+    );
+    assert!(
+        CombinedNdm::from_xml(&source).is_err(),
+        "local declarations cannot leak to siblings"
+    );
+}
+
+#[test]
+fn combined_xml_rejects_forbidden_literal_characters_even_in_ignored_content() {
+    for character in ['\0', '\u{1}', '\u{b}', '\u{fffe}', '\u{ffff}'] {
+        for body in [
+            format!("<ndm><MESSAGE_ID>{character}</MESSAGE_ID></ndm>"),
+            format!("<ndm><COMMENT><![CDATA[{character}]]></COMMENT></ndm>"),
+            format!("<ndm><!--{character}--></ndm>"),
+            format!("<ndm><?ignored {character}?></ndm>"),
+            format!("<ndm xmlns:unused='urn:{character}'/>"),
+            format!("<ndm/><!--{character}-->"),
+        ] {
+            let source = declared(&body);
+            let error = CombinedNdm::from_xml(&source).unwrap_err().to_string();
+            assert!(error.contains("XML 1.0 characters"), "{error}");
+            assert!(from_str(&source).is_err(), "{source}");
+        }
+    }
+}
+
+#[test]
 fn combined_xml_parser_enforces_the_normative_envelope() {
     // An unused schema-instance namespace may be omitted, as on standalone roots.
     assert!(CombinedNdm::from_xml(&declared("<ndm/>")).is_ok());
@@ -466,4 +537,13 @@ fn constituents_carry_only_id_and_version_unlike_standalone_messages() {
         &CombinedNdm::from_xml(&combined).unwrap_err(),
         "attribute 'xsi:noNamespaceSchemaLocation' is not allowed on a combined NDM constituent",
     );
+}
+
+#[test]
+fn constituent_edition_check_compares_decoded_xml_attribute_values() {
+    let source = include_str!("../../data/xml/ndm_g21.xml");
+    let expected = CombinedNdm::from_xml(source).unwrap();
+    let escaped = source.replacen("version=\"3.0\"", "version=\"&#51;.0\"", 1);
+    assert!(escaped.contains("version=\"&#51;.0\""));
+    assert_eq!(CombinedNdm::from_xml(&escaped).unwrap(), expected);
 }

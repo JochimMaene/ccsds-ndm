@@ -26,6 +26,7 @@ from ccsds_ndm import (
     RelativeMetadataData,
     RelativeStateVector,
 )
+from ccsds_ndm import NdmEpochError
 
 
 class TestCdm:
@@ -259,14 +260,14 @@ class TestCdm:
             )
 
     def test_epoch_fields_reject_numeric_xsd_branch(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             CdmHeader(
                 creation_date="123.5",
                 originator="TEST",
                 message_id="ID",
             )
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             RelativeMetadataData(tca="123.5", miss_distance=100.0)
 
     def test_cdm_data_numpy_shape_validation(self):

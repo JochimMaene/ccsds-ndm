@@ -18,6 +18,7 @@ from ccsds_ndm import (
     OpmSegment,
     StateVector,
 )
+from ccsds_ndm import NdmEpochError
 
 
 class TestOpm:
@@ -101,7 +102,7 @@ class TestOpm:
         assert opm2.header.originator == "TEST"
 
     def test_epoch_fields_require_calendar_form(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             OpmMetadata(
                 object_name="SAT1",
                 object_id="2023-001A",
@@ -111,7 +112,7 @@ class TestOpm:
                 ref_frame_epoch="12345.5",
             )
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             StateVector(
                 epoch="12345.5",
                 x=7000.0,

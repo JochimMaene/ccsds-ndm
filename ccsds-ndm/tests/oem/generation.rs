@@ -81,9 +81,11 @@ fn generation_diagnostics_identify_the_message_and_field() {
     let mut invalid = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
     invalid.body.segment[0].metadata.object_name.clear();
     for error in [invalid.to_kvn().unwrap_err(), invalid.to_xml().unwrap_err()] {
-        assert_eq!(error.code(), Some("validation.invalid_value"));
+        assert_eq!(error.code(), Some("validation.missing_required_field"));
         assert!(
-            error.to_string().contains("OBJECT_NAME is empty"),
+            error
+                .to_string()
+                .contains("Missing required field: OBJECT_NAME"),
             "{error}"
         );
         assert_eq!(

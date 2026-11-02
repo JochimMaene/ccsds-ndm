@@ -247,6 +247,21 @@ fn validate_root_start(
     for attribute in start.attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         validate_attribute_value(&attribute, invalid)?;
+        if let Some(prefix) = attribute
+            .key
+            .prefix()
+            .filter(|_| attribute.key.as_namespace_binding().is_none())
+        {
+            if matches!(
+                namespaces.resolve(Some(prefix.into_inner()), false),
+                Resolved::Unknown | Resolved::Unbound
+            ) {
+                return Err(invalid(format!(
+                    "undeclared XML namespace prefix '{}'",
+                    String::from_utf8_lossy(prefix.into_inner())
+                )));
+            }
+        }
         let kind = match attribute_kind(namespaces, &attribute, &mut schema_hints_seen, invalid) {
             Ok(kind) => kind,
             Err(_) => {
@@ -264,6 +279,13 @@ fn validate_root_start(
                     .into_owned();
                 // Check the edition before any content that edition may lack is reported.
                 if let Some(kind) = crate::versioning::kind_for_xml_root(root) {
+                    if kind == crate::validation::MessageKind::Tdm && version == "1.0" {
+                        return Err(crate::error::CcsdsNdmError::UnsupportedInputVersion {
+                            message_type: "TDM",
+                            version,
+                            supported: "2.0 (XML); use KVN for TDM 1.0".into(),
+                        });
+                    }
                     crate::versioning::check_input_version(kind, &version)?;
                 }
                 *source_edition = Some(version);
@@ -278,6 +300,34 @@ fn validate_root_start(
             "unknown {type_name} root attribute '{}'",
             String::from_utf8_lossy(&attribute)
         )));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_attributes(
+    namespaces: &Namespaces,
+    start: &quick_xml::events::BytesStart<'_>,
+    element: &[u8],
+    attribute_allowed: &AttributeRule<'_>,
+    invalid: &impl Fn(String) -> CcsdsNdmError,
+) -> Result<()> {
+    let mut schema_hints_seen = [false; 2];
+    for attribute in start.attributes() {
+        let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+        validate_attribute_value(&attribute, invalid)?;
+        let unknown = match attribute_kind(namespaces, &attribute, &mut schema_hints_seen, invalid)
+        {
+            Ok(AttributeKind::Declaration | AttributeKind::SchemaLocation) => false,
+            Ok(AttributeKind::Plain(key)) => !attribute_allowed(element, key),
+            Err(_) => true,
+        };
+        if unknown {
+            return Err(invalid(format!(
+                "unknown attribute '{}' on '{}'",
+                String::from_utf8_lossy(attribute.key.as_ref()),
+                String::from_utf8_lossy(element)
+            )));
+        }
     }
     Ok(())
 }
@@ -718,34 +768,6 @@ fn validate_document(
         Ok(())
     }
 
-    fn validate_attributes(
-        namespaces: &Namespaces,
-        start: &quick_xml::events::BytesStart<'_>,
-        element: &[u8],
-        attribute_allowed: &AttributeRule<'_>,
-        invalid: &impl Fn(String) -> CcsdsNdmError,
-    ) -> Result<()> {
-        let mut schema_hints_seen = [false; 2];
-        for attribute in start.attributes() {
-            let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
-            validate_attribute_value(&attribute, invalid)?;
-            let unknown =
-                match attribute_kind(namespaces, &attribute, &mut schema_hints_seen, invalid) {
-                    Ok(AttributeKind::Declaration | AttributeKind::SchemaLocation) => false,
-                    Ok(AttributeKind::Plain(key)) => !attribute_allowed(element, key),
-                    Err(_) => true,
-                };
-            if unknown {
-                return Err(invalid(format!(
-                    "unknown attribute '{}' on '{}'",
-                    String::from_utf8_lossy(attribute.key.as_ref()),
-                    String::from_utf8_lossy(element)
-                )));
-            }
-        }
-        Ok(())
-    }
-
     if !root_seen || !root_closed {
         return Err(invalid(format!("incomplete {type_name} XML document")));
     }
@@ -799,7 +821,8 @@ pub(crate) fn from_str_with_context<T: DeserializeOwned>(s: &str, type_name: &st
             error.to_string(),
         ))));
     }
-    let document = without_namespace_attributes(s)?;
+    let values = without_unavailable_values(s)?;
+    let document = without_namespace_attributes(&values)?;
     let mut deserializer = quick_xml::de::Deserializer::from_str(&document);
     T::deserialize(&mut deserializer).map_err(|e| {
         let position = deserializer.get_ref().get_ref().buffer_position() as usize;
@@ -824,13 +847,169 @@ pub(crate) fn from_str_with_context<T: DeserializeOwned>(s: &str, type_name: &st
         // missing field. Report the end of the last content rather than the following line.
         let offset = s[..offset].trim_end_matches([' ', '\t', '\r', '\n']).len();
         let (line, column) = crate::error::line_column(s, offset);
-        crate::error::CcsdsNdmError::Format(Box::new(FormatError::XmlWithContext {
-            context: format!(
-                "Failed to parse {type_name} from XML near line {line}, column {column}"
-            ),
-            source: e,
-        }))
+        let message = e.to_string();
+        let source = if let Some(field) = message
+            .strip_prefix("missing field `")
+            .and_then(|value| value.strip_suffix('`'))
+        {
+            crate::error::ValidationError::MissingRequiredField {
+                block: type_name.to_owned().into(),
+                field: field.trim_start_matches('@').to_owned().into(),
+                line: Some(line),
+            }
+            .into()
+        } else {
+            crate::error::CcsdsNdmError::Format(Box::new(FormatError::XmlWithContext {
+                context: format!(
+                    "Failed to parse {type_name} from XML near line {line}, column {column}"
+                ),
+                source: e,
+            }))
+        };
+        match crate::versioning::kind_for_xml_root(type_name.as_bytes()) {
+            Some(kind) => {
+                let mut context = crate::error::ParseErrorContext {
+                    notation: crate::error::DiagnosticNotation::Xml,
+                    message_kind: kind,
+                    source_edition: None,
+                    byte_offset: Some(offset),
+                    line: Some(line),
+                    column: Some(column),
+                    original_token: s.get(offset.saturating_sub(64)..offset).map(str::to_owned),
+                    expected: None,
+                };
+                let mut reader = quick_xml::Reader::from_str(s);
+                loop {
+                    match reader.read_event() {
+                        Ok(Event::Start(root)) | Ok(Event::Empty(root)) => {
+                            context.source_edition = root
+                                .attributes()
+                                .flatten()
+                                .find(|attribute| attribute.key.as_ref() == b"version")
+                                .map(|attribute| {
+                                    String::from_utf8_lossy(attribute.value.as_ref()).into_owned()
+                                });
+                            break;
+                        }
+                        Ok(Event::Eof) | Err(_) => break,
+                        _ => {}
+                    }
+                }
+
+                CcsdsNdmError::Parsing {
+                    context: Box::new(context),
+                    source: Box::new(source),
+                }
+            }
+            None => source,
+        }
     })
+}
+
+/// N/A means unavailable in both notations; retain opaque user-defined values and comments.
+pub(crate) fn without_unavailable_values(s: &str) -> Result<std::borrow::Cow<'_, str>> {
+    let content = if s.starts_with("<?xml") {
+        s.split_once("?>").map_or(s, |(_, rest)| rest)
+    } else {
+        s
+    };
+    if !s
+        .as_bytes()
+        .windows(3)
+        .any(|token| token.eq_ignore_ascii_case(b"N/A"))
+        && !s.contains("&#")
+        && !s.contains("<![CDATA[")
+        && !s.contains("<!--")
+        && !content.contains("<?")
+    {
+        return Ok(std::borrow::Cow::Borrowed(s));
+    }
+    // Recognize the decoded scalar without allocating a string for each history record.
+    fn append(matched: &mut Option<usize>, text: &str) {
+        for byte in text.bytes() {
+            let Some(index) = *matched else {
+                break;
+            };
+            if matches!(byte, b' ' | b'\t' | b'\r' | b'\n') && matches!(index, 0 | 3) {
+                continue;
+            }
+            *matched = b"N/A"
+                .get(index)
+                .filter(|expected| expected.eq_ignore_ascii_case(&byte))
+                .map(|_| index + 1);
+        }
+    }
+    let mut reader = quick_xml::Reader::from_str(s);
+    let mut stack = Vec::new();
+    let mut ranges = Vec::new();
+    loop {
+        let offset = reader.buffer_position() as usize;
+        match reader.read_event()? {
+            Event::Start(start) => {
+                if let Some((_, matched)) = stack.last_mut() {
+                    *matched = None;
+                }
+                let opaque = matches!(
+                    start.local_name().as_ref(),
+                    b"USER_DEFINED" | b"COMMENT" | b"MANEUVERABLE"
+                );
+                stack.push((offset, (!opaque).then_some(0)));
+            }
+            Event::Text(text) => {
+                if let Some((_, matched)) = stack.last_mut() {
+                    let value = text
+                        .decode()
+                        .map_err(|error| FormatError::InvalidFormat(error.to_string()))?;
+                    append(matched, &value);
+                }
+            }
+            Event::CData(text) => {
+                if let Some((_, matched)) = stack.last_mut() {
+                    let value = text
+                        .decode()
+                        .map_err(|error| FormatError::InvalidFormat(error.to_string()))?;
+                    append(matched, &value);
+                }
+            }
+            Event::GeneralRef(reference) => {
+                if let Some((_, matched)) = stack.last_mut() {
+                    match reference.resolve_char_ref()? {
+                        Some(character) => {
+                            let mut bytes = [0; 4];
+                            append(matched, character.encode_utf8(&mut bytes));
+                        }
+                        None => *matched = None,
+                    }
+                }
+            }
+            Event::End(_) => {
+                if let Some((start, Some(3))) = stack.pop() {
+                    ranges.push(start..reader.buffer_position() as usize);
+                }
+            }
+            Event::Comment(_) | Event::PI(_) => {}
+            Event::Eof => break,
+            _ => {
+                if let Some((_, matched)) = stack.last_mut() {
+                    *matched = None;
+                }
+            }
+        }
+    }
+    if ranges.is_empty() {
+        return Ok(std::borrow::Cow::Borrowed(s));
+    }
+    let mut bytes = s.as_bytes().to_vec();
+    for range in ranges {
+        for byte in &mut bytes[range] {
+            if !matches!(byte, b'\r' | b'\n') {
+                *byte = b' ';
+            }
+        }
+    }
+    Ok(std::borrow::Cow::Owned(
+        String::from_utf8(bytes).expect("ASCII replacement preserves UTF-8"),
+    ))
 }
 
 /// Remove namespace declarations and XSI schema-location hints below the root.

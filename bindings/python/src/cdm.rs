@@ -18,7 +18,7 @@ use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_py
 fn parse_epoch_str(value: &str) -> PyResult<CalendarEpoch> {
     value
         .parse()
-        .map_err(|e: EpochError| PyErr::new::<PyValueError, _>(e.to_string()))
+        .map_err(|e: EpochError| crate::errors::ccsds_error_to_pyerr(e.into()))
 }
 
 // Helper to handle unit setting
@@ -55,6 +55,10 @@ fn build_cdm_covariance_from_array(
         return Err(PyValueError::new_err(
             "Covariance matrix must be 6x6, 7x7, 8x8, or 9x9",
         ));
+    }
+
+    if (0..dim).any(|row| (0..row).any(|col| a[[row, col]] != a[[col, row]])) {
+        return Err(PyValueError::new_err("Covariance matrix must be symmetric"));
     }
 
     Ok(core_cdm::CdmCovarianceMatrix {
@@ -310,8 +314,6 @@ impl Cdm {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -323,7 +325,7 @@ impl Cdm {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed(py, data, format)?;
@@ -347,8 +349,6 @@ impl Cdm {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -363,7 +363,7 @@ impl Cdm {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
@@ -376,7 +376,7 @@ impl Cdm {
     /// path : str or os.PathLike
     ///     Destination file; existing content is replaced only after successful generation.
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Raises
     /// ------
@@ -395,8 +395,7 @@ impl Cdm {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<()> {
         crate::api::generate_file(
             py,
@@ -410,7 +409,7 @@ impl Cdm {
     /// Parameters
     /// ----------
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Returns
     /// -------
@@ -430,8 +429,7 @@ impl Cdm {
     fn to_str(
         &self,
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<String> {
         crate::api::generate_string(py, &self.to_core(py)?, format)
     }
@@ -1832,14 +1830,13 @@ impl CdmMetadata {
         })
     }
     #[setter]
-    fn set_object_type(&mut self, v: Option<ObjectDescription>) {
-        self.inner.object_type = v.map(|d| match d {
-            ObjectDescription::Payload => core_types::ObjectDescription::Payload,
-            ObjectDescription::RocketBody => core_types::ObjectDescription::RocketBody,
-            ObjectDescription::Debris => core_types::ObjectDescription::Debris,
-            ObjectDescription::Unknown => core_types::ObjectDescription::Unknown,
-            ObjectDescription::Other => core_types::ObjectDescription::Other,
-        });
+    fn set_object_type(
+        &mut self,
+        #[gen_stub(override_type(type_repr = "ObjectDescription | builtins.str | None", imports = ("builtins")))]
+        value: Option<Bound<'_, PyAny>>,
+    ) -> PyResult<()> {
+        self.inner.object_type = value.as_ref().map(parse_object_description).transpose()?;
+        Ok(())
     }
 
     /// Method used to calculate the covariance during the OD that produced the state vector, or
@@ -2010,7 +2007,7 @@ impl CdmMetadata {
 /// state_vector : CdmStateVector
 ///     Object position and velocity at TCA.
 /// covariance_matrix : CdmCovarianceMatrix, optional
-///     Object covariance at TCA. Required (CDM 3.5.2): validation and generation reject
+///     Object covariance at TCA. Required (CDM 5.2.8): validation and generation reject
 ///     ``None``; it may be omitted only while a message is being built incrementally.
 /// od_parameters : OdParameters, optional
 ///     Orbit-determination spans, counts, and residual statistics.
@@ -2110,6 +2107,9 @@ impl CdmData {
         }
     }
 
+    /// Build CDM state and optional covariance arrays. State columns are X, Y, Z (km),
+    /// X_DOT, Y_DOT, Z_DOT (km/s); covariance uses the fixed CDM units and must be symmetric.
+    /// CCSDS Reference: 508.0-B-1, Sections 3.4–3.5.
     #[staticmethod]
     #[pyo3(signature = (
         state_vector,
@@ -2144,7 +2144,7 @@ impl CdmData {
         ))
     }
 
-    /// Covariance Matrix (CDM 3.5.2). Required: validation and generation reject ``None``;
+    /// Covariance Matrix (CDM 5.2.8). Required: validation and generation reject ``None``;
     /// ``None`` is allowed only while a message is being built incrementally.
     ///
     /// :type: Optional[CdmCovarianceMatrix]
@@ -2217,7 +2217,7 @@ impl CdmData {
     /// Covariance matrix as a NumPy array (convenience method).
     ///
     /// Returns:
-    ///     numpy.ndarray: 9x9 covariance matrix.
+    ///     numpy.ndarray: symmetric 6x6, 7x7, 8x8 or 9x9 covariance matrix.
     ///
     /// :type: numpy.ndarray
     #[getter]
@@ -2325,6 +2325,8 @@ impl CdmStateVector {
         }
     }
 
+    /// Build from shape (6,) or (1, 6): X, Y, Z in km, then X_DOT, Y_DOT, Z_DOT in km/s.
+    /// CCSDS Reference: 508.0-B-1, Section 3.4.
     #[staticmethod]
     fn from_numpy(
         #[gen_stub(override_type(type_repr = "numpy.typing.ArrayLike", imports = ("numpy.typing")))]
@@ -2489,18 +2491,16 @@ impl CdmStateVector {
     }
 }
 
-/// Covariance Matrix at TCA.
-///
-/// Provides uncertainty information for the state vector.
-/// Can be converted to a NumPy array using `to_numpy()`.
-
 // -----------------------------------------------------------------------------------------
 // Enums
 // -----------------------------------------------------------------------------------------
 
+/// CDM object identifiers, OBJECT1 and OBJECT2.
+///
+/// CCSDS Reference: 508.0-B-1, Sections 3.3–3.4.
 #[gen_stub_pyclass_enum]
 #[pyclass(module = "ccsds_ndm", from_py_object, eq, eq_int)]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum CdmObjectType {
     Object1,
     Object2,
@@ -2516,7 +2516,7 @@ impl CdmObjectType {
         }
     }
     fn __repr__(&self) -> String {
-        format!("CdmObjectType.{}", self.__str__())
+        format!("CdmObjectType.{self:?}")
     }
 }
 
@@ -2536,9 +2536,12 @@ fn parse_cdm_object_type(ob: &Bound<'_, PyAny>) -> PyResult<CdmObjectType> {
     }
 }
 
+/// CDM screening-volume reference frames.
+///
+/// CCSDS Reference: 508.0-B-1, Sections 3.3–3.4.
 #[gen_stub_pyclass_enum]
 #[pyclass(module = "ccsds_ndm", from_py_object, eq, eq_int)]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum ScreenVolumeFrameType {
     Rtn,
     Tvn,
@@ -2554,7 +2557,7 @@ impl ScreenVolumeFrameType {
         }
     }
     fn __repr__(&self) -> String {
-        format!("ScreenVolumeFrameType.{}", self.__str__())
+        format!("ScreenVolumeFrameType.{self:?}")
     }
 }
 
@@ -2574,9 +2577,12 @@ fn parse_screen_volume_frame_type(ob: &Bound<'_, PyAny>) -> PyResult<ScreenVolum
     }
 }
 
+/// CDM screening-volume shapes.
+///
+/// CCSDS Reference: 508.0-B-1, Sections 3.3–3.4.
 #[gen_stub_pyclass_enum]
 #[pyclass(module = "ccsds_ndm", from_py_object, eq, eq_int)]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum ScreenVolumeShapeType {
     Ellipsoid,
     Box,
@@ -2592,7 +2598,7 @@ impl ScreenVolumeShapeType {
         }
     }
     fn __repr__(&self) -> String {
-        format!("ScreenVolumeShapeType.{}", self.__str__())
+        format!("ScreenVolumeShapeType.{self:?}")
     }
 }
 
@@ -2612,9 +2618,12 @@ fn parse_screen_volume_shape_type(ob: &Bound<'_, PyAny>) -> PyResult<ScreenVolum
     }
 }
 
+/// CDM state reference frames.
+///
+/// CCSDS Reference: 508.0-B-1, Sections 3.3–3.4.
 #[gen_stub_pyclass_enum]
 #[pyclass(module = "ccsds_ndm", from_py_object, eq, eq_int)]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum ReferenceFrameType {
     Eme2000,
     Gcrf,
@@ -2632,7 +2641,7 @@ impl ReferenceFrameType {
         }
     }
     fn __repr__(&self) -> String {
-        format!("ReferenceFrameType.{}", self.__str__())
+        format!("ReferenceFrameType.{self:?}")
     }
 }
 
@@ -2653,9 +2662,12 @@ fn parse_reference_frame_type(ob: &Bound<'_, PyAny>) -> PyResult<ReferenceFrameT
     }
 }
 
+/// CDM covariance calculation provenance.
+///
+/// CCSDS Reference: 508.0-B-1, Sections 3.3–3.4.
 #[gen_stub_pyclass_enum]
 #[pyclass(module = "ccsds_ndm", from_py_object, eq, eq_int)]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum CovarianceMethodType {
     Calculated,
     Default,
@@ -2671,7 +2683,7 @@ impl CovarianceMethodType {
         }
     }
     fn __repr__(&self) -> String {
-        format!("CovarianceMethodType.{}", self.__str__())
+        format!("CovarianceMethodType.{self:?}")
     }
 }
 
@@ -2691,9 +2703,12 @@ fn parse_covariance_method_type(ob: &Bound<'_, PyAny>) -> PyResult<CovarianceMet
     }
 }
 
+/// CDM maneuverability including N/A.
+///
+/// CCSDS Reference: 508.0-B-1, Sections 3.3–3.4.
 #[gen_stub_pyclass_enum]
 #[pyclass(module = "ccsds_ndm", from_py_object, eq, eq_int)]
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum ManeuverableType {
     Yes,
     No,
@@ -2711,7 +2726,7 @@ impl ManeuverableType {
         }
     }
     fn __repr__(&self) -> String {
-        format!("ManeuverableType.{}", self.__str__())
+        format!("ManeuverableType.{self:?}")
     }
 }
 
@@ -2944,7 +2959,7 @@ impl AdditionalParameters {
 
 /// Covariance Matrix.
 ///
-/// The optional rows 7 (CDRG_*), 8 (CSRP_*) and 9 (CTHR_*) follow CDM 3.5.2: a row that is
+/// The optional rows 7 (CDRG_*), 8 (CSRP_*) and 9 (CTHR_*) follow CDM 5.2.8: a row that is
 /// given must be complete, and every preceding optional row must be given too.
 ///
 /// Parameters
@@ -3201,6 +3216,11 @@ impl CdmCovarianceMatrix {
         }
     }
 
+    /// Build a symmetric 6x6, 7x7, 8x8 or 9x9 covariance in R, T, N, Rdot, Tdot, Ndot,
+    /// Drag, SRP, Thrust order. Position covariance uses m², position/velocity m²/s,
+    /// velocity covariance m²/s²; extended rows use the documented per-field units.
+    /// Input is not rescaled to the km and km/s used by CDM state vectors.
+    /// CCSDS Reference: 508.0-B-1, Section 5.2.8.
     #[staticmethod]
     #[pyo3(signature = (array, comment=None))]
     fn from_numpy(

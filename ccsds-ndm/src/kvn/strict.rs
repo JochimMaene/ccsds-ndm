@@ -79,7 +79,13 @@ pub(crate) fn validate_odm_assignments(kvn: &str, rules: &OdmAssignmentRules) ->
                 rules,
                 line_number,
                 line_offset,
-                format!("unknown {} keyword", rules.message_name),
+                if key.starts_with("USER_DEFINED_")
+                    && key.bytes().any(|byte| byte.is_ascii_lowercase())
+                {
+                    "USER_DEFINED keywords and suffixes must be uppercase".into()
+                } else {
+                    format!("unknown {} keyword", rules.message_name)
+                },
             )
         })?;
 

@@ -10,6 +10,17 @@ use ccsds_ndm::types::{
 use ccsds_ndm::{Ndm, Validate};
 
 #[test]
+fn producer_designators_follow_the_xsd_string_domain() {
+    let mut message = Rdm::from_kvn(KVN).unwrap();
+    message.body.segment.metadata.international_designator = "producer-catalog-id".into();
+    message.validate().unwrap();
+    let xml = message.to_xml().unwrap();
+    validate_xml("RDM nonstandard producer designator", &xml);
+    assert_eq!(Rdm::from_xml(&xml).unwrap(), message);
+    assert_eq!(Rdm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+}
+
+#[test]
 fn user_defined_punctuation_survives_generated_kvn() {
     use ccsds_ndm::types::{UserDefined, UserDefinedEntry, UserDefinedParameter};
     let mut message = Rdm::from_kvn(KVN).unwrap();

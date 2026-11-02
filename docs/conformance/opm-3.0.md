@@ -34,6 +34,10 @@ They are not missing self-contained behavior and are not guessed; see
 
 ## Deliberate boundaries
 
+An XML `userDefinedParameters` block with no parameters may be retained and regenerated as XML.
+KVN generation refuses that empty or comment-only block: without delimiters, KVN cannot preserve
+its presence or distinguish those comments from the previous logical block.
+
 - **Comment position across notations.** The XSD gives `opmData` and `stateVectorType` separate
   `COMMENT` positions; the KVN keyword table has one slot ahead of `EPOCH`. KVN parsing assigns
   every pre-`EPOCH` comment to `data.comment`; KVN generation writes `data.comment` then
@@ -110,9 +114,6 @@ Run `just verify` for the full quality checks plus the packaged-artifact gates.
 Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
 
-An XML `userDefinedParameters` block with no parameters may be retained and regenerated as XML.
-KVN generation refuses that empty or comment-only block: without delimiters, KVN cannot preserve
-its presence or distinguish those comments from the previous logical block.
 
 ## Empty spacecraft blocks and elapsed-time profile
 
@@ -126,3 +127,13 @@ checks OPM and OMM, including zero-byte streaming refusal.
 OPM retains the shared [OPM/OMM elapsed-time profile](../design/validation-contract.md#opm-and-omm-elapsed-time-profile):
 calendar-field-valid tokens are required even for MET/MRT. The full elapsed ordinal day
 range in ODM §3.2.3.2 is not implemented by its public `CalendarEpoch` fields.
+
+KVN reading tolerates lines longer than the book's 254-character limit where applicable;
+writing enforces that limit, so an accepted overlong record can require shortening before
+regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
+are specified in the [validation contract](../design/validation-contract.md).
+
+ODM 2.0 3.2.4.9 requires a spacecraft block with maneuvers but does not require MASS
+within that KVN block; 3.0 requires MASS. XML 2.0 separately requires all five spacecraft
+leaves by XSD. A 2.0 `MAN_DELTA_MASS` is a negativeDouble, so zero is rejected.
+`USER_DEFINED_` suffixes must use uppercase printable ASCII without blanks or `=`.

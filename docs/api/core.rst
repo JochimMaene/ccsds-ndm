@@ -39,9 +39,10 @@ Enums
 Exceptions
 ----------
 
-Parse syntax and epoch errors inherit from ``ValueError``; file errors inherit from ``OSError``.
-Validation and unsupported-message/notation errors inherit from ``NdmError``. Catching only
-``NdmError`` therefore does not catch every library exception. Unsupported input/output editions
+All library parse, epoch, validation, unsupported-operation and file exceptions inherit
+from ``NdmError``, so it catches every library exception. NumPy shape/type errors and other
+Python argument errors can still be ordinary ``ValueError`` or ``TypeError``.
+File errors expose ``errno``, ``filename`` and ``strerror`` explicitly. Unsupported input/output editions
 use ``NdmValidationError``; their ``parse.*`` or ``generation.*`` code distinguishes the operation.
 
 Diagnostic attributes

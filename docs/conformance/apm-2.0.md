@@ -18,7 +18,7 @@ The `apm` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN lexical and structural strictness | The APM marked-block scanner rejects non-ASCII/control input, malformed assignments, unknown and duplicate keywords, fixed-order violations within logical blocks, misplaced comments, unknown/nested blocks, and mismatched block ends. It accepts repeated attitude block families represented by the standard fixtures. Reading also tolerates `META_START`/`META_STOP` around the metadata, a non-standard producer spelling that ADM table 3-2 does not define; the writer never emits them (`apm::generation::apm_kvn_output_omits_metadata_delimiters_and_keeps_quaternion_rate_units`). |
+| KVN lexical and structural strictness | The APM marked-block scanner rejects non-ASCII or control input other than TAB, malformed assignments, unknown and duplicate keywords, fixed-order violations within logical blocks, misplaced comments, unknown/nested blocks, and mismatched block ends. It accepts repeated attitude block families represented by the standard fixtures. Reading also tolerates `META_START`/`META_STOP` around the metadata, a non-standard producer spelling that ADM table 3-2 does not define; the writer never emits them (`apm::generation::apm_kvn_output_omits_metadata_delimiters_and_keeps_quaternion_rate_units`). |
 | XML structure | The shared XML sequence engine is registered for the complete APM root, header, metadata, data, and six attitude logical-block families, including nested quaternion components. It rejects unknown, duplicate, and reordered children and non-schema attributes. |
 | Valid input and preservation | All three shipped KVN fixtures and the shipped XML fixture parse through the public strict API. Generated KVN and XML reparse to the same typed model. |
 | XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
@@ -53,7 +53,7 @@ remain caller-provided under the shared policy on [externally governed values](.
 
 `fixed_family_allocations` fixes strict KVN parse budgets at 136 allocations/24,000 bytes and
 preflighted streaming generation at 48 allocations/2,000 bytes for the shipped APM fixture.
-`test_apm.py` plus the shared Python options matrix cover construction, setters, both
+`test_apm.py` plus the shared Python workflow matrix cover construction, setters, both
 notations, files, and epochs. Strict binding audit, stubs/doc checks, wheel
 verification, and Rust artifact verification are the packaged gates.
 
@@ -128,3 +128,19 @@ The library follows the schema in both notations: neither triple is allowed, one
 triple is allowed, and partial or simultaneous triples fail. It does not invent nutation
 or momentum values to complete a bare spin state. The regression
 `apm::generation::spin_without_optional_triples_follows_the_schema` checks preservation and schema validity.
+
+ADM annex F implies unit quaternions. Shared validation requires components in `[-1, 1]`
+and squared norm in `[0.99, 1.01]`, an implementation tolerance accommodating rounded
+three-decimal data. Violations name `QUATERNION` and report an out-of-range error;
+no normalization is applied. KVN generation rechecks after numeric rounding.
+
+KVN reading tolerates lines longer than the book's 254-character limit where applicable;
+writing enforces that limit, so an accepted overlong record can require shortening before
+regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
+are specified in the [validation contract](../design/validation-contract.md).
+
+An APM needs at least one logical data block (3.2.4.3), although XSD permits an empty
+data container; this is an explicit book-over-XSD choice. COMMENT placement follows
+6.10.2: comments between EPOCH and a block start, or after a block stop, are rejected.
+Python QuaternionState checks component domains at construction, like Rust Quaternion::new;
+assignments are rechecked by complete-message validation. Mutable records can be temporarily incomplete.

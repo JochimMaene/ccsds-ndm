@@ -160,7 +160,7 @@ impl Aem {
     /// Parameters
     /// ----------
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Returns
     /// -------
@@ -180,8 +180,7 @@ impl Aem {
     fn to_str(
         &self,
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<String> {
         crate::api::generate_string(py, &self.to_core(py)?, format)
     }
@@ -203,8 +202,6 @@ impl Aem {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -216,7 +213,7 @@ impl Aem {
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed(py, data, format)?;
@@ -240,8 +237,6 @@ impl Aem {
     /// ------
     /// NdmFormatError
     ///     Malformed KVN/XML content.
-    /// NdmEpochError
-    ///     Invalid CCSDS epoch.
     /// NdmValidationError
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
@@ -256,7 +251,7 @@ impl Aem {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
@@ -269,7 +264,7 @@ impl Aem {
     /// path : str or os.PathLike
     ///     Destination file; existing content is replaced only after successful generation.
     /// format : str
-    ///     ``"kvn"`` or ``"xml"``.
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
     ///
     /// Raises
     /// ------
@@ -288,8 +283,7 @@ impl Aem {
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<()> {
         crate::api::generate_file(
             py,
@@ -439,7 +433,9 @@ impl AemSegment {
 /// Raises
 /// ------
 /// ValueError
-///     If an epoch, attitude type, rotation sequence or interpolation degree is invalid.
+///     If an attitude type, rotation sequence or interpolation degree is invalid.
+/// NdmEpochError
+///     If a CCSDS epoch or time tag is invalid.
 #[gen_stub_pyclass]
 #[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
@@ -997,6 +993,9 @@ impl AemData {
         self.to_core(py)?.validate().map_err(ccsds_error_to_pyerr)
     }
 
+    /// Build rows matching epochs and ATTITUDE_TYPE, in ADM table 4-4 column order and fixed units.
+    /// The array shape is (len(epochs), number of components); shape errors raise ValueError.
+    /// CCSDS Reference: 504.0-B-2, Table 4-4.
     #[staticmethod]
     #[pyo3(signature = (epochs, array, attitude_type, comment=None))]
     fn from_numpy(
@@ -1205,13 +1204,15 @@ impl AemData {
 ///
 /// Raises
 /// ------
-/// ValueError
+/// NdmEpochError
 ///     If epoch is not a CCSDS calendar epoch.
 #[gen_stub_pyclass]
 #[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct AttitudeState {
+    /// Record epoch in the metadata time system (ADM table 4-4).
     pub epoch: ccsds_ndm::types::CalendarEpoch,
+    /// Components in ATTITUDE_TYPE column order and fixed units (ADM table 4-4).
     #[pyo3(get, set)]
     pub values: Vec<f64>,
 }

@@ -95,7 +95,7 @@ pub(crate) fn message_to_py(py: Python<'_>, message: Message) -> PyResult<Py<PyA
 /// data : str
 ///     The content to parse.
 /// format : str, optional
-///     ``"kvn"`` or ``"xml"``. Detected automatically when omitted.
+///     ``"kvn"`` or ``"xml"`` (case-insensitive). Detected automatically when omitted.
 ///
 /// Returns
 /// -------
@@ -106,8 +106,6 @@ pub(crate) fn message_to_py(py: Python<'_>, message: Message) -> PyResult<Py<PyA
 /// ------
 /// NdmFormatError
 ///     If the input is malformed.
-/// NdmEpochError
-///     If a CCSDS epoch is invalid.
 /// NdmValidationError
 ///     If the message fails validation or uses an unsupported edition.
 /// NdmUnsupportedMessageError
@@ -121,7 +119,7 @@ pub(crate) fn message_to_py(py: Python<'_>, message: Message) -> PyResult<Py<PyA
 fn from_str(
     py: Python,
     data: &str,
-    #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+    #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
     format: Option<&str>,
 ) -> PyResult<Py<PyAny>> {
     let notation = format.map(api::notation).transpose()?;
@@ -146,8 +144,6 @@ fn from_str(
 ///     The file could not be read.
 /// NdmFormatError
 ///     Malformed document or invalid text encoding.
-/// NdmEpochError
-///     Invalid CCSDS epoch.
 /// NdmValidationError
 ///     Validation failed or the edition is unsupported.
 /// NdmUnsupportedMessageError
@@ -167,7 +163,7 @@ fn from_file(
     py: Python,
     #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
     path: PathBuf,
-    #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+    #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
     format: Option<&str>,
 ) -> PyResult<Py<PyAny>> {
     let notation = format.map(api::notation).transpose()?;
@@ -184,7 +180,7 @@ fn from_file(
 /// data : str
 ///     Input KVN or XML; notation is detected automatically.
 /// to_format : str
-///     ``"kvn"`` or ``"xml"``. The message's edition is preserved.
+///     ``"kvn"`` or ``"xml"`` (case-insensitive). The message's edition is preserved.
 ///
 /// Returns
 /// -------
@@ -195,8 +191,6 @@ fn from_file(
 /// ------
 /// NdmFormatError
 ///     Malformed input or content unrepresentable in the target notation.
-/// NdmEpochError
-///     Invalid epoch.
 /// NdmValidationError
 ///     Invalid message or unsupported edition.
 /// NdmUnsupportedMessageError
@@ -211,8 +205,7 @@ fn from_file(
 fn convert(
     py: Python<'_>,
     data: &str,
-    #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-    to_format: &str,
+    #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] to_format: &str,
 ) -> PyResult<String> {
     let notation = api::notation(to_format)?;
     py.detach(|| ccsds_ndm::convert(data, notation))
@@ -236,8 +229,6 @@ fn convert(
 ///     File read, write, or replacement failed; filename and filename2 name both paths.
 /// NdmFormatError
 ///     Malformed input or content unrepresentable in the target notation.
-/// NdmEpochError
-///     Invalid epoch.
 /// NdmValidationError
 ///     Invalid message or unsupported edition.
 /// NdmUnsupportedMessageError
@@ -255,8 +246,7 @@ fn convert_file(
     source_path: PathBuf,
     #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
     destination_path: PathBuf,
-    #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-    to_format: &str,
+    #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] to_format: &str,
 ) -> PyResult<()> {
     let notation = api::notation(to_format)?;
     py.detach(|| ccsds_ndm::convert_file(&source_path, &destination_path, notation))

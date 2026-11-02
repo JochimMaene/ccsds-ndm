@@ -57,7 +57,11 @@ fn minimal_xml_parses() {
 fn rejects_missing_time_system_xml() {
     let input = mutated(XML, "<TIME_SYSTEM>UTC</TIME_SYSTEM>", "");
     let error = Tdm::from_xml(&input).unwrap_err();
-    assert_eq!(error.code(), Some("parse.xml.syntax"), "{error}");
+    assert_eq!(
+        error.code(),
+        Some("validation.missing_required_field"),
+        "{error}"
+    );
 }
 
 #[test]

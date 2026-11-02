@@ -5,7 +5,7 @@
 use crate::common::OdmHeader;
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
-use crate::traits::Ndm;
+use crate::traits::{Ndm, Validate};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -85,7 +85,15 @@ impl Ndm for Ocm {
     fn from_xml(xml: &str) -> Result<Self> {
         xml::validate_sequences(xml)?;
         let ocm: Self = crate::xml::from_str_with_context(xml, "OCM")?;
-        crate::traits::Validate::validate(&ocm)?;
+        // NDM/XML 4.0.0 has no covariance TRAJ_ID; TC1 linkage applies only to KVN and generation.
+        crate::versioning::validate_root(
+            crate::validation::MessageKind::Ocm,
+            &ocm.id,
+            &ocm.version,
+        )?;
+        ocm.header.validate()?;
+        crate::traits::Validate::validate(&ocm.body.segment.metadata)?;
+        ocm.body.segment.data.validate_content()?;
         ocm.validate_xml_representability()?;
         Ok(ocm)
     }
@@ -108,9 +116,13 @@ impl crate::traits::Validate for OcmSegment {
 
 impl crate::traits::Validate for OcmData {
     fn validate(&self) -> Result<()> {
-        for traj in &self.traj {
-            traj.validate()?;
-        }
+        self.validate_content()?;
+        self.validate_linkage()
+    }
+}
+
+impl OcmData {
+    fn validate_linkage(&self) -> Result<()> {
         let multiple_trajectories = self.traj.len() > 1;
         let linked_covariances = multiple_trajectories || self.cov.len() > 1;
         if multiple_trajectories && !self.cov.is_empty() {
@@ -173,6 +185,13 @@ impl crate::traits::Validate for OcmData {
                     .into());
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn validate_content(&self) -> Result<()> {
+        for traj in &self.traj {
+            traj.validate()?;
         }
         if let Some(user) = &self.user {
             for parameter in user.parameters() {
@@ -253,10 +272,13 @@ impl OcmPhysicalDescription {
             "OEB_PARENT_FRAME_EPOCH",
             &self.oeb_parent_frame_epoch,
         )])?;
+        if let Some(epoch) = &self.oeb_parent_frame_epoch {
+            validate_ocm_history_epoch(epoch, "OEB_PARENT_FRAME_EPOCH")?;
+        }
         // ODM permits zero while the XSD requires a positive value. XML representability is
         // checked separately.
         if let Some(v) = self.drag_coeff_nom {
-            require_finite("DRAG_COEFF_NOM", v)?;
+            NonNegativeDouble::validate_value(v, "DRAG_COEFF_NOM")?;
         }
         // `areaType` and `massType` are `nonNegativeDouble`.
         for (field, value) in [
@@ -410,10 +432,6 @@ impl OcmTrajState {
                 }
                 .into());
             }
-            // Table 6-4: ORB_REVNUM_BASIS "shall be provided if ORB_REVNUM is specified".
-            if self.orb_revnum_basis.is_none() {
-                return Err(ValidationError::missing_required("TRAJ", "ORB_REVNUM_BASIS").into());
-            }
         }
         // `xsd:positiveInteger`, adopted in every notation so a valid model always converts.
         if self.interpolation_degree == Some(0) {
@@ -424,8 +442,14 @@ impl OcmTrajState {
             )
             .into());
         }
-        if let Some(epoch) = &self.traj_frame_epoch {
-            validate_ocm_history_epoch(epoch, "TRAJ_FRAME_EPOCH")?;
+        for (field, epoch) in [
+            ("TRAJ_FRAME_EPOCH", &self.traj_frame_epoch),
+            ("USEABLE_START_TIME", &self.useable_start_time),
+            ("USEABLE_STOP_TIME", &self.useable_stop_time),
+        ] {
+            if let Some(epoch) = epoch {
+                validate_ocm_history_epoch(epoch, field)?;
+            }
         }
 
         validate_ocm_history_epoch_sequence(
@@ -839,7 +863,8 @@ impl OcmManeuverParameters {
         let expected = tokens.len().saturating_sub(1);
         // Table 6-7: every element after the time tag must have a MAN_UNITS entry.
         if let Some(units) = &self.man_units {
-            let listed = parse_units_list(units).len();
+            let unit_tokens = parse_units_list(units);
+            let listed = unit_tokens.len();
             if listed != expected {
                 return Err(ValidationError::invalid_value(
                     "MAN_UNITS",
@@ -848,6 +873,46 @@ impl OcmManeuverParameters {
                 )
                 .into());
             }
+        }
+        if let Some(units) = &self.man_units {
+            for (column, unit) in tokens.iter().skip(1).zip(parse_units_list(units)) {
+                let expected = match column.to_ascii_uppercase().as_str() {
+                    "MAN_DURA" | "THR_ISP" => "s",
+                    "DELTA_MASS" | "DEPLOY_MASS" => "kg",
+                    "ACC_X" | "ACC_Y" | "ACC_Z" => "km/s**2",
+                    "DV_X" | "DV_Y" | "DV_Z" | "DEPLOY_DV_X" | "DEPLOY_DV_Y" | "DEPLOY_DV_Z" => {
+                        "km/s"
+                    }
+                    "THR_X" | "THR_Y" | "THR_Z" => "N",
+                    "ACC_MAG_SIGMA" | "DV_MAG_SIGMA" | "THR_MAG_SIGMA" | "DEPLOY_DV_SIGMA" => "%",
+                    "ACC_DIR_SIGMA" | "DV_DIR_SIGMA" | "THR_DIR_SIGMA" | "DEPLOY_DIR_SIGMA" => {
+                        "deg"
+                    }
+                    "DEPLOY_DV_CDA" => "m**2",
+                    _ => continue,
+                };
+                if unit != expected {
+                    return Err(ValidationError::invalid_value(
+                        "MAN_UNITS",
+                        unit,
+                        format!("{expected} for {column} (ODM tables 6-8/6-9)"),
+                    )
+                    .into());
+                }
+            }
+        }
+        if self.man_device_id.eq_ignore_ascii_case("DEPLOY")
+            && tokens
+                .iter()
+                .skip(1)
+                .any(|token| MAN_PROPULSIVE_COLUMNS.contains(token))
+        {
+            return Err(ValidationError::invalid_value(
+                "MAN_DEVICE_ID",
+                &self.man_device_id,
+                "DEPLOY only with deployment columns (ODM 6.2.8.9)",
+            )
+            .into());
         }
         // Built once per maneuver block rather than per line, so history parsing keeps its
         // recorded allocation budget.
@@ -1944,6 +2009,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Default: omitted means 0.0 SI seconds, including TIME_SYSTEM=SCLK (ODM 6.2.1.3).
     pub sclk_offset_at_epoch: Option<TimeOffset>,
     /// Defines the current number of clock seconds occurring during one SI second. It should be
     /// noted that this clock rate may vary with time and is the current approximate value.
@@ -1953,6 +2019,7 @@ pub struct OcmMetadata {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Default: omitted means 1.0, including TIME_SYSTEM=SCLK (ODM 6.2.1.3).
     pub sclk_sec_per_si_sec: Option<Duration>,
     /// Creation epoch of the previous message from this originator for this space object. (For
     /// format specification, see 7.5.10.) NOTE—One may provide the previous message epoch
@@ -2106,6 +2173,14 @@ fn validate_ocm_metadata(metadata: &OcmMetadata) -> Result<()> {
         ("STOP_TIME", &metadata.stop_time),
         ("NEXT_LEAP_EPOCH", &metadata.next_leap_epoch),
     ])?;
+    for (field, epoch) in [
+        ("START_TIME", &metadata.start_time),
+        ("STOP_TIME", &metadata.stop_time),
+    ] {
+        if let Some(epoch) = epoch {
+            validate_ocm_history_epoch(epoch, field)?;
+        }
+    }
     if let Some(span) = &metadata.time_span {
         DayInterval::validate_value(span.value, "TIME_SPAN")?;
     }
@@ -2154,16 +2229,6 @@ fn validate_ocm_metadata(metadata: &OcmMetadata) -> Result<()> {
     for (field, missing) in [
         ("TIME_SYSTEM", metadata.time_system.trim().is_empty()),
         ("EPOCH_TZERO", metadata.epoch_tzero.is_empty()),
-        (
-            "SCLK_OFFSET_AT_EPOCH",
-            metadata.time_system.trim().eq_ignore_ascii_case("SCLK")
-                && metadata.sclk_offset_at_epoch.is_none(),
-        ),
-        (
-            "SCLK_SEC_PER_SI_SEC",
-            metadata.time_system.trim().eq_ignore_ascii_case("SCLK")
-                && metadata.sclk_sec_per_si_sec.is_none(),
-        ),
     ] {
         if missing {
             return Err(ValidationError::missing_required("OCM Metadata", field).into());
@@ -2390,8 +2455,8 @@ pub struct OcmTrajState {
     #[builder(into)]
     pub interpolation: Option<String>,
     /// Recommended interpolation degree for ephemeris data in the immediately following set of
-    /// ephemeris lines. Must be an integer value. This keyword must be provided if the
-    /// 'INTERPOLATION' keyword is used and set to anything other than PROPAGATE.
+    /// ephemeris lines. A supplied value must be a positive integer. Omission adopts the
+    /// implicit book default (6.2.1.3) and stays absent in the model and output.
     ///
     /// **Examples**: 5, 1
     ///
@@ -2425,6 +2490,7 @@ pub struct OcmTrajState {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[builder(into)]
+    /// Default: EARTH when omitted on KVN input.
     pub center_name: String,
     /// Reference frame of the trajectory state time history. Select from the accepted set of
     /// values indicated in annex B, subsection B4.
@@ -2436,6 +2502,7 @@ pub struct OcmTrajState {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[builder(into)]
+    /// Default: ICRF3 when omitted on KVN input.
     pub traj_ref_frame: String,
     /// Epoch of the orbit data reference frame, if not intrinsic to the definition of the
     /// reference frame. Relative (seconds from EPOCH_TZERO) or absolute, as the XSD
@@ -2458,7 +2525,8 @@ pub struct OcmTrajState {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub useable_start_time: Option<CalendarEpoch>,
+    /// Accepts a relative SI-second tag or a calendar/ordinal epoch (ODM 6.2.2.3).
+    pub useable_start_time: Option<Epoch>,
     /// Stop time of USEABLE time span covered by ephemeris data immediately following this
     /// metadata block. (For format specification, see 7.5.10.) NOTES 1. This optional keyword
     /// allows the message creator to introduce fictitious (but numerically smooth) data nodes
@@ -2471,8 +2539,9 @@ pub struct OcmTrajState {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub useable_stop_time: Option<CalendarEpoch>,
-    /// The integer orbit revolution number associated with the first trajectory state in this
+    /// Accepts a relative SI-second tag or a calendar/ordinal epoch (ODM 6.2.2.3).
+    pub useable_stop_time: Option<Epoch>,
+    /// The orbit revolution number (fractional values are accepted) associated with the first trajectory state in this
     /// trajectory state time history block. NOTE—The first ascending node crossing that occurs
     /// AFTER launch or deployment is designated to be the beginning of orbit revolution number
     /// = one ('1').
@@ -2495,6 +2564,7 @@ pub struct OcmTrajState {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Default: omitted means 0; the model/output retains omission (ODM 6.2.1.3).
     pub orb_revnum_basis: Option<RevNumBasis>,
     /// Specifies the trajectory state type; selected per annex B, subsection B7.
     ///
@@ -2667,7 +2737,8 @@ pub struct OcmPhysicalDescription {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub oeb_parent_frame_epoch: Option<CalendarEpoch>,
+    /// Accepts a relative SI-second tag or a calendar/ordinal epoch (ODM 6.2.2.3).
+    pub oeb_parent_frame_epoch: Option<Epoch>,
     /// q1 = e1 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e1 = 1st
     /// component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
     /// (defined above) to the frame aligned with the OEB (defined in annex F, subsection F1).
@@ -3118,6 +3189,7 @@ pub struct OcmCovarianceMatrix {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[builder(into)]
+    /// Default: TNW_INERTIAL when omitted on KVN input.
     pub cov_ref_frame: String,
     /// Epoch of the covariance data reference frame, if not intrinsic to the definition of the
     /// reference frame. Relative (seconds from EPOCH_TZERO) or absolute, as the XSD
@@ -3172,6 +3244,7 @@ pub struct OcmCovarianceMatrix {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[builder(default)]
+    /// Default: LTM when omitted on KVN input.
     pub cov_ordering: CovOrder,
     /// A comma-delimited set of SI unit designations for each element of the covariance time
     /// history following the covariance time tag, solely for informational purposes, provided
@@ -3337,6 +3410,7 @@ pub struct OcmManeuverParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[builder(default)]
+    /// Default: CONTINUOUS when omitted.
     pub dc_type: ManDc,
     /// Start time of the duty cycle-based maneuver window that occurs on or prior to the
     /// actual maneuver execution start time. For example, this may identify the time at which
@@ -4542,8 +4616,8 @@ mod tests {
         assert!(traj.validate().is_err());
 
         traj.orb_revnum = Some(0.0);
-        let error = traj.validate().unwrap_err().to_string();
-        assert!(error.contains("ORB_REVNUM_BASIS"), "{error}");
+        traj.validate().unwrap(); // Omitted basis implicitly means zero (6.2.1.3).
+        assert!(traj.orb_revnum_basis.is_none());
         traj.orb_revnum_basis = Some(RevNumBasis::Zero);
         assert!(traj.validate().is_ok());
     }

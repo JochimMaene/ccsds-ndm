@@ -349,10 +349,10 @@ fn screen_frame_shape_validation() {
     let mut kvn = sample_cdm_kvn();
     kvn = kvn.replace("SCREEN_VOLUME_FRAME = RTN", "SCREEN_VOLUME_FRAME = BAD");
     let err = Cdm::from_kvn(&kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Enum(_)) => {} // Expected error
-        _ => panic!("unexpected error: {:?}", err),
-    }
+    assert!(
+        matches!(err.as_format_error(), Some(FormatError::Enum(_))),
+        "{err:?}"
+    );
 
     // Invalid SCREEN_VOLUME_SHAPE
     let mut kvn2 = sample_cdm_kvn();
@@ -561,10 +561,10 @@ fn metadata_invalid_object() {
     let mut kvn = sample_cdm_kvn();
     kvn = kvn.replace("OBJECT = OBJECT1", "OBJECT = OBJECT3");
     let err = Cdm::from_kvn(&kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Enum(_)) => {} // Expected error
-        _ => panic!("unexpected error: {:?}", err),
-    }
+    assert!(
+        matches!(err.as_format_error(), Some(FormatError::Enum(_))),
+        "{err:?}"
+    );
 }
 
 #[test]
@@ -575,10 +575,10 @@ fn metadata_invalid_covariance_method() {
         "COVARIANCE_METHOD = INVALID",
     );
     let err = Cdm::from_kvn(&kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Enum(_)) => {} // Expected error
-        _ => panic!("unexpected error: {:?}", err),
-    }
+    assert!(
+        matches!(err.as_format_error(), Some(FormatError::Enum(_))),
+        "{err:?}"
+    );
 }
 
 #[test]
@@ -597,10 +597,10 @@ fn metadata_invalid_maneuverable() {
     let mut kvn = sample_cdm_kvn();
     kvn = kvn.replace("MANEUVERABLE = YES", "MANEUVERABLE = MAYBE");
     let err = Cdm::from_kvn(&kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Enum(_)) => {} // Expected error
-        _ => panic!("unexpected error: {:?}", err),
-    }
+    assert!(
+        matches!(err.as_format_error(), Some(FormatError::Enum(_))),
+        "{err:?}"
+    );
 }
 
 #[test]
@@ -629,10 +629,10 @@ fn metadata_invalid_ref_frame() {
     let mut kvn = sample_cdm_kvn();
     kvn = kvn.replace("REF_FRAME = EME2000", "REF_FRAME = INVALID");
     let err = Cdm::from_kvn(&kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Enum(_)) => {} // Expected error
-        _ => panic!("unexpected error: {:?}", err),
-    }
+    assert!(
+        matches!(err.as_format_error(), Some(FormatError::Enum(_))),
+        "{err:?}"
+    );
 }
 
 #[test]
@@ -1047,7 +1047,7 @@ fn xml_required_unit_attributes_are_not_inferred() {
     let error = Cdm::from_xml(&input).expect_err("CDM XML state-vector positions require units");
     let diagnostic = error.to_string();
     assert!(
-        diagnostic.contains("missing") && diagnostic.contains("units"),
+        diagnostic.to_lowercase().contains("missing") && diagnostic.contains("units"),
         "{error}"
     );
 }
@@ -1091,4 +1091,19 @@ fn namespace_qualified_xml_reads_as_the_unqualified_message() {
     let message = Cdm::from_xml(&qualified).unwrap();
     assert_eq!(message, Cdm::from_xml(XML).unwrap());
     assert!(message.to_xml().unwrap().contains("<cdm "));
+}
+
+#[test]
+fn originator_accepts_the_books_esa_sst_example_and_optional_na_is_absent() {
+    let mut message = Cdm::from_kvn(KVN).unwrap();
+    message.header.originator = "ESA SST".into();
+    let xml = message.to_xml().unwrap();
+    assert_eq!(Cdm::from_xml(&xml).unwrap().header.originator, "ESA SST");
+    let kvn = message.to_kvn().unwrap();
+    assert_eq!(Cdm::from_kvn(&kvn).unwrap().header.originator, "ESA SST");
+    let xml = xml.replace(
+        "<ORIGINATOR>ESA SST</ORIGINATOR>",
+        "<ORIGINATOR>N/A</ORIGINATOR>",
+    );
+    assert!(Cdm::from_xml(&xml).is_err());
 }

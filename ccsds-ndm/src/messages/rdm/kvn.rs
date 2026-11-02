@@ -525,10 +525,6 @@ pub fn rdm_data(input: &mut &str) -> KvnResult<RdmData> {
         user_defined
             .entries
             .extend(loop_comments.into_iter().map(UserDefinedEntry::Comment));
-        if value_is_absent(key, input) {
-            skip_record(input);
-            continue;
-        }
         let v = kv_string.parse_next(input)?;
         user_defined
             .entries

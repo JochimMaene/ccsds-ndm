@@ -134,7 +134,9 @@ Once parsed, you can access the nested data structures.
    .. code-tab:: py
 
 
-        # Assuming 'ndm' is an Oem object
+        import ccsds_ndm
+
+        ndm = ccsds_ndm.Oem.from_file("orbit.oem")
         for segment in ndm.segments:
             meta = segment.metadata
             print(f"Object: {meta.object_name} ({meta.object_id})")

@@ -1149,3 +1149,29 @@ fn minimal_kvn_omits_optional_keplerian_elements() {
     assert!(!kvn.contains("SEMI_MAJOR_AXIS"));
     assert!(opm.validate().is_ok());
 }
+
+#[test]
+fn edition_two_maneuver_needs_spacecraft_block_but_not_mass_in_kvn() {
+    let mut message = Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).unwrap();
+    assert!(!message.body.segment.data.maneuver_parameters.is_empty());
+    message.version = "2.0".into();
+    message.header.message_id = None;
+    message.header.classification = None;
+    message
+        .body
+        .segment
+        .data
+        .spacecraft_parameters
+        .as_mut()
+        .unwrap()
+        .mass = None;
+    let kvn = message.to_kvn().unwrap();
+    Opm::from_kvn(&kvn).unwrap();
+    message.version = "3.0".into();
+    let error = message.to_kvn().unwrap_err();
+    assert!(error.to_string().contains("MASS"));
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment.data.spacecraft_parameters.mass")
+    );
+}

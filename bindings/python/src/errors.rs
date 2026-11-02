@@ -119,7 +119,7 @@ macro_rules! create_exception {
         }
     };
 }
-use pyo3::exceptions::{PyException, PyOSError, PyValueError};
+use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
 // Generic library error for failures without a more useful built-in category.
@@ -135,7 +135,7 @@ create_exception!(
 create_exception!(
     ccsds_ndm,
     NdmFormatError,
-    PyValueError,
+    NdmError,
     "Error during parsing of NDM data (KVN or XML).",
     DIAGNOSTIC_FIELDS
 );
@@ -164,7 +164,7 @@ create_exception!(
 create_exception!(
     ccsds_ndm,
     NdmEpochError,
-    PyValueError,
+    NdmError,
     "Error parsing a CCSDS epoch string.",
     DIAGNOSTIC_FIELDS
 );
@@ -173,7 +173,7 @@ create_exception!(
 create_exception!(
     ccsds_ndm,
     NdmIoError,
-    PyOSError,
+    NdmError,
     "I/O error during file operations.",
     DIAGNOSTIC_FIELDS
 );
@@ -395,7 +395,11 @@ pub fn file_error_to_pyerr(error: CcsdsNdmError, path: &std::path::Path) -> PyEr
                 path.display().to_string(),
             ));
             Python::attach(|py| {
-                let _ = exception.value(py).setattr("code", "io.error");
+                let value = exception.value(py);
+                let _ = value.setattr("code", "io.error");
+                let _ = value.setattr("errno", io.raw_os_error().unwrap_or(0));
+                let _ = value.setattr("strerror", io.to_string());
+                let _ = value.setattr("filename", path.display().to_string());
             });
             exception
         }

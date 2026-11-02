@@ -37,7 +37,7 @@ Annex A, section A2.2.3 contains 110 ACM implementation-conformance statement ro
 | 44–58 | Physical description | Complete typed scalar/vector physical model, CP frame dependency, fixed vector shape/units, schema order, and fixture preservation. Value validation covers `DRAG_COEFF` finiteness, `WET_MASS`/`DRY_MASS` as non-negative masses, and per-component finiteness of the fixed three-element `CP`. |
 | 59–68 | Covariance history | Covariance type/basis identifiers, fixed row shape/count, epochs, units, comments, and history representability. |
 | 69–82 | Maneuver history | Typed maneuver metadata and records, fixed vector/state shapes, units, comments, ordering, and representability. Value validation covers a non-negative `MAN_DURATION`, the `MAN_END_TIME`/`MAN_DURATION` exclusivity and ordered bounds, the frame requirement when `TARGET_MOMENTUM` is present, and per-component finiteness of every maneuver target choice. |
-| 83–105 | Attitude determination and sensors | Typed AD fields, Euler sequence, nested sensor blocks, declared sensor count/covariance dimensions, units, nesting, order, and duplicate rejection. |
+| 83–105 | Attitude determination and sensors | Typed AD fields, Euler sequence, nested sensor blocks, NUMBER_SENSOR_NOISE_COVARIANCE/covariance dimensions, units, nesting, order, and duplicate rejection. |
 | 106–110 | User defined | Block placement, leading comments, names/values, order, and XML/KVN preservation. |
 
 The typed validators enforce required fields and locally decidable record/cardinality,
@@ -206,3 +206,23 @@ mandatory marker and the XML element despite the table's permissive note. Exactl
 
 XML history numbers use the same finite-number check as KVN: nonzero underflow is refused,
 while representable subnormal doubles are retained (`xml_history_values_refuse_nonzero_underflow_and_keep_subnormals`).
+
+KVN reading tolerates lines longer than the book's 254-character limit where applicable;
+writing enforces that limit, so an accepted overlong record can require shortening before
+regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
+are specified in the [validation contract](../design/validation-contract.md).
+
+Relative ATT/COV history tags accept exponent doubles (5.3.4.3), using the same exact
+exponent-to-decimal expansion as OCM; no binary floating-point time conversion is involved.
+The shared 64-byte epoch-storage limit still applies. ACM also accepts ADM 1.0 numeric
+EULER_ROT_SEQ aliases through the shared rotation type despite having no 1.0 ACM edition;
+this harmless lexical alias does not enable an earlier message version. EULER_ROT_SEQ on
+non-Euler histories is retained without semantic use. Rate-only ATT_TYPEs are rejected in
+attitude histories; AD_METHOD remains open in KVN but XML has its schema enumeration.
+The acm_g7 fixture corrects the book's SENSOR_USED_ typo to SENSOR_USED.
+
+Optional Rust fields used while building mandatory ACM blocks remain Option so incomplete
+editable records can be represented and validated together. Presence is enforced by root
+validation; callers must not interpret Option as a statement that the book makes a field optional.
+Python AcmAttitudeState derives NUMBER_STATES from the first data row; an absent rate_type
+means attitude-only records. AcmCovarianceMatrix permits omitted cov_basis/cov_ref_frame.

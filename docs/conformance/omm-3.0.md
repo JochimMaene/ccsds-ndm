@@ -18,7 +18,7 @@ The `omm` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN lexical and structural strictness | The shared ODM assignment scanner rejects non-ASCII/control input, malformed assignments, unknown and duplicate keywords, fixed-order violations, and comments outside the beginning of a logical block. OMM registers only its standard-derived keyword ranks and choice/repetition transitions. Members of a keyword choice share a rank, so the scanner compares keys as well as ranks: the other alternative may follow, a repeat of the same keyword may not. |
+| KVN lexical and structural strictness | The shared ODM assignment scanner rejects non-ASCII or control input other than TAB, malformed assignments, unknown and duplicate keywords, fixed-order violations, and comments outside the beginning of a logical block. OMM registers only its standard-derived keyword ranks and choice/repetition transitions. Members of a keyword choice share a rank, so the scanner compares keys as well as ranks: the other alternative may follow, a repeat of the same keyword may not. |
 | XML structure | The OMM sequence registration rejects unknown, duplicate, and reordered children throughout the root, header, metadata, data, mean-elements, spacecraft, TLE, covariance, and user-defined structures. It rejects non-schema attributes while allowing only the fixed unit and user-defined parameter attributes at their applicable leaves. |
 | Valid input and preservation | All three shipped KVN fixtures and the shipped XML fixture parse through the public strict API. Generated KVN and XML reparse to the same typed model. |
 | XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
@@ -102,7 +102,7 @@ because its logical block permits leading comments only.
 `fixed_family_allocations` records strict KVN parse budgets of at most 128 allocations/24,000
 bytes and preflighted streaming-generation budgets of at most 48 allocations/2,000 bytes for the
 shipped OMM fixture. `test_omm.py`, `test_api_consistency.py`, and the shared Python
-options matrix exercise typed parsing, both notations, files, TLE conversion, diagnostics, and
+workflow matrix exercise typed parsing, both notations, files, TLE conversion, diagnostics, and
 limits.
 Strict binding audit, generated-stub/doc checks, the full wheel test, and the publishable Rust
 artifact check are the reproducible packaged gates.
@@ -194,3 +194,20 @@ covers both OPM and OMM, including zero-byte streaming refusal.
 
 OPM/OMM's [elapsed-time profile](../design/validation-contract.md#opm-and-omm-elapsed-time-profile)
 is narrower than ODM's complete MET/MRT duration domain.
+
+KVN reading tolerates lines longer than the book's 254-character limit where applicable;
+writing enforces that limit, so an accepted overlong record can require shortening before
+regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
+are specified in the [validation contract](../design/validation-contract.md).
+
+CelesTrak GP OMM exports such as `omm1_ct` may have empty `CREATION_DATE` and
+`ORIGINATOR`. These remain rejected under ODM 7.5.1: obtain populated provenance from
+the producer or supply known, truthful values before parsing; the library does not invent them.
+Space-Track exports such as `omm1_st.xml` wrap ODM 2.0 in `<ndm>`. The supported combined
+schema fixes ODM constituents to 3.0. Extract each OMM as standalone XML, preserving its
+namespace declarations, or obtain an ODM 3.0 export; changing the version label alone
+is not a conversion. The standalone 2.0 reader remains supported.
+
+TLE parameters are required for `SGP`, `SGP4`, and (3.0) `PPT3`/`SGP4-XP` theories.
+TLE line helpers use the stored TLE fields for `MEAN_MOTION_DOT` and
+`MEAN_MOTION_DDOT`: these are already ṅ/2 and n̈/6 (ODM 4.2.4.7 note 2), without further scaling.

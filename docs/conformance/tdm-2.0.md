@@ -57,7 +57,7 @@ spellings `km`, `s`, and `RU`. This is a TDM alias set in the sense of the share
 
 ## Packaged-surface evidence
 
-`test_tdm.py` and the shared Python options matrix cover both
+`test_tdm.py` and the shared Python workflow matrix cover both
 notations, file IO, epoch rules, generic identity, and diagnostics. Strict binding
 audit, generated stubs/doc checks, wheel verification, and Rust artifact verification are the
 packaged gates.
@@ -175,15 +175,19 @@ tokens are rejected, never truncated, on both notations and in direct epoch cons
 Other field-specific precision rules still apply where documented. See the shared
 [epoch storage policy](../design/validation-contract.md#epoch-storage-limit).
 
-The current implementation and evidence cover edition 2.0. Previous acceptance of 1.0
-merely reused the 2.0 grammar; tests changed version labels without providing actual 1.0
-wire-syntax and metadata fixtures. Agreement of several numeric domains across editions
-does not establish edition support. Input 1.0 is rejected until a complete edition-specific
-review and implementation is available.
+The primary implementation and full output evidence cover edition 2.0. A restricted
+KVN-only 1.0 input reader is also supported, with the explicit content limits below.
 
 Time-system and frame registry membership, calibration truth, and the correctness of an
 exchange-partner path are outside the message. Local participant-index existence, path/mode
 choices, observation domains, and conditional metadata remain library checks.
+
+Metadata `START_TIME`/`STOP_TIME` are checked for epoch syntax and precision, but the library
+does not compare their ordering or check that they enclose every observation. Table 3-3
+describes these bounds in UTC while observations use `TIME_SYSTEM`; observation enclosure
+can require time-scale conversion, which the library does not perform. The XSD permits
+independently optional bounds. Callers must establish coverage and window consistency;
+the per-keyword observation chronology checks do not establish those properties.
 
 Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
@@ -250,3 +254,30 @@ although their XSD positive-integer types have no upper bound. KVN integers are 
 `i32::MAX`, naming the keyword; XML keeps the full storage range. Exact phase counts remain
 strings. Schema-listed lowercase metadata forms are covered by
 `tdm::parsing::xml_accepts_schema_listed_lowercase_categories`.
+
+KVN reading tolerates lines longer than the book's 254-character limit where applicable;
+writing enforces that limit, so an accepted overlong record can require shortening before
+regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
+are specified in the [validation contract](../design/validation-contract.md).
+
+TDM 1.0 KVN is accepted through a restricted input-only reader based on the shared
+2.0 structure and the changes listed in 503.0-B-2 1.2.6.6. It rejects TRACK_ID, DATA_TYPES,
+DOPPLER_COUNT_* metadata, phase counts, DOPPLER_COUNT, MAG and RCS. XML 1.0 and
+1.0 output remain unsupported. Explicit caller relabelling to 2.0 is possible after validation;
+the reader never relabels automatically. `legacy_kvn_is_input_only_and_rejects_version_two_content`
+covers typed/generic input, refused output and later-edition content.
+
+KVN closed categories ignore case (4.3.7), and blank/underscore aliases are equivalent (4.3.8).
+DOPPLER_COUNT is emitted as plain integer digits (3.5.2.4); exact phase counts retain
+arbitrary precision, with `.5` and `5.` written as `0.5` and `5.0` (4.3.4).
+PARTICIPANT_1 is mandatory because the XSD requires it, despite the book's broader
+'at least one participant' wording. Indexed delay and ephemeris-name fields are preserved
+without requiring that participant; phase-count observations do require their participant.
+INTEGRATION_REF companion fields, REFERENCE_FRAME with AZEL, a zero turnaround denominator,
+and whether interpolation is necessary for a changing uplink are not inferred/enforced:
+inapplicable descriptors are retained rather than discarded. Whether interpolation is needed
+for a changing uplink additionally depends on the signal path and ICD. The library performs
+no turnaround-ratio calculation, so the schema's zero integer value is preserved. RANGE negative zero normalizes to numeric zero rather than
+retaining a sign bit (4.3.5); it is not a separate supported measurement value.
+Python nested TDM records are validated through Tdm.validate(); only the Rust API currently
+exposes each nested validate method separately.

@@ -863,7 +863,17 @@ impl ToKvn for TdmData {
         writer.write_comments(&self.comment);
         for obs in &self.observations {
             if let Some(value) = obs.data.phase_count() {
-                writer.write_tdm_observation(obs.data.key(), &obs.epoch, value);
+                let mut value = value.to_owned();
+                if value.ends_with('.') {
+                    value.push('0');
+                }
+                let sign = usize::from(value.starts_with(['+', '-']));
+                if value[sign..].starts_with('.') {
+                    value.insert(sign, '0');
+                }
+                writer.write_tdm_observation(obs.data.key(), &obs.epoch, &value);
+            } else if let TdmObservationData::DopplerCount(value) = obs.data {
+                writer.write_tdm_observation(obs.data.key(), &obs.epoch, format!("{value:.0}"));
             } else {
                 writer.write_tdm_numeric_observation(
                     obs.data.key(),

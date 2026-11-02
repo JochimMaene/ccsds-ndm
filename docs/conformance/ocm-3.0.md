@@ -39,7 +39,7 @@ inventory is reconciled as follows; the counts are statement rows, not public ca
 | ICS group | Rows | Reconciled implementation evidence |
 | --- | ---: | --- |
 | Header | 7 | Version, creation date, originator, message ID, and leading comments are covered by the common ODM header model and strict root/header sequence checks. |
-| Metadata | 51 | Required identity/time fields, SCLK dependencies, units, ordering, duplicates, and comments are covered by typed metadata validation plus KVN/XML structural checks. |
+| Metadata | 51 | Required identity/time fields, SCLK defaults and supplied-value domains, units, ordering, duplicates, and comments are covered by typed metadata validation plus KVN/XML structural checks. |
 | Trajectory | 23 | Block metadata, composition/units cardinality, time tags, epoch ordering, fixed record shape, and representability are covered by the trajectory model and history tests. `validate_ocm_line_values` additionally rejects non-finite numbers in every `trajLine`, naming the failing line and column. |
 | Physical | 54 | The complete optional scalar/vector XML/KVN model is registered; required-field, unit, order, duplicate, and notation-preservation behavior is exercised by the fixture corpus. `OcmPhysicalDescription::validate` covers the block's own editable values: `DRAG_COEFF_NOM`, the eleven areas, three masses, two percentages, `REFLECTANCE`, the three attitude angles, and the remaining plain doubles for finiteness. |
 | Covariance | 18 | Block metadata, ordering, epoch sequence, composition/units, fixed record shape, and representability are covered by covariance validation and history tests, and `validate_ocm_line_values` rejects non-finite numbers in every `covLine`. |
@@ -48,10 +48,9 @@ inventory is reconciled as follows; the counts are statement rows, not public ca
 | Orbit determination | 33 | The complete nested block is retained with typed required/optional values, legal units, schema order, and fixture round trips. All notations enforce positive-integer count facets; `OcmOdParameters::validate` covers `GDOP` and `WEIGHTED_RMS` (including NaN and both infinities), the OD spans, the eigenvalue lengths, `OD_CONFIDENCE`, and `SEDR`. |
 | User defined | 5 | Marked-block placement, comment placement, parameter names/values, and XML/KVN preservation are covered. |
 
-These OCM values are deliberately **not** validated, each for a recorded reason rather than by
-omission:
+The following OCM validation limits and schema exceptions are deliberate:
 
-- `DRAG_COEFF_NOM` accepts zero because ODM says it disables atmospheric drag, while the XSD's
+- `DRAG_COEFF_NOM` must be finite and nonnegative. It accepts zero because ODM says it disables atmospheric drag, while the XSD's
   `positiveDouble` excludes it. KVN preserves zero; XML input and generation require a positive value.
 - `DAYS_SINCE_FIRST_OBS`, `DAYS_SINCE_LAST_OBS`, `DC_PA_START_ANGLE`, and `DC_PA_STOP_ANGLE` are
   validated for finiteness only, because ODM's domain is wider than the 3.0 schema's. The
@@ -67,7 +66,8 @@ omission:
   rather than dropped during generation; embedded whitespace cannot split one value into several
   columns. Every declared-numeric column must hold a finite number. `ACC_INTERP`,
   `THR_INTERP`, and `DEPLOY_ID` are the only non-numeric columns in ODM tables 6-8 and 6-9. No
-  per-column domain is imposed, matching Orekit's `ManeuverFieldType`. The XSD types the line as a
+  additional per-column domain is imposed beyond the `ON`/`OFF` interpolation flags and
+  nonpositive `DEPLOY_MASS` required by tables 6-8 and 6-9. The XSD types the line as a
   `xsd:string`, so the schema oracle cannot establish this rule and a direct test does.
 
   KVN generation preserves legal numeric spellings in those rows, but rounds numeric mantissas
@@ -125,7 +125,7 @@ therefore come from the book, rather than an XSD assertion.
 
 Table 6-3 contains a SCLK anchor ambiguity: the `TIME_SYSTEM` row calls `EPOCH_TZERO`
 the spacecraft clock epoch, while the `EPOCH_TZERO` row explicitly places it in UTC.
-The library preserves that supplied anchor, requires the two SCLK clock parameters,
+The library preserves that supplied anchor, uses the implicit SCLK defaults 0.0 and 1.0 when clock parameters are omitted,
 and performs no clock conversion. Subtracting numeric relative tags does not interpret
 the anchor and follows section 6.2.2.3's explicit SI-second definition.
 
@@ -229,7 +229,7 @@ pre-corrigendum inventory, not the number of current keywords.
 | Change | Implementation and decision | Evidence |
 | --- | --- | --- |
 | Contact metadata | Ten new optional free-text fields are retained: `OPERATOR_URL`, `OPERATOR_EMAIL`, `OPERATOR_PHONE`, `OPERATOR_AUTOMATED_URL`, `EMERGENCY_EMAIL`, `EMERGENCY_PHONE`, `EMERGENCY_AVAILABILITY`, `SSA_EMAIL`, `SSA_PHONE`, `OWNER_URL`. `COUNTRY` already existed. No email, URL, phone, or country-registry truth is inferred or checked. | `corrigendum::contact_keywords_round_trip_and_refuse_old_xml_without_output` checks every new keyword. |
-| Covariance/trajectory linkage | Each trajectory must have a distinct nonempty `TRAJ_ID` when multiple trajectories and covariance histories coexist. Each covariance must identify its corresponding trajectory when there are multiple trajectory or covariance blocks. When trajectories are present, a supplied covariance `TRAJ_ID` must resolve to one of them; covariance-only messages may reference an external trajectory; an identifier that could refer to several trajectories is rejected. | `corrigendum::covariance_links_are_required_resolved_and_unambiguous` tests missing, unknown, duplicate, and valid links. |
+| Covariance/trajectory linkage | Each trajectory must have a distinct nonempty `TRAJ_ID` when multiple trajectories and covariance histories coexist. For KVN and generation, each covariance must identify its corresponding trajectory when there are multiple trajectory or covariance blocks; XML input skips the linkage checks because its schema has no covariance TRAJ_ID. When trajectories are present, a supplied covariance `TRAJ_ID` must resolve to one of them; covariance-only messages may reference an external trajectory; an identifier that could refer to several trajectories is rejected. | `corrigendum::covariance_links_are_required_resolved_and_unambiguous` tests missing, unknown, duplicate, and valid links. |
 | User-defined sequences | `OcmUserDefined` retains ordered `OcmUserDefinedParameter` entries. A `COMPOSITION_<ID>` parameter owns its following raw `records`, terminated by the next user-defined assignment or `USER_STOP`. Names, comma-delimited composition, rows, and entry order survive KVN regeneration. Records cannot contain newlines, actual user-defined assignment delimiters, `USER_STOP`, or nonprintable characters; other ICD-defined punctuation and marker-like text is preserved. Leading/trailing whitespace and blank separator lines are normalized. | `corrigendum::sequences_preserve_rows_and_parameter_order_and_refuse_xml` and `sequences_reject_missing_id_rows_and_composition_columns`. |
 | ICD boundary | The accompanying ICD defines column interpretation, time/event/sample ordering, and what each value means. Records stay opaque rather than guessing an epoch or numeric format. The library validates the message envelope and preserves producer row order; it does not claim to establish monotonicity under an absent ICD. | The typed model exposes rows without numerical reinterpretation. |
 | Covariance dimensions | `TCARTPV` includes uncertain event time and has dimension seven; `CARTPV` has dimension six. The corrigendum clarifies their meaning without changing the token or representation. | `corrigendum::covariance_dimensions_orderings_and_positive_definiteness` establishes both dimensions. |
@@ -247,7 +247,7 @@ schema; this is a published-edition conflict, not a reason to weaken semantic va
 
 `bindings/python/tests/test_ocm.py`, `test_api_consistency.py`, and
 `test_parse_and_generation_options.py` exercise the Python class, typed nested setters, generic
-dispatch, strict parsing/generation options, and shared limits. The repository-wide
+dispatch, validated generation, and the fixed XML nesting limit. The repository-wide
 `package-python` and `package-rust` gates verify the built artifacts; they are release gates shared
 by all family cells.
 
@@ -310,12 +310,12 @@ enumerations. `OBJECT_TYPE` preserves open SANA tokens, canonicalizing known val
 `COV_ORDERING`, or a usable `MAN_COMPOSITION`.
 
 `TRAJ_FRAME_EPOCH`, `COV_FRAME_EPOCH`, and `MAN_FRAME_EPOCH` permit relative or calendar
-forms; `OEB_PARENT_FRAME_EPOCH` and `USEABLE_*` remain calendar-only. Maneuver metadata epochs
+forms, as do `OEB_PARENT_FRAME_EPOCH` and `USEABLE_*` (6.2.2.3). Maneuver metadata epochs
 can independently use either form; data-line tags follow `MAN_COMPOSITION`.
 
-`ORB_REVNUM` requires `ORB_REVNUM_BASIS` (table 6-4). An OD block requires PERT (table 6-1),
+An omitted `ORB_REVNUM_BASIS` implicitly means 0 (6.2.1.3 and table 6-4). An OD block requires PERT (table 6-1),
 and `OD_ID`/`OD_METHOD` cannot be blank. `MAN_UNITS`, when present, has one entry for each
-composition element after the time tag. `DEPLOY_MASS` must be nonpositive and `THR_INTERP` /
+composition element after the time tag, using its mandatory units in tables 6-8/6-9. `DEPLOY_MASS` must be nonpositive and `THR_INTERP` /
 `ACC_INTERP` must be `ON` or `OFF`. `OEB_QC` is nonnegative except the book's tumbling sentinel
 `-999`; partial OEB quaternions remain accepted. `OCM_DATA_ELEMENTS` remains descriptive text
 without enforcing an exact block inventory, preserving real producer messages.
@@ -333,3 +333,37 @@ and TC1 user-composition examples are illustrative: unsupported or inconsistent 
 are not silently repaired. `KEPLERIANMEANSGP-4` is provisional in the SANA registry; the library
 preserves the token without certifying the external model. The TC1 document is linked above
 because the bundled base ODM text predates it.
+
+KVN reading tolerates lines longer than the book's 254-character limit where applicable;
+writing enforces that limit, so an accepted overlong record can require shortening before
+regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
+are specified in the [validation contract](../design/validation-contract.md).
+
+TC1 does not specify insertion positions for OWNER_URL and covariance TRAJ_ID, so KVN
+accepts either position around the related original fields while rejecting duplicates.
+Canonical output writes OWNER_URL before OWNER and covariance TRAJ_ID before COV_ID.
+USER_DEFINED_COMPOSITION permits trailing-comma continuation, as in TC1's example.
+The archived [TC1 source](../ccsds-books/odm-tc1.rst) makes these additions checkable.
+`schema_valid_xml_covariances_do_not_require_tc1_linkage` independently validates repeated
+covariance XML with xmllint and verifies it parses; generation still needs explicit linkage.
+
+Omitted CENTER_NAME and TRAJ_REF_FRAME use the KVN defaults EARTH and ICRF3;
+COV_REF_FRAME defaults to TNW_INERTIAL, COV_ORDERING is LTM,
+and DC_TYPE is CONTINUOUS. Omitted ORB_REVNUM_BASIS and SCLK parameters stay absent in
+the model/output, like INTERPOLATION_DEGREE; interpretation uses 0, 0.0 and 1.0.
+Fractional ORB_REVNUM values are accepted following its XSD double and the basis row's
+fractional-count wording, despite the main row saying integer. MAN_ID is mandatory per
+XSD despite the book's O status. Known OBJECT_TYPE values, including payload, are written
+canonically (PAYLOAD); open SANA tokens remain unchanged. DEPLOY devices require deployment
+columns. DC_REF_DIR is three space-separated numbers (7.6.1); commas are not separators.
+USER_DEFINED COMPOSITION_ names are reserved by TC1 for sequence descriptions.
+
+A covariance reference is resolved within the message when trajectories are present, to detect
+mistyped references and ambiguous linkage. Covariance-only messages may name external
+trajectories. This is a local consistency interpretation of TC1, not an external catalog lookup.
+
+An XML model with several covariance histories can parse without TC1 linkage but then fail
+notation-neutral validate() or generation. Supplying linkage permits KVN output; the current
+XML writer still refuses covariance TRAJ_ID rather than silently dropping it. XML input
+tolerance is therefore not a promise of an XML-to-XML round trip for these TC1-inexpressible
+models. The repeated-covariance regression checks these output refusals explicitly.

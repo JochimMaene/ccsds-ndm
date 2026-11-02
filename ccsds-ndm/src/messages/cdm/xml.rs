@@ -51,7 +51,7 @@ pub(super) fn normalize_missing_values(xml: &str) -> Result<Cow<'_, str>> {
                     for attribute in element.attributes().flatten() {
                         if attribute.key.as_ref() == b"nil" {
                             return Err(FormatError::InvalidFormat(format!(
-                                "{} is required and cannot be nil",
+                                "{} is required; the nil attribute is not supported, including nil=false",
                                 String::from_utf8_lossy(name)
                             ))
                             .into());

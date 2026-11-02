@@ -38,7 +38,7 @@ mission truth, interpolation algorithms, or an arbitrary external ICD.
 | OEM | [OEM 3.0 and 2.0; legacy input limits](oem-3.0.md) |
 | OCM | [OCM 3.0](ocm-3.0.md) |
 | CDM | [CDM 1.0](cdm-1.0.md) |
-| TDM | [TDM 2.0](tdm-2.0.md) |
+| TDM | [TDM 2.0; restricted 1.0 KVN input](tdm-2.0.md) |
 | RDM | [RDM 1.0](rdm-1.0.md) |
 | APM | [APM 2.0](apm-2.0.md) |
 | AEM | [AEM 2.0](aem-2.0.md) |

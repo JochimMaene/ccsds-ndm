@@ -206,7 +206,10 @@ fn nil_and_empty_required_values_name_the_problem() {
     let mut nil = original.clone();
     nil.replace_range(start..end, "<X units=\"km\" nil=\"true\"/>");
     let error = Cdm::from_xml(&nil).unwrap_err().to_string();
-    assert!(error.contains("X is required and cannot be nil"), "{error}");
+    assert!(
+        error.contains("X is required; the nil attribute is not supported"),
+        "{error}"
+    );
 
     let empty = mutated(
         &original,
@@ -217,8 +220,17 @@ fn nil_and_empty_required_values_name_the_problem() {
         "<ORIGINATOR/>",
     );
     let error = Cdm::from_xml(&empty).unwrap_err();
-    assert_eq!(error.code(), Some("validation.invalid_value"), "{error}");
-    assert!(error.to_string().contains("ORIGINATOR is empty"), "{error}");
+    assert_eq!(
+        error.code(),
+        Some("validation.missing_required_field"),
+        "{error}"
+    );
+    assert!(
+        error
+            .to_string()
+            .contains("Missing required field: ORIGINATOR"),
+        "{error}"
+    );
 }
 
 #[test]

@@ -16,7 +16,7 @@ behavior governed by an external algorithm, registry, or ICD.
 | OEM | 2.0, 3.0 | Parse, write, convert | Parse, write, convert | [Ephemerides](conformance/oem-3.0.md) |
 | OCM | 3.0 | Parse, write, convert | Parse, write, convert within the bundled schema | [Comprehensive orbit data](conformance/ocm-3.0.md) |
 | CDM | 1.0 | Parse, write, convert | Parse, write, convert | [Conjunction data](conformance/cdm-1.0.md) |
-| TDM | 2.0 | Parse, write, convert | Parse, write, convert | [Tracking data](conformance/tdm-2.0.md) |
+| TDM | 2.0; restricted 1.0 input | 2.0 parse/write/convert; 1.0 input only | 2.0 parse/write/convert | [Tracking data](conformance/tdm-2.0.md) |
 | RDM | 1.0 | Parse, write, convert | Parse, write, convert | [Reentry data](conformance/rdm-1.0.md) |
 | APM | 2.0 | Parse, write, convert | Parse, write, convert | [Attitude parameters](conformance/apm-2.0.md) |
 | AEM | 2.0 | Parse, write, convert | Parse, write, convert | [Attitude ephemerides](conformance/aem-2.0.md) |
@@ -47,7 +47,7 @@ segment spans, and rejects later-edition fields. Valid 1.0 Julian Date epochs re
 There is no OEM 1.0 XML representation, and generation/conversion of a stored 1.0 message is
 rejected. See [the complete compatibility limits](conformance/oem-3.0.md#oem-10).
 
-OPM, APM, AEM, and TDM 1.0 input is not supported: their older requirements or syntax have not
+OPM, APM, and AEM 1.0 input is not supported: their older requirements or syntax have not
 been implemented and verified as separate editions. ACM was introduced in ADM issue 2; the
 library accepts its defined 2.0 representation. A version label on a newer-format example is not
 evidence of an older format's support. Unsupported versions fail explicitly with
@@ -82,3 +82,10 @@ Run `just verify` for the quality suite and installed-artifact checks. The
 [conformance index](conformance/README.md) maps shared checks to the family records; resource tests
 and benchmarks measure implementation behavior without turning timing observations into
 standards requirements.
+
+TDM 1.0 has a restricted KVN input-only reader. It retains the 1.0 version and rejects
+2.0-only observation families and metadata listed in the [TDM record](conformance/tdm-2.0.md).
+It does not support TDM 1.0 XML or generation; relabelling is an explicit caller action.
+
+PRM (CCSDS 509.0) is outside the supported families. The files in data/prm are research
+inputs, not a claim of parser or generator support.

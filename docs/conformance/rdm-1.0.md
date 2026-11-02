@@ -40,7 +40,7 @@ logical ranges:
 | 1-6 | Mandatory header and message ID | `Rdm`, `RdmHeader`, strict required/root tests |
 | 7-20 | Object identity, controlled-reentry, center, time and reference epoch metadata | `RdmMetadata`, enums, required-field and epoch tests |
 | 21-41 | Optional orbit, propagator, uncertainty, previous/next-message metadata | complete optional metadata roundtrip and strict sequence evidence |
-| 42-52 | Mandatory atmospheric-reentry block and optional windows/confidence | `AtmosphericReentryParameters`, whose validator covers `ORBIT_LIFETIME` and its optional start/end window, with window/order and numeric tests |
+| 42-52 | Mandatory atmospheric-reentry block and optional windows/confidence | `AtmosphericReentryParameters`, whose validator checks positive numeric lifetime values and lifetime-window ordering; absolute epoch-window limits are stated below |
 | 53-84 | Ground-impact probabilities, location, and three confidence regions | `GroundImpactParameters`, whose validator covers the probabilities and every latitude/longitude bound, the nominal-impact frame/longitude/latitude co-requirement, all-or-none population and consecutive numbering per confidence interval, and strictly increasing `IMPACT_*_CONFIDENCE` |
 | 85-93 | Optional state vector | `StateVector`, completeness/reference-frame tests |
 | 94-117 | Optional 6x6 covariance | `OpmCovarianceMatrix`, state dependency and complete 21-element roundtrips |
@@ -90,8 +90,13 @@ Other accepted deviations, each read losslessly and written in canonical form:
 - a missing optional unit in KVN or XML (KVN output displays the fixed unit, see above);
 - mixed-case free text (`OBJECT_NAME`, frames, registry-sourced names), preserved as written;
 - `_` for a blank in multi-word enumeration values (`ROCKET_BODY`), per RDM 5.3.3.4;
-- `INTERNATIONAL_DESIGNATOR` values that do not follow the `YYYY-NNNP{PP}` format: the format is
-  a recommendation for registry-derived values, and `UNKNOWN` is permitted, so it is not enforced;
+- `INTERNATIONAL_DESIGNATOR` values that do not follow the `YYYY-NNNP{PP}` format: table 3-2
+  mandates that layout and provides `UNKNOWN` for objects without a designator. The library
+  deliberately follows the XSD's `xsd:string` domain instead, accepting any nonempty value
+  without rewriting producer identifiers. This is a compatibility departure from mandatory
+  book prose, not a claim that the book's layout is optional. The regression
+  `generation::producer_designators_follow_the_xsd_string_domain` checks both notation
+  round trips and schema-valid XML;
 - an `IMPACT_REF_FRAME` naming any body-fixed frame; frames are SANA-registry values and are not
   checked against the center.
 
@@ -110,7 +115,7 @@ Unit spellings follow the book tables (`m**2`, `kg/m**2`, `m/s**2`, `km**2/s`).
 
 `fixed_family_allocations` fixes strict KVN parse budgets at 96 allocations/12,000 bytes and
 preflighted streaming generation at 40 allocations/2,000 bytes. `test_rdm.py` and the shared Python
-options matrix cover both notations, files, epochs, generic identity, diagnostics, and limits.
+workflow matrix cover both notations, files, epochs, generic identity, diagnostics, and the fixed XML nesting limit.
 Strict binding audit, generated stubs/doc checks, wheel verification, and Rust artifact
 verification are the packaged gates.
 
@@ -142,14 +147,26 @@ re-entry and gives no zero or negative value a meaning. Following the shared rul
 apply in every notation (see the
 [validation contract](../design/validation-contract.md#authority-and-representability)), the
 `dayIntervalTypeUR` positivity is enforced in KVN, XML, and model validation for all three
-lifetime fields, to keep that value domain compatible across notations. Errors name the keyword. Existing
-lifetime-window start/end ordering checks still apply.
+lifetime fields, to keep that value domain compatible across notations. Model-validation errors
+name the keyword. Typed XML measures can fail deserialization first with a common type name
+and structured source location instead of a model path; see the shared diagnostics contract.
+Existing lifetime-window start/end ordering checks still apply.
 `generation::orbit_lifetime_rule_is_enforced_at_every_public_boundary` and
 `generation::lifetime_window_offsets_are_positive_in_every_notation` cover the rule.
 
-Range errors from KVN or XML input name the keyword (`PROBABILITY_OF_IMPACT`, `TRACKS_USED`,
-`NOMINAL_IMPACT_LON`, `ORBIT_LIFETIME_CONFIDENCE_LEVEL`, ...) rather than a Rust type; they are
-reported by model validation with the field path (`parsing::rdm_range_errors_name_the_keyword_in_both_notations`).
+Absolute reentry and impact epoch windows are checked for valid epoch syntax and precision,
+but their start/end ordering and enclosure of a nominal epoch are not checked. These are
+separate from the numeric lifetime-window checks above. The XSD represents their epochs as
+independently optional values; the caller remains responsible for establishing the window's
+physical consistency. RDM §§3.5.6–3.5.9 also contain recommendations, which are not additional
+parser rejection rules.
+
+For unwrapped scalar fields (`PROBABILITY_OF_IMPACT`, `TRACKS_USED`, `NOMINAL_IMPACT_LON`,
+`ORBIT_LIFETIME_CONFIDENCE_LEVEL`, ...), model validation names the keyword and field path
+(`parsing::rdm_range_errors_name_the_keyword_in_both_notations`). Typed XML measures such as
+WET_MASS and ORBIT_LIFETIME may instead fail deserialization with schema/type wording;
+these retain `parse.xml.syntax` and a structured location. A canonical model path is not
+always available at that boundary.
 
 ## Confidence-only locations and OD count profile
 
@@ -174,3 +191,16 @@ This deliberate interoperable profile follows the XSD rather than applying its p
 only to XML. Zero is rejected, not converted to absence. See the
 [CDM count decision](cdm-1.0.md#categorical-aliases-and-od-count-profile) and
 [integer storage limits](../design/validation-contract.md#integer-storage-limits).
+
+KVN reading tolerates lines longer than the book's 254-character limit where applicable;
+writing enforces that limit, so an accepted overlong record can require shortening before
+regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
+are specified in the [validation contract](../design/validation-contract.md).
+
+KVN reading permits omitted unit annotations, including those 5.2.4.1 says to display;
+the field's fixed unit is implied. XML still requires a units attribute wherever the XSD
+requires one. Omission on KVN input never performs unit conversion. Python model setters
+may defer scalar-domain errors to validate()/generation; constructor/setter timing is not
+a uniform eager-validation guarantee. To omit NEXT_MESSAGE_EPOCH in Python, use None;
+the string N/A is an input-document sentinel. Flattened KVN data comments merge into the
+first represented logical block, as in the shared ODM convention.

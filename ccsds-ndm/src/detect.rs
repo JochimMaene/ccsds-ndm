@@ -402,9 +402,11 @@ fn detect_xml_kind(s: &str) -> Result<NdmKind> {
             }
             Ok(Event::Text(text)) if ascii_whitespace(text.as_ref()) => continue,
             Ok(Event::Text(_)) => {
-                return Err(CcsdsNdmError::UnsupportedMessage(
-                    "Non-whitespace content before the XML root".into(),
-                ));
+                return Err(CcsdsNdmError::Format(Box::new(
+                    crate::error::FormatError::XmlDe(quick_xml::DeError::Custom(
+                        "Non-whitespace content before the XML root".into(),
+                    )),
+                )));
             }
             Ok(e) => {
                 return Err(CcsdsNdmError::UnsupportedMessage(format!(
