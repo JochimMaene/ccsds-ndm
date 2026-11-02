@@ -67,5 +67,6 @@ cache-keys = [
   { file = "Cargo.toml" },
   { file = "**/*.pyi" },
   { file = "**/*.rs" },
-  { file = "../**/*.rs" },
+  { file = "../../ccsds-ndm/src/**/*.rs" },
+  { file = "../../ccsds-ndm/Cargo.toml" },
 ]
