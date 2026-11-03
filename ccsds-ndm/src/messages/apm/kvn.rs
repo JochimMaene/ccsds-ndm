@@ -82,7 +82,9 @@ fn kv_quaternion_component(input: &mut &str, name: &'static str) -> KvnResult<f6
     let value = kv_float(input)?;
     if let Err(error) = Quaternion::validate_component(name, value) {
         input.reset(&start);
-        return Err(ErrMode::Cut(InternalParserError::from_external_error(input, error)));
+        return Err(ErrMode::Cut(InternalParserError::from_external_error(
+            input, error,
+        )));
     }
     Ok(value)
 }
