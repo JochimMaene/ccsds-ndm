@@ -1,5 +1,5 @@
 OCM Technical Corrigendum 1 (June 2026)
-=====================================
+=======================================
 
 Source: `CCSDS 502.0-B-3 Technical Corrigendum 1 <https://ccsds.org/wp-content/uploads/gravity_forms/5-448e85c647331d9cbaf66c096458bdd5/2026/10/502x0b3e2tc1_tc2603.pdf>`_.
 Extracted with ``pdftotext -layout``; page layout and publication wording are retained.

@@ -821,8 +821,7 @@ pub(crate) fn from_str_with_context<T: DeserializeOwned>(s: &str, type_name: &st
             error.to_string(),
         ))));
     }
-    let values = without_unavailable_values(s)?;
-    let document = without_namespace_attributes(&values)?;
+    let document = without_namespace_attributes(s)?;
     let mut deserializer = quick_xml::de::Deserializer::from_str(&document);
     T::deserialize(&mut deserializer).map_err(|e| {
         let position = deserializer.get_ref().get_ref().buffer_position() as usize;
@@ -904,112 +903,6 @@ pub(crate) fn from_str_with_context<T: DeserializeOwned>(s: &str, type_name: &st
             None => source,
         }
     })
-}
-
-/// N/A means unavailable in both notations; retain opaque user-defined values and comments.
-pub(crate) fn without_unavailable_values(s: &str) -> Result<std::borrow::Cow<'_, str>> {
-    let content = if s.starts_with("<?xml") {
-        s.split_once("?>").map_or(s, |(_, rest)| rest)
-    } else {
-        s
-    };
-    if !s
-        .as_bytes()
-        .windows(3)
-        .any(|token| token.eq_ignore_ascii_case(b"N/A"))
-        && !s.contains("&#")
-        && !s.contains("<![CDATA[")
-        && !s.contains("<!--")
-        && !content.contains("<?")
-    {
-        return Ok(std::borrow::Cow::Borrowed(s));
-    }
-    // Recognize the decoded scalar without allocating a string for each history record.
-    fn append(matched: &mut Option<usize>, text: &str) {
-        for byte in text.bytes() {
-            let Some(index) = *matched else {
-                break;
-            };
-            if matches!(byte, b' ' | b'\t' | b'\r' | b'\n') && matches!(index, 0 | 3) {
-                continue;
-            }
-            *matched = b"N/A"
-                .get(index)
-                .filter(|expected| expected.eq_ignore_ascii_case(&byte))
-                .map(|_| index + 1);
-        }
-    }
-    let mut reader = quick_xml::Reader::from_str(s);
-    let mut stack = Vec::new();
-    let mut ranges = Vec::new();
-    loop {
-        let offset = reader.buffer_position() as usize;
-        match reader.read_event()? {
-            Event::Start(start) => {
-                if let Some((_, matched)) = stack.last_mut() {
-                    *matched = None;
-                }
-                let opaque = matches!(
-                    start.local_name().as_ref(),
-                    b"USER_DEFINED" | b"COMMENT" | b"MANEUVERABLE"
-                );
-                stack.push((offset, (!opaque).then_some(0)));
-            }
-            Event::Text(text) => {
-                if let Some((_, matched)) = stack.last_mut() {
-                    let value = text
-                        .decode()
-                        .map_err(|error| FormatError::InvalidFormat(error.to_string()))?;
-                    append(matched, &value);
-                }
-            }
-            Event::CData(text) => {
-                if let Some((_, matched)) = stack.last_mut() {
-                    let value = text
-                        .decode()
-                        .map_err(|error| FormatError::InvalidFormat(error.to_string()))?;
-                    append(matched, &value);
-                }
-            }
-            Event::GeneralRef(reference) => {
-                if let Some((_, matched)) = stack.last_mut() {
-                    match reference.resolve_char_ref()? {
-                        Some(character) => {
-                            let mut bytes = [0; 4];
-                            append(matched, character.encode_utf8(&mut bytes));
-                        }
-                        None => *matched = None,
-                    }
-                }
-            }
-            Event::End(_) => {
-                if let Some((start, Some(3))) = stack.pop() {
-                    ranges.push(start..reader.buffer_position() as usize);
-                }
-            }
-            Event::Comment(_) | Event::PI(_) => {}
-            Event::Eof => break,
-            _ => {
-                if let Some((_, matched)) = stack.last_mut() {
-                    *matched = None;
-                }
-            }
-        }
-    }
-    if ranges.is_empty() {
-        return Ok(std::borrow::Cow::Borrowed(s));
-    }
-    let mut bytes = s.as_bytes().to_vec();
-    for range in ranges {
-        for byte in &mut bytes[range] {
-            if !matches!(byte, b'\r' | b'\n') {
-                *byte = b' ';
-            }
-        }
-    }
-    Ok(std::borrow::Cow::Owned(
-        String::from_utf8(bytes).expect("ASCII replacement preserves UTF-8"),
-    ))
 }
 
 /// Remove namespace declarations and XSI schema-location hints below the root.

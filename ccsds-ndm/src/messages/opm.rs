@@ -108,11 +108,13 @@ impl crate::traits::Validate for Opm {
                     .then_some("MASS")
             };
             if let Some(field) = field {
-                return Err(
-                    ValidationError::missing_required("Spacecraft Parameters", field)
-                        .at_field_in("body.segment.data.spacecraft_parameters")
-                        .into(),
-                );
+                let error = ValidationError::missing_required("Spacecraft Parameters", field);
+                let error = if field == "spacecraft_parameters" {
+                    error.at_path("body.segment.data.spacecraft_parameters")
+                } else {
+                    error
+                };
+                return Err(error.into());
             }
         }
         crate::versioning::validate_opm_edition(self)
@@ -321,15 +323,15 @@ impl crate::traits::Validate for OpmMetadata {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct OpmData {
     /// Comments (see 7.8 for formatting rules).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[builder(default)]
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.
     /// Flattened KVN data comments merge with the first represented logical block.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
 
     /// State vector components (position and velocity).
-    #[serde(rename = "stateVector")]
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.
+    #[serde(rename = "stateVector")]
     pub state_vector: StateVector,
 
     /// Osculating Keplerian elements.
@@ -365,8 +367,8 @@ pub struct OpmData {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
-    #[builder(default)]
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.
+    #[builder(default)]
     pub maneuver_parameters: Vec<ManeuverParameters>,
 
     /// User-defined parameters.

@@ -152,8 +152,7 @@ pub struct AcmMetadata {
     /// Outer Space Affairs designator index (reference `[2]`), which include Object name and
     /// international designator), the spacecraft operator, or a State Actor or commercial Space
     /// Situational Awareness (SSA) provider maintaining the ‘CATALOG_NAME’ space catalog. If the
-    /// object name is not known (uncorrelated object), ‘UNKNOWN’ may be used (or this keyword
-    /// omitted).
+    /// object name is not known (uncorrelated object), ‘UNKNOWN’ may be used; a nonempty OBJECT_NAME is required by the XML schema.
     ///
     /// **Examples**: SPOT, ENVISAT, IRIDIUM, INTELSAT
     ///
@@ -186,7 +185,7 @@ pub struct AcmMetadata {
     pub catalog_name: Option<String>,
     /// Free text field specification of the unique satellite identification designator for the
     /// object, as reflected in the catalog whose name is ‘CATALOG_NAME’. If the ID is not known,
-    /// ‘UNKNOWN’ may be used (with a required nonempty value).
+    /// ‘UNKNOWN’ may be used (or this optional keyword omitted).
     ///
     /// **Examples**: 22444, 18SPCS 18571, UNKNOWN
     ///
@@ -569,8 +568,8 @@ pub struct AcmAttitudeState {
     /// **Examples**: QUATERNION, EULER_ANGLES, DCM
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
-    #[builder(into)]
     /// Rate-only representations are refused in ATT histories (ADM table 5-4).
+    #[builder(into)]
     pub att_type: AcmAttitudeType,
     /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of
     /// the transformation is from left to right, where the leftmost letter (X, Y, or Z) represents
@@ -1432,9 +1431,9 @@ pub struct AcmAttitudeDetermination {
     /// **Examples**: EKF, TRIAD, BATCH
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.9.
+    /// XML permits only the schema AD_METHOD enumeration; KVN retains open text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
-    /// XML permits only the schema AD_METHOD enumeration; KVN retains open text.
     pub ad_method: Option<String>,
     /// Source of attitude estimate, whether from a ground based estimator or onboard estimator.
     ///

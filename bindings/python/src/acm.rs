@@ -425,8 +425,7 @@ impl AcmMetadata {
     /// Outer Space Affairs designator index (reference `[2]`), which include Object name and
     /// international designator), the spacecraft operator, or a State Actor or commercial Space
     /// Situational Awareness (SSA) provider maintaining the ‘CATALOG_NAME’ space catalog. If the
-    /// object name is not known (uncorrelated object), ‘UNKNOWN’ may be used (or this keyword
-    /// omitted).
+    /// object name is not known (uncorrelated object), ‘UNKNOWN’ may be used; a nonempty OBJECT_NAME is required in both KVN and XML.
     ///
     /// Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
     ///

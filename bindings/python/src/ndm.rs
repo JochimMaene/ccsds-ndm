@@ -123,17 +123,17 @@ fn py_messages_to_core(py: Python<'_>, messages: &[Py<PyAny>]) -> PyResult<Vec<M
 #[pymethods]
 impl CombinedNdm {
     #[new]
-    #[pyo3(signature = (messages, id=None, comments=vec![]))]
+    #[pyo3(signature = (messages, id=None, comments=None))]
     fn new(
         #[gen_stub(override_type(type_repr = "typing.Sequence[typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm]]", imports = ("typing")))]
         messages: Vec<Py<PyAny>>,
         id: Option<String>,
-        comments: Vec<String>,
+        comments: Option<Vec<String>>,
         py: Python,
     ) -> PyResult<Self> {
         Ok(Self {
             id,
-            comments,
+            comments: comments.unwrap_or_default(),
             messages: PyList::new(py, messages)?.unbind(),
         })
     }

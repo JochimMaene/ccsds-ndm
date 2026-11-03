@@ -254,13 +254,18 @@ fn convert_file(
             // Either side can fail, so name both, as OSError's filename and filename2.
             Some(io) => {
                 let exception = crate::errors::NdmIoError::new_err((
-                    io.raw_os_error().unwrap_or(0),
+                    io.raw_os_error(),
                     io.to_string(),
                     source_path.display().to_string(),
                     None::<i32>,
                     destination_path.display().to_string(),
                 ));
-                let _ = exception.value(py).setattr("code", "io.error");
+                let value = exception.value(py);
+                let _ = value.setattr("code", "io.error");
+                let _ = value.setattr("errno", io.raw_os_error());
+                let _ = value.setattr("strerror", io.to_string());
+                let _ = value.setattr("filename", source_path.display().to_string());
+                let _ = value.setattr("filename2", destination_path.display().to_string());
                 exception
             }
             None => ccsds_error_to_pyerr(error),

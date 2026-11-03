@@ -22,9 +22,9 @@ mod tle;
 /// Inverse Earth-radius unit for BSTAR (ODM table 4-3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum InvErUnits {
+    /// Inverse Earth radii, `1/ER`.
     #[serde(rename = "1/ER")]
     #[default]
-    /// Inverse Earth radii, `1/ER`.
     InvEr,
 }
 impl std::fmt::Display for InvErUnits {
@@ -51,9 +51,9 @@ pub type BStar = UnitValue<f64, InvErUnits>;
 /// Revolutions per day for mean motion (ODM table 4-3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum RevPerDayUnits {
+    /// Revolutions per day, `rev/day`.
     #[serde(rename = "rev/day", alias = "REV/DAY")]
     #[default]
-    /// Revolutions per day, `rev/day`.
     RevPerDay,
 }
 impl std::fmt::Display for RevPerDayUnits {
@@ -80,9 +80,9 @@ pub type MeanMotion = UnitValue<f64, RevPerDayUnits>;
 /// Revolutions per day squared for the first mean-motion derivative (ODM table 4-3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum RevPerDay2Units {
+    /// Revolutions per day squared, `rev/day**2`.
     #[serde(rename = "rev/day**2", alias = "REV/DAY**2")]
     #[default]
-    /// Revolutions per day squared, `rev/day**2`.
     RevPerDay2,
 }
 impl std::fmt::Display for RevPerDay2Units {
@@ -109,9 +109,9 @@ pub type MeanMotionDot = UnitValue<f64, RevPerDay2Units>;
 /// Revolutions per day cubed for the second mean-motion derivative (ODM table 4-3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub enum RevPerDay3Units {
+    /// Revolutions per day cubed, `rev/day**3`.
     #[serde(rename = "rev/day**3", alias = "REV/DAY**3")]
     #[default]
-    /// Revolutions per day cubed, `rev/day**3`.
     RevPerDay3,
 }
 impl std::fmt::Display for RevPerDay3Units {
@@ -400,14 +400,14 @@ impl crate::traits::Validate for OmmMetadata {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct OmmData {
     /// Comments.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[builder(default)]
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.
     /// Flattened KVN data comments merge with the first represented logical block.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Mean Keplerian Elements in the Specified Reference Frame.
-    #[serde(rename = "meanElements")]
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.
+    #[serde(rename = "meanElements")]
     pub mean_elements: MeanElements,
     /// Spacecraft Parameters.
     #[serde(
@@ -759,7 +759,8 @@ pub struct TleParameters {
     #[builder(into)]
     pub classification_type: Option<String>,
     /// NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword
-    /// is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
+    /// is required by the book for MEAN_ELEMENT_THEORY=SGP/SGP4. The library permits omission
+    /// because the XML schema makes it optional; to_tle_lines requires it.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 4.2.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]

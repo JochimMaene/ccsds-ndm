@@ -84,7 +84,9 @@ impl Ndm for Cdm {
         let xml = xml::normalize_missing_values(xml)?;
         let xml = xml.as_ref();
         xml::validate_xml_sequences(xml)?;
-        let mut cdm: Self = crate::xml::from_str_with_context(xml, "CDM")?;
+        let values = xml::without_unavailable_values(xml)?;
+        let mut cdm: Self = crate::xml::from_str_with_context(&values, "CDM")?;
+        cdm.header.originator = cdm.header.originator.trim().to_owned();
         for segment in &mut cdm.body.segments {
             segment.data.drop_empty_blocks();
         }
@@ -98,6 +100,61 @@ impl Ndm for Cdm {
 
     fn write_xml_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
         crate::generation::write_xml_to(self, output)
+    }
+}
+
+impl Cdm {
+    pub(crate) fn validate_xml_available_values(&self) -> Result<()> {
+        fn check(field: &'static str, value: Option<&str>) -> Result<()> {
+            if value.is_some_and(|value| {
+                value
+                    .trim_matches([' ', '\t', '\r', '\n'])
+                    .eq_ignore_ascii_case("N/A")
+            }) {
+                return Err(ValidationError::invalid_value(
+                    field,
+                    "N/A",
+                    "an available value; only optional fields may be omitted",
+                )
+                .into());
+            }
+            Ok(())
+        }
+        check("MESSAGE_FOR", self.header.message_for.as_deref())?;
+        check(
+            "COLLISION_PROBABILITY_METHOD",
+            self.body
+                .relative_metadata_data
+                .collision_probability_method
+                .as_deref(),
+        )?;
+        for segment in &self.body.segments {
+            let metadata = &segment.metadata;
+            for (field, value) in [
+                ("OBJECT_NAME", Some(metadata.object_name.as_str())),
+                ("EPHEMERIS_NAME", Some(metadata.ephemeris_name.as_str())),
+                (
+                    "OPERATOR_CONTACT_POSITION",
+                    metadata.operator_contact_position.as_deref(),
+                ),
+                (
+                    "OPERATOR_ORGANIZATION",
+                    metadata.operator_organization.as_deref(),
+                ),
+                ("OPERATOR_PHONE", metadata.operator_phone.as_deref()),
+                ("OPERATOR_EMAIL", metadata.operator_email.as_deref()),
+                ("ORBIT_CENTER", metadata.orbit_center.as_deref()),
+                ("GRAVITY_MODEL", metadata.gravity_model.as_deref()),
+                ("ATMOSPHERIC_MODEL", metadata.atmospheric_model.as_deref()),
+                (
+                    "N_BODY_PERTURBATIONS",
+                    metadata.n_body_perturbations.as_deref(),
+                ),
+            ] {
+                check(field, value)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -170,16 +227,18 @@ fn empty_required(field: &'static str) -> crate::error::CcsdsNdmError {
 
 // CDM 5.2.9 defines this closed lexical repertoire for five identifier fields.
 fn validate_identifier(field: &'static str, value: &str) -> Result<()> {
-    if !value.bytes().all(|byte| {
-        byte.is_ascii_alphanumeric()
-            || matches!(byte, b'_' | b'-')
-            || (field == "ORIGINATOR" && byte == b' ')
-    }) {
+    if (field == "ORIGINATOR" && value.trim() != value)
+        || !value.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric()
+                || matches!(byte, b'_' | b'-')
+                || (field == "ORIGINATOR" && byte == b' ')
+        })
+    {
         return Err(ValidationError::InvalidValue {
             field: field.into(),
             value: value.into(),
             expected: if field == "ORIGINATOR" {
-                "ASCII letters, digits, underscores, dashes or blanks"
+                "ASCII letters, digits, underscores, dashes or embedded blanks"
             } else {
                 "ASCII letters, digits, underscores or dashes"
             }
@@ -1013,9 +1072,9 @@ impl CdmStateVector {
 }
 
 /// Lower-triangular RTN covariance, optionally extended by drag, SRP, and thrust (CDM section 3.5.2).
+/// Extended rows must be complete in order through Drag/SRP/Thrust (CDM 5.2.8).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
-/// Extended rows must be complete in order through Drag/SRP/Thrust (CDM 5.2.8).
 pub struct CdmCovarianceMatrix {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

@@ -76,6 +76,17 @@ pub fn apm_metadata(input: &mut &str) -> KvnResult<(ApmMetadata, Vec<String>)> {
 // Logical Block Parsers
 //----------------------------------------------------------------------
 
+/// Parse a quaternion component, reporting a range error on its own record.
+fn kv_quaternion_component(input: &mut &str, name: &'static str) -> KvnResult<f64> {
+    let start = input.checkpoint();
+    let value = kv_float(input)?;
+    if let Err(error) = Quaternion::validate_component(name, value) {
+        input.reset(&start);
+        return Err(ErrMode::Cut(InternalParserError::from_external_error(input, error)));
+    }
+    Ok(value)
+}
+
 pub fn quaternion_state(input: &mut &str) -> KvnResult<QuaternionState> {
     expect_block_start("QUAT").parse_next(input)?;
     let mut comment = Vec::new();
@@ -93,10 +104,10 @@ pub fn quaternion_state(input: &mut &str) -> KvnResult<QuaternionState> {
     parse_block!(input, comment, {
         "REF_FRAME_A" => ref_frame_a: kv_string,
         "REF_FRAME_B" => ref_frame_b: kv_string,
-        "Q1" => q1: kv_float,
-        "Q2" => q2: kv_float,
-        "Q3" => q3: kv_float,
-        "QC" => qc: kv_float,
+        "Q1" => q1: |i: &mut &str| kv_quaternion_component(i, "Q1"),
+        "Q2" => q2: |i: &mut &str| kv_quaternion_component(i, "Q2"),
+        "Q3" => q3: |i: &mut &str| kv_quaternion_component(i, "Q3"),
+        "QC" => qc: |i: &mut &str| kv_quaternion_component(i, "QC"),
         "Q1_DOT" => q1_dot: kv_from_kvn,
         "Q2_DOT" => q2_dot: kv_from_kvn,
         "Q3_DOT" => q3_dot: kv_from_kvn,

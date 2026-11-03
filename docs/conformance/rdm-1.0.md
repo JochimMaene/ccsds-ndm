@@ -150,7 +150,9 @@ apply in every notation (see the
 lifetime fields, to keep that value domain compatible across notations. Model-validation errors
 name the keyword. Typed XML measures can fail deserialization first with a common type name
 and structured source location instead of a model path; see the shared diagnostics contract.
-Existing lifetime-window start/end ordering checks still apply.
+Numeric lifetime-window start/end ordering is an additional library consistency check:
+START is required to be no later than END, following the interval meanings in table 3-3 and §3.5.9.
+The XSD has no cross-field constraint; this is not a claim that it enforces the relationship.
 `generation::orbit_lifetime_rule_is_enforced_at_every_public_boundary` and
 `generation::lifetime_window_offsets_are_positive_in_every_notation` cover the rule.
 

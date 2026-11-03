@@ -1188,7 +1188,11 @@ impl Opm {
             value: &str,
             path: impl Into<FieldPath>,
         ) -> Result<()> {
-            if value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            if value
+                .trim_matches([' ', '\t', '\r', '\n'])
+                .bytes()
+                .all(|byte| (b' '..=b'~').contains(&byte) || byte == b'\t')
+            {
                 return Ok(());
             }
             Err(ValidationError::InvalidValue {
@@ -1209,7 +1213,7 @@ impl Opm {
         ) -> Result<()> {
             let path = path.into();
             invalid_text(field, value, path)?;
-            let line_len = key_len.max(20) + 3 + value.len();
+            let line_len = key_len.max(20) + 3 + value.trim_matches([' ', '\t', '\r', '\n']).len();
             if line_len <= 254 {
                 return Ok(());
             }

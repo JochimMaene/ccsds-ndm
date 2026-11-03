@@ -63,15 +63,10 @@ fn optional_xml_values_keep_their_schema_types_in_every_family() {
         let end = start + input[start..].find(&format!("</{element}>")).unwrap();
         let open_end = start + input[start..].find('>').unwrap() + 1;
         let invalid = format!("{}{value}{}", &input[..open_end], &input[end..]);
-        if value.eq_ignore_ascii_case("N/A") && element == "NEXT_MESSAGE_EPOCH" {
-            let parsed = from_str(&invalid).unwrap();
-            assert!(!parsed.to_xml().unwrap().contains(&format!("<{element}")));
-        } else {
-            assert!(
-                from_str(&invalid).is_err(),
-                "{fixture}: accepted {element}={value:?}"
-            );
-        }
+        assert!(
+            from_str(&invalid).is_err(),
+            "{fixture}: accepted {element}={value:?}"
+        );
     }
     for (fixture, element) in [
         ("rdm_c4.xml", "GRAVITY_MODEL"),
@@ -84,8 +79,8 @@ fn optional_xml_values_keep_their_schema_types_in_every_family() {
         let literal = format!("{}n/a{}", &input[..start], &input[end..]);
         let xml = from_str(&literal).unwrap().to_xml().unwrap();
         assert!(
-            !xml.contains(&format!("<{element}>")),
-            "{fixture}: {element} did not omit the unavailable value"
+            xml.contains(&format!("<{element}>n/a</{element}>")),
+            "{fixture}: {element} lost literal XML text"
         );
     }
 }
@@ -342,21 +337,18 @@ fn comment_text_that_looks_like_an_unavailable_assignment_is_opaque() {
 }
 
 #[test]
-fn xml_unavailable_values_use_decoded_text_including_cdata_and_character_references() {
+fn xml_na_is_literal_text_outside_cdm_and_never_a_number() {
     use ccsds_ndm::{messages::opm::Opm, Ndm};
-    let source = Opm::from_kvn(include_str!("../../data/kvn/opm_g1.kvn"))
-        .unwrap()
-        .to_xml()
-        .unwrap();
-    let start = source.find("<ORIGINATOR>").unwrap() + "<ORIGINATOR>".len();
-    let end = start + source[start..].find("</ORIGINATOR>").unwrap();
-    for value in ["N/A", "<![CDATA[N/A]]>", "N&#47;A", "N<!-- separator -->/A"] {
-        let invalid = format!("{}{value}{}", &source[..start], &source[end..]);
-        assert_eq!(
-            Opm::from_xml(&invalid).unwrap_err().code(),
-            Some("validation.missing_required_field"),
-            "{value}"
-        );
+    let mut message = Opm::from_kvn(include_str!("../../data/kvn/opm_g1.kvn")).unwrap();
+    message.header.message_id = Some("N/A".into());
+    message.body.segment.metadata.object_name = "N/A".into();
+    let source = message.to_xml().unwrap();
+    assert_eq!(Opm::from_xml(&source).unwrap(), message);
+    let start = source.find("<MASS").unwrap();
+    let end = start + source[start..].find("</MASS>").unwrap() + "</MASS>".len();
+    for leaf in ["<MASS>N/A</MASS>", "<MASS units='lb'>N/A</MASS>"] {
+        let invalid = format!("{}{}{}", &source[..start], leaf, &source[end..]);
+        assert!(Opm::from_xml(&invalid).is_err(), "{leaf}");
     }
 }
 
@@ -379,4 +371,67 @@ fn acm_and_rdm_preserve_opaque_user_defined_missing_value_spellings() {
         assert_eq!(from_str(&xml).unwrap(), message);
         assert_eq!(from_str(&message.to_kvn().unwrap()).unwrap(), message);
     }
+}
+
+#[test]
+fn xml_scalar_padding_and_tabs_normalize_before_kvn_preflights() {
+    for (fixture, field) in [
+        ("opm_g1.kvn", "OBJECT_NAME"),
+        ("omm_g7.kvn", "OBJECT_NAME"),
+        ("oem_g12.kvn", "OBJECT_NAME"),
+        ("ocm_g15.kvn", "ORIGINATOR"),
+        ("acm_g6.kvn", "OBJECT_NAME"),
+        ("tdm_e1.kvn", "PARTICIPANT_1"),
+        ("cdm_362.kvn", "OBJECT_NAME"),
+    ] {
+        let input = std::fs::read_to_string(data_dir().join("kvn").join(fixture)).unwrap();
+        let xml = from_str(&input).unwrap().to_xml().unwrap();
+        let opening = format!("<{field}>");
+        let start = xml.find(&opening).unwrap() + opening.len();
+        let end = start + xml[start..].find('<').unwrap();
+        let original = format!("{opening}{}</{field}>", &xml[start..end]);
+        let padded = xml.replace(&original, &format!("{opening} \r\nA\tB\n </{field}>"));
+        let parsed = from_str(&padded).unwrap();
+        let kvn = parsed
+            .to_kvn()
+            .unwrap_or_else(|error| panic!("{fixture}: {error}"));
+        assert!(
+            kvn.lines().any(|line| line
+                .split_once('=')
+                .is_some_and(|(key, value)| key.trim() == field && value.trim() == "A B")),
+            "{fixture}"
+        );
+        let invalid = format!("{}A\nB{}", &xml[..start], &xml[end..]);
+        if let Ok(message) = from_str(&invalid) {
+            assert!(
+                message.to_kvn().is_err(),
+                "{fixture}: embedded newline was flattened"
+            );
+        }
+    }
+}
+
+#[test]
+fn lowercase_user_defined_keywords_name_the_uppercase_rule() {
+    for fixture in ["opm_g1.kvn", "omm_g7.kvn"] {
+        let source = std::fs::read_to_string(data_dir().join("kvn").join(fixture)).unwrap();
+        let source = format!("{source}\nUSER_DEFINED_lower = value\n");
+        let error = from_str(&source).unwrap_err();
+        assert!(
+            error.to_string().contains("uppercase"),
+            "{fixture}: {error}"
+        );
+    }
+}
+
+#[test]
+fn bracketed_unit_padding_is_checked_at_public_message_boundaries() {
+    let source = std::fs::read_to_string(data_dir().join("kvn/opm_g2.kvn")).unwrap();
+    assert!(source.contains("[km]"));
+    let expected = from_str(&source).unwrap();
+    assert_eq!(
+        from_str(&source.replace("[km]", "[ km ]")).unwrap(),
+        expected
+    );
+    assert!(from_str(&source.replace("[km]", "[ lb ]")).is_err());
 }

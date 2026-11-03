@@ -143,6 +143,10 @@ systems as if they represented the same clock. Cross-system ordering and non-ove
 the caller's responsibility; no leap-second table or time-scale conversion is introduced.
 `aem::validation::cross_segment_chronology_requires_the_same_time_system` covers the distinction.
 
+`TIME_SYSTEM` and `INTERPOLATION_METHOD` are open text in every notation and API: the schema types
+them as `timeSystemType` (an unrestricted string) and `xsd:string`, and the values come from SANA
+and ADM annex lists that the library does not freeze. Unknown values are preserved, not rejected.
+
 KVN reading tolerates lines longer than the book's 254-character limit where applicable;
 writing enforces that limit, so an accepted overlong record can require shortening before
 regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules

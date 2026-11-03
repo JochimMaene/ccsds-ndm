@@ -424,3 +424,20 @@ fn apm_comments_without_metadata_delimiters_stay_in_their_section() {
     assert_eq!(segment.data.comment.len(), 3);
     assert_eq!(Apm::from_kvn(&apm.to_kvn().unwrap()).unwrap(), apm);
 }
+
+#[test]
+fn quaternion_diagnostics_name_their_record_or_field() {
+    let source = include_str!("../../data/kvn/apm_g1.kvn");
+    let line = source.lines().position(|l| l.starts_with("Q1 ")).unwrap() + 1;
+    let out_of_range = mutated_once(source, "Q1 = 0.00005", "Q1 = 2.0");
+    let error = Apm::from_kvn(&out_of_range).unwrap_err();
+    assert_eq!(error.code(), Some("validation.out_of_range"));
+    assert_eq!(error.as_validation_error().unwrap().line(), Some(line));
+
+    let bad_norm = mutated_once(source, "Q1 = 0.00005", "Q1 = 0.9");
+    let error = Apm::from_kvn(&bad_norm).unwrap_err();
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment.data.quaternion_state[0].quaternion")
+    );
+}

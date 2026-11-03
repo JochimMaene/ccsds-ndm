@@ -403,3 +403,149 @@ fn published_g17_typo_is_preserved_separately_from_the_corrected_fixture() {
         Some("[s, N, N, N, n/a, n/a, s, %]")
     );
 }
+
+#[test]
+fn tc1_keywords_allow_alternate_header_positions_but_not_duplicates() {
+    for before in ["TIME_SYSTEM", "EPOCH_TZERO", "META_STOP"] {
+        let source = BASE.replacen(
+            before,
+            &format!("OWNER_URL = https://example.org\n{before}"),
+            1,
+        );
+        Ocm::from_kvn(&source).unwrap();
+        let duplicate = source.replacen(
+            "META_STOP",
+            "OWNER_URL = https://duplicate.org\nMETA_STOP",
+            1,
+        );
+        assert!(Ocm::from_kvn(&duplicate)
+            .unwrap_err()
+            .to_string()
+            .contains("duplicate"));
+    }
+    let start = LINKED.find("COV_START").unwrap();
+    let source = format!(
+        "{}{}",
+        &LINKED[..start],
+        LINKED[start..].replacen("TRAJ_ID = G19_TRAJECTORY\n", "", 1)
+    );
+    for before in ["COV_BASIS", "COV_TYPE", "COV_UNITS"] {
+        let source = source.replacen(before, &format!("TRAJ_ID = G19_TRAJECTORY\n{before}"), 1);
+        Ocm::from_kvn(&source).unwrap();
+        let duplicate = source.replacen("COV_BASIS", "TRAJ_ID = G19_TRAJECTORY\nCOV_BASIS", 1);
+        assert!(Ocm::from_kvn(&duplicate)
+            .unwrap_err()
+            .to_string()
+            .contains("duplicate"));
+    }
+}
+
+#[test]
+fn tc1_composition_continuations_preserve_columns_and_refuse_missing_continuations() {
+    let source = format!("{BASE}\nUSER_START\nUSER_DEFINED_COMPOSITION_TEST = TIME_RELATIVE,\n VALUE\n0 1\nUSER_STOP\n");
+    let message = Ocm::from_kvn(&source).unwrap();
+    let parameter = message
+        .body
+        .segment
+        .data
+        .user
+        .as_ref()
+        .unwrap()
+        .parameters()
+        .next()
+        .unwrap();
+    assert_eq!(parameter.value, "TIME_RELATIVE, VALUE");
+    assert_eq!(Ocm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    for continuation in ["", "USER_DEFINED_OTHER = value", "USER_STOP"] {
+        assert!(Ocm::from_kvn(&source.replace(" VALUE\n", &format!("{continuation}\n"))).is_err());
+    }
+}
+
+#[test]
+fn maneuver_units_and_deploy_device_are_checked_on_input_and_generation() {
+    let source = "CCSDS_OCM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\nMETA_START\nTIME_SYSTEM = UTC\nEPOCH_TZERO = 2023-01-01T00:00:00\nMETA_STOP\nMAN_START\nMAN_ID = M1\nMAN_DEVICE_ID = THRUSTER\nMAN_REF_FRAME = GCRF\nMAN_COMPOSITION = TIME_RELATIVE, DV_X\nMAN_UNITS = km/s\n0 1\nMAN_STOP\n";
+    let message = Ocm::from_kvn(source).unwrap();
+    let xml = message.to_xml().unwrap();
+    for (key, value) in [("MAN_UNITS", "kg"), ("MAN_DEVICE_ID", "DEPLOY")] {
+        let old = if key == "MAN_UNITS" {
+            "km/s"
+        } else {
+            "THRUSTER"
+        };
+        let invalid = source.replace(&format!("{key} = {old}"), &format!("{key} = {value}"));
+        assert!(Ocm::from_kvn(&invalid)
+            .unwrap_err()
+            .to_string()
+            .contains(key));
+        let invalid = xml.replace(
+            &format!("<{key}>{old}</{key}>"),
+            &format!("<{key}>{value}</{key}>"),
+        );
+        assert!(Ocm::from_xml(&invalid)
+            .unwrap_err()
+            .to_string()
+            .contains(key));
+        let mut edited = message.clone();
+        if key == "MAN_UNITS" {
+            edited.body.segment.data.man[0].man_units = Some(value.into());
+        } else {
+            edited.body.segment.data.man[0].man_device_id = value.into();
+        }
+        crate::common::assert_rejects(&edited, key);
+    }
+    let lower = source
+        .replace("TIME_RELATIVE, DV_X", "time_relative, dv_x")
+        .replace("THRUSTER", "deploy");
+    assert!(Ocm::from_kvn(&lower)
+        .unwrap_err()
+        .to_string()
+        .contains("MAN_DEVICE_ID"));
+    let mut edited = message;
+    edited.body.segment.data.man[0].man_device_id = "deploy".into();
+    edited.body.segment.data.man[0].man_composition = "time_relative, dv_x".into();
+    crate::common::assert_rejects(&edited, "MAN_DEVICE_ID");
+}
+
+#[test]
+fn xml_scalar_composition_prefix_error_explains_tc1_reservation() {
+    use ccsds_ndm::messages::ocm::{OcmUserDefined, OcmUserDefinedEntry, OcmUserDefinedParameter};
+    let mut message = Ocm::from_kvn(BASE).unwrap();
+    message.body.segment.data.user = Some(OcmUserDefined {
+        entries: vec![OcmUserDefinedEntry::Parameter(OcmUserDefinedParameter {
+            parameter: "MODE".into(),
+            value: "AWGN".into(),
+            records: Vec::new(),
+        })],
+    });
+    let xml = message
+        .to_xml()
+        .unwrap()
+        .replace("parameter=\"MODE\"", "parameter=\"COMPOSITION_MODE\"");
+    let error = Ocm::from_xml(&xml).unwrap_err().to_string();
+    assert!(
+        error.contains("COMPOSITION_MODE") && error.contains("TC1") && error.contains("XML 4.0"),
+        "{error}"
+    );
+}
+
+#[test]
+fn owner_country_and_owner_url_accept_adjacent_metadata_orders() {
+    for entries in [
+        "OWNER = OWNER
+COUNTRY = COUNTRY
+OWNER_URL = https://example.org
+",
+        "OWNER_URL = https://example.org
+OWNER = OWNER
+COUNTRY = COUNTRY
+",
+        "OWNER = OWNER
+OWNER_URL = https://example.org
+COUNTRY = COUNTRY
+",
+    ] {
+        let source = BASE.replacen("TIME_SYSTEM", &format!("{entries}TIME_SYSTEM"), 1);
+        let message = Ocm::from_kvn(&source).unwrap();
+        assert_eq!(Ocm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    }
+}

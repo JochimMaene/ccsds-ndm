@@ -229,7 +229,7 @@ pre-corrigendum inventory, not the number of current keywords.
 | Change | Implementation and decision | Evidence |
 | --- | --- | --- |
 | Contact metadata | Ten new optional free-text fields are retained: `OPERATOR_URL`, `OPERATOR_EMAIL`, `OPERATOR_PHONE`, `OPERATOR_AUTOMATED_URL`, `EMERGENCY_EMAIL`, `EMERGENCY_PHONE`, `EMERGENCY_AVAILABILITY`, `SSA_EMAIL`, `SSA_PHONE`, `OWNER_URL`. `COUNTRY` already existed. No email, URL, phone, or country-registry truth is inferred or checked. | `corrigendum::contact_keywords_round_trip_and_refuse_old_xml_without_output` checks every new keyword. |
-| Covariance/trajectory linkage | Each trajectory must have a distinct nonempty `TRAJ_ID` when multiple trajectories and covariance histories coexist. For KVN and generation, each covariance must identify its corresponding trajectory when there are multiple trajectory or covariance blocks; XML input skips the linkage checks because its schema has no covariance TRAJ_ID. When trajectories are present, a supplied covariance `TRAJ_ID` must resolve to one of them; covariance-only messages may reference an external trajectory; an identifier that could refer to several trajectories is rejected. | `corrigendum::covariance_links_are_required_resolved_and_unambiguous` tests missing, unknown, duplicate, and valid links. |
+| Covariance/trajectory linkage | Each trajectory must have a distinct nonempty `TRAJ_ID` when multiple trajectories and covariance histories coexist. For KVN input/output and general validation, each covariance must identify its corresponding trajectory when there are multiple trajectory or covariance blocks; XML input/output skip the linkage checks because its schema has no covariance TRAJ_ID. When trajectories are present, a supplied covariance `TRAJ_ID` must resolve to one of them; covariance-only messages may reference an external trajectory; an identifier that could refer to several trajectories is rejected. | `corrigendum::covariance_links_are_required_resolved_and_unambiguous` tests missing, unknown, duplicate, and valid links. |
 | User-defined sequences | `OcmUserDefined` retains ordered `OcmUserDefinedParameter` entries. A `COMPOSITION_<ID>` parameter owns its following raw `records`, terminated by the next user-defined assignment or `USER_STOP`. Names, comma-delimited composition, rows, and entry order survive KVN regeneration. Records cannot contain newlines, actual user-defined assignment delimiters, `USER_STOP`, or nonprintable characters; other ICD-defined punctuation and marker-like text is preserved. Leading/trailing whitespace and blank separator lines are normalized. | `corrigendum::sequences_preserve_rows_and_parameter_order_and_refuse_xml` and `sequences_reject_missing_id_rows_and_composition_columns`. |
 | ICD boundary | The accompanying ICD defines column interpretation, time/event/sample ordering, and what each value means. Records stay opaque rather than guessing an epoch or numeric format. The library validates the message envelope and preserves producer row order; it does not claim to establish monotonicity under an absent ICD. | The typed model exposes rows without numerical reinterpretation. |
 | Covariance dimensions | `TCARTPV` includes uncertain event time and has dimension seven; `CARTPV` has dimension six. The corrigendum clarifies their meaning without changing the token or representation. | `corrigendum::covariance_dimensions_orderings_and_positive_definiteness` establishes both dimensions. |
@@ -240,8 +240,9 @@ linkage. Its original bytes are retained in `data/invalid/ocm_g19_pre_corrigendu
 explicitly rejected under the current semantic baseline. `data/kvn/ocm_g19.kvn` is an annotated
 adaptation adding the required IDs; it is no longer cited as an unchanged official example.
 A single trajectory and single covariance need no IDs and remain XML-representable. A message
-with multiple covariance blocks cannot satisfy both the current linkage rule and the older XML
-schema; this is a published-edition conflict, not a reason to weaken semantic validation.
+with multiple covariance blocks cannot represent TC1 covariance linkage in the older XML
+schema. XML input/output therefore apply represented-content validation; general validation
+and KVN still apply the current TC1 rule.
 
 ## Public-surface and artifact evidence
 
@@ -340,12 +341,12 @@ regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categoric
 are specified in the [validation contract](../design/validation-contract.md).
 
 TC1 does not specify insertion positions for OWNER_URL and covariance TRAJ_ID, so KVN
-accepts either position around the related original fields while rejecting duplicates.
+accepts any position within the applicable header block before history data, while rejecting duplicates.
 Canonical output writes OWNER_URL before OWNER and covariance TRAJ_ID before COV_ID.
 USER_DEFINED_COMPOSITION permits trailing-comma continuation, as in TC1's example.
 The archived [TC1 source](../ccsds-books/odm-tc1.rst) makes these additions checkable.
 `schema_valid_xml_covariances_do_not_require_tc1_linkage` independently validates repeated
-covariance XML with xmllint and verifies it parses; generation still needs explicit linkage.
+covariance XML with xmllint and verifies parsing and XML generation; KVN generation still needs explicit linkage.
 
 Omitted CENTER_NAME and TRAJ_REF_FRAME use the KVN defaults EARTH and ICRF3;
 COV_REF_FRAME defaults to TNW_INERTIAL, COV_ORDERING is LTM,
@@ -362,8 +363,8 @@ A covariance reference is resolved within the message when trajectories are pres
 mistyped references and ambiguous linkage. Covariance-only messages may name external
 trajectories. This is a local consistency interpretation of TC1, not an external catalog lookup.
 
-An XML model with several covariance histories can parse without TC1 linkage but then fail
-notation-neutral validate() or generation. Supplying linkage permits KVN output; the current
-XML writer still refuses covariance TRAJ_ID rather than silently dropping it. XML input
-tolerance is therefore not a promise of an XML-to-XML round trip for these TC1-inexpressible
-models. The repeated-covariance regression checks these output refusals explicitly.
+XML generation, including streaming and combined NDM, uses the same represented-content
+validation as XML parsing: several covariance blocks can round-trip without TC1 TRAJ_ID.
+General `validate()` and KVN input/output retain TC1 linkage checks. Supplied TC1 values
+unrepresentable in XML are still refused rather than lost. Regression:
+`schema_valid_xml_covariances_do_not_require_tc1_linkage`.

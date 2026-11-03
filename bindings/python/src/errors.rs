@@ -384,24 +384,62 @@ pub fn ccsds_error_to_pyerr(e: CcsdsNdmError) -> PyErr {
     error
 }
 
+const IO_FIELDS: &[MemberInfo] = &[
+    diagnostic_field::<Option<i32>>("errno", "Operating-system error number, when available."),
+    diagnostic_field::<Option<String>>("strerror", "I/O error description, when available."),
+    diagnostic_field::<Option<String>>(
+        "filename",
+        "File involved in the operation, when available.",
+    ),
+    diagnostic_field::<Option<String>>(
+        "filename2",
+        "Destination file for conversion, when available.",
+    ),
+];
+
+pyo3_stub_gen::inventory::submit! {
+    pyo3_stub_gen::type_info::PyMethodsInfo {
+        struct_id: std::any::TypeId::of::<NdmIoError>,
+        attrs: IO_FIELDS,
+        getters: &[], setters: &[], methods: &[],
+        file: file!(), line: line!(), column: column!(),
+    }
+}
+
 /// Map a file operation's error, giving I/O failures the `errno` and `filename` of an
 /// `OSError` so callers can tell which file failed and why.
 pub fn file_error_to_pyerr(error: CcsdsNdmError, path: &std::path::Path) -> PyErr {
     match error.as_io_error() {
         Some(io) => {
             let exception = NdmIoError::new_err((
-                io.raw_os_error().unwrap_or(0),
+                io.raw_os_error(),
                 io.to_string(),
                 path.display().to_string(),
             ));
             Python::attach(|py| {
                 let value = exception.value(py);
                 let _ = value.setattr("code", "io.error");
-                let _ = value.setattr("errno", io.raw_os_error().unwrap_or(0));
+                let _ = value.setattr("errno", io.raw_os_error());
                 let _ = value.setattr("strerror", io.to_string());
                 let _ = value.setattr("filename", path.display().to_string());
             });
-            exception
+            match error.diagnostic() {
+                Some(diagnostic) => enrich_exception(
+                    exception,
+                    "parse",
+                    Some(diagnostic.notation),
+                    Some(diagnostic.message_kind.as_str()),
+                    diagnostic.source_edition.map(str::to_owned),
+                    diagnostic.code,
+                    diagnostic.field_path,
+                    diagnostic.source_location.map(|(line, _)| line),
+                    diagnostic.source_location.map(|(_, column)| column),
+                    diagnostic.byte_offset,
+                    diagnostic.original_token.map(str::to_owned),
+                    diagnostic.expected,
+                ),
+                None => exception,
+            }
         }
         None => ccsds_error_to_pyerr(error),
     }
@@ -492,6 +530,11 @@ pub fn register_exceptions(m: &Bound<'_, PyModule>) -> PyResult<()> {
         for field in DIAGNOSTIC_FIELDS {
             exception.setattr(field.name, m.py().None())?;
         }
+    }
+    for field in IO_FIELDS {
+        m.py()
+            .get_type::<NdmIoError>()
+            .setattr(field.name, m.py().None())?;
     }
     m.add("NdmError", m.py().get_type::<NdmError>())?;
     m.add("NdmFormatError", m.py().get_type::<NdmFormatError>())?;

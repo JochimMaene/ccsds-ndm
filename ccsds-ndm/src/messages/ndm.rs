@@ -373,8 +373,15 @@ impl CombinedNdm {
         &self,
         format: crate::generation::OutputFormat,
     ) -> Result<()> {
-        crate::traits::Validate::validate(self)?;
         for message in &self.messages {
+            if matches!(message, Message::Ndm(_)) {
+                return Err(crate::error::ValidationError::invalid_value(
+                    "ndm",
+                    "nested combined NDM",
+                    "a constituent standalone message",
+                )
+                .into());
+            }
             message.validate_for_generation(format)?;
             validate_combined_constituent_edition(message)?;
         }

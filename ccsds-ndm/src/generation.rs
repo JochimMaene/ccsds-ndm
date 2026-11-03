@@ -61,19 +61,6 @@ pub(crate) fn validate_output_version(
     Ok(())
 }
 
-pub(crate) fn validate_for_generation(
-    kind: MessageKind,
-    version: &str,
-    format: OutputFormat,
-    value: &impl Validate,
-) -> Result<()> {
-    (|| {
-        validate_output_version(kind, version, format)?;
-        value.validate()
-    })()
-    .map_err(|error| generation_error(error, kind, format, version))
-}
-
 pub(crate) fn to_kvn_string<T: GenerationMetadata + ToKvn>(message: &T) -> Result<String> {
     (|| {
         validate_output_version(T::KIND, message.version(), OutputFormat::Kvn)?;
@@ -89,7 +76,7 @@ pub(crate) fn to_kvn_string<T: GenerationMetadata + ToKvn>(message: &T) -> Resul
 pub(crate) fn to_xml_string<T: GenerationMetadata>(message: &T) -> Result<String> {
     (|| {
         validate_output_version(T::KIND, message.version(), OutputFormat::Xml)?;
-        message.validate()?;
+        message.validate_xml_semantics()?;
         message.validate_xml_model()?;
         // Buffered output checks XML characters during serialization, before returning bytes.
         crate::xml::to_string(message)
@@ -103,6 +90,11 @@ pub(crate) trait GenerationMetadata: Ndm {
 
     /// Return the edition stored on the message.
     fn version(&self) -> &str;
+
+    /// Validate semantics represented by XML; defaults to the complete model contract.
+    fn validate_xml_semantics(&self) -> Result<()> {
+        self.validate()
+    }
 
     /// Model-level XML checks: representability and lexical constraints read off the model.
     ///
@@ -152,7 +144,8 @@ pub(crate) fn write_xml_to<T: GenerationMetadata, W: Write>(
     output: &mut W,
 ) -> Result<()> {
     (|| {
-        validate_for_generation(T::KIND, message.version(), OutputFormat::Xml, message)?;
+        validate_output_version(T::KIND, message.version(), OutputFormat::Xml)?;
+        message.validate_xml_semantics()?;
         message.validate_xml_output()?;
         crate::xml::to_writer(output, message)
     })()
@@ -195,14 +188,40 @@ impl_generation_metadata!(
     kvn_representability,
     validate_xml_representability
 );
-impl_generation_metadata!(crate::messages::cdm::Cdm, Cdm, kvn_representability);
+impl GenerationMetadata for crate::messages::cdm::Cdm {
+    const KIND: MessageKind = MessageKind::Cdm;
+    fn version(&self) -> &str {
+        &self.version
+    }
+    fn validate_xml_model(&self) -> Result<()> {
+        self.validate_xml_available_values()
+    }
+    fn validate_kvn_model(&self) -> Result<()> {
+        self.validate()?;
+        self.validate_kvn_representability()
+    }
+}
 impl_generation_metadata!(crate::messages::aem::Aem, Aem, kvn_representability);
-impl_generation_metadata!(
-    crate::messages::ocm::Ocm,
-    Ocm,
-    kvn_representability,
-    validate_xml_representability
-);
+impl GenerationMetadata for crate::messages::ocm::Ocm {
+    const KIND: MessageKind = MessageKind::Ocm;
+
+    fn version(&self) -> &str {
+        &self.version
+    }
+
+    fn validate_xml_semantics(&self) -> Result<()> {
+        self.validate_content()
+    }
+
+    fn validate_xml_model(&self) -> Result<()> {
+        self.validate_xml_representability()
+    }
+
+    fn validate_kvn_model(&self) -> Result<()> {
+        self.validate()?;
+        self.validate_kvn_representability()
+    }
+}
 impl_generation_metadata!(
     crate::messages::tdm::Tdm,
     Tdm,

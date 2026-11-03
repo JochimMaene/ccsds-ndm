@@ -1107,3 +1107,121 @@ fn originator_accepts_the_books_esa_sst_example_and_optional_na_is_absent() {
     );
     assert!(Cdm::from_xml(&xml).is_err());
 }
+
+#[test]
+fn xml_na_is_cdm_specific_validates_units_and_refuses_lossy_output() {
+    let source = Cdm::from_kvn(include_str!("../../data/kvn/cdm_362.kvn"))
+        .unwrap()
+        .to_xml()
+        .unwrap();
+    let source = source.replacen(
+        "<stateVector>",
+        "<additionalParameters><MASS units='kg'>1</MASS></additionalParameters><stateVector>",
+        1,
+    );
+    let start = source.find("<MASS").unwrap();
+    let end = start + source[start..].find("</MASS>").unwrap() + "</MASS>".len();
+    for value in ["N/A", "<![CDATA[N/A]]>", "N&#47;A", "N<!--split-->/A"] {
+        let xml = format!(
+            "{}<MASS units='kg'>{value}</MASS>{}",
+            &source[..start],
+            &source[end..]
+        );
+        let message = Cdm::from_xml(&xml).unwrap();
+        assert!(message.body.segments[0]
+            .data
+            .additional_parameters
+            .as_ref()
+            .is_none_or(|parameters| parameters.mass.is_none()));
+        let invalid = xml.replace("units='kg'", "units='lb'");
+        assert!(Cdm::from_xml(&invalid).is_err());
+    }
+    let mut message = Cdm::from_xml(&source).unwrap();
+    message.header.message_for = Some("N/A".into());
+    assert!(message
+        .to_xml()
+        .unwrap_err()
+        .to_string()
+        .contains("MESSAGE_FOR"));
+    let mut output = Vec::new();
+    assert!(message.write_xml_to(&mut output).is_err());
+    assert!(output.is_empty());
+    message.header.message_for = None;
+    message.header.comment.push("N/A".into());
+    assert_eq!(Cdm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+}
+
+#[test]
+fn cdm_originator_accepts_embedded_blanks_and_normalizes_xml_padding() {
+    let message = Cdm::from_kvn(include_str!("../../data/kvn/cdm_362.kvn")).unwrap();
+    let xml = message.to_xml().unwrap();
+    let opening = xml.find("<ORIGINATOR>").unwrap() + "<ORIGINATOR>".len();
+    let end = opening + xml[opening..].find('<').unwrap();
+    let padded = format!("{} ESA SST {}", &xml[..opening], &xml[end..]);
+    let mut message = Cdm::from_xml(&padded).unwrap();
+    assert_eq!(message.header.originator, "ESA SST");
+    message.to_kvn().unwrap();
+    message.header.originator = " ESA SST ".into();
+    let error = message.to_kvn().unwrap_err();
+    assert!(error.to_string().contains("ORIGINATOR"));
+}
+
+#[test]
+fn xml_unit_diagnostics_do_not_depend_on_comments_or_other_unavailable_values() {
+    let source = Cdm::from_kvn(include_str!("../../data/kvn/cdm_362.kvn"))
+        .unwrap()
+        .to_xml()
+        .unwrap();
+    let source = source.replacen(
+        "<stateVector>",
+        "<additionalParameters><MASS units='lb'>1</MASS></additionalParameters><stateVector>",
+        1,
+    );
+    let baseline = Cdm::from_xml(&source).unwrap_err();
+    assert_eq!(baseline.code(), Some("parse.xml.syntax"));
+    let baseline = baseline.diagnostic().unwrap();
+    assert!(baseline.source_location.is_some());
+    for extra in [
+        "<!--unrelated-->",
+        "<?test unrelated?>",
+        "<COMMENT><![CDATA[unrelated]]></COMMENT>",
+        "<COMMENT>N/A</COMMENT>",
+    ] {
+        let xml = source.replacen("</cdm>", &format!("{extra}</cdm>"), 1);
+        // COMMENT elements belong in the header, unlike XML comments and PIs.
+        let xml = if extra.starts_with("<COMMENT>") {
+            source.replacen("<CREATION_DATE>", &format!("{extra}<CREATION_DATE>"), 1)
+        } else {
+            xml
+        };
+        let error = Cdm::from_xml(&xml).unwrap_err();
+        assert_eq!(error.code(), Some("parse.xml.syntax"), "{extra}: {error}");
+        assert!(
+            error.diagnostic().unwrap().source_location.is_some(),
+            "{extra}"
+        );
+    }
+}
+
+#[test]
+fn unavailable_area_and_mass_keep_fixed_unit_checks_and_locations() {
+    let source = Cdm::from_kvn(include_str!("../../data/kvn/cdm_362.kvn"))
+        .unwrap()
+        .to_xml()
+        .unwrap();
+    for (field, unit) in [
+        ("MASS", "kg"),
+        ("AREA_PC", "m**2"),
+        ("CD_AREA_OVER_MASS", "m**2/kg"),
+    ] {
+        for extra in ["", "<!--unrelated-->"] {
+            let xml = source.replacen("<stateVector>", &format!(
+                "{extra}<additionalParameters><{field} units='{unit}'>N/A</{field}></additionalParameters><stateVector>"), 1);
+            Cdm::from_xml(&xml).unwrap();
+            let error =
+                Cdm::from_xml(&xml.replace(&format!("units='{unit}'"), "units='lb'")).unwrap_err();
+            assert_eq!(error.code(), Some("parse.xml.syntax"));
+            assert!(error.diagnostic().unwrap().source_location.is_some());
+        }
+    }
+}

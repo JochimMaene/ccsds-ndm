@@ -19,6 +19,19 @@ else
     artifact="${wheels[0]}"
 fi
 
+uv run --no-project python - "${artifact}" <<'PY_CHECK'
+import sys, zipfile, tarfile
+artifact = sys.argv[1]
+if artifact.endswith(".whl"):
+    with zipfile.ZipFile(artifact) as archive:
+        names = archive.namelist()
+else:
+    with tarfile.open(artifact) as archive:
+        names = archive.getnames()
+assert not any("__pycache__" in name or name.endswith((".pyc", ".pyo")) for name in names), "artifact ships Python caches"
+assert any(name.endswith("ccsds_ndm/py.typed") for name in names), "artifact is missing py.typed"
+PY_CHECK
+
 temporary="$(mktemp -d)"
 trap 'rm -rf "${temporary}"' EXIT
 uv venv --python "${CCSDS_NDM_VERIFY_PYTHON:-3.10}" "${temporary}/venv"
@@ -34,6 +47,8 @@ import sys
 import ccsds_ndm
 import pytest
 
+package = Path(ccsds_ndm.__file__).resolve().parent
+assert (package / "py.typed").is_file(), "installed wheel is missing its typing marker"
 root = Path(sys.argv[1])
 assert Path(ccsds_ndm.__file__).resolve().is_relative_to(Path(sys.prefix).resolve()), (
     "package verification imported a checkout instead of the installed artifact"

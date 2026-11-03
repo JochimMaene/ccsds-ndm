@@ -9,14 +9,16 @@ Additional conformance corrections
 
 - Restricted TDM 1.0 KVN input is supported; XML 1.0 and generation remain unsupported.
   TDM closed categories ignore case, and shared categorical lookup accepts blank/underscore runs.
-- XML and KVN treat standard-field ``N/A`` values as absent. Comments, user-defined
-  values, and CDM ``MANEUVERABLE=N/A`` retain their content.
+- KVN treats standard-field ``N/A`` values as absent. In XML this convention is restricted
+  to CDM; other families retain literal text and validate numeric values against their types.
+  Comments, user-defined values, and CDM ``MANEUVERABLE=N/A`` retain their content.
+  CDM XML refuses output whose N/A values would be lost on read-back.
 - Quaternion validation accepts squared norms in [0.99, 1.01] and reports a field-named
   out-of-range error. CDM originators may contain blanks, including ``ESA SST``.
 - OCM accepts omitted orbit-counter basis and SCLK parameters with the book's implicit defaults.
   ``USEABLE_START_TIME``, ``USEABLE_STOP_TIME``, and ``OEB_PARENT_FRAME_EPOCH`` now use
   Rust ``Epoch`` rather than ``CalendarEpoch`` (breaking). XML input omits the TC1 covariance
-  linkage check that its schema cannot represent; validation and generation still enforce it.
+  linkage check that its schema cannot represent; general validation and KVN generation still enforce it, while XML generation permits schema-valid round trips.
 - Python errors now share ``NdmError`` as their base; ``NdmFormatError`` and ``NdmEpochError``
   no longer derive from ``ValueError``, and ``NdmIoError`` no longer derives from ``OSError``
   (breaking). I/O errors retain file and errno attributes. ``AcmCovarianceMatrix`` now takes
@@ -331,7 +333,7 @@ Newly rejected:
 - Time tags with more than 16 fractional-second digits, in every family except
   TDM (ODM 7.5.10 and the matching ADM, CDM and RDM rules).
 - Empty XML values for optional numbers, epochs and enumerations, except the documented
-  CDM compatibility and schema defaults. Standard-field ``n/a`` is treated as absent;
+  CDM compatibility and schema defaults. CDM standard-field ``n/a`` is treated as absent;
   optional XML strings retain empty text literally. A
   malformed optional value can no longer silently drop its ``units`` attribute.
 - XML special values spelled other than ``INF``, ``-INF`` or ``NaN`` (for
@@ -462,3 +464,14 @@ See :doc:`guide/workflows` for metadata construction guidance.
 ``attitude_type`` instead of inferring it from unambiguous row widths.
 ``OemData`` names its optional covariance collection ``covariance_matrices``;
 the mutable model property remains ``covariance_matrix``.
+
+Release follow-up corrections
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- XML N/A handling no longer masks invalid non-CDM numeric values or their units.
+- OCM XML with repeated covariance blocks round-trips in standalone and combined messages.
+- TDM 1.0 input excludes later-edition fields according to the original 1.0 tables.
+- KVN scalar preflights consistently normalize XML padding and internal tabs.
+- Python wheels include the typing marker and exclude cached bytecode. NdmIoError stubs
+  describe file attributes, and RdmSpacecraftParameters accepts every exposed field.
+- Invalid UTF-8 file errors retain their I/O category and now identify the first invalid byte.

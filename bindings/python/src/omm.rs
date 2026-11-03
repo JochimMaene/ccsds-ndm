@@ -262,10 +262,10 @@ impl Omm {
         crate::api::generate_string(py, &self.to_core(py)?, format)
     }
 
+    /// Generate canonical NORAD TLE lines (line 1 and line 2) from this OMM.
+    ///
     /// MEAN_MOTION_DOT/DDOT are the stored TLE fields (already n-dot/2 and n-double-dot/6),
     /// without additional scaling (ODM 4.2.4.7 note 2).
-    ///
-    /// Generate canonical NORAD TLE lines (line 1 and line 2) from this OMM.
     ///
     /// Requires Earth-centered TEME elements and UTC epochs; no coordinate/time conversion.
     /// Cyclic angles round to four decimals, with a rounded 360 degrees emitted as zero.
@@ -281,6 +281,9 @@ impl Omm {
     }
 
     /// Build a minimal OMM from NORAD TLE line 1 and line 2.
+    ///
+    /// MEAN_MOTION_DOT/DDOT retain the TLE n-dot/2 and n-double-dot/6 fields without rescaling
+    /// (CCSDS 502.0-B-3, 4.2.4.7 note 2).
     ///
     /// Parameters
     /// ----------
@@ -1240,7 +1243,8 @@ impl TleParameters {
     }
 
     /// NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword
-    /// is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
+    /// is required by the book for MEAN_ELEMENT_THEORY=SGP/SGP4. The library permits omission
+    /// because the XML schema makes it optional; to_tle_lines requires it.
     ///
     /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
     ///

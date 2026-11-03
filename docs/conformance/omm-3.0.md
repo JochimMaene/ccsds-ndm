@@ -200,7 +200,7 @@ writing enforces that limit, so an accepted overlong record can require shorteni
 regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
 are specified in the [validation contract](../design/validation-contract.md).
 
-CelesTrak GP OMM exports such as `omm1_ct` may have empty `CREATION_DATE` and
+CelesTrak GP OMM exports may have empty `CREATION_DATE` and
 `ORIGINATOR`. These remain rejected under ODM 7.5.1: obtain populated provenance from
 the producer or supply known, truthful values before parsing; the library does not invent them.
 Space-Track exports such as `omm1_st.xml` wrap ODM 2.0 in `<ndm>`. The supported combined
@@ -211,3 +211,7 @@ is not a conversion. The standalone 2.0 reader remains supported.
 TLE parameters are required for `SGP`, `SGP4`, and (3.0) `PPT3`/`SGP4-XP` theories.
 TLE line helpers use the stored TLE fields for `MEAN_MOTION_DOT` and
 `MEAN_MOTION_DDOT`: these are already ṅ/2 and n̈/6 (ODM 4.2.4.7 note 2), without further scaling.
+
+The bundled `omm1_ct.xml` also uses an ODM 2.0 `<ndm>` wrapper and therefore encounters
+that envelope refusal before provenance validation. Extracting it as standalone XML does not
+waive the requirement for populated CREATION_DATE and ORIGINATOR.

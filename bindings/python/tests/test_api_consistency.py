@@ -476,6 +476,9 @@ def test_typed_and_generic_files_preserve_invalid_utf8_io_details(tmp_path):
             reader(path)
         assert caught.value.code == "io.error"
         assert caught.value.filename == str(path)
+        assert caught.value.line == 1
+        assert caught.value.column == 1
+        assert caught.value.byte_offset == 0
 
 
 @pytest.mark.parametrize("cls", [ccsds_ndm, ccsds_ndm.Acm])
@@ -531,10 +534,12 @@ def test_tdm_legacy_kvn_is_readable_and_output_remains_current_only():
         .read_text()
         .replace("= 2.0", "= 1.0", 1)
     )
-    message = ccsds_ndm.Tdm.from_str(source)
-    assert message.version == "1.0"
-    with pytest.raises(ccsds_ndm.NdmError):
-        message.to_str("kvn")
+    for reader in (ccsds_ndm.Tdm.from_str, ccsds_ndm.from_str):
+        message = reader(source)
+        assert message.version == "1.0"
+        for notation in ("kvn", "xml"):
+            with pytest.raises(ccsds_ndm.NdmError):
+                message.to_str(notation)
 
 
 def test_quaternion_constructor_checks_components_before_building_a_message():
@@ -552,3 +557,76 @@ def test_python_aem_rows_normalize_optional_fixed_unit_annotations():
         == control.segments[0].data.attitude_states[0].values
     )
     assert 'units="deg"' not in message.to_str("xml")
+
+
+def test_rdm_spacecraft_constructor_accepts_every_exposed_field():
+    values = dict(
+        wet_mass=10.0,
+        dry_mass=9.0,
+        hazardous_substances="FUEL",
+        solar_rad_area=1.0,
+        solar_rad_coeff=1.0,
+        drag_area=2.0,
+        drag_coeff=2.0,
+        rcs=3.0,
+        ballistic_coeff=4.0,
+        thrust_acceleration=0.1,
+        comment=["test"],
+    )
+    spacecraft = ccsds_ndm.RdmSpacecraftParameters(**values)
+    for field, value in values.items():
+        assert getattr(spacecraft, field) == value
+
+
+def test_tdm_legacy_reader_refuses_later_header_metadata():
+    source = (
+        (ROOT / "ccsds-ndm/data/kvn/tdm_e1.kvn")
+        .read_text()
+        .replace("= 2.0", "= 1.0", 1)
+    )
+    source = source.replace("META_START", "MESSAGE_ID = LATER\nMETA_START", 1)
+    with pytest.raises(ccsds_ndm.NdmValidationError, match="MESSAGE_ID"):
+        ccsds_ndm.Tdm.from_str(source)
+
+
+def test_cdm_covariance_rejects_nonfinite_before_reporting_symmetry():
+    import numpy as np
+
+    matrix = np.eye(6)
+    matrix[0, 1] = np.nan
+    with pytest.raises(ValueError, match="finite"):
+        ccsds_ndm.CdmCovarianceMatrix.from_numpy(matrix)
+
+
+def test_invalid_utf8_has_byte_line_and_column_in_both_file_readers(tmp_path):
+    path = tmp_path / "invalid.kvn"
+    path.write_bytes(b"CCSDS_OPM_VERS = 3.0\nORIGINATOR = \xff")
+    for reader in (ccsds_ndm.from_file, ccsds_ndm.Opm.from_file):
+        with pytest.raises(ccsds_ndm.NdmIoError) as caught:
+            reader(path)
+        error = caught.value
+        assert error.code == "io.error"
+        assert error.filename == str(path)
+        assert error.line == 2
+        assert error.column == 14
+        assert error.byte_offset == 34
+        assert error.errno is None
+
+
+@pytest.mark.parametrize("missing_source", [False, True])
+def test_convert_file_io_error_has_both_paths_and_os_details(tmp_path, missing_source):
+    source = ROOT / "ccsds-ndm/data/kvn/opm_g1.kvn"
+    destination = tmp_path / "missing-parent" / "opm.xml"
+    if missing_source:
+        source = tmp_path / "missing.kvn"
+    with pytest.raises(ccsds_ndm.NdmIoError) as caught:
+        ccsds_ndm.convert_file(source, destination, "xml")
+    error = caught.value
+    assert error.code == "io.error"
+    assert error.errno is None or error.errno > 0
+    if missing_source:
+        assert error.errno is not None
+    assert error.strerror
+    assert error.filename == str(source)
+    assert error.filename2 == str(destination)
+    assert not destination.exists()

@@ -232,12 +232,20 @@ pub enum FormatError {
     },
 }
 
+/// Display suffix naming the block; an empty block marks a present but empty mandatory value.
+fn block_suffix(block: &str) -> String {
+    match block {
+        "" => " (empty value)".to_owned(),
+        block => format!(" in block {block}"),
+    }
+}
+
 /// Errors related to the validation of NDM data against CCSDS rules.
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
 pub enum ValidationError {
     /// A required field was missing in the message.
-    #[error("Missing required field: {field} in block {block}")]
+    #[error("Missing required field: {field}{}", block_suffix(block))]
     MissingRequiredField {
         /// Logical block containing the required field.
         block: Cow<'static, str>,
@@ -483,7 +491,7 @@ impl ValidationError {
 
     /// Convenience constructor for an empty mandatory value.
     pub(crate) fn empty_value(field: impl Into<Cow<'static, str>>) -> Self {
-        Self::missing_required("mandatory value", field)
+        Self::missing_required("", field)
     }
 
     /// Convenience constructor for an invalid value error.
@@ -1098,10 +1106,6 @@ impl CcsdsNdmError {
         match self {
             Self::Generation { source, .. } | Self::Parsing { source, .. } => source.field_path(),
             Self::Validation(error) => error.field_path(),
-            Self::Format(error) => match error.as_ref() {
-                FormatError::Enum(error) => Some(error.field.to_ascii_lowercase()),
-                _ => None,
-            },
             _ => None,
         }
     }
@@ -1338,6 +1342,12 @@ mod tests {
         };
         let s = format!("{}", err);
         assert!(s.contains("Missing required field: FIELD in block BLOCK"));
+    }
+
+    #[test]
+    fn empty_mandatory_value_message_does_not_invent_a_block() {
+        let s = ValidationError::empty_value("OBJECT_NAME").to_string();
+        assert_eq!(s, "Missing required field: OBJECT_NAME (empty value)");
     }
 
     #[test]

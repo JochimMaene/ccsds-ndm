@@ -1149,8 +1149,7 @@ class AcmMetadata:
         Outer Space Affairs designator index (reference `[2]`), which include Object name and
         international designator), the spacecraft operator, or a State Actor or commercial Space
         Situational Awareness (SSA) provider maintaining the ‘CATALOG_NAME’ space catalog. If the
-        object name is not known (uncorrelated object), ‘UNKNOWN’ may be used (or this keyword
-        omitted).
+        object name is not known (uncorrelated object), ‘UNKNOWN’ may be used; a nonempty OBJECT_NAME is required in both KVN and XML.
 
         Examples: SPOT, ENVISAT, IRIDIUM, INTELSAT
 
@@ -1868,7 +1867,7 @@ class AdditionalParameters:
         cr_area_over_mass: typing.Optional[builtins.float] = None,
         thrust_acceleration: typing.Optional[builtins.float] = None,
         sedr: typing.Optional[builtins.float] = None,
-        comment: typing.Sequence[builtins.str] = [],
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> AdditionalParameters: ...
 
 @typing.final
@@ -3648,7 +3647,12 @@ class AttitudeState:
         Components in ATTITUDE_TYPE column order and fixed units (ADM table 4-4).
         """
     @property
-    def epoch(self) -> builtins.str: ...
+    def epoch(self) -> builtins.str:
+        r"""
+        Record epoch in the metadata time system (CCSDS 504.0-B-2, table 4-4).
+
+        :type: str
+        """
     @epoch.setter
     def epoch(self, value: builtins.str) -> None: ...
     def __new__(
@@ -4547,7 +4551,7 @@ class CdmCovarianceMatrix:
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> CdmCovarianceMatrix:
         r"""
-        Build a symmetric 6x6, 7x7, 8x8 or 9x9 covariance in R, T, N, Rdot, Tdot, Ndot,
+        Build a finite, symmetric 6x6, 7x7, 8x8 or 9x9 covariance in R, T, N, Rdot, Tdot, Ndot,
         Drag, SRP, Thrust order. Position covariance uses m², position/velocity m²/s,
         velocity covariance m²/s²; extended rows use the documented per-field units.
         Input is not rescaled to the km and km/s used by CDM state vectors.
@@ -4689,7 +4693,7 @@ class CdmData:
     ) -> CdmData:
         r"""
         Build CDM state and optional covariance arrays. State columns are X, Y, Z (km),
-        X_DOT, Y_DOT, Z_DOT (km/s); covariance uses the fixed CDM units and must be symmetric.
+        X_DOT, Y_DOT, Z_DOT (km/s); covariance uses the fixed CDM units and must be finite and symmetric.
         CCSDS Reference: 508.0-B-1, Sections 3.4–3.5.
         """
     def __repr__(self) -> builtins.str: ...
@@ -4790,7 +4794,7 @@ class CdmHeader:
         originator: builtins.str,
         message_id: builtins.str,
         message_for: typing.Optional[builtins.str] = None,
-        comment: typing.Sequence[builtins.str] = [],
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> CdmHeader: ...
     def __repr__(self) -> builtins.str: ...
 
@@ -5176,7 +5180,7 @@ class CdmMetadata:
         solar_rad_pressure: typing.Optional[builtins.bool] = None,
         earth_tides: typing.Optional[builtins.bool] = None,
         intrack_thrust: typing.Optional[builtins.bool] = None,
-        comment: typing.Sequence[builtins.str] = [],
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> CdmMetadata:
         r"""
         Construct metadata with explicit covariance provenance and maneuverability.
@@ -5419,7 +5423,7 @@ class CombinedNdm:
             typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm]
         ],
         id: typing.Optional[builtins.str] = None,
-        comments: typing.Sequence[builtins.str] = [],
+        comments: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> CombinedNdm: ...
     def validate(self) -> None:
         r"""
@@ -7037,6 +7041,22 @@ class NdmIoError(NdmError):
     expected: typing.Optional[builtins.str]
     r"""
     Expected parser token, when available; excludes internal labels.
+    """
+    errno: typing.Optional[builtins.int]
+    r"""
+    Operating-system error number, when available.
+    """
+    strerror: typing.Optional[builtins.str]
+    r"""
+    I/O error description, when available.
+    """
+    filename: typing.Optional[builtins.str]
+    r"""
+    File involved in the operation, when available.
+    """
+    filename2: typing.Optional[builtins.str]
+    r"""
+    Destination file for conversion, when available.
     """
 
 class NdmKvnParseError(NdmFormatError):
@@ -11796,7 +11816,7 @@ class OdParameters:
         tracks_used: typing.Optional[builtins.int] = None,
         residuals_accepted: typing.Optional[builtins.float] = None,
         weighted_rms: typing.Optional[builtins.float] = None,
-        comment: typing.Sequence[builtins.str] = [],
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> OdParameters: ...
 
 @typing.final
@@ -13185,10 +13205,10 @@ class Omm:
         """
     def to_tle_lines(self) -> tuple[builtins.str, builtins.str]:
         r"""
+        Generate canonical NORAD TLE lines (line 1 and line 2) from this OMM.
+
         MEAN_MOTION_DOT/DDOT are the stored TLE fields (already n-dot/2 and n-double-dot/6),
         without additional scaling (ODM 4.2.4.7 note 2).
-
-        Generate canonical NORAD TLE lines (line 1 and line 2) from this OMM.
 
         Requires Earth-centered TEME elements and UTC epochs; no coordinate/time conversion.
         Cyclic angles round to four decimals, with a rounded 360 degrees emitted as zero.
@@ -13210,6 +13230,9 @@ class Omm:
     ) -> Omm:
         r"""
         Build a minimal OMM from NORAD TLE line 1 and line 2.
+
+        MEAN_MOTION_DOT/DDOT retain the TLE n-dot/2 and n-double-dot/6 fields without rescaling
+        (CCSDS 502.0-B-3, 4.2.4.7 note 2).
 
         Parameters
         ----------
@@ -15738,17 +15761,34 @@ class RdmSpacecraftParameters:
     r"""
     RDM spacecraft parameters (rdmSpacecraftParametersType).
 
+    CCSDS Reference: 508.1-B-1, Section 3.5, Table 3-3.
+
     Parameters
     ----------
     wet_mass : float, optional
         Mass including consumables, in kg.
     dry_mass : float, optional
         Mass without consumables, in kg.
+    hazardous_substances : str, optional
+        Comma-separated hazardous substances.
+    solar_rad_area : float, optional
+        Solar radiation pressure area, in m**2.
+    solar_rad_coeff : float, optional
+        Solar radiation coefficient.
+    drag_area : float, optional
+        Drag area, in m**2.
+    drag_coeff : float, optional
+        Drag coefficient.
+    rcs : float, optional
+        Radar cross section, in m**2.
+    ballistic_coeff : float, optional
+        Ballistic coefficient, in kg/m**2.
+    thrust_acceleration : float, optional
+        In-track thrust acceleration, in m/s**2.
     comment : list[str], optional
         Comments at the start of this logical block.
 
-    Other spacecraft fields can be assigned after construction; complete-message validation
-    checks their domains and dependencies.
+    Complete-message validation checks field domains and dependencies.
     """
     @property
     def wet_mass(self) -> typing.Optional[builtins.float]:
@@ -15891,6 +15931,14 @@ class RdmSpacecraftParameters:
         *,
         wet_mass: typing.Optional[builtins.float] = None,
         dry_mass: typing.Optional[builtins.float] = None,
+        hazardous_substances: typing.Optional[builtins.str] = None,
+        solar_rad_area: typing.Optional[builtins.float] = None,
+        solar_rad_coeff: typing.Optional[builtins.float] = None,
+        drag_area: typing.Optional[builtins.float] = None,
+        drag_coeff: typing.Optional[builtins.float] = None,
+        rcs: typing.Optional[builtins.float] = None,
+        ballistic_coeff: typing.Optional[builtins.float] = None,
+        thrust_acceleration: typing.Optional[builtins.float] = None,
         comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> RdmSpacecraftParameters: ...
 
@@ -16168,7 +16216,7 @@ class RelativeMetadataData:
         screen_exit_time: typing.Optional[builtins.str] = None,
         collision_probability: typing.Optional[builtins.float] = None,
         collision_probability_method: typing.Optional[builtins.str] = None,
-        comment: typing.Sequence[builtins.str] = [],
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
         miss_distance_unit: typing.Optional[builtins.str] = None,
     ) -> RelativeMetadataData: ...
     def __repr__(self) -> builtins.str: ...
@@ -16283,7 +16331,7 @@ class RelativeStateVector:
 @typing.final
 class SpacecraftParameters:
     r"""
-    Spacecraft Parameters (if maneuver is specified, then mass must be provided).
+    Spacecraft parameters. OPM 3.0 maneuvers require mass; OPM 2.0 requires the block but permits omitted mass in KVN.
 
     References:
     - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
@@ -16655,7 +16703,7 @@ class StateVector:
     @property
     def comment(self) -> builtins.list[builtins.str]:
         r"""
-        Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
+        Comments (allowed at the beginning of the state-vector block). (See 7.8 for formatting rules.)
 
         CCSDS Reference: 502.0-B-3, Section 3.2.4.
 
@@ -17183,7 +17231,7 @@ class TdmData:
 
         :type: list[str]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Sections 3.4–3.5.
         """
     @comment.setter
     def comment(self, value: typing.Sequence[builtins.str]) -> None:
@@ -17192,14 +17240,15 @@ class TdmData:
 
         :type: list[str]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Sections 3.4–3.5.
         """
     @property
     def observations(self) -> list[TdmObservation]:
         r"""
         Tracking data records.
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Sections 3.4–3.5.
+
         :type: list[TdmObservation]
         """
     @observations.setter
@@ -17516,7 +17565,7 @@ class TdmMetadata:
 
         :type: list[str]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @comment.setter
     def comment(self, value: typing.Sequence[builtins.str]) -> None: ...
@@ -17622,7 +17671,7 @@ class TdmMetadata:
 
         :type: Optional[str]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @participant_2.setter
     def participant_2(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17633,7 +17682,7 @@ class TdmMetadata:
 
         :type: Optional[str]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @participant_3.setter
     def participant_3(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17644,7 +17693,7 @@ class TdmMetadata:
 
         :type: Optional[str]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @participant_4.setter
     def participant_4(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17655,7 +17704,7 @@ class TdmMetadata:
 
         :type: Optional[str]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @participant_5.setter
     def participant_5(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17700,7 +17749,7 @@ class TdmMetadata:
 
         :type: Optional[str]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @path_1.setter
     def path_1(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17713,7 +17762,7 @@ class TdmMetadata:
 
         :type: Optional[str]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @path_2.setter
     def path_2(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17726,7 +17775,7 @@ class TdmMetadata:
 
         :type: Optional[str]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @ephemeris_name_1.setter
     def ephemeris_name_1(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17739,7 +17788,7 @@ class TdmMetadata:
 
         :type: Optional[str]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @ephemeris_name_2.setter
     def ephemeris_name_2(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17752,7 +17801,7 @@ class TdmMetadata:
 
         :type: Optional[str]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @ephemeris_name_3.setter
     def ephemeris_name_3(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17765,7 +17814,7 @@ class TdmMetadata:
 
         :type: Optional[str]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @ephemeris_name_4.setter
     def ephemeris_name_4(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -17778,7 +17827,7 @@ class TdmMetadata:
 
         :type: Optional[str]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @ephemeris_name_5.setter
     def ephemeris_name_5(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -18084,7 +18133,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @transmit_delay_2.setter
     def transmit_delay_2(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18098,7 +18147,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @transmit_delay_3.setter
     def transmit_delay_3(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18112,7 +18161,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @transmit_delay_4.setter
     def transmit_delay_4(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18126,7 +18175,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @transmit_delay_5.setter
     def transmit_delay_5(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18157,7 +18206,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @receive_delay_2.setter
     def receive_delay_2(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18171,7 +18220,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @receive_delay_3.setter
     def receive_delay_3(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18185,7 +18234,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @receive_delay_4.setter
     def receive_delay_4(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18199,7 +18248,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @receive_delay_5.setter
     def receive_delay_5(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18242,7 +18291,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @correction_angle_2.setter
     def correction_angle_2(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18255,7 +18304,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @correction_doppler.setter
     def correction_doppler(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18268,7 +18317,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @correction_mag.setter
     def correction_mag(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18281,7 +18330,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @correction_range.setter
     def correction_range(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18294,7 +18343,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @correction_rcs.setter
     def correction_rcs(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18307,7 +18356,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @correction_receive.setter
     def correction_receive(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18320,7 +18369,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @correction_transmit.setter
     def correction_transmit(self, value: typing.Optional[builtins.float]) -> None: ...
@@ -18333,7 +18382,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @correction_aberration_yearly.setter
     def correction_aberration_yearly(
@@ -18348,7 +18397,7 @@ class TdmMetadata:
 
         :type: Optional[float]
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
         """
     @correction_aberration_diurnal.setter
     def correction_aberration_diurnal(
@@ -18456,7 +18505,7 @@ class TdmObservation:
 
         :type: str
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Sections 3.4–3.5.
         """
     @epoch.setter
     def epoch(self, value: builtins.str) -> None: ...
@@ -18467,7 +18516,7 @@ class TdmObservation:
 
         :type: str
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Sections 3.4–3.5.
         """
     @property
     def value(self) -> builtins.float | builtins.str:
@@ -18485,7 +18534,7 @@ class TdmObservation:
 
         :type: str
 
-        CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+        CCSDS Reference: 503.0-B-2, Sections 3.4–3.5.
         """
     def __new__(
         cls,
@@ -18620,7 +18669,8 @@ class TleParameters:
     def norad_cat_id(self) -> typing.Optional[builtins.int]:
         r"""
         NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword
-        is only required if MEAN_ELEMENT_THEORY=SGP/SGP4.
+        is required by the book for MEAN_ELEMENT_THEORY=SGP/SGP4. The library permits omission
+        because the XML schema makes it optional; to_tle_lines requires it.
 
         CCSDS Reference: 502.0-B-3, Section 4.2.4.
 

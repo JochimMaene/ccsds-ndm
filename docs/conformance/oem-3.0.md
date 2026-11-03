@@ -126,6 +126,10 @@ and the cases where reading is looser than a clear rule under
 
 ### Stricter than required
 
+Negative MET/MRT elapsed epochs remain outside the supported profile, as recorded in the
+shared epoch contract. This is a deliberate restriction of the library's elapsed-calendar
+representation, not an additional XSD constraint.
+
 - **Epochs.** The schema's `epochType` also allows time-zone offsets like `+01:00`, years with
   more than four digits, an empty fraction, and a bare number. 7.5.10 only allows `Z`. We follow
   7.5.10 in both notations, like OPM. All message types share this rule, so relaxing it has to

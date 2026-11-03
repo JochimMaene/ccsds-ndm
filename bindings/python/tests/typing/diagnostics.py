@@ -40,3 +40,9 @@ def describe(
         error.byte_offset,
     )
     return f"{text} at {location}"
+
+
+def io_attributes(
+    error: NdmIoError,
+) -> tuple[int | None, str | None, str | None, str | None]:
+    return error.errno, error.strerror, error.filename, error.filename2

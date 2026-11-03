@@ -799,7 +799,7 @@ impl StateVector {
         )
     }
 
-    /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
+    /// Comments (allowed at the beginning of the state-vector block). (See 7.8 for formatting rules.)
     ///
     /// CCSDS Reference: 502.0-B-3, Section 3.2.4.
     ///
@@ -933,7 +933,7 @@ impl StateVector {
     }
 }
 
-/// Spacecraft Parameters (if maneuver is specified, then mass must be provided).
+/// Spacecraft parameters. OPM 3.0 maneuvers require mass; OPM 2.0 requires the block but permits omitted mass in KVN.
 ///
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
@@ -1168,7 +1168,7 @@ impl OdParameters {
         tracks_used=None,
         residuals_accepted=None,
         weighted_rms=None,
-        comment=vec![]
+        comment=None
     ))]
     fn new(
         time_lastob_start: Option<String>,
@@ -1181,12 +1181,12 @@ impl OdParameters {
         tracks_used: Option<u32>,
         residuals_accepted: Option<f64>,
         weighted_rms: Option<f64>,
-        comment: Vec<String>,
+        comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         use ccsds_ndm::types::{DayInterval, NonNegativeDouble, Percentage, PositiveInteger};
         Ok(Self {
             inner: core_common::OdParameters {
-                comment,
+                comment: comment.unwrap_or_default(),
                 time_lastob_start: time_lastob_start
                     .map(|s| parse_calendar_epoch(&s))
                     .transpose()?,

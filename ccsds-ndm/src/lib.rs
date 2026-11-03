@@ -288,7 +288,7 @@ impl Message {
                         .validate_kvn_model()
                         .and_then(|()| traits::ToKvn::validate_kvn(message)),
                     generation::OutputFormat::Xml => {
-                        traits::Validate::validate(message)?;
+                        message.validate_xml_semantics()?;
                         message.validate_xml_output()
                     }
                 });

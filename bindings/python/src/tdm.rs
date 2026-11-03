@@ -1038,7 +1038,7 @@ impl TdmMetadata {
     ///
     /// :type: list[str]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -1173,7 +1173,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[str]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_participant_2(&self) -> Option<String> {
         self.inner.participant_2.clone()
@@ -1187,7 +1187,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[str]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_participant_3(&self) -> Option<String> {
         self.inner.participant_3.clone()
@@ -1201,7 +1201,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[str]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_participant_4(&self) -> Option<String> {
         self.inner.participant_4.clone()
@@ -1215,7 +1215,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[str]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_participant_5(&self) -> Option<String> {
         self.inner.participant_5.clone()
@@ -1279,7 +1279,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[str]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_path_1(&self) -> Option<String> {
         self.inner.path_1.as_ref().map(|v| v.to_string())
@@ -1300,7 +1300,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[str]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_path_2(&self) -> Option<String> {
         self.inner.path_2.as_ref().map(|v| v.to_string())
@@ -1321,7 +1321,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[str]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_ephemeris_name_1(&self) -> Option<String> {
         self.inner.ephemeris_name_1.clone()
@@ -1337,7 +1337,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[str]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_ephemeris_name_2(&self) -> Option<String> {
         self.inner.ephemeris_name_2.clone()
@@ -1353,7 +1353,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[str]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_ephemeris_name_3(&self) -> Option<String> {
         self.inner.ephemeris_name_3.clone()
@@ -1369,7 +1369,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[str]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_ephemeris_name_4(&self) -> Option<String> {
         self.inner.ephemeris_name_4.clone()
@@ -1385,7 +1385,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[str]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_ephemeris_name_5(&self) -> Option<String> {
         self.inner.ephemeris_name_5.clone()
@@ -1794,7 +1794,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_transmit_delay_2(&self) -> Option<f64> {
         self.inner.transmit_delay_2
@@ -1811,7 +1811,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_transmit_delay_3(&self) -> Option<f64> {
         self.inner.transmit_delay_3
@@ -1828,7 +1828,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_transmit_delay_4(&self) -> Option<f64> {
         self.inner.transmit_delay_4
@@ -1845,7 +1845,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_transmit_delay_5(&self) -> Option<f64> {
         self.inner.transmit_delay_5
@@ -1882,7 +1882,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_receive_delay_2(&self) -> Option<f64> {
         self.inner.receive_delay_2
@@ -1899,7 +1899,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_receive_delay_3(&self) -> Option<f64> {
         self.inner.receive_delay_3
@@ -1916,7 +1916,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_receive_delay_4(&self) -> Option<f64> {
         self.inner.receive_delay_4
@@ -1933,7 +1933,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_receive_delay_5(&self) -> Option<f64> {
         self.inner.receive_delay_5
@@ -1990,7 +1990,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_angle_2(&self) -> Option<f64> {
         self.inner.correction_angle_2
@@ -2006,7 +2006,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_doppler(&self) -> Option<f64> {
         self.inner.correction_doppler
@@ -2022,7 +2022,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_mag(&self) -> Option<f64> {
         self.inner.correction_mag
@@ -2038,7 +2038,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_range(&self) -> Option<f64> {
         self.inner.correction_range
@@ -2054,7 +2054,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_rcs(&self) -> Option<f64> {
         self.inner.correction_rcs
@@ -2070,7 +2070,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_receive(&self) -> Option<f64> {
         self.inner.correction_receive
@@ -2086,7 +2086,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_transmit(&self) -> Option<f64> {
         self.inner.correction_transmit
@@ -2102,7 +2102,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_aberration_yearly(&self) -> Option<f64> {
         self.inner.correction_aberration_yearly
@@ -2118,7 +2118,7 @@ impl TdmMetadata {
     ///
     /// :type: Optional[float]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_aberration_diurnal(&self) -> Option<f64> {
         self.inner.correction_aberration_diurnal
@@ -2175,7 +2175,7 @@ pub struct TdmData {
     ///
     /// :type: list[str]
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Sections 3.4–3.5.
     #[pyo3(get, set)]
     comment: Vec<String>,
 
@@ -2230,7 +2230,8 @@ impl TdmData {
 
     /// Tracking data records.
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Sections 3.4–3.5.
+    ///
     /// :type: list[TdmObservation]
     #[gen_stub(override_return_type(type_repr = "list[TdmObservation]"))]
     #[getter]
@@ -2310,7 +2311,7 @@ impl TdmObservation {
     ///
     /// :type: str
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Sections 3.4–3.5.
     #[getter]
     fn get_epoch(&self) -> String {
         self.inner.epoch.as_str().to_string()
@@ -2326,7 +2327,7 @@ impl TdmObservation {
     ///
     /// :type: str
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Sections 3.4–3.5.
     #[getter]
     fn get_keyword(&self) -> String {
         self.inner.data.key().to_string()
@@ -2357,7 +2358,7 @@ impl TdmObservation {
     ///
     /// :type: str
     ///
-    /// CCSDS Reference: 503.0-B-2, Sections 3.3 and 3.5.
+    /// CCSDS Reference: 503.0-B-2, Sections 3.4–3.5.
     #[getter]
     fn get_value_str(&self) -> String {
         self.inner.data.value_to_string()

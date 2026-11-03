@@ -49,10 +49,14 @@ fn from_file_reports_invalid_utf8_as_an_io_error() {
     std::fs::write(&path, b"CCSDS_OPM_VERS = 3.0\n\xff").unwrap();
     let error = from_file(&path).unwrap_err();
     assert!(
-        matches!(error, CcsdsNdmError::Io(ref source)
-            if source.kind() == std::io::ErrorKind::InvalidData),
+        error
+            .as_io_error()
+            .is_some_and(|source| source.kind() == std::io::ErrorKind::InvalidData),
         "expected an encoding error, got {error}"
     );
+    let diagnostic = error.diagnostic().unwrap();
+    assert_eq!(diagnostic.source_location, Some((2, 1)));
+    assert_eq!(diagnostic.byte_offset, Some(21));
 }
 
 #[test]

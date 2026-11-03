@@ -108,6 +108,9 @@ pub(crate) fn prepare_input(
         record_offset += line.len();
     }
     // N/A denotes an unavailable standard field; user-defined payload is opaque.
+    if !normalized.contains("/A") && !normalized.contains("/a") {
+        return Ok(normalized);
+    }
     let mut offset = 0;
     let mut absent = Vec::new();
     let mut user_block = false;
@@ -199,6 +202,18 @@ pub(crate) fn normalize_line_endings(input: &str) -> std::borrow::Cow<'_, str> {
 mod tests {
     use super::prepare_input;
     use crate::{error::FormatError, validation::MessageKind};
+
+    #[test]
+    fn sentinel_fast_path_preserves_all_casings_and_opaque_values() {
+        for sentinel in ["N/A", "N/a", "n/A", "n/a"] {
+            let input = format!("CCSDS_TDM_VERS = 2.0\nMESSAGE_ID = {sentinel}\nMETA_START\nCOMMENT {sentinel}\nUSER_DEFINED_TEST = {sentinel}\n");
+            let normalized = prepare_input(&input, MessageKind::Tdm).unwrap();
+            assert_eq!(normalized.len(), input.len());
+            assert!(normalized.contains("MESSAGE_ID =    \n"));
+            assert!(normalized.contains(&format!("COMMENT {sentinel}\n")));
+            assert!(normalized.contains(&format!("USER_DEFINED_TEST = {sentinel}\n")));
+        }
+    }
 
     #[test]
     fn input_preparation_borrows_plain_text_and_preserves_normalized_error_positions() {

@@ -18,18 +18,14 @@ fn unavailable_values_cannot_hide_invalid_xml_structure() {
     }
     let valid = mutated_once(XML, original, "<MESSAGE_ID>N/A</MESSAGE_ID>");
     let message = Oem::from_xml(&valid).unwrap();
-    assert!(message.header.message_id.is_none());
+    assert_eq!(message.header.message_id.as_deref(), Some("N/A"));
 }
 
 #[test]
 fn xml_optional_fields_keep_their_declared_types() {
     for (tag, value, code) in [
         ("INTERPOLATION_DEGREE", "", "parse.xml.syntax"),
-        (
-            "INTERPOLATION_DEGREE",
-            "n/a",
-            "validation.missing_required_field",
-        ),
+        ("INTERPOLATION_DEGREE", "n/a", "parse.xml.syntax"),
         ("X_DDOT", "", "parse.xml.syntax"),
         (
             "USEABLE_START_TIME",

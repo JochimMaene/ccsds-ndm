@@ -12,6 +12,9 @@ impl Omm {
 
     /// Generate canonical NORAD TLE line 1 and line 2 from this OMM.
     ///
+    /// MEAN_MOTION_DOT/DDOT retain the TLE n-dot/2 and n-double-dot/6 fields; no extra
+    /// scaling is applied (CCSDS 502.0-B-3, 4.2.4.7 note 2).
+    ///
     /// This method requires:
     /// - `MEAN_ELEMENT_THEORY` to be `SGP`, `SGP4`, or `SGP/SGP4` (case-insensitive)
     /// - Earth-centered TEME elements with UTC epochs (no coordinate/time conversion)
@@ -225,6 +228,9 @@ impl Omm {
     }
 
     /// Parse NORAD TLE line 1/2 into a minimal OMM.
+    ///
+    /// MEAN_MOTION_DOT/DDOT retain the TLE n-dot/2 and n-double-dot/6 fields without
+    /// rescaling (CCSDS 502.0-B-3, 4.2.4.7 note 2).
     pub fn from_tle_lines(line1: &str, line2: &str) -> Result<Self> {
         Self::from_tle_lines_with_options(line1, line2, &TleToOmmOptions::default())
     }

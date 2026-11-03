@@ -1816,3 +1816,58 @@ fn categorical_values_ignore_case_and_blank_aliases_in_kvn() {
     );
     assert_eq!("Yes".parse::<YesNo>().unwrap(), YesNo::Yes);
 }
+
+#[test]
+fn legacy_tables_exclude_every_later_edition_metadata_keyword() {
+    let legacy = include_str!("../../data/kvn/tdm_e1.kvn").replacen("= 2.0", "= 1.0", 1);
+    for (keyword, value) in [
+        ("EPHEMERIS_NAME_1", "FILE"),
+        ("INTERPOLATION", "LINEAR"),
+        ("INTERPOLATION_DEGREE", "1"),
+        ("CORRECTION_MAG", "1"),
+        ("CORRECTION_RCS", "1"),
+        ("CORRECTION_ABERRATION_YEARLY", "1"),
+        ("CORRECTION_ABERRATION_DIURNAL", "1"),
+    ] {
+        let current = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e1.kvn")).unwrap();
+        let mut message = current;
+        match keyword {
+            "EPHEMERIS_NAME_1" => {
+                message.body.segments[0].metadata.ephemeris_name_1 = Some(value.into())
+            }
+            "INTERPOLATION" => {
+                message.body.segments[0].metadata.interpolation = Some(value.into());
+                message.body.segments[0].metadata.interpolation_degree = Some(1);
+            }
+            "INTERPOLATION_DEGREE" => {
+                message.body.segments[0].metadata.interpolation_degree = Some(1)
+            }
+            "CORRECTION_MAG" => message.body.segments[0].metadata.correction_mag = Some(1.0),
+            "CORRECTION_RCS" => message.body.segments[0].metadata.correction_rcs = Some(1.0),
+            "CORRECTION_ABERRATION_YEARLY" => {
+                message.body.segments[0]
+                    .metadata
+                    .correction_aberration_yearly = Some(1.0)
+            }
+            _ => {
+                message.body.segments[0]
+                    .metadata
+                    .correction_aberration_diurnal = Some(1.0)
+            }
+        }
+        message.body.segments[0].metadata.corrections_applied = Some(ccsds_ndm::types::YesNo::Yes);
+        let source = message.to_kvn().unwrap().replacen("= 2.0", "= 1.0", 1);
+        assert!(
+            Tdm::from_kvn(&source)
+                .unwrap_err()
+                .to_string()
+                .contains(keyword),
+            "{keyword}"
+        );
+    }
+    let source = legacy.replacen("META_START", "MESSAGE_ID = LATER\nMETA_START", 1);
+    assert!(Tdm::from_kvn(&source)
+        .unwrap_err()
+        .to_string()
+        .contains("MESSAGE_ID"));
+}

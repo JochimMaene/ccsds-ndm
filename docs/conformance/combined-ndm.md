@@ -84,7 +84,8 @@ Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and i
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
 
 Space-Track ODM 2.0 `<ndm>` exports are rejected before parsing constituent content,
-so an edition mismatch takes precedence over later content errors. Extract the constituent
+so an edition mismatch takes precedence over later constituent-content errors. XML well-formedness
+and namespace checks still run first; a sample with an undeclared xsi prefix fails on that prefix. Extract the constituent
 as standalone XML with its namespace bindings or request an ODM 3.0 export. CelesTrak
 OMM with empty creation/originator fields is also rejected under ODM 7.5.1; obtain real
 provenance rather than filling dummy values.

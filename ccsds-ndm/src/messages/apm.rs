@@ -327,8 +327,15 @@ impl crate::traits::Validate for ApmData {
             }
             .into());
         }
-        for block in &self.quaternion_state {
-            crate::traits::Validate::validate(block)?;
+        for (index, block) in self.quaternion_state.iter().enumerate() {
+            match crate::traits::Validate::validate(block) {
+                Err(crate::error::CcsdsNdmError::Validation(error)) => {
+                    return Err((*error)
+                        .within_path(format!("body.segment.data.quaternion_state[{index}]"))
+                        .into());
+                }
+                result => result?,
+            }
         }
         for block in &self.spin {
             block.validate()?;

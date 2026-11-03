@@ -79,12 +79,34 @@ pub(crate) fn reject_wide_encoding(input: &[u8]) -> Result<()> {
 
 /// Decode UTF-8 file contents, rejecting UTF-16/UTF-32 before decoding.
 ///
-/// Wide encodings produce a parse diagnostic. Other invalid UTF-8 bytes retain the file
-/// reader's `InvalidData` I/O category.
+/// Invalid bytes retain the InvalidData I/O category and carry a byte/line/column parse location.
 pub fn decode_utf8(input: &[u8]) -> Result<&str> {
     reject_wide_encoding(input)?;
-    std::str::from_utf8(input)
-        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error).into())
+    std::str::from_utf8(input).map_err(|error| {
+        let offset = error.valid_up_to();
+        let prefix =
+            std::str::from_utf8(&input[..offset]).expect("valid_up_to is a UTF-8 boundary");
+        let (line, column) = crate::error::line_column(prefix, offset);
+        let notation = detect_notation_bytes(input).unwrap_or(Notation::Kvn);
+        let kind = detect_message_header(prefix, Some(notation))
+            .unwrap_or(crate::validation::MessageKind::Ndm);
+        CcsdsNdmError::Parsing {
+            context: Box::new(crate::error::ParseErrorContext {
+                notation: match notation {
+                    Notation::Kvn => crate::error::DiagnosticNotation::Kvn,
+                    Notation::Xml => crate::error::DiagnosticNotation::Xml,
+                },
+                message_kind: kind,
+                source_edition: None,
+                line: Some(line),
+                column: Some(column),
+                byte_offset: Some(offset),
+                original_token: Some(format!("byte 0x{:02X}", input[offset])),
+                expected: Some("UTF-8"),
+            }),
+            source: Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, error).into()),
+        }
+    })
 }
 
 /// Detect whether a complete NDM document uses KVN or XML notation.

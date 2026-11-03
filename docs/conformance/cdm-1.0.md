@@ -122,7 +122,7 @@ byte-position-preserving normalization.
 
 XML accepts the uppercase and lowercase spellings explicitly enumerated by the bundled
 CDM XSD for `OBJECT`, screening volume frame/shape, `REF_FRAME`, `COVARIANCE_METHOD`, and
-`MANEUVERABLE`; generation uses canonical uppercase. Arbitrary mixed case is not an alias.
+`MANEUVERABLE`; generation uses canonical uppercase. Arbitrary mixed case is not an XML alias.
 `cdm::parsing::xml_accepts_schema_listed_lowercase_categories` checks full-message preservation.
 
 Shared `OBS_AVAILABLE`, `OBS_USED`, `TRACKS_AVAILABLE`, and `TRACKS_USED` use positive
@@ -172,7 +172,16 @@ one checked constructor. All entries carry the existing CDM field units; the six
 entries are kilometres and km/s, while relative miss geometry is in metres. No unit conversion
 or implicit averaging of asymmetric entries occurs.
 
-The shared YES/NO KVN/Python lookup also accepts mixed case, extending CDM 6.2.3.3's
-all-uppercase/all-lowercase vocabulary losslessly through the common TDM 4.3.7 boolean
-reader. XML still follows its schema spelling; writers emit uppercase. The shared categorical
-alias regression exercises this lookup.
+Case rules are field-specific: KVN MANEUVERABLE accepts YES/NO/N/A and their all-lowercase
+spellings, but not Yes/No. KVN OBJECT_TYPE accepts its all-uppercase and all-lowercase
+spellings, not mixed case; XML uses its schema-listed spellings. Writers emit each field's
+canonical token.
+
+XML ORIGINATOR padding is trimmed on input; embedded blanks such as `ESA SST` remain part
+of the value. Edited models with padded ORIGINATOR are refused with that field named.
+CDM 1.4.3.1's N/A convention applies only to CDM XML; other message families retain literal
+XML text. The CDM reader checks fixed unit values before omitting N/A leaves. Wrong units report
+`parse.xml.syntax` with a source location, including when XML comments or N/A normalization
+are present. The XML writer
+refuses standard scalar N/A values that would be lost on read-back, preserving comments and
+MANEUVERABLE=N/A. NumPy symmetry is exact, without implicit averaging or a tolerance.

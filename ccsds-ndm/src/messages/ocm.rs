@@ -51,13 +51,21 @@ pub struct Ocm {
 
 impl crate::traits::Validate for Ocm {
     fn validate(&self) -> Result<()> {
+        self.validate_content()?;
+        self.body.segment.data.validate_linkage()
+    }
+}
+
+impl Ocm {
+    pub(crate) fn validate_content(&self) -> Result<()> {
         crate::versioning::validate_root(
             crate::validation::MessageKind::Ocm,
             &self.id,
             &self.version,
         )?;
         self.header.validate()?;
-        self.body.validate()
+        self.body.segment.metadata.validate()?;
+        self.body.segment.data.validate_content()
     }
 }
 
@@ -85,15 +93,7 @@ impl Ndm for Ocm {
     fn from_xml(xml: &str) -> Result<Self> {
         xml::validate_sequences(xml)?;
         let ocm: Self = crate::xml::from_str_with_context(xml, "OCM")?;
-        // NDM/XML 4.0.0 has no covariance TRAJ_ID; TC1 linkage applies only to KVN and generation.
-        crate::versioning::validate_root(
-            crate::validation::MessageKind::Ocm,
-            &ocm.id,
-            &ocm.version,
-        )?;
-        ocm.header.validate()?;
-        crate::traits::Validate::validate(&ocm.body.segment.metadata)?;
-        ocm.body.segment.data.validate_content()?;
+        ocm.validate_content()?;
         ocm.validate_xml_representability()?;
         Ok(ocm)
     }
@@ -202,7 +202,8 @@ impl OcmData {
                     return Err(ValidationError::InvalidValue {
                         field: "USER_DEFINED_COMPOSITION".into(),
                         value: parameter.parameter.clone(),
-                        expected: "COMPOSITION_<sequence ID> for sequence records".into(),
+                        expected: "TC1 reserves COMPOSITION_<sequence ID> for sequence records"
+                            .into(),
                         line: None,
                     }
                     .into());
@@ -216,8 +217,8 @@ impl OcmData {
                 {
                     return Err(ValidationError::InvalidValue {
                         field: "USER_DEFINED_COMPOSITION".into(),
-                        value: parameter.value.clone(),
-                        expected: "nonempty comma-delimited composition and sequence records"
+                        value: parameter.parameter.clone(),
+                        expected: "TC1 reserves COMPOSITION_ for nonempty sequence columns and records; XML 4.0 cannot represent sequence records"
                             .into(),
                         line: None,
                     }
@@ -902,10 +903,11 @@ impl OcmManeuverParameters {
             }
         }
         if self.man_device_id.eq_ignore_ascii_case("DEPLOY")
-            && tokens
-                .iter()
-                .skip(1)
-                .any(|token| MAN_PROPULSIVE_COLUMNS.contains(token))
+            && tokens.iter().skip(1).any(|token| {
+                MAN_PROPULSIVE_COLUMNS
+                    .iter()
+                    .any(|column| column.eq_ignore_ascii_case(token))
+            })
         {
             return Err(ValidationError::invalid_value(
                 "MAN_DEVICE_ID",
@@ -2008,8 +2010,8 @@ pub struct OcmMetadata {
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Default: omitted means 0.0 SI seconds, including TIME_SYSTEM=SCLK (ODM 6.2.1.3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sclk_offset_at_epoch: Option<TimeOffset>,
     /// Defines the current number of clock seconds occurring during one SI second. It should be
     /// noted that this clock rate may vary with time and is the current approximate value.
@@ -2018,8 +2020,8 @@ pub struct OcmMetadata {
     /// **Units**: s
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.4.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Default: omitted means 1.0, including TIME_SYSTEM=SCLK (ODM 6.2.1.3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sclk_sec_per_si_sec: Option<Duration>,
     /// Creation epoch of the previous message from this originator for this space object. (For
     /// format specification, see 7.5.10.) NOTE—One may provide the previous message epoch
@@ -2489,8 +2491,8 @@ pub struct OcmTrajState {
     /// **Examples**: EARTH, MOON, ISS, EROS
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
-    #[builder(into)]
     /// Default: EARTH when omitted on KVN input.
+    #[builder(into)]
     pub center_name: String,
     /// Reference frame of the trajectory state time history. Select from the accepted set of
     /// values indicated in annex B, subsection B4.
@@ -2501,8 +2503,8 @@ pub struct OcmTrajState {
     /// **Examples**: ICRF3, J2000
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
-    #[builder(into)]
     /// Default: ICRF3 when omitted on KVN input.
+    #[builder(into)]
     pub traj_ref_frame: String,
     /// Epoch of the orbit data reference frame, if not intrinsic to the definition of the
     /// reference frame. Relative (seconds from EPOCH_TZERO) or absolute, as the XSD
@@ -2524,8 +2526,8 @@ pub struct OcmTrajState {
     /// **Examples**: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Accepts a relative SI-second tag or a calendar/ordinal epoch (ODM 6.2.2.3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub useable_start_time: Option<Epoch>,
     /// Stop time of USEABLE time span covered by ephemeris data immediately following this
     /// metadata block. (For format specification, see 7.5.10.) NOTES 1. This optional keyword
@@ -2538,8 +2540,8 @@ pub struct OcmTrajState {
     /// **Examples**: 1996-12-18T14:28:15.1172, 1996-277T07:22:54
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Accepts a relative SI-second tag or a calendar/ordinal epoch (ODM 6.2.2.3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub useable_stop_time: Option<Epoch>,
     /// The orbit revolution number (fractional values are accepted) associated with the first trajectory state in this
     /// trajectory state time history block. NOTE—The first ascending node crossing that occurs
@@ -2563,8 +2565,8 @@ pub struct OcmTrajState {
     /// **Examples**: 0, 1
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Default: omitted means 0; the model/output retains omission (ODM 6.2.1.3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub orb_revnum_basis: Option<RevNumBasis>,
     /// Specifies the trajectory state type; selected per annex B, subsection B7.
     ///
@@ -2736,8 +2738,8 @@ pub struct OcmPhysicalDescription {
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.6.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Accepts a relative SI-second tag or a calendar/ordinal epoch (ODM 6.2.2.3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oeb_parent_frame_epoch: Option<Epoch>,
     /// q1 = e1 * sin(φ/2), where per reference `[H1]`, φ = Euler rotation angle and e1 = 1st
     /// component of Euler rotation axis for the rotation that maps from the OEB_PARENT_FRAME
@@ -3188,8 +3190,8 @@ pub struct OcmCovarianceMatrix {
     /// **Examples**: TNW_INERTIAL, J2000
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
-    #[builder(into)]
     /// Default: TNW_INERTIAL when omitted on KVN input.
+    #[builder(into)]
     pub cov_ref_frame: String,
     /// Epoch of the covariance data reference frame, if not intrinsic to the definition of the
     /// reference frame. Relative (seconds from EPOCH_TZERO) or absolute, as the XSD
@@ -3243,8 +3245,8 @@ pub struct OcmCovarianceMatrix {
     /// **Examples**: LTM, UTM, FULL, LTMWCC, UTMWCC
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
-    #[builder(default)]
     /// Default: LTM when omitted on KVN input.
+    #[builder(default)]
     pub cov_ordering: CovOrder,
     /// A comma-delimited set of SI unit designations for each element of the covariance time
     /// history following the covariance time tag, solely for informational purposes, provided
@@ -3409,8 +3411,8 @@ pub struct OcmManeuverParameters {
     /// direction past a reference direction.
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
-    #[builder(default)]
     /// Default: CONTINUOUS when omitted.
+    #[builder(default)]
     pub dc_type: ManDc,
     /// Start time of the duty cycle-based maneuver window that occurs on or prior to the
     /// actual maneuver execution start time. For example, this may identify the time at which

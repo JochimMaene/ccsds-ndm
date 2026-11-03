@@ -1309,9 +1309,42 @@ impl Cdm {
                     comment.truncate(comment.trim_end().len());
                 }
             };
+            let scalar = |value: &mut String| {
+                *value = value
+                    .trim_matches([' ', '\t', '\r', '\n'])
+                    .replace('\t', " ");
+            };
+            if let Some(value) = &mut expected.header.message_for {
+                scalar(value);
+            }
+            if let Some(value) = &mut expected
+                .body
+                .relative_metadata_data
+                .collision_probability_method
+            {
+                scalar(value);
+            }
             trim(&mut expected.header.comment);
             trim(&mut expected.body.relative_metadata_data.comment);
             for segment in &mut expected.body.segments {
+                let metadata = &mut segment.metadata;
+                scalar(&mut metadata.object_name);
+                scalar(&mut metadata.ephemeris_name);
+                for value in [
+                    &mut metadata.operator_contact_position,
+                    &mut metadata.operator_organization,
+                    &mut metadata.operator_phone,
+                    &mut metadata.operator_email,
+                    &mut metadata.orbit_center,
+                    &mut metadata.gravity_model,
+                    &mut metadata.atmospheric_model,
+                    &mut metadata.n_body_perturbations,
+                ]
+                .into_iter()
+                .flatten()
+                {
+                    scalar(value);
+                }
                 let data = &mut segment.data;
                 data.canonicalize_kvn_comments();
                 trim(&mut segment.metadata.comment);

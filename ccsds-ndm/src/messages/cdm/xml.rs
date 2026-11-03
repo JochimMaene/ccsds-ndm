@@ -199,82 +199,46 @@ pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {
 }
 
 fn allows_units(element: &[u8]) -> bool {
-    matches!(
-        element,
+    expected_unit(element).is_some()
+}
+
+fn expected_unit(element: &[u8]) -> Option<&'static str> {
+    Some(match element {
         b"MISS_DISTANCE"
-            | b"RELATIVE_SPEED"
-            | b"RELATIVE_POSITION_R"
-            | b"RELATIVE_POSITION_T"
-            | b"RELATIVE_POSITION_N"
-            | b"RELATIVE_VELOCITY_R"
-            | b"RELATIVE_VELOCITY_T"
-            | b"RELATIVE_VELOCITY_N"
-            | b"SCREEN_VOLUME_X"
-            | b"SCREEN_VOLUME_Y"
-            | b"SCREEN_VOLUME_Z"
-            | b"RECOMMENDED_OD_SPAN"
-            | b"ACTUAL_OD_SPAN"
-            | b"RESIDUALS_ACCEPTED"
-            | b"AREA_PC"
-            | b"AREA_DRG"
-            | b"AREA_SRP"
-            | b"MASS"
-            | b"CD_AREA_OVER_MASS"
-            | b"CR_AREA_OVER_MASS"
-            | b"THRUST_ACCELERATION"
-            | b"SEDR"
-            | b"X"
-            | b"Y"
-            | b"Z"
-            | b"X_DOT"
-            | b"Y_DOT"
-            | b"Z_DOT"
-            | b"CR_R"
-            | b"CT_R"
-            | b"CT_T"
-            | b"CN_R"
-            | b"CN_T"
-            | b"CN_N"
-            | b"CRDOT_R"
-            | b"CRDOT_T"
-            | b"CRDOT_N"
-            | b"CRDOT_RDOT"
-            | b"CTDOT_R"
-            | b"CTDOT_T"
-            | b"CTDOT_N"
-            | b"CTDOT_RDOT"
-            | b"CTDOT_TDOT"
-            | b"CNDOT_R"
-            | b"CNDOT_T"
-            | b"CNDOT_N"
-            | b"CNDOT_RDOT"
-            | b"CNDOT_TDOT"
-            | b"CNDOT_NDOT"
-            | b"CDRG_R"
-            | b"CDRG_T"
-            | b"CDRG_N"
-            | b"CDRG_RDOT"
-            | b"CDRG_TDOT"
-            | b"CDRG_NDOT"
-            | b"CDRG_DRG"
-            | b"CSRP_R"
-            | b"CSRP_T"
-            | b"CSRP_N"
-            | b"CSRP_RDOT"
-            | b"CSRP_TDOT"
-            | b"CSRP_NDOT"
-            | b"CSRP_DRG"
-            | b"CSRP_SRP"
-            | b"CTHR_R"
-            | b"CTHR_T"
-            | b"CTHR_N"
-            | b"CTHR_RDOT"
-            | b"CTHR_TDOT"
-            | b"CTHR_NDOT"
-            | b"CTHR_DRG"
-            | b"CTHR_SRP"
-            | b"CTHR_THR"
-    )
+        | b"RELATIVE_POSITION_R"
+        | b"RELATIVE_POSITION_T"
+        | b"RELATIVE_POSITION_N"
+        | b"SCREEN_VOLUME_X"
+        | b"SCREEN_VOLUME_Y"
+        | b"SCREEN_VOLUME_Z" => "m",
+        b"RELATIVE_SPEED"
+        | b"RELATIVE_VELOCITY_R"
+        | b"RELATIVE_VELOCITY_T"
+        | b"RELATIVE_VELOCITY_N" => "m/s",
+        b"RECOMMENDED_OD_SPAN" | b"ACTUAL_OD_SPAN" => "d",
+        b"RESIDUALS_ACCEPTED" => "%",
+        b"AREA_PC" | b"AREA_DRG" | b"AREA_SRP" => "m**2",
+        b"MASS" => "kg",
+        b"CD_AREA_OVER_MASS" | b"CR_AREA_OVER_MASS" => "m**2/kg",
+        b"THRUST_ACCELERATION" => "m/s**2",
+        b"SEDR" => "W/kg",
+        b"X" | b"Y" | b"Z" => "km",
+        b"X_DOT" | b"Y_DOT" | b"Z_DOT" => "km/s",
+        b"CR_R" | b"CT_R" | b"CT_T" | b"CN_R" | b"CN_T" | b"CN_N" => "m**2",
+        b"CRDOT_R" | b"CRDOT_T" | b"CRDOT_N" | b"CTDOT_R" | b"CTDOT_T" | b"CTDOT_N"
+        | b"CNDOT_R" | b"CNDOT_T" | b"CNDOT_N" => "m**2/s",
+        b"CRDOT_RDOT" | b"CTDOT_RDOT" | b"CTDOT_TDOT" | b"CNDOT_RDOT" | b"CNDOT_TDOT"
+        | b"CNDOT_NDOT" | b"CTHR_R" | b"CTHR_T" | b"CTHR_N" => "m**2/s**2",
+        b"CDRG_R" | b"CDRG_T" | b"CDRG_N" | b"CSRP_R" | b"CSRP_T" | b"CSRP_N" => "m**3/kg",
+        b"CDRG_RDOT" | b"CDRG_TDOT" | b"CDRG_NDOT" | b"CSRP_RDOT" | b"CSRP_TDOT" | b"CSRP_NDOT" => {
+            "m**3/(kg*s)"
+        }
+        b"CDRG_DRG" | b"CSRP_DRG" | b"CSRP_SRP" => "m**4/kg**2",
+        b"CTHR_RDOT" | b"CTHR_TDOT" | b"CTHR_NDOT" => "m**2/s**3",
+        b"CTHR_DRG" | b"CTHR_SRP" => "m**3/(kg*s**2)",
+        b"CTHR_THR" => "m**2/s**4",
+        _ => return None,
+    })
 }
 
 fn cdm_xml_children(parent: &[u8]) -> Option<&'static [&'static [u8]]> {
@@ -421,4 +385,145 @@ fn cdm_xml_children(parent: &[u8]) -> Option<&'static [&'static [u8]]> {
         ],
         _ => return None,
     })
+}
+
+/// CDM 1.4.3.1: N/A denotes an unavailable value; comments and MANEUVERABLE remain opaque.
+pub(super) fn without_unavailable_values(s: &str) -> Result<Cow<'_, str>> {
+    use quick_xml::events::Event;
+
+    let content = if s.starts_with("<?xml") {
+        s.split_once("?>").map_or(s, |(_, rest)| rest)
+    } else {
+        s
+    };
+    if !s
+        .as_bytes()
+        .windows(3)
+        .any(|token| token.eq_ignore_ascii_case(b"N/A"))
+        && !s.contains("&#")
+        && !s.contains("<![CDATA[")
+        && !s.contains("<!--")
+        && !content.contains("<?")
+    {
+        return Ok(std::borrow::Cow::Borrowed(s));
+    }
+    // Recognize the decoded scalar without allocating a string for each history record.
+    fn append(matched: &mut Option<usize>, text: &str) {
+        for byte in text.bytes() {
+            let Some(index) = *matched else {
+                break;
+            };
+            if matches!(byte, b' ' | b'\t' | b'\r' | b'\n') && matches!(index, 0 | 3) {
+                continue;
+            }
+            *matched = b"N/A"
+                .get(index)
+                .filter(|expected| expected.eq_ignore_ascii_case(&byte))
+                .map(|_| index + 1);
+        }
+    }
+    let mut reader = quick_xml::Reader::from_str(s);
+    let mut stack = Vec::new();
+    let mut ranges = Vec::new();
+    loop {
+        let offset = reader.buffer_position() as usize;
+        match reader.read_event()? {
+            Event::Start(start) => {
+                let mut invalid_unit = None;
+                for attribute in start.attributes() {
+                    let attribute = attribute.map_err(quick_xml::Error::from)?;
+                    if attribute.key.as_ref() == b"units" {
+                        let unit = attribute.unescape_value()?;
+                        if expected_unit(start.local_name().as_ref()) != Some(unit.as_ref()) {
+                            invalid_unit = Some(format!(
+                                "{} units must be {}; got {unit:?}",
+                                String::from_utf8_lossy(start.local_name().as_ref()),
+                                expected_unit(start.local_name().as_ref()).unwrap_or("absent"),
+                            ));
+                        }
+                    }
+                }
+                if let Some((_, matched, _)) = stack.last_mut() {
+                    *matched = None;
+                }
+                let opaque = matches!(
+                    start.local_name().as_ref(),
+                    b"USER_DEFINED" | b"COMMENT" | b"MANEUVERABLE"
+                );
+                stack.push((offset, (!opaque).then_some(0), invalid_unit));
+            }
+            Event::Text(text) => {
+                if let Some((_, matched, _)) = stack.last_mut() {
+                    let value = text
+                        .decode()
+                        .map_err(|error| FormatError::InvalidFormat(error.to_string()))?;
+                    append(matched, &value);
+                }
+            }
+            Event::CData(text) => {
+                if let Some((_, matched, _)) = stack.last_mut() {
+                    let value = text
+                        .decode()
+                        .map_err(|error| FormatError::InvalidFormat(error.to_string()))?;
+                    append(matched, &value);
+                }
+            }
+            Event::GeneralRef(reference) => {
+                if let Some((_, matched, _)) = stack.last_mut() {
+                    match reference.resolve_char_ref()? {
+                        Some(character) => {
+                            let mut bytes = [0; 4];
+                            append(matched, character.encode_utf8(&mut bytes));
+                        }
+                        None => *matched = None,
+                    }
+                }
+            }
+            Event::End(_) => {
+                if let Some((start, Some(3), invalid_unit)) = stack.pop() {
+                    // Ordinary values keep the deserializer's unit diagnostics, even on this path.
+                    if let Some(message) = invalid_unit {
+                        let (line, column) = crate::error::line_column(s, start);
+                        return Err(crate::error::CcsdsNdmError::Parsing {
+                            context: Box::new(crate::error::ParseErrorContext {
+                                notation: crate::error::DiagnosticNotation::Xml,
+                                message_kind: crate::validation::MessageKind::Cdm,
+                                source_edition: None,
+                                byte_offset: Some(start),
+                                line: Some(line),
+                                column: Some(column),
+                                original_token: None,
+                                expected: None,
+                            }),
+                            source: Box::new(
+                                FormatError::XmlDe(quick_xml::DeError::Custom(message)).into(),
+                            ),
+                        });
+                    }
+                    ranges.push(start..reader.buffer_position() as usize);
+                }
+            }
+            Event::Comment(_) | Event::PI(_) => {}
+            Event::Eof => break,
+            _ => {
+                if let Some((_, matched, _)) = stack.last_mut() {
+                    *matched = None;
+                }
+            }
+        }
+    }
+    if ranges.is_empty() {
+        return Ok(std::borrow::Cow::Borrowed(s));
+    }
+    let mut bytes = s.as_bytes().to_vec();
+    for range in ranges {
+        for byte in &mut bytes[range] {
+            if !matches!(byte, b'\r' | b'\n') {
+                *byte = b' ';
+            }
+        }
+    }
+    Ok(std::borrow::Cow::Owned(
+        String::from_utf8(bytes).expect("ASCII replacement preserves UTF-8"),
+    ))
 }

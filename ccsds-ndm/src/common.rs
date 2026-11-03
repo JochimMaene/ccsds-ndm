@@ -236,7 +236,7 @@ impl crate::traits::Validate for OdmHeader {
     }
 }
 
-/// Spacecraft Parameters (if maneuver is specified, then mass must be provided).
+/// Spacecraft parameters. OPM 3.0 maneuvers require mass; OPM 2.0 requires the block but permits omitted mass in KVN.
 ///
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
@@ -614,15 +614,21 @@ impl Quaternion {
             ("Q3", self.q3),
             ("QC", self.qc),
         ] {
-            if !(-1.0..=1.0).contains(&v) {
-                return Err(crate::error::ValidationError::OutOfRange {
-                    name: name.into(),
-                    value: v.to_string(),
-                    expected: "[-1, 1]".into(),
-                    line: None,
-                }
-                .into());
+            Self::validate_component(name, v)?;
+        }
+        Ok(())
+    }
+
+    /// One component must lie in [-1, 1]; KVN readers check it on its own record.
+    pub(crate) fn validate_component(name: &'static str, v: f64) -> Result<()> {
+        if !(-1.0..=1.0).contains(&v) {
+            return Err(crate::error::ValidationError::OutOfRange {
+                name: name.into(),
+                value: v.to_string(),
+                expected: "[-1, 1]".into(),
+                line: None,
             }
+            .into());
         }
         Ok(())
     }
@@ -639,6 +645,7 @@ impl crate::traits::Validate for Quaternion {
                 expected: "squared norm in [0.99, 1.01]".into(),
                 line: None,
             }
+            .at_path("quaternion")
             .into());
         }
         Ok(())

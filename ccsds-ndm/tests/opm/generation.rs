@@ -730,7 +730,11 @@ fn opm_kvn_gm_units_survive_a_kvn_round_trip() {
 
 #[test]
 fn opm_kvn_rejects_non_ascii_and_control_characters() {
-    for invalid in ["ESOC 🚀", "ESOC\tFlight Dynamics", "ESOC\nFlight Dynamics"] {
+    for invalid in [
+        "ESOC 🚀",
+        "ESOC\x0bFlight Dynamics",
+        "ESOC\nFlight Dynamics",
+    ] {
         let mut message = opm();
         message.header.originator = invalid.to_owned();
 

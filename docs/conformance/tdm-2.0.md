@@ -74,11 +74,11 @@ accepted in XML and generate as `ITRF2000`, `ITRF-93`, `ITRF-93`, and `TOD`, res
 Arbitrary mixed case is rejected in XML. KVN reads the same aliases and the book spellings
 `ITRF1993` and `TOD_EARTH` as the known frames, so KVN output is canonical too: `ITRF1993`
 and `ITRF93` are written `ITRF-93`, `ITRF-2000` is written `ITRF2000`, and `TOD_EARTH` is
-written `TOD`. Only values outside the known frames (`GCRF`, mixed-case spellings) are kept as
-written in KVN.
+written `TOD`. Known mixed-case aliases canonicalize too; only open values outside the known
+frames, such as `GCRF`, retain their spelling in KVN.
 
 `REFERENCE_FRAME` is required whenever `ANGLE_TYPE` is `RADEC`, in any letter case (a mixed-case
-`Radec` is kept as an open value but still triggers the rule). Table 3-3 says the frame "shall
+`Radec` canonicalizes to `RADEC` and triggers the rule). Table 3-3 says the frame "shall
 be used in conjunction with" RADEC, and right ascension/declination angles cannot be interpreted
 without their inertial frame; the XSD does not express the dependency. `DATA_TYPES`, when supplied, must contain observation keywords from table 3-5;
 indexed families may use the table's `_n` notation. The library does not invent participant
@@ -261,8 +261,11 @@ regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categoric
 are specified in the [validation contract](../design/validation-contract.md).
 
 TDM 1.0 KVN is accepted through a restricted input-only reader based on the shared
-2.0 structure and the changes listed in 503.0-B-2 1.2.6.6. It rejects TRACK_ID, DATA_TYPES,
-DOPPLER_COUNT_* metadata, phase counts, DOPPLER_COUNT, MAG and RCS. XML 1.0 and
+2.0 structure restricted to the header/metadata tables 3-2/3-3 of CCSDS 503.0-B-1
+(https://public.ccsds.org/Pubs/503x0b1s.pdf), not just the 2.0 change summary.
+It rejects MESSAGE_ID, TRACK_ID, DATA_TYPES, EPHEMERIS_NAME_n, INTERPOLATION and
+INTERPOLATION_DEGREE, DOPPLER_COUNT_* metadata, CORRECTION_MAG, CORRECTION_RCS,
+CORRECTION_ABERRATION_YEARLY/DIURNAL, phase counts, DOPPLER_COUNT, MAG and RCS. XML 1.0 and
 1.0 output remain unsupported. Explicit caller relabelling to 2.0 is possible after validation;
 the reader never relabels automatically. `legacy_kvn_is_input_only_and_rejects_version_two_content`
 covers typed/generic input, refused output and later-edition content.
@@ -281,3 +284,8 @@ no turnaround-ratio calculation, so the schema's zero integer value is preserved
 retaining a sign bit (4.3.5); it is not a separate supported measurement value.
 Python nested TDM records are validated through Tdm.validate(); only the Rust API currently
 exposes each nested validate method separately.
+
+Recognized categorical frames and angle types canonicalize on KVN input, including
+`Eme2000` to `EME2000` and `Radec` to `RADEC`; arbitrary open registry text is retained only
+where the model field is open. `legacy_tables_exclude_every_later_edition_metadata_keyword`
+covers the 1.0 table boundary.

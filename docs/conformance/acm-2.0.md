@@ -226,3 +226,8 @@ editable records can be represented and validated together. Presence is enforced
 validation; callers must not interpret Option as a statement that the book makes a field optional.
 Python AcmAttitudeState derives NUMBER_STATES from the first data row; an absent rate_type
 means attitude-only records. AcmCovarianceMatrix permits omitted cov_basis/cov_ref_frame.
+
+Known KVN basis/method aliases canonicalize: for example `FILTER  SMOOTHER` becomes
+`FILTER_SMOOTHER`. Unknown open text remains unchanged. OBJECT_NAME is required by the
+XML schema; OBJECT_DESIGNATOR remains optional. Exponent-relative tags are covered through
+both public readers by `exponent_history_tags_expand_exactly_on_both_public_readers`.

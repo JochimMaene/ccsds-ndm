@@ -188,6 +188,22 @@ pub fn to_ccsds_error(
         }
     };
 
+    let base_err = if assignment_key(input, offset).is_some_and(|key| {
+        key.starts_with("USER_DEFINED_") && key.bytes().any(|byte| byte.is_ascii_lowercase())
+    }) {
+        let (line, column) = crate::error::line_column(input, offset);
+        CcsdsNdmError::Format(Box::new(FormatError::Kvn(Box::new(
+            crate::error::KvnParseError {
+                line,
+                column,
+                offset,
+                contexts: Vec::new(),
+                message: "USER_DEFINED keywords and suffixes must be uppercase".into(),
+            },
+        ))))
+    } else {
+        base_err
+    };
     let error = base_err.with_location(input, offset);
     if error.as_enum_error().is_some() {
         if let Some((kind, version)) = input.lines().find_map(|line| {
@@ -306,7 +322,8 @@ pub fn kv_sep(input: &mut &str) -> KvnResult<()> {
     (ws, '=', ws).void().parse_next(input)
 }
 
-/// Parses an optional unit in brackets: `[unit]`
+/// Parses an optional unit in brackets: `[unit]`. Surrounding blanks inside brackets are
+/// tolerated losslessly on input; writers emit the canonical unit without padding.
 /// If a `[` is encountered, a matching `]` is strictly enforced.
 pub fn kv_unit<'a>(input: &mut &'a str) -> KvnResult<Option<&'a str>> {
     ws.parse_next(input)?;
@@ -1671,6 +1688,12 @@ mod tests {
         assert_eq!(key, "X");
         assert_eq!(value, "6503.514");
         assert_eq!(unit, Some("km"));
+    }
+
+    #[test]
+    fn bracketed_unit_padding_is_trimmed_before_validation() {
+        let mut input = " [ m ]\n";
+        assert_eq!(kv_unit.parse_next(&mut input).unwrap(), Some("m"));
     }
 
     #[test]

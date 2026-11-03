@@ -910,7 +910,11 @@ impl Tdm {
             .into())
         };
         let check = |field: &'static str, value: &str| -> Result<()> {
-            if value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            if value
+                .trim_matches([' ', '\t', '\r', '\n'])
+                .bytes()
+                .all(|byte| (b' '..=b'~').contains(&byte) || byte == b'\t')
+            {
                 fits(field, value.trim().len())
             } else {
                 Err(ValidationError::InvalidValue {

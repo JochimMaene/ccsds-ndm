@@ -1228,6 +1228,9 @@ impl AttitudeState {
         })
     }
 
+    /// Record epoch in the metadata time system (CCSDS 504.0-B-2, table 4-4).
+    ///
+    /// :type: str
     #[getter]
     fn get_epoch(&self) -> String {
         self.epoch.as_str().to_string()

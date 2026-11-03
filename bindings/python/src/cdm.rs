@@ -57,6 +57,11 @@ fn build_cdm_covariance_from_array(
         ));
     }
 
+    if a.iter().any(|value| !value.is_finite()) {
+        return Err(PyValueError::new_err(
+            "Covariance matrix entries must be finite",
+        ));
+    }
     if (0..dim).any(|row| (0..row).any(|col| a[[row, col]] != a[[col, row]])) {
         return Err(PyValueError::new_err("Covariance matrix must be symmetric"));
     }
@@ -467,17 +472,17 @@ pub struct CdmHeader {
 #[pymethods]
 impl CdmHeader {
     #[new]
-    #[pyo3(signature = (creation_date, originator, message_id, message_for=None, comment=vec![]))]
+    #[pyo3(signature = (creation_date, originator, message_id, message_for=None, comment=None))]
     fn new(
         creation_date: String,
         originator: String,
         message_id: String,
         message_for: Option<String>,
-        comment: Vec<String>,
+        comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         Ok(Self {
             inner: core_cdm::CdmHeader {
-                comment,
+                comment: comment.unwrap_or_default(),
                 creation_date: parse_epoch_str(&creation_date)?,
                 originator,
                 message_for,
@@ -765,7 +770,7 @@ impl RelativeMetadataData {
         screen_exit_time=None,
         collision_probability=None,
         collision_probability_method=None,
-        comment=vec![],
+        comment=None,
         // Optional units arguments for strict validation
         miss_distance_unit=None
     ))]
@@ -789,7 +794,7 @@ impl RelativeMetadataData {
         screen_exit_time: Option<String>,
         collision_probability: Option<f64>,
         collision_probability_method: Option<String>,
-        comment: Vec<String>,
+        comment: Option<Vec<String>>,
         miss_distance_unit: Option<String>,
     ) -> PyResult<Self> {
         validate_unit::<LengthUnits>(miss_distance_unit)?;
@@ -834,7 +839,7 @@ impl RelativeMetadataData {
         Self::from_core(
             py,
             core_cdm::RelativeMetadataData {
-                comment,
+                comment: comment.unwrap_or_default(),
                 tca: parse_epoch_str(&tca)?,
                 miss_distance: Length::new(miss_distance, None),
                 relative_speed: relative_speed.map(Dv::new),
@@ -1458,7 +1463,7 @@ impl CdmMetadata {
         solar_rad_pressure=None,
         earth_tides=None,
         intrack_thrust=None,
-        comment=vec![]
+        comment=None
     ))]
     fn new(
         #[gen_stub(override_type(type_repr = "CdmObjectType | builtins.str", imports = ("builtins")))]
@@ -1487,7 +1492,7 @@ impl CdmMetadata {
         solar_rad_pressure: Option<bool>,
         earth_tides: Option<bool>,
         intrack_thrust: Option<bool>,
-        comment: Vec<String>,
+        comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         // Parse enum-like arguments (accept str or Enum)
         let object = parse_cdm_object_type(&object)?;
@@ -1529,7 +1534,7 @@ impl CdmMetadata {
 
         Ok(Self {
             inner: core_cdm::CdmMetadata {
-                comment,
+                comment: comment.unwrap_or_default(),
                 object: map_object(object),
                 object_designator,
                 catalog_name,
@@ -2108,7 +2113,7 @@ impl CdmData {
     }
 
     /// Build CDM state and optional covariance arrays. State columns are X, Y, Z (km),
-    /// X_DOT, Y_DOT, Z_DOT (km/s); covariance uses the fixed CDM units and must be symmetric.
+    /// X_DOT, Y_DOT, Z_DOT (km/s); covariance uses the fixed CDM units and must be finite and symmetric.
     /// CCSDS Reference: 508.0-B-1, Sections 3.4–3.5.
     #[staticmethod]
     #[pyo3(signature = (
@@ -2780,7 +2785,7 @@ pub struct AdditionalParameters {
 #[pymethods]
 impl AdditionalParameters {
     #[new]
-    #[pyo3(signature = (area_pc=None, area_drg=None, area_srp=None, mass=None, cd_area_over_mass=None, cr_area_over_mass=None, thrust_acceleration=None, sedr=None, comment=vec![]))]
+    #[pyo3(signature = (area_pc=None, area_drg=None, area_srp=None, mass=None, cd_area_over_mass=None, cr_area_over_mass=None, thrust_acceleration=None, sedr=None, comment=None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         area_pc: Option<f64>,
@@ -2791,11 +2796,11 @@ impl AdditionalParameters {
         cr_area_over_mass: Option<f64>,
         thrust_acceleration: Option<f64>,
         sedr: Option<f64>,
-        comment: Vec<String>,
+        comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         Ok(Self {
             inner: core_cdm::AdditionalParameters {
-                comment,
+                comment: comment.unwrap_or_default(),
                 area_pc: area_pc.map(|value| core_types::Area { value, units: None }),
                 area_drg: area_drg.map(|value| core_types::Area { value, units: None }),
                 area_srp: area_srp.map(|value| core_types::Area { value, units: None }),
@@ -3216,7 +3221,7 @@ impl CdmCovarianceMatrix {
         }
     }
 
-    /// Build a symmetric 6x6, 7x7, 8x8 or 9x9 covariance in R, T, N, Rdot, Tdot, Ndot,
+    /// Build a finite, symmetric 6x6, 7x7, 8x8 or 9x9 covariance in R, T, N, Rdot, Tdot, Ndot,
     /// Drag, SRP, Thrust order. Position covariance uses m², position/velocity m²/s,
     /// velocity covariance m²/s²; extended rows use the documented per-field units.
     /// Input is not rescaled to the km and km/s used by CDM state vectors.

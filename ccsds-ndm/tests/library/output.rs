@@ -390,22 +390,18 @@ fn kvn_generation_rejects_non_ascii_and_control_text_before_streaming() {
     );
     assert!(output.is_empty());
 
-    // A tab is not printable ASCII either, and the streaming path must hold the same line: the
-    // two notations had already drifted apart on whether they checked it before writing.
+    // Internal scalar TABs represent blanks; other embedded controls remain unrepresentable.
     let mut tdm = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e1.kvn")).unwrap();
     tdm.header.originator = "NA\tSA".into();
-    let error = tdm.to_kvn().expect_err("a tab reached KVN generation");
-    assert!(
-        error.to_string().contains("expected printable ASCII"),
-        "unexpected diagnostic: {error}"
-    );
-
+    let kvn = tdm.to_kvn().unwrap();
+    assert!(kvn.contains("NA SA"));
     let mut output = Vec::new();
-    crate::common::assert_validation_field(
-        &tdm.write_kvn_to(&mut output).unwrap_err(),
-        "ORIGINATOR",
-    );
-    assert!(output.is_empty(), "streaming KVN wrote bytes for a tab");
+    tdm.write_kvn_to(&mut output).unwrap();
+    assert_eq!(output, kvn.as_bytes());
+    tdm.header.originator = "NA\x0bSA".into();
+    let mut output = Vec::new();
+    assert!(tdm.write_kvn_to(&mut output).is_err());
+    assert!(output.is_empty());
 }
 
 #[test]

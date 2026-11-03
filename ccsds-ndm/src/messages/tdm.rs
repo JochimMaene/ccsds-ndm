@@ -238,11 +238,54 @@ impl Ndm for Tdm {
 
 impl Tdm {
     fn validate_legacy_content(&self) -> Result<()> {
-        // TDM 503.0-B-2 §1.2.6.6 identifies the additions to version 1.
+        // CCSDS 503.0-B-1 tables 3-2/3-3 define the complete 1.0 keyword set.
+        if self.header.message_id.is_some() {
+            return Err(ValidationError::invalid_value(
+                "MESSAGE_ID",
+                "present",
+                "absent in TDM 1.0 (table 3-2)",
+            )
+            .into());
+        }
         for segment in &self.body.segments {
             for (field, present) in [
                 ("TRACK_ID", segment.metadata.track_id.is_some()),
                 ("DATA_TYPES", segment.metadata.data_types.is_some()),
+                (
+                    "EPHEMERIS_NAME_1",
+                    segment.metadata.ephemeris_name_1.is_some(),
+                ),
+                (
+                    "EPHEMERIS_NAME_2",
+                    segment.metadata.ephemeris_name_2.is_some(),
+                ),
+                (
+                    "EPHEMERIS_NAME_3",
+                    segment.metadata.ephemeris_name_3.is_some(),
+                ),
+                (
+                    "EPHEMERIS_NAME_4",
+                    segment.metadata.ephemeris_name_4.is_some(),
+                ),
+                (
+                    "EPHEMERIS_NAME_5",
+                    segment.metadata.ephemeris_name_5.is_some(),
+                ),
+                ("INTERPOLATION", segment.metadata.interpolation.is_some()),
+                (
+                    "INTERPOLATION_DEGREE",
+                    segment.metadata.interpolation_degree.is_some(),
+                ),
+                ("CORRECTION_MAG", segment.metadata.correction_mag.is_some()),
+                ("CORRECTION_RCS", segment.metadata.correction_rcs.is_some()),
+                (
+                    "CORRECTION_ABERRATION_YEARLY",
+                    segment.metadata.correction_aberration_yearly.is_some(),
+                ),
+                (
+                    "CORRECTION_ABERRATION_DIURNAL",
+                    segment.metadata.correction_aberration_diurnal.is_some(),
+                ),
                 (
                     "DOPPLER_COUNT_BIAS",
                     segment.metadata.doppler_count_bias.is_some(),
@@ -437,9 +480,9 @@ impl TdmSegment {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct TdmMetadata {
     /// Comments.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default)]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub comment: Vec<String>,
     /// The TRACK_ID keyword specifies a unique identifier for the tracking data in the
     /// associated data section. The value may be a freely selected string of characters and
@@ -503,24 +546,24 @@ pub struct TdmMetadata {
     #[builder(into)]
     pub participant_1: String,
     /// The second participant in a tracking data session.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub participant_2: Option<String>,
     /// The third participant in a tracking data session.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub participant_3: Option<String>,
     /// The fourth participant in a tracking data session.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub participant_4: Option<String>,
     /// The fifth participant in a tracking data session.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub participant_5: Option<String>,
     /// The MODE keyword shall reflect the tracking mode associated with the Data Section of
     /// the segment. The value ‘SEQUENTIAL’ applies for most sequential signal paths; the name
@@ -544,39 +587,39 @@ pub struct TdmMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<TdmPath>,
     /// The first signal path where the MODE is 'SINGLE_DIFF'.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     /// PATH_1 and PATH_2 must be supplied together; every index names a supplied participant.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path_1: Option<TdmPath>,
     /// The second signal path where the MODE is 'SINGLE_DIFF'.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     /// PATH_1 and PATH_2 must be supplied together; every index names a supplied participant.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path_2: Option<TdmPath>,
     /// Unique name of the external ephemeris file used for participant 1.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub ephemeris_name_1: Option<String>,
     /// Unique name of the external ephemeris file used for participant 2.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub ephemeris_name_2: Option<String>,
     /// Unique name of the external ephemeris file used for participant 3.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub ephemeris_name_3: Option<String>,
     /// Unique name of the external ephemeris file used for participant 4.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub ephemeris_name_4: Option<String>,
     /// Unique name of the external ephemeris file used for participant 5.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub ephemeris_name_5: Option<String>,
     /// The TRANSMIT_BAND keyword shall indicate the frequency band for transmitted
     /// frequencies. The frequency ranges associated with each band should be specified in the
@@ -781,7 +824,7 @@ pub struct TdmMetadata {
         skip_serializing_if = "Option::is_none",
         deserialize_with = "xml::default_zero"
     )]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     pub transmit_delay_2: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 3.
@@ -792,7 +835,7 @@ pub struct TdmMetadata {
         skip_serializing_if = "Option::is_none",
         deserialize_with = "xml::default_zero"
     )]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     pub transmit_delay_3: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 4.
@@ -803,7 +846,7 @@ pub struct TdmMetadata {
         skip_serializing_if = "Option::is_none",
         deserialize_with = "xml::default_zero"
     )]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     pub transmit_delay_4: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the
     /// transmitting electronics to the transmit point for participant 5.
@@ -814,7 +857,7 @@ pub struct TdmMetadata {
         skip_serializing_if = "Option::is_none",
         deserialize_with = "xml::default_zero"
     )]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     pub transmit_delay_5: Option<f64>,
     /// The RECEIVE_DELAY_n keyword shall specify a fixed interval of time, in seconds,
     /// required for the signal to travel from the tracking point to the receiving electronics.
@@ -840,7 +883,7 @@ pub struct TdmMetadata {
         skip_serializing_if = "Option::is_none",
         deserialize_with = "xml::default_zero"
     )]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     pub receive_delay_2: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 3.
@@ -851,7 +894,7 @@ pub struct TdmMetadata {
         skip_serializing_if = "Option::is_none",
         deserialize_with = "xml::default_zero"
     )]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     pub receive_delay_3: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 4.
@@ -862,7 +905,7 @@ pub struct TdmMetadata {
         skip_serializing_if = "Option::is_none",
         deserialize_with = "xml::default_zero"
     )]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     pub receive_delay_4: Option<f64>,
     /// Fixed interval of time, in seconds, required for the signal to travel from the tracking
     /// point to the receiving electronics for participant 5.
@@ -873,7 +916,7 @@ pub struct TdmMetadata {
         skip_serializing_if = "Option::is_none",
         deserialize_with = "xml::default_zero"
     )]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     pub receive_delay_5: Option<f64>,
     /// Provides an estimate of the quality of the data, based on indicators from the producers
     /// of the data (e.g., bad time synchronization flags, marginal lock status indicators,
@@ -898,40 +941,40 @@ pub struct TdmMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correction_angle_1: Option<f64>,
     /// Correction for the second angle, in degrees (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub correction_angle_2: Option<f64>,
     /// Correction for Doppler (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub correction_doppler: Option<f64>,
     /// Correction for magnitude (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub correction_mag: Option<f64>,
     /// Correction for range (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub correction_range: Option<f64>,
     /// Correction for radar cross section (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub correction_rcs: Option<f64>,
     /// Correction for received frequency (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub correction_receive: Option<f64>,
     /// Correction for transmitted frequency (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub correction_transmit: Option<f64>,
     /// Correction for annual aberration (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub correction_aberration_yearly: Option<f64>,
     /// Correction for diurnal aberration (TDM table 3-3); CORRECTIONS_APPLIED indicates whether applied.
+    /// **CCSDS Reference**: 503.0-B-2, Section 3.3, Table 3-3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub correction_aberration_diurnal: Option<f64>,
     /// This keyword is used to indicate whether or not the values associated with the
     /// CORRECTION_* keywords have been applied to the tracking data. Required if any of the
@@ -1278,14 +1321,14 @@ impl TdmMetadata {
 #[serde(deny_unknown_fields)]
 pub struct TdmData {
     /// Comments.
+    /// **CCSDS Reference**: 503.0-B-2, Sections 3.4–3.5.
     #[serde(rename = "COMMENT", default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default)]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub comment: Vec<String>,
     /// Tracking data records.
+    /// **CCSDS Reference**: 503.0-B-2, Sections 3.4–3.5.
     #[serde(rename = "observation")]
     #[builder(default)]
-    /// **CCSDS Reference**: 503.0-B-2, Sections 3.3 and 3.5.
     pub observations: Vec<TdmObservation>,
 }
 

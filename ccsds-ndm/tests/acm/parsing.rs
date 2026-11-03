@@ -565,3 +565,41 @@ fn xml_history_values_refuse_nonzero_underflow_and_keep_subnormals() {
     let parsed = Acm::from_xml(&valid).unwrap();
     assert!(parsed.body.segment.data.att[0].att_lines[0].values[0] > 0.0);
 }
+
+#[test]
+fn invalid_rate_states_names_the_actual_keyword_and_between_block_comments_are_clear() {
+    let source = include_str!("../../data/kvn/acm_g7.kvn");
+    let invalid = source.replacen("SENSOR_START", "RATE_STATES = NONE\nSENSOR_START", 1);
+    let error = Acm::from_kvn(&invalid).unwrap_err();
+    assert!(error.to_string().contains("RATE_STATES"), "{error}");
+    let source = format!("{}\nCOMMENT between blocks\nCOV_START\n", crate::ATT_KVN);
+    let error = Acm::from_kvn(&source).unwrap_err();
+    assert!(
+        error.to_string().contains("comments between blocks"),
+        "{error}"
+    );
+}
+
+#[test]
+fn known_basis_and_method_blank_aliases_canonicalize() {
+    let source = include_str!("../../data/kvn/acm_g7.kvn");
+    let record = source
+        .lines()
+        .find(|line| line.starts_with("AD_METHOD"))
+        .unwrap();
+    let alias = source.replacen(record, "AD_METHOD = FILTER  SMOOTHER", 1);
+    let message = Acm::from_kvn(&alias).unwrap();
+    assert_eq!(
+        message
+            .body
+            .segment
+            .data
+            .ad
+            .as_ref()
+            .unwrap()
+            .ad_method
+            .as_deref(),
+        Some("FILTER_SMOOTHER")
+    );
+    message.to_xml().unwrap();
+}

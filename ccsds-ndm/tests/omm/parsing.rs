@@ -681,3 +681,21 @@ fn mean_motion_dot_is_required_only_by_its_theories_and_by_xml() {
         crate::common::assert_validation_field(&message.validate().unwrap_err(), "MEAN_MOTION_DOT");
     }
 }
+
+#[test]
+fn bad_epoch_retains_omm_source_edition_and_location() {
+    let source = include_str!("../../data/kvn/omm_g7.kvn");
+    let record = source
+        .lines()
+        .find(|line| line.starts_with("EPOCH ="))
+        .unwrap();
+    let invalid = source.replacen(record, "EPOCH = invalid", 1);
+    let error = Omm::from_kvn(&invalid).unwrap_err();
+    let diagnostic = error.diagnostic().unwrap();
+    assert_eq!(
+        diagnostic.message_kind,
+        ccsds_ndm::validation::MessageKind::Omm
+    );
+    assert_eq!(diagnostic.source_edition, Some("3.0"));
+    assert!(diagnostic.source_location.is_some());
+}

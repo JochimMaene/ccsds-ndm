@@ -122,9 +122,16 @@ producer deviations, and writing always emits the canonical form.
   written by omission. A blank or `N/A` mandatory value is reported as missing at its record. Writers never
   emit an empty or `N/A` value: an optional value that would read back as absent, such as an empty
   string from XML, is refused at KVN generation, naming the keyword. XML optional strings keep
-  empty values. In XML, case-insensitive `N/A` leaves are absent too, except `MANEUVERABLE`.
+  empty values. In CDM XML, case-insensitive `N/A` leaves are absent too (CDM 1.4.3.1), except
+  `MANEUVERABLE`; attributes and fixed units are checked before omission. Other families' XML
+  text fields retain literal `N/A`; numeric/epoch/enumeration fields must satisfy their schema type.
+  CDM XML generation refuses a present `N/A` value that its reader would discard.
   User-defined values and comments are opaque: blank and `N/A` payloads are retained. XML whitespace around scalar text is trimmed on KVN output and inner TABs become blanks;
   embedded CR/LF remains unrepresentable. Values are trimmed as KVN readers trim them.
+  Unit labels tolerate surrounding blanks inside KVN brackets (`[ m ]` reads as `[m]`).
+  This lossless lexical extension follows the parsing policy above; ODM 7.7 governs the unit
+  value, which is still checked. `bracketed_unit_padding_is_trimmed_before_validation` and the public-message regression
+  `bracketed_unit_padding_is_checked_at_public_message_boundaries` cover it.
 - **Case:** `EULER_ROT_SEQ` reads lowercase letters and legacy ADM 1.0 numeric sequences
   in KVN/Python, writing canonical uppercase letters; XML requires its exact enum spelling.
   Keywords are uppercase. Closed enumeration values accept all-uppercase or
@@ -307,9 +314,24 @@ insignificant. The library follows 7.4.7 for fixed-width padding and trims trail
 leading comment text is preserved. This is an explicit resolution of conflicting clauses.
 
 XML deserializer failures retain structured line, column, byte offset and family context.
-Missing XML leaves use `validation.missing_required_field`, matching KVN. Other serde
+Missing XML leaves use `validation.missing_required_field`, the same category as KVN;
+field paths and detection locations can differ between notations. Other serde
 value-conversion failures may retain schema/type wording and `parse.xml.syntax`;
 converting every serde message into a stable semantic category by matching English text
 would be brittle. Consumers should use the code and location rather than parse message text.
 The lexical source spelling may be normalized in value-error messages (for example `INF`
 becomes `inf`); `original_token` is the source excerpt when available.
+
+OCM `validate()` retains the TC1 trajectory/covariance linkage rule. XML parsing and generation
+validate all represented content but omit that linkage requirement because NDM/XML 4.0.0 has
+no covariance TRAJ_ID element. KVN parsing/generation still enforce it. Populated TC1 fields
+that XML cannot represent remain generation errors; no supplied linkage information is dropped.
+
+Invalid UTF-8 retains the `io.error` category and file attributes, with a parse byte offset,
+line and column identifying the first invalid byte. UTF-16/UTF-32 remain explicitly refused.
+
+Enum/unit parser failures expose a canonical model field path only when the containing
+validator knows it; a lowercased keyword is not substituted for a model path. Some low-level
+vector/numeric deserialization errors still have a source location and stable category without
+a canonical field path or a field-specific human message. These remain diagnostic limits,
+not evidence that validation was bypassed.

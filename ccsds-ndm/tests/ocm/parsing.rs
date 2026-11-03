@@ -1899,5 +1899,22 @@ fn schema_valid_xml_covariances_do_not_require_tc1_linkage() {
         .unwrap_err()
         .to_string()
         .contains("TRAJ_ID"));
-    assert!(message.to_xml().is_err());
+    assert!(ccsds_ndm::Validate::validate(&message).is_err());
+    let xml = message.to_xml().unwrap();
+    crate::common::validate_xml("OCM repeated covariance round trip", &xml);
+    assert_eq!(Ocm::from_xml(&xml).unwrap(), message);
+    let mut streamed = Vec::new();
+    message.write_xml_to(&mut streamed).unwrap();
+    assert_eq!(streamed, xml.as_bytes());
+    let combined = ccsds_ndm::messages::ndm::CombinedNdm {
+        id: None,
+        comments: Vec::new(),
+        messages: vec![ccsds_ndm::Message::Ocm(message)],
+    };
+    let xml = combined.to_xml().unwrap();
+    crate::common::validate_xml("combined OCM repeated covariance", &xml);
+    assert_eq!(
+        ccsds_ndm::messages::ndm::CombinedNdm::from_xml(&xml).unwrap(),
+        combined
+    );
 }

@@ -1830,17 +1830,34 @@ impl AtmosphericReentryParameters {
 
 /// RDM spacecraft parameters (rdmSpacecraftParametersType).
 ///
+/// CCSDS Reference: 508.1-B-1, Section 3.5, Table 3-3.
+///
 /// Parameters
 /// ----------
 /// wet_mass : float, optional
 ///     Mass including consumables, in kg.
 /// dry_mass : float, optional
 ///     Mass without consumables, in kg.
+/// hazardous_substances : str, optional
+///     Comma-separated hazardous substances.
+/// solar_rad_area : float, optional
+///     Solar radiation pressure area, in m**2.
+/// solar_rad_coeff : float, optional
+///     Solar radiation coefficient.
+/// drag_area : float, optional
+///     Drag area, in m**2.
+/// drag_coeff : float, optional
+///     Drag coefficient.
+/// rcs : float, optional
+///     Radar cross section, in m**2.
+/// ballistic_coeff : float, optional
+///     Ballistic coefficient, in kg/m**2.
+/// thrust_acceleration : float, optional
+///     In-track thrust acceleration, in m/s**2.
 /// comment : list[str], optional
 ///     Comments at the start of this logical block.
 ///
-/// Other spacecraft fields can be assigned after construction; complete-message validation
-/// checks their domains and dependencies.
+/// Complete-message validation checks field domains and dependencies.
 #[gen_stub_pyclass]
 #[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
@@ -1852,31 +1869,36 @@ pub struct RdmSpacecraftParameters {
 #[pymethods]
 impl RdmSpacecraftParameters {
     #[new]
-    #[pyo3(signature = (*, wet_mass=None, dry_mass=None, comment=None))]
-    fn new(wet_mass: Option<f64>, dry_mass: Option<f64>, comment: Option<Vec<String>>) -> Self {
-        use ccsds_ndm::types::Mass;
-
-        Self {
-            inner: core_common::RdmSpacecraftParameters {
-                comment: comment.unwrap_or_default(),
-                wet_mass: wet_mass.map(|v| Mass {
-                    value: v,
-                    units: None,
-                }),
-                dry_mass: dry_mass.map(|v| Mass {
-                    value: v,
-                    units: None,
-                }),
-                hazardous_substances: None,
-                solar_rad_area: None,
-                solar_rad_coeff: None,
-                drag_area: None,
-                drag_coeff: None,
-                rcs: None,
-                ballistic_coeff: None,
-                thrust_acceleration: None,
-            },
-        }
+    #[pyo3(signature = (*, wet_mass=None, dry_mass=None, hazardous_substances=None, solar_rad_area=None, solar_rad_coeff=None, drag_area=None, drag_coeff=None, rcs=None, ballistic_coeff=None, thrust_acceleration=None, comment=None))]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        wet_mass: Option<f64>,
+        dry_mass: Option<f64>,
+        hazardous_substances: Option<String>,
+        solar_rad_area: Option<f64>,
+        solar_rad_coeff: Option<f64>,
+        drag_area: Option<f64>,
+        drag_coeff: Option<f64>,
+        rcs: Option<f64>,
+        ballistic_coeff: Option<f64>,
+        thrust_acceleration: Option<f64>,
+        comment: Option<Vec<String>>,
+    ) -> Self {
+        let mut value = Self {
+            inner: core_common::RdmSpacecraftParameters::default(),
+        };
+        value.set_wet_mass(wet_mass);
+        value.set_dry_mass(dry_mass);
+        value.set_hazardous_substances(hazardous_substances);
+        value.set_solar_rad_area(solar_rad_area);
+        value.set_solar_rad_coeff(solar_rad_coeff);
+        value.set_drag_area(drag_area);
+        value.set_drag_coeff(drag_coeff);
+        value.set_rcs(rcs);
+        value.set_ballistic_coeff(ballistic_coeff);
+        value.set_thrust_acceleration(thrust_acceleration);
+        value.set_comment(comment.unwrap_or_default());
+        value
     }
 
     /// Total object mass at EPOCH_TZERO.

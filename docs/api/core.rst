@@ -40,9 +40,11 @@ Exceptions
 ----------
 
 All library parse, epoch, validation, unsupported-operation and file exceptions inherit
-from ``NdmError``, so it catches every library exception. NumPy shape/type errors and other
-Python argument errors can still be ordinary ``ValueError`` or ``TypeError``.
-File errors expose ``errno``, ``filename`` and ``strerror`` explicitly. Unsupported input/output editions
+from ``NdmError``. Argument conversions, including some categorical setters, may raise
+ordinary ``ValueError`` or ``TypeError``.
+File errors expose ``errno``, ``filename`` and ``strerror`` explicitly; conversions also
+expose the destination as ``filename2``. ``errno`` is ``None`` when no raw OS number is
+available, including destination-creation errors wrapped by ``tempfile``. Unsupported input/output editions
 use ``NdmValidationError``; their ``parse.*`` or ``generation.*`` code distinguishes the operation.
 
 Diagnostic attributes

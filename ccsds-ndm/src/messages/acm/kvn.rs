@@ -1291,7 +1291,11 @@ impl Acm {
             }
         };
         let check_text = |value: &str| -> Result<()> {
-            if value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            if value
+                .trim_matches([' ', '\t', '\r', '\n'])
+                .bytes()
+                .all(|byte| (b' '..=b'~').contains(&byte) || byte == b'\t')
+            {
                 Ok(())
             } else {
                 Err(ValidationError::Generic {
