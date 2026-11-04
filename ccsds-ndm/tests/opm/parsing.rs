@@ -65,15 +65,15 @@ fn strict_kvn_rejects_unknown_duplicate_reordered_malformed_and_lossy_content() 
         mutated(KVN, object_name, &format!("{object_name}\u{1}")),
     );
 
+    // Lines longer than 254 characters are read (lossless producer deviation), never written.
     let version = KVN.lines().next().expect("fixture should have a version");
-    assert_kvn_rejected(
-        "line longer than 254 characters",
-        mutated(
-            KVN,
-            version,
-            &format!("{version}\nCOMMENT {}", "x".repeat(250)),
-        ),
-    );
+    let long = Opm::from_kvn(&mutated(
+        KVN,
+        version,
+        &format!("{version}\nCOMMENT {}", "x".repeat(250)),
+    ))
+    .unwrap();
+    assert!(long.to_kvn().is_err());
     assert_kvn_rejected(
         "lone carriage return",
         mutated(KVN, "OBJECT_NAME", "OBJECT\r_NAME"),
@@ -308,17 +308,17 @@ fn kvn_parse_diagnostic_is_located_bounded_and_machine_readable() {
     assert_eq!(diagnostic.code, Some("parse.kvn.syntax"));
     assert_eq!(diagnostic.source_location, Some((6, 1)));
     assert_eq!(diagnostic.original_token, Some("UNKNOWN_KEY = value"));
-    assert_eq!(diagnostic.expected, Some("strict OPM KVN"));
+    assert_eq!(diagnostic.expected, None);
 }
 
 #[test]
-fn parse_token_excerpt_is_bounded_and_semantic_paths_survive_the_context_wrapper() {
+fn parse_token_excerpt_is_bounded_and_blank_mandatory_values_name_their_record() {
     let long = mutated(
         KVN,
         "OBJECT_NAME = OSPREY 5",
-        &format!("OBJECT_NAME = {}", "x".repeat(300)),
+        &format!("OBJECT_NAME = OSPREY 5\n{} = 1", "X".repeat(300)),
     );
-    let error = Opm::from_kvn(&long).expect_err("overlong line should fail");
+    let error = Opm::from_kvn(&long).expect_err("unknown keyword should fail");
     assert!(
         error
             .diagnostic()
@@ -333,10 +333,11 @@ fn parse_token_excerpt_is_bounded_and_semantic_paths_survive_the_context_wrapper
     let diagnostic = error.diagnostic().expect("parse context should be present");
     assert_eq!(diagnostic.operation, DiagnosticOperation::Parse);
     assert_eq!(diagnostic.code, Some("validation.missing_required_field"));
-    assert_eq!(
-        diagnostic.field_path.as_deref(),
-        Some("body.segment.metadata.object_name")
-    );
+    // A blank mandatory value is absent under the shared KVN rule; the error names its record.
+    assert!(matches!(
+        crate::common::validation_error_source(error.as_validation_error().unwrap()),
+        ValidationError::MissingRequiredField { line: Some(5), .. }
+    ));
 }
 
 #[test]
@@ -484,7 +485,9 @@ fn opm_preserves_comment_before_user_defined_after_optional_maneuvers() {
             .user_defined_parameters
             .as_ref()
             .unwrap()
-            .comment,
+            .comments()
+            .cloned()
+            .collect::<Vec<_>>(),
         ["belongs to user parameters"]
     );
 }
@@ -533,8 +536,11 @@ fn opm_xml_allows_a_comment_to_reopen_the_user_defined_group() {
         .user_defined_parameters
         .as_ref()
         .unwrap();
-    assert_eq!(user_defined.comment, ["first", "second"]);
-    assert_eq!(user_defined.user_defined.len(), 2);
+    assert_eq!(
+        user_defined.comments().cloned().collect::<Vec<_>>(),
+        ["first", "second"]
+    );
+    assert_eq!(user_defined.parameters().count(), 2);
 }
 
 #[test]
@@ -1089,7 +1095,7 @@ MAN_DV_3 = 0.0 [km/s]
 "#
     );
     // Should fail - positive MAN_DELTA_MASS is not allowed (must be <= 0)
-    crate::common::assert_validation_field(&Opm::from_kvn(kvn).unwrap_err(), "DeltaMassZ");
+    crate::common::assert_validation_field(&Opm::from_kvn(kvn).unwrap_err(), "MAN_DELTA_MASS");
 }
 
 #[test]
@@ -1110,4 +1116,24 @@ MAN_DV_3 = 0.0 [km/s]
     let opm = Opm::from_kvn(kvn).unwrap();
     let man = &opm.body.segment.data.maneuver_parameters[0];
     assert_eq!(man.man_delta_mass.value, -100.0);
+}
+
+#[test]
+fn opm_1_0_requires_an_edition_specific_reader() {
+    // B1 tables 3-1 through 3-3 define a KVN-only message without covariance or
+    // later metadata, with obligatory spacecraft parameters. Relabeling 3.0 is not support.
+    let legacy_kvn = mutated_once(KVN, "CCSDS_OPM_VERS = 3.0", "CCSDS_OPM_VERS = 1.0");
+    let legacy_xml = mutated_once(
+        &Opm::from_kvn(KVN).unwrap().to_xml().unwrap(),
+        "version=\"3.0\"",
+        "version=\"1.0\"",
+    );
+    for input in [legacy_kvn, legacy_xml] {
+        let error = ccsds_ndm::from_str(&input).unwrap_err();
+        assert_eq!(error.code(), Some("parse.unsupported_input_version"));
+    }
+    assert_eq!(
+        ccsds_ndm::versioning::supported_input_versions(MessageKind::Opm),
+        Some(&["2.0", "3.0"][..])
+    );
 }

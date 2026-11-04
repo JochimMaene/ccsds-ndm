@@ -68,6 +68,7 @@ ccsds-ndm/data/xsd/*
 !ccsds-ndm/data/xsd/ndmxml-2.0.0-omm-2.0.xsd
 !ccsds-ndm/data/xsd/ndmxml-2.0.0-opm-2.0.xsd
 !ccsds-ndm/data/xsd/ndmxml-4.0.0-*.xsd
+!ccsds-ndm/data/xsd/ndmxml-1.0-*.xsd
 
 # ------------------------------
 # Profiling outputs

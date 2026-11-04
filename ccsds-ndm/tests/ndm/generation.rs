@@ -110,3 +110,46 @@ fn combined_envelope_carries_one_message_of_every_family() {
     };
     assert_eq!(reparsed.messages, messages);
 }
+
+#[test]
+fn combined_schema_refuses_standalone_odm2_constituents_before_output() {
+    for source in [
+        include_str!("../../data/kvn/opm_g1.kvn"),
+        include_str!("../../data/kvn/omm_g9.kvn"),
+        include_str!("../../data/kvn/oem_g13.kvn"),
+    ] {
+        let mut child = ccsds_ndm::from_str(source).unwrap();
+        let (version, header) = match &mut child {
+            Message::Opm(value) => (&mut value.version, &mut value.header),
+            Message::Omm(value) => (&mut value.version, &mut value.header),
+            Message::Oem(value) => (&mut value.version, &mut value.header),
+            _ => unreachable!(),
+        };
+        *version = "2.0".into();
+        header.classification = None;
+        header.message_id = None;
+        let standalone = child.to_xml().unwrap();
+        let combined = CombinedNdm {
+            id: None,
+            comments: vec![],
+            messages: vec![child],
+        };
+        combined.validate().unwrap();
+        assert!(combined
+            .to_xml()
+            .unwrap_err()
+            .to_string()
+            .contains("NDM/XML 4.0.0"));
+        let mut output = Vec::new();
+        assert!(combined.write_xml_to(&mut output).is_err());
+        assert!(output.is_empty());
+        let document = format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?><ndm>{}</ndm>",
+            standalone.split_once('\n').unwrap().1
+        );
+        assert!(CombinedNdm::from_xml(&document)
+            .unwrap_err()
+            .to_string()
+            .contains("NDM/XML 4.0.0"));
+    }
+}

@@ -1,5 +1,49 @@
 use ccsds_ndm::messages::omm::{Omm, TleToOmmOptions};
 use ccsds_ndm::Ndm;
+
+#[test]
+fn comment_merges_and_user_parameter_interleaving_are_preserved() {
+    let mut message = Omm::from_kvn(crate::KVN).unwrap();
+    message.body.segment.data.comment = vec!["outer-data".into()];
+    message.body.segment.data.mean_elements.comment = vec!["mean-elements".into()];
+    let kvn = message.to_kvn().unwrap();
+    let reparsed = Omm::from_kvn(&kvn).unwrap();
+    assert_eq!(
+        reparsed.body.segment.data.comment,
+        ["outer-data", "mean-elements"]
+    );
+    assert!(reparsed.body.segment.data.mean_elements.comment.is_empty());
+    assert_eq!(reparsed.to_kvn().unwrap(), kvn);
+
+    let mut message = Omm::from_kvn(crate::KVN).unwrap();
+    let user_xml = "<userDefinedParameters><COMMENT>first</COMMENT><USER_DEFINED parameter=\"A\">1</USER_DEFINED><COMMENT>second</COMMENT><USER_DEFINED parameter=\"B\">2</USER_DEFINED></userDefinedParameters>";
+    let xml = message.to_xml().unwrap();
+    let start = xml.find("<userDefinedParameters>").unwrap();
+    let end = start
+        + xml[start..].find("</userDefinedParameters>").unwrap()
+        + "</userDefinedParameters>".len();
+    message = Omm::from_xml(&format!("{}{}{}", &xml[..start], user_xml, &xml[end..])).unwrap();
+    let user = message
+        .body
+        .segment
+        .data
+        .user_defined_parameters
+        .as_ref()
+        .unwrap();
+    assert_eq!(
+        user.comments().cloned().collect::<Vec<_>>(),
+        ["first", "second"]
+    );
+    assert_eq!(
+        user.parameters()
+            .map(|value| value.parameter.as_str())
+            .collect::<Vec<_>>(),
+        ["A", "B"]
+    );
+    let regenerated = message.to_xml().unwrap();
+    assert!(regenerated.contains(user_xml));
+    assert!(message.to_kvn().is_err());
+}
 #[test]
 fn to_tle_lines_iss_example() {
     let kvn = r#"CCSDS_OMM_VERS = 2.0
@@ -262,4 +306,48 @@ fn from_tle_lines_rejects_invalid_length() {
     assert!(err
         .to_string()
         .contains("exactly 68 (no checksum) or 69 (with checksum) characters"));
+}
+
+#[test]
+fn empty_user_defined_xml_block_cannot_silently_disappear_in_kvn() {
+    let mut original = Omm::from_kvn(crate::KVN).unwrap();
+    original.body.segment.data.user_defined_parameters = None;
+    let source = original.to_xml().unwrap();
+    for block in [
+        "<userDefinedParameters/>",
+        "<userDefinedParameters><COMMENT>only a comment</COMMENT></userDefinedParameters>",
+    ] {
+        let xml = source.replace("</data>", &format!("{block}</data>"));
+        let message = Omm::from_xml(&xml).unwrap();
+        assert!(message.to_kvn().is_err());
+        assert!(message.to_xml().unwrap().contains("userDefinedParameters"));
+    }
+}
+
+#[test]
+fn tle_export_requires_earth_teme_and_rounds_cyclic_angle_boundaries() {
+    for (center, frame, field) in [
+        ("MARS", "TEME", "CENTER_NAME"),
+        ("EARTH", "ICRF", "REF_FRAME"),
+    ] {
+        let mut message = Omm::from_kvn(crate::KVN).unwrap();
+        message.body.segment.metadata.center_name = center.into();
+        message.body.segment.metadata.ref_frame = frame.into();
+        crate::common::assert_validation_field(&message.to_tle_lines().unwrap_err(), field);
+        // Ordinary OMM remains usable; only the TLE representation requires these frames.
+        message.to_xml().unwrap();
+    }
+    for (value, expected) in [(359.999_94, 359.9999), (359.999_96, 0.0)] {
+        let mut message = Omm::from_kvn(crate::KVN).unwrap();
+        let elements = &mut message.body.segment.data.mean_elements;
+        elements.ra_of_asc_node.value = value;
+        elements.arg_of_pericenter.value = value;
+        elements.mean_anomaly.value = value;
+        let (line1, line2) = message.to_tle_lines().unwrap();
+        let parsed = Omm::from_tle_lines(&line1, &line2).unwrap();
+        let elements = &parsed.body.segment.data.mean_elements;
+        assert_eq!(elements.ra_of_asc_node.value, expected);
+        assert_eq!(elements.arg_of_pericenter.value, expected);
+        assert_eq!(elements.mean_anomaly.value, expected);
+    }
 }

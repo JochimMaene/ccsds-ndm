@@ -38,7 +38,7 @@ fn ocm_validation_traj_lines() {
         .build();
     // Missing lines
     ocm.body.segment.data.traj.push(traj);
-    crate::common::assert_rejects(&ocm, "trajLine");
+    crate::common::assert_rejects(&ocm, "TRAJ data line");
 
     // Fix it
     ocm.body.segment.data.traj[0].traj_lines.push(TrajLine {
@@ -54,7 +54,10 @@ fn ocm_validation_traj_lines() {
 
     for value in ["2001-366T00:00:00", "2023-01-01T24:00:00", "+", "123."] {
         ocm.body.segment.data.traj[0].traj_lines[0].epoch = value.parse().unwrap();
-        crate::common::assert_validation_field(&ocm.validate().unwrap_err(), "trajLine epoch");
+        crate::common::assert_validation_field(
+            &ocm.validate().unwrap_err(),
+            "TRAJ data line epoch",
+        );
     }
 }
 
@@ -115,15 +118,15 @@ fn ocm_metadata_sclk_requirements_and_units() {
         .time_system("SCLK")
         .epoch_tzero("2023-01-01T00:00:00".parse().unwrap())
         .build();
-    let error = metadata.validate().unwrap_err().to_string();
-    assert!(error.contains("SCLK_OFFSET_AT_EPOCH"));
+    metadata.validate().unwrap();
+    assert!(metadata.sclk_offset_at_epoch.is_none());
 
     metadata.sclk_offset_at_epoch = Some(TimeOffset {
         value: 100.0,
         units: Some(TimeUnits::Seconds),
     });
-    let error = metadata.validate().unwrap_err().to_string();
-    assert!(error.contains("SCLK_SEC_PER_SI_SEC"));
+    metadata.validate().unwrap();
+    assert!(metadata.sclk_sec_per_si_sec.is_none());
 
     metadata.sclk_sec_per_si_sec = Some(Duration {
         value: 1.0,
@@ -135,11 +138,16 @@ fn ocm_metadata_sclk_requirements_and_units() {
     assert!(metadata.validate().is_ok());
 
     metadata.sclk_offset_at_epoch.as_mut().unwrap().units = Some(TimeUnits::Day);
-    let error = metadata.validate().unwrap_err().to_string();
-    assert!(error.contains("SCLK_OFFSET_AT_EPOCH"));
-
+    assert!(metadata
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("SCLK_OFFSET_AT_EPOCH"));
     metadata.sclk_offset_at_epoch.as_mut().unwrap().units = Some(TimeUnits::Seconds);
     metadata.sclk_sec_per_si_sec.as_mut().unwrap().units = Some(TimeUnits::Day);
-    let error = metadata.validate().unwrap_err().to_string();
-    assert!(error.contains("SCLK_SEC_PER_SI_SEC"));
+    assert!(metadata
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("SCLK_SEC_PER_SI_SEC"));
 }

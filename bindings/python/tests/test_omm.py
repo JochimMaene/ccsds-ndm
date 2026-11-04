@@ -8,8 +8,33 @@ Unit tests for Orbit Mean-Elements Message (OMM) Python bindings.
 
 import ccsds_ndm
 import pytest
+from pathlib import Path
 
 from ccsds_ndm import MeanElements, OdmHeader, Omm, OmmData, OmmMetadata, OmmSegment
+from ccsds_ndm import NdmEpochError
+
+
+@pytest.mark.parametrize("element", ["BSTAR", "MEAN_MOTION_DOT", "MEAN_MOTION_DDOT"])
+def test_tle_choices_are_required_only_at_xml_boundaries(element):
+    source = (
+        Path(__file__).resolve().parents[3] / "ccsds-ndm/data/kvn/omm_g9.kvn"
+    ).read_text()
+    source = "\n".join(
+        line for line in source.splitlines() if not line.startswith(element)
+    )
+    message = Omm.from_str(source, format="kvn")
+    message.validate()
+    Omm.from_str(message.to_str("kvn"), format="kvn")
+    with pytest.raises(ccsds_ndm.NdmValidationError, match=element):
+        message.to_str("xml")
+
+
+def test_tle_parameters_mean_motion_dot_is_optional():
+    import inspect
+
+    tle = ccsds_ndm.TleParameters(bstar=0.0001)
+    assert tle.mean_motion_dot is None
+    assert "mean_motion_dot" in inspect.signature(ccsds_ndm.TleParameters).parameters
 
 
 class TestOmm:
@@ -73,7 +98,7 @@ class TestOmm:
         assert omm2.segment.data.mean_elements.eccentricity == 0.001
 
     def test_ref_frame_epoch_requires_calendar_form(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             OmmMetadata(
                 object_name="SAT1",
                 object_id="2023-001A",
@@ -85,7 +110,7 @@ class TestOmm:
             )
 
         omm = self._create_valid_omm()
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             omm.segment.data.mean_elements.epoch = "123.5"
 
     def test_file_io(self, tmp_path):

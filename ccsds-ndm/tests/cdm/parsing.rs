@@ -349,10 +349,10 @@ fn screen_frame_shape_validation() {
     let mut kvn = sample_cdm_kvn();
     kvn = kvn.replace("SCREEN_VOLUME_FRAME = RTN", "SCREEN_VOLUME_FRAME = BAD");
     let err = Cdm::from_kvn(&kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Enum(_)) => {} // Expected error
-        _ => panic!("unexpected error: {:?}", err),
-    }
+    assert!(
+        matches!(err.as_format_error(), Some(FormatError::Enum(_))),
+        "{err:?}"
+    );
 
     // Invalid SCREEN_VOLUME_SHAPE
     let mut kvn2 = sample_cdm_kvn();
@@ -551,14 +551,9 @@ fn metadata_object_types() {
         Some(ObjectDescription::Other)
     );
 
-    // Test fallback to OTHER for unknown values
-    let mut kvn = sample_cdm_kvn();
-    kvn = kvn.replace("OBJECT_TYPE = PAYLOAD", "OBJECT_TYPE = SATELLITE");
-    let cdm = Cdm::from_kvn(&kvn).expect("parse");
-    assert_eq!(
-        cdm.body.segments[0].metadata.object_type,
-        Some(ObjectDescription::Other)
-    );
+    // A closed vocabulary must not erase an unknown token by substituting OTHER.
+    let kvn = sample_cdm_kvn().replace("OBJECT_TYPE = PAYLOAD", "OBJECT_TYPE = SATELLITE");
+    assert!(Cdm::from_kvn(&kvn).is_err());
 }
 
 #[test]
@@ -566,10 +561,10 @@ fn metadata_invalid_object() {
     let mut kvn = sample_cdm_kvn();
     kvn = kvn.replace("OBJECT = OBJECT1", "OBJECT = OBJECT3");
     let err = Cdm::from_kvn(&kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Enum(_)) => {} // Expected error
-        _ => panic!("unexpected error: {:?}", err),
-    }
+    assert!(
+        matches!(err.as_format_error(), Some(FormatError::Enum(_))),
+        "{err:?}"
+    );
 }
 
 #[test]
@@ -580,10 +575,10 @@ fn metadata_invalid_covariance_method() {
         "COVARIANCE_METHOD = INVALID",
     );
     let err = Cdm::from_kvn(&kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Enum(_)) => {} // Expected error
-        _ => panic!("unexpected error: {:?}", err),
-    }
+    assert!(
+        matches!(err.as_format_error(), Some(FormatError::Enum(_))),
+        "{err:?}"
+    );
 }
 
 #[test]
@@ -602,10 +597,10 @@ fn metadata_invalid_maneuverable() {
     let mut kvn = sample_cdm_kvn();
     kvn = kvn.replace("MANEUVERABLE = YES", "MANEUVERABLE = MAYBE");
     let err = Cdm::from_kvn(&kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Enum(_)) => {} // Expected error
-        _ => panic!("unexpected error: {:?}", err),
-    }
+    assert!(
+        matches!(err.as_format_error(), Some(FormatError::Enum(_))),
+        "{err:?}"
+    );
 }
 
 #[test]
@@ -634,10 +629,10 @@ fn metadata_invalid_ref_frame() {
     let mut kvn = sample_cdm_kvn();
     kvn = kvn.replace("REF_FRAME = EME2000", "REF_FRAME = INVALID");
     let err = Cdm::from_kvn(&kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Enum(_)) => {} // Expected error
-        _ => panic!("unexpected error: {:?}", err),
-    }
+    assert!(
+        matches!(err.as_format_error(), Some(FormatError::Enum(_))),
+        "{err:?}"
+    );
 }
 
 #[test]
@@ -1052,7 +1047,200 @@ fn xml_required_unit_attributes_are_not_inferred() {
     let error = Cdm::from_xml(&input).expect_err("CDM XML state-vector positions require units");
     let diagnostic = error.to_string();
     assert!(
-        diagnostic.contains("missing") && diagnostic.contains("units"),
+        diagnostic.to_lowercase().contains("missing") && diagnostic.contains("units"),
         "{error}"
     );
+}
+
+#[test]
+fn all_normative_line_endings_preserve_the_message() {
+    let expected = Cdm::from_kvn(crate::KVN).unwrap();
+    for ending in ["\n", "\r", "\r\n", "\n\r"] {
+        let input = crate::KVN.replace('\n', ending);
+        assert_eq!(Cdm::from_kvn(&input).unwrap(), expected, "{ending:?}");
+    }
+}
+
+#[test]
+fn xml_accepts_schema_listed_lowercase_categories() {
+    let baseline = Cdm::from_xml(XML).unwrap();
+    for (upper, lower) in [
+        ("OBJECT1", "object1"),
+        ("OBJECT2", "object2"),
+        ("RTN", "rtn"),
+        ("ELLIPSOID", "ellipsoid"),
+        ("EME2000", "eme2000"),
+        ("CALCULATED", "calculated"),
+        ("YES", "yes"),
+    ] {
+        let xml = mutated(XML, &format!(">{upper}<"), &format!(">{lower}<"));
+        crate::common::validate_xml("lowercase CDM", &xml);
+        assert_eq!(Cdm::from_xml(&xml).unwrap(), baseline, "{lower}");
+    }
+    let invalid = mutated(XML, ">CALCULATED<", ">Calculated<");
+    assert!(Cdm::from_xml(&invalid).is_err());
+}
+
+#[test]
+fn namespace_qualified_xml_reads_as_the_unqualified_message() {
+    // Cor. 2 (4.3.3.3) adds the `ndm:`-qualified form; generation stays unqualified.
+    let qualified = XML.replace("</", "</ndm:").replace('<', "<ndm:");
+    let qualified = qualified
+        .replace("<ndm:?", "<?")
+        .replace("<ndm:/ndm:", "</ndm:");
+    let message = Cdm::from_xml(&qualified).unwrap();
+    assert_eq!(message, Cdm::from_xml(XML).unwrap());
+    assert!(message.to_xml().unwrap().contains("<cdm "));
+}
+
+#[test]
+fn originator_accepts_the_books_esa_sst_example_and_optional_na_is_absent() {
+    let mut message = Cdm::from_kvn(KVN).unwrap();
+    message.header.originator = "ESA SST".into();
+    let xml = message.to_xml().unwrap();
+    assert_eq!(Cdm::from_xml(&xml).unwrap().header.originator, "ESA SST");
+    let kvn = message.to_kvn().unwrap();
+    assert_eq!(Cdm::from_kvn(&kvn).unwrap().header.originator, "ESA SST");
+    let xml = xml.replace(
+        "<ORIGINATOR>ESA SST</ORIGINATOR>",
+        "<ORIGINATOR>N/A</ORIGINATOR>",
+    );
+    assert!(Cdm::from_xml(&xml).is_err());
+}
+
+#[test]
+fn xml_na_is_cdm_specific_validates_units_and_refuses_lossy_output() {
+    let source = Cdm::from_kvn(include_str!("../../data/kvn/cdm_362.kvn"))
+        .unwrap()
+        .to_xml()
+        .unwrap();
+    let source = source.replacen(
+        "<stateVector>",
+        "<additionalParameters><MASS units='kg'>1</MASS></additionalParameters><stateVector>",
+        1,
+    );
+    let start = source.find("<MASS").unwrap();
+    let end = start + source[start..].find("</MASS>").unwrap() + "</MASS>".len();
+    for value in ["N/A", "<![CDATA[N/A]]>", "N&#47;A", "N<!--split-->/A"] {
+        let xml = format!(
+            "{}<MASS units='kg'>{value}</MASS>{}",
+            &source[..start],
+            &source[end..]
+        );
+        let message = Cdm::from_xml(&xml).unwrap();
+        assert!(message.body.segments[0]
+            .data
+            .additional_parameters
+            .as_ref()
+            .is_none_or(|parameters| parameters.mass.is_none()));
+        let invalid = xml.replace("units='kg'", "units='lb'");
+        assert!(Cdm::from_xml(&invalid).is_err());
+    }
+    let mut message = Cdm::from_xml(&source).unwrap();
+    message.header.message_for = Some("N/A".into());
+    assert!(message
+        .to_xml()
+        .unwrap_err()
+        .to_string()
+        .contains("MESSAGE_FOR"));
+    let mut output = Vec::new();
+    assert!(message.write_xml_to(&mut output).is_err());
+    assert!(output.is_empty());
+    message.header.message_for = None;
+    message.header.comment.push("N/A".into());
+    assert_eq!(Cdm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+}
+
+#[test]
+fn cdm_originator_accepts_embedded_blanks_and_normalizes_xml_padding() {
+    let message = Cdm::from_kvn(include_str!("../../data/kvn/cdm_362.kvn")).unwrap();
+    let xml = message.to_xml().unwrap();
+    let opening = xml.find("<ORIGINATOR>").unwrap() + "<ORIGINATOR>".len();
+    let end = opening + xml[opening..].find('<').unwrap();
+    let padded = format!("{} ESA SST {}", &xml[..opening], &xml[end..]);
+    let mut message = Cdm::from_xml(&padded).unwrap();
+    assert_eq!(message.header.originator, "ESA SST");
+    message.to_kvn().unwrap();
+    message.header.originator = " ESA SST ".into();
+    let error = message.to_kvn().unwrap_err();
+    assert!(error.to_string().contains("ORIGINATOR"));
+}
+
+#[test]
+fn xml_unit_diagnostics_do_not_depend_on_comments_or_other_unavailable_values() {
+    let source = Cdm::from_kvn(include_str!("../../data/kvn/cdm_362.kvn"))
+        .unwrap()
+        .to_xml()
+        .unwrap();
+    let source = source.replacen(
+        "<stateVector>",
+        "<additionalParameters><MASS units='lb'>1</MASS></additionalParameters><stateVector>",
+        1,
+    );
+    let baseline = Cdm::from_xml(&source).unwrap_err();
+    assert_eq!(baseline.code(), Some("parse.xml.syntax"));
+    let baseline = baseline.diagnostic().unwrap();
+    assert!(baseline.source_location.is_some());
+    for extra in [
+        "<!--unrelated-->",
+        "<?test unrelated?>",
+        "<COMMENT><![CDATA[unrelated]]></COMMENT>",
+        "<COMMENT>N/A</COMMENT>",
+    ] {
+        let xml = source.replacen("</cdm>", &format!("{extra}</cdm>"), 1);
+        // COMMENT elements belong in the header, unlike XML comments and PIs.
+        let xml = if extra.starts_with("<COMMENT>") {
+            source.replacen("<CREATION_DATE>", &format!("{extra}<CREATION_DATE>"), 1)
+        } else {
+            xml
+        };
+        let error = Cdm::from_xml(&xml).unwrap_err();
+        assert_eq!(error.code(), Some("parse.xml.syntax"), "{extra}: {error}");
+        assert!(
+            error.diagnostic().unwrap().source_location.is_some(),
+            "{extra}"
+        );
+    }
+}
+
+#[test]
+fn unavailable_area_and_mass_keep_fixed_unit_checks_and_locations() {
+    let source = Cdm::from_kvn(include_str!("../../data/kvn/cdm_362.kvn"))
+        .unwrap()
+        .to_xml()
+        .unwrap();
+    for (field, unit) in [
+        ("MASS", "kg"),
+        ("AREA_PC", "m**2"),
+        ("CD_AREA_OVER_MASS", "m**2/kg"),
+    ] {
+        for extra in ["", "<!--unrelated-->"] {
+            let xml = source.replacen("<stateVector>", &format!(
+                "{extra}<additionalParameters><{field} units='{unit}'>N/A</{field}></additionalParameters><stateVector>"), 1);
+            Cdm::from_xml(&xml).unwrap();
+            let error =
+                Cdm::from_xml(&xml.replace(&format!("units='{unit}'"), "units='lb'")).unwrap_err();
+            assert_eq!(error.code(), Some("parse.xml.syntax"));
+            assert!(error.diagnostic().unwrap().source_location.is_some());
+        }
+    }
+}
+
+#[test]
+fn xml_identifier_padding_is_normalized_without_allowing_internal_blanks() {
+    let message = Cdm::from_kvn(crate::KVN).unwrap();
+    let mut xml = message.to_xml().unwrap();
+    for field in [
+        "ORIGINATOR",
+        "MESSAGE_ID",
+        "OBJECT_DESIGNATOR",
+        "CATALOG_NAME",
+        "INTERNATIONAL_DESIGNATOR",
+    ] {
+        xml = xml
+            .replace(&format!("<{field}>"), &format!("<{field}> \t"))
+            .replace(&format!("</{field}>"), &format!("\r\n </{field}>"));
+    }
+    assert_eq!(Cdm::from_xml(&xml).unwrap(), message);
+    assert!(Cdm::from_xml(&xml.replace("<MESSAGE_ID> \t", "<MESSAGE_ID> A B")).is_err());
 }

@@ -18,6 +18,7 @@ from ccsds_ndm import (
     TdmObservation,
     TdmSegment,
 )
+from ccsds_ndm import NdmEpochError
 
 
 class TestTdm:
@@ -87,10 +88,10 @@ class TestTdm:
         assert tdm2.header.originator == "TEST"
 
     def test_epoch_fields_reject_numeric_xsd_branch(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             TdmHeader(originator="TEST", creation_date="123.5")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             TdmObservation(epoch="123.5", keyword="RANGE", value=1.0)
 
     def test_out_of_range_rhumidity_is_rejected(self):
@@ -140,6 +141,54 @@ class TestTdm:
         ]
         tdm.validate()
 
+    def test_mode_and_path_are_plain_strings(self):
+        """MODE and PATH are str on input and output; no TdmMode/TdmPath enum classes."""
+        assert not hasattr(ccsds_ndm, "TdmMode")
+        assert not hasattr(ccsds_ndm, "TdmPath")
+        metadata = self._create_valid_tdm().body.segments[0].metadata
+        assert metadata.mode == "SEQUENTIAL"
+        assert metadata.path == "1,2,1"
+        metadata.mode = "single_diff"
+        assert metadata.mode == "SINGLE_DIFF"
+        with pytest.raises(ValueError):
+            metadata.path = "1,6"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+@pytest.mark.parametrize("direction", ["RECEIVE", "TRANSMIT"])
+@pytest.mark.parametrize("index", range(1, 6))
+def test_phase_counts_preserve_exact_decimal_text(direction, index):
+    value = "9007199254740993.12345678901234567890"
+    observation = TdmObservation(
+        epoch="2023-01-01T00:00:00",
+        keyword=f"{direction}_PHASE_CT_{index}",
+        value=value,
+    )
+    assert observation.value == value
+    assert observation.value_str == value
+    assert f'value="{value}"' in repr(observation)
+    message = Tdm(
+        header=TdmHeader(creation_date="2023-01-01T00:00:00", originator="TEST"),
+        body=TdmBody(
+            segments=[
+                TdmSegment(
+                    metadata=TdmMetadata(
+                        time_system="UTC",
+                        **{
+                            f"participant_{number}": f"STN{number}"
+                            for number in range(1, 6)
+                        },
+                    ),
+                    data=TdmData(observations=[observation]),
+                )
+            ]
+        ),
+    )
+    for notation in ("kvn", "xml"):
+        text = message.to_str(notation)
+        assert value in text
+        parsed = Tdm.from_str(text, notation)
+        assert parsed.segments[0].data.observations[0].value == value

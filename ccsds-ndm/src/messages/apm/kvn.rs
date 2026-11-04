@@ -37,17 +37,21 @@ pub fn apm_version(input: &mut &str) -> KvnResult<String> {
 // APM Metadata Parser
 //----------------------------------------------------------------------
 
-pub fn apm_metadata(input: &mut &str) -> KvnResult<ApmMetadata> {
-    let mut comment = Vec::new();
+/// Returns the metadata and any comments that followed it, which (without the non-standard
+/// META_STOP) are the data comments before EPOCH.
+pub fn apm_metadata(input: &mut &str) -> KvnResult<(ApmMetadata, Vec<String>)> {
+    let mut trailing = Vec::new();
     let mut object_name = None;
     let mut object_id = None;
     let mut center_name = None;
     let mut time_system = None;
 
-    // META_START is optional in some APM examples (e.g. apm_g1.kvn)
+    // ADM table 3-2 has no META_START/META_STOP; some producers write them anyway.
     let _ = winnow::combinator::opt(expect_block_start("META")).parse_next(input)?;
+    // The syntax check allows metadata comments only before OBJECT_NAME.
+    let comment = collect_comments.parse_next(input)?;
 
-    parse_block!(input, comment, {
+    parse_block!(input, trailing, {
         "OBJECT_NAME" => object_name: kv_string,
         "OBJECT_ID" => object_id: kv_string,
         "CENTER_NAME" => center_name: kv_string,
@@ -56,18 +60,34 @@ pub fn apm_metadata(input: &mut &str) -> KvnResult<ApmMetadata> {
 
     let _ = winnow::combinator::opt(expect_block_end("META")).parse_next(input)?;
 
-    Ok(ApmMetadata {
-        comment,
-        object_name: require_field(input, "APM Metadata", "OBJECT_NAME", object_name)?,
-        object_id: require_field(input, "APM Metadata", "OBJECT_ID", object_id)?,
-        center_name,
-        time_system: require_field(input, "APM Metadata", "TIME_SYSTEM", time_system)?,
-    })
+    Ok((
+        ApmMetadata {
+            comment,
+            object_name: require_field(input, "APM Metadata", "OBJECT_NAME", object_name)?,
+            object_id: require_field(input, "APM Metadata", "OBJECT_ID", object_id)?,
+            center_name,
+            time_system: require_field(input, "APM Metadata", "TIME_SYSTEM", time_system)?,
+        },
+        trailing,
+    ))
 }
 
 //----------------------------------------------------------------------
 // Logical Block Parsers
 //----------------------------------------------------------------------
+
+/// Parse a quaternion component, reporting a range error on its own record.
+fn kv_quaternion_component(input: &mut &str, name: &'static str) -> KvnResult<f64> {
+    let start = input.checkpoint();
+    let value = kv_float(input)?;
+    if let Err(error) = Quaternion::validate_component(name, value) {
+        input.reset(&start);
+        return Err(ErrMode::Cut(InternalParserError::from_external_error(
+            input, error,
+        )));
+    }
+    Ok(value)
+}
 
 pub fn quaternion_state(input: &mut &str) -> KvnResult<QuaternionState> {
     expect_block_start("QUAT").parse_next(input)?;
@@ -86,10 +106,10 @@ pub fn quaternion_state(input: &mut &str) -> KvnResult<QuaternionState> {
     parse_block!(input, comment, {
         "REF_FRAME_A" => ref_frame_a: kv_string,
         "REF_FRAME_B" => ref_frame_b: kv_string,
-        "Q1" => q1: kv_float,
-        "Q2" => q2: kv_float,
-        "Q3" => q3: kv_float,
-        "QC" => qc: kv_float,
+        "Q1" => q1: |i: &mut &str| kv_quaternion_component(i, "Q1"),
+        "Q2" => q2: |i: &mut &str| kv_quaternion_component(i, "Q2"),
+        "Q3" => q3: |i: &mut &str| kv_quaternion_component(i, "Q3"),
+        "QC" => qc: |i: &mut &str| kv_quaternion_component(i, "QC"),
         "Q1_DOT" => q1_dot: kv_from_kvn,
         "Q2_DOT" => q2_dot: kv_from_kvn,
         "Q3_DOT" => q3_dot: kv_from_kvn,
@@ -201,6 +221,28 @@ pub fn ang_vel_state(input: &mut &str) -> KvnResult<AngVelState> {
     })
 }
 
+fn kv_seconds_duration(input: &mut &str, field: &'static str) -> KvnResult<crate::types::Duration> {
+    let value_start = *input;
+    let (value, unit) = kv_float_unit(input)?;
+    let units = match unit {
+        None => None,
+        Some("s") => Some(crate::types::TimeUnits::Seconds),
+        _ => {
+            *input = value_start;
+            let message = match field {
+                "NUTATION_PER" => "Invalid NUTATION_PER unit; expected s",
+                _ => "Invalid MAN_DURATION unit; expected s",
+            };
+            return Err(cut_err(input, message));
+        }
+    };
+    crate::types::Duration::validate_value(value, field).map_err(|error| {
+        *input = value_start;
+        ErrMode::Cut(InternalParserError::from_external_error(input, error))
+    })?;
+    Ok(crate::types::Duration { value, units })
+}
+
 pub fn spin_state(input: &mut &str) -> KvnResult<SpinState> {
     expect_block_start("SPIN").parse_next(input)?;
     let mut comment = Vec::new();
@@ -225,7 +267,7 @@ pub fn spin_state(input: &mut &str) -> KvnResult<SpinState> {
         "SPIN_ANGLE" => spin_angle: kv_from_kvn,
         "SPIN_ANGLE_VEL" => spin_angle_vel: kv_from_kvn,
         "NUTATION" => nutation: kv_from_kvn,
-        "NUTATION_PER" => nutation_per: kv_from_kvn,
+        "NUTATION_PER" => nutation_per: |i: &mut &str| kv_seconds_duration(i, "NUTATION_PER"),
         "NUTATION_PHASE" => nutation_phase: kv_from_kvn,
         "MOMENTUM_ALPHA" => momentum_alpha: kv_from_kvn,
         "MOMENTUM_DELTA" => momentum_delta: kv_from_kvn,
@@ -300,7 +342,7 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<AttManeuverState> {
 
     parse_block!(input, comment, {
         "MAN_EPOCH_START" => man_epoch_start: kv_calendar_epoch,
-        "MAN_DURATION" => man_duration: kv_from_kvn,
+        "MAN_DURATION" => man_duration: |i: &mut &str| kv_seconds_duration(i, "MAN_DURATION"),
         "MAN_REF_FRAME" => man_ref_frame: kv_string,
         "MAN_TOR_X" => man_tor_x: kv_from_kvn,
         "MAN_TOR_Y" => man_tor_y: kv_from_kvn,
@@ -326,11 +368,8 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<AttManeuverState> {
 // APM Segment & Main Parser
 //----------------------------------------------------------------------
 
-pub fn apm_data(input: &mut &str) -> KvnResult<ApmData> {
-    // APM Data Section parsing
-
-    // First, comments are allowed before EPOCH
-    let mut comment = Vec::new();
+pub fn apm_data(input: &mut &str, mut comment: Vec<String>) -> KvnResult<ApmData> {
+    // Comments are allowed before EPOCH
     comment.extend(collect_comments.parse_next(input)?);
 
     // EPOCH is mandatory and usually the first key in data section
@@ -387,9 +426,9 @@ pub fn apm_data(input: &mut &str) -> KvnResult<ApmData> {
 }
 
 pub fn apm_segment(input: &mut &str) -> KvnResult<ApmSegment> {
-    let metadata = apm_metadata.parse_next(input)?;
+    let (metadata, data_comment) = apm_metadata.parse_next(input)?;
     let _ = skip_empty_lines.parse_next(input);
-    let data = apm_data.parse_next(input)?;
+    let data = apm_data(input, data_comment)?;
 
     Ok(ApmSegment { metadata, data })
 }
@@ -527,12 +566,6 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
         if line.as_bytes().contains(&b'\r') {
             return fail("lone carriage return");
         }
-        if line.len() > 254 {
-            return fail("line exceeds the normative 254-character limit");
-        }
-        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
-            return fail("non-printable or non-ASCII character");
-        }
         let line = line.trim();
         if line.is_empty() {
             offset += raw_line.len() + 1;
@@ -543,7 +576,7 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
                 return fail("COMMENT is not at the beginning of a logical block");
             }
             if current_block.is_none() && !matches!(top_previous, Some(0 | 3 | 4 | 13)) {
-                return fail("COMMENT is not at the beginning of a logical block");
+                return fail("COMMENT must precede the first field of its logical block; header comments precede CREATION_DATE");
             }
             pending_comment = true;
             offset += raw_line.len() + 1;
@@ -599,15 +632,21 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             .0
             .trim();
         if let Some(block) = current_block {
-            let rank = block_rank(block, key)
-                .ok_or_else(|| invalid(line_number, offset, "unknown APM block keyword".into()))?;
+            let rank = block_rank(block, key).ok_or_else(|| {
+                invalid(
+                    line_number,
+                    offset,
+                    format!("unknown APM block keyword {key}"),
+                )
+            })?;
             if block_previous.is_some_and(|previous| rank <= previous) {
                 return fail("duplicate or out-of-order APM block keyword");
             }
             block_previous = Some(rank);
         } else {
-            let rank = top_rank(key)
-                .ok_or_else(|| invalid(line_number, offset, "unknown APM keyword".into()))?;
+            let rank = top_rank(key).ok_or_else(|| {
+                invalid(line_number, offset, format!("unknown APM keyword {key}"))
+            })?;
             if pending_comment {
                 let starts_block = match key {
                     "CLASSIFICATION" | "CREATION_DATE" => top_previous == Some(0),
@@ -661,9 +700,8 @@ impl ToKvn for ApmBody {
 
 impl ToKvn for ApmSegment {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_line("META_START");
+        // APM (ADM table 3-2) has no metadata delimiters; the reader only tolerates them.
         self.metadata.write_kvn(writer);
-        writer.write_line("META_STOP");
         writer.write_line("");
         self.data.write_kvn(writer);
     }

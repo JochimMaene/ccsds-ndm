@@ -443,8 +443,11 @@ fn omm_xml_allows_a_comment_to_reopen_the_user_defined_group() {
         .user_defined_parameters
         .as_ref()
         .unwrap();
-    assert_eq!(user_defined.comment, ["first", "second"]);
-    assert_eq!(user_defined.user_defined.len(), 2);
+    assert_eq!(
+        user_defined.comments().cloned().collect::<Vec<_>>(),
+        ["first", "second"]
+    );
+    assert_eq!(user_defined.parameters().count(), 2);
 }
 
 #[test]
@@ -512,7 +515,7 @@ fn strip_tle_parameters(kvn: &str) -> String {
 #[test]
 fn omm_kvn_validation_rules_name_the_offending_field() {
     const FIXTURE: &str = include_str!("../../data/kvn/omm_g7.kvn");
-    // The shipped theory is SGP/SGP4, which imposes no TLE requirements of its own.
+    // Select a specific propagator to exercise its coefficient requirements.
     let sgp4 = |kvn: &str| mutated(kvn, "THEORY = SGP/SGP4", "THEORY = SGP4");
     let sgp = |kvn: &str| mutated(kvn, "THEORY = SGP/SGP4", "THEORY = SGP");
 
@@ -620,5 +623,119 @@ fn omm_kvn_validation_rules_name_the_offending_field() {
             error.to_string().contains(expected),
             "diagnostic did not name {expected}: {error}"
         );
+    }
+}
+
+#[test]
+fn recognized_theory_spellings_keep_conditional_requirements() {
+    for theory in [
+        "SGP/SGP4", "sgp/sgp4", "SGP4", "sgp4", "SGP", "sgp", "PPT3", "ppt3",
+    ] {
+        let source = mutated(
+            crate::KVN,
+            "THEORY = SGP/SGP4",
+            &format!("THEORY = {theory}"),
+        );
+        let mut message = Omm::from_kvn(&source).unwrap();
+        assert_eq!(message.body.segment.metadata.mean_element_theory, theory);
+        message.body.segment.data.tle_parameters = None;
+        crate::common::assert_rejects(&message, "TLE_PARAMETERS");
+        crate::common::assert_validation_field(
+            &Omm::from_kvn(&strip_tle_parameters(&source)).unwrap_err(),
+            "TLE_PARAMETERS",
+        );
+    }
+    let source = mutated(crate::KVN, "THEORY = SGP/SGP4", "THEORY = sgp4");
+    let missing_bstar = source
+        .lines()
+        .filter(|line| !line.starts_with("BSTAR"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    crate::common::assert_validation_field(&Omm::from_kvn(&missing_bstar).unwrap_err(), "BSTAR");
+}
+
+/// MEAN_MOTION_DOT is conditional (table 4-3: SGP and PPT3), so KVN may omit it for other
+/// theories; both XML schemas still require it in every TLE block.
+#[test]
+fn mean_motion_dot_is_required_only_by_its_theories_and_by_xml() {
+    let source = crate::common::mutated(
+        crate::KVN,
+        "MEAN_MOTION_DOT = -0.00000113 [rev/day**2]\n",
+        "",
+    );
+    let message = Omm::from_kvn(&source).unwrap();
+    assert!(message
+        .body
+        .segment
+        .data
+        .tle_parameters
+        .as_ref()
+        .unwrap()
+        .mean_motion_dot
+        .is_none());
+    Omm::from_kvn(&message.to_kvn().unwrap()).unwrap();
+    crate::common::assert_validation_field(&message.to_xml().unwrap_err(), "MEAN_MOTION_DOT");
+    for theory in ["SGP", "PPT3"] {
+        let mut message = message.clone();
+        message.body.segment.metadata.mean_element_theory = theory.into();
+        crate::common::assert_validation_field(&message.validate().unwrap_err(), "MEAN_MOTION_DOT");
+    }
+}
+
+#[test]
+fn bad_epoch_retains_omm_source_edition_and_location() {
+    let source = include_str!("../../data/kvn/omm_g7.kvn");
+    let record = source
+        .lines()
+        .find(|line| line.starts_with("EPOCH ="))
+        .unwrap();
+    let invalid = source.replacen(record, "EPOCH = invalid", 1);
+    let error = Omm::from_kvn(&invalid).unwrap_err();
+    let diagnostic = error.diagnostic().unwrap();
+    assert_eq!(
+        diagnostic.message_kind,
+        ccsds_ndm::validation::MessageKind::Omm
+    );
+    assert_eq!(diagnostic.source_edition, Some("3.0"));
+    assert!(diagnostic.source_location.is_some());
+}
+
+#[test]
+fn xml_unsigned_integer_fields_accept_signed_zero_without_accepting_negatives() {
+    for field in ["NORAD_CAT_ID", "REV_AT_EPOCH"] {
+        let open = format!("<{field}>");
+        let close = format!("</{field}>");
+        let value = XML
+            .split_once(&open)
+            .unwrap()
+            .1
+            .split_once(&close)
+            .unwrap()
+            .0;
+        for spelling in ["-0", "-000", "+000", " 0 "] {
+            let xml = mutated(
+                XML,
+                &format!("{open}{value}{close}"),
+                &format!("{open}{spelling}{close}"),
+            );
+            crate::common::validate_xml("OMM unsigned integer lexical zero", &xml);
+            let message = Omm::from_xml(&xml).unwrap();
+            let tle = message.body.segment.data.tle_parameters.as_ref().unwrap();
+            assert_eq!(
+                if field == "NORAD_CAT_ID" {
+                    tle.norad_cat_id
+                } else {
+                    tle.rev_at_epoch
+                },
+                Some(0)
+            );
+            Omm::from_xml(&message.to_xml().unwrap()).unwrap();
+        }
+        let negative = mutated(
+            XML,
+            &format!("{open}{value}{close}"),
+            &format!("{open}-1{close}"),
+        );
+        assert!(Omm::from_xml(&negative).is_err());
     }
 }

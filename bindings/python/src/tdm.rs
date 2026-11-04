@@ -9,8 +9,7 @@ use ccsds_ndm::types::{self as core_types};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
-use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pymethods};
-use std::str::FromStr;
+use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 
 // ============================================================================
 // TDM - Tracking Data Message
@@ -40,15 +39,15 @@ use std::str::FromStr;
 ///     The message body containing segments.
 ///     (Mandatory)
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct Tdm {
-    /// The message identifier.
+    /// The XML root id attribute, always "CCSDS_TDM_VERS"; see the header for MESSAGE_ID.
     ///
     /// :type: Optional[str]
     #[pyo3(get)]
     id: Option<String>,
 
-    /// The message version.
+    /// Message edition: "2.0", or "1.0" from the restricted input-only KVN/XML reader.
     ///
     /// :type: str
     #[pyo3(get)]
@@ -135,55 +134,110 @@ impl Tdm {
     fn get_segments(&self, py: Python<'_>) -> Py<PyList> {
         self.body.borrow(py).segments.clone_ref(py)
     }
-
-    /// Create a TDM message from a string.
+    /// Parse a TDM document and validate its contents.
     ///
     /// Parameters
     /// ----------
     /// data : str
-    ///     Input string/content.
+    ///     KVN or XML content.
     /// format : str, optional
-    ///     Format ('kvn' or 'xml'). Auto-detected if None.
-    ///     (Optional)
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
     ///
     /// Returns
     /// -------
     /// Tdm
-    ///     The parsed TDM object.
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Concatenated KVN messages have no combined KVN representation.
+    /// ValueError
+    ///     Unsupported format argument.
     #[staticmethod]
     #[pyo3(signature = (data, format=None))]
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Parse a TDM from a KVN or XML file.
+    /// Read a UTF-8 TDM document from a file and validate it.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Input file.
+    /// format : str, optional
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// Tdm
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Concatenated KVN messages have no combined KVN representation.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Input file could not be read.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Atomically write this TDM as KVN or XML.
+    /// Validate this TDM message and atomically replace the destination.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Destination file; existing content is replaced only after successful generation.
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Temporary-file writing or atomic replacement failed.
     fn to_file(
         &self,
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<()> {
         crate::api::generate_file(
             py,
@@ -192,13 +246,32 @@ impl Tdm {
             format,
         )
     }
-
-    /// Serialize to validated KVN or XML.
+    /// Validate and serialize this TDM message, preserving its edition.
+    ///
+    /// Parameters
+    /// ----------
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     Generated document, subject to the documented notation normalizations.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
     fn to_str(
         &self,
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<String> {
         crate::api::generate_string(py, &self.to_core(py)?, format)
     }
@@ -220,12 +293,15 @@ impl Tdm {
 ///     (Mandatory)
 /// message_id : str, optional
 ///     ID that uniquely identifies a message from a given originator.
-///     (Optional)
 /// comment : list[str], optional
 ///     Comments.
-///     (Optional)
+///
+/// Raises
+/// ------
+/// NdmEpochError
+///     If creation_date is not a CCSDS calendar epoch.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct TdmHeader {
     pub inner: core_tdm::TdmHeader,
@@ -341,7 +417,7 @@ impl TdmHeader {
 /// segments : list[TdmSegment]
 ///     List of data segments.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct TdmBody {
     segments: Py<PyList>,
 }
@@ -421,7 +497,7 @@ impl TdmBody {
 ///     Segment data.
 ///     (Mandatory)
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct TdmSegment {
     /// Metadata section for this TDM segment.
     ///
@@ -482,20 +558,214 @@ impl TdmSegment {
 /// Represents the Metadata Section of a TDM Segment.
 ///
 /// Contains configuration details applicable to the Data Section in the same TDM Segment.
+/// Omitted optional fields remain None. Book defaults below describe interpretation and
+/// are not automatically stored by this constructor. Complete cross-field validation runs
+/// through the owning Tdm.validate() and every generation method.
 ///
-/// Mandatory Parameters
-/// --------------------
-/// time_system : str
-///     Time system used for timetags (e.g., "UTC", "TAI").
+/// Parameters
+/// ----------
 /// participant_1 : str
-///     First participant in the tracking session.
+///     The PARTICIPANT_n keyword shall represent the participants (see 1.3.4.1) in a tracking data
+///     session. It is indexed to allow unambiguous reference to other data in the TDM (max index is
+///     5). At least two participants must be specified for most sessions; for some special TDMs such
+///     as tropospheric media, only one participant need be listed.
+/// time_system : str
+///     The TIME_SYSTEM keyword shall specify the time system used for timetags in the associated Data
+///     Section. This should be UTC for ground-based data. The value associated with this keyword must
+///     be selected from the full set of allowed values enumerated in the SANA Time Systems Registry
+///     <https://sanaregistry.org/r/time_systems> (reference `[12]`). (See annex B.) TDM 1.0 input
+///     (503.0-B-1 annex A1) admits ICD-defined values in KVN; 1.0 XML uses the NDM/XML 1.0 list.
+/// track_id : str, optional
+///     The TRACK_ID keyword specifies a unique identifier for the tracking data in the associated
+///     data section. The value may be a freely selected string of characters and numbers, only
+///     required to be unique for each track of the corresponding sensor. For example, the value may
+///     be constructed from the measurement date and time and a counter to distinguish simultaneously
+///     tracked objects.
+/// data_types : str, optional
+///     Comma-separated list of data types in the Data Section. The elements of the list shall be
+///     selected from the data types shown in table 3-5, with the exception of the DATA_START,
+///     DATA_STOP, and COMMENT keywords.
+/// start_time : str, optional
+///     The START_TIME keyword shall specify the UTC start time of the total time span covered by the
+///     tracking data immediately following this Metadata Section. (For format specification, see
+///     4.3.9.)
+/// stop_time : str, optional
+///     The STOP_TIME keyword shall specify the UTC stop time of the total time span covered by the
+///     tracking data immediately following this Metadata Section. (For format specification, see
+///     4.3.9.)
+/// participant_2 : str, optional
+///     The second participant in a tracking data session.
+/// participant_3 : str, optional
+///     The third participant in a tracking data session.
+/// participant_4 : str, optional
+///     The fourth participant in a tracking data session.
+/// participant_5 : str, optional
+///     The fifth participant in a tracking data session.
+/// mode : str, optional
+///     The MODE keyword shall reflect the tracking mode associated with the Data Section of the
+///     segment. The value ‘SEQUENTIAL’ applies for most sequential signal paths; the name implies a
+///     sequential signal path between tracking participants. The value ‘SINGLE_DIFF’ applies only for
+///     differenced data.
+/// path : str, optional
+///     The PATH keywords shall reflect the signal path by listing the index of each participant in
+///     order, separated by commas, with no inserted white space. Correlated with the indices of the
+///     PARTICIPANT_n keywords. The first entry in the PATH shall be the transmit participant.
+/// path_1 : str, optional
+///     The first signal path where the MODE is 'SINGLE_DIFF'.
+/// path_2 : str, optional
+///     The second signal path where the MODE is 'SINGLE_DIFF'.
+/// transmit_band : str, optional
+///     The TRANSMIT_BAND keyword shall indicate the frequency band for transmitted frequencies. The
+///     frequency ranges associated with each band should be specified in the ICD.
+/// receive_band : str, optional
+///     The RECEIVE_BAND keyword shall indicate the frequency band for received frequencies. Although
+///     not required in general, the RECEIVE_BAND must be present if the MODE is SINGLE_DIFF and
+///     differenced frequencies or differenced range are provided in order to allow proper frequency
+///     dependent corrections to be applied.
+/// turnaround_numerator : int, optional
+///     The TURNAROUND_NUMERATOR keyword shall indicate the numerator of the turnaround ratio that is
+///     necessary to calculate the coherent downlink from the uplink frequency.
+/// turnaround_denominator : int, optional
+///     The TURNAROUND_DENOMINATOR keyword shall indicate the denominator of the turnaround ratio that
+///     is necessary to calculate the coherent downlink from the uplink frequency.
+/// timetag_ref : str, optional
+///     The TIMETAG_REF keyword shall provide a reference for time tags in the tracking data. This
+///     keyword indicates whether the timetag associated with the data is the transmit time or the
+///     receive time.
+/// integration_interval : float, optional
+///     The INTEGRATION_INTERVAL keyword shall provide the Doppler count time in seconds for Doppler
+///     data or for the creation of normal points.
+/// integration_ref : str, optional
+///     Indicates the relationship between the INTEGRATION_INTERVAL and the timetag on the data, i.e.,
+///     whether the timetag represents the start, middle, or end of the integration period.
+/// freq_offset : float, optional
+///     The FREQ_OFFSET keyword represents a frequency in Hz that must be added to every RECEIVE_FREQ
+///     to reconstruct it. One use is if a Doppler shift frequency observable is transferred instead
+///     of the actual received frequency. The default shall be 0.0.
+/// range_mode : str, optional
+///     The value of the RANGE_MODE keyword shall be ‘COHERENT’, in which case the range tones are
+///     coherent with the uplink carrier; ‘CONSTANT’, in which case the range tones have a constant
+///     frequency; or ‘ONE_WAY’ (used in Delta-DOR).
+/// range_modulus : float, optional
+///     The value associated with the RANGE_MODULUS keyword shall be the modulus of the range
+///     observable in the units as specified by the RANGE_UNITS keyword; that is, the actual
+///     (unambiguous) range is an integer k times the modulus, plus the observable value. The default
+///     value shall be 0.0.
+/// range_units : str, optional
+///     The RANGE_UNITS keyword specifies the units for the range observable. ‘km’ shall be used if
+///     the range is measured in kilometers. ‘s’ shall be used if the range is measured in seconds.
+///     ‘RU’, for ‘range units’, shall be used where the transmit frequency is changing. The default
+///     value shall be ‘km’.
+/// angle_type : str, optional
+///     The ANGLE_TYPE keyword shall indicate the type of antenna geometry represented in the angle
+///     data (ANGLE_1 and ANGLE_2 keywords).
+/// reference_frame : str, optional
+///     The REFERENCE_FRAME keyword shall be used in conjunction with the ‘ANGLE_TYPE=RADEC’
+///     keyword/value combination, indicating the inertial reference frame to which the antenna frame
+///     is referenced.
+/// interpolation : str, optional
+///     The INTERPOLATION keyword shall specify the interpolation method to be used to calculate a
+///     transmit phase count at an arbitrary time in tracking data where the uplink frequency is not
+///     constant.
+/// interpolation_degree : int, optional
+///     The INTERPOLATION_DEGREE keyword shall specify the recommended degree of the interpolating
+///     polynomial used to calculate a transmit phase count at an arbitrary time in tracking data
+///     where the uplink frequency is not constant.
+/// doppler_count_bias : float, optional
+///     Doppler counts are generally biased so as to accommodate negative Doppler within an
+///     accumulator. In order to reconstruct the measurement, the bias shall be subtracted from the
+///     DOPPLER_COUNT data value.
+/// doppler_count_scale : int, optional
+///     Doppler counts are generally scaled so as to capture partial cycles in an integer count. In
+///     order to reconstruct the measurement, the DOPPLER_COUNT data value shall be divided by the
+///     scale factor. The default shall be 1.
+/// doppler_count_rollover : str, optional
+///     Doppler counts may overflow the accumulator and roll over in cases where the track is of long
+///     duration or very high Doppler shift. This flag indicates whether or not a counter rollover has
+///     occurred during the track.
+/// transmit_delay_1 : float, optional
+///     The TRANSMIT_DELAY_n keyword shall specify a fixed interval of time, in seconds, required for
+///     the signal to travel from the transmitting electronics to the transmit point. The default
+///     value shall be 0.0.
+/// transmit_delay_2 : float, optional
+///     Fixed interval of time, in seconds, required for the signal to travel from the transmitting
+///     electronics to the transmit point for participant 2.
+/// transmit_delay_3 : float, optional
+///     Fixed interval of time, in seconds, required for the signal to travel from the transmitting
+///     electronics to the transmit point for participant 3.
+/// transmit_delay_4 : float, optional
+///     Fixed interval of time, in seconds, required for the signal to travel from the transmitting
+///     electronics to the transmit point for participant 4.
+/// transmit_delay_5 : float, optional
+///     Fixed interval of time, in seconds, required for the signal to travel from the transmitting
+///     electronics to the transmit point for participant 5.
+/// receive_delay_1 : float, optional
+///     The RECEIVE_DELAY_n keyword shall specify a fixed interval of time, in seconds, required for
+///     the signal to travel from the tracking point to the receiving electronics. The default value
+///     shall be 0.0.
+/// receive_delay_2 : float, optional
+///     Fixed interval of time, in seconds, required for the signal to travel from the tracking point
+///     to the receiving electronics for participant 2.
+/// receive_delay_3 : float, optional
+///     Fixed interval of time, in seconds, required for the signal to travel from the tracking point
+///     to the receiving electronics for participant 3.
+/// receive_delay_4 : float, optional
+///     Fixed interval of time, in seconds, required for the signal to travel from the tracking point
+///     to the receiving electronics for participant 4.
+/// receive_delay_5 : float, optional
+///     Fixed interval of time, in seconds, required for the signal to travel from the tracking point
+///     to the receiving electronics for participant 5.
+/// data_quality : str, optional
+///     Provides an estimate of the quality of the data, based on indicators from the producers of the
+///     data (e.g., bad time synchronization flags, marginal lock status indicators, etc.). The
+///     default value shall be ‘RAW’.
+/// correction_angle_1 : float, optional
+///     The set of CORRECTION_* keywords may be used to reflect the values of corrections that have
+///     been added to the data or should be added to the data (e.g., ranging station delay
+///     calibration, etc.).
+/// correction_angle_2 : float, optional
+///     A correction value to be added to the ANGLE_2 data.
+/// correction_doppler : float, optional
+///     A correction value to be added to the Doppler data.
+/// correction_mag : float, optional
+///     A correction value to be added to the magnitude data.
+/// correction_range : float, optional
+///     A correction value to be added to the range data.
+/// correction_rcs : float, optional
+///     A correction value to be added to the RCS data.
+/// correction_receive : float, optional
+///     A correction value to be added to the received frequency or phase count data.
+/// correction_transmit : float, optional
+///     A correction value to be added to the transmitted frequency or phase count data.
+/// correction_aberration_yearly : float, optional
+///     A correction value for yearly aberration.
+/// correction_aberration_diurnal : float, optional
+///     A correction value for diurnal aberration.
+/// corrections_applied : Boun, optional
+///     This keyword is used to indicate whether or not the values associated with the CORRECTION_*
+///     keywords have been applied to the tracking data. Required if any of the CORRECTION_* keywords
+///     is used.
+/// ephemeris_name_1 : str, optional
+///     Unique name of the external ephemeris file used for participant 1.
+/// ephemeris_name_2 : str, optional
+///     Unique name of the external ephemeris file used for participant 2.
+/// ephemeris_name_3 : str, optional
+///     Unique name of the external ephemeris file used for participant 3.
+/// ephemeris_name_4 : str, optional
+///     Unique name of the external ephemeris file used for participant 4.
+/// ephemeris_name_5 : str, optional
+///     Unique name of the external ephemeris file used for participant 5.
+/// comment : list[str], optional
+///     Comments.
 ///
-/// Optional Parameters
-/// -------------------
-/// Many optional parameters are available to describe the tracking configuration,
-/// signal path, frequencies, and corrections. See CCSDS TDM Blue Book for full details.
+/// Raises
+/// ------
+/// ValueError
+///     If an enumeration, integer, or unit-bearing metadata value is invalid.
+/// NdmEpochError
+///     If a CCSDS epoch or time tag is invalid.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct TdmMetadata {
     pub inner: core_tdm::TdmMetadata,
@@ -582,8 +852,8 @@ impl TdmMetadata {
         participant_3: Option<String>,
         participant_4: Option<String>,
         participant_5: Option<String>,
-        mode: Option<Bound<'_, PyAny>>,
-        path: Option<Bound<'_, PyAny>>,
+        mode: Option<String>,
+        path: Option<String>,
 
         path_1: Option<String>,
         path_2: Option<String>,
@@ -626,6 +896,7 @@ impl TdmMetadata {
         correction_transmit: Option<f64>,
         correction_aberration_yearly: Option<f64>,
         correction_aberration_diurnal: Option<f64>,
+        #[gen_stub(override_type(type_repr = "YesNo | builtins.str | None", imports = ("builtins")))]
         corrections_applied: Option<Bound<'_, PyAny>>,
         ephemeris_name_1: Option<String>,
         ephemeris_name_2: Option<String>,
@@ -635,16 +906,6 @@ impl TdmMetadata {
         comment: Option<Vec<String>>,
     ) -> PyResult<Self> {
         use std::str::FromStr;
-
-        let mode = match mode {
-            Some(ref ob) => Some(parse_tdm_mode(ob)?),
-            None => None,
-        };
-
-        let path = match path {
-            Some(ref ob) => Some(parse_tdm_path(ob)?),
-            None => None,
-        };
 
         let corrections_applied = match corrections_applied {
             Some(ref ob) => Some(parse_yes_no(ob)?),
@@ -664,8 +925,18 @@ impl TdmMetadata {
                 participant_3,
                 participant_4,
                 participant_5,
-                mode,
-                path,
+                mode: mode
+                    .map(|s| {
+                        core_types::TdmMode::from_str(&s)
+                            .map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
+                path: path
+                    .map(|s| {
+                        core_types::TdmPath::from_str(&s)
+                            .map_err(|e| PyValueError::new_err(e.to_string()))
+                    })
+                    .transpose()?,
                 path_1: path_1
                     .map(|s| {
                         core_types::TdmPath::from_str(&s)
@@ -774,6 +1045,8 @@ impl TdmMetadata {
     /// Comments.
     ///
     /// :type: list[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_comment(&self) -> Vec<String> {
         self.inner.comment.clone()
@@ -825,7 +1098,8 @@ impl TdmMetadata {
     /// associated Data Section. This should be UTC for ground-based data. The value associated
     /// with this keyword must be selected from the full set of allowed values enumerated in
     /// the SANA Time Systems Registry <https://sanaregistry.org/r/time_systems> (reference `[12]`).
-    /// (See annex B.)
+    /// (See annex B.) TDM 1.0 input (503.0-B-1 annex A1) lists the same systems and admits
+    /// ICD-defined values in KVN; 1.0 XML is limited to the NDM/XML 1.0 schema list.
     ///
     /// Examples: UTC, TAI, GPS, SCLK
     ///
@@ -907,6 +1181,8 @@ impl TdmMetadata {
     /// The second participant in a tracking data session.
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_participant_2(&self) -> Option<String> {
         self.inner.participant_2.clone()
@@ -919,6 +1195,8 @@ impl TdmMetadata {
     /// The third participant in a tracking data session.
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_participant_3(&self) -> Option<String> {
         self.inner.participant_3.clone()
@@ -931,6 +1209,8 @@ impl TdmMetadata {
     /// The fourth participant in a tracking data session.
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_participant_4(&self) -> Option<String> {
         self.inner.participant_4.clone()
@@ -943,6 +1223,8 @@ impl TdmMetadata {
     /// The fifth participant in a tracking data session.
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_participant_5(&self) -> Option<String> {
         self.inner.participant_5.clone()
@@ -1002,7 +1284,11 @@ impl TdmMetadata {
 
     /// The first signal path where the MODE is 'SINGLE_DIFF'.
     ///
+    /// PATH_1 and PATH_2 must be supplied together; every index names a supplied participant.
+    ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_path_1(&self) -> Option<String> {
         self.inner.path_1.as_ref().map(|v| v.to_string())
@@ -1019,7 +1305,11 @@ impl TdmMetadata {
 
     /// The second signal path where the MODE is 'SINGLE_DIFF'.
     ///
+    /// PATH_1 and PATH_2 must be supplied together; every index names a supplied participant.
+    ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_path_2(&self) -> Option<String> {
         self.inner.path_2.as_ref().map(|v| v.to_string())
@@ -1039,6 +1329,8 @@ impl TdmMetadata {
     /// Examples: SATELLITE_A_EPHEM27
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_ephemeris_name_1(&self) -> Option<String> {
         self.inner.ephemeris_name_1.clone()
@@ -1053,6 +1345,8 @@ impl TdmMetadata {
     /// Examples: SATELLITE_A_EPHEM27
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_ephemeris_name_2(&self) -> Option<String> {
         self.inner.ephemeris_name_2.clone()
@@ -1067,6 +1361,8 @@ impl TdmMetadata {
     /// Examples: SATELLITE_A_EPHEMERIS
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_ephemeris_name_3(&self) -> Option<String> {
         self.inner.ephemeris_name_3.clone()
@@ -1081,6 +1377,8 @@ impl TdmMetadata {
     /// Examples: SATELLITE_A_EPHEMERIS
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_ephemeris_name_4(&self) -> Option<String> {
         self.inner.ephemeris_name_4.clone()
@@ -1095,6 +1393,8 @@ impl TdmMetadata {
     /// Examples: SATELLITE_A_EPHEMERIS
     ///
     /// :type: Optional[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_ephemeris_name_5(&self) -> Option<String> {
         self.inner.ephemeris_name_5.clone()
@@ -1502,6 +1802,8 @@ impl TdmMetadata {
     /// Units: s
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_transmit_delay_2(&self) -> Option<f64> {
         self.inner.transmit_delay_2
@@ -1517,6 +1819,8 @@ impl TdmMetadata {
     /// Units: s
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_transmit_delay_3(&self) -> Option<f64> {
         self.inner.transmit_delay_3
@@ -1532,6 +1836,8 @@ impl TdmMetadata {
     /// Units: s
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_transmit_delay_4(&self) -> Option<f64> {
         self.inner.transmit_delay_4
@@ -1547,6 +1853,8 @@ impl TdmMetadata {
     /// Units: s
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_transmit_delay_5(&self) -> Option<f64> {
         self.inner.transmit_delay_5
@@ -1582,6 +1890,8 @@ impl TdmMetadata {
     /// Units: s
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_receive_delay_2(&self) -> Option<f64> {
         self.inner.receive_delay_2
@@ -1597,6 +1907,8 @@ impl TdmMetadata {
     /// Units: s
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_receive_delay_3(&self) -> Option<f64> {
         self.inner.receive_delay_3
@@ -1612,6 +1924,8 @@ impl TdmMetadata {
     /// Units: s
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_receive_delay_4(&self) -> Option<f64> {
         self.inner.receive_delay_4
@@ -1627,6 +1941,8 @@ impl TdmMetadata {
     /// Units: s
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_receive_delay_5(&self) -> Option<f64> {
         self.inner.receive_delay_5
@@ -1682,6 +1998,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_angle_2(&self) -> Option<f64> {
         self.inner.correction_angle_2
@@ -1696,6 +2014,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_doppler(&self) -> Option<f64> {
         self.inner.correction_doppler
@@ -1710,6 +2030,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_mag(&self) -> Option<f64> {
         self.inner.correction_mag
@@ -1724,6 +2046,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_range(&self) -> Option<f64> {
         self.inner.correction_range
@@ -1738,6 +2062,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_rcs(&self) -> Option<f64> {
         self.inner.correction_rcs
@@ -1752,6 +2078,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_receive(&self) -> Option<f64> {
         self.inner.correction_receive
@@ -1766,6 +2094,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_transmit(&self) -> Option<f64> {
         self.inner.correction_transmit
@@ -1780,6 +2110,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_aberration_yearly(&self) -> Option<f64> {
         self.inner.correction_aberration_yearly
@@ -1794,6 +2126,8 @@ impl TdmMetadata {
     /// Examples: -1.35, 0.23, -3.0e-1, 150000.0
     ///
     /// :type: Optional[float]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Section 3.3, Table 3-3.
     #[getter]
     fn get_correction_aberration_diurnal(&self) -> Option<f64> {
         self.inner.correction_aberration_diurnal
@@ -1841,16 +2175,16 @@ impl TdmMetadata {
 /// ----------
 /// observations : list[TdmObservation], optional
 ///     List of tracking data records.
-///     (Optional)
 /// comment : list[str], optional
 ///     Comments in the data section.
-///     (Optional)
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct TdmData {
     /// Comments.
     ///
-    /// :type: list[TdmObservation]
+    /// :type: list[str]
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.4–3.5.
     #[pyo3(get, set)]
     comment: Vec<String>,
 
@@ -1905,6 +2239,8 @@ impl TdmData {
 
     /// Tracking data records.
     ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.4–3.5.
+    ///
     /// :type: list[TdmObservation]
     #[gen_stub(override_return_type(type_repr = "list[TdmObservation]"))]
     #[getter]
@@ -1933,12 +2269,16 @@ impl TdmData {
 ///     Time associated with the tracking observable.
 /// keyword : str
 ///     Data type keyword (e.g., "RANGE", "RECEIVE_FREQ").
-/// value : float
-///     Tracking observable value. Note: For phase counts that require full precision strings,
-///     use internal representation handling (this constructor takes float for simplicity,
-///     but the object can hold string representations internally).
+/// value : float | str
+///     Measurement value in the keyword's fixed CCSDS table 3-5 units; RANGE uses
+///     metadata RANGE_UNITS. No unit conversion is performed. Pass decimal text for
+///     phase counts to retain all digits.
+///
+/// Construction checks the keyword, epoch and lexical number, and RHUMIDITY's percentage
+/// domain. Complete observation domains and metadata dependencies are checked by the
+/// owning Tdm.validate() and generation methods.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct TdmObservation {
     pub inner: core_tdm::TdmObservation,
@@ -1949,9 +2289,18 @@ pub struct TdmObservation {
 impl TdmObservation {
     #[new]
     #[pyo3(signature = (*, epoch, keyword, value))]
-    fn new(epoch: String, keyword: String, value: f64) -> PyResult<Self> {
-        let data = core_tdm::TdmObservationData::from_key_value(&keyword, value)
-            .map_err(crate::errors::ccsds_error_to_pyerr)?;
+    fn new(
+        epoch: String,
+        keyword: String,
+        #[gen_stub(override_type(type_repr = "builtins.float | builtins.str", imports=("builtins")))]
+        value: Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        let data = if let Ok(value) = value.extract::<String>() {
+            core_tdm::TdmObservationData::from_key_val(&keyword, &value)
+        } else {
+            core_tdm::TdmObservationData::from_key_value(&keyword, value.extract::<f64>()?)
+        }
+        .map_err(crate::errors::ccsds_error_to_pyerr)?;
 
         Ok(Self {
             inner: core_tdm::TdmObservation {
@@ -1966,13 +2315,18 @@ impl TdmObservation {
             "TdmObservation(epoch='{}', keyword='{}', value={})",
             self.inner.epoch,
             self.inner.data.key(),
-            self.inner.data.value_to_string()
+            self.inner.data.value().map_or_else(
+                || format!("{:?}", self.inner.data.value_to_string()),
+                |value| value.to_string(),
+            )
         )
     }
 
     /// Time associated with the tracking observable.
     ///
     /// :type: str
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.4–3.5.
     #[getter]
     fn get_epoch(&self) -> String {
         self.inner.epoch.as_str().to_string()
@@ -1987,19 +2341,30 @@ impl TdmObservation {
     /// Keyword of the observation (e.g., "RANGE").
     ///
     /// :type: str
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.4–3.5.
     #[getter]
     fn get_keyword(&self) -> String {
         self.inner.data.key().to_string()
     }
 
-    /// Measurement value as float.
+    /// Exact decimal text for phase counts, otherwise a numeric measurement.
     ///
-    /// Returns None if the value is not representable as a float (unlikely for TDM).
-    ///
-    /// :type: Optional[float]
+    /// :type: float | str
     #[getter]
-    fn get_value(&self) -> Option<f64> {
-        Some(self.inner.data.value())
+    #[gen_stub(override_return_type(type_repr = "builtins.float | builtins.str", imports=("builtins")))]
+    fn get_value(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        if let Some(value) = self.inner.data.value() {
+            Ok(value.into_pyobject(py)?.into_any().unbind())
+        } else {
+            Ok(self
+                .inner
+                .data
+                .value_to_string()
+                .into_pyobject(py)?
+                .into_any()
+                .unbind())
+        }
     }
 
     /// Measurement value as string.
@@ -2007,77 +2372,10 @@ impl TdmObservation {
     /// Useful for phase counts which may require high precision.
     ///
     /// :type: str
+    ///
+    /// CCSDS Reference: 503.0-B-2, Sections 3.4–3.5.
     #[getter]
     fn get_value_str(&self) -> String {
         self.inner.data.value_to_string()
-    }
-}
-
-#[gen_stub_pyclass_enum]
-#[pyclass(from_py_object, eq, eq_int)]
-#[derive(Clone, PartialEq, Copy)]
-pub enum TdmMode {
-    Sequential,
-    SingleDiff,
-}
-
-#[gen_stub_pymethods]
-#[pymethods]
-impl TdmMode {
-    fn __str__(&self) -> &'static str {
-        match self {
-            TdmMode::Sequential => "SEQUENTIAL",
-            TdmMode::SingleDiff => "SINGLE_DIFF",
-        }
-    }
-    fn __repr__(&self) -> String {
-        format!("TdmMode.{}", self.__str__())
-    }
-}
-
-pub fn parse_tdm_mode(ob: &Bound<'_, PyAny>) -> PyResult<core_types::TdmMode> {
-    if let Ok(val) = ob.extract::<TdmMode>() {
-        Ok(match val {
-            TdmMode::Sequential => core_types::TdmMode::Sequential,
-            TdmMode::SingleDiff => core_types::TdmMode::SingleDiff,
-        })
-    } else if let Ok(s) = ob.extract::<String>() {
-        core_types::TdmMode::from_str(&s).map_err(|e| PyValueError::new_err(e.to_string()))
-    } else {
-        Err(PyValueError::new_err("Expected TdmMode enum or string"))
-    }
-}
-
-#[gen_stub_pyclass_enum]
-#[pyclass(from_py_object, eq, eq_int)]
-#[derive(Clone, PartialEq, Copy)]
-pub enum TdmPath {
-    Path1,
-    Path2,
-    Path3,
-}
-
-#[gen_stub_pymethods]
-#[pymethods]
-impl TdmPath {
-    fn __str__(&self) -> &'static str {
-        match self {
-            TdmPath::Path1 => "1,2",
-            TdmPath::Path2 => "2,1",
-            TdmPath::Path3 => "1,2,1",
-        }
-    }
-    fn __repr__(&self) -> String {
-        format!("TdmPath.Path_{}", self.__str__())
-    }
-}
-
-pub fn parse_tdm_path(ob: &Bound<'_, PyAny>) -> PyResult<core_types::TdmPath> {
-    if let Ok(val) = ob.extract::<TdmPath>() {
-        Ok(core_types::TdmPath(val.__str__().to_string()))
-    } else if let Ok(s) = ob.extract::<String>() {
-        Ok(core_types::TdmPath(s))
-    } else {
-        Err(PyValueError::new_err("Expected TdmPath enum or string"))
     }
 }

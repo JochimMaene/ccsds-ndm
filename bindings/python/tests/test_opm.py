@@ -18,6 +18,7 @@ from ccsds_ndm import (
     OpmSegment,
     StateVector,
 )
+from ccsds_ndm import NdmEpochError
 
 
 class TestOpm:
@@ -101,7 +102,7 @@ class TestOpm:
         assert opm2.header.originator == "TEST"
 
     def test_epoch_fields_require_calendar_form(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             OpmMetadata(
                 object_name="SAT1",
                 object_id="2023-001A",
@@ -111,7 +112,7 @@ class TestOpm:
                 ref_frame_epoch="12345.5",
             )
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             StateVector(
                 epoch="12345.5",
                 x=7000.0,
@@ -126,3 +127,15 @@ class TestOpm:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+def test_covariance_constructor_uses_comment_keyword():
+    fields = (
+        "cx_x cy_x cy_y cz_x cz_y cz_z cx_dot_x cx_dot_y cx_dot_z "
+        "cy_dot_x cy_dot_y cy_dot_z cz_dot_x cz_dot_y cz_dot_z "
+        "cx_dot_x_dot cy_dot_x_dot cy_dot_y_dot cz_dot_x_dot cz_dot_y_dot cz_dot_z_dot"
+    ).split()
+    covariance = ccsds_ndm.OpmCovarianceMatrix(
+        **dict.fromkeys(fields, 0.0), comment=["caller comment"]
+    )
+    assert covariance.comment == ["caller comment"]

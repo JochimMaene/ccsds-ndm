@@ -18,28 +18,26 @@ fn aem_data_validation_mismatches() {
         angle_3: Angle::new(30.0, None).unwrap(),
     });
 
-    // Type mismatch: Expects QUATERNION, gets EULER_ANGLE
-    let data = AemData {
-        comment: vec![],
-        attitude_states: vec![valid_euler.clone()],
+    // ADM 4.2.4.5: every record must match the segment's ATTITUDE_TYPE. `AemData` has no
+    // metadata, so the segment is the single validation path for this rule.
+    use ccsds_ndm::Ndm;
+    let base = ccsds_ndm::messages::aem::Aem::from_kvn(crate::KVN)
+        .unwrap()
+        .body
+        .segment[0]
+        .clone();
+    let check = |attitude_type: AttitudeTypeType, state: &AemAttitudeState| {
+        let mut segment = base.clone();
+        segment.metadata.attitude_type = attitude_type.clone();
+        segment.data.attitude_states = vec![state.clone()];
+        assert_validation_field(
+            &segment.validate().unwrap_err(),
+            &format!("expected {attitude_type} data"),
+        );
     };
-    assert_validation_field(
-        &data.validate(&AttitudeTypeType::Quaternion).unwrap_err(),
-        "expected QUATERNION data",
-    );
-
-    // Type mismatch: Expects EULER_ANGLE, gets QUATERNION
-    let data_q = AemData {
-        comment: vec![],
-        attitude_states: vec![valid_q.clone()],
-    };
-    assert_validation_field(
-        &data_q.validate(&AttitudeTypeType::EulerAngle).unwrap_err(),
-        "expected EULER_ANGLE data",
-    );
-
-    // Check all other variants against a wrong type declaration
-    let cases = vec![
+    check(AttitudeTypeType::Quaternion, &valid_euler);
+    for attitude_type in [
+        AttitudeTypeType::EulerAngle,
         AttitudeTypeType::QuaternionDerivative,
         AttitudeTypeType::QuaternionAngVel,
         AttitudeTypeType::EulerAngleDerivative,
@@ -47,17 +45,8 @@ fn aem_data_validation_mismatches() {
         AttitudeTypeType::Spin,
         AttitudeTypeType::SpinNutation,
         AttitudeTypeType::SpinNutationMom,
-    ];
-
-    for attitude_type in cases {
-        let d = AemData {
-            comment: vec![],
-            attitude_states: vec![valid_q.clone()],
-        };
-        assert_validation_field(
-            &d.validate(&attitude_type).unwrap_err(),
-            &format!("expected {attitude_type} data"),
-        );
+    ] {
+        check(attitude_type, &valid_q);
     }
 }
 

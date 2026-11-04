@@ -19,6 +19,7 @@ from ccsds_ndm import (
     QuaternionState,
     SpinState,
 )
+from ccsds_ndm import NdmEpochError
 
 
 class TestApm:
@@ -50,7 +51,7 @@ class TestApm:
         assert man.man_ref_frame == "EME2000"
 
     def test_apm_epoch_fields_require_calendar_or_ordinal_form(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             ApmData(
                 epoch="123.5",
                 quaternion_state=[],
@@ -62,7 +63,7 @@ class TestApm:
                 comment=None,
             )
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             ApmManeuverParameters(
                 man_epoch_start="123.5",
                 man_duration=10.0,

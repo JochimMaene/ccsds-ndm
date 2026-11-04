@@ -6,6 +6,64 @@
 
 use serde::{Deserializer, Serializer};
 
+/// XML integer value equality includes `-0`; retain the native unsigned storage bound.
+pub(crate) fn deserialize_optional_u32<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::Deserialize;
+    struct Value(u32);
+    impl<'de> Deserialize<'de> for Value {
+        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            struct Visitor;
+            impl<'de> serde::de::Visitor<'de> for Visitor {
+                type Value = Value;
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    formatter.write_str("an unsigned 32-bit integer")
+                }
+
+                fn visit_str<E: serde::de::Error>(self, text: &str) -> Result<Value, E> {
+                    let token = text.trim_matches([' ', '\t', '\r', '\n']);
+                    let negative_zero = token.strip_prefix('-').is_some_and(|digits| {
+                        !digits.is_empty() && digits.bytes().all(|b| b == b'0')
+                    });
+                    if negative_zero {
+                        Ok(Value(0))
+                    } else {
+                        token.parse().map(Value).map_err(E::custom)
+                    }
+                }
+
+                fn visit_u64<E: serde::de::Error>(self, value: u64) -> Result<Value, E> {
+                    u32::try_from(value).map(Value).map_err(E::custom)
+                }
+
+                fn visit_i64<E: serde::de::Error>(self, value: i64) -> Result<Value, E> {
+                    u32::try_from(value).map(Value).map_err(E::custom)
+                }
+
+                fn visit_map<M: serde::de::MapAccess<'de>>(
+                    self,
+                    mut map: M,
+                ) -> Result<Value, M::Error> {
+                    let key = map.next_key::<String>()?;
+                    if key.as_deref() != Some("$text") {
+                        return Err(serde::de::Error::custom("expected integer element text"));
+                    }
+                    let text = map.next_value::<String>()?;
+                    if map.next_key::<serde::de::IgnoredAny>()?.is_some() {
+                        return Err(serde::de::Error::custom("unexpected content after integer"));
+                    }
+                    self.visit_str(&text)
+                }
+            }
+            deserializer.deserialize_any(Visitor)
+        }
+    }
+    Option::<Value>::deserialize(deserializer).map(|value| value.map(|value| value.0))
+}
+
 /// Deserialize a value from the deserializer's own view of the token, without an owned `String`.
 ///
 /// Every caller parses a short lexical token into a fixed-size or numeric value, so routing

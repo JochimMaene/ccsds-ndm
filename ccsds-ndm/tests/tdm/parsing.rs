@@ -7,6 +7,17 @@ use ccsds_ndm::types::{
     TdmReferenceFrame, TdmTimetagRef, YesNo,
 };
 use ccsds_ndm::Ndm;
+
+#[test]
+fn original_e17_repeated_rcs_epoch_is_rejected_and_adaptation_remains_valid() {
+    let original = include_str!("../../data/invalid/tdm_e17_original.kvn");
+    let error = Tdm::from_kvn(original).unwrap_err();
+    crate::common::assert_validation_field(&error, "RCS");
+    assert!(error.to_string().contains("strictly increasing epochs"));
+    let adapted = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e17.kvn")).unwrap();
+    assert_eq!(Tdm::from_kvn(&adapted.to_kvn().unwrap()).unwrap(), adapted);
+    assert_eq!(Tdm::from_xml(&adapted.to_xml().unwrap()).unwrap(), adapted);
+}
 #[test]
 fn test_parse_tdm_example_e1_oneway() {
     let kvn = r#"
@@ -103,7 +114,7 @@ DATA_STOP
     let tdm = Tdm::from_kvn(kvn).unwrap();
     let seg = &tdm.body.segments[0];
     match &seg.data.observations[0].data {
-        TdmObservationData::TransmitPhaseCt1(s) => assert_eq!(*s, 7175173383.615373),
+        TdmObservationData::TransmitPhaseCt1(s) => assert_eq!(s, "7175173383.615373"),
         _ => panic!("Wrong type"),
     }
 }
@@ -124,8 +135,8 @@ DATA_STOP
     assert!(
         crate::common::kvn_parse_error(&error)
             .unwrap()
-            .contexts
-            .contains(&"Expected CREATION_DATE"),
+            .message
+            .contains("Expected CREATION_DATE"),
         "{error}"
     );
 }
@@ -604,6 +615,10 @@ ORIGINATOR = TEST
 META_START
 TIME_SYSTEM = UTC
 PARTICIPANT_1 = DSS-14
+PARTICIPANT_2 = P2
+PARTICIPANT_3 = P3
+PARTICIPANT_4 = P4
+PARTICIPANT_5 = P5
 META_STOP
 DATA_START
 RECEIVE_FREQ = 2023-01-01T00:00:00 8415000000.0
@@ -637,13 +652,13 @@ DATA_STOP
     let tdm = Tdm::from_kvn(kvn).unwrap();
     match &tdm.body.segments[0].data.observations[0].data {
         TdmObservationData::TransmitPhaseCt1(s) => {
-            assert_eq!(*s, 7175173383.615373);
+            assert_eq!(s, "7175173383.615373");
         }
         _ => panic!("Wrong type"),
     }
     match &tdm.body.segments[0].data.observations[1].data {
         TdmObservationData::ReceivePhaseCt1(s) => {
-            assert_eq!(*s, 8429753135.986102);
+            assert_eq!(s, "8429753135.986102");
         }
         _ => panic!("Wrong type"),
     }
@@ -998,6 +1013,10 @@ ORIGINATOR = TEST
 META_START
 TIME_SYSTEM = UTC
 PARTICIPANT_1 = P1
+PARTICIPANT_2 = P2
+PARTICIPANT_3 = P3
+PARTICIPANT_4 = P4
+PARTICIPANT_5 = P5
 TRANSMIT_DELAY_3 = 0.3
 TRANSMIT_DELAY_4 = 0.4
 TRANSMIT_DELAY_5 = 0.5
@@ -1086,6 +1105,8 @@ fn test_observation_value_error_reports_record_line() {
     let CcsdsNdmError::Validation(error) = Tdm::from_kvn(&bad).unwrap_err() else {
         panic!("expected a validation error");
     };
+    // The range error names the keyword, not the shared Rust `Percentage` type.
+    assert!(error.to_string().contains("RHUMIDITY"), "{error}");
     let ccsds_ndm::error::ValidationError::OutOfRange { line, .. } = *error else {
         panic!("expected an out-of-range error");
     };
@@ -1195,6 +1216,10 @@ fn tdm_xml_accepts_the_schema_defined_optional_observation_units() {
         "<ANGLE_1 units=\"deg\">1.0</ANGLE_1>",
     );
     Tdm::from_xml(&angle).expect("ANGLE_1 units=deg is allowed by the TDM schema");
+    for units in ["rad", "DEG", "km"] {
+        let invalid = mutated(&angle, "units=\"deg\"", &format!("units=\"{units}\""));
+        assert!(Tdm::from_xml(&invalid).is_err(), "ignored {units}");
+    }
 
     let humidity = mutated_once(
         XML,
@@ -1279,6 +1304,11 @@ fn tdm_conditional_metadata_rules_name_the_offending_field() {
                 mutated(FIXTURE, "DATA_QUALITY = RAW", "ANGLE_TYPE = RADEC\nDATA_QUALITY = RAW"),
                 "Missing required field: REFERENCE_FRAME (required when ANGLE_TYPE=RADEC)",
             ),
+            // The RADEC rule applies in any letter case, even when the value stays `Other`.
+            (
+                mutated(FIXTURE, "DATA_QUALITY = RAW", "ANGLE_TYPE = Radec\nDATA_QUALITY = RAW"),
+                "Missing required field: REFERENCE_FRAME (required when ANGLE_TYPE=RADEC)",
+            ),
             // Path indices must refer to populated participants.
             (
                 mutated(FIXTURE, "PATH = 2,1", "PATH = 1,6"),
@@ -1307,6 +1337,10 @@ fn tdm_xml_exhaustive_observations() {
       <metadata>
         <TIME_SYSTEM>UTC</TIME_SYSTEM>
         <PARTICIPANT_1>P1</PARTICIPANT_1>
+        <PARTICIPANT_2>P2</PARTICIPANT_2>
+        <PARTICIPANT_3>P3</PARTICIPANT_3>
+        <PARTICIPANT_4>P4</PARTICIPANT_4>
+        <PARTICIPANT_5>P5</PARTICIPANT_5>
       </metadata>
       <data>
         <observation>
@@ -1532,4 +1566,332 @@ fn tdm_xml_exhaustive_observations() {
         &Tdm::from_xml(xml_unknown).unwrap_err(),
         "unknown TDM root attribute 'extra'",
     );
+}
+
+#[test]
+fn all_normative_line_endings_preserve_the_message() {
+    let expected = Tdm::from_kvn(crate::KVN).unwrap();
+    for ending in ["\n", "\r", "\r\n", "\n\r"] {
+        let input = crate::KVN.replace('\n', ending);
+        assert_eq!(Tdm::from_kvn(&input).unwrap(), expected, "{ending:?}");
+    }
+}
+
+#[test]
+fn observation_numbers_use_shared_reading_rules_without_underflow() {
+    for value in [".5", "5.", "1e3", "1.2345678901234567", "5e-324"] {
+        assert!(
+            TdmObservationData::from_key_val("RANGE", value).is_ok(),
+            "{value}"
+        );
+    }
+    for value in ["1e-999", "1e999", "1e", "NaN", "INF"] {
+        assert!(
+            TdmObservationData::from_key_val("RANGE", value).is_err(),
+            "{value}"
+        );
+    }
+}
+
+#[test]
+fn xml_accepts_schema_listed_lowercase_categories() {
+    for (field, upper, lower) in [
+        ("MODE", "SEQUENTIAL", "sequential"),
+        ("TIMETAG_REF", "TRANSMIT", "transmit"),
+        ("INTEGRATION_REF", "MIDDLE", "middle"),
+        ("RANGE_MODE", "COHERENT", "coherent"),
+        ("ANGLE_TYPE", "AZEL", "azel"),
+        ("REFERENCE_FRAME", "EME2000", "eme2000"),
+        ("DATA_QUALITY", "RAW", "raw"),
+    ] {
+        let base = if field == "MODE" {
+            mutated(XML, "<MODE>SEQUENTIAL</MODE>", "")
+        } else {
+            XML.to_owned()
+        };
+        let insertion = if field == "MODE" {
+            "<PATH>"
+        } else {
+            "</metadata>"
+        };
+        let make = |value: &str| {
+            mutated(
+                &base,
+                insertion,
+                &format!("<{field}>{value}</{field}>{insertion}"),
+            )
+        };
+        let xml = make(lower);
+        crate::common::validate_xml("lowercase TDM", &xml);
+        assert_eq!(
+            Tdm::from_xml(&xml).unwrap(),
+            Tdm::from_xml(&make(upper)).unwrap(),
+            "{field}"
+        );
+    }
+    for (field, value) in [
+        ("MODE", "Sequential"),
+        ("ANGLE_TYPE", "AzEl"),
+        ("REFERENCE_FRAME", "Eme2000"),
+    ] {
+        let base = mutated(XML, "<MODE>SEQUENTIAL</MODE>", "");
+        let insertion = if field == "MODE" {
+            "<PATH>"
+        } else {
+            "</metadata>"
+        };
+        let xml = mutated(
+            &base,
+            insertion,
+            &format!("<{field}>{value}</{field}>{insertion}"),
+        );
+        assert!(Tdm::from_xml(&xml).is_err(), "{field}={value}");
+    }
+}
+
+#[test]
+fn present_empty_xml_elements_use_schema_defaults_and_omissions_stay_absent() {
+    let source = XML.replace("‘DSS-25’", "DSS-25");
+    let baseline = Tdm::from_xml(&source).unwrap();
+    assert!(baseline.body.segments[0].metadata.freq_offset.is_none());
+    assert!(baseline.body.segments[0].metadata.data_quality.is_none());
+    let fields = [
+        "FREQ_OFFSET",
+        "RANGE_MODULUS",
+        "TRANSMIT_DELAY_1",
+        "TRANSMIT_DELAY_2",
+        "TRANSMIT_DELAY_3",
+        "TRANSMIT_DELAY_4",
+        "TRANSMIT_DELAY_5",
+        "RECEIVE_DELAY_1",
+        "RECEIVE_DELAY_2",
+        "RECEIVE_DELAY_3",
+        "RECEIVE_DELAY_4",
+        "RECEIVE_DELAY_5",
+        "DATA_QUALITY",
+    ];
+    for field in fields {
+        let explicit = if field == "DATA_QUALITY" {
+            "RAW"
+        } else {
+            "0.0"
+        };
+        let expected = Tdm::from_xml(&mutated(
+            &source,
+            "</metadata>",
+            &format!("<{field}>{explicit}</{field}></metadata>"),
+        ))
+        .unwrap();
+        let metadata = &expected.body.segments[0].metadata;
+        let json = serde_json::to_string(metadata).unwrap();
+        assert_eq!(
+            serde_json::from_str::<ccsds_ndm::messages::tdm::TdmMetadata>(&json).unwrap(),
+            *metadata
+        );
+        for empty in [format!("<{field}/>"), format!("<{field}></{field}>")] {
+            let xml = mutated(&source, "</metadata>", &format!("{empty}</metadata>"));
+            crate::common::validate_xml("TDM default", &xml);
+            let parsed = Tdm::from_xml(&xml).unwrap();
+            assert_eq!(parsed, expected, "{field}");
+            assert_eq!(Tdm::from_kvn(&parsed.to_kvn().unwrap()).unwrap(), expected);
+        }
+    }
+    for (field, data) in [
+        ("CLOCK_BIAS", TdmObservationData::ClockBias(0.0)),
+        ("CLOCK_DRIFT", TdmObservationData::ClockDrift(0.0)),
+    ] {
+        let mut expected = baseline.clone();
+        expected.body.segments[0].metadata.data_types = None;
+        expected.body.segments[0].data.observations[0].data = data;
+        let xml = expected.to_xml().unwrap();
+        let xml = mutated(
+            &xml,
+            &format!("<{field}>0</{field}>"),
+            &format!("<{field}/>"),
+        );
+        crate::common::validate_xml("TDM clock default", &xml);
+        assert_eq!(Tdm::from_xml(&xml).unwrap(), expected);
+    }
+    for field in ["INTEGRATION_INTERVAL", "ANGLE_TYPE"] {
+        let xml = mutated(&source, "</metadata>", &format!("<{field}/></metadata>"));
+        assert!(Tdm::from_xml(&xml).is_err(), "non-defaulted {field}");
+    }
+}
+
+#[test]
+fn kvn_paths_with_blanks_after_commas_read_as_canonical_paths() {
+    // Orekit writes `PATH = 2, 1`; TDM 3.3 forbids the blank, but it carries no information.
+    const FIXTURE: &str = include_str!("../../data/kvn/tdm_e2.kvn");
+    let tdm = Tdm::from_kvn(&mutated(FIXTURE, "PATH = 2,1", "PATH = 2 , 1")).unwrap();
+    assert_eq!(tdm, Tdm::from_kvn(FIXTURE).unwrap());
+    assert!(tdm
+        .to_kvn()
+        .unwrap()
+        .contains("PATH                 = 2,1\n"));
+    let single_diff = mutated(
+        FIXTURE,
+        "MODE = SEQUENTIAL\nPATH = 2,1",
+        "MODE = SINGLE_DIFF\nPATH_1 = 2, 1\nPATH_2 = 1, 2",
+    );
+    let metadata = &Tdm::from_kvn(&single_diff).unwrap().body.segments[0].metadata;
+    assert_eq!(metadata.path_1, Some(TdmPath("2,1".into())));
+    assert_eq!(metadata.path_2, Some(TdmPath("1,2".into())));
+}
+
+#[test]
+fn phase_count_exponents_are_xml_double_spellings_but_not_kvn_phase_counts() {
+    const FIXTURE: &str = include_str!("../../data/kvn/tdm_e18.kvn");
+    let line = "TRANSMIT_PHASE_CT_1=2005-184T11:12:23 7175173383.615373";
+    // TDM 4.3.11: KVN phase counts contain no alphabetic characters.
+    let error = Tdm::from_kvn(&mutated(
+        FIXTURE,
+        line,
+        "TRANSMIT_PHASE_CT_1=2005-184T11:12:23 7.175173383615373E9",
+    ))
+    .unwrap_err();
+    assert!(error.to_string().contains("without an exponent"), "{error}");
+    // The XSD types XML phase counts as xsd:double, so XML keeps the exponent text (trimmed
+    // like every other XML number) and KVN output refuses it rather than rewriting digits.
+    let xml = Tdm::from_kvn(FIXTURE).unwrap().to_xml().unwrap().replacen(
+        "<TRANSMIT_PHASE_CT_1>7175173383.615373<",
+        "<TRANSMIT_PHASE_CT_1> 7.175173383615373E9 <",
+        1,
+    );
+    let tdm = Tdm::from_xml(&xml).unwrap();
+    assert_eq!(
+        tdm.body.segments[0].data.observations[0].data,
+        TdmObservationData::TransmitPhaseCt1("7.175173383615373E9".into())
+    );
+    let error = tdm.to_kvn().unwrap_err();
+    crate::common::assert_validation_field(&error, "TRANSMIT_PHASE_CT_1");
+    assert!(error.to_string().contains("without an exponent"), "{error}");
+}
+
+#[test]
+fn legacy_kvn_is_input_only_and_rejects_version_two_content() {
+    let legacy = include_str!("../../data/kvn/tdm_e1.kvn").replacen("= 2.0", "= 1.0", 1);
+    let message = Tdm::from_kvn(&legacy).unwrap();
+    assert_eq!(message.version, "1.0");
+    assert!(ccsds_ndm::from_str(&legacy).is_ok());
+    assert_eq!(
+        message.to_kvn().unwrap_err().code(),
+        Some("generation.unsupported_output_version")
+    );
+    assert!(message.to_xml().is_err());
+    let later = legacy.replace("TIME_SYSTEM = UTC", "TRACK_ID = LATER\nTIME_SYSTEM = UTC");
+    assert!(Tdm::from_kvn(&later)
+        .unwrap_err()
+        .to_string()
+        .contains("TRACK_ID"));
+    // TDM 1.0 XML is input-only too (conformance::tdm1 covers the 1.0 schema rules).
+    let xml = include_str!("../../data/legacy/tdm_1_0_b9.xml");
+    let message = Tdm::from_xml(xml).unwrap();
+    assert_eq!(message.version, "1.0");
+    assert!(message.to_xml().is_err());
+    assert_eq!(
+        Tdm::from_xml(&xml.replace("version=\"1.0\">", "version=\"1.1\">"))
+            .unwrap_err()
+            .code(),
+        Some("parse.unsupported_input_version")
+    );
+}
+
+#[test]
+fn categorical_values_ignore_case_and_blank_aliases_in_kvn() {
+    let source = include_str!("../../data/kvn/tdm_e1.kvn")
+        .replace("SEQUENTIAL", "Sequential")
+        .replace("DEGRADED", "Degraded");
+    let message = Tdm::from_kvn(&source).unwrap();
+    assert!(message.to_xml().unwrap().contains("SEQUENTIAL"));
+    assert_eq!(
+        "Single  Diff".parse::<TdmMode>().unwrap(),
+        TdmMode::SingleDiff
+    );
+    assert_eq!(
+        "One Way".parse::<TdmRangeMode>().unwrap(),
+        TdmRangeMode::OneWay
+    );
+    assert_eq!("Azel".parse::<TdmAngleType>().unwrap(), TdmAngleType::Azel);
+    assert_eq!(
+        "Eme2000".parse::<TdmReferenceFrame>().unwrap(),
+        TdmReferenceFrame::Eme2000
+    );
+    assert_eq!("Yes".parse::<YesNo>().unwrap(), YesNo::Yes);
+}
+
+#[test]
+fn legacy_tables_exclude_every_later_edition_metadata_keyword() {
+    let legacy = include_str!("../../data/kvn/tdm_e1.kvn").replacen("= 2.0", "= 1.0", 1);
+    for (keyword, value) in [
+        ("EPHEMERIS_NAME_1", "FILE"),
+        ("INTERPOLATION", "LINEAR"),
+        ("INTERPOLATION_DEGREE", "1"),
+        ("CORRECTION_MAG", "1"),
+        ("CORRECTION_RCS", "1"),
+        ("CORRECTION_ABERRATION_YEARLY", "1"),
+        ("CORRECTION_ABERRATION_DIURNAL", "1"),
+    ] {
+        let current = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e1.kvn")).unwrap();
+        let mut message = current;
+        match keyword {
+            "EPHEMERIS_NAME_1" => {
+                message.body.segments[0].metadata.ephemeris_name_1 = Some(value.into())
+            }
+            "INTERPOLATION" => {
+                message.body.segments[0].metadata.interpolation = Some(value.into());
+                message.body.segments[0].metadata.interpolation_degree = Some(1);
+            }
+            "INTERPOLATION_DEGREE" => {
+                message.body.segments[0].metadata.interpolation_degree = Some(1)
+            }
+            "CORRECTION_MAG" => message.body.segments[0].metadata.correction_mag = Some(1.0),
+            "CORRECTION_RCS" => message.body.segments[0].metadata.correction_rcs = Some(1.0),
+            "CORRECTION_ABERRATION_YEARLY" => {
+                message.body.segments[0]
+                    .metadata
+                    .correction_aberration_yearly = Some(1.0)
+            }
+            _ => {
+                message.body.segments[0]
+                    .metadata
+                    .correction_aberration_diurnal = Some(1.0)
+            }
+        }
+        message.body.segments[0].metadata.corrections_applied = Some(ccsds_ndm::types::YesNo::Yes);
+        let source = message.to_kvn().unwrap().replacen("= 2.0", "= 1.0", 1);
+        assert!(
+            Tdm::from_kvn(&source)
+                .unwrap_err()
+                .to_string()
+                .contains(keyword),
+            "{keyword}"
+        );
+    }
+    let source = legacy.replacen("META_START", "MESSAGE_ID = LATER\nMETA_START", 1);
+    assert!(Tdm::from_kvn(&source)
+        .unwrap_err()
+        .to_string()
+        .contains("MESSAGE_ID"));
+}
+
+#[test]
+fn itrf97_aliases_canonicalize_in_both_notations() {
+    for alias in ["ITRF97", "ITRF1997"] {
+        let input = KVN.replacen(
+            "META_STOP",
+            &format!("REFERENCE_FRAME = {alias}\nMETA_STOP"),
+            1,
+        );
+        let message = Tdm::from_kvn(&input).unwrap();
+        assert_eq!(
+            message.body.segments[0].metadata.reference_frame,
+            Some(TdmReferenceFrame::Itrf97)
+        );
+        let xml = message.to_xml().unwrap();
+        assert!(xml.contains("<REFERENCE_FRAME>ITRF-97</REFERENCE_FRAME>"));
+        assert_eq!(
+            Tdm::from_xml(&xml.replace("ITRF-97", alias)).unwrap(),
+            message
+        );
+    }
 }

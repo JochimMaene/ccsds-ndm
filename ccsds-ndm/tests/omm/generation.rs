@@ -7,6 +7,42 @@ use ccsds_ndm::messages::omm::{
 };
 use ccsds_ndm::types::{Angle, ElementSetNo, Inclination, M2kg, NonNegativeDouble};
 use ccsds_ndm::Ndm;
+
+#[test]
+fn xml_tle_choices_are_required_without_rejecting_kvn_omissions() {
+    let control = Omm::from_kvn(KVN).unwrap();
+    let xml = control.to_xml().unwrap();
+    for (element, field) in [
+        ("BSTAR", "BSTAR or BTERM"),
+        ("MEAN_MOTION_DDOT", "MEAN_MOTION_DDOT or AGOM"),
+    ] {
+        let mut edited = control.clone();
+        let tle = edited.body.segment.data.tle_parameters.as_mut().unwrap();
+        if element == "BSTAR" {
+            tle.bstar = None;
+        } else {
+            tle.mean_motion_ddot = None;
+        }
+        edited.validate().unwrap();
+        assert_eq!(Omm::from_kvn(&edited.to_kvn().unwrap()).unwrap(), edited);
+        crate::common::assert_validation_field(&edited.to_xml().unwrap_err(), field);
+        let mut output = Vec::new();
+        crate::common::assert_validation_field(
+            &edited.write_xml_to(&mut output).unwrap_err(),
+            field,
+        );
+        assert!(output.is_empty());
+
+        let mut missing = xml.clone();
+        let begin = missing.find(&format!("<{element}")).unwrap();
+        let closing = format!("</{element}>");
+        let end = missing[begin..].find(&closing).unwrap() + begin + closing.len();
+        missing.replace_range(begin..end, "");
+        crate::common::assert_validation_field(&Omm::from_xml(&missing).unwrap_err(), field);
+        assert!(ccsds_ndm::from_str(&missing).is_err());
+    }
+    validate_xml("complete XML TLE choices", &xml);
+}
 /// `elementSetNoType` restricts to `[0, 9999]` in both bundled OMM schemas, but `ElementSetNo`
 /// only enforces that in its constructor and the value field is public. Before this was routed
 /// through the root, `ELEMENT_SET_NO = 100000` produced XML that `xmllint` rejected with
@@ -89,6 +125,8 @@ fn omm_generation_rejects_non_finite_values_in_every_numeric_block() {
                 .as_mut()
                 .expect("fixture has TLE parameters")
                 .mean_motion_dot
+                .as_mut()
+                .expect("fixture has MEAN_MOTION_DOT")
                 .value = f64::NAN
         }),
         ("CX_X", |omm| {
@@ -141,9 +179,9 @@ fn omm_kvn_generation_spells_numbers_as_ccsds_numbers() {
 
     let kvn = omm.to_kvn().expect("finite values should generate");
     assert!(kvn.contains("CX_X                 = 1.0e-9\n"), "{kvn}");
-    assert!(kvn.contains("CY_X                 = 3.0e-1\n"), "{kvn}");
+    assert!(kvn.contains("CY_X                 = 0.3\n"), "{kvn}");
     assert!(
-        kvn.contains("CY_Y                 = 1.234567890123457e0\n"),
+        kvn.contains("CY_Y                 = 1.234567890123457\n"),
         "{kvn}"
     );
     Omm::from_kvn(&kvn).expect("generated KVN should reparse");
@@ -238,7 +276,7 @@ USER_DEFINED_BAZ = QUX
         .user_defined_parameters
         .as_ref()
         .unwrap();
-    let ud = &binding.user_defined;
+    let ud: Vec<_> = binding.parameters().collect();
     assert_eq!(ud.len(), 2);
     assert_eq!(ud[0].parameter, "FOO");
     assert_eq!(ud[0].value, "BAR");
@@ -347,8 +385,7 @@ fn kvn_preserves_sgp4_xp_drag_and_solar_radiation_terms() {
 
 #[test]
 fn omm_rejects_kvn_numbers_it_could_not_spell_back() {
-    // The schema types these fields as plain doubles, so finiteness and range checks let through
-    // magnitudes whose shortest round-tripping spelling blows past the 254-character line limit.
+    // Rounding the largest finite double to 16 significant digits would overflow when reparsed.
     let mut message = Omm::from_kvn(include_str!("../../data/kvn/omm_g7.kvn")).unwrap();
     message.body.segment.data.mean_elements.eccentricity.value = f64::MAX;
 
@@ -366,7 +403,7 @@ fn omm_kvn_numbers_use_odm_spellings_in_every_block() {
     data.mean_elements.eccentricity.value = 0.1 + 0.2;
     data.mean_elements.mean_motion.as_mut().unwrap().value = 0.1 + 0.2;
     let tle = data.tle_parameters.as_mut().unwrap();
-    tle.mean_motion_dot.value = 0.1 + 0.2;
+    tle.mean_motion_dot.as_mut().unwrap().value = 0.1 + 0.2;
 
     let kvn = message.to_kvn().unwrap();
     assert!(
@@ -384,4 +421,65 @@ fn omm_kvn_numbers_use_odm_spellings_in_every_block() {
         );
         assert!(line.len() <= 254, "{key} line exceeds 254 characters");
     }
+}
+
+#[test]
+fn omm_user_defined_names_and_line_endings_are_checked() {
+    let source = include_str!("../../data/kvn/omm_g9.kvn");
+    let expected = Omm::from_kvn(source).unwrap();
+    for ending in ["\r", "\r\n", "\n\r"] {
+        assert_eq!(
+            Omm::from_kvn(&source.replace('\n', ending)).unwrap(),
+            expected
+        );
+    }
+    for invalid in ["", "bad", "A B", "A=B"] {
+        let mut message = expected.clone();
+        message
+            .body
+            .segment
+            .data
+            .user_defined_parameters
+            .as_mut()
+            .unwrap()
+            .parameters_mut()
+            .next()
+            .unwrap()
+            .parameter = invalid.into();
+        assert!(message.to_kvn().is_err());
+        let mut bytes = Vec::new();
+        assert!(message.write_kvn_to(&mut bytes).is_err());
+        assert!(bytes.is_empty());
+    }
+    let mut message = expected;
+    message
+        .body
+        .segment
+        .data
+        .user_defined_parameters
+        .as_mut()
+        .unwrap()
+        .parameters_mut()
+        .next()
+        .unwrap()
+        .parameter = "USER_DEFINED_LITERAL".into();
+    assert_eq!(Omm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+}
+
+/// ODM 7.7.1 admits only the table spelling in KVN; the uppercase GM unit the XSD also
+/// enumerates is canonicalized on KVN output (as in OPM) and kept for XML.
+#[test]
+fn omm_kvn_canonicalizes_gm_units_to_the_odm_spelling() {
+    let source = crate::common::mutated(
+        include_str!("../../data/kvn/omm_g7.kvn"),
+        "GM = 398600.8",
+        "GM = 398600.8 [KM**3/S**2]",
+    );
+    let message = Omm::from_kvn(&source).unwrap();
+    let kvn = message.to_kvn().unwrap();
+    assert!(
+        kvn.contains("[km**3/s**2]") && !kvn.contains("KM**3"),
+        "{kvn}"
+    );
+    assert!(message.to_xml().unwrap().contains("KM**3/S**2"));
 }

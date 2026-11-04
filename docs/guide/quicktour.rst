@@ -14,10 +14,8 @@ Installation
 
       cargo add ccsds-ndm
 
-Parsing Messages
-----------------
-
-**Constructing Messages**
+Constructing a message
+----------------------
 
 Build a small complete message from explicit metadata and caller data, then generate
 valid output. Generation validates the complete message before writing.
@@ -50,10 +48,38 @@ valid output. Generation validates the complete message before writing.
 
    .. code-tab:: rust
 
+        use ccsds_ndm::Validate;
+        use ccsds_ndm::common::{OdmHeader, StateVector};
         use ccsds_ndm::messages::opm::{Opm, OpmBody, OpmData, OpmMetadata, OpmSegment};
+        use ccsds_ndm::types::{Position, Velocity};
 
-        // See ccsds-ndm/examples/builder_demo.rs for a minimal state-vector OPM
-        // built with public builders, then validated generation with to_kvn()/to_xml().
+        fn main() -> ccsds_ndm::error::Result<()> {
+            let opm = Opm::builder()
+                .version("3.0")
+                .header(OdmHeader::builder()
+                    .creation_date("2023-01-01T00:00:00".parse()?)
+                    .originator("TEST")
+                    .build())
+                .body(OpmBody::builder().segment(OpmSegment::builder()
+                    .metadata(OpmMetadata::builder()
+                        .object_name("SAT1").object_id("2023-001A")
+                        .center_name("EARTH").ref_frame("GCRF").time_system("UTC")
+                        .build())
+                    .data(OpmData::builder().state_vector(StateVector::builder()
+                        .epoch("2023-01-01T00:00:00".parse()?)
+                        .x(Position::new(7000.0, None)).y(Position::new(0.0, None)).z(Position::new(0.0, None))
+                        .x_dot(Velocity::new(0.0, None)).y_dot(Velocity::new(7.5, None)).z_dot(Velocity::new(0.0, None))
+                        .build()).build())
+                    .build()).build())
+                .build();
+            opm.validate()?;
+            ccsds_ndm::Message::Opm(opm).to_kvn_file("output.opm")?;
+            Ok(())
+        }
+
+
+Parsing messages
+----------------
 
 **Generic Parsing**
 
@@ -95,7 +121,7 @@ If you know the file type (e.g., OPM), you can parse it directly into the struct
         use std::fs;
 
         let text = fs::read_to_string("example.opm")?;
-        // Parses strict KVN for OPM
+        // Parses complete OPM KVN under the documented producer-compatibility rules.
         let opm = Opm::from_kvn(&text)?;
 
 Data Access
@@ -108,7 +134,9 @@ Once parsed, you can access the nested data structures.
    .. code-tab:: py
 
 
-        # Assuming 'ndm' is an Oem object
+        import ccsds_ndm
+
+        ndm = ccsds_ndm.Oem.from_file("orbit.oem")
         for segment in ndm.segments:
             meta = segment.metadata
             print(f"Object: {meta.object_name} ({meta.object_id})")

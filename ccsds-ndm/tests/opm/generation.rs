@@ -294,7 +294,9 @@ fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
                     .user_defined_parameters
                     .as_mut()
                     .unwrap()
-                    .user_defined[0]
+                    .parameters_mut()
+                    .next()
+                    .unwrap()
                     .parameter
                     .push('\u{1}')
             },
@@ -310,8 +312,8 @@ fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
                     .user_defined_parameters
                     .as_mut()
                     .unwrap()
-                    .comment
-                    .push("\u{1}".into())
+                    .entries
+                    .push(ccsds_ndm::types::UserDefinedEntry::Comment("\u{1}".into()))
             },
         ),
         (
@@ -325,7 +327,9 @@ fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
                     .user_defined_parameters
                     .as_mut()
                     .unwrap()
-                    .user_defined[0]
+                    .parameters_mut()
+                    .next()
+                    .unwrap()
                     .value
                     .push('\u{1}')
             },
@@ -593,7 +597,7 @@ fn opm_kvn_rounds_values_that_need_seventeen_digits() {
     message.body.segment.data.state_vector.x.value = 1.234_567_890_123_456_7;
 
     let generated = message.to_kvn().expect("finite value should be rounded");
-    assert!(generated.contains("X                    = 1.234567890123457e0"));
+    assert!(generated.contains("X                    = 1.234567890123457"));
 
     let mut output = Vec::new();
     message
@@ -676,7 +680,7 @@ fn opm_kvn_rounds_numbers_in_every_optional_numeric_block() {
         assert!(message
             .to_kvn()
             .expect("finite value should be rounded")
-            .contains("1.234567890123457e0"));
+            .contains("1.234567890123457"));
         message
             .to_xml()
             .expect("the KVN-specific precision rule must not affect XML");
@@ -726,7 +730,11 @@ fn opm_kvn_gm_units_survive_a_kvn_round_trip() {
 
 #[test]
 fn opm_kvn_rejects_non_ascii_and_control_characters() {
-    for invalid in ["ESOC 🚀", "ESOC\tFlight Dynamics", "ESOC\nFlight Dynamics"] {
+    for invalid in [
+        "ESOC 🚀",
+        "ESOC\x0bFlight Dynamics",
+        "ESOC\nFlight Dynamics",
+    ] {
         let mut message = opm();
         message.header.originator = invalid.to_owned();
 
@@ -756,7 +764,9 @@ fn opm_kvn_rejects_invalid_user_defined_keyword_suffixes() {
             .user_defined_parameters
             .as_mut()
             .unwrap()
-            .user_defined[0]
+            .parameters_mut()
+            .next()
+            .unwrap()
             .parameter = invalid.to_owned();
 
         let error = message
@@ -789,7 +799,9 @@ fn opm_kvn_accepts_normative_user_defined_keyword_forms() {
             .user_defined_parameters
             .as_mut()
             .unwrap()
-            .user_defined[0]
+            .parameters_mut()
+            .next()
+            .unwrap()
             .parameter = valid.to_owned();
 
         let generated = message.to_kvn().expect("valid KVN keyword should generate");
@@ -849,7 +861,9 @@ fn opm_kvn_attributes_an_oversized_user_defined_keyword_to_its_parameter() {
         .user_defined_parameters
         .as_mut()
         .unwrap()
-        .user_defined[0];
+        .parameters_mut()
+        .next()
+        .unwrap();
     parameter.parameter = "A".repeat(237);
     parameter.value = "V".to_owned();
 
@@ -869,7 +883,9 @@ fn opm_kvn_attributes_an_oversized_user_defined_keyword_to_its_parameter() {
         .user_defined_parameters
         .as_mut()
         .unwrap()
-        .user_defined[0]
+        .parameters_mut()
+        .next()
+        .unwrap()
         .parameter = "A".repeat(239);
     let error = message
         .to_kvn()
@@ -1136,4 +1152,30 @@ fn minimal_kvn_omits_optional_keplerian_elements() {
     let kvn = opm.to_kvn().unwrap();
     assert!(!kvn.contains("SEMI_MAJOR_AXIS"));
     assert!(opm.validate().is_ok());
+}
+
+#[test]
+fn edition_two_maneuver_needs_spacecraft_block_but_not_mass_in_kvn() {
+    let mut message = Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).unwrap();
+    assert!(!message.body.segment.data.maneuver_parameters.is_empty());
+    message.version = "2.0".into();
+    message.header.message_id = None;
+    message.header.classification = None;
+    message
+        .body
+        .segment
+        .data
+        .spacecraft_parameters
+        .as_mut()
+        .unwrap()
+        .mass = None;
+    let kvn = message.to_kvn().unwrap();
+    Opm::from_kvn(&kvn).unwrap();
+    message.version = "3.0".into();
+    let error = message.to_kvn().unwrap_err();
+    assert!(error.to_string().contains("MASS"));
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment.data.spacecraft_parameters.mass")
+    );
 }

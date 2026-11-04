@@ -20,6 +20,15 @@ from ccsds_ndm import (
 class TestAttitudeStates:
     """Tests for shared attitude state classes defined in attitude.rs."""
 
+    @pytest.mark.parametrize("mask", range(1, 15))
+    def test_partial_quaternion_derivatives_are_rejected(self, mask):
+        derivatives = {
+            name: 0.1 if mask & (1 << index) else None
+            for index, name in enumerate(("q1_dot", "q2_dot", "q3_dot", "qc_dot"))
+        }
+        with pytest.raises(ValueError, match="must be supplied together"):
+            QuaternionState("GCRF", "SC_BODY_1", 0, 0, 0, 1, **derivatives)
+
     def test_quaternion_state(self):
         qs = QuaternionState(
             ref_frame_a="EME2000",

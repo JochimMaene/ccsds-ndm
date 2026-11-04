@@ -18,6 +18,7 @@ from ccsds_ndm import (
     RdmMetadata,
     RdmSegment,
 )
+from ccsds_ndm import NdmEpochError
 
 
 class TestRdm:
@@ -32,6 +33,7 @@ class TestRdm:
             object_name="SAT1",
             international_designator="2023-001A",
             epoch_tzero="2023-01-01T00:00:00",
+            controlled_reentry="NO",
             center_name="EARTH",
             time_system="UTC",
         )
@@ -89,20 +91,32 @@ class TestRdm:
         rdm2 = ccsds_ndm.from_file(str(path), format="kvn")
         assert rdm2.header.originator == "TEST"
 
-    def test_epoch_fields_reject_numeric_xsd_branch(self):
-        with pytest.raises(ValueError):
-            RdmHeader(originator="TEST", creation_date="123.5", message_id="ID")
-
-        with pytest.raises(ValueError):
+    def test_metadata_requires_controlled_reentry(self):
+        # CONTROLLED_REENTRY is mandatory (RDM 3.4); it must not default to UNKNOWN.
+        with pytest.raises(TypeError, match="controlled_reentry"):
             RdmMetadata(
                 object_name="SAT1",
                 international_designator="2023-001A",
-                epoch_tzero="123.5",
+                epoch_tzero="2023-01-01T00:00:00",
                 center_name="EARTH",
                 time_system="UTC",
             )
 
-        with pytest.raises(ValueError):
+    def test_epoch_fields_reject_numeric_xsd_branch(self):
+        with pytest.raises(NdmEpochError):
+            RdmHeader(originator="TEST", creation_date="123.5", message_id="ID")
+
+        with pytest.raises(NdmEpochError):
+            RdmMetadata(
+                object_name="SAT1",
+                international_designator="2023-001A",
+                epoch_tzero="123.5",
+                controlled_reentry="NO",
+                center_name="EARTH",
+                time_system="UTC",
+            )
+
+        with pytest.raises(NdmEpochError):
             AtmosphericReentryParameters(
                 orbit_lifetime=5.0,
                 reentry_altitude=120.0,
@@ -123,6 +137,36 @@ class TestRdm:
             rdm.validate()
         with pytest.raises(ccsds_ndm.NdmValidationError):
             rdm.to_str(format="xml")
+
+    def test_unitless_xml_impact_altitude_remains_editable(self):
+        rdm = self._create_valid_rdm()
+        rdm.segment.data.ground_impact_parameters = GroundImpactParameters(
+            impact_ref_frame="ITRF2000",
+            nominal_impact_lon=10.0,
+            nominal_impact_lat=20.0,
+            nominal_impact_alt=1.0,
+        )
+        xml = rdm.to_str("xml").replace(
+            '<NOMINAL_IMPACT_ALT units="m">', "<NOMINAL_IMPACT_ALT>"
+        )
+        assert "<NOMINAL_IMPACT_ALT>" in xml
+        parsed = Rdm.from_str(xml, "xml")
+        assert parsed.segment.data.ground_impact_parameters.nominal_impact_alt == 1.0
+        assert "<NOMINAL_IMPACT_ALT>" in parsed.to_str("xml")
+        parsed.segment.data.ground_impact_parameters.nominal_impact_alt = 2.0
+        parsed.validate()
+        line = next(
+            line
+            for line in parsed.to_str("kvn").splitlines()
+            if line.startswith("NOMINAL_IMPACT_ALT")
+        )
+        assert line.endswith("[m]")
+        assert (
+            Rdm.from_str(
+                parsed.to_str("xml")
+            ).segment.data.ground_impact_parameters.nominal_impact_alt
+            == 2.0
+        )
 
 
 if __name__ == "__main__":

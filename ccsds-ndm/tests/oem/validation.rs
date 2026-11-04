@@ -236,49 +236,16 @@ fn elapsed_time_systems_use_three_digit_day_durations() {
 }
 
 #[test]
-fn kvn_values_listed_in_the_book_use_a_single_case() {
-    // ODM 7.5.3 is a KVN rule for normative values: those listed in 3.2.3.2, 3.2.3.3 and, for
-    // COV_REF_FRAME, 3.2.4.11. XML text follows xsd:string (8.13.5), which the schema leaves
-    // unrestricted here.
-    const COV: &str = "COV_REF_FRAME = EME2000";
-    for (from, to, field) in [
-        ("TIME_SYSTEM = UTC", "TIME_SYSTEM = Utc", "TIME_SYSTEM"),
-        ("REF_FRAME = EME2000", "REF_FRAME = Eme2000", "REF_FRAME"),
-        (COV, "COV_REF_FRAME = Eme2000", "COV_REF_FRAME"),
-        (COV, "COV_REF_FRAME = Rsw", "COV_REF_FRAME"),
-        (COV, "COV_REF_FRAME = Rtn", "COV_REF_FRAME"),
-        (COV, "COV_REF_FRAME = Tnw", "COV_REF_FRAME"),
-    ] {
-        let kvn = crate::common::mutated_once(KVN_FIXTURES[2], from, to);
-        crate::common::assert_validation_field(&Oem::from_kvn(&kvn).unwrap_err(), field);
-    }
-    for to in ["COV_REF_FRAME = rtn", "COV_REF_FRAME = TNW"] {
-        Oem::from_kvn(&crate::common::mutated_once(KVN_FIXTURES[2], COV, to)).unwrap();
-    }
-
-    // ICD-defined values and registry centers keep their spelling in KVN.
-    let custom = crate::common::mutated_once(
-        KVN_FIXTURES[0],
-        "REF_FRAME = EME2000",
-        "REF_FRAME = MissionFrame",
-    );
-    let custom = crate::common::mutated_once(
-        &custom,
-        "CENTER_NAME = MARS BARYCENTER",
-        "CENTER_NAME = Mars Barycenter",
-    );
-    Oem::from_kvn(&custom).unwrap();
-
-    // The same spellings are valid XML; only conversion to KVN refuses them.
-    let mut message = Oem::from_xml(XML).unwrap();
-    message.body.segment[0].metadata.time_system = "Utc".into();
-    message.body.segment[0].data.covariance_matrix[0].cov_ref_frame = Some("Icrf".into());
-    message.validate().unwrap();
-    let reparsed = Oem::from_xml(&message.to_xml().unwrap()).unwrap();
-    assert_eq!(reparsed, message);
-    crate::common::assert_validation_field(&message.to_kvn().unwrap_err(), "TIME_SYSTEM");
-    message.body.segment[0].metadata.time_system = "UTC".into();
-    crate::common::assert_validation_field(&message.to_kvn().unwrap_err(), "COV_REF_FRAME");
+fn mixed_case_text_values_are_preserved_in_every_notation() {
+    // ODM 7.5.3's single-case rule is not enforced: mixed case loses nothing, so it is accepted
+    // and preserved in every family and notation (validation contract, shared lexical decisions).
+    let kvn =
+        crate::common::mutated_once(KVN_FIXTURES[2], "TIME_SYSTEM = UTC", "TIME_SYSTEM = Utc");
+    let kvn = crate::common::mutated_once(&kvn, "COV_REF_FRAME = EME2000", "COV_REF_FRAME = Rtn");
+    let message = Oem::from_kvn(&kvn).unwrap();
+    assert_eq!(message.body.segment[0].metadata.time_system, "Utc");
+    assert_eq!(Oem::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    assert_eq!(Oem::from_xml(&message.to_xml().unwrap()).unwrap(), message);
 }
 
 #[test]

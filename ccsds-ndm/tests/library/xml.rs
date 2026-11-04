@@ -141,8 +141,8 @@ fn xml_rejects_mixed_content_and_invalid_references_without_losing_valid_text() 
         }
         let valid = mutated_once(
             input,
-            "<ORIGINATOR>",
-            "<ORIGINATOR><![CDATA[A & B]]>&amp;&#65;",
+            "<OBJECT_NAME>",
+            "<OBJECT_NAME><![CDATA[A & B]]>&amp;&#65;",
         );
         let parsed = from_str(&valid).unwrap();
         assert!(parsed.to_xml().unwrap().contains("A &amp; B&amp;A"));
@@ -197,7 +197,7 @@ fn xml_rejects_malformed_text_namespaces_and_processing_instructions() {
             "<?xml-stylesheet href='style.xsl'?><?π valid?><header xmlns=\"\">",
         );
         assert_eq!(from_str(&valid).unwrap(), from_str(input).unwrap());
-        let valid = mutated_once(input, "<ORIGINATOR>", "<ORIGINATOR>]]&gt;");
+        let valid = mutated_once(input, "<OBJECT_NAME>", "<OBJECT_NAME>]]&gt;");
         assert!(from_str(&valid).unwrap().to_xml().is_ok());
     }
 }
@@ -237,5 +237,76 @@ fn wrapped_message_is_rejected_by_root_detection() {
             detail.contains(wrapper),
             "diagnostic for <{wrapper}> should name the offending root, got: {detail}"
         );
+    }
+}
+
+#[test]
+fn xml_attribute_whitespace_matches_independent_readers_and_preserves_text() {
+    use ccsds_ndm::messages::opm::Opm;
+
+    let baseline = Opm::from_kvn(include_str!("../../data/kvn/opm_g1.kvn"))
+        .unwrap()
+        .to_xml()
+        .unwrap();
+    for (source, expected) in [
+        ("A\tB", "A B"),
+        ("A\t\"B", "A \"B"),
+        ("A\"B", "A\"B"),
+        ("A\nB", "A B"),
+        ("A\rB", "A B"),
+        ("A\r\nB", "A B"),
+        ("A\n\rB", "A  B"),
+        ("A&#9;&#10;&#13;B", "A\t\n\rB"),
+        ("A\r\n&#x9;B", "A \tB"),
+        ("A&amp;#9;&quot;&lt;éB", "A&#9;\"<éB"),
+    ] {
+        for declaration in ["", " xmlns:p='urn:unused'"] {
+            let input = mutated_once(
+                &baseline,
+                "</data>",
+                &format!("<userDefinedParameters{declaration}><USER_DEFINED parameter='{source}'>left\t\nright&#13;&lt;&amp;&quot;</USER_DEFINED></userDefinedParameters></data>"),
+            );
+            let message = Opm::from_xml(&input).unwrap();
+            let user = message
+                .body
+                .segment
+                .data
+                .user_defined_parameters
+                .as_ref()
+                .unwrap();
+            assert_eq!(user.parameters().next().unwrap().parameter, expected);
+            assert_eq!(
+                user.parameters().next().unwrap().value,
+                "left\t\nright\r<&\""
+            );
+            assert_eq!(
+                from_str(&input).unwrap().to_xml().unwrap(),
+                message.to_xml().unwrap()
+            );
+            let output = message.to_xml().unwrap();
+            let mut streamed = Vec::new();
+            message.write_xml_to(&mut streamed).unwrap();
+            assert_eq!(streamed, output.as_bytes());
+            assert_eq!(Opm::from_xml(&output).unwrap(), message);
+            crate::common::validate_xml("attribute whitespace", &output);
+            for xml in [&input, &output] {
+                let document = tempfile::NamedTempFile::new().unwrap();
+                std::fs::write(document.path(), xml).unwrap();
+                let oracle = std::process::Command::new("xmllint")
+                    .args(["--xpath", "string(//USER_DEFINED/@parameter)"])
+                    .arg(document.path())
+                    .output()
+                    .expect("xmllint is required for the XML attribute oracle");
+                assert!(
+                    oracle.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&oracle.stderr)
+                );
+                assert_eq!(
+                    String::from_utf8(oracle.stdout).unwrap(),
+                    format!("{expected}\n")
+                );
+            }
+        }
     }
 }

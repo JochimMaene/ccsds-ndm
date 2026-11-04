@@ -59,7 +59,7 @@ class TestRoutingShapes:
         # In range per component, so the norm check is what rejects this.
         broken[0] = 0.5  # destroys quaternion normalisation
         states[1].values = broken
-        assert_all_surfaces_reject(aem, "Quaternion not normalized")
+        assert_all_surfaces_reject(aem, "QUATERNION")
 
     def test_required_scalar_on_a_required_block(self):
         """CDM relative metadata is required, not optional, and its numbers must be finite.
@@ -202,13 +202,13 @@ class TestAssignmentDefersToRootValidation:
         cdm.body.segments[0].data.additional_parameters = parameters
         assert_all_surfaces_reject(cdm, "AREA_PC")
 
-    def test_ocm_gm_defers_to_root(self):
-        """Zero is the interesting value: `gmType` is a positiveDouble, so it distinguishes this
-        setter from the non-negative ones. The rest of the domain is `types.rs::test_gm_validation`.
-        """
+    def test_ocm_gm_schema_facet_applies_in_every_notation(self):
+        """The positive GM schema facet applies to every notation and edited models."""
         ocm = load("ocm_g18.kvn", ccsds_ndm.Ocm)
         ocm.segment.data.pert.gm = 0.0
         assert ocm.segment.data.pert.gm == 0.0
+        assert_all_surfaces_reject(ocm, "GM")
+        ocm.segment.data.pert.gm = float("nan")
         assert_all_surfaces_reject(ocm, "GM")
 
 

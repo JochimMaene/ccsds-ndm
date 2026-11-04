@@ -11,6 +11,12 @@ ODM
 .. centered:: BLUE BOOK
 .. centered:: April 2023
 
+.. NOTE::
+   This is an extracted reference, not the authoritative publication. Table 6-7 loses some
+   status/default columns: MAN_ID is mandatory; MAN_REF_FRAME defaults to TNW_INERTIAL and
+   DC_TYPE to CONTINUOUS in the publication. Consult the source PDF in ``data/`` and the
+   OCM conformance record when resolving those entries.
+
 AUTHORITY
 =========
 

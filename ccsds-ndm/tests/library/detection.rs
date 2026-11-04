@@ -41,9 +41,15 @@ fn kvn_detection_does_not_bypass_strict_preamble_rules() {
 
 #[test]
 fn kvn_detection_does_not_bypass_printable_ascii_rules() {
-    let input = mutated(OPM_KVN, "ORIGINATOR", "\tORIGINATOR");
-    let error = from_str(&input).expect_err("tabs are not printable ASCII");
+    // A TAB reads as a blank (lossless producer deviation); other control characters do not.
+    let tabbed = mutated(OPM_KVN, "ORIGINATOR = ", "\tORIGINATOR\t=\t");
+    assert_eq!(from_str(&tabbed).unwrap(), from_str(OPM_KVN).unwrap());
+    let input = mutated(OPM_KVN, "ORIGINATOR", "  \u{7}ORIGINATOR");
+    let error = from_str(&input).expect_err("BEL is not printable ASCII");
     assert_eq!(error.code(), Some("parse.kvn.syntax"));
+    let kvn = crate::common::kvn_parse_error(&error).unwrap();
+    assert_eq!(kvn.column, 3, "the byte column of the offending character");
+    assert!(kvn.message.contains("U+0007"), "{}", kvn.message);
 }
 
 #[test]
@@ -63,6 +69,44 @@ fn detect_failure_unknown_header() {
     "#;
     let err = from_str(input).unwrap_err();
     assert!(format!("{}", err).contains("Could not identify KVN header"));
+}
+
+#[test]
+fn concatenated_kvn_messages_are_detected_on_reader_record_boundaries() {
+    // Detection uses the readers' rules: any terminator, insignificant leading blanks.
+    let expected = from_str(OPM_KVN).unwrap();
+    for ending in ["\n", "\r", "\r\n", "\n\r"] {
+        let single = OPM_KVN.replace('\n', ending);
+        assert_eq!(from_str(&single).unwrap(), expected);
+        for separator in ["\n  ", "\r", "\r\n\t", "\n\r\t", "\r\r\n", "\n\u{a0}"] {
+            let input = format!("{}{separator}{single}", single.trim_end());
+            assert_eq!(
+                from_str(&input).unwrap_err().code(),
+                Some("unsupported.notation"),
+                "{ending:?} {separator:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn header_detection_identifies_only_the_first_header_or_root() {
+    use ccsds_ndm::detect::{detect_message_header, detect_message_kind};
+    use ccsds_ndm::validation::MessageKind;
+
+    let input = format!("{OPM_KVN}\r\n\t{OPM_KVN}");
+    assert_eq!(
+        detect_message_header(&input, None).unwrap(),
+        MessageKind::Opm
+    );
+    assert_eq!(
+        detect_message_kind(&input, None).unwrap_err().code(),
+        Some("unsupported.notation")
+    );
+    assert_eq!(
+        detect_message_header("<opm><unfinished", None).unwrap(),
+        MessageKind::Opm
+    );
 }
 
 #[test]
@@ -141,4 +185,16 @@ fn every_family_reads_kvn_after_one_leading_bom() {
     check::<Opm>(read("kvn", "opm_g1.kvn"), Some(read("xml", "opm_g5.xml")));
     check::<Rdm>(read("kvn", "rdm_c1.kvn"), Some(read("xml", "rdm_c3.xml")));
     check::<Tdm>(read("kvn", "tdm_e1.kvn"), Some(read("xml", "tdm_e21.xml")));
+}
+
+#[test]
+fn family_detection_does_not_parse_the_message_body() {
+    use ccsds_ndm::{detect::detect_message_kind, validation::MessageKind};
+    for input in [
+        "CCSDS_OEM_VERS = 3.0\nBROKEN = content",
+        "<oem version=\"3.0\"><broken/></oem>",
+    ] {
+        assert_eq!(detect_message_kind(input, None).unwrap(), MessageKind::Oem);
+        assert!(ccsds_ndm::from_str(input).is_err());
+    }
 }

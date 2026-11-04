@@ -68,6 +68,7 @@ including interrupted/short writes and full sinks. Combined NDM has its own XML-
 case. Keep filesystem guarantees in the shared tests: create/replace, permissions,
 in-place conversion, and preserving existing or absent destinations on failure.
 
-The bundled standards and `docs/conformance/` inventories remain the authority
-for the rules being tested. In particular, AEM interpolation sufficiency remains
-unresolved; this test organization does not establish full compliance.
+The publications and schemas cited in the [family records](../../docs/conformance/README.md)
+govern the rules being tested. Every family uses the same verification criteria; test organization
+or case count alone does not establish conformance. Each record explains its externally governed
+requirements, notation limits, and published-example conflicts.

@@ -11,6 +11,7 @@ from pathlib import Path
 import ccsds_ndm
 import pytest
 
+
 from ccsds_ndm import (
     Cdm,
     CdmBody,
@@ -31,6 +32,39 @@ from ccsds_ndm import (
     StateVectorAcc,  # Verified class name
     Tdm,
 )
+
+
+def test_combined_messages_reject_nested_or_cyclic_constituents_before_conversion():
+    message = ccsds_ndm.CombinedNdm([])
+    message.messages.append(message)
+    for operation in (message.validate, lambda: message.to_str("xml")):
+        with pytest.raises(ValueError, match="Nested combined"):
+            operation()
+    with pytest.raises(ValueError, match="Nested combined"):
+        message.messages = [ccsds_ndm.CombinedNdm([])]
+
+
+def test_combined_envelope_preserves_decoded_text_and_empty_fields():
+    source = (
+        '<?xml version="1.0" encoding="UTF-8"?><ndm>'
+        "<MESSAGE_ID>A&amp;B</MESSAGE_ID><COMMENT><![CDATA[A<B]]></COMMENT>"
+        "<?ignored instruction?><COMMENT/></ndm>"
+    )
+    message = CombinedNdm.from_str(source, format="xml")
+    text = message.to_str("xml")
+    assert "<MESSAGE_ID>A&amp;B</MESSAGE_ID>" in text
+    assert "amp;amp" not in text
+    assert "<COMMENT>A&lt;B</COMMENT>" in text
+    assert CombinedNdm.from_str(text, format="xml").to_str("xml") == text
+
+
+@pytest.mark.parametrize(
+    "content", ['<COMMENT bad="x">a</COMMENT>', "<COMMENT><bad>x</bad></COMMENT>"]
+)
+def test_combined_envelope_rejects_unsupported_text_structure(content):
+    source = f'<?xml version="1.0" encoding="UTF-8"?><ndm>{content}</ndm>'
+    with pytest.raises(ccsds_ndm.NdmFormatError):
+        CombinedNdm.from_str(source, format="xml")
 
 
 class TestNdm:
@@ -95,12 +129,15 @@ class TestNdm:
         )
 
         meta1 = CdmMetadata(
+            ephemeris_name="NONE",
             object="OBJECT1",
             object_designator="12345",
             catalog_name="SATCAT",
             object_name="SAT1",
             international_designator="2023-001A",
             ref_frame="EME2000",
+            covariance_method="CALCULATED",
+            maneuverable="YES",
         )
         vector1 = CdmStateVector(7000.0, 0.0, 0.0, 0.0, 7.5, 0.0)
         cov_args = (
@@ -135,12 +172,15 @@ class TestNdm:
         seg1 = CdmSegment(meta1, data1)
 
         meta2 = CdmMetadata(
+            ephemeris_name="NONE",
             object="OBJECT2",
             object_designator="67890",
             catalog_name="SATCAT",
             object_name="DEBRIS",
             international_designator="UNKNOWN",
             ref_frame="EME2000",
+            covariance_method="CALCULATED",
+            maneuverable="YES",
         )
         vector2 = CdmStateVector(7100.0, 0.0, 0.0, 0.0, 7.4, 0.0)
         cov2 = CdmCovarianceMatrix(*cov_args)
@@ -185,9 +225,7 @@ class TestNdm:
         opm = (root / "ccsds-ndm/data/kvn/opm_g1.kvn").read_text()
 
         for format_hint in (None, "kvn"):
-            with pytest.raises(
-                ccsds_ndm.NdmUnsupportedMessageError, match="expected NDM, found OPM"
-            ):
+            with pytest.raises(ccsds_ndm.NdmUnsupportedNotationError, match="KVN"):
                 CombinedNdm.from_str(opm, format=format_hint)
 
     def test_ndm_roundtrip_xml(self):

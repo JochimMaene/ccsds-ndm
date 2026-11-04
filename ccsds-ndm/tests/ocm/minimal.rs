@@ -42,7 +42,7 @@ fn rejects_wrong_keyword_kvn() {
 }
 
 #[test]
-fn rejects_invalid_trajectory_basis_kvn() {
+fn trajectory_basis_is_open_book_text_but_schema_enum_in_xml() {
     let input = mutated(KVN, "TRAJ_START\n", "TRAJ_START\nTRAJ_BASIS = INVALID\n");
     Ocm::from_kvn(&mutated(
         &input,
@@ -50,11 +50,13 @@ fn rejects_invalid_trajectory_basis_kvn() {
         "TRAJ_BASIS = PREDICTED",
     ))
     .expect("valid control");
-    let error = Ocm::from_kvn(&input).unwrap_err();
-    assert!(
-        matches!(error.as_format_error(), Some(ccsds_ndm::error::FormatError::Enum(cause)) if cause.field == "TRAJ_BASIS" && cause.value == "INVALID"),
-        "{error}"
+    let message = Ocm::from_kvn(&input).unwrap();
+    assert_eq!(
+        message.body.segment.data.traj[0].traj_basis.as_deref(),
+        Some("INVALID")
     );
+    assert_eq!(Ocm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    assert!(message.to_xml().is_err());
 }
 
 #[test]
