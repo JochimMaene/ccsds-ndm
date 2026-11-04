@@ -128,14 +128,25 @@ pub(crate) fn check_input_version(kind: MessageKind, version: &str) -> Result<()
     }
 }
 
-/// XML supports the output editions; the additional legacy readers are KVN-only.
+/// XML reads the output editions plus TDM 1.0, which NDM/XML 505.0-B-1 defined. OEM 1.0
+/// (ODM 502.0-B-1) predates NDM/XML, so its legacy reader stays KVN-only.
 pub(crate) fn check_xml_input_version(kind: MessageKind, version: &str) -> Result<()> {
+    let legacy: &[&str] = if kind == MessageKind::Tdm {
+        &["1.0"]
+    } else {
+        &[]
+    };
     match spec(kind) {
-        Some(spec) if !spec.output_versions.contains(&version) => {
+        Some(spec) if !spec.output_versions.contains(&version) && !legacy.contains(&version) => {
             Err(CcsdsNdmError::UnsupportedInputVersion {
                 message_type: kind.as_str(),
                 version: version.to_owned(),
-                supported: spec.output_versions.join(", "),
+                supported: legacy
+                    .iter()
+                    .chain(spec.output_versions)
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join(", "),
             })
         }
         _ => Ok(()),

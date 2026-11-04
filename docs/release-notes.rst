@@ -40,7 +40,15 @@ Final conformance corrections
 - Family records and the shared contract distinguish XSD structure/value domains from book
   conditional requirements. Missing frames, OPM maneuver mass, OEM interpolation degree, and
   overlapping OEM usable spans remain validation failures. OCM book defaults may remain omitted.
-  Earlier combined ODM envelopes, TDM 1.0 XML, and attitude 1.0 remain outside the supported scope.
+  Earlier combined ODM envelopes and attitude 1.0 remain outside the supported scope.
+- APM and AEM 1.0 remain rejected by decision; the APM record documents the 1.0/2.0 differences
+  and why 1.0 rates, ``B2A`` directions, inertia signs and spin conventions cannot be mapped
+  without guessing. ``EULER_ROT_SEQ`` no longer reads ADM 1.0 numeric sequences such as ``313``
+  in 2.0 messages (breaking); use the letter spelling (``ZXZ``).
+- TDM 1.0 XML is read as input-only, like TDM 1.0 KVN, following the NDM/XML 1.0 schema
+  (505.0-B-1). The bundled 1.0 schema files come from the archived SANA registry. 1.0 XML
+  rejects time systems outside the schema's closed list, ``RHUMIDITY`` units and the qualified
+  form; 1.0 KVN keeps the book's open ``TIME_SYSTEM``. Generation of a 1.0 message is refused.
 
 Additional conformance corrections
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

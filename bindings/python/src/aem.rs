@@ -415,9 +415,8 @@ impl AemSegment {
 ///     rotation axis of the first rotation, the second letter (X, Y, or Z) represents the rotation
 ///     axis of the second rotation, and the third letter (X, Y, or Z) represents the rotation axis of
 ///     the third rotation. This keyword is applicable only if ATTITUDE_TYPE specifies the use of
-///     Euler angles. Accepts the twelve letter sequences in either case and the ADM 1.0 numeric
-///     spellings (``"313"`` for ``ZXZ``) as a legacy alias; the getter and all output use uppercase
-///     letters.
+///     Euler angles. Accepts the twelve letter sequences in any case; ADM 1.0 numeric
+///     spellings such as ``"313"`` are rejected. The getter and all output use uppercase letters.
 /// angvel_frame : str, optional
 ///     The frame of reference in which angular velocity data are specified. The set of allowed values
 ///     is described in annex B, subsection B3. This keyword is applicable only if ATTITUDE_TYPE
@@ -775,8 +774,8 @@ impl AemMetadata {
     /// rotation axis of the second rotation, and the third letter (X, Y, or Z) represents the
     /// rotation axis of the third rotation. This keyword is applicable only if ATTITUDE_TYPE
     /// specifies the use of Euler angles.
-    /// Accepts the twelve letter sequences in either case and the ADM 1.0 numeric spellings
-    /// (``"313"`` for ``ZXZ``) as a legacy alias; the getter and all output use uppercase letters.
+    /// Accepts the twelve letter sequences in any case; ADM 1.0 numeric spellings such as
+    /// ``"313"`` are rejected. The getter and all output use uppercase letters.
     ///
     /// Examples: ZXZ, XYZ
     ///

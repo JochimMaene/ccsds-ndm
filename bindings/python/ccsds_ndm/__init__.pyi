@@ -2333,9 +2333,8 @@ class AemMetadata:
         rotation axis of the first rotation, the second letter (X, Y, or Z) represents the rotation
         axis of the second rotation, and the third letter (X, Y, or Z) represents the rotation axis of
         the third rotation. This keyword is applicable only if ATTITUDE_TYPE specifies the use of
-        Euler angles. Accepts the twelve letter sequences in either case and the ADM 1.0 numeric
-        spellings (``"313"`` for ``ZXZ``) as a legacy alias; the getter and all output use uppercase
-        letters.
+        Euler angles. Accepts the twelve letter sequences in any case; ADM 1.0 numeric
+        spellings such as ``"313"`` are rejected. The getter and all output use uppercase letters.
     angvel_frame : str, optional
         The frame of reference in which angular velocity data are specified. The set of allowed values
         is described in annex B, subsection B3. This keyword is applicable only if ATTITUDE_TYPE
@@ -2552,8 +2551,8 @@ class AemMetadata:
         rotation axis of the second rotation, and the third letter (X, Y, or Z) represents the
         rotation axis of the third rotation. This keyword is applicable only if ATTITUDE_TYPE
         specifies the use of Euler angles.
-        Accepts the twelve letter sequences in either case and the ADM 1.0 numeric spellings
-        (``"313"`` for ``ZXZ``) as a legacy alias; the getter and all output use uppercase letters.
+        Accepts the twelve letter sequences in any case; ADM 1.0 numeric spellings such as
+        ``"313"`` are rejected. The getter and all output use uppercase letters.
 
         Examples: ZXZ, XYZ
 
@@ -5625,9 +5624,8 @@ class EulerAngleState:
         transformation is from left to right, where the leftmost letter (X, Y, or Z) represents the
         rotation axis of the first rotation, the second letter (X, Y, or Z) represents the rotation
         axis of the second rotation, and the third letter (X, Y, or Z) represents the rotation axis of
-        the third rotation. Accepts the twelve letter sequences in either case and the ADM 1.0 numeric
-        spellings (``"313"`` for ``ZXZ``) as a legacy alias; the getter and all output use uppercase
-        letters.
+        the third rotation. Accepts the twelve letter sequences in any case; ADM 1.0 numeric
+        spellings such as ``"313"`` are rejected. The getter and all output use uppercase letters.
     angle_1 : float
         Angle of the first rotation.
     angle_2 : float
@@ -5680,8 +5678,8 @@ class EulerAngleState:
         the rotation axis of the first rotation, the second letter (X, Y, or Z) represents the
         rotation axis of the second rotation, and the third letter (X, Y, or Z) represents the
         rotation axis of the third rotation.
-        Accepts the twelve letter sequences in either case and the ADM 1.0 numeric spellings
-        (``"313"`` for ``ZXZ``) as a legacy alias; the getter and all output use uppercase letters.
+        Accepts the twelve letter sequences in any case; ADM 1.0 numeric spellings such as
+        ``"313"`` are rejected. The getter and all output use uppercase letters.
 
         CCSDS Reference: 504.0-B-2, Section 3.2.4.
 
@@ -17067,7 +17065,7 @@ class Tdm:
     @property
     def version(self) -> builtins.str:
         r"""
-        Message edition: "2.0", or "1.0" from the restricted KVN input-only reader.
+        Message edition: "2.0", or "1.0" from the restricted input-only KVN/XML reader.
 
         :type: str
         """
@@ -17415,7 +17413,8 @@ class TdmMetadata:
         The TIME_SYSTEM keyword shall specify the time system used for timetags in the associated Data
         Section. This should be UTC for ground-based data. The value associated with this keyword must
         be selected from the full set of allowed values enumerated in the SANA Time Systems Registry
-        <https://sanaregistry.org/r/time_systems> (reference `[12]`). (See annex B.)
+        <https://sanaregistry.org/r/time_systems> (reference `[12]`). (See annex B.) TDM 1.0 input
+        (503.0-B-1 annex A1) admits ICD-defined values in KVN; 1.0 XML uses the NDM/XML 1.0 list.
     track_id : str, optional
         The TRACK_ID keyword specifies a unique identifier for the tracking data in the associated
         data section. The value may be a freely selected string of characters and numbers, only
@@ -17656,7 +17655,8 @@ class TdmMetadata:
         associated Data Section. This should be UTC for ground-based data. The value associated
         with this keyword must be selected from the full set of allowed values enumerated in
         the SANA Time Systems Registry <https://sanaregistry.org/r/time_systems> (reference `[12]`).
-        (See annex B.)
+        (See annex B.) TDM 1.0 input (503.0-B-1 annex A1) lists the same systems and admits
+        ICD-defined values in KVN; 1.0 XML is limited to the NDM/XML 1.0 schema list.
 
         Examples: UTC, TAI, GPS, SCLK
 

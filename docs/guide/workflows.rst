@@ -105,8 +105,9 @@ The input notation is detected automatically.
 OPM, OEM, and OMM support edition-correct ODM 2.0 and 3.0 output. The message's ``version``
 attribute selects the edition, for example ``message.version = "2.0"`` before ``to_file``. The 2.0 checks use the official `SANA NDM/XML schema
 archive <https://sanaregistry.org/r/ndmxml_unqualified/>`_. OEM 1.0 has a restricted KVN input-only compatibility reader; stored 1.0 messages cannot be
-generated. TDM 1.0 also has a restricted KVN input-only reader. OPM, APM, and AEM 1.0 input is rejected because their older syntax and requirements
-are not implemented as separate editions. ACM has only its defined 2.0 representation. See the
+generated. TDM 1.0 has a restricted input-only reader in KVN and XML. OPM 1.0 input is rejected because its
+older syntax and requirements are not implemented as a separate edition; APM and AEM 1.0 input is
+rejected because some 1.0 values cannot be converted to the 2.0 meaning without guessing. ACM has only its defined 2.0 representation. See the
 project support matrix for the precise scope, including unsupported older combined ODM exports
 and missing mandatory provenance in producer feeds.
 

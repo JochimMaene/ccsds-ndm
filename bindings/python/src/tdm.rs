@@ -47,7 +47,7 @@ pub struct Tdm {
     #[pyo3(get)]
     id: Option<String>,
 
-    /// Message edition: "2.0", or "1.0" from the restricted KVN input-only reader.
+    /// Message edition: "2.0", or "1.0" from the restricted input-only KVN/XML reader.
     ///
     /// :type: str
     #[pyo3(get)]
@@ -573,7 +573,8 @@ impl TdmSegment {
 ///     The TIME_SYSTEM keyword shall specify the time system used for timetags in the associated Data
 ///     Section. This should be UTC for ground-based data. The value associated with this keyword must
 ///     be selected from the full set of allowed values enumerated in the SANA Time Systems Registry
-///     <https://sanaregistry.org/r/time_systems> (reference `[12]`). (See annex B.)
+///     <https://sanaregistry.org/r/time_systems> (reference `[12]`). (See annex B.) TDM 1.0 input
+///     (503.0-B-1 annex A1) admits ICD-defined values in KVN; 1.0 XML uses the NDM/XML 1.0 list.
 /// track_id : str, optional
 ///     The TRACK_ID keyword specifies a unique identifier for the tracking data in the associated
 ///     data section. The value may be a freely selected string of characters and numbers, only
@@ -1097,7 +1098,8 @@ impl TdmMetadata {
     /// associated Data Section. This should be UTC for ground-based data. The value associated
     /// with this keyword must be selected from the full set of allowed values enumerated in
     /// the SANA Time Systems Registry <https://sanaregistry.org/r/time_systems> (reference `[12]`).
-    /// (See annex B.)
+    /// (See annex B.) TDM 1.0 input (503.0-B-1 annex A1) lists the same systems and admits
+    /// ICD-defined values in KVN; 1.0 XML is limited to the NDM/XML 1.0 schema list.
     ///
     /// Examples: UTC, TAI, GPS, SCLK
     ///

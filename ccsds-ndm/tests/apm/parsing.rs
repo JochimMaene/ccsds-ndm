@@ -371,8 +371,15 @@ fn quaternion_components_refuse_ignored_units() {
 /// (annex J). KVN reads both; XML `rotseqType` admits only the uppercase letters; output is
 /// always the uppercase letters.
 #[test]
-fn euler_rot_seq_reads_lowercase_and_legacy_digits_in_kvn_only() {
-    for seq in ["zyx", "321"] {
+fn euler_rot_seq_reads_lowercase_in_kvn_only_and_rejects_adm_1_digits() {
+    let numeric = format!("{}{}EPOCH = 2023-01-01T00:00:00\nEULER_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nEULER_ROT_SEQ = 321\nANGLE_1 = 10\nANGLE_2 = 20\nANGLE_3 = 30\nEULER_STOP\n",
+        sample_apm_header(), sample_apm_meta());
+    assert!(Apm::from_kvn(&numeric)
+        .unwrap_err()
+        .to_string()
+        .contains("EULER_ROT_SEQ"));
+    assert!("313".parse::<ccsds_ndm::types::RotSeq>().is_err());
+    for seq in ["zyx", "Zyx"] {
         let input = format!("{}{}EPOCH = 2023-01-01T00:00:00\nEULER_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nEULER_ROT_SEQ = {seq}\nANGLE_1 = 10\nANGLE_2 = 20\nANGLE_3 = 30\nEULER_STOP\n",
             sample_apm_header(), sample_apm_meta());
         let apm = Apm::from_kvn(&input).unwrap();

@@ -1783,13 +1783,15 @@ fn legacy_kvn_is_input_only_and_rejects_version_two_content() {
         .unwrap_err()
         .to_string()
         .contains("TRACK_ID"));
-    let xml = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e1.kvn"))
-        .unwrap()
-        .to_xml()
-        .unwrap()
-        .replace("version=\"2.0\"", "version=\"1.0\"");
+    // TDM 1.0 XML is input-only too (conformance::tdm1 covers the 1.0 schema rules).
+    let xml = include_str!("../../data/legacy/tdm_1_0_b9.xml");
+    let message = Tdm::from_xml(xml).unwrap();
+    assert_eq!(message.version, "1.0");
+    assert!(message.to_xml().is_err());
     assert_eq!(
-        Tdm::from_xml(&xml).unwrap_err().code(),
+        Tdm::from_xml(&xml.replace("version=\"1.0\">", "version=\"1.1\">"))
+            .unwrap_err()
+            .code(),
         Some("parse.unsupported_input_version")
     );
 }

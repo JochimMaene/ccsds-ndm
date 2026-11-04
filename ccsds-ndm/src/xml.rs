@@ -241,7 +241,7 @@ fn validate_root_start(
         )));
     }
     // The books show both an unprefixed and an `ndm:`-prefixed root for the qualified set.
-    element_form(namespaces, start.name(), invalid)?;
+    let form = element_form(namespaces, start.name(), invalid)?;
     let mut unknown_attribute = None;
     let mut schema_hints_seen = [false; 2];
     for attribute in start.attributes() {
@@ -279,14 +279,16 @@ fn validate_root_start(
                     .into_owned();
                 // Check the edition before any content that edition may lack is reported.
                 if let Some(kind) = crate::versioning::kind_for_xml_root(root) {
-                    if kind == crate::validation::MessageKind::Tdm && version == "1.0" {
-                        return Err(crate::error::CcsdsNdmError::UnsupportedInputVersion {
-                            message_type: "TDM",
-                            version,
-                            supported: "2.0 (XML); use KVN for TDM 1.0".into(),
-                        });
-                    }
                     crate::versioning::check_xml_input_version(kind, &version)?;
+                    // NDM/XML 1.0 (505.0-B-1) defined only the unqualified schema set.
+                    if kind == crate::validation::MessageKind::Tdm
+                        && version == "1.0"
+                        && form == ElementForm::Qualified
+                    {
+                        return Err(invalid(
+                            "TDM 1.0 XML has no qualified (namespaced) form in NDM/XML 1.0".into(),
+                        ));
+                    }
                 }
                 *source_edition = Some(version);
             }

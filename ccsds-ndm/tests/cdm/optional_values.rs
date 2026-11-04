@@ -325,7 +325,8 @@ fn unavailable_leaves_cannot_hide_incompatible_units() {
 fn unavailable_leaves_are_removed_before_order_and_duplicate_checks() {
     let original = Cdm::from_kvn(crate::KVN).unwrap().to_xml().unwrap();
     let start = original.find("<RELATIVE_SPEED").unwrap();
-    let end = start + original[start..].find("</RELATIVE_SPEED>").unwrap() + "</RELATIVE_SPEED>".len();
+    let end =
+        start + original[start..].find("</RELATIVE_SPEED>").unwrap() + "</RELATIVE_SPEED>".len();
     let speed = &original[start..end];
     let expected = Cdm::from_xml(&original).unwrap();
 

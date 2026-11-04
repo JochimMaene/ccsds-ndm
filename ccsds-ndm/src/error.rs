@@ -373,8 +373,9 @@ impl ValidationError {
             return self;
         }
         let field = match &self {
-            Self::MissingRequiredField { field, .. }
-            | Self::InvalidValue { field, .. } => field.as_ref(),
+            Self::MissingRequiredField { field, .. } | Self::InvalidValue { field, .. } => {
+                field.as_ref()
+            }
             Self::OutOfRange { name, .. } => name.as_ref(),
             Self::InvalidChoice { .. } => return self.at_path(parent_path),
             Self::Conflict { .. } | Self::Generic { .. } | Self::AtPath { .. } => return self,

@@ -224,6 +224,9 @@ impl Ndm for Tdm {
         let tdm: Self = crate::xml::from_str_with_context(xml, "TDM")?;
         crate::traits::Validate::validate(&tdm)?;
         tdm.validate_xml_representability()?;
+        if tdm.version == "1.0" {
+            tdm.validate_xml_1_0_schema()?;
+        }
         Ok(tdm)
     }
 
@@ -314,6 +317,40 @@ impl Tdm {
                     || matches!(key, "DOPPLER_COUNT" | "MAG" | "RCS")
                 {
                     return Err(ValidationError::invalid_value("observation", key, "a TDM 1.0 observation; phase counts, Doppler counts, MAG and RCS require 2.0").into());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Value domains of the NDM/XML 1.0 TDM schema (`ndmxml-1.0-tdm-1.0.xsd`) that are narrower
+    /// than 2.0: `timeSystemType` is a closed enumeration, and `RHUMIDITY` (`percentType`) has no
+    /// units attribute. TDM 1.0 KVN keeps the book's open TIME_SYSTEM (503.0-B-1 annex A1).
+    fn validate_xml_1_0_schema(&self) -> Result<()> {
+        const TIME_SYSTEMS: [&str; 20] = [
+            "GMST", "gmst", "GPS", "gps", "SCLK", "sclk", "TAI", "tai", "TCB", "tcb", "TDB", "tdb",
+            "TOD", "tod", "TT", "tt", "UT1", "ut1", "UTC", "utc",
+        ];
+        for segment in &self.body.segments {
+            let time_system = &segment.metadata.time_system;
+            if !TIME_SYSTEMS.contains(&time_system.as_str()) {
+                return Err(ValidationError::invalid_value(
+                    "TIME_SYSTEM",
+                    time_system,
+                    "a NDM/XML 1.0 timeSystemType value (GMST, GPS, SCLK, TAI, TCB, TDB, TOD, TT, UT1, UTC)",
+                )
+                .into());
+            }
+            for observation in &segment.data.observations {
+                if let TdmObservationData::Rhumidity(Percentage { units: Some(_), .. }) =
+                    &observation.data
+                {
+                    return Err(ValidationError::invalid_value(
+                        "RHUMIDITY",
+                        "units attribute",
+                        "no units attribute in NDM/XML 1.0 (percentType)",
+                    )
+                    .into());
                 }
             }
         }
@@ -510,7 +547,8 @@ pub struct TdmMetadata {
     /// associated Data Section. This should be UTC for ground-based data. The value associated
     /// with this keyword must be selected from the full set of allowed values enumerated in
     /// the SANA Time Systems Registry <https://sanaregistry.org/r/time_systems> (reference `[12]`).
-    /// (See annex B.)
+    /// (See annex B.) TDM 1.0 input (503.0-B-1 annex A1) lists the same systems and admits
+    /// ICD-defined values in KVN; 1.0 XML is limited to the NDM/XML 1.0 schema list.
     ///
     /// **Examples**: UTC, TAI, GPS, SCLK
     ///

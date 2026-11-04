@@ -77,10 +77,11 @@ throughout the usable interval. Consumers must establish that separately before 
 fixes this boundary in both notations. This is a resolved validation boundary, consistent
 with OEM's interpolation policy, rather than an unresolved numeric capacity rule.
 
-**Legacy edition is not inferred.** ADM annex J documents incompatible AEM 1.0 changes,
-including quaternion order/direction keywords, rotation-sequence spelling, and attitude
-rate types. Relabelling a 2.0 fixture does not verify 1.0. Input edition 1.0 is rejected
-until its actual grammar and semantics receive an edition-specific implementation and review.
+**AEM 1.0 is rejected.** AEM 1.0 input is refused with `parse.unsupported_input_version`
+because some 1.0 values (rates, `ATTITUDE_DIR = B2A`, spin conventions) cannot be given their
+2.0 meaning without guessing. The full 1.0-versus-2.0 comparison, the reasons and the corpus
+evidence are in [APM and AEM 1.0](apm-2.0.md#apm-and-aem-1-0). Relabelling a 2.0 fixture does not
+verify 1.0.
 
 ## Quaternion magnitude
 
@@ -119,8 +120,8 @@ chapter, and the KVN writer already writes negative zero as `0.0`. XML follows t
 ([preservation rules](../design/validation-contract.md#preservation-and-normalization)).
 
 **Rotation sequences.** XML accepts only the twelve uppercase `rotseqType` letters. KVN and Python
-also read lowercase (`zxz`, ADM §6.8.6), mixed-case letters (`Zxz`, a lossless producer alias),
-and the ADM 1.0 numeric spellings (`313` for `ZXZ`, annex J) as a documented lexical alias. Every writer emits the uppercase letters.
+also read lowercase (`zxz`, ADM §6.8.6) and mixed-case letters (`Zxz`, a lossless producer alias).
+ADM 1.0 numeric spellings (`313`) are 1.0 syntax and are rejected. Every writer emits the uppercase letters.
 
 **One object per message.** ADM §2.3.1 limits an AEM to one object. Every segment must carry
 the first segment's `OBJECT_ID` exactly; `OBJECT_NAME` is compared case-insensitively, with

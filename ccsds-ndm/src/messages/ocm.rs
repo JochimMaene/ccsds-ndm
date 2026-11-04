@@ -1565,7 +1565,11 @@ fn parse_units_list(units: &str) -> Vec<&str> {
 /// piece also separate columns (the documented blank-separated compatibility syntax).
 pub(crate) fn parse_man_composition(value: &str) -> Vec<Cow<'_, str>> {
     let mut columns = Vec::new();
-    for piece in value.split(',').map(str::trim).filter(|piece| !piece.is_empty()) {
+    for piece in value
+        .split(',')
+        .map(str::trim)
+        .filter(|piece| !piece.is_empty())
+    {
         if piece.contains(char::is_whitespace) {
             let alias = crate::types::enum_token(piece);
             if man_time_tag(&alias).is_some()

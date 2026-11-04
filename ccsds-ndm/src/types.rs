@@ -3436,8 +3436,8 @@ impl std::fmt::Display for ObjectDescription {
 /// Euler rotation sequence (ADM table 3-3 `EULER_ROT_SEQ`).
 ///
 /// XML (serde) accepts exactly the twelve uppercase XSD `rotseqType` tokens. `FromStr`, used by
-/// KVN and Python, also accepts lowercase per ADM 6.8.6 and the ADM 1.0 numeric spellings
-/// (`313` for `ZXZ`, annex J) as a KVN-only legacy alias; every writer emits the uppercase letters.
+/// KVN and Python, also accepts lowercase per ADM 6.8.6 and mixed-case letters; every writer
+/// emits the uppercase letters. ADM 1.0 numeric spellings (`313`) are 1.0 syntax and rejected.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum RotSeq {
     /// Successive rotations about the X, Y, X axes (ADM §6.8.6).
@@ -3494,22 +3494,10 @@ impl std::str::FromStr for RotSeq {
             "ZXZ" => Ok(Self::ZXZ),
             "ZYX" => Ok(Self::ZYX),
             "ZYZ" => Ok(Self::ZYZ),
-            "121" => Ok(Self::XYX),
-            "123" => Ok(Self::XYZ),
-            "131" => Ok(Self::XZX),
-            "132" => Ok(Self::XZY),
-            "212" => Ok(Self::YXY),
-            "213" => Ok(Self::YXZ),
-            "231" => Ok(Self::YZX),
-            "232" => Ok(Self::YZY),
-            "312" => Ok(Self::ZXY),
-            "313" => Ok(Self::ZXZ),
-            "321" => Ok(Self::ZYX),
-            "323" => Ok(Self::ZYZ),
             _ => Err(crate::error::EnumParseError {
                 field: "EULER_ROT_SEQ",
                 value: s.to_string(),
-                expected: "XYX, XYZ, XZX, XZY, YXY, YXZ, YZX, YZY, ZXY, ZXZ, ZYX, ZYZ (either case), or ADM 1.0 numeric equivalents",
+                expected: "XYX, XYZ, XZX, XZY, YXY, YXZ, YZX, YZY, ZXY, ZXZ, ZYX, ZYZ",
             }),
         }
     }

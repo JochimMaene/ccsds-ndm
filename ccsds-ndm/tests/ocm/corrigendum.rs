@@ -513,7 +513,11 @@ fn reserved_ocm_values_follow_blank_underscore_equivalence() {
     let message = Ocm::from_kvn(source).unwrap();
 
     // Complete comma-delimited column aliases are one column each.
-    for composition in ["TIME RELATIVE, DV_X", "TIME_RELATIVE, DV X", "time relative, dv  x"] {
+    for composition in [
+        "TIME RELATIVE, DV_X",
+        "TIME_RELATIVE, DV X",
+        "time relative, dv  x",
+    ] {
         let aliased = Ocm::from_kvn(&source.replace("TIME_RELATIVE, DV_X", composition)).unwrap();
         assert!(aliased
             .to_kvn()

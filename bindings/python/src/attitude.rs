@@ -306,9 +306,8 @@ impl QuaternionState {
 ///     transformation is from left to right, where the leftmost letter (X, Y, or Z) represents the
 ///     rotation axis of the first rotation, the second letter (X, Y, or Z) represents the rotation
 ///     axis of the second rotation, and the third letter (X, Y, or Z) represents the rotation axis of
-///     the third rotation. Accepts the twelve letter sequences in either case and the ADM 1.0 numeric
-///     spellings (``"313"`` for ``ZXZ``) as a legacy alias; the getter and all output use uppercase
-///     letters.
+///     the third rotation. Accepts the twelve letter sequences in any case; ADM 1.0 numeric
+///     spellings such as ``"313"`` are rejected. The getter and all output use uppercase letters.
 /// angle_1 : float
 ///     Angle of the first rotation.
 /// angle_2 : float
@@ -418,8 +417,8 @@ impl EulerAngleState {
     /// the rotation axis of the first rotation, the second letter (X, Y, or Z) represents the
     /// rotation axis of the second rotation, and the third letter (X, Y, or Z) represents the
     /// rotation axis of the third rotation.
-    /// Accepts the twelve letter sequences in either case and the ADM 1.0 numeric spellings
-    /// (``"313"`` for ``ZXZ``) as a legacy alias; the getter and all output use uppercase letters.
+    /// Accepts the twelve letter sequences in any case; ADM 1.0 numeric spellings such as
+    /// ``"313"`` are rejected. The getter and all output use uppercase letters.
     ///
     /// CCSDS Reference: 504.0-B-2, Section 3.2.4.
     ///

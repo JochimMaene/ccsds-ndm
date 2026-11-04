@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:ndm="urn:ccsds:recommendation:navigation:schema:ndmxml"
+            targetNamespace="urn:ccsds:recommendation:navigation:schema:ndmxml"
+            elementFormDefault="unqualified" attributeFormDefault="unqualified">
+
+<!--********************************************************************-->
+<!-- NOTE: This is version 1.0 of the NDM/XML Schema (03/14/2010).      -->
+<!-- This component of the schema is the "CCSDS common" module,         -->
+<!-- which contains only simple types and complex types used by the     -->
+<!-- constituent schemas that make up Navigation Data Messages (AEM,    -->
+<!-- APM, OEM, OMM, OPM, TDM).  In particular, the types in this common -->
+<!-- module could potentially have applicability across the CCSDS XML   -->
+<!-- applications (see the schema ndmxml-1.0-navwg-common.xsd for       --> 
+<!-- common data types that are unique to the Navigation Data Messages. -->
+<!--                                                                    -->
+<!-- Compatible document versions are:                                  -->
+<!--    NDM/XML 505.0-B-1 Blue Book   (12/2010)                         -->
+<!--    ODM     502.0-B-2 Blue Book   (11/2009)                         -->
+<!--    ADM     504.0-B-1 Blue Book   (05/2008)                         -->
+<!--    TDM     503.0-B-1 Blue Book   (11/2007)                         -->
+<!--                                                                    -->
+<!-- *********************  BLUE BOOK CHANGE LOG  ********************* -->
+<!--                                                                    -->
+<!--********************************************************************-->
+
+<!--********************************************************************-->
+<!-- Simple Types and Complex Types shared in the various NDM messages  -->
+<!--********************************************************************-->
+
+<xsd:complexType name="accType">
+   <xsd:simpleContent>
+      <xsd:extension base="xsd:double">
+         <xsd:attribute name="units" type="ndm:accUnits" use="optional"/>
+      </xsd:extension>
+   </xsd:simpleContent>
+</xsd:complexType>
+
+
+<xsd:simpleType name="accUnits">
+   <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="km/s**2"/>
+   </xsd:restriction>
+</xsd:simpleType>
+
+
+<xsd:simpleType name="angleRange">
+   <xsd:restriction base="xsd:double">
+      <xsd:minInclusive value="-180.0"/>
+      <xsd:maxExclusive value="360.0"/>
+   </xsd:restriction>
+</xsd:simpleType>
+
+
+<xsd:complexType name="angleRateType">
+   <xsd:simpleContent>
+      <xsd:extension base="xsd:double">
+         <xsd:attribute name="units" 
+            type="ndm:angleRateUnits" use="optional"/>
+      </xsd:extension>
+   </xsd:simpleContent>
+</xsd:complexType>
+
+
+<xsd:simpleType name="angleRateUnits">
+   <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="deg/s"/>
+   </xsd:restriction>
+</xsd:simpleType>
+
+
+<xsd:complexType name="angleType">
+   <xsd:simpleContent>
+      <xsd:extension base="ndm:angleRange">
+         <xsd:attribute name="units" type="ndm:angleUnits" use="optional"/>
+      </xsd:extension>
+   </xsd:simpleContent>
+</xsd:complexType>
+
+
+<xsd:simpleType name="angleUnits">
+	<xsd:restriction base="xsd:string">
+		<xsd:enumeration value="deg"/>
+	</xsd:restriction>
+</xsd:simpleType>
+
+
+<xsd:complexType name="areaType">
+   <xsd:simpleContent>
+      <xsd:extension base="ndm:nonNegativeDouble">
+         <xsd:attribute name="units" type="ndm:areaUnits" use="optional"/>
+      </xsd:extension>
+   </xsd:simpleContent>
+</xsd:complexType>
+
+
+<xsd:simpleType name="areaUnits">
+   <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="m**2"/>
+   </xsd:restriction>
+</xsd:simpleType>
+
+
+<xsd:complexType name="distanceType">
+   <xsd:simpleContent>
+      <xsd:extension base="xsd:double">
+         <xsd:attribute name="units" type="ndm:positionUnits" use="optional"/>
+      </xsd:extension>
+   </xsd:simpleContent>
+</xsd:complexType>
+
+
+<xsd:complexType name="positionType">
+   <xsd:simpleContent>
+      <xsd:extension base="xsd:double">
+         <xsd:attribute name="units" type="ndm:positionUnits" use="optional"/>
+      </xsd:extension>
+   </xsd:simpleContent>
+</xsd:complexType>
+
+
+<xsd:simpleType name="positionUnits">
+   <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="km"/>
+   </xsd:restriction>
+</xsd:simpleType>
+
+
+<xsd:complexType name="durationType">
+   <xsd:simpleContent>
+      <xsd:extension base="ndm:nonNegativeDouble">
+         <xsd:attribute name="units" type="ndm:timeUnits" use="optional"/>
+      </xsd:extension>
+   </xsd:simpleContent>
+</xsd:complexType>
+
+
+<!--********************************************************************-->
+<!-- NOTE:  convoluted structure for "epochType" seems necessary in     -->
+<!-- order to convey the "yyyy-dddThh:mm:ss.d->dZ" structure.  There    -->
+<!-- is no built-in type in the XML Schema language that describes this -->
+<!-- structure. In the pattern, "\p{Nd}" represents a numeric digit.    -->
+<!--********************************************************************-->
+<xsd:simpleType name="epochType">
+   <xsd:restriction base="xsd:string">
+      <xsd:pattern 
+         value="\-?\d{4}\d*-((\d{2}\-\d{2})|\d{3})T\d{2}:\d{2}:\d{2}(\.\d*)?(Z|[+|\-]\d{2}:\d{2})?|[+|\-]?\d*(\.\d*)?"/>
+   </xsd:restriction>
+</xsd:simpleType>
+
+
+<xsd:complexType name="frequencyType">
+   <xsd:simpleContent>
+      <xsd:extension base="ndm:positiveDouble">
+         <xsd:attribute name="units" type="ndm:frequencyUnits" use="optional"/>
+      </xsd:extension>
+   </xsd:simpleContent>
+</xsd:complexType>
+
+
+<xsd:simpleType name="frequencyUnits">
+   <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="Hz"/>
+   </xsd:restriction>
+</xsd:simpleType>
+
+
+<xsd:complexType name="massType">
+   <xsd:simpleContent>
+      <xsd:extension base="ndm:nonNegativeDouble">
+         <xsd:attribute name="units" type="ndm:massUnits" use="optional"/>
+      </xsd:extension>
+   </xsd:simpleContent>
+</xsd:complexType>
+
+
+<xsd:simpleType name="massUnits">
+   <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="kg"/>
+   </xsd:restriction>
+</xsd:simpleType>
+
+
+<xsd:simpleType name="negativeDouble">
+   <xsd:restriction base="xsd:double">
+      <xsd:maxExclusive value="0.0"/>
+   </xsd:restriction>
+</xsd:simpleType>
+
+
+<xsd:simpleType name="nonNegativeDouble">
+   <xsd:restriction base="xsd:double">
+      <xsd:minInclusive value="0.0"/>
+   </xsd:restriction>
+</xsd:simpleType>
+
+
+<xsd:simpleType name="percentType">
+   <xsd:restriction base="xsd:double">
+      <xsd:minInclusive value="0.0"/>
+      <xsd:maxInclusive value="100.0"/>
+   </xsd:restriction>
+</xsd:simpleType>
+
+
+<xsd:simpleType name="positiveDouble">
+   <xsd:restriction base="xsd:double">
+      <xsd:minExclusive value="0.0"/>
+   </xsd:restriction>
+</xsd:simpleType>
+
+
+<xsd:complexType name="velocityType">
+   <xsd:simpleContent>
+      <xsd:extension base="xsd:double">
+         <xsd:attribute name="units" type="ndm:velocityUnits" use="optional"/>
+      </xsd:extension>
+   </xsd:simpleContent>
+</xsd:complexType>
+
+
+<xsd:simpleType name="velocityUnits">
+   <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="km/s"/>
+   </xsd:restriction>
+</xsd:simpleType>
+
+
+<xsd:simpleType name="timeUnits">
+   <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="s"/>
+   </xsd:restriction>
+</xsd:simpleType>
+
+
+<xsd:simpleType name="timeSystemType">
+   <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="GMST"/> 
+      <xsd:enumeration value="gmst"/>     
+      <xsd:enumeration value="GPS"/>
+      <xsd:enumeration value="gps"/>
+      <xsd:enumeration value="SCLK"/>
+      <xsd:enumeration value="sclk"/>
+      <xsd:enumeration value="TAI"/>
+      <xsd:enumeration value="tai"/>
+      <xsd:enumeration value="TCB"/>
+      <xsd:enumeration value="tcb"/>
+      <xsd:enumeration value="TDB"/>
+      <xsd:enumeration value="tdb"/>
+      <xsd:enumeration value="TOD"/>
+      <xsd:enumeration value="tod"/>
+      <xsd:enumeration value="TT"/>
+      <xsd:enumeration value="tt"/>
+      <xsd:enumeration value="UT1"/>
+      <xsd:enumeration value="ut1"/>
+      <xsd:enumeration value="UTC"/>
+      <xsd:enumeration value="utc"/>
+   </xsd:restriction>
+</xsd:simpleType>
+
+
+<xsd:simpleType name="yesNoType">
+   <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="YES"/>
+      <xsd:enumeration value="yes"/>
+      <xsd:enumeration value="NO"/>
+      <xsd:enumeration value="no"/>
+   </xsd:restriction>
+</xsd:simpleType>
+
+</xsd:schema>

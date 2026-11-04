@@ -178,7 +178,7 @@ Other field-specific precision rules still apply where documented. See the share
 [epoch storage policy](../design/validation-contract.md#epoch-storage-limit).
 
 The primary implementation and full output evidence cover edition 2.0. A restricted
-KVN-only 1.0 input reader is also supported, with the explicit content limits below.
+input-only 1.0 reader is also supported in KVN and XML; see [TDM 1.0 input](#tdm-1-0-input).
 
 Time-system and frame registry membership, calibration truth, and the correctness of an
 exchange-partner path are outside the message. Local participant-index existence, path/mode
@@ -262,15 +262,6 @@ writing enforces that limit, so an accepted overlong record can require shorteni
 regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
 are specified in the [validation contract](../design/validation-contract.md).
 
-TDM 1.0 KVN is accepted through a restricted input-only reader based on the shared
-2.0 structure restricted to the header/metadata tables 3-2/3-3 of CCSDS 503.0-B-1
-(https://public.ccsds.org/Pubs/503x0b1s.pdf), not just the 2.0 change summary.
-It rejects MESSAGE_ID, TRACK_ID, DATA_TYPES, EPHEMERIS_NAME_n, INTERPOLATION and
-INTERPOLATION_DEGREE, DOPPLER_COUNT_* metadata, CORRECTION_MAG, CORRECTION_RCS,
-CORRECTION_ABERRATION_YEARLY/DIURNAL, phase counts, DOPPLER_COUNT, MAG and RCS. XML 1.0 and
-1.0 output remain unsupported. Explicit caller relabelling to 2.0 is possible after validation;
-the reader never relabels automatically. `legacy_kvn_is_input_only_and_rejects_version_two_content`
-covers typed/generic input, refused output and later-edition content.
 
 KVN closed categories ignore case (4.3.7), and blank/underscore aliases are equivalent (4.3.8).
 DOPPLER_COUNT is emitted as plain integer digits (3.5.2.4), within the signed 32-bit
@@ -310,8 +301,7 @@ When MODE is absent, either PATH form is retained and no mode-specific companion
 Present but empty `DATA_TYPES` is invalid: the declaration must name one or more observation
 keywords. Empty list members and trailing commas are rejected. This is field-specific validation,
 not a rule that all optional strings are interchangeable. All implemented numeric/conditional
-checks also apply to restricted 1.0 KVN input; relabelling a 2.0 XML sample does not verify 1.0
-XML grammar or requirements, so 1.0 XML remains unsupported.
+checks also apply to restricted 1.0 input; the 1.0 book states the same rules (see below).
 
 Phase-count text accepts a sign and preserves leading zeros and decimal digits. KVN output
 fills a missing digit beside a decimal point and canonicalizes negative zero; exponent text
@@ -329,3 +319,55 @@ exposes nested validators; Python currently exposes root validation.
 Observation values use the fixed per-keyword units in table 3-5 and §§3.5.1–3.5.8; RANGE uses
 `RANGE_UNITS`. There is no unit conversion. Phase counts should be supplied as decimal strings
 when every digit matters.
+
+## TDM 1.0 input
+
+TDM 1.0 (CCSDS 503.0-B-1, November 2007 with Cor. 1 of September 2010,
+https://public.ccsds.org/Pubs/503x0b1s.pdf) is read in KVN and XML through a restricted
+input-only reader. The message keeps `version = "1.0"`; KVN and XML generation and conversion
+refuse it with `generation.unsupported_output_version`. The reader never relabels the edition;
+an explicit caller relabelling to 2.0 is possible after validation.
+
+**What changed between 1.0 and 2.0.** Edition 2.0 only adds keywords; nothing was removed or
+renamed, and the shared keywords keep their order, units, defaults, value domains, conditional
+rules, chronology and uniqueness rules (§§3.4.10–3.4.11) and chapter 4 syntax. The 1.0 reader
+therefore reuses the 2.0 structure and rejects every 2.0 addition: header `MESSAGE_ID`;
+metadata `TRACK_ID`, `DATA_TYPES`, `EPHEMERIS_NAME_n`, `INTERPOLATION`,
+`INTERPOLATION_DEGREE`, `DOPPLER_COUNT_BIAS`/`SCALE`/`ROLLOVER`, `CORRECTION_MAG`,
+`CORRECTION_RCS`, `CORRECTION_ABERRATION_YEARLY`/`DIURNAL`; observations `DOPPLER_COUNT`,
+`MAG`, `RCS` and the phase counts. Every 2.0 value domain and conditional rule that runs on 1.0
+input has the same text in the 1.0 book, so no 2.0-only rule applies to 1.0 content.
+
+**XML follows the NDM/XML 1.0 schema.** NDM/XML 505.0-B-1 (December 2010,
+https://public.ccsds.org/Pubs/505x0b1s.pdf) defined TDM 1.0 XML in
+`ndmxml-1.0-tdm-1.0.xsd`. That schema is no longer hosted by SANA; the bundled copies
+(`ndmxml-1.0-tdm-1.0.xsd`, `ndmxml-1.0-navwg-common.xsd`, `ndmxml-1.0-ccsds-common.xsd`, labelled
+"version 1.0 … 03/14/2010") come from the only Internet Archive capture of
+sanaregistry.org/r/ndmxml/ (2011-12-06). Its element names, nesting, order and enumerations
+match the 2.0 schema apart from the additions above, with three narrower rules the reader
+enforces for 1.0 XML:
+
+| 1.0 schema rule | Library behaviour |
+| --- | --- |
+| `TIME_SYSTEM` is the closed `timeSystemType` list: GMST, GPS, SCLK, TAI, TCB, TDB, TOD, TT, UT1, UTC, each all-uppercase or all-lowercase | Other values (including `TCG` and mixed case such as `Utc`) are rejected in 1.0 XML |
+| `RHUMIDITY` is `percentType` with no `units` attribute | `units` on `RHUMIDITY` is rejected in 1.0 XML |
+| Only the unqualified schema set exists | A namespaced (qualified) 1.0 root is rejected |
+
+**KVN and XML differ on TIME_SYSTEM by design.** The 1.0 book (annex A1) lists the same time
+systems but also admits other values defined in an ICD, so 1.0 KVN keeps `TIME_SYSTEM` open, as
+2.0 does. The 1.0 XML schema closes the list, and XML follows its schema. A 1.0 KVN file using
+an ICD-defined time system therefore reads, while the same content in 1.0 XML is rejected.
+
+**Evidence.** The 1.0 book's annex D examples were checked: 11 of 15 read; the other four contain
+errors in the book itself (duplicate keyword/epoch pairs in D-4 and D-5, a `CREATION_DATE`
+without seconds in D-7, and `PARTICIPANT 3` without its underscore in D-10), three of which
+2.0 corrected. Every schema-valid 1.0 XML sample in the repository reads; the two that fail are
+also invalid under the 1.0 schema (`TIME_SYSTEM` `TCG` and `WRONG-TIME-SYSTEM`). The 1.0
+combined `<ndm>` envelope is not supported.
+
+Tests: `conformance::tdm1::tdm_1_0_xml_input_follows_the_ndm_xml_1_0_schema` validates the
+505.0-B-1 figure B-9 fixture (`data/legacy/tdm_1_0_b9.xml`) against the bundled 1.0 schema and
+checks that each rejection above is also a schema rejection;
+`tdm::parsing::legacy_kvn_is_input_only_and_rejects_version_two_content` covers typed/generic
+input, refused output and later-edition content; and
+`legacy_tables_exclude_every_later_edition_metadata_keyword` covers the 1.0 table boundary.

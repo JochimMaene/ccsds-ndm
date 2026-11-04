@@ -17,7 +17,7 @@ behavior governed by an external algorithm, registry, or ICD.
 | OEM | 2.0, 3.0 | Parse, write, convert | Parse, write, convert | [Ephemerides](conformance/oem-3.0.md) |
 | OCM | 3.0 | Parse, write, convert | Parse, write, convert within the bundled schema | [Comprehensive orbit data](conformance/ocm-3.0.md) |
 | CDM | 1.0 | Parse, write, convert | Parse, write, convert | [Conjunction data](conformance/cdm-1.0.md) |
-| TDM | 2.0; restricted 1.0 input | 2.0 parse/write/convert; 1.0 input only | 2.0 parse/write/convert | [Tracking data](conformance/tdm-2.0.md) |
+| TDM | 2.0; restricted 1.0 input | 2.0 parse/write/convert; 1.0 input only | 2.0 parse/write/convert; 1.0 input only | [Tracking data](conformance/tdm-2.0.md) |
 | RDM | 1.0 | Parse, write, convert | Parse, write, convert | [Reentry data](conformance/rdm-1.0.md) |
 | APM | 2.0 | Parse, write, convert | Parse, write, convert | [Attitude parameters](conformance/apm-2.0.md) |
 | AEM | 2.0 | Parse, write, convert | Parse, write, convert | [Attitude ephemerides](conformance/aem-2.0.md) |
@@ -56,8 +56,10 @@ segment spans, and rejects later-edition fields. Valid 1.0 Julian Date epochs re
 There is no OEM 1.0 XML representation, and generation/conversion of a stored 1.0 message is
 rejected. See [the complete compatibility limits](conformance/oem-3.0.md#oem-10).
 
-OPM, APM, and AEM 1.0 input is not supported: their older requirements or syntax have not
-been implemented and verified as separate editions. ACM was introduced in ADM issue 2; the
+OPM 1.0 input is not supported: its older requirements and syntax have not been implemented
+and verified as a separate edition. APM and AEM 1.0 input is rejected by decision, because some
+1.0 values (rates, `B2A` directions, inertia signs, spin conventions) cannot be given their 2.0
+meaning without guessing; see [APM and AEM 1.0](conformance/apm-2.0.md#apm-and-aem-1-0). ACM was introduced in ADM issue 2; the
 library accepts its defined 2.0 representation. A version label on a newer-format example is not
 evidence of an older format's support. Unsupported versions fail explicitly with
 `parse.unsupported_input_version`, checked after encoding/character checks and before structural
@@ -65,9 +67,10 @@ parsing, rather than being silently treated as current messages.
 
 This excludes genuine APM/AEM 1.0 producer files, including legacy Orekit corpus examples;
 implementation coverage of attitude 2.0 is not a claim to accept every attitude fixture.
-TDM 1.0 is restricted KVN input only, retains its edition, and rejects the later fields listed
-in the [TDM record](conformance/tdm-2.0.md). TDM 1.0 XML and generation remain unsupported;
-successful parsing after relabelling a sample does not verify its original edition.
+TDM 1.0 has a restricted **input-only reader in KVN and XML**. It retains the 1.0 edition,
+rejects the later fields, and applies the NDM/XML 1.0 schema's narrower XML rules (closed
+`TIME_SYSTEM` list, no `RHUMIDITY` units, unqualified form only). Generation and conversion of a
+stored 1.0 message are refused. See [TDM 1.0 input](conformance/tdm-2.0.md#tdm-1-0-input).
 
 ## Common guarantees and boundaries
 

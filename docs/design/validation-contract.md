@@ -142,8 +142,8 @@ producer deviations, and writing always emits the canonical form.
   This lossless lexical extension follows the parsing policy above; ODM 7.7 governs the unit
   value, which is still checked. `bracketed_unit_padding_is_trimmed_before_validation` and the public-message regression
   `bracketed_unit_padding_is_checked_at_public_message_boundaries` cover it.
-- **Case:** `EULER_ROT_SEQ` reads mixed-case axis letters and legacy ADM 1.0 numeric sequences
-  in KVN/Python, writing canonical uppercase letters; XML requires its exact enum spelling.
+- **Case:** `EULER_ROT_SEQ` reads mixed-case axis letters in KVN/Python, writing canonical
+  uppercase letters; ADM 1.0 numeric sequences (`313`) are rejected; XML requires its exact enum spelling.
   Keywords are uppercase. Closed enumeration values accept all-uppercase or
   all-lowercase spellings and documented aliases, but not arbitrary mixed case. TDM KVN/Python
   closed categories are case-insensitive under TDM 4.3.7; XML retains schema spellings.

@@ -74,10 +74,41 @@ readers, edited models and generation, rather than silently reinterpreted as sec
 `apm::generation::apm_nutation_period_is_seconds_without_reinterpreting_day_units` covers that boundary.
 
 
-ADM annex J lists incompatible APM 1.0 differences: quaternion frame/direction keywords,
-Euler sequence and inertia names, and the addition of repeatable logical-block delimiters.
-A 2.0 message with a changed version header is not proof of legacy support. Input edition
-1.0 is rejected until those actual grammar and semantic differences are implemented and reviewed.
+## APM and AEM 1.0
+
+APM and AEM 1.0 input (CCSDS 504.0-B-1 with Cor. 1, https://public.ccsds.org/Pubs/504x0b1c1s.pdf)
+is rejected with `parse.unsupported_input_version`, in both notations. This is a decision, not
+a gap: a 1.0 reader must give each value the meaning the 1.0 edition gives it, and several 1.0
+constructs cannot be mapped onto the 2.0 model without guessing.
+
+**How 1.0 differs.** The header has no `CLASSIFICATION` or `MESSAGE_ID`. APM 1.0 has no block
+delimiters; a mandatory quaternion block uses `Q_FRAME_A`/`Q_FRAME_B`, a direction flag `Q_DIR`
+(`A2B`/`B2A`) and a scalar component that may come first or last. Optional Euler and spin blocks
+use their own frame and direction keywords (`EULER_FRAME_A/B`, `EULER_DIR`, `SPIN_FRAME_A/B`,
+`SPIN_DIR`), numeric rotation sequences (`121` … `323`), axis-keyed `X/Y/Z_ANGLE` and
+`X/Y/Z_RATE`, and `RATE_FRAME` naming `EULER_FRAME_A`/`EULER_FRAME_B`. Inertia uses
+`I11` … `I23` with an optional `INERTIA_REF_FRAME`; maneuvers use `MAN_TOR_1/2/3` and have no
+`MAN_DELTA_MASS`. AEM 1.0 requires `ATTITUDE_DIR`, requires `QUATERNION_TYPE` (`FIRST`/`LAST`,
+which changes the column order) for quaternion types, uses `RATE_FRAME = REF_FRAME_A`/`REF_FRAME_B`,
+and offers QUATERNION, QUATERNION/DERIVATIVE, QUATERNION/RATE, EULER_ANGLE, EULER_ANGLE/RATE, SPIN
+and SPIN/NUTATION.
+
+**Why it is not read.**
+
+| 1.0 construct | Problem |
+| --- | --- |
+| Euler/quaternion rates (`X/Y/Z_RATE`, QUATERNION/RATE, EULER_ANGLE/RATE) | Published sources disagree on the meaning. 504.0-B-1 table 3-3 calls them body rotation rates (angular velocity), and 504.0-B-2 annex J item 6 reads them that way; but the 1.0 book's own example repeats `Y_RATE` (Y, X, Y), and 505.0-B-1 §4.8 orders rates by rotation sequence, which only fits Euler-angle derivatives. Even as angular velocity, 1.0 A2B rates are "A with respect to B" while 2.0 annex F4 defines the opposite, so values would need sign changes. Either mapping is a guess that can silently corrupt data. |
+| `B2A` direction (`Q_DIR`, `EULER_DIR`, `SPIN_DIR`, `ATTITUDE_DIR`) | Representable in 2.0 only by swapping `REF_FRAME_A`/`REF_FRAME_B`, which is correct only if the 1.0 convention (defined by reference to 500.0-G-2) equals 2.0 annex F; this has not been verified, and the stored frame labels would differ from the file. |
+| Inertia `I11` … `I23` | 1.0 calls the cross terms a "negative double integral" while 2.0 annex F6 writes the tensor with `-IXY`, so the sign mapping is ambiguous; 1.0 also makes `INERTIA_REF_FRAME` optional where 2.0 requires it. |
+| Spin and nutation | 1.0 leaves the spin-angle and nutation conventions to an ICD (Cor. 1 also redefines nutation); 2.0 annex F5 fixes them, so mapping asserts a meaning the file does not state. |
+
+A partial reader limited to quaternions, Euler angles without rates and maneuvers was
+considered. It would read 12 of the 43 1.0 KVN samples in the repository (19 if `B2A` frame
+swapping and spin were accepted), none of the 1.0 XML samples (all carry rates) and none of the
+files from the only real producer in the corpus (GSFC, 2007), which use rates. The original
+NDM/XML 1.0 APM/AEM schemas survive only in an Internet Archive capture of the SANA registry.
+That benefit does not justify the risk of misread attitude data, so 1.0 stays rejected. A 2.0
+message with a changed version header is not proof of 1.0 support.
 
 Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
@@ -104,9 +135,9 @@ library follows the XSD in every notation, so a partial set is rejected rather t
 produced that XML cannot represent.
 
 **Rotation sequences.** XML accepts only the twelve uppercase `rotseqType` letters. KVN and Python
-also read lowercase (`zxz`, ADM §6.8.6), mixed-case letters (`Zxz`, a lossless producer alias),
-and ADM 1.0 numeric spellings (`313` for `ZXZ`, annex J) as a documented lexical alias. Every writer emits the
-uppercase letters (`apm::parsing::euler_rot_seq_reads_lowercase_and_legacy_digits_in_kvn_only`).
+also read lowercase (`zxz`, ADM §6.8.6) and mixed-case letters (`Zxz`, a lossless producer alias).
+ADM 1.0 numeric spellings (`313`) are 1.0 syntax and are rejected in every notation. Every writer
+emits the uppercase letters (`apm::parsing::euler_rot_seq_reads_lowercase_in_kvn_only_and_rejects_adm_1_digits`).
 
 **Logical-block order.** Table 3-3 and the XSD `apmData` sequence list the blocks in a fixed
 order (quaternion, Euler, angular velocity, spin, inertia, maneuver). KVN reading accepts the

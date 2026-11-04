@@ -542,6 +542,18 @@ def test_tdm_legacy_kvn_is_readable_and_output_remains_current_only():
                 message.to_str(notation)
 
 
+def test_tdm_legacy_xml_is_readable_and_output_remains_current_only():
+    source = (ROOT / "ccsds-ndm/data/legacy/tdm_1_0_b9.xml").read_text()
+    for reader in (ccsds_ndm.Tdm.from_str, ccsds_ndm.from_str):
+        message = reader(source)
+        assert message.version == "1.0"
+        for notation in ("kvn", "xml"):
+            with pytest.raises(ccsds_ndm.NdmError):
+                message.to_str(notation)
+    with pytest.raises(ccsds_ndm.NdmError, match="TIME_SYSTEM"):
+        ccsds_ndm.Tdm.from_str(source.replace("<TIME_SYSTEM>UTC<", "<TIME_SYSTEM>TCG<"))
+
+
 def test_quaternion_constructor_checks_components_before_building_a_message():
     with pytest.raises(ccsds_ndm.NdmValidationError, match="Q1"):
         ccsds_ndm.QuaternionState("GCRF", "SC_BODY_1", 2.0, 0.0, 0.0, 0.0)
