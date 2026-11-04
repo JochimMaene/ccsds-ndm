@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
+            xmlns:ndm="urn:ccsds:recommendation:navigation:schema:ndmxml" 
+            elementFormDefault="unqualified" 
+            attributeFormDefault="unqualified">
+
+<!--********************************************************************-->
+<!-- NOTE: This is version 1.0 of the NDM/XML Schema (03/14/2010).      -->
+<!-- This component of the schema is the "master" module, which         -->
+<!-- imports the NDM/XML namespace and declares the principal elements  -->
+<!-- of the schema set.  The validation of any NDM/XML element may be   -->
+<!-- confirmed with this simple schema.                                 -->
+<!--                                                                    -->
+<!-- Compatible document versions are:                                  -->
+<!--    NDM/XML 505.0-B-1   Blue Book (12/2010)                         -->
+<!--    ODM     502.0-B-2   Blue Book (11/2009)                         -->
+<!--    ADM     504.0-B-1   Blue Book (05/2008)                         -->
+<!--    TDM     503.0-B-1   Blue Book (11/2007)                         -->
+<!--                                                                    -->
+<!-- ********************** BLUE BOOK CHANGE LOG  ********************* -->
+<!--                                                                    -->
+<!--********************************************************************-->
+
+<!--********************************************************************-->
+<!-- Import the applicable namespace                                    -->
+<!--********************************************************************-->
+
+   <xsd:import namespace="urn:ccsds:recommendation:navigation:schema:ndmxml" 
+   schemaLocation="./ndmxml-1.0-namespace.xsd"/>
+
+<!--********************************************************************-->
+<!-- Element declarations for all element types contained in the NDM/XML-->
+<!-- schemas: ndm, aem, apm, oem, omm, opm, and tdm.                    -->
+<!--********************************************************************-->
+
+   <xsd:element name="ndm" type="ndm:ndmType" />
+   <xsd:element name="aem" type="ndm:aemType" />
+   <xsd:element name="apm" type="ndm:apmType" />
+   <xsd:element name="oem" type="ndm:oemType" />
+   <xsd:element name="omm" type="ndm:ommType" />
+   <xsd:element name="opm" type="ndm:opmType" />
+   <xsd:element name="tdm" type="ndm:tdmType" />
+</xsd:schema>
+
+
