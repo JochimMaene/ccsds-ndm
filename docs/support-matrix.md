@@ -93,7 +93,7 @@ OPM and OMM retain a narrower [elapsed-time profile](design/validation-contract.
 than the complete MET/MRT duration syntax. Native [integer storage limits](design/validation-contract.md#integer-storage-limits)
 also apply where an XSD integer type is unbounded.
 ACM attitude/covariance histories support relative or absolute calendar time tags; each block
-uses a single form, compared lexically within that form without time-scale conversion. Family records list further checks left
+uses a single form, compared by represented time within that form without time-scale conversion. Family records list further checks left
 to the caller, including physical consistency and externally defined algorithms.
 
 Run `just verify` for the quality suite and installed-artifact checks. The

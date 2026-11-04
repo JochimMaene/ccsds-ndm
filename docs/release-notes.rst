@@ -7,6 +7,13 @@ Unreleased
 Final conformance corrections
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+- XML attribute values follow XML 1.0 whitespace normalization: literal TAB/LF/CR become
+  spaces (CRLF counts once), while character references retain their characters. Output
+  preserves TAB/LF/CR in attributes using references, including user-defined parameter names.
+  Element-text whitespace is unchanged.
+- Atomic file replacement applies existing destination permissions before writing contents,
+  preventing private output from appearing in a more broadly readable temporary file.
+
 - Python combined messages reject nested or self-referencing constituents before conversion,
   raising ``ValueError`` instead of recursing until the process crashes. XML constituent
   deserializer errors now report positions in the original combined document.
@@ -53,7 +60,7 @@ Final conformance corrections
 Additional conformance corrections
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Restricted TDM 1.0 KVN input is supported; XML 1.0 and generation remain unsupported.
+- Restricted TDM 1.0 input is supported in KVN and XML; generation remains unsupported.
   TDM closed categories ignore case, and shared categorical lookup accepts blank/underscore runs.
 - KVN treats standard-field ``N/A`` values as absent. In XML this convention is restricted
   to CDM; other families retain literal text and validate numeric values against their types.

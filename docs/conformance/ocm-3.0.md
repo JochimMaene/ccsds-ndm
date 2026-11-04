@@ -50,6 +50,12 @@ inventory is reconciled as follows; the counts are statement rows, not public ca
 
 The following OCM validation limits and schema exceptions are deliberate:
 
+- `INTERNATIONAL_DESIGNATOR` is preserved as free text without certifying COSPAR syntax.
+  ODM table 6-3 specifies `YYYY-NNNP{PP}` or `UNKNOWN`, while the bundled OCM XSD declares
+  `xsd:string`. The library follows the XSD domain in both notations; callers requiring COSPAR
+  syntax must check it themselves. `international_designator_is_preserved_without_certifying_cospar_syntax`
+  checks validation and preservation through both notations.
+
 - `DRAG_COEFF_NOM` must be finite and nonnegative. It accepts zero because ODM says it disables atmospheric drag, while the XSD's
   `positiveDouble` excludes it. KVN preserves zero; XML input and generation require a positive value.
 - `DAYS_SINCE_FIRST_OBS`, `DAYS_SINCE_LAST_OBS`, `DC_PA_START_ANGLE`, and `DC_PA_STOP_ANGLE` are

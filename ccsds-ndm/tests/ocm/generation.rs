@@ -1490,3 +1490,27 @@ fn maneuver_metadata_epochs_are_independent_and_composition_output_is_canonical(
         "2023-01-01T00:00:00"
     );
 }
+
+#[test]
+fn international_designator_is_preserved_without_certifying_cospar_syntax() {
+    let input = mutated(
+        KVN,
+        "INTERNATIONAL_DESIGNATOR = 2022-999A",
+        "INTERNATIONAL_DESIGNATOR = NOT-A-COSPAR-ID",
+    );
+    let message = Ocm::from_kvn(&input).unwrap();
+    message.validate().unwrap();
+    assert_eq!(
+        message
+            .body
+            .segment
+            .metadata
+            .international_designator
+            .as_deref(),
+        Some("NOT-A-COSPAR-ID")
+    );
+    let xml = message.to_xml().unwrap();
+    validate_xml("free-text international designator", &xml);
+    assert_eq!(Ocm::from_xml(&xml).unwrap(), message);
+    assert_eq!(Ocm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+}

@@ -1662,6 +1662,8 @@ pub struct OcmMetadata {
     /// letter for the identification of the part brought into space by the launch. If the
     /// object has no international designator or the content is either unknown (uncorrelated)
     /// or cannot be disclosed, the value should be set to UNKNOWN (or this keyword omitted).
+    /// The library preserves this string without certifying COSPAR syntax, following the
+    /// bundled XSD's `xsd:string` domain; callers own that syntax check.
     /// NOTE—The international designator was typically specified by 'OBJECT_ID' in the OPM,
     /// OMM, and OEM.
     ///

@@ -49,7 +49,9 @@ Nested model objects and record collections are live. Change them directly:
 
 Retained child references preserve their identity, and structural changes to repeated model fields
 such as OEM segment, state-vector, and covariance lists affect the owning message. Generation always
-validates the complete message. There is no commit step and no unchecked ``validate=False`` mode.
+validates the complete content represented by the selected notation, subject to the OCM XML
+exception described under generation guarantees below. There is no commit step and no unchecked
+``validate=False`` mode.
 
 Lists of plain values are copies, not live views: ``comment`` returns a new ``list`` of strings each
 time, so appending to it changes nothing. Assign the whole list instead:
@@ -130,8 +132,11 @@ Callers that accept untrusted input should enforce size limits at their system b
 nesting retains a fixed internal safety limit. Parsing materializes complete messages; streaming
 parsing is intentionally absent.
 
-Generation always validates the complete message before writing any caller-visible bytes and
-preserves the edition stored on the message. In Python, use ``to_str(format)`` for a string and
+Generation validates the complete message content represented by the selected notation before
+writing any caller-visible bytes and preserves the edition stored on the message. OCM XML
+omits the TC1 covariance-linkage check because its schema cannot represent that linkage; see the
+`OCM XML exception <https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/design/validation-contract.md#ocm-xml-linkage-exception>`_.
+In Python, use ``to_str(format)`` for a string and
 ``to_file(path, format)`` for atomic file replacement. Rust exposes ``to_kvn``, ``to_xml``, and
 the ``write_*_to`` streaming methods; streaming can leave partial output if the caller's sink
 fails mid-write. ``convert_file`` also replaces its destination atomically. Ordinary numeric

@@ -353,8 +353,9 @@ epochs.
 These edition-specific rules do not impose an invented epoch-order requirement on 2.0 or 3.0.
 
 This reader is a restricted legacy compatibility path, separate from the current verified
-editions. It cannot write or convert 1.0 messages; construct a supported edition explicitly
-instead of changing the version string on a parsed legacy message.
+editions. It cannot write or convert a message while its version remains 1.0, and never changes
+its edition automatically. A caller may deliberately relabel it to 2.0/3.0, validate, and generate,
+as described below; relabelling alone does not establish validity in the target edition.
 
 KVN reading tolerates lines longer than the book's 254-character limit where applicable;
 writing enforces that limit, so an accepted overlong record can require shortening before

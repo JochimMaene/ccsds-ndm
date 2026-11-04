@@ -26,17 +26,17 @@ pub(crate) fn atomic_write(
         builder.permissions(fs::Permissions::from_mode(0o666));
     }
     let mut temporary = builder.tempfile_in(parent)?;
+    if let Ok(metadata) = path.metadata() {
+        temporary
+            .as_file()
+            .set_permissions(metadata.permissions())?;
+    }
     {
         let mut output = BufWriter::new(temporary.as_file_mut());
         write(&mut output)?;
         output.flush()?;
     }
     temporary.as_file().sync_all()?;
-    if let Ok(metadata) = path.metadata() {
-        temporary
-            .as_file()
-            .set_permissions(metadata.permissions())?;
-    }
     temporary.persist(path).map_err(std::io::Error::from)?;
     Ok(())
 }
@@ -61,6 +61,31 @@ mod tests {
         .unwrap();
         assert_eq!(fs::read_to_string(&destination).unwrap(), expected);
         assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn private_destination_permissions_apply_before_writing() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("message");
+        fs::write(&destination, b"original").unwrap();
+        fs::set_permissions(&destination, fs::Permissions::from_mode(0o600)).unwrap();
+        atomic_write(&destination, |output| {
+            assert_eq!(
+                output.get_ref().metadata()?.permissions().mode() & 0o777,
+                0o600
+            );
+            output.write_all(b"private message")?;
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(fs::read(&destination).unwrap(), b"private message");
+        assert_eq!(
+            fs::metadata(&destination).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
     }
 
     #[test]

@@ -832,7 +832,7 @@ pub(crate) fn from_str_with_context<T: DeserializeOwned>(s: &str, type_name: &st
             error.to_string(),
         ))));
     }
-    let document = without_namespace_attributes(s)?;
+    let document = prepare_xml_document(s)?;
     let mut deserializer = quick_xml::de::Deserializer::from_str(&document);
     T::deserialize(&mut deserializer).map_err(|e| {
         let position = deserializer.get_ref().get_ref().buffer_position() as usize;
@@ -916,40 +916,48 @@ pub(crate) fn from_str_with_context<T: DeserializeOwned>(s: &str, type_name: &st
     })
 }
 
-/// Remove namespace declarations and XSI schema-location hints below the root.
-///
-/// They are not message content, but serde would otherwise see them as unknown fields. The
-/// document is copied only when it may contain such an attribute below the root.
-fn without_namespace_attributes(s: &str) -> Result<std::borrow::Cow<'_, str>> {
+/// Normalize literal attribute whitespace and remove namespace/schema hints below the root.
+/// Character references remain encoded so serde can distinguish them from literal whitespace.
+fn prepare_xml_document(s: &str) -> Result<std::borrow::Cow<'_, str>> {
     use quick_xml::name::{Namespace, ResolveResult};
 
-    let mut reader = quick_xml::NsReader::from_str(s);
-    let mut xsi_prefixes = vec!["xsi:".to_owned()];
+    let mut reader = quick_xml::Reader::from_str(s);
+    let mut depth = 0usize;
     loop {
-        match reader.read_event()? {
+        let event = reader.read_event()?;
+        let opens = matches!(event, Event::Start(_));
+        match event {
             Event::Start(start) | Event::Empty(start) => {
-                for attribute in start.attributes().flatten() {
-                    if let Some(quick_xml::name::PrefixDeclaration::Named(prefix)) =
-                        attribute.key.as_namespace_binding()
-                    {
-                        if attribute.value.as_ref() == XSI_NAMESPACE {
-                            xsi_prefixes.push(format!("{}:", String::from_utf8_lossy(prefix)));
-                        }
+                let raw = start.attributes_raw();
+                if raw.iter().any(|byte| matches!(byte, b'\t' | b'\r' | b'\n'))
+                    || (depth > 0 && (mentions_xmlns(raw) || raw.contains(&b':')))
+                {
+                    let rewrite = start.attributes().any(|attribute| {
+                        attribute.is_ok_and(|attribute| {
+                            attribute
+                                .value
+                                .iter()
+                                .any(|byte| matches!(byte, b'\t' | b'\r' | b'\n'))
+                                || (depth > 0
+                                    && (attribute.key.as_namespace_binding().is_some()
+                                        || matches!(
+                                            attribute.key.local_name().as_ref(),
+                                            b"schemaLocation" | b"noNamespaceSchemaLocation"
+                                        )))
+                        })
+                    });
+                    if rewrite {
+                        break;
                     }
                 }
-                break;
+                if opens {
+                    depth += 1;
+                }
             }
+            Event::End(_) => depth = depth.saturating_sub(1),
             Event::Eof => return Ok(std::borrow::Cow::Borrowed(s)),
             _ => {}
         }
-    }
-    let below_root = &s[reader.buffer_position() as usize..];
-    if !below_root.contains("xmlns")
-        && !xsi_prefixes
-            .iter()
-            .any(|prefix| below_root.contains(prefix.as_str()))
-    {
-        return Ok(std::borrow::Cow::Borrowed(s));
     }
 
     let mut reader = quick_xml::NsReader::from_str(s);
@@ -959,11 +967,11 @@ fn without_namespace_attributes(s: &str) -> Result<std::borrow::Cow<'_, str>> {
         let event = reader.read_event()?;
         let event = match event {
             Event::Eof => break,
-            Event::Start(ref start) | Event::Empty(ref start) if depth > 0 => {
+            Event::Start(ref start) | Event::Empty(ref start) => {
                 let mut kept = start.to_owned();
                 kept.clear_attributes();
                 for attribute in start.attributes() {
-                    let attribute = attribute.map_err(quick_xml::Error::from)?;
+                    let mut attribute = attribute.map_err(quick_xml::Error::from)?;
                     let hint = matches!(
                         reader.resolver().resolve_attribute(attribute.key),
                         (ResolveResult::Bound(Namespace(XSI_NAMESPACE)), local)
@@ -972,9 +980,23 @@ fn without_namespace_attributes(s: &str) -> Result<std::borrow::Cow<'_, str>> {
                                 b"schemaLocation" | b"noNamespaceSchemaLocation"
                             )
                     );
-                    if attribute.key.as_namespace_binding().is_none() && !hint {
-                        kept.push_attribute(attribute);
+                    if depth > 0 && (attribute.key.as_namespace_binding().is_some() || hint) {
+                        continue;
                     }
+                    if attribute
+                        .value
+                        .iter()
+                        .any(|byte| matches!(byte, b'\t' | b'\r' | b'\n' | b'"'))
+                    {
+                        // Normalize literal whitespace; Writer uses double quotes, regardless of the source delimiter.
+                        let value = std::str::from_utf8(&attribute.value)
+                            .expect("XML input is UTF-8")
+                            .replace("\r\n", " ")
+                            .replace(['\t', '\r', '\n'], " ")
+                            .replace('"', "&quot;");
+                        attribute.value = std::borrow::Cow::Owned(value.into_bytes());
+                    }
+                    kept.push_attribute(attribute);
                 }
                 if matches!(event, Event::Start(_)) {
                     Event::Start(kept)
@@ -1032,10 +1054,12 @@ const ROOT_NAMESPACES: &str = concat!(
     r#" xmlns:ndm="urn:ccsds:schema:ndmxml""#
 );
 
-/// Inserts [`ROOT_NAMESPACES`] and preserves carriage returns in serialized values.
+/// Inserts [`ROOT_NAMESPACES`] and preserves XML-normalized whitespace in serialized values.
 struct RootNamespaces<W> {
     inner: W,
     state: RootNameState,
+    in_tag: bool,
+    in_attribute: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1050,39 +1074,44 @@ impl<W> RootNamespaces<W> {
         Self {
             inner,
             state: RootNameState::BeforeName,
+            in_tag: false,
+            in_attribute: false,
         }
     }
 }
 
 impl<W: FmtWrite> FmtWrite for RootNamespaces<W> {
     fn write_str(&mut self, value: &str) -> std::fmt::Result {
-        // XML 1.0 normalizes literal CR and CRLF to LF. quick-xml leaves CR literal
-        // in strings, so use character references to preserve the model's text.
-        if value.contains('\r') {
-            for (index, part) in value.split('\r').enumerate() {
-                if index > 0 {
-                    self.inner.write_str("&#13;")?;
-                }
-                self.write_str(part)?;
-            }
-            return Ok(());
-        }
-        if self.state == RootNameState::Done {
-            return self.inner.write_str(value);
-        }
-        for (index, character) in value.char_indices() {
-            match (self.state, character) {
-                (RootNameState::BeforeName, '<') => self.state = RootNameState::InName,
-                (RootNameState::InName, ' ' | '/' | '>') => {
+        let mut start = 0;
+        for (index, byte) in value.bytes().enumerate() {
+            match (self.state, byte) {
+                (RootNameState::BeforeName, b'<') => self.state = RootNameState::InName,
+                (RootNameState::InName, b' ' | b'/' | b'>') => {
                     self.state = RootNameState::Done;
-                    self.inner.write_str(&value[..index])?;
+                    self.inner.write_str(&value[start..index])?;
                     self.inner.write_str(ROOT_NAMESPACES)?;
-                    return self.inner.write_str(&value[index..]);
+                    start = index;
                 }
                 _ => {}
             }
+            match byte {
+                b'<' => self.in_tag = true,
+                b'>' => self.in_tag = false,
+                b'"' if self.in_tag => self.in_attribute = !self.in_attribute,
+                _ => {}
+            }
+            // XML normalizes CR everywhere, and TAB/LF additionally inside attributes.
+            let escaped = match byte {
+                b'\r' => "&#13;",
+                b'\t' if self.in_attribute => "&#9;",
+                b'\n' if self.in_attribute => "&#10;",
+                _ => continue,
+            };
+            self.inner.write_str(&value[start..index])?;
+            self.inner.write_str(escaped)?;
+            start = index + 1;
         }
-        self.inner.write_str(value)
+        self.inner.write_str(&value[start..])
     }
 }
 

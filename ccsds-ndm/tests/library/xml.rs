@@ -239,3 +239,74 @@ fn wrapped_message_is_rejected_by_root_detection() {
         );
     }
 }
+
+#[test]
+fn xml_attribute_whitespace_matches_independent_readers_and_preserves_text() {
+    use ccsds_ndm::messages::opm::Opm;
+
+    let baseline = Opm::from_kvn(include_str!("../../data/kvn/opm_g1.kvn"))
+        .unwrap()
+        .to_xml()
+        .unwrap();
+    for (source, expected) in [
+        ("A\tB", "A B"),
+        ("A\t\"B", "A \"B"),
+        ("A\"B", "A\"B"),
+        ("A\nB", "A B"),
+        ("A\rB", "A B"),
+        ("A\r\nB", "A B"),
+        ("A\n\rB", "A  B"),
+        ("A&#9;&#10;&#13;B", "A\t\n\rB"),
+        ("A\r\n&#x9;B", "A \tB"),
+        ("A&amp;#9;&quot;&lt;éB", "A&#9;\"<éB"),
+    ] {
+        for declaration in ["", " xmlns:p='urn:unused'"] {
+            let input = mutated_once(
+                &baseline,
+                "</data>",
+                &format!("<userDefinedParameters{declaration}><USER_DEFINED parameter='{source}'>left\t\nright&#13;&lt;&amp;&quot;</USER_DEFINED></userDefinedParameters></data>"),
+            );
+            let message = Opm::from_xml(&input).unwrap();
+            let user = message
+                .body
+                .segment
+                .data
+                .user_defined_parameters
+                .as_ref()
+                .unwrap();
+            assert_eq!(user.parameters().next().unwrap().parameter, expected);
+            assert_eq!(
+                user.parameters().next().unwrap().value,
+                "left\t\nright\r<&\""
+            );
+            assert_eq!(
+                from_str(&input).unwrap().to_xml().unwrap(),
+                message.to_xml().unwrap()
+            );
+            let output = message.to_xml().unwrap();
+            let mut streamed = Vec::new();
+            message.write_xml_to(&mut streamed).unwrap();
+            assert_eq!(streamed, output.as_bytes());
+            assert_eq!(Opm::from_xml(&output).unwrap(), message);
+            crate::common::validate_xml("attribute whitespace", &output);
+            for xml in [&input, &output] {
+                let document = tempfile::NamedTempFile::new().unwrap();
+                std::fs::write(document.path(), xml).unwrap();
+                let oracle = std::process::Command::new("xmllint")
+                    .args(["--xpath", "string(//USER_DEFINED/@parameter)"])
+                    .arg(document.path())
+                    .output()
+                    .expect("xmllint is required for the XML attribute oracle");
+                assert!(
+                    oracle.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&oracle.stderr)
+                );
+                assert_eq!(
+                    String::from_utf8(oracle.stdout).unwrap(),
+                    format!("{expected}\n")
+                );
+            }
+        }
+    }
+}

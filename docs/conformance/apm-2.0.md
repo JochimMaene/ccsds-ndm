@@ -155,9 +155,9 @@ after the header belong to the metadata and comments after `TIME_SYSTEM` to the 
 
 ADM §3.2.4.6 says a spin block contains either the complete nutation triple or the complete
 momentum triple. Bundled `spinStateType` instead sets the choice's `minOccurs` to zero.
-The library follows the schema in both notations: neither triple is allowed, one complete
-triple is allowed, and partial or simultaneous triples fail. It does not invent nutation
-or momentum values to complete a bare spin state. The regression
+The library follows the schema in both notations: omitting both triples is allowed;
+supplying exactly one complete triple is allowed. Partial or simultaneous triples fail. It does not
+invent nutation or momentum values to complete a bare spin state. The regression
 `apm::generation::spin_without_optional_triples_follows_the_schema` checks preservation and schema validity.
 
 ADM annex F implies unit quaternions. Shared validation requires components in `[-1, 1]`

@@ -14,10 +14,12 @@ defines the complete accepted domain.
   including rules specific to the edition recorded on the message. P3 is notation-neutral but not
   edition-neutral: `Opm`, `Oem`, and `Omm` already resolve edition-specific value domains through
   `versioning::validate_*_edition`.
-- **P4 — generation:** enforce P3 plus the selected notation and edition's representability rules.
+- **P4 — generation:** enforce P3 plus the selected notation and edition's representability rules,
+  except for the [OCM XML linkage exception](#ocm-xml-linkage-exception) below.
 
 Models remain conveniently mutable. They may be temporarily invalid between edits, but every
-public generation path validates the complete graph before writing any caller-visible bytes.
+public generation path validates the complete graph of represented content before writing any
+caller-visible bytes. OCM XML uses the [linkage exception](#ocm-xml-linkage-exception) below.
 
 ## Rules
 
@@ -28,7 +30,8 @@ public generation path validates the complete graph before writing any caller-vi
    standards agree. Legal lexical spellings may differ when the standard says they differ.
 3. Root validation revisits every relevant child, including populated optional blocks and every
    element of repeated collections. A correct but unreachable child validator is a defect.
-4. Generation performs P3 before notation-specific checks. Validation and representability
+4. Generation performs P3 before notation-specific checks, subject to the OCM XML linkage
+   exception above. Validation and representability
    failures expose no output. A caller-provided streaming sink may fail after accepting a prefix;
    file helpers use atomic replacement to preserve the destination on failure.
 5. Unknown normative values are rejected or preserved according to their governing domain; they
@@ -117,7 +120,10 @@ producer deviations, and writing always emits the canonical form.
   underflow text remains available in the model/XML, and KVN generation refuses it as
   unrepresentable. Shared three-component vectors and KVN four-component vectors use the
   checked double reader and reject nonzero underflow, retaining representable subnormals.
-- **XML values:** blanks around an XML number are ignored; blanks around an epoch are not. `NaN`
+- **XML values:** literal TAB/LF/CR in attribute values normalize to spaces, with CRLF counting
+  as one space (XML 1.0 §§2.11/3.3.3). Character references retain their referenced characters;
+  writers use references to preserve TAB/LF/CR in attributes. Element-text TAB/LF remain text.
+  Blanks around an XML number are ignored; blanks around an epoch are not. `NaN`
   and `INF` are rejected as non-finite despite `xsd:double`, except where a family record accepts
   them (OEM states/covariance and OCM time offsets). `xsi:nil` is rejected; CDM separately accepts the unqualified
   producer attribute `nil` on empty optional leaves, as documented in its family record.
@@ -335,10 +341,14 @@ would be brittle. Consumers should use the code and location rather than parse m
 The lexical source spelling may be normalized in value-error messages (for example `INF`
 becomes `inf`); `original_token` is the source excerpt when available.
 
+## OCM XML linkage exception
+
 OCM `validate()` retains the TC1 trajectory/covariance linkage rule. XML parsing and generation
 validate all represented content but omit that linkage requirement because NDM/XML 4.0.0 has
 no covariance TRAJ_ID element. KVN parsing/generation still enforce it. Populated TC1 fields
 that XML cannot represent remain generation errors; no supplied linkage information is dropped.
+
+## Remaining diagnostic boundaries
 
 Invalid UTF-8 retains the `io.error` category and file attributes, with a parse byte offset,
 line and column identifying the first invalid byte. UTF-16/UTF-32 remain explicitly refused.
