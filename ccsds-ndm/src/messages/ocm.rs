@@ -789,7 +789,7 @@ impl OcmManeuverParameters {
             }
             .into());
         }
-        let tokens = parse_csv_list(&self.man_composition);
+        let tokens = parse_man_composition(&self.man_composition);
         let Some(time_tag) = tokens.first().and_then(|token| man_time_tag(token)) else {
             return Err(ValidationError::InvalidValue {
                 field: Cow::Borrowed("MAN_COMPOSITION"),
@@ -902,7 +902,7 @@ impl OcmManeuverParameters {
                 }
             }
         }
-        if self.man_device_id.eq_ignore_ascii_case("DEPLOY")
+        if crate::types::enum_token(&self.man_device_id).eq_ignore_ascii_case("DEPLOY")
             && tokens.iter().skip(1).any(|token| {
                 MAN_PROPULSIVE_COLUMNS
                     .iter()
@@ -1062,7 +1062,7 @@ fn is_numeric_man_column(token: &str) -> bool {
 /// as a double and likewise enforces no per-column domain.
 fn validate_man_line_values(
     numeric_columns: &[bool],
-    tokens: &[&str],
+    tokens: &[Cow<'_, str>],
     line: &ManLine,
 ) -> Result<()> {
     for (index, value) in line.values.iter().enumerate() {
@@ -1329,7 +1329,7 @@ fn known_ocm_type(kind: &str) -> &str {
     KNOWN
         .iter()
         .copied()
-        .find(|known| known.eq_ignore_ascii_case(kind.trim()))
+        .find(|known| known.eq_ignore_ascii_case(&crate::types::enum_token(kind.trim())))
         .unwrap_or(kind)
 }
 
@@ -1558,6 +1558,28 @@ fn unit_matches_expected(unit: &str, expected: &str) -> bool {
 
 fn parse_units_list(units: &str) -> Vec<&str> {
     parse_csv_list(units.trim().trim_start_matches('[').trim_end_matches(']'))
+}
+
+/// Splits `MAN_COMPOSITION`. Commas separate columns; a comma piece that is a known column
+/// alias under ODM 7.5.9 (`THR X`, `time relative`) is one column, otherwise blanks inside the
+/// piece also separate columns (the documented blank-separated compatibility syntax).
+pub(crate) fn parse_man_composition(value: &str) -> Vec<Cow<'_, str>> {
+    let mut columns = Vec::new();
+    for piece in value.split(',').map(str::trim).filter(|piece| !piece.is_empty()) {
+        if piece.contains(char::is_whitespace) {
+            let alias = crate::types::enum_token(piece);
+            if man_time_tag(&alias).is_some()
+                || [MAN_PROPULSIVE_COLUMNS, MAN_DEPLOYMENT_COLUMNS]
+                    .iter()
+                    .any(|table| table.iter().any(|known| known.eq_ignore_ascii_case(&alias)))
+            {
+                columns.push(Cow::Owned(alias.into_owned()));
+                continue;
+            }
+        }
+        columns.extend(piece.split_whitespace().map(Cow::Borrowed));
+    }
+    columns
 }
 
 fn parse_csv_list(value: &str) -> Vec<&str> {

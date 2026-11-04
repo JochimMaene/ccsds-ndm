@@ -88,7 +88,8 @@ library does not infer a missing frame from other declarations.
 
 **Maneuver purposes and targets.** Table 5-7 marks targets conditional on `MOM_DESAT`,
 `ATT_ADJUST` and `SPIN_RATE_ADJUST`. Each supplied canonical purpose requires its matching
-target; lowercase aliases follow ADM §6.8.6. Purpose strings remain open, including custom purposes
+target; lowercase aliases follow ADM §6.8.6 and blank/underscore spellings (`MOM DESAT`,
+including list members) follow ADM §6.8.8. The purpose text itself is stored as written. Purpose strings remain open, including custom purposes
 and comma-delimited lists, so unknown purposes do not acquire invented target requirements.
 A target quaternion uses the shared quaternion component and magnitude checks, with the documented
 rounded-data tolerance. Multiple purposes may require multiple targets: KVN retains them, while

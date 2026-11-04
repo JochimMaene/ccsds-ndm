@@ -50,7 +50,9 @@ invented. A consumer that needs those values to interpret or transform the attit
 them from its exchange context. `aem::parsing::aem_uses_canonical_angular_velocity_frame_and_preserves_optional_metadata`
 covers both omissions and the old frame-keyword alias. The alias accepts an actual frame
 name, not ADM 1.0's symbolic `REF_FRAME_A`/`REF_FRAME_B` placeholders: those placeholders are
-rejected rather than being silently stored as the angular-velocity frame.
+rejected rather than being silently stored as the angular-velocity frame. The placeholder check
+applies ADM §6.8.8 spelling equivalence (`ref_frame_b`, `REF FRAME B`); genuine frame names are
+stored as written.
 
 **Nutation periods use seconds.** ADM §4.2.4.6 and the XSD `durationType`/`timeUnits`
 require seconds. The shared Rust `TimeUnits` enum also contains `Day` for other contexts,

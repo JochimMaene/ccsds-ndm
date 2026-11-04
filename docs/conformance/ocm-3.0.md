@@ -321,7 +321,12 @@ without enforcing an exact block inventory, preserving real producer messages.
 
 KVN comments must follow the version or begin a block; comments between blocks or after the
 last stop are refused, avoiding relocation or loss. `MAN_COMPOSITION` accepts lowercase,
-whitespace separators and continued lines, and writes uppercase comma-separated columns.
+whitespace separators and continued lines, and writes uppercase comma-separated columns. A
+comma-delimited piece that is a known column under ODM §7.5.9 blank/underscore equivalence
+(`TIME RELATIVE`, `THR X`) is one column; any other piece is split at blanks. Reserved values
+use the same equivalence: a padded or blank-spelled `MAN_DEVICE_ID = DEPLOY` is the reserved
+deployment device, and known trajectory/covariance types such as `TEQUINOCTIAL P` keep their
+dimension, unit and matrix checks. Unknown registry tokens remain opaque.
 A model using other separators may therefore differ lexically after KVN regeneration.
 EQUINOCTIAL and EQUINOCTIALMOD covariance matrices keep all seven coordinates, but positive
 definiteness covers the six uncertain coordinates: the constant retrograde factor has no variance.
@@ -382,8 +387,11 @@ materialization of the default. Other TC1 contact keywords follow their declared
 positions; OWNER_URL and covariance TRAJ_ID have the separately documented permissive positions.
 
 Inside a TC1 user-defined sequence, `COMMENT` is sequence data, not a message comment; sequence
-rows are opaque ICD text. Duty-cycle window/execution bounds and `DC_MIN_CYCLES` versus
-`DC_MAX_CYCLES` are not ordered against one another. Consumers must check those operational
-relationships, as well as trajectory usable bounds and record coverage. Native unsigned count
+rows are opaque ICD text. For epochs of the same form (both absolute or
+both relative), `DC_EXEC_START` must not precede `DC_WIN_OPEN` and `DC_EXEC_STOP` must not
+follow `DC_WIN_CLOSE` (table 6-7); `DC_TIME_PULSE_PERIOD` must not be shorter than
+`DC_TIME_PULSE_DURATION`. Mixed-form epochs are not compared. `DC_WIN_OPEN` versus
+`DC_WIN_CLOSE`, `DC_EXEC_START` versus `DC_EXEC_STOP`, and `DC_MIN_CYCLES` versus
+`DC_MAX_CYCLES` are not ordered. Consumers must check those operational relationships, as well as trajectory usable bounds and record coverage. Native unsigned count
 fields can retain values such as OBS_USED=3000000000 in XML/model form, while KVN integer
 output refuses values above its signed 32-bit maximum.

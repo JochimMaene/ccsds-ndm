@@ -507,6 +507,46 @@ fn maneuver_units_and_deploy_device_are_checked_on_input_and_generation() {
 }
 
 #[test]
+fn reserved_ocm_values_follow_blank_underscore_equivalence() {
+    // ODM 7.5.9: blanks and underscores are equivalent in reserved values; custom text is kept.
+    let source = "CCSDS_OCM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\nMETA_START\nTIME_SYSTEM = UTC\nEPOCH_TZERO = 2023-01-01T00:00:00\nMETA_STOP\nMAN_START\nMAN_ID = M1\nMAN_DEVICE_ID = THRUSTER\nMAN_REF_FRAME = GCRF\nMAN_COMPOSITION = TIME_RELATIVE, DV_X\nMAN_UNITS = km/s\n0 1\nMAN_STOP\n";
+    let message = Ocm::from_kvn(source).unwrap();
+
+    // Complete comma-delimited column aliases are one column each.
+    for composition in ["TIME RELATIVE, DV_X", "TIME_RELATIVE, DV X", "time relative, dv  x"] {
+        let aliased = Ocm::from_kvn(&source.replace("TIME_RELATIVE, DV_X", composition)).unwrap();
+        assert!(aliased
+            .to_kvn()
+            .unwrap()
+            .contains("MAN_COMPOSITION      = TIME_RELATIVE, DV_X"));
+    }
+
+    // A padded reserved DEPLOY device is still the reserved value, in the model and in XML.
+    let mut padded = message.clone();
+    padded.body.segment.data.man[0].man_device_id = " DEPLOY ".into();
+    crate::common::assert_rejects(&padded, "MAN_DEVICE_ID");
+    let xml = message.to_xml().unwrap().replace(
+        "<MAN_DEVICE_ID>THRUSTER</MAN_DEVICE_ID>",
+        "<MAN_DEVICE_ID> DEPLOY </MAN_DEVICE_ID>",
+    );
+    assert!(Ocm::from_xml(&xml)
+        .unwrap_err()
+        .to_string()
+        .contains("MAN_DEVICE_ID"));
+
+    // A blank-spelled known covariance type keeps its 28-value matrix check.
+    let covariance = "CCSDS_OCM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\nMETA_START\nTIME_SYSTEM = UTC\nEPOCH_TZERO = 2023-01-01T00:00:00\nMETA_STOP\nCOV_START\nCOV_REF_FRAME = GCRF\nCOV_TYPE = TEQUINOCTIAL_P\nCOV_ORDERING = LTM\n0 1\nCOV_STOP\n";
+    // Control: a genuinely unknown registry token stays opaque, so the rejection is the matrix check.
+    Ocm::from_kvn(&covariance.replace("TEQUINOCTIAL_P", "CUSTOM_TYPE")).unwrap();
+    for spelling in ["TEQUINOCTIAL_P", "TEQUINOCTIAL P", "tequinoctialmod n"] {
+        assert!(
+            Ocm::from_kvn(&covariance.replace("TEQUINOCTIAL_P", spelling)).is_err(),
+            "{spelling}"
+        );
+    }
+}
+
+#[test]
 fn xml_scalar_composition_prefix_error_explains_tc1_reservation() {
     use ccsds_ndm::messages::ocm::{OcmUserDefined, OcmUserDefinedEntry, OcmUserDefinedParameter};
     let mut message = Ocm::from_kvn(BASE).unwrap();

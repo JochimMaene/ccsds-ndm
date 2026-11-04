@@ -626,7 +626,7 @@ fn aem_uses_canonical_angular_velocity_frame_and_preserves_optional_metadata() {
             Aem::from_kvn(&input.replace("META_STOP", "RATE_FRAME = OTHER\nMETA_STOP")).is_err()
         );
     }
-    for placeholder in ["REF_FRAME_A", "REF_FRAME_B"] {
+    for placeholder in ["REF_FRAME_A", "REF_FRAME_B", "ref_frame_b", "REF FRAME B"] {
         let input = source.replace(
             "META_STOP",
             &format!("RATE_FRAME = {placeholder}\nMETA_STOP"),

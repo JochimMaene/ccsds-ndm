@@ -1389,16 +1389,11 @@ impl AcmManeuverParameters {
             .split(',')
             .map(str::trim)
         {
-            let missing = match purpose {
-                "MOM_DESAT" | "mom_desat" if self.target_momentum.is_none() => {
-                    Some("TARGET_MOMENTUM")
-                }
-                "ATT_ADJUST" | "att_adjust" if self.target_attitude.is_none() => {
-                    Some("TARGET_ATTITUDE")
-                }
-                "SPIN_RATE_ADJUST" | "spin_rate_adjust" if self.target_spinrate.is_none() => {
-                    Some("TARGET_SPINRATE")
-                }
+            // ADM 6.8.8: blanks and underscores are equivalent in these reserved purposes.
+            let missing = match crate::types::enum_token(purpose).as_ref() {
+                "MOM_DESAT" if self.target_momentum.is_none() => Some("TARGET_MOMENTUM"),
+                "ATT_ADJUST" if self.target_attitude.is_none() => Some("TARGET_ATTITUDE"),
+                "SPIN_RATE_ADJUST" if self.target_spinrate.is_none() => Some("TARGET_SPINRATE"),
                 _ => None,
             };
             if let Some(field) = missing {

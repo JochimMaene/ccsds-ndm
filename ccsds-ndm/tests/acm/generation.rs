@@ -530,6 +530,10 @@ fn acm_maneuver_targets_follow_purposes_without_closing_custom_values() {
         ("MOM_DESAT", "TARGET_MOMENTUM"),
         ("ATT_ADJUST", "TARGET_ATTITUDE"),
         ("spin_rate_adjust", "TARGET_SPINRATE"),
+        // ADM 6.8.8 blank/underscore equivalence, alone and as a list member.
+        ("MOM DESAT", "TARGET_MOMENTUM"),
+        ("SCI_OBJ, ATT  ADJUST", "TARGET_ATTITUDE"),
+        ("spin rate adjust", "TARGET_SPINRATE"),
     ] {
         message.body.segment.data.man[0].man_purpose = Some(purpose.into());
         assert_rejects(&message, field);

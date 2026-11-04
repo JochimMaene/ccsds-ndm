@@ -31,6 +31,12 @@ Final conformance corrections
 - Python ``OpmCovarianceMatrix`` takes ``comment=`` rather than ``comments=`` (breaking),
   matching its property. AEM compares object names using blank/underscore equivalence and
   refuses obsolete symbolic ``RATE_FRAME`` placeholders instead of treating them as frame names.
+- Reserved values apply blank/underscore equivalence (ODM 7.5.9, ADM 6.8.8) wherever they are
+  compared: OCM ``MAN_COMPOSITION`` reads complete column aliases such as ``THR X``, a padded
+  ``MAN_DEVICE_ID = DEPLOY`` is the reserved deployment device, and known trajectory/covariance
+  types such as ``TEQUINOCTIAL P`` keep their matrix checks. ACM ``MOM DESAT``-style purposes
+  require their targets, and AEM ``RATE_FRAME`` placeholder rejection covers ``ref_frame_b``.
+  CDM documents that unavailable XML leaves are removed before order/duplicate checks.
 - Family records and the shared contract distinguish XSD structure/value domains from book
   conditional requirements. Missing frames, OPM maneuver mass, OEM interpolation degree, and
   overlapping OEM usable spans remain validation failures. OCM book defaults may remain omitted.

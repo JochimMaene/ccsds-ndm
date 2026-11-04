@@ -108,7 +108,10 @@ Only the unqualified `nil` producer attribute is accepted; `nil="false"`, nil on
 values, nil with content, unknown attributes, and unknown/nested elements remain errors.
 Supplied units are checked against the field's fixed unit before an unavailable leaf is removed;
 empty, nil, and N/A payloads cannot hide incompatible units. Normalization preserves byte positions
-for subsequent diagnostics. Empty, comment-free optional OD and additional-parameter blocks
+for subsequent diagnostics. Unavailable leaves are removed before element order and cardinality
+are checked, so an empty optional leaf next to a populated one (for example an empty
+`<RELATIVE_SPEED/>` before a populated `RELATIVE_SPEED`, or before `MISS_DISTANCE`) is not a
+duplicate or ordering error; two populated occurrences still are. Empty, comment-free optional OD and additional-parameter blocks
 normalize to absent. An optional container containing only decoded `N/A` is likewise unavailable;
 this compatibility does not admit `nil` attributes on containers. Comment-only blocks retain their text
 through the canonical KVN comment merge below.

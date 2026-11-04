@@ -797,7 +797,7 @@ fn kv_man_composition(input: &mut &str) -> KvnResult<String> {
 /// Canonical MAN_COMPOSITION spelling: uppercase keywords separated by ", ". Reading accepts any
 /// case and blanks instead of commas (table 6-7 asks for a comma-separated list).
 pub(super) fn canonical_man_composition(composition: &str) -> String {
-    super::parse_csv_list(composition)
+    super::parse_man_composition(composition)
         .iter()
         .map(|column| column.to_ascii_uppercase())
         .collect::<Vec<_>>()
@@ -2566,7 +2566,7 @@ impl ToKvn for OcmManeuverParameters {
         if let Some(v) = &self.dc_pa_stop_angle {
             writer.write_odm_float_measure("DC_PA_STOP_ANGLE", &v.to_unit_value());
         }
-        let composition = super::parse_csv_list(&self.man_composition);
+        let composition = super::parse_man_composition(&self.man_composition);
         writer.write_pair(
             "MAN_COMPOSITION",
             canonical_man_composition(&self.man_composition),

@@ -378,7 +378,9 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
                 let key = line.split_once('=').unwrap().0.trim();
                 if key == "RATE_FRAME"
                     && matches!(
-                        line.split_once('=').unwrap().1.trim(),
+                        crate::types::enum_token(line.split_once('=').unwrap().1.trim())
+                            .to_ascii_uppercase()
+                            .as_str(),
                         "REF_FRAME_A" | "REF_FRAME_B"
                     )
                 {

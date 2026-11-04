@@ -19,7 +19,8 @@ use winnow::Parser;
 /// Represents the `epochType` from the XSD (e.g., "2023-11-13T12:00:00.123Z").
 ///
 /// This struct uses a stack-allocated buffer to avoid heap allocations during parsing of large NDM
-/// files. The original lexical spelling remains the serialization source. Ordering keys are
+/// files. The supplied lexical spelling remains the serialization source, except that the zero
+/// UTC offsets `+00:00` and `-00:00` are stored as `Z` (see the validation contract). Ordering keys are
 /// computed only by validators that need them, avoiding permanent per-record comparison state.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Epoch {
@@ -403,8 +404,8 @@ pub(crate) fn fraction_digit_count(bytes: &[u8]) -> usize {
 }
 
 impl Epoch {
-    /// Retain a schema-compatible epoch spelling of at most MAX_EPOCH_LEN bytes.
-    /// Message validation additionally enforces calendar and book-specific field rules.
+    /// Retain a schema-compatible epoch spelling of at most MAX_EPOCH_LEN bytes; a zero UTC
+    /// offset (`+00:00`/`-00:00`) is stored as `Z`. Message validation additionally enforces calendar and book-specific field rules.
     pub fn new(value: &str) -> std::result::Result<Self, EpochError> {
         // Fast path for empty or very short strings which are common in some tests
         // and allowed by the regex [+-]?\d*(\.\d*)?
@@ -844,13 +845,15 @@ impl TryFrom<String> for Epoch {
 ///
 /// `Epoch` intentionally mirrors the XSD union and therefore accepts numeric spellings as well.
 /// Use this wrapper when the containing field requires an absolute calendar or ordinal date. The
-/// original lexical spelling is retained and conversions never normalize the value.
+/// spelling is retained as supplied, except that a zero UTC offset (`+00:00`/`-00:00`) is stored
+/// as `Z`, as for every [`Epoch`]. It is not lexical archival storage.
 #[repr(transparent)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct CalendarEpoch(Epoch);
 
 impl CalendarEpoch {
-    /// Parses a valid calendar or ordinal epoch while retaining its exact spelling.
+    /// Parses a valid calendar or ordinal epoch, retaining its spelling apart from storing a zero
+    /// UTC offset as `Z`.
     pub fn new(value: &str) -> std::result::Result<Self, EpochError> {
         let epoch = Epoch::new(value)?;
         if epoch.kind() != EpochKind::Calendar || epoch.calendar_fields_are_valid() != Some(true) {
@@ -859,7 +862,7 @@ impl CalendarEpoch {
         Ok(Self(epoch))
     }
 
-    /// Returns the original lexical spelling.
+    /// Returns the stored spelling (a zero UTC offset reads back as `Z`).
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }

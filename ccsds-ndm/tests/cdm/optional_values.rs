@@ -320,3 +320,25 @@ fn unavailable_leaves_cannot_hide_incompatible_units() {
         assert!(error.diagnostic().unwrap().source_location.is_some());
     }
 }
+
+#[test]
+fn unavailable_leaves_are_removed_before_order_and_duplicate_checks() {
+    let original = Cdm::from_kvn(crate::KVN).unwrap().to_xml().unwrap();
+    let start = original.find("<RELATIVE_SPEED").unwrap();
+    let end = start + original[start..].find("</RELATIVE_SPEED>").unwrap() + "</RELATIVE_SPEED>".len();
+    let speed = &original[start..end];
+    let expected = Cdm::from_xml(&original).unwrap();
+
+    let mut empty_first = original.clone();
+    empty_first.replace_range(start..end, &format!("<RELATIVE_SPEED/>{speed}"));
+    assert_eq!(Cdm::from_xml(&empty_first).unwrap(), expected);
+
+    let miss = original.find("<MISS_DISTANCE").unwrap();
+    let mut empty_out_of_order = original.clone();
+    empty_out_of_order.insert_str(miss, "<RELATIVE_SPEED/>");
+    assert_eq!(Cdm::from_xml(&empty_out_of_order).unwrap(), expected);
+
+    let mut populated_twice = original.clone();
+    populated_twice.replace_range(start..end, &format!("{speed}{speed}"));
+    assert!(Cdm::from_xml(&populated_twice).is_err());
+}
