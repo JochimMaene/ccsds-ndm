@@ -118,6 +118,8 @@ Additional conformance corrections
 - Error codes cover all error categories, including Python file and EOF errors. Typed Python
   readers identify a wrong message family before parsing its body. Unused ``requirement``
   diagnostics are removed; available paths and source lines are retained in diagnostics.
+  The unused Rust ``ValidationError::EmptyValue`` variant is removed; empty mandatory values
+  report ``validation.missing_required_field``.
   Validation locations remain aligned for LF, CR, CRLF, and LFCR input.
   Python classes now identify their module as ``ccsds_ndm``.
 

@@ -59,7 +59,6 @@ fn assert_missing_required<T: std::fmt::Debug>(
         matches!(
             validation,
             ValidationError::MissingRequiredField { field, .. }
-                | ValidationError::EmptyValue { field, .. }
                 if field.as_ref() == expected_field
         ) || matches!(
             validation,

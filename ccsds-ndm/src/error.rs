@@ -288,16 +288,6 @@ pub enum ValidationError {
         line: Option<usize>,
     },
 
-    /// A mandatory value is present but empty. The books require a value (ODM 7.5.1) where
-    /// the XSD string and epoch types also admit an empty one; see the validation contract.
-    #[error("{field} is empty")]
-    EmptyValue {
-        /// CCSDS keyword or field whose value failed.
-        field: Cow<'static, str>,
-        /// One-based source line, when available.
-        line: Option<usize>,
-    },
-
     /// Specific validation error for values out of expected range.
     #[error("Value for '{name}' is out of range: {value} (expected {expected})")]
     OutOfRange {
@@ -337,7 +327,7 @@ impl ValidationError {
         match self {
             Self::MissingRequiredField { .. } => Some("validation.missing_required_field"),
             Self::InvalidChoice { .. } => Some("validation.invalid_choice"),
-            Self::InvalidValue { .. } | Self::EmptyValue { .. } => Some("validation.invalid_value"),
+            Self::InvalidValue { .. } => Some("validation.invalid_value"),
             Self::OutOfRange { .. } => Some("validation.out_of_range"),
             Self::AtPath { source, .. } => source.code(),
             Self::Conflict { .. } => Some("validation.conflict"),
@@ -384,8 +374,7 @@ impl ValidationError {
         }
         let field = match &self {
             Self::MissingRequiredField { field, .. }
-            | Self::InvalidValue { field, .. }
-            | Self::EmptyValue { field, .. } => field.as_ref(),
+            | Self::InvalidValue { field, .. } => field.as_ref(),
             Self::OutOfRange { name, .. } => name.as_ref(),
             Self::InvalidChoice { .. } => return self.at_path(parent_path),
             Self::Conflict { .. } | Self::Generic { .. } | Self::AtPath { .. } => return self,
@@ -435,7 +424,6 @@ impl ValidationError {
             | Self::Conflict { line, .. }
             | Self::InvalidChoice { line, .. }
             | Self::InvalidValue { line, .. }
-            | Self::EmptyValue { line, .. }
             | Self::OutOfRange { line, .. }
             | Self::Generic { line, .. } => *line,
         }
@@ -458,9 +446,6 @@ impl ValidationError {
                 line: error_line, ..
             }
             | Self::InvalidValue {
-                line: error_line, ..
-            }
-            | Self::EmptyValue {
                 line: error_line, ..
             }
             | Self::MissingRequiredField {

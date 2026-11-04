@@ -127,7 +127,7 @@ original XML document; structural errors can have no location.
      - ``Validation::MissingRequiredField`` / ``InvalidChoice``
      - ``NdmValidationError``
    * - ``validation.invalid_value`` / ``validation.out_of_range``
-     - ``Validation::InvalidValue`` or ``EmptyValue`` / ``OutOfRange``
+     - ``Validation::InvalidValue`` / ``OutOfRange``
      - ``NdmValidationError``
    * - ``validation.conflict`` / ``validation.generic``
      - ``Validation::Conflict`` / ``Generic``
