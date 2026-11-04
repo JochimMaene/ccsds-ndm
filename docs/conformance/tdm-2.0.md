@@ -351,7 +351,7 @@ enforces for 1.0 XML:
 | --- | --- |
 | `TIME_SYSTEM` is the closed `timeSystemType` list: GMST, GPS, SCLK, TAI, TCB, TDB, TOD, TT, UT1, UTC, each all-uppercase or all-lowercase | Other values (including `TCG` and mixed case such as `Utc`) are rejected in 1.0 XML |
 | `RHUMIDITY` is `percentType` with no `units` attribute | `units` on `RHUMIDITY` is rejected in 1.0 XML |
-| Only the unqualified schema set exists | A namespaced (qualified) 1.0 root is rejected |
+| Only the unqualified schema set exists | A namespaced (qualified) root or descendant element is rejected in 1.0 XML |
 
 **KVN and XML differ on TIME_SYSTEM by design.** The 1.0 book (annex A1) lists the same time
 systems but also admits other values defined in an ICD, so 1.0 KVN keeps `TIME_SYSTEM` open, as

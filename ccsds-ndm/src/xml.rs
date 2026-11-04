@@ -578,6 +578,15 @@ fn validate_document(
                     // NDM/XML 4.3.5: a qualified instantiation prefixes every element, so the
                     // two schema forms cannot be mixed below the root.
                     let form = element_form(&namespaces, start.name(), &invalid_sequence)?;
+                    // NDM/XML 1.0 (505.0-B-1) defined only the unqualified schema set.
+                    if form == ElementForm::Qualified
+                        && rules.root == Some(b"tdm".as_slice())
+                        && source_edition.as_deref() == Some("1.0")
+                    {
+                        return Err(invalid_sequence(
+                            "TDM 1.0 XML has no qualified (namespaced) form in NDM/XML 1.0".into(),
+                        ));
+                    }
                     if *child_form.get_or_insert(form) != form {
                         return Err(invalid_sequence(
                             "qualified and unqualified NDM/XML elements cannot be mixed".into(),

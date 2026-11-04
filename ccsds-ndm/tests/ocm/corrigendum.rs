@@ -517,6 +517,8 @@ fn reserved_ocm_values_follow_blank_underscore_equivalence() {
         "TIME RELATIVE, DV_X",
         "TIME_RELATIVE, DV X",
         "time relative, dv  x",
+        "TIME__RELATIVE, DV_X",
+        "TIME_RELATIVE, DV__X",
     ] {
         let aliased = Ocm::from_kvn(&source.replace("TIME_RELATIVE, DV_X", composition)).unwrap();
         assert!(aliased
@@ -529,14 +531,19 @@ fn reserved_ocm_values_follow_blank_underscore_equivalence() {
     let mut padded = message.clone();
     padded.body.segment.data.man[0].man_device_id = " DEPLOY ".into();
     crate::common::assert_rejects(&padded, "MAN_DEVICE_ID");
-    let xml = message.to_xml().unwrap().replace(
-        "<MAN_DEVICE_ID>THRUSTER</MAN_DEVICE_ID>",
-        "<MAN_DEVICE_ID> DEPLOY </MAN_DEVICE_ID>",
-    );
-    assert!(Ocm::from_xml(&xml)
-        .unwrap_err()
-        .to_string()
-        .contains("MAN_DEVICE_ID"));
+    for padded in [" DEPLOY ", "\nDEPLOY\n", "\r\n\tDEPLOY\r\n"] {
+        let xml = message.to_xml().unwrap().replace(
+            "<MAN_DEVICE_ID>THRUSTER</MAN_DEVICE_ID>",
+            &format!("<MAN_DEVICE_ID>{padded}</MAN_DEVICE_ID>"),
+        );
+        assert!(
+            Ocm::from_xml(&xml)
+                .unwrap_err()
+                .to_string()
+                .contains("MAN_DEVICE_ID"),
+            "{padded:?}"
+        );
+    }
 
     // A blank-spelled known covariance type keeps its 28-value matrix check.
     let covariance = "CCSDS_OCM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\nMETA_START\nTIME_SYSTEM = UTC\nEPOCH_TZERO = 2023-01-01T00:00:00\nMETA_STOP\nCOV_START\nCOV_REF_FRAME = GCRF\nCOV_TYPE = TEQUINOCTIAL_P\nCOV_ORDERING = LTM\n0 1\nCOV_STOP\n";

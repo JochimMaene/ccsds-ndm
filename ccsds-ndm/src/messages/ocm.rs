@@ -902,7 +902,7 @@ impl OcmManeuverParameters {
                 }
             }
         }
-        if crate::types::enum_token(&self.man_device_id).eq_ignore_ascii_case("DEPLOY")
+        if crate::types::enum_token(self.man_device_id.trim()).eq_ignore_ascii_case("DEPLOY")
             && tokens.iter().skip(1).any(|token| {
                 MAN_PROPULSIVE_COLUMNS
                     .iter()
@@ -1561,8 +1561,8 @@ fn parse_units_list(units: &str) -> Vec<&str> {
 }
 
 /// Splits `MAN_COMPOSITION`. Commas separate columns; a comma piece that is a known column
-/// alias under ODM 7.5.9 (`THR X`, `time relative`) is one column, otherwise blanks inside the
-/// piece also separate columns (the documented blank-separated compatibility syntax).
+/// alias under ODM 7.5.9 (`THR X`, `time relative`, `DV__X`) is one column, otherwise blanks
+/// inside the piece also separate columns (the documented blank-separated compatibility syntax).
 pub(crate) fn parse_man_composition(value: &str) -> Vec<Cow<'_, str>> {
     let mut columns = Vec::new();
     for piece in value
@@ -1570,16 +1570,14 @@ pub(crate) fn parse_man_composition(value: &str) -> Vec<Cow<'_, str>> {
         .map(str::trim)
         .filter(|piece| !piece.is_empty())
     {
-        if piece.contains(char::is_whitespace) {
-            let alias = crate::types::enum_token(piece);
-            if man_time_tag(&alias).is_some()
-                || [MAN_PROPULSIVE_COLUMNS, MAN_DEPLOYMENT_COLUMNS]
-                    .iter()
-                    .any(|table| table.iter().any(|known| known.eq_ignore_ascii_case(&alias)))
-            {
-                columns.push(Cow::Owned(alias.into_owned()));
-                continue;
-            }
+        let alias = crate::types::enum_token(piece);
+        if man_time_tag(&alias).is_some()
+            || [MAN_PROPULSIVE_COLUMNS, MAN_DEPLOYMENT_COLUMNS]
+                .iter()
+                .any(|table| table.iter().any(|known| known.eq_ignore_ascii_case(&alias)))
+        {
+            columns.push(Cow::Owned(alias.into_owned()));
+            continue;
         }
         columns.extend(piece.split_whitespace().map(Cow::Borrowed));
     }

@@ -19,8 +19,10 @@ use winnow::Parser;
 /// Represents the `epochType` from the XSD (e.g., "2023-11-13T12:00:00.123Z").
 ///
 /// This struct uses a stack-allocated buffer to avoid heap allocations during parsing of large NDM
-/// files. The supplied lexical spelling remains the serialization source, except that the zero
-/// UTC offsets `+00:00` and `-00:00` are stored as `Z` (see the validation contract). Ordering keys are
+/// files. The supplied lexical spelling remains the serialization source, with two exact
+/// normalizations: zero UTC offsets (`+00:00`, `-00:00`) are stored as `Z`, and a numeric relative
+/// tag with an exponent is stored as its plain decimal (`1e3` becomes `1000`); see the validation
+/// contract. Ordering keys are
 /// computed only by validators that need them, avoiding permanent per-record comparison state.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Epoch {
@@ -405,7 +407,8 @@ pub(crate) fn fraction_digit_count(bytes: &[u8]) -> usize {
 
 impl Epoch {
     /// Retain a schema-compatible epoch spelling of at most MAX_EPOCH_LEN bytes; a zero UTC
-    /// offset (`+00:00`/`-00:00`) is stored as `Z`. Message validation additionally enforces calendar and book-specific field rules.
+    /// offset (`+00:00`/`-00:00`) is stored as `Z` and an exponent numeric tag as its exact plain
+    /// decimal (`1e3` as `1000`). Message validation additionally enforces calendar and book-specific field rules.
     pub fn new(value: &str) -> std::result::Result<Self, EpochError> {
         // Fast path for empty or very short strings which are common in some tests
         // and allowed by the regex [+-]?\d*(\.\d*)?
@@ -445,7 +448,8 @@ impl Epoch {
             Err(EpochError::InvalidFormat(value.to_string()))
         }
     }
-    /// Borrow the retained spelling; zero-offset aliases are normalized to `Z`.
+    /// Borrow the stored spelling; zero-offset aliases read back as `Z` and exponent numeric tags
+    /// as their exact plain decimal.
     pub fn as_str(&self) -> &str {
         // Bytes are validated to be ASCII/UTF-8 during creation.
         std::str::from_utf8(&self.bytes[..self.len as usize])

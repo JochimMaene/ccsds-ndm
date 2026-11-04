@@ -111,7 +111,19 @@ fn tdm_1_0_xml_input_follows_the_ndm_xml_1_0_schema() {
     assert!(tdm_1_0_schema_accepts(&humidity));
     Tdm::from_xml(&humidity).unwrap();
 
-    // NDM/XML 1.0 had no qualified schema set.
+    // NDM/XML 1.0 had no qualified schema set: neither the root nor any descendant may be
+    // namespaced.
+    let qualified_children = B9
+        .replacen("<tdm ", "<tdm xmlns:ndm=\"urn:ccsds:schema:ndmxml\" ", 1)
+        .replace("<header>", "<ndm:header>")
+        .replace("</header>", "</ndm:header>")
+        .replace("<body>", "<ndm:body>")
+        .replace("</body>", "</ndm:body>");
+    assert!(!tdm_1_0_schema_accepts(&qualified_children));
+    assert!(Tdm::from_xml(&qualified_children)
+        .unwrap_err()
+        .to_string()
+        .contains("qualified"));
     let qualified = B9
         .replacen(
             "<tdm ",
