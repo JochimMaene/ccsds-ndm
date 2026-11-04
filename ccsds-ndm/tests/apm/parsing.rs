@@ -441,3 +441,34 @@ fn quaternion_diagnostics_name_their_record_or_field() {
         Some("body.segment.data.quaternion_state[0].quaternion")
     );
 }
+
+#[test]
+fn seconds_only_fields_report_their_own_unit_domain_and_record() {
+    for (source, field, from) in [
+        (crate::SPIN_KVN, "NUTATION_PER", "NUTATION_PER = 100"),
+        (
+            include_str!("../../data/kvn/apm_g3.kvn"),
+            "MAN_DURATION",
+            "MAN_DURATION = 3 [s]",
+        ),
+    ] {
+        let original = source.lines().find(|line| line.starts_with(from)).unwrap();
+        for unit in ["h", "d"] {
+            let invalid =
+                crate::common::mutated(source, original, &format!("{field} = 3 [{unit}]"));
+            let error = Apm::from_kvn(&invalid).unwrap_err();
+            let kvn = crate::common::kvn_parse_error(&error).unwrap();
+            let line = invalid
+                .lines()
+                .position(|line| line.starts_with(field))
+                .unwrap()
+                + 1;
+            assert_eq!(kvn.line, line);
+            assert!(
+                kvn.message
+                    .contains(&format!("Invalid {field} unit; expected s")),
+                "{error}"
+            );
+        }
+    }
+}

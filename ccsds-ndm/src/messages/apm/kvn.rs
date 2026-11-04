@@ -221,6 +221,28 @@ pub fn ang_vel_state(input: &mut &str) -> KvnResult<AngVelState> {
     })
 }
 
+fn kv_seconds_duration(input: &mut &str, field: &'static str) -> KvnResult<crate::types::Duration> {
+    let value_start = *input;
+    let (value, unit) = kv_float_unit(input)?;
+    let units = match unit {
+        None => None,
+        Some("s") => Some(crate::types::TimeUnits::Seconds),
+        _ => {
+            *input = value_start;
+            let message = match field {
+                "NUTATION_PER" => "Invalid NUTATION_PER unit; expected s",
+                _ => "Invalid MAN_DURATION unit; expected s",
+            };
+            return Err(cut_err(input, message));
+        }
+    };
+    crate::types::Duration::validate_value(value, field).map_err(|error| {
+        *input = value_start;
+        ErrMode::Cut(InternalParserError::from_external_error(input, error))
+    })?;
+    Ok(crate::types::Duration { value, units })
+}
+
 pub fn spin_state(input: &mut &str) -> KvnResult<SpinState> {
     expect_block_start("SPIN").parse_next(input)?;
     let mut comment = Vec::new();
@@ -245,7 +267,7 @@ pub fn spin_state(input: &mut &str) -> KvnResult<SpinState> {
         "SPIN_ANGLE" => spin_angle: kv_from_kvn,
         "SPIN_ANGLE_VEL" => spin_angle_vel: kv_from_kvn,
         "NUTATION" => nutation: kv_from_kvn,
-        "NUTATION_PER" => nutation_per: kv_from_kvn,
+        "NUTATION_PER" => nutation_per: |i: &mut &str| kv_seconds_duration(i, "NUTATION_PER"),
         "NUTATION_PHASE" => nutation_phase: kv_from_kvn,
         "MOMENTUM_ALPHA" => momentum_alpha: kv_from_kvn,
         "MOMENTUM_DELTA" => momentum_delta: kv_from_kvn,
@@ -320,7 +342,7 @@ pub fn maneuver_parameters(input: &mut &str) -> KvnResult<AttManeuverState> {
 
     parse_block!(input, comment, {
         "MAN_EPOCH_START" => man_epoch_start: kv_calendar_epoch,
-        "MAN_DURATION" => man_duration: kv_from_kvn,
+        "MAN_DURATION" => man_duration: |i: &mut &str| kv_seconds_duration(i, "MAN_DURATION"),
         "MAN_REF_FRAME" => man_ref_frame: kv_string,
         "MAN_TOR_X" => man_tor_x: kv_from_kvn,
         "MAN_TOR_Y" => man_tor_y: kv_from_kvn,
@@ -554,7 +576,7 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
                 return fail("COMMENT is not at the beginning of a logical block");
             }
             if current_block.is_none() && !matches!(top_previous, Some(0 | 3 | 4 | 13)) {
-                return fail("COMMENT is not at the beginning of a logical block");
+                return fail("COMMENT must precede the first field of its logical block; header comments precede CREATION_DATE");
             }
             pending_comment = true;
             offset += raw_line.len() + 1;
@@ -610,15 +632,21 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
             .0
             .trim();
         if let Some(block) = current_block {
-            let rank = block_rank(block, key)
-                .ok_or_else(|| invalid(line_number, offset, "unknown APM block keyword".into()))?;
+            let rank = block_rank(block, key).ok_or_else(|| {
+                invalid(
+                    line_number,
+                    offset,
+                    format!("unknown APM block keyword {key}"),
+                )
+            })?;
             if block_previous.is_some_and(|previous| rank <= previous) {
                 return fail("duplicate or out-of-order APM block keyword");
             }
             block_previous = Some(rank);
         } else {
-            let rank = top_rank(key)
-                .ok_or_else(|| invalid(line_number, offset, "unknown APM keyword".into()))?;
+            let rank = top_rank(key).ok_or_else(|| {
+                invalid(line_number, offset, format!("unknown APM keyword {key}"))
+            })?;
             if pending_comment {
                 let starts_block = match key {
                     "CLASSIFICATION" | "CREATION_DATE" => top_previous == Some(0),

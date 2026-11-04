@@ -38,7 +38,10 @@ public generation path validates the complete graph before writing any caller-vi
 ## Authority and representability
 
 CCSDS books govern normalized semantics and KVN. The bundled XSD selected for an XML edition
-governs XML structure and representability. When they conflict, the library records both sources,
+governs XML structure, representability, and schema-defined value domains. Explicit book
+requirements, including conditional dependencies, also apply when the schema cannot express them.
+An optional XSD element does not cancel a book requirement conditional on another field.
+Defaults and recommendations do not create additional mandatory fields. When authorities conflict, the library records both sources,
 preserves a book-valid value in the model, and rejects conversion to an XML edition that cannot
 represent it. It does not alter the value to make the conversion succeed.
 
@@ -65,12 +68,14 @@ still apply. When the book explicitly permits a value the XSD forbids, the model
 and XML generation refuses it; the family record names each such field.
 
 Book-over-XSD epoch constraints are explicit: absolute epoch fields use four-digit,
-nonnegative years and calendar or ordinal dates, without timezone offsets (`+hh:mm`),
+nonnegative years and calendar or ordinal dates, without nonzero timezone offsets (`+hh:mm`),
 empty fractional seconds (`15.`), or empty values. ODM 7.5.10, ADM 6.8.9 and their
 CDM/RDM counterparts limit fractional seconds to 16 digits; this cap remains enforced
 rather than broadening the shared validation and generation contract in this release.
 TDM has no fractional-digit cap. Negative OPM/OMM/OEM MET/MRT elapsed epochs remain unsupported; OCM/ACM SI-second
-relative offsets may be negative.
+relative offsets may be negative. The lossless input aliases `+00:00` and `-00:00` normalize
+to `Z` without changing `TIME_SYSTEM` or performing a time-scale conversion. Nonzero offsets
+remain unsupported. The 64-byte limit is checked on the supplied token before normalization.
 OCM and ACM relative fields and histories accept numeric SI-second tags, including
 exponents expanded exactly to plain decimal; their absolute reference anchors remain
 calendar/ordinal. These limits are narrower than the XSD epoch union. The 64-byte
@@ -88,12 +93,16 @@ producer deviations, and writing always emits the canonical form.
 - **KVN records:** accept LF, CR, CRLF, and LFCR terminators; normalizing a terminator never joins
   two records. Blank lines are allowed anywhere, and leading and trailing blanks on a record are
   insignificant, including on the version and header records. A TAB reads as a blank; writers
-  never emit TAB. Content must be printable ASCII: anything else is rejected at its line and byte
-  column, naming the code point. Lines longer than 254 characters are read in every family;
+  never emit TAB. Keywords and ordinary values must be printable ASCII. COMMENT payloads also
+  accept printable UTF-8 as a producer extension and preserve their text. XML can retain those
+  comments; KVN generation refuses non-ASCII comments before output instead of transliterating
+  or deleting characters. Other forbidden characters are rejected at their line and byte column,
+  naming the code point. An unterminated final record is accepted in every family. The version
+  is the first nonblank record; comments before it are rejected. Lines longer than 254 characters are read in every family;
   writers keep the limit where the family has one. A UTF-8 byte-order mark is skipped; UTF-16 and
   UTF-32 input is rejected as "input must be UTF-8". Keywords and block markers are case-sensitive.
 - **Edition first:** the `CCSDS_xxx_VERS` value (KVN) or root `version` attribute (XML) is checked
-  after encoding/character checks and before the structural parse. Lexically valid input in an
+  after encoding/character checks and before the structural parse. A recognized version record with an
   unsupported edition reports `parse.unsupported_input_version`.
 - **KVN numbers:** accept ordinary signed decimal and exponent forms, including `.5`, `5.`, `1e3`,
   and mantissas longer than 16 digits. Integers accept a leading `+` (ODM 7.5.4); unsigned fields
@@ -120,19 +129,20 @@ producer deviations, and writing always emits the canonical form.
   absent. CDM `MANEUVERABLE` keeps `N/A` as the value the book lists for it. RDM
   `NEXT_MESSAGE_EPOCH = N/A` ("no other message is scheduled") is therefore read as absent and
   written by omission. A blank or `N/A` mandatory value is reported as missing at its record. Writers never
-  emit an empty or `N/A` value: an optional value that would read back as absent, such as an empty
+  emit an empty or `N/A` standard-field value: an optional value that would read back as absent, such as an empty
   string from XML, is refused at KVN generation, naming the keyword. XML optional strings keep
   empty values. In CDM XML, case-insensitive `N/A` leaves are absent too (CDM 1.4.3.1), except
   `MANEUVERABLE`; attributes and fixed units are checked before omission. Other families' XML
   text fields retain literal `N/A`; numeric/epoch/enumeration fields must satisfy their schema type.
   CDM XML generation refuses a present `N/A` value that its reader would discard.
-  User-defined values and comments are opaque: blank and `N/A` payloads are retained. XML whitespace around scalar text is trimmed on KVN output and inner TABs become blanks;
+  User-defined values and comments are opaque: blank and `N/A` payloads are retained. Parameter
+  names must be nonempty; repeated names preserve ordered entries. XML whitespace around scalar text is trimmed on KVN output and inner TABs become blanks;
   embedded CR/LF remains unrepresentable. Values are trimmed as KVN readers trim them.
   Unit labels tolerate surrounding blanks inside KVN brackets (`[ m ]` reads as `[m]`).
   This lossless lexical extension follows the parsing policy above; ODM 7.7 governs the unit
   value, which is still checked. `bracketed_unit_padding_is_trimmed_before_validation` and the public-message regression
   `bracketed_unit_padding_is_checked_at_public_message_boundaries` cover it.
-- **Case:** `EULER_ROT_SEQ` reads lowercase letters and legacy ADM 1.0 numeric sequences
+- **Case:** `EULER_ROT_SEQ` reads mixed-case axis letters and legacy ADM 1.0 numeric sequences
   in KVN/Python, writing canonical uppercase letters; XML requires its exact enum spelling.
   Keywords are uppercase. Closed enumeration values accept all-uppercase or
   all-lowercase spellings and documented aliases, but not arbitrary mixed case. TDM KVN/Python
@@ -141,10 +151,11 @@ producer deviations, and writing always emits the canonical form.
   keeps boolean construction and parsing consistent without family-specific copies of the helper. Free text and
   open or ICD-defined values (frames, time systems, names) are accepted and preserved in any case,
   in every notation; the ODM 7.5.3 single-case rule is not enforced.
-- **Underscore:** `_` and a blank are interchangeable in categorical lookup, and runs of
+- **Underscore:** in KVN/Python categorical lookup, `_` and a blank are interchangeable, and runs of
   blanks collapse to one (ODM 7.5.9, CDM 6.3.2.5, RDM 5.3.3.4, TDM 4.3.8, ADM 6.8.8).
   Writers emit each category's canonical spelling (`ROCKET BODY`, `SINGLE_DIFF`, etc.).
   Free text retains underscores and internal blank runs; normalization is not applied to names.
+  XML categories follow their schema enumeration and explicitly documented producer aliases.
 - **Comments:** trailing blanks on a comment line are trimmed (including fixed-width padding),
   although 7.8.5 calls them significant; leading text is kept as written.
 - **Units:** check any supplied annotation against the field's allowed unit, including XML fields
@@ -177,6 +188,8 @@ notations. Whitespace, numeric spelling, and optional fixed-unit annotations may
   the double's sign. Opaque text and retained epoch spellings have their own family rules.
 - Fixed-unit annotations may be omitted or canonicalized without changing the measurement's
   unit or applying a conversion. Optional XML annotations cannot always survive unitless KVN.
+  CDM and RDM KVN writers always supply their book-required fixed units, including when an
+  optional XML unit annotation was absent.
 - Comment text and order are retained subject to documented whitespace normalization. Where KVN
   has fewer comment positions, a family either documents a canonical merge (OPM data/state-vector,
   OMM data/mean-elements, CDM nested data, and RDM data/atmospheric comments) or refuses
@@ -335,3 +348,30 @@ validator knows it; a lowercased keyword is not substituted for a model path. So
 vector/numeric deserialization errors still have a source location and stable category without
 a canonical field path or a field-specific human message. These remain diagnostic limits,
 not evidence that validation was bypassed.
+
+## Input detection and diagnostics
+
+File extensions do not select the parser. After a leading UTF-8 BOM and ASCII whitespace,
+`<` selects XML; any other nonblank byte selects KVN. Empty input fails. XML family names and
+KVN version keywords are case-sensitive. Supplying a notation selects that parser directly;
+it does not reinterpret the file extension or turn a document in the other notation into valid
+input. Rust `detect_message_header` identifies only the first header/root, whereas
+`detect_message_kind` also scans for concatenated KVN headers. Neither validates the body.
+Full readers validate the complete message and reject concatenated KVN with
+`unsupported.notation`; use a separate file per KVN message.
+
+Empty mandatory values report `validation.missing_required_field`. Invalid epochs may report
+`parse.invalid_epoch` at direct constructors, `parse.kvn.syntax` in KVN combinators,
+`parse.xml.syntax` in XML deserialization, or `validation.invalid_value` when contextual model
+validation finds the error. These codes describe the failing boundary; they do not promise
+identical exception classes for every notation. Human messages and low-level type names are not
+an API contract. Codes, available canonical paths, and source locations are the machine interface.
+Shared structural/envelope errors can lack a location; deserializer detection points identify a
+nearby token rather than necessarily its first byte. Combined constituent deserializer locations
+are translated back into the original document, and their messages identify the zero-based
+constituent index. A leading BOM is excluded from parser offsets after input preparation.
+
+OCM/ACM calendar and relative epoch comparisons recognize equivalent ordinal/calendar
+spellings and decimal spellings within one branch, without converting time systems.
+Physical plausibility and external algorithms remain caller checks; an omitted XSD cross-field
+constraint does not by itself exempt a documented, self-contained book requirement.

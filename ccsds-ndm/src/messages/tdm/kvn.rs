@@ -325,6 +325,25 @@ fn kvn_phase_count_error(data: &TdmObservationData) -> Option<ValidationError> {
         })
 }
 
+fn kvn_phase_count_spelling(value: &str) -> std::borrow::Cow<'_, str> {
+    if value.starts_with('-') && value.bytes().all(|byte| matches!(byte, b'-' | b'0' | b'.')) {
+        return std::borrow::Cow::Borrowed("0");
+    }
+    let sign = usize::from(value.starts_with(['+', '-']));
+    if value.ends_with('.') || value[sign..].starts_with('.') {
+        let mut spelling = value.to_owned();
+        if spelling.ends_with('.') {
+            spelling.push('0');
+        }
+        if spelling[sign..].starts_with('.') {
+            spelling.insert(sign, '0');
+        }
+        std::borrow::Cow::Owned(spelling)
+    } else {
+        std::borrow::Cow::Borrowed(value)
+    }
+}
+
 //----------------------------------------------------------------------
 // TDM Observation Parser
 //----------------------------------------------------------------------
@@ -863,17 +882,17 @@ impl ToKvn for TdmData {
         writer.write_comments(&self.comment);
         for obs in &self.observations {
             if let Some(value) = obs.data.phase_count() {
-                let mut value = value.to_owned();
-                if value.ends_with('.') {
-                    value.push('0');
-                }
-                let sign = usize::from(value.starts_with(['+', '-']));
-                if value[sign..].starts_with('.') {
-                    value.insert(sign, '0');
-                }
-                writer.write_tdm_observation(obs.data.key(), &obs.epoch, &value);
+                writer.write_tdm_observation(
+                    obs.data.key(),
+                    &obs.epoch,
+                    kvn_phase_count_spelling(value),
+                );
             } else if let TdmObservationData::DopplerCount(value) = obs.data {
-                writer.write_tdm_observation(obs.data.key(), &obs.epoch, format!("{value:.0}"));
+                writer.write_tdm_observation(
+                    obs.data.key(),
+                    &obs.epoch,
+                    format!("{:.0}", if value == 0.0 { 0.0 } else { value }),
+                );
             } else {
                 writer.write_tdm_numeric_observation(
                     obs.data.key(),
@@ -964,13 +983,27 @@ impl Tdm {
                 check("COMMENT", comment)?;
             }
             for observation in &segment.data.observations {
+                if let TdmObservationData::DopplerCount(value) = observation.data {
+                    if value < f64::from(i32::MIN) || value > f64::from(i32::MAX) {
+                        return Err(ValidationError::OutOfRange {
+                            name: "DOPPLER_COUNT".into(),
+                            value: value.to_string(),
+                            expected: "an integer from -2147483648 through 2147483647 for KVN"
+                                .into(),
+                            line: None,
+                        }
+                        .into());
+                    }
+                }
                 if let Some(error) = kvn_phase_count_error(&observation.data) {
                     return Err(error.into());
                 }
                 if let Some(value) = observation.data.phase_count() {
                     fits(
                         observation.data.key(),
-                        observation.epoch.to_string().len() + 1 + value.len(),
+                        observation.epoch.to_string().len()
+                            + 1
+                            + kvn_phase_count_spelling(value).len(),
                     )?;
                 }
             }

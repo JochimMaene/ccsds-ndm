@@ -9,7 +9,7 @@ This inventory records maintainer evidence for standalone APM 2.0. The
 - Semantic and KVN authority: CCSDS 504.0-B-2, principally section 3 and the APM
   implementation-conformance statement in annex A.
 - XML authority: NDM/XML schema set 4.0.0 and APM schema 2.0.
-- Profile: strict standalone parsing, self-contained validation, deterministic KVN/XML generation,
+- Profile: validated standalone parsing, self-contained validation, deterministic KVN/XML generation,
   and notation conversion through the shared Rust generation gate.
 
 ## Executable evidence
@@ -18,7 +18,7 @@ The `apm` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN lexical and structural strictness | The APM marked-block scanner rejects non-ASCII or control input other than TAB, malformed assignments, unknown and duplicate keywords, fixed-order violations within logical blocks, misplaced comments, unknown/nested blocks, and mismatched block ends. It accepts repeated attitude block families represented by the standard fixtures. Reading also tolerates `META_START`/`META_STOP` around the metadata, a non-standard producer spelling that ADM table 3-2 does not define; the writer never emits them (`apm::generation::apm_kvn_output_omits_metadata_delimiters_and_keeps_quaternion_rate_units`). |
+| KVN lexical and structural strictness | The APM marked-block scanner rejects non-ASCII values outside comments and control input other than TAB, malformed assignments, unknown and duplicate keywords, fixed-order violations within logical blocks, misplaced comments, unknown/nested blocks, and mismatched block ends. It accepts repeated attitude block families represented by the standard fixtures. Reading also tolerates `META_START`/`META_STOP` around the metadata, a non-standard producer spelling that ADM table 3-2 does not define; the writer never emits them (`apm::generation::apm_kvn_output_omits_metadata_delimiters_and_keeps_quaternion_rate_units`). |
 | XML structure | The shared XML sequence engine is registered for the complete APM root, header, metadata, data, and six attitude logical-block families, including nested quaternion components. It rejects unknown, duplicate, and reordered children and non-schema attributes. |
 | Valid input and preservation | All three shipped KVN fixtures and the shipped XML fixture parse through the public strict API. Generated KVN and XML reparse to the same typed model. |
 | XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
@@ -104,8 +104,8 @@ library follows the XSD in every notation, so a partial set is rejected rather t
 produced that XML cannot represent.
 
 **Rotation sequences.** XML accepts only the twelve uppercase `rotseqType` letters. KVN and Python
-also read lowercase (`zxz`, ADM §6.8.6) and, as a documented legacy alias, the ADM 1.0 numeric
-spellings (`313` for `ZXZ`, annex J), because both convert without loss. Every writer emits the
+also read lowercase (`zxz`, ADM §6.8.6), mixed-case letters (`Zxz`, a lossless producer alias),
+and ADM 1.0 numeric spellings (`313` for `ZXZ`, annex J) as a documented lexical alias. Every writer emits the
 uppercase letters (`apm::parsing::euler_rot_seq_reads_lowercase_and_legacy_digits_in_kvn_only`).
 
 **Logical-block order.** Table 3-3 and the XSD `apmData` sequence list the blocks in a fixed
@@ -144,3 +144,9 @@ data container; this is an explicit book-over-XSD choice. COMMENT placement foll
 6.10.2: comments between EPOCH and a block start, or after a block stop, are rejected.
 Python QuaternionState checks component domains at construction, like Rust Quaternion::new;
 assignments are rechecked by complete-message validation. Mutable records can be temporarily incomplete.
+
+Within a KVN logical block the keywords still follow table order, including Q1/Q2/Q3/QC.
+Relaxing the order of self-delimited blocks does not permit arbitrary keyword reordering.
+Python APM objects have identity equality rather than value-based `__eq__`; compare fields or
+canonical generated output when a value comparison is needed. Quaternion derivative constructor
+arguments are scalars, while the model exposes the complete derivative components together.

@@ -7,7 +7,7 @@
 [![crates.io](https://img.shields.io/crates/v/ccsds-ndm)](https://crates.io/crates/ccsds-ndm)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 
-A high-performance Rust library with Python bindings for parsing, validating, and generating [CCSDS Navigation Data Messages (NDM)](https://public.ccsds.org/Pubs/500x2g3.pdf) in both KVN (Key-Value Notation) and XML formats.
+A high-performance Rust library with Python bindings for parsing, validating, and generating [CCSDS Navigation Data Messages (NDM)](https://public.ccsds.org/Pubs/500x0g4.pdf) in both KVN (Key-Value Notation) and XML formats.
 
 ## Implemented Message Families
 
@@ -82,7 +82,7 @@ use ccsds_ndm::{from_file, Message};
 
 fn main() -> ccsds_ndm::error::Result<()> {
     // Parse any NDM file
-    let msg = from_file("example.ndm")?;
+    let msg = from_file("example.opm")?;
 
     // Match on the message type
     if let Message::Opm(opm) = msg {

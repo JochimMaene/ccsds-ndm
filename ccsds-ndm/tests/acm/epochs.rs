@@ -325,3 +325,61 @@ fn exponent_covariance_tags_expand_exactly_on_both_public_readers() {
     assert_ne!(exponent, xml);
     assert_eq!(Acm::from_xml(&exponent).unwrap(), expected);
 }
+
+#[test]
+fn metadata_bounds_require_real_absolute_dates_or_complete_relative_times() {
+    for field in ["START_TIME", "STOP_TIME"] {
+        for token in [
+            "2023-02-31T00:00:00",
+            "2023-000T00:00:00",
+            "",
+            "+",
+            ".",
+            "-.",
+        ] {
+            let source = mutated(
+                ACM_KVN,
+                "META_STOP",
+                &format!("{field} = {token}\nMETA_STOP"),
+            );
+            if token.is_empty() {
+                // An empty optional KVN assignment means absent; present XML leaves do not.
+                Acm::from_kvn(&source).unwrap();
+            } else {
+                crate::common::assert_validation_field(&Acm::from_kvn(&source).unwrap_err(), field);
+            }
+            let mut message = Acm::from_kvn(ACM_KVN).unwrap();
+            let bound = if field == "START_TIME" {
+                &mut message.body.segment.metadata.start_time
+            } else {
+                &mut message.body.segment.metadata.stop_time
+            };
+            *bound = Some("-1".parse().unwrap());
+            message.validate().unwrap();
+            let xml = message.to_xml().unwrap();
+            let invalid = mutated(
+                &xml,
+                &format!("<{field}>-1</{field}>"),
+                &format!("<{field}>{token}</{field}>"),
+            );
+            crate::common::assert_validation_field(&Acm::from_xml(&invalid).unwrap_err(), field);
+            let bound = if field == "START_TIME" {
+                &mut message.body.segment.metadata.start_time
+            } else {
+                &mut message.body.segment.metadata.stop_time
+            };
+            *bound = Some(token.parse().unwrap());
+            crate::common::assert_rejects(&message, field);
+            for xml in [false, true] {
+                let mut output = Vec::new();
+                assert!(if xml {
+                    message.write_xml_to(&mut output)
+                } else {
+                    message.write_kvn_to(&mut output)
+                }
+                .is_err());
+                assert!(output.is_empty());
+            }
+        }
+    }
+}

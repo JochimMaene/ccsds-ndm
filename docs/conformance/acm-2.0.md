@@ -8,7 +8,10 @@ This inventory records maintainer evidence for standalone ACM 2.0. The
 - Message edition: ACM 2.0.
 - Semantic and KVN authority: CCSDS 504.0-B-2, principally sections 5 and 6.
 - XML authority: NDM/XML schema set 4.0.0 and ACM schema 2.0.
-- Profile: strict standalone parsing, complete logical-block preservation, deterministic
+- The local ADM text extraction omits some table 5-7 maneuver rows, including duration and
+  block delimiters. The source publication and schema, not that incomplete extraction, govern
+  those fields; the model and parsers retain them.
+- Profile: validated standalone parsing, complete logical-block preservation, deterministic
   generation, and bounded notation conversion through the shared Rust generation gate.
 
 ## Executable evidence
@@ -17,7 +20,7 @@ The `acm` and `acm_kvn_allocations` suites establish:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN structure | The family-local scanner rejects non-ASCII/control input, malformed/unknown/duplicate/reordered assignments, misplaced comments, assignments after history data, unknown/nested/mismatched blocks, invalid outer-block order/repetition, invalid SENSOR nesting, and trailing content. ACM lines may have arbitrary length under CCSDS 504.0-B-2 section 6.6.2. |
+| KVN structure | The family-local scanner rejects non-ASCII values outside comments and forbidden controls, malformed/unknown/duplicate/reordered assignments, misplaced comments, assignments after history data, unknown/nested/mismatched blocks, invalid outer-block order/repetition, invalid SENSOR nesting, and trailing content. ACM lines may have arbitrary length under CCSDS 504.0-B-2 section 6.6.2. |
 | XML structure | The shared sequence engine covers root/header/body/segment, metadata, all six data block types, nested sensor data, history records, user-defined parameters, and their legal attributes. Unknown, duplicate, reordered, and illegal-attribute content is rejected. |
 | Schema-model fidelity | ACM 2.0 covariance identifiers and basis identifiers, AD Euler sequence, sensor covariance count, frequency units, CP vector units, and target-momentum vector units are modeled. Non-schema `COV_CONFIDENCE`, `AD_EPOCH`, and AD `ATTITUDE_TYPE` have no public model fields and are rejected on input; split CP/momentum aliases are also rejected. |
 | Fixture preservation | All four shipped KVN fixtures preserve their complete typed model through KVN and XML. Generated XML validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
@@ -63,8 +66,11 @@ none alone establishes conformance or exhaustive mutation coverage.
 **Declared content and intervals.** ADM table 5-3's optional `ACM_DATA_ELEMENTS` must
 name the actual blocks in order, including repeated ATT/COV/MAN entries. Uppercase and lowercase
 block names are accepted; unknown, missing and extra entries fail. Supplied `START_TIME` and
-`STOP_TIME` are compared when they use the same epoch branch; reversed bounds fail. Relative
-`MAN_END_TIME` cannot precede `MAN_BEGIN_TIME` (table 5-7). Calendar/relative bounds are not
+`STOP_TIME` must have real calendar/ordinal dates or complete relative numeric tags. Empty,
+sign-only, and decimal-point-only present XML/model tags are invalid; an empty optional KVN
+assignment means absence under the shared input rule. Zero and negative offsets remain valid. They are compared
+when they use the same epoch branch; reversed bounds fail. Relative
+`MAN_END_TIME` cannot precede `MAN_BEGIN_TIME`, a local consistency check. Calendar/relative bounds are not
 converted or inferred from histories. The declaration, interval and edited-model regressions
 in `acm::generation` and `acm::epochs` cover these boundaries.
 
@@ -167,8 +173,9 @@ canonical numeric form with at most 16 significant digits, as for other numeric 
 
 ## Additional schema and producer decisions
 
-**Attitude-determination method.** The book's method names are externally described in
-ADM annex B5, so `AD_METHOD` remains a preserved string in KVN/model form. XML input/output
+**Attitude-determination method.** ADM annex B5 enumerates allowed `AD_METHOD` values.
+The library deliberately accepts additional producer methods in KVN/model form and preserves
+those strings as a compatibility extension beyond the book; annex B5 is not an external registry. XML input/output
 requires the bundled `adMethodType` enumeration: `EKF`, `TRIAD`, `QUEST`, `BATCH`,
 `Q_METHOD`, `FILTER_SMOOTHER`, `OTHER`, or their explicitly enumerated lowercase forms.
 Mixed case and extensions fail XML representability; they are not rewritten to `OTHER`.
@@ -190,7 +197,8 @@ is `acm::parsing::euler_history_preserves_unwrapped_finite_angles`.
 
 **Producer order and open basis text.** `EULER_ROT_SEQ` may precede `NUMBER_STATES` in ATT
 and AD KVN blocks, matching Orekit output; generation writes table order. Euler sequences accept
-all-uppercase or all-lowercase axis letters in KVN and write uppercase. Euler histories place
+axis letters in any case in KVN/Python and write uppercase. Mixed case is a deliberate lossless
+producer alias; XML still requires the schema's uppercase spelling. Euler histories place
 `EULER_ROT_SEQ` before `RATE_TYPE` in XML, matching `acmAttitudeStateType`.
 `ATT_BASIS` and `COV_BASIS` retain book-suggested free text in KVN/model form; XML requires the
 schema enumeration. AD `COV_TYPE = NONE` normalizes to omission, as does `RATE_TYPE = NONE`.
@@ -207,9 +215,8 @@ mandatory marker and the XML element despite the table's permissive note. Exactl
 XML history numbers use the same finite-number check as KVN: nonzero underflow is refused,
 while representable subnormal doubles are retained (`xml_history_values_refuse_nonzero_underflow_and_keep_subnormals`).
 
-KVN reading tolerates lines longer than the book's 254-character limit where applicable;
-writing enforces that limit, so an accepted overlong record can require shortening before
-regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
+ADM §6.6.2 gives ACM no fixed line-length limit. Both KVN reading and writing therefore
+permit lines longer than 254 characters; other families may impose that output limit. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
 are specified in the [validation contract](../design/validation-contract.md).
 
 Relative ATT/COV history tags accept exponent doubles (5.3.4.3), using the same exact
@@ -224,10 +231,33 @@ The acm_g7 fixture corrects the book's SENSOR_USED_ typo to SENSOR_USED.
 Optional Rust fields used while building mandatory ACM blocks remain Option so incomplete
 editable records can be represented and validated together. Presence is enforced by root
 validation; callers must not interpret Option as a statement that the book makes a field optional.
-Python AcmAttitudeState derives NUMBER_STATES from the first data row; an absent rate_type
-means attitude-only records. AcmCovarianceMatrix permits omitted cov_basis/cov_ref_frame.
+Python AcmAttitudeState derives NUMBER_STATES from the first data row at construction and
+on `att_lines` assignment. Every assigned row must have the same nonzero width; failed row or
+epoch conversion leaves both the rows and count unchanged. An absent rate_type means attitude-only records. AcmCovarianceMatrix permits omitted cov_basis/cov_ref_frame.
 
 Known KVN basis/method aliases canonicalize: for example `FILTER  SMOOTHER` becomes
 `FILTER_SMOOTHER`. Unknown open text remains unchanged. OBJECT_NAME is required by the
 XML schema; OBJECT_DESIGNATOR remains optional. Exponent-relative tags are covered through
 both public readers by `exponent_history_tags_expand_exactly_on_both_public_readers`.
+
+## Additional caller boundaries
+
+Frame dependencies (`CP_REF_FRAME` for `CP`, `TARGET_MOM_FRAME` for `TARGET_MOMENTUM`)
+remain enforced on read and write even though the XSD marks each leaf optional: the book's
+conditional requirements determine how those vectors are interpreted. No frame is guessed.
+`MAN_END_TIME >= MAN_BEGIN_TIME` is an additional local consistency rule rather than a
+separate table 5-7 mandatory marker; the library rejects a negative maneuver interval.
+
+History and scalar validation do not prove DCM orthonormality, positive-semidefinite covariance
+or sensor-noise matrices, positive moments of inertia, or `DRY_MASS <= WET_MASS`. Finite
+`DRAG_COEFF` may be negative. These physical-consistency checks remain with the caller.
+AD `NUMBER_STATES`, when present, must be positive and at least six if `RATE_STATES` is
+supplied. It is not checked against an exact sum of attitude/rate widths as in ATT histories. `RATE_TYPE=NONE` is the
+documented no-rate alias; `RATE_STATES=NONE` is not a recognized keyword.
+
+An empty USER, PHYS, or SENSOR block is accepted where its optional fields permit emptiness.
+Repeated user-parameter names preserve their order; empty values and text such as `[unit]`
+inside a user value are literal user content. Tabs in numeric histories are accepted as blanks.
+Free-text fields retain trailing bracketed text rather than treating it as a unit annotation.
+Absolute history tags compare by date/time value across calendar and ordinal spellings,
+including different fractional precision; no time-scale conversion occurs.

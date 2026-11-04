@@ -699,3 +699,43 @@ fn bad_epoch_retains_omm_source_edition_and_location() {
     assert_eq!(diagnostic.source_edition, Some("3.0"));
     assert!(diagnostic.source_location.is_some());
 }
+
+#[test]
+fn xml_unsigned_integer_fields_accept_signed_zero_without_accepting_negatives() {
+    for field in ["NORAD_CAT_ID", "REV_AT_EPOCH"] {
+        let open = format!("<{field}>");
+        let close = format!("</{field}>");
+        let value = XML
+            .split_once(&open)
+            .unwrap()
+            .1
+            .split_once(&close)
+            .unwrap()
+            .0;
+        for spelling in ["-0", "-000", "+000", " 0 "] {
+            let xml = mutated(
+                XML,
+                &format!("{open}{value}{close}"),
+                &format!("{open}{spelling}{close}"),
+            );
+            crate::common::validate_xml("OMM unsigned integer lexical zero", &xml);
+            let message = Omm::from_xml(&xml).unwrap();
+            let tle = message.body.segment.data.tle_parameters.as_ref().unwrap();
+            assert_eq!(
+                if field == "NORAD_CAT_ID" {
+                    tle.norad_cat_id
+                } else {
+                    tle.rev_at_epoch
+                },
+                Some(0)
+            );
+            Omm::from_xml(&message.to_xml().unwrap()).unwrap();
+        }
+        let negative = mutated(
+            XML,
+            &format!("{open}{value}{close}"),
+            &format!("{open}-1{close}"),
+        );
+        assert!(Omm::from_xml(&negative).is_err());
+    }
+}

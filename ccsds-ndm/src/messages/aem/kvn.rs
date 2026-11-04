@@ -376,6 +376,14 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
                     return fail("expected one AEM metadata assignment");
                 }
                 let key = line.split_once('=').unwrap().0.trim();
+                if key == "RATE_FRAME"
+                    && matches!(
+                        line.split_once('=').unwrap().1.trim(),
+                        "REF_FRAME_A" | "REF_FRAME_B"
+                    )
+                {
+                    return fail("RATE_FRAME legacy placeholders are unsupported; supply the actual frame in ANGVEL_FRAME");
+                }
                 let key = if key == "RATE_FRAME" {
                     "ANGVEL_FRAME"
                 } else {
@@ -385,7 +393,11 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
                     .iter()
                     .position(|candidate| *candidate == key)
                     .ok_or_else(|| {
-                        invalid(number, offset, "unknown AEM metadata keyword".into())
+                        invalid(
+                            number,
+                            offset,
+                            format!("unknown AEM metadata keyword {key}"),
+                        )
                     })?;
                 if previous_key.is_some_and(|previous| rank <= previous) {
                     return fail("duplicate or out-of-order AEM metadata keyword");
@@ -409,7 +421,7 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
                         .position(|candidate| *candidate == key)
                         .map(|rank| rank + 1)
                         .ok_or_else(|| {
-                            invalid(number, offset, "unknown AEM header keyword".into())
+                            invalid(number, offset, format!("unknown AEM header keyword {key}"))
                         })?
                 };
                 if top_rank.is_none() && rank != 0 {

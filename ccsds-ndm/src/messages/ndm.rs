@@ -42,6 +42,9 @@ fn validate_combined_root_attributes(
 
 /// Parse a constituent as a standalone message within the namespace scope of the combined root.
 fn parse_constituent(
+    document: &str,
+    source_offset: usize,
+    constituent: usize,
     element: &str,
     start: &quick_xml::events::BytesStart<'_>,
     root_declarations: &[(Vec<u8>, Vec<u8>)],
@@ -90,7 +93,23 @@ fn parse_constituent(
         &element[..name_end],
         &element[name_end..]
     );
-    crate::from_str_with_notation(&standalone, Some(crate::detect::Notation::Xml))
+    crate::from_str_with_notation(&standalone, Some(crate::detect::Notation::Xml)).map_err(
+        |error| {
+            error.rebase_xml_location(
+                document,
+                |offset| {
+                    let offset = offset.saturating_sub(crate::xml::XML_HEADER.len() + 1);
+                    let offset = if offset <= name_end {
+                        offset
+                    } else {
+                        offset.saturating_sub(inherited.len()).max(name_end)
+                    };
+                    source_offset + offset
+                },
+                constituent,
+            )
+        },
+    )
 }
 
 /// ODM 8.12.7: "the only attributes that shall appear on the constituent message tags ... are
@@ -329,7 +348,7 @@ impl Ndm for CombinedNdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        Self::from_xml_strict(xml)
+        Self::from_xml_strict(crate::detect::without_utf8_bom(xml))
     }
 
     /// Always returns `UnsupportedNotation`; combined NDM has no KVN representation.
@@ -510,7 +529,14 @@ impl CombinedNdm {
                             let end_pos = reader.buffer_position() as usize;
                             let full_element = &xml[actual_start_pos..end_pos];
 
-                            let msg = parse_constituent(full_element, &e, &root_declarations)?;
+                            let msg = parse_constituent(
+                                xml,
+                                actual_start_pos,
+                                messages.len(),
+                                full_element,
+                                &e,
+                                &root_declarations,
+                            )?;
                             validate_combined_constituent_edition(&msg)?;
                             messages.push(msg);
                         }

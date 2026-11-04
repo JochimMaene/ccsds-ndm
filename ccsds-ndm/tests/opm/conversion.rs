@@ -111,3 +111,21 @@ fn empty_user_defined_xml_block_cannot_silently_disappear_in_kvn() {
         assert!(message.to_xml().unwrap().contains("userDefinedParameters"));
     }
 }
+
+#[test]
+fn repeated_user_parameter_names_preserve_both_values_across_notations() {
+    let source = Opm::from_kvn(crate::KVN).unwrap().to_xml().unwrap();
+    let xml = source.replace("</data>", "<userDefinedParameters><USER_DEFINED parameter=\"A\">first</USER_DEFINED><USER_DEFINED parameter=\"A\">second</USER_DEFINED></userDefinedParameters></data>");
+    let message = Opm::from_xml(&xml).unwrap();
+    let kvn = message.to_kvn().unwrap();
+    assert_eq!(
+        kvn.lines()
+            .filter(|line| line.starts_with("USER_DEFINED_A "))
+            .count(),
+        2
+    );
+    assert_eq!(Opm::from_kvn(&kvn).unwrap(), message);
+    let mut output = Vec::new();
+    message.write_kvn_to(&mut output).unwrap();
+    assert_eq!(output, kvn.as_bytes());
+}

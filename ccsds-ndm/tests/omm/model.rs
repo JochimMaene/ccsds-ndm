@@ -97,3 +97,22 @@ fn inherent_validation_and_tle_generation_use_the_root_validation_gate() {
     assert!(message.write_kvn_to(&mut bytes).is_err());
     assert!(bytes.is_empty());
 }
+
+#[test]
+fn edition_forbidden_coefficients_are_reported_before_missing_theory_fields() {
+    use ccsds_ndm::messages::omm::Omm;
+    use ccsds_ndm::{Ndm, Validate};
+    let mut message = Omm::from_kvn(include_str!("../../data/kvn/omm_g7.kvn")).unwrap();
+    message.version = "2.0".into();
+    message.header.classification = None;
+    message.header.message_id = None;
+    let tle = message.body.segment.data.tle_parameters.as_mut().unwrap();
+    tle.bstar = None;
+    tle.bterm = Some(M2kg::new(0.01, None));
+    let error = Validate::validate(&message).unwrap_err();
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment.data.tle_parameters.bterm")
+    );
+    assert!(error.to_string().contains("BTERM"), "{error}");
+}

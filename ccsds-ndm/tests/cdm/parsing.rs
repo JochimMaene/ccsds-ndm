@@ -1225,3 +1225,22 @@ fn unavailable_area_and_mass_keep_fixed_unit_checks_and_locations() {
         }
     }
 }
+
+#[test]
+fn xml_identifier_padding_is_normalized_without_allowing_internal_blanks() {
+    let message = Cdm::from_kvn(crate::KVN).unwrap();
+    let mut xml = message.to_xml().unwrap();
+    for field in [
+        "ORIGINATOR",
+        "MESSAGE_ID",
+        "OBJECT_DESIGNATOR",
+        "CATALOG_NAME",
+        "INTERNATIONAL_DESIGNATOR",
+    ] {
+        xml = xml
+            .replace(&format!("<{field}>"), &format!("<{field}> \t"))
+            .replace(&format!("</{field}>"), &format!("\r\n </{field}>"));
+    }
+    assert_eq!(Cdm::from_xml(&xml).unwrap(), message);
+    assert!(Cdm::from_xml(&xml.replace("<MESSAGE_ID> \t", "<MESSAGE_ID> A B")).is_err());
+}

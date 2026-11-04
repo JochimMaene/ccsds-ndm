@@ -47,7 +47,7 @@ pub struct Tdm {
     #[pyo3(get)]
     id: Option<String>,
 
-    /// Message edition; only "2.0" is accepted.
+    /// Message edition: "2.0", or "1.0" from the restricted KVN input-only reader.
     ///
     /// :type: str
     #[pyo3(get)]
@@ -156,6 +156,8 @@ impl Tdm {
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
     ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Concatenated KVN messages have no combined KVN representation.
     /// ValueError
     ///     Unsupported format argument.
     #[staticmethod]
@@ -191,6 +193,8 @@ impl Tdm {
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
     ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Concatenated KVN messages have no combined KVN representation.
     /// ValueError
     ///     Unsupported format argument.
     /// NdmIoError
@@ -554,6 +558,9 @@ impl TdmSegment {
 /// Represents the Metadata Section of a TDM Segment.
 ///
 /// Contains configuration details applicable to the Data Section in the same TDM Segment.
+/// Omitted optional fields remain None. Book defaults below describe interpretation and
+/// are not automatically stored by this constructor. Complete cross-field validation runs
+/// through the owning Tdm.validate() and every generation method.
 ///
 /// Parameters
 /// ----------
@@ -2261,7 +2268,13 @@ impl TdmData {
 /// keyword : str
 ///     Data type keyword (e.g., "RANGE", "RECEIVE_FREQ").
 /// value : float | str
-///     Measurement value. Pass decimal text for phase counts to retain all digits.
+///     Measurement value in the keyword's fixed CCSDS table 3-5 units; RANGE uses
+///     metadata RANGE_UNITS. No unit conversion is performed. Pass decimal text for
+///     phase counts to retain all digits.
+///
+/// Construction checks the keyword, epoch and lexical number, and RHUMIDITY's percentage
+/// domain. Complete observation domains and metadata dependencies are checked by the
+/// owning Tdm.validate() and generation methods.
 #[gen_stub_pyclass]
 #[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]

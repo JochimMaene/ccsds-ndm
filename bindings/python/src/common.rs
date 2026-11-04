@@ -1903,7 +1903,7 @@ impl GroundImpactParameters {
     fn set_nominal_impact_alt(&mut self, v: Option<f64>) {
         self.inner.nominal_impact_alt = v.map(|value| ccsds_ndm::types::AltitudeRequired {
             value,
-            units: ccsds_ndm::types::LengthUnits::M,
+            units: Some(ccsds_ndm::types::LengthUnits::M),
         });
     }
 

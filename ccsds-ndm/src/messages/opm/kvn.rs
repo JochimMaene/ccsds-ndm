@@ -986,7 +986,7 @@ fn opm_allows_non_increasing_derived(
     current: crate::kvn::strict::Assignment<'_>,
 ) -> bool {
     if current.rank == previous.rank {
-        return current.key != previous.key;
+        return current.key != previous.key || current.key.starts_with("USER_DEFINED_");
     }
     let (Some((current_block, current_offset)), Some((previous_block, _))) = (
         opm_kvn_position(current.key),

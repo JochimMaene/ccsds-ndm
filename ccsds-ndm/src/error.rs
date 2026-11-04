@@ -447,6 +447,12 @@ impl ValidationError {
     }
 
     fn set_line_if_missing(&mut self, line: usize) {
+        if self.line().is_none() {
+            self.set_line(line);
+        }
+    }
+
+    fn set_line(&mut self, line: usize) {
         match self {
             Self::OutOfRange {
                 line: error_line, ..
@@ -469,11 +475,9 @@ impl ValidationError {
             | Self::Generic {
                 line: error_line, ..
             } => {
-                if error_line.is_none() {
-                    *error_line = Some(line);
-                }
+                *error_line = Some(line);
             }
-            Self::AtPath { source, .. } => source.set_line_if_missing(line),
+            Self::AtPath { source, .. } => source.set_line(line),
         }
     }
 
@@ -911,6 +915,43 @@ impl AddContext<&str, StrContext> for CcsdsNdmError {
 }
 
 impl CcsdsNdmError {
+    /// Translate a reconstructed constituent's XML detection point to the caller's document.
+    pub(crate) fn rebase_xml_location(
+        mut self,
+        input: &str,
+        translate: impl FnOnce(usize) -> usize,
+        constituent: usize,
+    ) -> Self {
+        if let Self::Parsing { context, source } = &mut self {
+            if let Some(offset) = context.byte_offset.map(translate) {
+                let (line, column) = line_column(input, offset);
+                context.byte_offset = Some(offset);
+                context.line = Some(line);
+                context.column = Some(column);
+                context.original_token = input
+                    .get(offset.saturating_sub(64)..offset)
+                    .map(str::to_owned);
+                match source.as_mut() {
+                    Self::Validation(error) => error.set_line(line),
+                    Self::Format(error) => {
+                        if let FormatError::XmlWithContext {
+                            context: description,
+                            ..
+                        } = error.as_mut()
+                        {
+                            *description = format!(
+                                "Failed to parse {} constituent {constituent} from XML near line {line}, column {column}",
+                                context.message_kind.as_str().to_ascii_uppercase(),
+                            );
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        self
+    }
+
     pub(crate) fn with_generation_context(
         self,
         message_kind: crate::validation::MessageKind,

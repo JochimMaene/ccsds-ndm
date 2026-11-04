@@ -75,6 +75,17 @@ standalone controls, model validation, XML input, and both output paths.
 
 ## Verification outcome
 
+Constituent deserializer errors retain their family and translate line, column, byte offset,
+and source excerpt back into the original combined XML, including inherited namespace
+declarations inserted for standalone parsing. The human message identifies the zero-based
+constituent index. Structural/envelope errors may still have no source location, as stated in
+the shared diagnostic contract. Python rejects nested combined children before converting
+their contents, so a self-reference cannot recurse through the live `messages` list.
+
+An ODM 2.0 child is a supported standalone edition but unrepresentable in this 4.0.0 envelope;
+that contextual constraint uses `validation.invalid_value` rather than declaring the standalone
+edition unsupported. No automatic upgrade or version relabelling takes place.
+
 Combined NDM meets the common [verification criteria](README.md#verification-criteria)
 on Rust and Python for XML. KVN is an explicitly unsupported notation, not a missing
 conversion implementation. The G22 example defect is resolved by rejecting its invalid

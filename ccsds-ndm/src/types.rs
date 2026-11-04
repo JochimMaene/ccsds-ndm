@@ -353,9 +353,8 @@ fn clock_is_valid(time: &str) -> bool {
         if timezone == "Z" {
             return true;
         }
-        // The schema's union permits offsets, while ODM §7.5.10 and ADM §6.8.9 permit only the
-        // optional `Z` terminator. Keep the XSD spelling parseable as `Epoch`, but classify it as
-        // semantically invalid for strict message fields.
+        // Zero-offset aliases are normalized to Z by Epoch::new; nonzero offsets need a
+        // time-scale conversion outside this library's representation contract.
         return false;
     }
     true
@@ -416,6 +415,15 @@ impl Epoch {
             });
         }
 
+        let normalized;
+        let value =
+            if value.contains('T') && (value.ends_with("+00:00") || value.ends_with("-00:00")) {
+                normalized = format!("{}Z", &value[..value.len() - 6]);
+                normalized.as_str()
+            } else {
+                value
+            };
+
         let classification = if value.is_empty() {
             Some(EpochClassification::Numeric)
         } else {
@@ -436,7 +444,7 @@ impl Epoch {
             Err(EpochError::InvalidFormat(value.to_string()))
         }
     }
-    /// Borrow the retained epoch spelling without normalization.
+    /// Borrow the retained spelling; zero-offset aliases are normalized to `Z`.
     pub fn as_str(&self) -> &str {
         // Bytes are validated to be ASCII/UTF-8 during creation.
         std::str::from_utf8(&self.bytes[..self.len as usize])
@@ -2205,15 +2213,15 @@ define_unit_type!(
     { M => "m" }
 );
 
-/// Altitude with a required length unit annotation; the owning field defines its range.
+/// Altitude with an optional XML length unit annotation; the owning field defines its range.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct AltitudeRequired {
     /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
-    /// Required unit annotation for this quantity.
-    #[serde(rename = "@units")]
-    pub units: LengthUnits,
+    /// Optional fixed metre annotation, matching XSD `altType`.
+    #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
+    pub units: Option<LengthUnits>,
 }
 impl AltitudeRequired {
     /// The common 4.0 XSD's `altRange`, which is Earth-derived.
@@ -2228,7 +2236,7 @@ impl AltitudeRequired {
         require_finite("Altitude", value)?;
         Ok(Self {
             value,
-            units: LengthUnits::M,
+            units: Some(LengthUnits::M),
         })
     }
 
@@ -2240,14 +2248,14 @@ impl AltitudeRequired {
     pub fn to_unit_value(&self) -> UnitValue<f64, LengthUnits> {
         UnitValue {
             value: self.value,
-            units: Some(self.units.clone()),
+            units: self.units.clone(),
         }
     }
 }
 impl FromKvnFloat for AltitudeRequired {
     fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
         let mut parsed = Self::new(value)?;
-        parsed.units = kvn_unit_or_default(unit, LengthUnits::M)?;
+        parsed.units = Some(kvn_unit_or_default(unit, LengthUnits::M)?);
         Ok(parsed)
     }
 }
@@ -5344,7 +5352,7 @@ impl std::str::FromStr for TdmReferenceFrame {
             "ICRF" => Ok(Self::Icrf),
             "ITRF2000" | "ITRF-2000" => Ok(Self::Itrf2000),
             "ITRF-93" | "ITRF1993" | "ITRF93" => Ok(Self::Itrf93),
-            "ITRF-97" => Ok(Self::Itrf97),
+            "ITRF-97" | "ITRF1997" | "ITRF97" => Ok(Self::Itrf97),
             "TOD" | "TOD_EARTH" => Ok(Self::Tod),
             // The TDM 2.0 XSD spells these `ITRF-93` and `TOD`, while the book's table spells the
             // same frames `ITRF1993` and `TOD_EARTH`. Both authorities are accepted, so both

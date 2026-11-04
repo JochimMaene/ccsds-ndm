@@ -1124,3 +1124,48 @@ fn rdm_empty_mandatory_xml_strings_are_reported_as_empty() {
         );
     }
 }
+
+#[test]
+fn nominal_impact_altitude_units_are_optional_in_xml_but_displayed_in_kvn() {
+    let original = crate::generation::ground_impact_with_altitude(1.0);
+    let mut xml = original.to_xml().unwrap();
+    let start = xml.find("<NOMINAL_IMPACT_ALT units=\"m\"").unwrap();
+    xml.replace_range(
+        start..start + "<NOMINAL_IMPACT_ALT units=\"m\"".len(),
+        "<NOMINAL_IMPACT_ALT",
+    );
+    crate::common::validate_xml("RDM unitless impact altitude", &xml);
+    let message = Rdm::from_xml(&xml).unwrap();
+    let altitude = message
+        .body
+        .segment
+        .data
+        .ground_impact_parameters
+        .as_ref()
+        .unwrap()
+        .nominal_impact_alt
+        .as_ref()
+        .unwrap();
+    assert!(altitude.units.is_none());
+    assert_eq!(Rdm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    let kvn = message.to_kvn().unwrap();
+    let line = kvn
+        .lines()
+        .find(|line| line.starts_with("NOMINAL_IMPACT_ALT"))
+        .unwrap();
+    assert!(line.ends_with("[m]"), "{line}");
+    let with_units = Rdm::from_kvn(&kvn).unwrap();
+    assert!(with_units
+        .body
+        .segment
+        .data
+        .ground_impact_parameters
+        .as_ref()
+        .unwrap()
+        .nominal_impact_alt
+        .as_ref()
+        .unwrap()
+        .units
+        .is_some());
+    assert_eq!(with_units.to_kvn().unwrap(), kvn);
+}

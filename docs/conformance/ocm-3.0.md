@@ -10,7 +10,7 @@ This inventory records maintainer evidence for standalone OCM 3.0. The
   6 and 7 and the OCM implementation-conformance statement in annex A.
 - XML authority: NDM/XML schema set 4.0.0 and OCM schema 3.0. This schema predates the technical corrigendum; the explicit
   conversion refusals below apply.
-- Profile: strict standalone parsing, self-contained validation, deterministic KVN/XML generation,
+- Profile: validated standalone parsing, self-contained validation, deterministic KVN/XML generation,
   and notation conversion through the shared Rust generation gate.
 
 ## Executable evidence
@@ -19,7 +19,7 @@ The `ocm` and `ocm_kvn_allocations` suites establish:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN lexical and marked-block structure | The OCM scanner rejects non-ASCII/control input, malformed or unknown assignments, duplicate and reordered keywords, unknown/nested/mismatched blocks, invalid logical-block order, and comments outside the beginning of a block. OCM permits arbitrary line lengths under ODM §7.3.3; reading and generation preserve this family exception. |
+| KVN lexical and marked-block structure | The OCM scanner rejects non-ASCII values outside comments and forbidden controls, malformed or unknown assignments, duplicate and reordered keywords, unknown/nested/mismatched blocks, invalid logical-block order, and comments outside the beginning of a block. OCM permits arbitrary line lengths under ODM §7.3.3; reading and generation preserve this family exception. |
 | XML structure | The shared XML sequence engine is registered for the complete OCM root, header, metadata, data, trajectory, physical, covariance, maneuver, perturbation, orbit-determination, and user-defined structures. It rejects unknown, duplicate, reordered, and non-schema nested content and attributes. |
 | Silent-loss corrections | Complex `pert`, `od`, and `user` elements no longer use the scalar nullable adapter, so they survive XML parsing. KVN retains optional GM units. `DC_REF_DIR` and `DC_BODY_TRIGGER` use the schema's single three-number lexical value rather than generating nested Rust field elements. |
 | Fixture and history preservation | The five current KVN fixtures and the shipped XML fixture retain their typed model under source-notation regeneration. KVN/XML crossings retain trajectory, physical, covariance, maneuver, perturbation, OD, and user blocks represented by the corpus. G19 is adapted for current covariance linkage and cannot cross to the older XML schema. Every generated XML document validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
@@ -152,14 +152,12 @@ equal and reversed calendar bounds through parsing, mutation, and generation.
 
 ### Trajectory usable bounds
 
-The trajectory `USEABLE_START_TIME` and `USEABLE_STOP_TIME` fields currently accept calendar
-or ordinal epochs only, even when trajectory rows use relative tags. The common `EPOCH_TZERO`
-anchors relative rows; the library does not convert those tags into the bounds' representation
-or prove that the usable interval covers the records. This is an explicit supported-profile
-restriction: ODM §6.2.2.3 broadly permits relative time tags and the XML fields use `epochType`,
-but table 6-4 specifically refers these bounds to §7.5.10's calendar syntax. Supporting relative
-usable bounds would require changing the public field types; the present release keeps the
-calendar interpretation and rejects relative bounds rather than guessing a conversion.
+The trajectory `USEABLE_START_TIME` and `USEABLE_STOP_TIME` fields accept relative numeric
+seconds or real calendar/ordinal epochs, as allowed by ODM §6.2.2.3 and XSD `epochType`.
+The model retains those spellings without converting between forms. Their syntax is checked,
+but the library does not prove that the bounds cover the history rows or reject reversed
+trajectory usable bounds; callers must establish the intended usable interval. Regression:
+`epochs::trajectory_useable_times_accept_relative_tags`.
 
 ## Numerical record contracts
 
@@ -350,11 +348,11 @@ covariance XML with xmllint and verifies parsing and XML generation; KVN generat
 
 Omitted CENTER_NAME and TRAJ_REF_FRAME use the KVN defaults EARTH and ICRF3;
 COV_REF_FRAME defaults to TNW_INERTIAL, COV_ORDERING is LTM,
-and DC_TYPE is CONTINUOUS. Omitted ORB_REVNUM_BASIS and SCLK parameters stay absent in
+MAN_REF_FRAME defaults to TNW_INERTIAL, and DC_TYPE is CONTINUOUS. Omitted ORB_REVNUM_BASIS and SCLK parameters stay absent in
 the model/output, like INTERPOLATION_DEGREE; interpretation uses 0, 0.0 and 1.0.
 Fractional ORB_REVNUM values are accepted following its XSD double and the basis row's
-fractional-count wording, despite the main row saying integer. MAN_ID is mandatory per
-XSD despite the book's O status. Known OBJECT_TYPE values, including payload, are written
+fractional-count wording, despite the main row saying integer. MAN_ID is mandatory in both
+the source PDF table 6-7 and the XSD; the extracted book table's optional marker is a transcription error. Known OBJECT_TYPE values, including payload, are written
 canonically (PAYLOAD); open SANA tokens remain unchanged. DEPLOY devices require deployment
 columns. DC_REF_DIR is three space-separated numbers (7.6.1); commas are not separators.
 USER_DEFINED COMPOSITION_ names are reserved by TC1 for sequence descriptions.
@@ -368,3 +366,24 @@ validation as XML parsing: several covariance blocks can round-trip without TC1 
 General `validate()` and KVN input/output retain TC1 linkage checks. Supplied TC1 values
 unrepresentable in XML are still refused rather than lost. Regression:
 `schema_valid_xml_covariances_do_not_require_tc1_linkage`.
+
+## Empty blocks and additional local boundaries
+
+Completely empty, comment-free TRAJ and COV KVN blocks normalize to absence; they contain
+no represented history or metadata to preserve. A populated or comment-only history block
+without a data row is rejected. XML `<traj/>` cannot supply the schema's required fields.
+This is a KVN producer-compatibility rule, not permission to discard populated optional blocks.
+
+All three `TRAJ_UNITS`, `COV_UNITS`, and `MAN_UNITS` lists compare known unit spellings
+case-insensitively and retain the supplied list. The mandatory/conditional defaults in table 6-4
+and the physical-description tables, including ORB_REVNUM_BASIS, INTERPOLATION_DEGREE, and
+OEB_PARENT_FRAME, may remain omitted under ODM §6.2.1.3; omission does not require output
+materialization of the default. Other TC1 contact keywords follow their declared metadata
+positions; OWNER_URL and covariance TRAJ_ID have the separately documented permissive positions.
+
+Inside a TC1 user-defined sequence, `COMMENT` is sequence data, not a message comment; sequence
+rows are opaque ICD text. Duty-cycle window/execution bounds and `DC_MIN_CYCLES` versus
+`DC_MAX_CYCLES` are not ordered against one another. Consumers must check those operational
+relationships, as well as trajectory usable bounds and record coverage. Native unsigned count
+fields can retain values such as OBS_USED=3000000000 in XML/model form, while KVN integer
+output refuses values above its signed 32-bit maximum.

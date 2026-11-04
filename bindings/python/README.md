@@ -55,8 +55,9 @@ if isinstance(msg, ccsds_ndm.Opm):
     msg.to_file("output.opm", "kvn")
     msg.to_file("output.xml", "xml")
 
-# Input notation is detected; only choose the output notation.
-xml = ccsds_ndm.convert(msg.to_str("kvn"), "xml")
+    # Input notation is detected; only choose the output notation.
+    xml = ccsds_ndm.convert(msg.to_str("kvn"), "xml")
+
 ccsds_ndm.convert_file("input.opm", "output.xml", "xml")
 ```
 

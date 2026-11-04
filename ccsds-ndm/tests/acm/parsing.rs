@@ -603,3 +603,44 @@ fn known_basis_and_method_blank_aliases_canonicalize() {
     );
     message.to_xml().unwrap();
 }
+
+#[test]
+fn unit_errors_name_the_field_on_its_original_record() {
+    for (source, from, to, field) in [
+        (
+            include_str!("../../data/kvn/acm_g8.kvn"),
+            "CP = 0.04 -0.78 -0.023 [m]",
+            "CP = 0.04 -0.78 -0.023 [lb]",
+            "CP",
+        ),
+        (
+            ATT_KVN,
+            "TARGET_MOMENTUM = 1.30 -16.400 -11.350",
+            "TARGET_MOMENTUM = 1.30 -16.400 -11.350 [lb]",
+            "TARGET_MOMENTUM",
+        ),
+        (
+            ATT_KVN,
+            "MAN_DURATION = 450.0",
+            "MAN_DURATION = 450.0 [lb]",
+            "MAN_DURATION",
+        ),
+        (
+            ATT_KVN,
+            "SENSOR_USED = DSS",
+            "SENSOR_USED = DSS\nNUMBER_SENSOR_NOISE_COVARIANCE = 1\nSENSOR_NOISE_STDDEV = 1 [lb]",
+            "SENSOR_NOISE_STDDEV",
+        ),
+    ] {
+        let invalid = mutated(source, from, to);
+        let expected_line = invalid
+            .lines()
+            .position(|line| line.starts_with(&format!("{field} =")))
+            .unwrap()
+            + 1;
+        let error = Acm::from_kvn(&invalid).unwrap_err();
+        let kvn = crate::common::kvn_parse_error(&error).unwrap();
+        assert_eq!(kvn.line, expected_line, "{error}");
+        assert!(kvn.message.contains(field), "{error}");
+    }
+}

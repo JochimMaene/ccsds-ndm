@@ -84,7 +84,7 @@ pub(crate) fn validate_odm_assignments(kvn: &str, rules: &OdmAssignmentRules) ->
                 {
                     "USER_DEFINED keywords and suffixes must be uppercase".into()
                 } else {
-                    format!("unknown {} keyword", rules.message_name)
+                    format!("unknown {} keyword {key}", rules.message_name)
                 },
             )
         })?;
@@ -117,7 +117,10 @@ pub(crate) fn validate_odm_assignments(kvn: &str, rules: &OdmAssignmentRules) ->
                     rules,
                     line_number,
                     line_offset,
-                    format!("duplicate or out-of-order {} keyword", rules.message_name),
+                    format!(
+                        "duplicate or out-of-order {} keyword {key}",
+                        rules.message_name
+                    ),
                 ));
             }
         }

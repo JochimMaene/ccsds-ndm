@@ -19,11 +19,17 @@ This library contains models, parsers, and serializers for the following message
 *   **AEM (Attitude Ephemeris Message)**: Attitude state (quaternions/Euler angles) time series.
 *   **APM (Attitude Parameter Message)**: Single attitude state and parameters.
 *   **ACM (Attitude Comprehensive Message)**: Detailed attitude data.
+*   **Combined NDM**: Ordered XML envelope containing standalone navigation messages.
 
 Inclusion in this list describes implementation coverage, not verified support for every edition,
 notation, operation, or public surface. Exact conformance claims are made only through the project's
 `support matrix <https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/support-matrix.md>`_
 (canonical; not duplicated here).
+
+The `validation contract <https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/design/validation-contract.md>`_,
+`family conformance records <https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/conformance/README.md>`_, and
+`Python object model <https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/design/python-object-model.md>`_
+describe interpretation choices, conversion refusals, and live/snapshot editing behavior.
 
 .. toctree::
    :maxdepth: 2

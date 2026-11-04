@@ -15,7 +15,8 @@
 //! - **Broad Message Coverage**: Typed models, parsers, and serializers for OPM, OMM, OEM, OCM,
 //!   CDM, TDM, RDM, AEM, APM, ACM, and combined NDM messages. Model availability does not by itself establish
 //!   conformance for every edition, notation, or operation.
-//! - **Format Agnostic**: Seamlessly convert between KVN and XML formats.
+//! - **Notation Conversion**: Convert between KVN and XML where the target can preserve the model;
+//!   unrepresentable content is refused explicitly.
 //! - **Type Safety**: Typed quantities retain supported unit annotations (e.g., `km`, `deg`, `s`); validators check field-specific units.
 //! - **High Performance Parsing**: Utilizes `winnow` and `quick-xml` for efficient, low-allocation parsing.
 //! - **Ergonomic Construction**: Uses the builder pattern (via the [`bon`](https://docs.rs/bon) crate) for safe and easy message creation.

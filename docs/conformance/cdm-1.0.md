@@ -18,7 +18,7 @@ The `cdm` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN lexical and logical structure | The family-local scanner rejects non-ASCII/control input, malformed assignments, unknown and duplicate keywords, fixed-order violations, nonstandard marked blocks, misplaced comments, extra segments, and trailing content. It models the header, relative data, two metadata sections, and each flattened OD, additional-parameter, state-vector, and covariance block in CDM order. |
+| KVN lexical and logical structure | The family-local scanner rejects non-ASCII values outside COMMENT payloads and forbidden control input, malformed assignments, unknown and duplicate keywords, fixed-order violations, nonstandard marked blocks, misplaced comments, extra segments, and trailing content. It models the header, relative data, two metadata sections, and each flattened OD, additional-parameter, state-vector, and covariance block in CDM order. |
 | XML structure | The shared XML sequence engine is registered for the complete CDM root, header, body, relative-state vector, two segments, metadata, data, OD, additional-parameter, state-vector, and covariance hierarchy. It rejects unknown, duplicate, reordered, and non-schema children and attributes, subject to the explicit missing-value producer compatibility below. |
 | Delimiter-free COMMENT decision | A leading KVN comment run before the first data keyword is normatively retained on the outer data block; no textual delimiter exists from which to infer a split. XML nested comments are merged canonically into that leading run when needed; see KVN comment merge below. Empty optional blocks do not obstruct conversion. |
 | Typed preservation and generation | All three shipped KVN fixtures retain their complete typed model through deterministic KVN and XML generation. The shipped XML fixture retains its model through XML generation. Every generated XML document validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
@@ -95,9 +95,10 @@ artifact checks are indexed once in the [common evidence table](README.md#shared
 
 Operational CDM XML sometimes encodes unavailable optional scalar values as empty elements
 or with the non-XSD attribute `nil="true"` (also `nil="1"`). For known optional numeric,
-epoch, enumeration, and text leaves, an empty element or one containing only literal XML whitespace
-(space, tab, CR, LF) means absent, with or without the nil marker. Entity references and CDATA
-are treated as content. This applies equally to unqualified and namespace-qualified CCSDS elements;
+epoch, enumeration, and text leaves, an empty element or one whose decoded text contains only XML
+whitespace (space, tab, CR, LF) means absent, with or without the nil marker. Empty/whitespace
+CDATA and whitespace character references follow the same rule; XML comments and processing
+instructions do not supply a scalar value. This applies equally to unqualified and namespace-qualified CCSDS elements;
 foreign, unbound, and mixed namespaces are rejected before a missing leaf can be removed.
 This is a deliberate producer-compatibility exception to the XSD, not a claim that those
 original documents validate against it. Generated
@@ -105,14 +106,18 @@ XML omits absent leaves and uses the normal schema form.
 
 Only the unqualified `nil` producer attribute is accepted; `nil="false"`, nil on required
 values, nil with content, unknown attributes, and unknown/nested elements remain errors.
-Units attached to an unavailable value carry no measurement and are discarded with that leaf.
-Normalization preserves byte positions for subsequent diagnostics. Empty, comment-free optional
-OD and additional-parameter blocks normalize to absent. Comment-only blocks retain their text
+Supplied units are checked against the field's fixed unit before an unavailable leaf is removed;
+empty, nil, and N/A payloads cannot hide incompatible units. Normalization preserves byte positions
+for subsequent diagnostics. Empty, comment-free optional OD and additional-parameter blocks
+normalize to absent. An optional container containing only decoded `N/A` is likewise unavailable;
+this compatibility does not admit `nil` attributes on containers. Comment-only blocks retain their text
 through the canonical KVN comment merge below.
 
 A relative-state vector is absent or contains all six position and velocity components.
-Supplying velocity components without position components is rejected in KVN, just as an
-incomplete XML `relativeStateVector` is rejected. Missing required metadata and state/covariance
+Although the book table independently marks the components optional, the XSD's optional
+`relativeStateVector` group requires all six once present. The model uses that complete group in
+both notations: any incomplete subset, including velocity-only content or an empty XML vector,
+is rejected rather than filling missing components. Missing required metadata and state/covariance
 values are errors; the reader does not fabricate values from defaults.
 
 All four book line endings (LF, CR, CRLF and LFCR) are accepted with identical models and
@@ -139,7 +144,9 @@ value domains compatible with XML.
 KVN cannot distinguish outer data comments from comments before its first nested data
 keyword. Generation combines those runs in XML order. Comments from an optional block
 without values move to the next present block; leading runs become outer data comments.
-Later comments keep their association with the following block. Empty optional blocks
+If no OD or additional-parameter values precede the state vector, that vector's leading
+comments join the outer data run too. Later comments keep their association with the following
+block. Empty optional blocks
 normalize to absent. This preserves comment text and order, and repeating conversion is
 stable; XML-to-XML retains its original associations. Space-Track layouts with nil leaves
 and nested OD comments are covered by `xml_nested_comments_merge_canonically_into_kvn`.
@@ -173,15 +180,31 @@ entries are kilometres and km/s, while relative miss geometry is in metres. No u
 or implicit averaging of asymmetric entries occurs.
 
 Case rules are field-specific: KVN MANEUVERABLE accepts YES/NO/N/A and their all-lowercase
-spellings, but not Yes/No. KVN OBJECT_TYPE accepts its all-uppercase and all-lowercase
+spellings, but not Yes/No. KVN SOLAR_RAD_PRESSURE, EARTH_TIDES, and INTRACK_THRUST use the
+shared case-insensitive YES/NO lookup. KVN OBJECT_TYPE accepts its all-uppercase and all-lowercase
 spellings, not mixed case; XML uses its schema-listed spellings. Writers emit each field's
 canonical token.
 
-XML ORIGINATOR padding is trimmed on input; embedded blanks such as `ESA SST` remain part
-of the value. Edited models with padded ORIGINATOR are refused with that field named.
+XML whitespace around ORIGINATOR, MESSAGE_ID, OBJECT_DESIGNATOR, CATALOG_NAME, and
+INTERNATIONAL_DESIGNATOR is trimmed on input. Embedded blanks such as `ESA SST` remain part
+of ORIGINATOR; the other four identifiers still reject embedded blanks. Edited models with
+padded identifiers are refused with that field named.
 CDM 1.4.3.1's N/A convention applies only to CDM XML; other message families retain literal
 XML text. The CDM reader checks fixed unit values before omitting N/A leaves. Wrong units report
 `parse.xml.syntax` with a source location, including when XML comments or N/A normalization
 are present. The XML writer
 refuses standard scalar N/A values that would be lost on read-back, preserving comments and
 MANEUVERABLE=N/A. NumPy symmetry is exact, without implicit averaging or a tolerance.
+
+## KVN units and producer compatibility
+
+CDM §6.2.4.1 requires applicable units to be displayed. KVN generation always writes each
+unit-bearing field's fixed unit, including MISS_DISTANCE, relative geometry, screening sizes,
+OD spans and percentages, areas, mass, state, and covariance fields. Omitted unit annotations
+on KVN input are accepted as an unambiguous producer extension; the unit is defined by the
+keyword and no conversion occurs. The same applies to XSD-optional XML annotations, but
+XML fields whose schema requires units still require them. Rewriting such a model to KVN
+therefore populates fixed-unit annotations. Dimensionless fields remain unitless.
+`generation::kvn_generation_supplies_fixed_units_missing_from_the_model` covers both output
+paths, reparsing, and generated XML schema validity. `optional_values` also checks empty/nil
+unit validation and decoded empty scalar normalization.

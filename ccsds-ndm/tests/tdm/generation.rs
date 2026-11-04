@@ -457,10 +457,9 @@ fn kvn_output_refuses_integers_and_lines_beyond_the_kvn_limits() {
 }
 
 #[test]
-fn doppler_counts_are_plain_integer_digits_even_for_large_values() {
-    let source = include_str!("../../data/kvn/tdm_e1.kvn");
-    for value in [5.0, 1.234567890123457e20] {
-        let mut message = Tdm::from_kvn(source).unwrap();
+fn doppler_count_kvn_checks_integer_bounds_and_canonicalizes_zero() {
+    for value in [f64::from(i32::MIN), -0.0, 5.0, f64::from(i32::MAX)] {
+        let mut message = Tdm::from_kvn(KVN).unwrap();
         message.body.segments[0].data.observations[0].data =
             TdmObservationData::DopplerCount(value);
         let kvn = message.to_kvn().unwrap();
@@ -469,9 +468,53 @@ fn doppler_counts_are_plain_integer_digits_even_for_large_values() {
             .find(|line| line.starts_with("DOPPLER_COUNT "))
             .unwrap();
         let token = line.split_whitespace().last().unwrap();
-        assert!(token.bytes().all(|byte| byte.is_ascii_digit()), "{token}");
-        assert_eq!(token.parse::<f64>().unwrap(), value);
+        assert_eq!(token.parse::<i32>().unwrap(), value as i32);
+        if value == 0.0 {
+            assert_eq!(token, "0");
+        }
         Tdm::from_kvn(&kvn).unwrap();
+    }
+    for value in [
+        f64::from(i32::MIN) - 1.0,
+        f64::from(i32::MAX) + 1.0,
+        1e20,
+        1e200,
+    ] {
+        let mut message = Tdm::from_kvn(KVN).unwrap();
+        message.body.segments[0].data.observations[0].data =
+            TdmObservationData::DopplerCount(value);
+        message.validate().unwrap();
+        Tdm::from_xml(&message.to_xml().unwrap()).unwrap();
+        let error = message.to_kvn().unwrap_err();
+        assert!(error.to_string().contains("DOPPLER_COUNT"), "{error}");
+        let mut output = Vec::new();
+        assert!(message.write_kvn_to(&mut output).is_err());
+        assert!(output.is_empty());
+    }
+}
+
+#[test]
+fn phase_counts_keep_arbitrary_precision_but_write_unsigned_zero() {
+    for value in ["9".repeat(200), "-0".into(), "-000.000".into()] {
+        let mut message = Tdm::from_kvn(KVN).unwrap();
+        message.body.segments[0].data.observations[0].data =
+            TdmObservationData::ReceivePhaseCt1(value.clone());
+        let xml = message.to_xml().unwrap();
+        assert!(xml.contains(&value));
+        let kvn = message.to_kvn().unwrap();
+        let token = kvn
+            .lines()
+            .find(|line| line.starts_with("RECEIVE_PHASE_CT_1 "))
+            .unwrap()
+            .split_whitespace()
+            .last()
+            .unwrap();
+        assert_eq!(token, if value.starts_with('-') { "0" } else { &value });
+        let reparsed = Tdm::from_kvn(&kvn).unwrap();
+        let mut output = Vec::new();
+        message.write_kvn_to(&mut output).unwrap();
+        assert_eq!(output, kvn.as_bytes());
+        assert_eq!(reparsed.to_kvn().unwrap(), kvn);
     }
 }
 
@@ -488,5 +531,46 @@ fn phase_counts_fill_missing_digits_on_either_side_of_the_decimal_point() {
             .unwrap();
         assert_eq!(line.split_whitespace().last().unwrap(), expected);
         Tdm::from_kvn(&kvn).unwrap();
+    }
+}
+
+#[test]
+fn phase_count_line_limits_measure_the_emitted_spelling() {
+    let base = Tdm::from_kvn(KVN).unwrap();
+    let epoch_length = base.body.segments[0].data.observations[0]
+        .epoch
+        .to_string()
+        .len();
+    let budget = 254 - (20 + 3 + epoch_length + 1);
+    for (value, expected_length) in [
+        (format!("-{}", "0".repeat(300)), Some(1)),
+        (format!(".{}", "1".repeat(budget - 2)), Some(budget)),
+        (format!("{}.", "1".repeat(budget - 2)), Some(budget)),
+        (format!(".{}", "1".repeat(budget - 1)), None),
+        (format!("{}.", "1".repeat(budget - 1)), None),
+    ] {
+        let mut message = base.clone();
+        message.body.segments[0].data.observations[0].data =
+            TdmObservationData::ReceivePhaseCt1(value);
+        if let Some(length) = expected_length {
+            let kvn = message.to_kvn().unwrap();
+            let line = kvn
+                .lines()
+                .find(|line| line.starts_with("RECEIVE_PHASE_CT_1 "))
+                .unwrap();
+            assert_eq!(line.split_whitespace().last().unwrap().len(), length);
+            assert_eq!(line.len(), 20 + 3 + epoch_length + 1 + length);
+            Tdm::from_kvn(&kvn).unwrap();
+            let mut output = Vec::new();
+            message.write_kvn_to(&mut output).unwrap();
+            assert_eq!(output, kvn.as_bytes());
+        } else {
+            let error = message.to_kvn().unwrap_err();
+            crate::common::assert_validation_field(&error, "RECEIVE_PHASE_CT_1");
+            assert!(error.to_string().contains("254"), "{error}");
+            let mut output = Vec::new();
+            assert!(message.write_kvn_to(&mut output).is_err());
+            assert!(output.is_empty());
+        }
     }
 }

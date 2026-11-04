@@ -27,12 +27,13 @@ pub(crate) mod strict;
 
 /// Shared front end of every family's KVN reader.
 ///
-/// Expects the caller to have stripped one UTF-8 byte-order mark. Normalizes terminators and TABs, rejects non-printable or
-/// non-ASCII content by line, byte column, and code point, and checks the `CCSDS_xxx_VERS`
+/// Expects the caller to have stripped one UTF-8 byte-order mark. Normalizes terminators and
+/// TABs, accepts printable Unicode comment payloads, and rejects other non-printable/non-ASCII
+/// content by line, byte column, and code point. Checks the `CCSDS_xxx_VERS`
 /// edition before any structural parse, so an unsupported edition reports
 /// `parse.unsupported_input_version` rather than a keyword that edition lacks. Line length is not
 /// checked on read: producers commonly exceed the 254-character limit losslessly, and writers
-/// still enforce it.
+/// still enforce each family's applicable limit.
 pub(crate) fn prepare_input(
     input: &str,
     kind: crate::validation::MessageKind,
@@ -40,20 +41,35 @@ pub(crate) fn prepare_input(
     let mut invalid_offset = input
         .bytes()
         .position(|byte| !matches!(byte, b' '..=b'~' | b'\n'));
-    // Plain LF input needs one ASCII scan; normalize and rescan only after CR or TAB.
-    let mut normalized =
-        if invalid_offset.is_some_and(|offset| matches!(input.as_bytes()[offset], b'\r' | b'\t')) {
-            let normalized = normalize_line_endings(input);
-            invalid_offset = normalized
-                .bytes()
-                .position(|byte| !matches!(byte, b' '..=b'~' | b'\n' | b'\r'));
-            normalized
-        } else {
-            std::borrow::Cow::Borrowed(input)
-        };
+    // Plain ASCII LF input needs one scan; only producer extensions need slower checks.
+    let mut normalized = if invalid_offset.is_some() {
+        let normalized = normalize_line_endings(input);
+        invalid_offset = normalized
+            .bytes()
+            .position(|byte| !matches!(byte, b' '..=b'~' | b'\n' | b'\r'));
+        normalized
+    } else {
+        std::borrow::Cow::Borrowed(input)
+    };
+    if invalid_offset.is_some_and(|offset| normalized.as_bytes()[offset] >= 0x80) {
+        let mut line_offset = 0;
+        invalid_offset = normalized.split_inclusive('\n').find_map(|line| {
+            let comment = line
+                .trim_start_matches(' ')
+                .strip_prefix("COMMENT")
+                .is_some_and(|tail| tail.is_empty() || tail.starts_with([' ', '\r', '\n']));
+            let invalid = line.char_indices().find_map(|(index, character)| {
+                let printable = matches!(character, ' '..='~' | '\r' | '\n');
+                let unicode_comment = comment && !character.is_ascii() && !character.is_control();
+                (!printable && !unicode_comment).then_some(line_offset + index)
+            });
+            line_offset += line.len();
+            invalid
+        });
+    }
     if let Some(offset) = invalid_offset {
         let character = normalized[offset..].chars().next().unwrap_or_default();
-        // Every earlier byte on the line is ASCII, so the character column is the byte column.
+        // Source columns are byte columns, including after a Unicode comment payload.
         let (line, column) = crate::error::line_column(&normalized, offset);
         return Err(crate::error::CcsdsNdmError::Format(Box::new(
             crate::error::FormatError::Kvn(Box::new(crate::error::KvnParseError {
@@ -108,7 +124,10 @@ pub(crate) fn prepare_input(
         record_offset += line.len();
     }
     // N/A denotes an unavailable standard field; user-defined payload is opaque.
-    if !normalized.contains("/A") && !normalized.contains("/a") {
+    if !normalized.contains("/A")
+        && !normalized.contains("/a")
+        && !normalized.contains("USER_DEFINED_")
+    {
         return Ok(normalized);
     }
     let mut offset = 0;
@@ -127,6 +146,19 @@ pub(crate) fn prepare_input(
         }
         if let Some((key, value)) = line.split_once('=') {
             let key = key.trim();
+            if key == "USER_DEFINED_" {
+                let (line, column) = crate::error::line_column(input, offset);
+                return Err(crate::error::FormatError::Kvn(Box::new(
+                    crate::error::KvnParseError {
+                        line,
+                        column,
+                        offset,
+                        contexts: Vec::new(),
+                        message: "USER_DEFINED_ requires a nonempty parameter name".into(),
+                    },
+                ))
+                .into());
+            }
             if !key.starts_with("USER_DEFINED_")
                 && key != "MANEUVERABLE"
                 && value.trim().eq_ignore_ascii_case("N/A")
@@ -227,7 +259,7 @@ mod tests {
             let normalized = prepare_input(&input, MessageKind::Tdm).unwrap();
             assert_eq!(normalized.len(), input.len());
             assert!(!normalized.contains('\t'));
-            let invalid = input.replace("bad", "badé");
+            let invalid = input.replace("COMMENT\tbad", "VALUE_X\tbadé");
             let error = prepare_input(&invalid, MessageKind::Tdm).unwrap_err();
             let Some(FormatError::Kvn(error)) = error.as_format_error() else {
                 panic!("{error}");

@@ -110,6 +110,8 @@ pub(crate) fn message_to_py(py: Python<'_>, message: Message) -> PyResult<Py<PyA
 ///     If the message fails validation or uses an unsupported edition.
 /// NdmUnsupportedMessageError
 ///     If the message family cannot be detected or is unsupported.
+/// NdmUnsupportedNotationError
+///     Multiple KVN message headers require separate files or an XML envelope.
 /// ValueError
 ///     If the requested format is unsupported.
 #[gen_stub_pyfunction]
@@ -148,6 +150,8 @@ fn from_str(
 ///     Validation failed or the edition is unsupported.
 /// NdmUnsupportedMessageError
 ///     Unrecognized message family.
+/// NdmUnsupportedNotationError
+///     Multiple KVN message headers require separate files or an XML envelope.
 /// ValueError
 ///     Unsupported format argument.
 ///

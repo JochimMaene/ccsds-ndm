@@ -265,18 +265,53 @@ impl Acm {
                 ))
             }));
         for (field, path, basis) in bases {
-            basis
-                .parse::<crate::types::AttBasisType>()
-                .map_err(|error| {
-                    ValidationError::invalid_value(field, basis, error.expected).at_path(path)
-                })?;
+            if !matches!(
+                basis.as_str(),
+                "PREDICTED"
+                    | "predicted"
+                    | "DETERMINED_GND"
+                    | "determined_gnd"
+                    | "DETERMINED_OBC"
+                    | "determined_obc"
+                    | "SIMULATED"
+                    | "simulated"
+            ) {
+                return Err(ValidationError::invalid_value(
+                    field,
+                    basis,
+                    "an exact XML attBasisType enumeration value",
+                )
+                .at_path(path)
+                .into());
+            }
         }
         if let Some(determination) = &self.body.segment.data.ad {
             if let Some(method) = &determination.ad_method {
-                method.parse::<crate::types::AdMethod>().map_err(|error| {
-                    ValidationError::invalid_value(error.field, method, error.expected)
-                        .at_path("body.segment.data.ad.ad_method")
-                })?;
+                if !matches!(
+                    method.as_str(),
+                    "EKF"
+                        | "ekf"
+                        | "TRIAD"
+                        | "triad"
+                        | "QUEST"
+                        | "quest"
+                        | "BATCH"
+                        | "batch"
+                        | "Q_METHOD"
+                        | "q_method"
+                        | "FILTER_SMOOTHER"
+                        | "filter_smoother"
+                        | "OTHER"
+                        | "other"
+                ) {
+                    return Err(ValidationError::invalid_value(
+                        "AD_METHOD",
+                        method,
+                        "an exact XML adMethodType enumeration value",
+                    )
+                    .at_path("body.segment.data.ad.ad_method")
+                    .into());
+                }
             }
         }
         for sensor in self.body.segment.data.ad.iter().flat_map(|ad| &ad.sensors) {

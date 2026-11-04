@@ -69,7 +69,20 @@ pub(super) fn normalize_missing_values(xml: &str) -> Result<Cow<'_, str>> {
                         })?;
                         match attribute.key.as_ref() {
                             b"nil" if matches!(attribute.value.as_ref(), b"true" | b"1") => {}
-                            b"units" if allows_units(name) => {}
+                            b"units" if allows_units(name) => {
+                                let unit = attribute.unescape_value()?;
+                                if expected_unit(name) != Some(unit.as_ref()) {
+                                    return Err(unit_error(
+                                        xml,
+                                        start,
+                                        format!(
+                                            "{} units must be {}; got {unit:?}",
+                                            String::from_utf8_lossy(name),
+                                            expected_unit(name).unwrap(),
+                                        ),
+                                    ));
+                                }
+                            }
                             _ if attribute.key.as_namespace_binding().is_some() => {}
                             _ => supported_attributes = false,
                         }
@@ -112,6 +125,28 @@ pub(super) fn normalize_missing_values(xml: &str) -> Result<Cow<'_, str>> {
                     }
                 }
             }
+            Event::CData(text) => {
+                let text: &[u8] = text.as_ref();
+                if !text
+                    .iter()
+                    .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+                {
+                    if let Some((_, _, ref mut empty)) = candidate {
+                        *empty = false;
+                    }
+                }
+            }
+            Event::GeneralRef(reference) => {
+                if !reference
+                    .resolve_char_ref()?
+                    .is_some_and(|value| matches!(value, ' ' | '\t' | '\r' | '\n'))
+                {
+                    if let Some((_, _, ref mut empty)) = candidate {
+                        *empty = false;
+                    }
+                }
+            }
+            Event::Comment(_) | Event::PI(_) => {}
             Event::Eof => break,
             _ => {
                 if let Some((_, _, ref mut empty)) = candidate {
@@ -483,22 +518,7 @@ pub(super) fn without_unavailable_values(s: &str) -> Result<Cow<'_, str>> {
                 if let Some((start, Some(3), invalid_unit)) = stack.pop() {
                     // Ordinary values keep the deserializer's unit diagnostics, even on this path.
                     if let Some(message) = invalid_unit {
-                        let (line, column) = crate::error::line_column(s, start);
-                        return Err(crate::error::CcsdsNdmError::Parsing {
-                            context: Box::new(crate::error::ParseErrorContext {
-                                notation: crate::error::DiagnosticNotation::Xml,
-                                message_kind: crate::validation::MessageKind::Cdm,
-                                source_edition: None,
-                                byte_offset: Some(start),
-                                line: Some(line),
-                                column: Some(column),
-                                original_token: None,
-                                expected: None,
-                            }),
-                            source: Box::new(
-                                FormatError::XmlDe(quick_xml::DeError::Custom(message)).into(),
-                            ),
-                        });
+                        return Err(unit_error(s, start, message));
                     }
                     ranges.push(start..reader.buffer_position() as usize);
                 }
@@ -526,4 +546,21 @@ pub(super) fn without_unavailable_values(s: &str) -> Result<Cow<'_, str>> {
     Ok(std::borrow::Cow::Owned(
         String::from_utf8(bytes).expect("ASCII replacement preserves UTF-8"),
     ))
+}
+
+fn unit_error(xml: &str, offset: usize, message: String) -> crate::error::CcsdsNdmError {
+    let (line, column) = crate::error::line_column(xml, offset);
+    crate::error::CcsdsNdmError::Parsing {
+        context: Box::new(crate::error::ParseErrorContext {
+            notation: crate::error::DiagnosticNotation::Xml,
+            message_kind: crate::validation::MessageKind::Cdm,
+            source_edition: None,
+            byte_offset: Some(offset),
+            line: Some(line),
+            column: Some(column),
+            original_token: None,
+            expected: None,
+        }),
+        source: Box::new(FormatError::XmlDe(quick_xml::DeError::Custom(message)).into()),
+    }
 }

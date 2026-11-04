@@ -106,7 +106,9 @@ OPM, OEM, and OMM support edition-correct ODM 2.0 and 3.0 output. The message's 
 attribute selects the edition, for example ``message.version = "2.0"`` before ``to_file``. The 2.0 checks use the official `SANA NDM/XML schema
 archive <https://sanaregistry.org/r/ndmxml_unqualified/>`_. OEM 1.0 has a restricted KVN input-only compatibility reader; stored 1.0 messages cannot be
 generated. TDM 1.0 also has a restricted KVN input-only reader. OPM, APM, and AEM 1.0 input is rejected because their older syntax and requirements
-are not implemented as separate editions. See the project support matrix for the precise scope.
+are not implemented as separate editions. ACM has only its defined 2.0 representation. See the
+project support matrix for the precise scope, including unsupported older combined ODM exports
+and missing mandatory provenance in producer feeds.
 
 CCSDS units
 -----------
@@ -155,9 +157,11 @@ Unavailable diagnostic fields are ``None``. The :doc:`exception reference <../ap
 all codes, diagnostic fields, and Python exception bases.
 
 Constructors and setters parse lexical inputs such as epochs, units, and enum values immediately.
-Some numeric wrapper domains are also checked on assignment. Cross-field conditions and
-complete-message semantics are checked by ``validate()`` and every generation method; successful
-construction or mutation alone does not establish a valid message.
+Numeric checks at construction are field-specific and do not establish complete validity.
+Use ``validate()`` after numeric or structural edits: it checks all supported numeric domains and
+cross-field conditions, as does every generation method. Successful construction or mutation alone
+does not establish a valid message. Argument conversion failures use ordinary ``ValueError`` or
+``TypeError``; message validation raises ``NdmValidationError``.
 
 Migrating metadata construction
 -------------------------------

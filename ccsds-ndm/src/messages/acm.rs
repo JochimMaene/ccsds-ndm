@@ -336,6 +336,29 @@ impl AcmMetadata {
             ("STOP_TIME", &self.stop_time),
             ("NEXT_LEAP_EPOCH", &self.next_leap_epoch),
         ])?;
+        for (field, epoch) in [
+            ("START_TIME", &self.start_time),
+            ("STOP_TIME", &self.stop_time),
+        ] {
+            if let Some(epoch) = epoch {
+                let valid = match epoch.kind() {
+                    EpochKind::Calendar => epoch.calendar_fields_are_valid() == Some(true),
+                    EpochKind::Numeric => epoch.numeric_is_non_degenerate() == Some(true),
+                };
+                if !valid {
+                    return Err(ValidationError::invalid_value(
+                        field,
+                        epoch.to_string(),
+                        "a real CCSDS calendar/ordinal date or a relative time in seconds",
+                    )
+                    .at_path(format!(
+                        "body.segment.metadata.{}",
+                        field.to_ascii_lowercase()
+                    ))
+                    .into());
+                }
+            }
+        }
         for (field, value) in [
             ("TAIMUTC_AT_TZERO", &self.taimutc_at_tzero),
             ("NEXT_LEAP_TAIMUTC", &self.next_leap_taimutc),
@@ -568,7 +591,8 @@ pub struct AcmAttitudeState {
     /// **Examples**: QUATERNION, EULER_ANGLES, DCM
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 5.3.5.
-    /// Rate-only representations are refused in ATT histories (ADM table 5-4).
+    /// This library's ATT-history profile supports orientation primaries only; rate-only
+    /// representations from annex B4 remain unsupported here, even though the vocabulary includes them.
     #[builder(into)]
     pub att_type: AcmAttitudeType,
     /// Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of

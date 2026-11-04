@@ -938,6 +938,7 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
 
 impl ToKvn for Cdm {
     fn write_kvn(&self, writer: &mut KvnWriter) {
+        writer.always_write_units();
         // 1. Header
         writer.write_pair("CCSDS_CDM_VERS", &self.version);
         self.header.write_kvn(writer);

@@ -1499,6 +1499,16 @@ MAN_STOP
 "#;
     let ocm = Ocm::from_kvn(kvn).unwrap();
     assert!(!ocm.body.segment.data.man.is_empty());
+    let lowercase_units =
+        Ocm::from_kvn(&kvn.replace("MAN_UNITS = N, N, N", "MAN_UNITS = n, n, n")).unwrap();
+    assert_eq!(
+        lowercase_units.body.segment.data.man[0]
+            .man_units
+            .as_deref(),
+        Some("n, n, n")
+    );
+    Ocm::from_kvn(&lowercase_units.to_kvn().unwrap()).unwrap();
+    Ocm::from_xml(&lowercase_units.to_xml().unwrap()).unwrap();
 }
 
 #[test]

@@ -108,5 +108,7 @@ Rust opm::ManeuverParameters is named OpmManeuverParameters in Python to disting
 from attitude maneuvers. CDM exposes objects under body.segments; TDM offers both body
 and segments; CombinedNdm uses comments. These names reflect existing schema wrappers.
 Root id is Optional in stubs because incomplete editable models may hold None; valid
-messages require the family id. Constructor comment defaults shown as Ellipsis by introspection
-mean an omitted empty list, as stated in the generated stubs, not a stored Ellipsis value.
+messages require the family id. Constructor comment defaults are `None`, which initializes an
+empty list. Plain comment lists are snapshots; assign the entire list to replace them.
+CombinedNdm refuses nested combined constituents before recursive conversion, including a
+self-reference appended through its live `messages` list.

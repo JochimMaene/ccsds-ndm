@@ -224,6 +224,8 @@ class Acm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Multiple KVN message headers require separate files or an XML envelope.
         ValueError
             Unsupported format argument.
         """
@@ -255,6 +257,8 @@ class Acm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Multiple KVN message headers require separate files or an XML envelope.
         ValueError
             Unsupported format argument.
         NdmIoError
@@ -520,7 +524,8 @@ class AcmAttitudeState:
     r"""
     ACM Data: Attitude State Time History Section.
 
-    NUMBER_STATES is derived from the first row. An omitted rate_type means attitude-only rows.
+    NUMBER_STATES is derived from the first row on construction and att_lines assignment.
+    An omitted rate_type means attitude-only rows.
 
     Parameters
     ----------
@@ -2098,6 +2103,8 @@ class Aem:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Multiple KVN message headers require separate files or an XML envelope.
         ValueError
             Unsupported format argument.
         """
@@ -2129,6 +2136,8 @@ class Aem:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Multiple KVN message headers require separate files or an XML envelope.
         ValueError
             Unsupported format argument.
         NdmIoError
@@ -2915,6 +2924,8 @@ class Apm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Multiple KVN message headers require separate files or an XML envelope.
         ValueError
             Unsupported format argument.
         """
@@ -2946,6 +2957,8 @@ class Apm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Multiple KVN message headers require separate files or an XML envelope.
         ValueError
             Unsupported format argument.
         NdmIoError
@@ -3757,6 +3770,8 @@ class Cdm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Multiple KVN message headers require separate files or an XML envelope.
         ValueError
             Unsupported format argument.
         """
@@ -3788,6 +3803,8 @@ class Cdm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Multiple KVN message headers require separate files or an XML envelope.
         ValueError
             Unsupported format argument.
         NdmIoError
@@ -5456,6 +5473,8 @@ class CombinedNdm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Multiple KVN message headers require separate files or an XML envelope.
         ValueError
             Unsupported format argument.
         """
@@ -5487,6 +5506,8 @@ class CombinedNdm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Multiple KVN message headers require separate files or an XML envelope.
         ValueError
             Unsupported format argument.
         NdmIoError
@@ -7188,6 +7209,8 @@ class Ocm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Multiple KVN message headers require separate files or an XML envelope.
         ValueError
             Unsupported format argument.
         """
@@ -7219,6 +7242,8 @@ class Ocm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Multiple KVN message headers require separate files or an XML envelope.
         ValueError
             Unsupported format argument.
         NdmIoError
@@ -12025,6 +12050,8 @@ class Oem:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Concatenated KVN messages have no combined KVN representation.
         ValueError
             Unsupported format argument.
         """
@@ -12056,6 +12083,8 @@ class Oem:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Concatenated KVN messages have no combined KVN representation.
         ValueError
             Unsupported format argument.
         NdmIoError
@@ -13116,6 +13145,8 @@ class Omm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Concatenated KVN messages have no combined KVN representation.
         ValueError
             Unsupported format argument.
         """
@@ -13147,6 +13178,8 @@ class Omm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Concatenated KVN messages have no combined KVN representation.
         ValueError
             Unsupported format argument.
         NdmIoError
@@ -13673,6 +13706,8 @@ class Opm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Concatenated KVN messages have no combined KVN representation.
         ValueError
             Unsupported format argument.
         """
@@ -13704,6 +13739,8 @@ class Opm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Concatenated KVN messages have no combined KVN representation.
         ValueError
             Unsupported format argument.
         NdmIoError
@@ -13813,7 +13850,7 @@ class OpmCovarianceMatrix:
         Velocity Z covariance [6,6]. Units: km²/s².
     cov_ref_frame : str, optional
         Reference frame for the covariance matrix.
-    comments : list[str], optional
+    comment : list[str], optional
         Comments before the covariance matrix.
 
     Attributes
@@ -14142,7 +14179,7 @@ class OpmCovarianceMatrix:
         cz_dot_y_dot: builtins.float,
         cz_dot_z_dot: builtins.float,
         cov_ref_frame: typing.Optional[builtins.str] = None,
-        comments: typing.Optional[typing.Sequence[builtins.str]] = None,
+        comment: typing.Optional[typing.Sequence[builtins.str]] = None,
     ) -> OpmCovarianceMatrix: ...
     def __repr__(self) -> builtins.str: ...
 
@@ -14880,6 +14917,8 @@ class Rdm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Multiple KVN message headers require separate files or an XML envelope.
         ValueError
             Unsupported format argument.
         """
@@ -14911,6 +14950,8 @@ class Rdm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Multiple KVN message headers require separate files or an XML envelope.
         ValueError
             Unsupported format argument.
         NdmIoError
@@ -17026,7 +17067,7 @@ class Tdm:
     @property
     def version(self) -> builtins.str:
         r"""
-        Message edition; only "2.0" is accepted.
+        Message edition: "2.0", or "1.0" from the restricted KVN input-only reader.
 
         :type: str
         """
@@ -17100,6 +17141,8 @@ class Tdm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Concatenated KVN messages have no combined KVN representation.
         ValueError
             Unsupported format argument.
         """
@@ -17131,6 +17174,8 @@ class Tdm:
             CCSDS validation failure or unsupported edition.
         NdmUnsupportedMessageError
             Unrecognized or different message family.
+        NdmUnsupportedNotationError
+            Concatenated KVN messages have no combined KVN representation.
         ValueError
             Unsupported format argument.
         NdmIoError
@@ -17355,6 +17400,9 @@ class TdmMetadata:
     Represents the Metadata Section of a TDM Segment.
 
     Contains configuration details applicable to the Data Section in the same TDM Segment.
+    Omitted optional fields remain None. Book defaults below describe interpretation and
+    are not automatically stored by this constructor. Complete cross-field validation runs
+    through the owning Tdm.validate() and every generation method.
 
     Parameters
     ----------
@@ -18496,7 +18544,13 @@ class TdmObservation:
     keyword : str
         Data type keyword (e.g., "RANGE", "RECEIVE_FREQ").
     value : float | str
-        Measurement value. Pass decimal text for phase counts to retain all digits.
+        Measurement value in the keyword's fixed CCSDS table 3-5 units; RANGE uses
+        metadata RANGE_UNITS. No unit conversion is performed. Pass decimal text for
+        phase counts to retain all digits.
+
+    Construction checks the keyword, epoch and lexical number, and RHUMIDITY's percentage
+    domain. Complete observation domains and metadata dependencies are checked by the
+    owning Tdm.validate() and generation methods.
     """
     @property
     def epoch(self) -> builtins.str:
@@ -18669,8 +18723,8 @@ class TleParameters:
     def norad_cat_id(self) -> typing.Optional[builtins.int]:
         r"""
         NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword
-        is required by the book for MEAN_ELEMENT_THEORY=SGP/SGP4. The library permits omission
-        because the XML schema makes it optional; to_tle_lines requires it.
+        is required for SGP/SGP4 in ODM 2.0 and for TLE export. ODM 3.0 permits omission;
+        its schema makes the field optional. Negative catalog numbers are not supported.
 
         CCSDS Reference: 502.0-B-3, Section 4.2.4.
 
@@ -18706,8 +18760,8 @@ class TleParameters:
     @property
     def bstar(self) -> typing.Optional[builtins.float]:
         r"""
-        Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
-        MEAN_ELEMENT_THEORY= SGP4 (BSTAR = drag parameter for SGP4).
+        Drag parameter for SGP4, required for MEAN_ELEMENT_THEORY=SGP4.
+        ODM 2.0 also requires BSTAR for SGP and SGP/SGP4. SGP4-XP uses BTERM instead.
 
         Units: 1/[Earth radii]
 
@@ -18720,8 +18774,8 @@ class TleParameters:
     @property
     def bterm(self) -> typing.Optional[builtins.float]:
         r"""
-        Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
-        MEAN_ELEMENT_THEORY= SGP4-XP (BTERM ballistic coefficient CDA/m, where CD = drag
+        Ballistic coefficient required with AGOM for MEAN_ELEMENT_THEORY=SGP4-XP in ODM 3.0.
+        BTERM and BSTAR are mutually exclusive. BTERM is CDA/m, where CD = drag
         coefficient, A = average cross-sectional area, m = mass. Example values for BTERM =
         0.02 (rocket body), 0.0015 (payload); average value spanning 20,000 catalog objects =
         0.0286.
@@ -19103,6 +19157,8 @@ def from_file(
         Validation failed or the edition is unsupported.
     NdmUnsupportedMessageError
         Unrecognized message family.
+    NdmUnsupportedNotationError
+        Multiple KVN message headers require separate files or an XML envelope.
     ValueError
         Unsupported format argument.
 
@@ -19138,6 +19194,8 @@ def from_str(
         If the message fails validation or uses an unsupported edition.
     NdmUnsupportedMessageError
         If the message family cannot be detected or is unsupported.
+    NdmUnsupportedNotationError
+        Multiple KVN message headers require separate files or an XML envelope.
     ValueError
         If the requested format is unsupported.
     """

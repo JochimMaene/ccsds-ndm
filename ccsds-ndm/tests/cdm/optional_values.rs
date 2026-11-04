@@ -11,6 +11,7 @@ fn qualified(xml: &str) -> String {
     xml.replace("</", "</ndm:")
         .replace('<', "<ndm:")
         .replace("<ndm:?", "<?")
+        .replace("<ndm:!", "<!")
         .replace("<ndm:/ndm:", "</ndm:")
 }
 
@@ -100,6 +101,11 @@ fn operational_xml_missing_leaves_are_absent_without_erasing_text() {
         ("OBJECT_TYPE", "<OBJECT_TYPE/>"),
         ("MESSAGE_FOR", "<MESSAGE_FOR nil=\"true\"/>"),
         ("MESSAGE_FOR", "<MESSAGE_FOR/>"),
+        ("MESSAGE_FOR", "<MESSAGE_FOR><![CDATA[]]></MESSAGE_FOR>"),
+        (
+            "MESSAGE_FOR",
+            "<MESSAGE_FOR><![CDATA[ \t]]>&#32;<!--empty--></MESSAGE_FOR>",
+        ),
     ] {
         let mut expected = Cdm::from_xml(&original).unwrap();
         match field {
@@ -293,4 +299,24 @@ fn velocity_only_kvn_is_rejected_instead_of_silently_discarded() {
         .join("\n");
     let error = Cdm::from_kvn(&input).unwrap_err();
     assert!(error.to_string().contains("RELATIVE_POSITION_R"), "{error}");
+}
+
+#[test]
+fn unavailable_leaves_cannot_hide_incompatible_units() {
+    let original = Cdm::from_kvn(crate::KVN).unwrap().to_xml().unwrap();
+    for missing in [
+        "<MASS units=\"lb\"/>",
+        "<MASS units=\"lb\" nil=\"true\"/>",
+        "<MASS units=\"lb\"><![CDATA[]]></MASS>",
+        "<MASS units=\"lb\">&#32;</MASS>",
+    ] {
+        let start = original.find("<MASS").unwrap();
+        let end = start + original[start..].find("</MASS>").unwrap() + "</MASS>".len();
+        let mut xml = original.clone();
+        xml.replace_range(start..end, missing);
+        let error = Cdm::from_xml(&xml).unwrap_err();
+        assert_eq!(error.code(), Some("parse.xml.syntax"));
+        assert!(error.to_string().contains("MASS units must be kg"));
+        assert!(error.diagnostic().unwrap().source_location.is_some());
+    }
 }

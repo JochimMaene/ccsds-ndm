@@ -286,7 +286,7 @@ fn validate_root_start(
                             supported: "2.0 (XML); use KVN for TDM 1.0".into(),
                         });
                     }
-                    crate::versioning::check_input_version(kind, &version)?;
+                    crate::versioning::check_xml_input_version(kind, &version)?;
                 }
                 *source_edition = Some(version);
             }

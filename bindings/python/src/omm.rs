@@ -146,6 +146,8 @@ impl Omm {
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
     ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Concatenated KVN messages have no combined KVN representation.
     /// ValueError
     ///     Unsupported format argument.
     #[staticmethod]
@@ -181,6 +183,8 @@ impl Omm {
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
     ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Concatenated KVN messages have no combined KVN representation.
     /// ValueError
     ///     Unsupported format argument.
     /// NdmIoError
@@ -1243,8 +1247,8 @@ impl TleParameters {
     }
 
     /// NORAD Catalog Number (‘Satellite Number’) an integer of up to nine digits. This keyword
-    /// is required by the book for MEAN_ELEMENT_THEORY=SGP/SGP4. The library permits omission
-    /// because the XML schema makes it optional; to_tle_lines requires it.
+    /// is required for SGP/SGP4 in ODM 2.0 and for TLE export. ODM 3.0 permits omission;
+    /// its schema makes the field optional. Negative catalog numbers are not supported.
     ///
     /// CCSDS Reference: 502.0-B-3, Section 4.2.4.
     ///
@@ -1292,8 +1296,8 @@ impl TleParameters {
         self.inner.rev_at_epoch = value;
     }
 
-    /// Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
-    /// MEAN_ELEMENT_THEORY= SGP4 (BSTAR = drag parameter for SGP4).
+    /// Drag parameter for SGP4, required for MEAN_ELEMENT_THEORY=SGP4.
+    /// ODM 2.0 also requires BSTAR for SGP and SGP/SGP4. SGP4-XP uses BTERM instead.
     ///
     /// Units: 1/[Earth radii]
     ///
@@ -1311,8 +1315,8 @@ impl TleParameters {
         self.inner.bstar = value.map(|v| BStar::new(v, Default::default()));
     }
 
-    /// Drag-like ballistic coefficient, required for SGP4 and SGP4-XP mean element models:
-    /// MEAN_ELEMENT_THEORY= SGP4-XP (BTERM ballistic coefficient CDA/m, where CD = drag
+    /// Ballistic coefficient required with AGOM for MEAN_ELEMENT_THEORY=SGP4-XP in ODM 3.0.
+    /// BTERM and BSTAR are mutually exclusive. BTERM is CDA/m, where CD = drag
     /// coefficient, A = average cross-sectional area, m = mass. Example values for BTERM =
     /// 0.02 (rocket body), 0.0015 (payload); average value spanning 20,000 catalog objects =
     /// 0.0286.

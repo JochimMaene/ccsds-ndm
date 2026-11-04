@@ -892,7 +892,7 @@ impl OcmManeuverParameters {
                     "DEPLOY_DV_CDA" => "m**2",
                     _ => continue,
                 };
-                if unit != expected {
+                if !unit.eq_ignore_ascii_case(expected) {
                     return Err(ValidationError::invalid_value(
                         "MAN_UNITS",
                         unit,

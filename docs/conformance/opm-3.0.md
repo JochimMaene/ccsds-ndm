@@ -17,12 +17,12 @@ They are not missing self-contained behavior and are not guessed; see
 | Area | Normative source | Implemented behavior | Executable evidence |
 | --- | --- | --- | --- |
 | Message identity and structure | ODM 3.1.5, 3.2.1, 8.2–8.3 | One OPM root describing one object, ordered header/metadata/data, an XML 1.0 UTF-8 declaration with the shared producer-compatible spellings, `id="CCSDS_OPM_VERS"`/`version="3.0"` root attributes, and the supported-edition generation gate | `opm::parsing`, `opm::generation`, `library::xml` |
-| KVN lexical and record structure | ODM 7.3.2–7.3.4, 7.4.3–7.4.7 | Printable ASCII (TAB reads as a blank), 254-character lines on output (longer lines are read), all four normative terminators, one uppercase assignment per line, and the `USER_DEFINED_` suffix repertoire accepted per table 3-3 rather than Annex F's narrower informative regex | `opm::parsing`, `opm::generation` |
-| KVN keyword order and blocks | ODM 3.2.2–3.2.4, 7.4.8 | Fixed keyword order with unknown, duplicate, reordered, trailing, and incomplete content rejected; `TRUE_ANOMALY`/`MEAN_ANOMALY` share an ordering rank, so either fills the anomaly slot while a repeat is still a duplicate and both present is a choice violation | `opm::parsing`, `opm::generation` |
+| KVN lexical and record structure | ODM 7.3.2–7.3.4, 7.4.3–7.4.7 | Printable ASCII outside comment payloads (TAB reads as a blank), with UTF-8 comments preserved on input, 254-character lines on output (longer lines are read), all four normative terminators, one uppercase assignment per line, and the `USER_DEFINED_` suffix repertoire accepted per table 3-3 rather than Annex F's narrower informative regex | `opm::parsing`, `opm::generation` |
+| KVN keyword order and blocks | ODM 3.2.2–3.2.4, 7.4.8 | Fixed keyword order with unknown, duplicate singleton, reordered, trailing, and incomplete content rejected; `TRUE_ANOMALY`/`MEAN_ANOMALY` share an ordering rank, so either fills the anomaly slot while a repeat is still a duplicate and both present is a choice violation | `opm::parsing`, `opm::generation` |
 | XML structure | ODM 8.4–8.7; `ndmxml-4.0.0-opm-3.0.xsd` and common schema | Exact root and attributes, ordered known elements, no DTD or trailing document, fixed nesting limit of 16, and `units`/`parameter` attributes permitted only where the schema declares them | `opm::parsing` |
-| Time semantics | ODM 3.2.3.2, 7.5.10–7.5.11 | `CREATION_DATE`, `REF_FRAME_EPOCH`, state-vector `EPOCH`, and `MAN_EPOCH_IGNITION` require the calendar or ordinal spelling, rejecting the XSD union's numeric branch, impossible fields, empty fractions, non-`YYYY` years, timezone offsets, and tokens past the 64-byte epoch bound | `opm::parsing`, `opm::validation` |
+| Time semantics | ODM 3.2.3.2, 7.5.10–7.5.11 | `CREATION_DATE`, `REF_FRAME_EPOCH`, state-vector `EPOCH`, and `MAN_EPOCH_IGNITION` require the calendar or ordinal spelling, rejecting the XSD union's numeric branch, impossible fields, empty fractions, non-`YYYY` years, nonzero timezone offsets, and tokens past the 64-byte epoch bound | `opm::parsing`, `opm::validation` |
 | Typed values, units, and ranges | ODM 3.2.4, 7.5.1–7.7.1; tables 3-1 to 3-3 | Required content, finite numbers, XSD facet ranges, exactly one anomaly, complete lower-triangular covariance, complete maneuver blocks requiring spacecraft mass, and closed unit enums matching the XSD enumerations | `opm::validation`, `opm::generation` |
-| Comments | ODM 7.8.3–7.8.7 | Comments only at logical-block starts, preserved relative to surrounding assignment keys; the header parser assigns only post-version comments to the header; comment-internal whitespace is retained under 7.8.5 | `opm::parsing`, `opm::generation` |
+| Comments | ODM 7.8.3–7.8.7 | Comments only at logical-block starts, preserved relative to surrounding assignment keys; the header parser assigns only post-version comments to the header; leading comment text is retained; trailing padding follows the shared 7.4.7/7.8.5 resolution | `opm::parsing`, `opm::generation` |
 | KVN generation | ODM 3.2, 7.3–7.9 | Deterministic ordered output identical across typed, versioned, type-erased, streaming, and file entry points; the shortest numeric spelling rounded to the 16-digit ODM limit; every generated Annex G line re-checked for printable ASCII and the 254-character bound | `opm::generation`, `opm_kvn_allocations` |
 | XML generation | OPM 3.0 XSD in NDM/XML 4.0.0 | Deterministic validated XML; all five shipped OPM fixtures generate output accepted by the official master schema; every schema-constrained public field has focused mutation evidence | `opm::generation`, `opm_xml_allocations` |
 | Conversion | ODM 3 and project semantic-preservation policy | KVN↔XML preserves the complete typed model and edition across every shipped fixture, including units, repeated maneuvers, covariance, and user-defined parameters; XML values beyond KVN's 16-digit limit round to a conforming spelling | `opm::conversion` |
@@ -137,3 +137,20 @@ ODM 2.0 3.2.4.9 requires a spacecraft block with maneuvers but does not require 
 within that KVN block; 3.0 requires MASS. XML 2.0 separately requires all five spacecraft
 leaves by XSD. A 2.0 `MAN_DELTA_MASS` is a negativeDouble, so zero is rejected.
 `USER_DEFINED_` suffixes must use uppercase printable ASCII without blanks or `=`.
+
+## Conditional requirements and user parameters
+
+ODM §3.2.4.9 requires MASS when a 3.0 maneuver is supplied. The schema cannot express this
+cross-field dependency; its optional spacecraft element does not waive the book rule.
+The published combined example `ndm_g22.xml` is therefore rejected, including its standalone
+OPM constituent, rather than inventing a spacecraft mass. Complete maneuver records are
+required by §3.2.4.8 and the XSD, resolving the table's optional markers as optional block
+presence rather than permission to omit leaves from a supplied maneuver.
+
+Repeated user-parameter names are allowed in both notations and retain their order and values;
+there is no last-value-wins lookup. `conversion::repeated_user_parameter_names_preserve_both_values_across_notations`
+checks XML, KVN, streaming and reparsing. An empty suffix after `USER_DEFINED_` is rejected.
+An empty user-defined value remains literal user data, unlike an absent standard-field value.
+Comments before the version record are rejected; after it they must begin a logical block.
+Keyword order remains significant even when a producer's center or frame name is unknown:
+open frame/name domains do not relax record structure.

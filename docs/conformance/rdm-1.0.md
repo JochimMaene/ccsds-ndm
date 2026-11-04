@@ -18,7 +18,7 @@ The `rdm` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN lexical and structural strictness | The shared assignment scanner rejects non-ASCII/control input, malformed assignments, unknown and duplicate keywords, fixed-order violations, and comments outside the beginning of one of the seven logical data blocks. RDM registers only its standard keyword order and user-defined repetition. |
+| KVN lexical and structural strictness | The shared assignment scanner rejects non-ASCII values outside COMMENT payloads and forbidden control input, malformed assignments, unknown and duplicate keywords, fixed-order violations, and comments outside the beginning of one of the seven logical data blocks. RDM registers only its standard keyword order and user-defined repetition. |
 | XML structure | The shared XML sequence engine is registered for the complete RDM root, header, metadata, data, and seven nested logical-block families. It rejects unknown, duplicate, and reordered children and non-schema attributes. |
 | Conversion preservation | The routed-comment parser associates KVN comments with the logical block selected by the following keyword. RDM 5.2.4.1 requires applicable units to be displayed, so KVN generation writes the fixed unit of every unit-bearing keyword (atmospheric, impact, metadata altitude, state, covariance, spacecraft, and OD measures) even when the model holds none, for example after reading XML that omitted an XSD-optional `units` attribute; such a value reads back from KVN with its unit set. Unitless keywords (probabilities, coefficients, `WEIGHTED_RMS`) are written without a unit. The Annex C XML fixture survives XML-to-KVN conversion modulo the KVN COMMENT separator's non-semantic surrounding-whitespace normalization. |
 | XML-only comment positions | KVN has no `<data>` comment position. Following the OPM/OMM canonical merge, KVN generation writes XML `<data><COMMENT>` lines first, directly before the atmospheric block's own comments, so a KVN reparse returns them at the start of `atmosphericReentryParameters.comment` (`generation::rdm_kvn_merges_an_xml_outer_data_comment_into_the_atmospheric_block`). A comment-only `groundImpactParameters`, `spacecraftParameters`, `odParameters`, or `userDefinedParameters` block has no KVN position (its comment would attach to the next block or trail the message); all materialized and streaming KVN gates refuse it, naming the block, before writing bytes. An empty, comment-free optional XML block (`<odParameters/>`) is read as absent, as KVN would read it (`parsing::rdm_xml_empty_optional_blocks_read_as_absent_and_comment_only_blocks_are_refused_for_kvn`). |
@@ -46,7 +46,7 @@ logical ranges:
 | 94-117 | Optional 6x6 covariance | `OpmCovarianceMatrix`, state dependency and complete 21-element roundtrips |
 | 118-129 | Optional spacecraft properties | `RdmSpacecraftParameters` (not the OPM/OMM `SpacecraftParameters`), whose validator covers the masses, areas, and coefficients, and permits signed `THRUST_ACCELERATION` while requiring it finite |
 | 130-141 | Optional orbit-determination information | `OdParameters`, shared with CDM and routed from `RdmData::validate`; its validator covers the counts, spans, and percentages |
-| 142 | User-defined parameters | typed user-defined map, strict scanner and roundtrips |
+| 142 | User-defined parameters | ordered user-defined entries, scanner and roundtrips |
 
 No annex-A RDM feature is absent. `OBJECT_TYPE` is the exception to caller-supplied vocabulary:
 RDM defines it as a closed edition-specific list, so unknown values are rejected rather than
@@ -62,7 +62,12 @@ not supply, so the two are not compared. Recorded here as a deliberate non-claim
 permits non-Earth body-fixed frames, while the common 4.0 XSD applies an Earth-derived range, so
 the model preserves any finite altitude and validation enforces only finiteness. KVN writes such a
 value; XML generation refuses it with the offending field path rather than altering it to fit.
-Both XSD boundaries generate schema-valid XML.
+Both XSD boundaries generate schema-valid XML. `altType` makes the metre `units` annotation
+optional: XML input retains omission, XML output may omit it, and KVN output supplies `[m]`
+under §5.2.4.1. The public Rust `AltitudeRequired` name is retained for compatibility, but its
+`units` field is `Option<LengthUnits>`. Python continues to expose the numeric altitude.
+`parsing::nominal_impact_altitude_units_are_optional_in_xml_but_displayed_in_kvn` covers the
+schema-valid omission, XML preservation, and canonical KVN output.
 
 All public validation and generation routes revisit mutable atmospheric values:
 `ORBIT_LIFETIME_CONFIDENCE_LEVEL` remains within `[0, 100]`, including after direct field
@@ -89,7 +94,9 @@ Other accepted deviations, each read losslessly and written in canonical form:
 
 - a missing optional unit in KVN or XML (KVN output displays the fixed unit, see above);
 - mixed-case free text (`OBJECT_NAME`, frames, registry-sourced names), preserved as written;
-- `_` for a blank in multi-word enumeration values (`ROCKET_BODY`), per RDM 5.3.3.4;
+- `_` for a blank in multi-word enumeration values (`ROCKET_BODY`) in KVN and Python
+  categorical lookup, per RDM 5.3.3.4; XML uses its schema spellings, except the explicitly
+  documented disintegration transcription alias above;
 - `INTERNATIONAL_DESIGNATOR` values that do not follow the `YYYY-NNNP{PP}` format: table 3-2
   mandates that layout and provides `UNKNOWN` for objects without a designator. The library
   deliberately follows the XSD's `xsd:string` domain instead, accepting any nonempty value
@@ -106,7 +113,7 @@ type has no `N/A` spelling. See "Absent optional KVN values" in the
 [validation contract](../design/validation-contract.md#shared-lexical-decisions).
 
 XML epochs follow the shared book-over-XSD epoch rule stated once in the
-[validation contract](../design/validation-contract.md#authority-and-representability): offset,
+[validation contract](../design/validation-contract.md#authority-and-representability): nonzero offset,
 bare numeric, and empty `epochType` values are rejected.
 
 Unit spellings follow the book tables (`m**2`, `kg/m**2`, `m/s**2`, `km**2/s`).
@@ -136,6 +143,10 @@ including comments between parameters. XML generation preserves that order. Flat
 can retain comments only before the first user-defined parameter; conversion rejects an
 interleaved, empty or comments-only user-defined block before writing bytes. Ordinary leading
 comments and all parameter values retain their order through KVN parsing and generation.
+Repeated parameter names are preserved in their original order in both notations. Names must
+have a nonempty suffix after `USER_DEFINED_`. XML parameter names that contain lowercase
+letters or blanks cannot be represented by RDM's KVN name grammar and are refused on KVN
+output rather than rewritten.
 
 All four book line endings (LF, CR, CRLF and LFCR) are accepted with identical models and
 byte-position-preserving normalization.
@@ -206,3 +217,10 @@ may defer scalar-domain errors to validate()/generation; constructor/setter timi
 a uniform eager-validation guarantee. To omit NEXT_MESSAGE_EPOCH in Python, use None;
 the string N/A is an input-document sentinel. Flattened KVN data comments merge into the
 first represented logical block, as in the shared ODM convention.
+
+The library does not infer physical consistency beyond its stated scalar and conditional checks.
+In particular, finite signed cross-track distances are retained; DRY_MASS is not compared to
+WET_MASS, observation/track counts are not compared to their available counts, and absolute
+impact/reentry windows are not ordered or checked for enclosure. These relationships remain
+the caller's responsibility. This does not relax the positive count and nonnegative mass domains, nominal
+location dependencies, confidence-region completeness, or increasing confidence levels.

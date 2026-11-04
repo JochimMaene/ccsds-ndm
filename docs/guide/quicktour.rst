@@ -121,7 +121,7 @@ If you know the file type (e.g., OPM), you can parse it directly into the struct
         use std::fs;
 
         let text = fs::read_to_string("example.opm")?;
-        // Parses strict KVN for OPM
+        // Parses complete OPM KVN under the documented producer-compatibility rules.
         let opm = Opm::from_kvn(&text)?;
 
 Data Access

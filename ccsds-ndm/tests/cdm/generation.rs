@@ -572,3 +572,48 @@ CNDOT_NDOT = 1.0 [m**2/s**2]
         .is_some());
     assert_eq!(cdm2, cdm);
 }
+
+#[test]
+fn kvn_generation_supplies_fixed_units_missing_from_the_model() {
+    let source = crate::KVN
+        .lines()
+        .map(|line| line.split_once(" [").map_or(line, |(value, _)| value))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let message = Cdm::from_kvn(&source).unwrap();
+    assert!(message
+        .body
+        .relative_metadata_data
+        .miss_distance
+        .units
+        .is_none());
+    let kvn = message.to_kvn().unwrap();
+    for (field, units) in [
+        ("MISS_DISTANCE", "m"),
+        ("RELATIVE_SPEED", "m/s"),
+        ("RELATIVE_POSITION_R", "m"),
+        ("RELATIVE_VELOCITY_R", "m/s"),
+        ("RECOMMENDED_OD_SPAN", "d"),
+        ("RESIDUALS_ACCEPTED", "%"),
+        ("AREA_PC", "m**2"),
+        ("MASS", "kg"),
+        ("X", "km"),
+        ("X_DOT", "km/s"),
+        ("CR_R", "m**2"),
+    ] {
+        let line = kvn
+            .lines()
+            .find(|line| {
+                line.split_once('=')
+                    .is_some_and(|(key, _)| key.trim() == field)
+            })
+            .unwrap();
+        assert!(line.ends_with(&format!("[{units}]")), "{line}");
+    }
+    let mut output = Vec::new();
+    message.write_kvn_to(&mut output).unwrap();
+    assert_eq!(output, kvn.as_bytes());
+    let reparsed = Cdm::from_kvn(&kvn).unwrap();
+    assert_eq!(reparsed.to_kvn().unwrap(), kvn);
+    crate::common::validate_xml("CDM supplied KVN units", &reparsed.to_xml().unwrap());
+}

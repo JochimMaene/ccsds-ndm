@@ -8,7 +8,7 @@ This inventory records maintainer evidence for standalone AEM 2.0. The
 - Message edition: AEM 2.0.
 - Semantic and KVN authority: CCSDS 504.0-B-2, principally sections 4 and 6.
 - XML authority: NDM/XML schema set 4.0.0 and AEM schema 2.0.
-- Profile: strict standalone parsing, typed attitude-state validation, deterministic generation,
+- Profile: validated standalone parsing, typed attitude-state validation, deterministic generation,
   and bounded notation conversion through the shared Rust generation gate.
 
 ## Executable evidence
@@ -17,7 +17,7 @@ The `aem`, `aem_kvn_allocations`, and `library::output` suites establish:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN structure | The family-local marked-block scanner rejects non-ASCII or control input other than TAB, malformed/unknown/duplicate/reordered metadata, misplaced history comments, unknown/nested/mismatched blocks, invalid META/DATA sequencing, assignments in history data, and trailing content. It emits and accepts the table 4-3 keyword `ANGVEL_FRAME` in both notations. The previously emitted KVN `RATE_FRAME` remains a read alias; supplying both spellings is a duplicate, not two independent fields. |
+| KVN structure | The family-local marked-block scanner rejects non-ASCII values outside comments and control input other than TAB, malformed/unknown/duplicate/reordered metadata, misplaced history comments, unknown/nested/mismatched blocks, invalid META/DATA sequencing, assignments in history data, and trailing content. It emits and accepts the table 4-3 keyword `ANGVEL_FRAME` in both notations. The previously emitted KVN `RATE_FRAME` remains a read alias; supplying both spellings is a duplicate, not two independent fields. |
 | XML structure and choices | The shared XML sequence engine covers the complete root/header/body/segment hierarchy and every nested quaternion, derivative, angular-velocity, Euler, spin, nutation, and momentum structure. It rejects unknown, duplicate, reordered, multi-choice, and non-schema attribute content. |
 | Fixture and typed-state preservation | Both KVN fixtures preserve their complete typed model through KVN and XML. Both XML fixtures preserve their XML model; the all-types fixture covers all nine attitude-state choices. Generated XML validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
 | Optional fixed units | AEM KVN history records forbid unit annotations (504.0-B-2 section 6.9.2) while the fixed XML unit attributes are optional (section 7.6.10). Optional fixed XML units on derivative, angle, rate, nutation, and momentum values are therefore deliberately normalized to omission on an XML-to-KVN-to-XML hop, while values, choices, and record counts remain preserved. A dedicated regression verifies the output stays schema-valid. |
@@ -48,7 +48,9 @@ Their applicability descriptions do not make them conditionally mandatory. Reade
 models therefore accept omission and preserve it through both notations; no sequence or frame is
 invented. A consumer that needs those values to interpret or transform the attitude must obtain
 them from its exchange context. `aem::parsing::aem_uses_canonical_angular_velocity_frame_and_preserves_optional_metadata`
-covers both omissions and the old frame-keyword alias.
+covers both omissions and the old frame-keyword alias. The alias accepts an actual frame
+name, not ADM 1.0's symbolic `REF_FRAME_A`/`REF_FRAME_B` placeholders: those placeholders are
+rejected rather than being silently stored as the angular-velocity frame.
 
 **Nutation periods use seconds.** ADM §4.2.4.6 and the XSD `durationType`/`timeUnits`
 require seconds. The shared Rust `TimeUnits` enum also contains `Day` for other contexts,
@@ -115,12 +117,13 @@ chapter, and the KVN writer already writes negative zero as `0.0`. XML follows t
 ([preservation rules](../design/validation-contract.md#preservation-and-normalization)).
 
 **Rotation sequences.** XML accepts only the twelve uppercase `rotseqType` letters. KVN and Python
-also read lowercase (`zxz`, ADM §6.8.6) and, as a documented legacy alias, the ADM 1.0 numeric
-spellings (`313` for `ZXZ`, annex J). Every writer emits the uppercase letters.
+also read lowercase (`zxz`, ADM §6.8.6), mixed-case letters (`Zxz`, a lossless producer alias),
+and the ADM 1.0 numeric spellings (`313` for `ZXZ`, annex J) as a documented lexical alias. Every writer emits the uppercase letters.
 
 **One object per message.** ADM §2.3.1 limits an AEM to one object. Every segment must carry
-the first segment's `OBJECT_ID` exactly; `OBJECT_NAME` is compared case-insensitively, because the
-normative figure G-4 (`aem_g4.kvn`) spells one object's name in two casings.
+the first segment's `OBJECT_ID` exactly; `OBJECT_NAME` is compared case-insensitively, with
+underscores and blank runs equivalent under ADM §6.8.8. Figure G-4 (`aem_g4.kvn`) also spells
+one object's name in two casings.
 
 **Records match `ATTITUDE_TYPE`.** The XSD lets each `attitudeState` be any of the nine choices.
 ADM §4.2.4.5 requires the data lines to match the segment's `ATTITUDE_TYPE`, so the library
@@ -137,8 +140,9 @@ entries, so the model differs after an XML-to-KVN hop. ADM §6.10.3 forbids comm
 ## Cross-segment time systems
 
 ADM §4.2.4.8.2 fixes `TIME_SYSTEM` within a segment, not across the entire message.
-Adjacent usable bounds are compared only when the segments declare the same time system
-(case-insensitively). The library does not compare calendar labels from different time
+Adjacent usable bounds are compared only when both the previous usable stop and the next
+usable start are supplied and the segments declare the same time system (case-insensitively).
+Total spans of separate segments are not compared. The library does not compare calendar labels from different time
 systems as if they represented the same clock. Cross-system ordering and non-overlap remain
 the caller's responsibility; no leap-second table or time-scale conversion is introduced.
 `aem::validation::cross_segment_chronology_requires_the_same_time_system` covers the distinction.
@@ -158,3 +162,8 @@ definitions. EULER_ROT_SEQ and ANGVEL_FRAME are retained even on QUATERNION meta
 Python's compact epoch/value rows omit optional XML unit attributes on rewriting; their
 ATTITUDE_TYPE fixes the units (table 4-4), so numeric values are unchanged. Rust retains
 those optional annotations. This is a documented Python representation normalization.
+
+KVN metadata keywords retain table order, including quaternion component order in data rows;
+self-delimiting block order does not make arbitrary field reordering valid. XML uses its schema
+sequence. Python APM/AEM objects expose mutable model access rather than value-based `__eq__`;
+compare represented fields or canonical output when value comparison is needed.

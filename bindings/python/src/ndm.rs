@@ -103,8 +103,10 @@ pub(crate) fn py_message_to_core(py: Python<'_>, msg: &Py<PyAny>) -> PyResult<Me
         Ok(Message::Apm(apm.to_core(py)?))
     } else if let Ok(acm) = msg.bind(py).extract::<PyRef<'_, crate::acm::Acm>>() {
         Ok(Message::Acm(acm.to_core(py)?))
-    } else if let Ok(ndm) = msg.bind(py).extract::<PyRef<'_, CombinedNdm>>() {
-        Ok(Message::Ndm(ndm.to_core(py)?))
+    } else if msg.bind(py).is_instance_of::<CombinedNdm>() {
+        Err(PyValueError::new_err(
+            "Nested combined NDM messages are not supported",
+        ))
     } else {
         Err(PyValueError::new_err(
             "Unsupported message type in NDM combined instantiation",
@@ -165,6 +167,8 @@ impl CombinedNdm {
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
     ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Multiple KVN message headers require separate files or an XML envelope.
     /// ValueError
     ///     Unsupported format argument.
     #[staticmethod]
@@ -200,6 +204,8 @@ impl CombinedNdm {
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
     ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Multiple KVN message headers require separate files or an XML envelope.
     /// ValueError
     ///     Unsupported format argument.
     /// NdmIoError

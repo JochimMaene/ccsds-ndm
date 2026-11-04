@@ -17,7 +17,7 @@ The TDM suites establish:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN structure | A local state scanner enforces printable ASCII, header and `META`/`DATA` section sequencing, metadata uniqueness and the `PATH` choice, known observation keywords, and section-scoped comments. Metadata assignments are accepted out of order as a producer-compatibility decision; TDM §3.3.1.8 prescribes table order, which the writer emits. The four header keywords, by contrast, must keep table 3-2 order: the header is short, fixed, and no known producer reorders it, so no tolerance was added. Duplicate assignments and misplaced comments remain errors. |
+| KVN structure | A local state scanner enforces printable ASCII outside comment payloads, header and `META`/`DATA` section sequencing, metadata uniqueness and the `PATH` choice, known observation keywords, and section-scoped comments. Metadata assignments are accepted out of order as a producer-compatibility decision; TDM §3.3.1.8 prescribes table order, which the writer emits. The four header keywords, by contrast, must keep table 3-2 order: the header is short, fixed, and no known producer reorders it, so no tolerance was added. Duplicate assignments and misplaced comments remain errors. |
 | XML structure | The shared XML sequence engine covers the root, repeated segments, metadata, data, and the complete observation choice; it rejects unknown, duplicate, reordered, and non-schema nested content while accepting the schema's optional angle/percentage units. |
 | Preservation and generation | All 21 shipped KVN fixtures and both shipped XML fixtures preserve their typed source-notation model. Generated XML validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). Fixed optional XML units are semantically normalized when crossing unitless KVN. Bare `COMMENT` records are preserved by the shared KVN writer. |
 | History allocation | `tdm_kvn_allocations` compares 10 and 1,000 observations. Parsing allocations grow with vector capacity rather than per record; validated streaming generation has fixed temporary-allocation overhead; materialized storage remains output-proportional. |
@@ -44,7 +44,8 @@ All 53 numbered features in CCSDS 503.0-B-2 corrigendum 1 annex A2.1.5 were reco
 
 No annex-A TDM feature is absent. TDM's exception to the shared policy on [externally governed values](../design/validation-contract.md#registry-governed-values) is that normative
 annex B places time-system and reference-frame registry membership outside the message, so those
-values remain caller supplied while local syntax and conditional semantics are enforced.
+values remain caller supplied. The implemented local syntax and conditional checks, and
+the deliberate signal-context exceptions below, define the acceptance boundary.
 Concretely, every populated `PATH`, `PATH_1`, and `PATH_2` is re-parsed at
 validation and each index is checked against the `PARTICIPANT_n` fields actually supplied, so the
 XML and tuple-field routes no longer bypass the path parser; and the `SINGLE_DIFF` requirement for
@@ -69,8 +70,8 @@ SANA registry. KVN preserves nonempty caller-supplied values in those domains, i
 outside the older XML enumeration. XML input/output uses the bundled schema's value domains;
 conversion refuses an unrepresentable value before output instead of substituting a frame or
 angle convention. Known XML enumeration values accept the uppercase/lowercase forms listed by
-the XSD. Compatibility frame aliases `ITRF-2000`, `ITRF1993`, `ITRF93`, and `TOD_EARTH` are also
-accepted in XML and generate as `ITRF2000`, `ITRF-93`, `ITRF-93`, and `TOD`, respectively.
+the XSD. Compatibility frame aliases `ITRF-2000`, `ITRF1993`, `ITRF93`, `ITRF1997`, `ITRF97`, and `TOD_EARTH` are also
+accepted in XML and generate as `ITRF2000`, `ITRF-93`, `ITRF-93`, `ITRF-97`, `ITRF-97`, and `TOD`, respectively.
 Arbitrary mixed case is rejected in XML. KVN reads the same aliases and the book spellings
 `ITRF1993` and `TOD_EARTH` as the known frames, so KVN output is canonical too: `ITRF1993`
 and `ITRF93` are written `ITRF-93`, `ITRF-2000` is written `ITRF2000`, and `TOD_EARTH` is
@@ -93,7 +94,8 @@ number. Such a count cannot be written to KVN without rewriting its digits, so K
 XML-to-KVN conversion refuse it, naming the keyword, rather than expanding the exponent.
 `parsing::phase_count_exponents_are_xml_double_spellings_but_not_kvn_phase_counts` covers all
 three paths. All ten receive/transmit phase-count variants retain their source text in the model,
-XML and Python. Decimal counts also preserve it through KVN and conversion. They are not parsed
+XML and Python. Decimal counts also preserve it through KVN and conversion, except that negative lexical
+zero is written as `0` in KVN. They are not parsed
 through `f64`. Lexical validation rejects
 malformed numbers and non-finite spellings without limiting the number of digits. Other
 observations use doubles and the ordinary-number generation rules below. The allocation-growth
@@ -164,7 +166,7 @@ Positive counts are only recommended, so signed integer counts and zero remain a
 This count is distinct from the arbitrary-precision decimal phase-count strings described
 above. Values already rounded by a caller into a double cannot recover lost integer digits.
 
-**Epoch spellings follow the book.** XML epochs with a timezone offset, bare numeric epochs, and
+**Epoch spellings follow the book.** XML epochs with a nonzero timezone offset, bare numeric epochs, and
 empty epochs are rejected although the XSD `epochType` admits them; this is the shared
 book-over-XSD decision stated once in the
 [validation contract](../design/validation-contract.md#authority-and-representability).
@@ -271,8 +273,11 @@ the reader never relabels automatically. `legacy_kvn_is_input_only_and_rejects_v
 covers typed/generic input, refused output and later-edition content.
 
 KVN closed categories ignore case (4.3.7), and blank/underscore aliases are equivalent (4.3.8).
-DOPPLER_COUNT is emitted as plain integer digits (3.5.2.4); exact phase counts retain
-arbitrary precision, with `.5` and `5.` written as `0.5` and `5.0` (4.3.4).
+DOPPLER_COUNT is emitted as plain integer digits (3.5.2.4), within the signed 32-bit
+KVN integer range (4.3.2); out-of-range model values remain available in XML and are refused
+before any KVN output. Exact phase counts retain arbitrary precision, with `.5` and `5.`
+written as `0.5` and `5.0` (4.3.4). Negative zero writes as `0` for Doppler/phase counts;
+ordinary floating observations write it as `0.0`. XML and the model retain their source sign.
 PARTICIPANT_1 is mandatory because the XSD requires it, despite the book's broader
 'at least one participant' wording. Indexed delay and ephemeris-name fields are preserved
 without requiring that participant; phase-count observations do require their participant.
@@ -280,8 +285,9 @@ INTEGRATION_REF companion fields, REFERENCE_FRAME with AZEL, a zero turnaround d
 and whether interpolation is necessary for a changing uplink are not inferred/enforced:
 inapplicable descriptors are retained rather than discarded. Whether interpolation is needed
 for a changing uplink additionally depends on the signal path and ICD. The library performs
-no turnaround-ratio calculation, so the schema's zero integer value is preserved. RANGE negative zero normalizes to numeric zero rather than
-retaining a sign bit (4.3.5); it is not a separate supported measurement value.
+no turnaround-ratio calculation, so the schema's zero integer value is preserved. Negative
+zero denotes the same measurement as zero, but its sign bit remains in model/XML values;
+only KVN generation canonicalizes its spelling (4.3.5).
 Python nested TDM records are validated through Tdm.validate(); only the Rust API currently
 exposes each nested validate method separately.
 
@@ -289,3 +295,37 @@ Recognized categorical frames and angle types canonicalize on KVN input, includi
 `Eme2000` to `EME2000` and `Radec` to `RADEC`; arbitrary open registry text is retained only
 where the model field is open. `legacy_tables_exclude_every_later_edition_metadata_keyword`
 covers the 1.0 table boundary.
+
+## Signal context and construction boundaries
+
+DOR and VLBI_DELAY are accepted without an in-message `TRANSMIT_FREQ_n` history or a complete
+signal/reference path. This deliberately follows the schema's permissive structure rather than
+book §§3.5.3.2–3.5.3.3's requirement to supply the beacon/uplink or interferometer reference
+frequency. Callers must establish that frequency and signal context; validation does not certify
+that the measurements can be reconstructed from this message alone.
+`DATA_TYPES` checks keyword vocabulary, not correspondence with actual observations. Angle
+observations may omit `ANGLE_TYPE`; custom conventions remain the exchange partners' context.
+When MODE is absent, either PATH form is retained and no mode-specific companion rule is inferred.
+
+Present but empty `DATA_TYPES` is invalid: the declaration must name one or more observation
+keywords. Empty list members and trailing commas are rejected. This is field-specific validation,
+not a rule that all optional strings are interchangeable. All implemented numeric/conditional
+checks also apply to restricted 1.0 KVN input; relabelling a 2.0 XML sample does not verify 1.0
+XML grammar or requirements, so 1.0 XML remains unsupported.
+
+Phase-count text accepts a sign and preserves leading zeros and decimal digits. KVN output
+fills a missing digit beside a decimal point and canonicalizes negative zero; exponent text
+retained from XML is refused by KVN output rather than expanded or rounded. No 32-bit or double
+precision bound is imposed on these strings.
+
+In Python, omitted optional metadata getters return `None`, including fields with book defaults;
+those defaults describe interpretation, not automatic constructor population. Categorical metadata
+setters (`mode`, path fields, timetag/integration/range references, units, angle/frame values,
+yes/no flags and quality) can raise `ValueError` immediately. Invalid epoch tokens raise
+`NdmEpochError`. `TdmObservation` construction resolves the keyword, epoch and lexical number;
+RHUMIDITY additionally checks its percentage domain immediately. Complete observation and
+cross-field domains are checked by root `validate()` and every generation route. Rust also
+exposes nested validators; Python currently exposes root validation.
+Observation values use the fixed per-keyword units in table 3-5 and §§3.5.1–3.5.8; RANGE uses
+`RANGE_UNITS`. There is no unit conversion. Phase counts should be supplied as decimal strings
+when every digit matters.

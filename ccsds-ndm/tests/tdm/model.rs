@@ -262,3 +262,15 @@ fn tdm_open_metadata_domains_refuse_only_unrepresentable_xml() {
     message.body.segments[0].metadata.data_types = Some("RANGE, TRANSMIT_FREQ_n".into());
     message.validate().unwrap();
 }
+
+#[test]
+fn dor_and_vlbi_reference_context_is_left_to_the_caller() {
+    use ccsds_ndm::messages::tdm::Tdm;
+    use ccsds_ndm::Ndm;
+    for keyword in ["DOR", "VLBI_DELAY"] {
+        let input = format!("CCSDS_TDM_VERS = 2.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\nMETA_START\nTIME_SYSTEM = UTC\nPARTICIPANT_1 = STATION\nMETA_STOP\nDATA_START\n{keyword} = 2023-01-01T00:00:00 1\nDATA_STOP\n");
+        let message = Tdm::from_kvn(&input).unwrap();
+        message.validate().unwrap();
+        assert_eq!(Tdm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    }
+}

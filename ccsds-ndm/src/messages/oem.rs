@@ -105,7 +105,7 @@ impl crate::traits::Validate for Oem {
             &self.id,
             &self.version,
         )?;
-        self.header.validate()?;
+        crate::validation::validate_at_field_path(self.header.validate(), "header")?;
         validate_within_path(self.body.validate(), || "body".into())?;
         // Edition rules compare epochs, so they run after the epoch format checks.
         crate::versioning::validate_oem_edition(self)

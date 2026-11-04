@@ -213,7 +213,7 @@ class TestAcm:
         assert state.att_basis_id == "AD_1985"
         assert state.ref_frame_a == "J2000"
         assert state.ref_frame_b == "SC_BODY_2"
-        assert state.number_states == 7
+        assert state.number_states == 3
         assert state.att_type == "EULER_ANGLES"
         assert state.rate_type == "ANGVEL"
         assert state.euler_rot_seq == "XYZ"
@@ -221,6 +221,13 @@ class TestAcm:
             ("1.0", [2.0, 3.0, 4.0]),
             ("2017-001T00:00:00", [5.0, 6.0, 7.0]),
         ]
+
+        saved_lines = state.att_lines
+        for invalid_lines in ([], [("1.0", [])], [("1.0", [1.0]), ("2.0", [1.0, 2.0])]):
+            with pytest.raises(ValueError):
+                state.att_lines = invalid_lines
+            assert state.att_lines == saved_lines
+            assert state.number_states == 3
 
         with pytest.raises(ValueError):
             state.att_type = "NOT_IN_XSD_ENUM"

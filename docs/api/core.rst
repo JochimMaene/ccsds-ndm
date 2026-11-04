@@ -40,8 +40,10 @@ Exceptions
 ----------
 
 All library parse, epoch, validation, unsupported-operation and file exceptions inherit
-from ``NdmError``. Argument conversions, including some categorical setters, may raise
-ordinary ``ValueError`` or ``TypeError``.
+from ``NdmError``. Python argument conversions use ordinary ``ValueError`` or ``TypeError``
+for invalid enum/unit arguments, wrong child types, malformed array shapes, and out-of-storage-range
+integers. Epoch conversions use ``NdmEpochError``; complete-message ``validate()`` uses
+``NdmValidationError``. Constructor/setter success does not replace complete-message validation.
 File errors expose ``errno``, ``filename`` and ``strerror`` explicitly; conversions also
 expose the destination as ``filename2``. ``errno`` is ``None`` when no raw OS number is
 available, including destination-creation errors wrapped by ``tempfile``. Unsupported input/output editions
@@ -84,6 +86,11 @@ Rust ``CcsdsNdmError::code()`` and Python ``error.code`` use the same categories
 Python typed-reader mismatch code, which describes that binding's class selection. Parse and
 generation wrappers preserve the source error class and available field path. Pure model
 validation has no wire notation or source token; Rust ``diagnostic()`` returns ``None`` there.
+Empty mandatory input values use ``validation.missing_required_field``. Invalid epochs can use
+``parse.invalid_epoch`` for direct epoch conversion, notation syntax codes during deserialization,
+or ``validation.invalid_value`` for contextual model checks. Human message text and internal
+type names are not stable interfaces. Combined constituent detection locations refer to the
+original XML document; structural errors can have no location.
 
 .. list-table::
    :header-rows: 1

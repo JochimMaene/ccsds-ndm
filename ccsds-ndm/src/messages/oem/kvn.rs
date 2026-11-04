@@ -532,7 +532,7 @@ impl Oem {
             line_length_error(field, field.len().max(20) + 3 + value.len(), path)
         }
         // KVN reads an empty optional metadata or covariance value as absent (7.5.1), so writing
-        // one would drop it. The shared header parser keeps empty strings, so the header is exempt.
+        // one would drop it. Header text has its own shared representability checks.
         fn optional_text(
             field: &'static str,
             value: &str,
@@ -566,7 +566,7 @@ impl Oem {
             &self.version,
         )?;
         crate::versioning::validate_oem_edition(self)?;
-        self.header.validate()?;
+        crate::validation::validate_at_field_path(self.header.validate(), "header")?;
         validate_within_path(self.body.validate_identity(), || "body".into())?;
         validate_within_path(self.body.validate_useable_spans(), || "body".into())?;
         comments(&self.header.comment, || "header.comment".into())?;
@@ -1192,7 +1192,11 @@ fn validate_syntax(kvn: &str, legacy_comments: bool) -> Result<()> {
         return Err(invalid(
             kvn.lines().count().max(1),
             kvn.len(),
-            "incomplete OEM document",
+            if phase == Phase::Covariance {
+                "incomplete OEM covariance block: expected EPOCH, six matrix rows and COVARIANCE_STOP"
+            } else {
+                "incomplete OEM document"
+            },
         ));
     }
     // ODM 7.3.7 terminates every line, but a missing terminator on the last line is common in

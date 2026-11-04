@@ -597,12 +597,25 @@ fn sensor_frequency_schema_bound_applies_in_every_notation() {
 #[test]
 fn attitude_determination_method_has_an_xml_enum_but_open_kvn_text() {
     let source = include_str!("../../data/kvn/acm_g7.kvn");
-    for method in ["EKF", "ekf", "OTHER", "other", "CUSTOM_METHOD", "Ekf"] {
+    for method in [
+        "EKF",
+        "ekf",
+        "OTHER",
+        "other",
+        "CUSTOM_METHOD",
+        "Ekf",
+        "FILTER SMOOTHER",
+        " FILTER_SMOOTHER ",
+        "FILTER__SMOOTHER",
+    ] {
         let mut message = Acm::from_kvn(source).unwrap();
         message.body.segment.data.ad.as_mut().unwrap().ad_method = Some(method.into());
         ccsds_ndm::Validate::validate(&message).unwrap();
         Acm::from_kvn(&message.to_kvn().unwrap()).unwrap();
-        if matches!(method, "CUSTOM_METHOD" | "Ekf") {
+        if matches!(
+            method,
+            "CUSTOM_METHOD" | "Ekf" | "FILTER SMOOTHER" | " FILTER_SMOOTHER " | "FILTER__SMOOTHER"
+        ) {
             let error = message.to_xml().unwrap_err();
             crate::common::assert_validation_field(&error, "AD_METHOD");
             assert_eq!(
@@ -656,4 +669,42 @@ fn history_basis_has_an_xml_enum_but_open_kvn_text() {
     crate::common::assert_validation_field(&attitude.to_xml().unwrap_err(), "ATT_BASIS");
     attitude.body.segment.data.att[0].att_basis = Some("predicted".into());
     validate_xml("ATT_BASIS", &attitude.to_xml().unwrap());
+}
+
+#[test]
+fn xml_history_basis_requires_the_exact_schema_spelling() {
+    for basis in ["DETERMINED GND", "DETERMINED__GND", " PREDICTED "] {
+        for covariance in [false, true] {
+            let mut message = Acm::from_kvn(if covariance { COV_KVN } else { ATT_KVN }).unwrap();
+            let field = if covariance { "COV_BASIS" } else { "ATT_BASIS" };
+            if covariance {
+                message.body.segment.data.cov[0].cov_basis = Some(basis.into());
+            } else {
+                message.body.segment.data.att[0].att_basis = Some(basis.into());
+            }
+            crate::common::assert_validation_field(&message.to_xml().unwrap_err(), field);
+            let mut output = Vec::new();
+            assert!(message.write_xml_to(&mut output).is_err());
+            assert!(output.is_empty());
+            let mut baseline = Acm::from_kvn(if covariance { COV_KVN } else { ATT_KVN }).unwrap();
+            if !covariance {
+                baseline.body.segment.data.att[0].att_basis = Some("PREDICTED".into());
+            }
+            let baseline = baseline.to_xml().unwrap();
+            let invalid = if covariance {
+                mutated(
+                    &baseline,
+                    "<COV_BASIS>DETERMINED_OBC</COV_BASIS>",
+                    &format!("<COV_BASIS>{basis}</COV_BASIS>"),
+                )
+            } else {
+                mutated(
+                    &baseline,
+                    "<ATT_BASIS>PREDICTED</ATT_BASIS>",
+                    &format!("<ATT_BASIS>{basis}</ATT_BASIS>"),
+                )
+            };
+            assert!(Acm::from_xml(&invalid).is_err());
+        }
+    }
 }

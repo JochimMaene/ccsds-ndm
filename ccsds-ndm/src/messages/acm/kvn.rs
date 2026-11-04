@@ -293,12 +293,16 @@ fn parse_cov_block(input: &mut &str) -> KvnResult<AcmCovarianceMatrix> {
 }
 
 fn kv_target_momentum(input: &mut &str) -> KvnResult<crate::types::TargetMomentum> {
+    let value_start = *input;
     let (values, unit_str) = kv_float_list(input)?;
 
     let units = unit_str
         .map(crate::types::AngMomentumUnits::from_str)
         .transpose()
-        .map_err(|_| cut_err(input, "Invalid TARGET_MOMENTUM unit; expected N*m*s"))?;
+        .map_err(|_| {
+            *input = value_start;
+            cut_err(input, "Invalid TARGET_MOMENTUM unit; expected N*m*s")
+        })?;
     Ok(crate::types::TargetMomentum {
         elements: values,
         units,
@@ -354,30 +358,46 @@ fn parse_man_block(input: &mut &str) -> KvnResult<AcmManeuverParameters> {
 
 /// Reads MAN_DURATION; its range is checked by model validation, which names the keyword.
 fn kv_man_duration(input: &mut &str) -> KvnResult<crate::types::Duration> {
+    let value_start = *input;
     let (value, unit) = kv_float_unit(input)?;
     let units = unit
         .map(crate::types::TimeUnits::from_str)
         .transpose()
-        .map_err(|_| cut_err(input, "Invalid MAN_DURATION unit; expected s"))?;
+        .map_err(|_| {
+            *input = value_start;
+            cut_err(input, "Invalid MAN_DURATION unit; expected s")
+        })?;
+    if matches!(units, Some(crate::types::TimeUnits::Day)) {
+        *input = value_start;
+        return Err(cut_err(input, "Invalid MAN_DURATION unit; expected s"));
+    }
     Ok(crate::types::Duration { value, units })
 }
 
 fn kv_sensor_noise(input: &mut &str) -> KvnResult<crate::types::SensorNoise> {
+    let value_start = *input;
     let (values, unit_str) = kv_float_list(input)?;
 
     let units = unit_str
         .map(crate::types::AngleUnits::from_str)
         .transpose()
-        .map_err(|_| cut_err(input, "Invalid SENSOR_NOISE_STDDEV unit; expected deg"))?;
+        .map_err(|_| {
+            *input = value_start;
+            cut_err(input, "Invalid SENSOR_NOISE_STDDEV unit; expected deg")
+        })?;
     Ok(crate::types::SensorNoise { values, units })
 }
 
 fn kv_cp(input: &mut &str) -> KvnResult<crate::types::Vector3> {
+    let value_start = *input;
     let (values, unit_str) = kv_float_list(input)?;
     let units = unit_str
         .map(crate::types::LengthUnits::from_str)
         .transpose()
-        .map_err(|_| cut_err(input, "Invalid CP unit; expected m"))?;
+        .map_err(|_| {
+            *input = value_start;
+            cut_err(input, "Invalid CP unit; expected m")
+        })?;
     Ok(crate::types::Vector3 {
         elements: values,
         units,

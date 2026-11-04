@@ -607,7 +607,7 @@ fn rdm_routes_the_shared_covariance_validator() {
 }
 
 /// Populates the nominal-impact triple that RDM §3.5.10 requires alongside an altitude.
-fn ground_impact_with_altitude(value: f64) -> Rdm {
+pub(super) fn ground_impact_with_altitude(value: f64) -> Rdm {
     use ccsds_ndm::types::{AltitudeRequired, LatLonUnits, LatitudeRequired, LongitudeRequired};
     let mut message = Rdm::from_kvn(KVN).unwrap();
     let parameters = message
@@ -628,7 +628,7 @@ fn ground_impact_with_altitude(value: f64) -> Rdm {
     });
     parameters.nominal_impact_alt = Some(AltitudeRequired {
         value,
-        units: ccsds_ndm::types::LengthUnits::M,
+        units: Some(ccsds_ndm::types::LengthUnits::M),
     });
     message
 }

@@ -7,6 +7,38 @@ use crate::common::mutated_once;
 use ccsds_ndm::messages::ndm::CombinedNdm;
 use ccsds_ndm::{from_str, Message, Ndm};
 
+#[test]
+fn constituent_error_locations_refer_to_the_original_combined_document() {
+    let original = include_str!("../../data/xml/ndm_g12.xml");
+    assert_eq!(
+        CombinedNdm::from_xml(&format!("\u{feff}{original}")).unwrap(),
+        CombinedNdm::from_xml(original).unwrap(),
+    );
+    let source = mutated_once(original, "<Q1>-0.005068</Q1>", "<Q1>bad</Q1>");
+    let expected_offset = source.find("bad</Q1>").unwrap() + "bad</Q1>".len();
+    let expected_line = source[..expected_offset]
+        .bytes()
+        .filter(|b| *b == b'\n')
+        .count()
+        + 1;
+    let expected_column = expected_offset - source[..expected_offset].rfind('\n').unwrap();
+    for error in [
+        CombinedNdm::from_xml(&source).unwrap_err(),
+        from_str(&source).unwrap_err(),
+        CombinedNdm::from_xml(&format!("\u{feff}{source}")).unwrap_err(),
+        from_str(&format!("\u{feff}{source}")).unwrap_err(),
+    ] {
+        let diagnostic = error.diagnostic().unwrap();
+        assert_eq!(diagnostic.byte_offset, Some(expected_offset));
+        assert_eq!(
+            diagnostic.source_location,
+            Some((expected_line, expected_column))
+        );
+        assert!(error.to_string().contains(&format!("line {expected_line}")));
+        assert!(diagnostic.original_token.unwrap().contains("bad</Q1>"));
+    }
+}
+
 /// Prefix the XML declaration that NDM/XML 4.2 requires on the first line.
 fn declared(body: &str) -> String {
     format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n{body}")

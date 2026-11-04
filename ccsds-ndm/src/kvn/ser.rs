@@ -409,10 +409,10 @@ impl<'a> KvnWriter<'a> {
         self.allow_long_records = true;
     }
 
-    /// Write the fixed unit of every measure even when the model holds none (RDM 5.2.4.1:
-    /// applicable units "must be displayed").
+    /// Write fixed units required by CDM 6.2.4.1 and RDM 5.2.4.1, except in the
+    /// private comparison pass that checks preservation of original annotations.
     pub(crate) fn always_write_units(&mut self) {
-        self.always_units = true;
+        self.always_units = !self.exact_floats;
     }
 
     /// Builds and writes one raw line using a reusable growable buffer.
@@ -506,7 +506,7 @@ impl<'a> KvnWriter<'a> {
             self.reject(|| crate::error::ValidationError::InvalidValue {
                 field: key.to_owned().into(),
                 value,
-                expected: "a non-empty KVN value (omit an absent optional keyword)".into(),
+                expected: "a non-empty KVN standard-field value".into(),
                 line: None,
             });
         }

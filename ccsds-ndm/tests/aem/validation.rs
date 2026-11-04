@@ -81,6 +81,19 @@ fn aem_enforces_useable_span_continuity_between_blocks() {
 
 #[test]
 fn aem_requires_one_object_but_allows_a_time_system_per_segment() {
+    let mut equivalent = valid_aem();
+    equivalent.body.segment[0].metadata.object_name = "MARS  GLOBAL SURVEYOR".into();
+    equivalent.body.segment[1].metadata.object_name = "mars_global_surveyor".into();
+    equivalent.validate().unwrap();
+    assert_eq!(
+        Aem::from_kvn(&equivalent.to_kvn().unwrap()).unwrap(),
+        equivalent
+    );
+    assert_eq!(
+        Aem::from_xml(&equivalent.to_xml().unwrap()).unwrap(),
+        equivalent
+    );
+
     let mut renamed = valid_aem();
     renamed.body.segment[1].metadata.object_name = "PHOBOS SURVEYOR".to_string();
     let error = renamed.validate().unwrap_err().to_string();

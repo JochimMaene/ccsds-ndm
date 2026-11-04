@@ -323,6 +323,8 @@ impl Cdm {
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
     ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Multiple KVN message headers require separate files or an XML envelope.
     /// ValueError
     ///     Unsupported format argument.
     #[staticmethod]
@@ -358,6 +360,8 @@ impl Cdm {
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
     ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Multiple KVN message headers require separate files or an XML envelope.
     /// ValueError
     ///     Unsupported format argument.
     /// NdmIoError

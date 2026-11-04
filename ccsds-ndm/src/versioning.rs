@@ -128,6 +128,20 @@ pub(crate) fn check_input_version(kind: MessageKind, version: &str) -> Result<()
     }
 }
 
+/// XML supports the output editions; the additional legacy readers are KVN-only.
+pub(crate) fn check_xml_input_version(kind: MessageKind, version: &str) -> Result<()> {
+    match spec(kind) {
+        Some(spec) if !spec.output_versions.contains(&version) => {
+            Err(CcsdsNdmError::UnsupportedInputVersion {
+                message_type: kind.as_str(),
+                version: version.to_owned(),
+                supported: spec.output_versions.join(", "),
+            })
+        }
+        _ => Ok(()),
+    }
+}
+
 /// The message family whose standalone XML root element is `root` (`<opm>`, `<tdm>`, ...).
 pub(crate) fn kind_for_xml_root(root: &[u8]) -> Option<MessageKind> {
     use MessageKind::*;

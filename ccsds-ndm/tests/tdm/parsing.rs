@@ -1871,3 +1871,25 @@ fn legacy_tables_exclude_every_later_edition_metadata_keyword() {
         .to_string()
         .contains("MESSAGE_ID"));
 }
+
+#[test]
+fn itrf97_aliases_canonicalize_in_both_notations() {
+    for alias in ["ITRF97", "ITRF1997"] {
+        let input = KVN.replacen(
+            "META_STOP",
+            &format!("REFERENCE_FRAME = {alias}\nMETA_STOP"),
+            1,
+        );
+        let message = Tdm::from_kvn(&input).unwrap();
+        assert_eq!(
+            message.body.segments[0].metadata.reference_frame,
+            Some(TdmReferenceFrame::Itrf97)
+        );
+        let xml = message.to_xml().unwrap();
+        assert!(xml.contains("<REFERENCE_FRAME>ITRF-97</REFERENCE_FRAME>"));
+        assert_eq!(
+            Tdm::from_xml(&xml.replace("ITRF-97", alias)).unwrap(),
+            message
+        );
+    }
+}

@@ -19,7 +19,7 @@ lists what the library deliberately leaves to the parties exchanging the message
 | Area | Source | Behavior | Tests |
 | --- | --- | --- | --- |
 | Message structure | ODM 5.1–5.2, tables 5-1 to 5-4 | One OEM root with header, body and segments in order. All segments describe the same object and use the same time system. | `oem::parsing`, `oem::diagnostics`, `oem::validation` |
-| KVN layout | ODM 5.2.4–5.2.5, 7.3–7.9, A2.5.3 | Printable ASCII only (TAB reads as a blank), lines written at no more than 254 characters (longer lines are read), and lines terminated by LF, CR, CRLF or LFCR; reading also accepts an unterminated last line and trailing-space padding (see [More lenient than the book](#more-lenient-than-the-book)). Blank lines may appear anywhere. Writing uses the fixed keyword order; reading accepts unique header and metadata assignments in any order, while `CCSDS_OEM_VERS` must remain first. Comments may appear between header or metadata assignments. Data comments retain the book's placement rules. An ephemeris line has 7 or 10 fields, and each covariance row has as many values as its row number. The covariance section may be empty. An optional keyword with no value counts as absent; a mandatory keyword with no value is reported missing, with its line and segment path. | `oem::parsing`, `oem::generation`, `kvn::parser` unit tests |
+| KVN layout | ODM 5.2.4–5.2.5, 7.3–7.9, A2.5.3 | Printable ASCII outside comment payloads (TAB reads as a blank); UTF-8 comment text is preserved on input and requires XML or ASCII-compatible text for output, lines written at no more than 254 characters (longer lines are read), and lines terminated by LF, CR, CRLF or LFCR; reading also accepts an unterminated last line and trailing-space padding (see [More lenient than the book](#more-lenient-than-the-book)). Blank lines may appear anywhere. Writing uses the fixed keyword order; reading accepts unique header and metadata assignments in any order, while `CCSDS_OEM_VERS` must remain first. Comments may appear between header or metadata assignments. Data comments retain the book's placement rules. An ephemeris line has 7 or 10 fields, and each covariance row has as many values as its row number. The covariance section may be empty. An optional keyword with no value counts as absent; a mandatory keyword with no value is reported missing, with its line and segment path. | `oem::parsing`, `oem::generation`, `kvn::parser` unit tests |
 | XML layout | ODM 8, NDM/XML 4.2–4.3, `ndmxml-4.0.0-oem-3.0.xsd` | An XML 1.0 declaration, when present, must start the document; a missing one, equivalent UTF-8 spellings and omission of an unused `xmlns:xsi` are accepted (see below). Elements below the root are either all unqualified or all in the `urn:ccsds:schema:ndmxml` namespace; the root itself may be prefixed or not, as the books show both. Namespace declarations and schema-location hints are allowed on any element. Header and metadata children may be read in any order if unique; writing follows schema order. Other elements remain in schema order. Unknown content, a DTD, or a second document is rejected. | `oem::parsing`, `library::xml` |
 | Time | ODM 3.2.3.2, 5.1.3, 5.2.3–5.2.5, 7.5.10 | Epochs use the calendar or day-of-year form with at most 16 fraction digits. MET and MRT also accept durations spelled `YYYY-DDDThh:mm:ss` with day 000 to 999. Start and stop times must be in order. Complete useable spans of consecutive segments may touch but not overlap; segments need not be in time order. State epochs must fall inside the segment's total span; covariance epochs need not (see [Where sources conflict](#where-sources-conflict)). Covariance epochs must increase, but equal epochs are allowed. | `oem::validation` |
 | Values | ODM 5.2, 7.5, 8.13 | Required fields must be present. Text values keep their case as written (see [Where the book is unclear](#where-the-book-is-unclear)). XML numbers follow `xsd:double` (see [Where the book is unclear](#where-the-book-is-unclear)). KVN numbers must be finite and fit in a double; reading accepts more than 16 digits (see [More lenient than the book](#more-lenient-than-the-book)). Units are fixed and filled in when missing, and XML output omits the optional `units` attributes. | `oem::parsing`, `oem::validation`, `oem::conversion` |
@@ -131,14 +131,15 @@ shared epoch contract. This is a deliberate restriction of the library's elapsed
 representation, not an additional XSD constraint.
 
 - **Epochs.** The schema's `epochType` also allows time-zone offsets like `+01:00`, years with
-  more than four digits, an empty fraction, and a bare number. 7.5.10 only allows `Z`. We follow
-  7.5.10 in both notations, like OPM. All message types share this rule, so relaxing it has to
-  happen for all of them at once.
+  more than four digits, an empty fraction, and a bare number. 7.5.10 only allows `Z`. The shared reader additionally accepts zero-offset
+  aliases `+00:00`/`-00:00` and canonicalizes them without changing `TIME_SYSTEM`. Nonzero
+  offsets, expanded/negative years and empty fractions remain rejected.
 - **Empty mandatory values in XML.** The schema's `epochType` pattern and its plain strings
   admit an empty element (`<OBJECT_NAME/>`, `<START_TIME></START_TIME>`, `<EPOCH/>`). 7.5.1
   requires a value for every mandatory keyword and 7.5.10 defines no empty time tag, so we
-  reject them with `X is empty` (code `validation.invalid_value`, with the field path). An
-  empty optional epoch such as `<REF_FRAME_EPOCH/>` is rejected the same way. This is the shared
+  reject empty required values with `validation.missing_required_field`. An empty optional
+  epoch such as `<REF_FRAME_EPOCH/>` is also rejected, but can retain a lexical epoch or XML
+  parsing code; the shared diagnostic contract documents route-dependent categories. This is the shared
   book-over-XSD rule of the
   [validation contract](../design/validation-contract.md#authority-and-representability).
 - **OEM 1.0** is read only, and some valid 1.0 files are rejected; see [OEM 1.0](#oem-10).
@@ -337,8 +338,10 @@ lenient readings under [More lenient than the book](#more-lenient-than-the-book)
 useable-order rule does not apply.
 
 Mixed-case text values are accepted and retain their spelling (4.3.3g), as in later editions.
-Julian Date epochs such as `2451534.29812` (table 4-3) are still rejected: the model's epoch
-comparison and validation require a calendar or day-of-year value, and 2.0 withdrew Julian Dates.
+Julian Date epochs such as `2451534.29812` (table 4-3) are still rejected by this reader's
+edition-specific calendar/ordinal profile. The shared lexical `Epoch` can store and compare
+numbers, but OEM does not assign those numbers a Julian-Date interpretation. ODM 2.0 withdrew
+Julian Dates; implementing the older interpretation remains outside this compatibility reader.
 
 1.0 requires strictly increasing, non-repeating ephemeris epochs within a segment (4.3.5c), and
 each segment's `START_TIME` at or after the previous segment's `STOP_TIME` (table 4-3), so a
@@ -362,7 +365,7 @@ The covariance-marker tolerance covers the unmarked form only when both markers 
 absent; a lone marker is rejected. This deliberately avoids guessing whether the producer
 intended the marked or unmarked grammar. A leading covariance COMMENT needs an explicit
 COVARIANCE_START so that it has an unambiguous block owner; later comments follow the
-existing matrix rules. Marker generation is always explicit (ODM 5.4).
+existing matrix rules. Marker generation is always explicit (ODM §5.2.5.2).
 
 OEM 1.0 is input-only while its version remains 1.0. The public version field is mutable:
 a caller may deliberately relabel to 2.0/3.0, validate, and generate, with the documented
@@ -370,3 +373,25 @@ comment merging/movement. Relabelling is an explicit caller action, not automati
 The legacy reader uses the shared epoch syntax, which is looser than B-1's six fractional
 digits and no-Z spelling. TAB is accepted as a blank despite B-1 4.3.1b. Negative MET/MRT
 elapsed-time durations remain outside the supported profile.
+
+## Producer and diagnostic boundaries
+
+A supplied `INTERPOLATION` requires `INTERPOLATION_DEGREE` under the book's conditional
+rule even though the XSD makes both independent optional fields. A positive degree alone is
+retained without inventing a method. Complete usable spans may touch but must not overlap
+(§5.2.4.4); this is a book requirement, not an extra library restriction. Requiring usable
+bounds to lie inside total bounds follows their total/usable meaning and older edition tables;
+the 3.0 schema does not encode that relationship.
+
+The 2.0/3.0 KVN readers reject comments after the last ephemeris row, after
+`COVARIANCE_STOP`, or at EOF unless a following record gives them a supported block owner.
+The restricted 1.0 reader has its separately documented comment-placement rules. The library
+does not silently move these trailing comments between blocks.
+
+KVN output also refuses empty or literal `N/A` standard strings, non-ASCII content,
+embedded line breaks, lines longer than 254 characters, integers outside the KVN range,
+non-finite state/covariance values, and partial acceleration triples. These are shared or
+notation-specific representability checks, not proof that an XML model is invalid.
+Model header failures expose their `header.<field>` paths. Low-level deserializer failures can
+still lack canonical paths. Unclosed/incomplete covariance sections name their block and expected
+record shape; the parser does not invent a missing epoch or matrix.

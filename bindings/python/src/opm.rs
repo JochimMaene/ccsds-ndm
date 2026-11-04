@@ -140,6 +140,8 @@ impl Opm {
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
     ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Concatenated KVN messages have no combined KVN representation.
     /// ValueError
     ///     Unsupported format argument.
     #[staticmethod]
@@ -175,6 +177,8 @@ impl Opm {
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
     ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Concatenated KVN messages have no combined KVN representation.
     /// ValueError
     ///     Unsupported format argument.
     /// NdmIoError
@@ -856,7 +860,7 @@ impl KeplerianElements {
 ///     Velocity Z covariance [6,6]. Units: km²/s².
 /// cov_ref_frame : str, optional
 ///     Reference frame for the covariance matrix.
-/// comments : list[str], optional
+/// comment : list[str], optional
 ///     Comments before the covariance matrix.
 ///
 /// Attributes
@@ -899,7 +903,7 @@ impl OpmCovarianceMatrix {
         cz_dot_y_dot,
         cz_dot_z_dot,
         cov_ref_frame=None,
-        comments=None
+        comment=None
     ))]
     fn new(
         cx_x: f64,
@@ -924,14 +928,14 @@ impl OpmCovarianceMatrix {
         cz_dot_y_dot: f64,
         cz_dot_z_dot: f64,
         cov_ref_frame: Option<String>,
-        comments: Option<Vec<String>>,
+        comment: Option<Vec<String>>,
     ) -> Self {
         use ccsds_ndm::types::{
             PositionCovariance, PositionVelocityCovariance, VelocityCovariance,
         };
         Self {
             inner: ccsds_ndm::common::OpmCovarianceMatrix {
-                comment: comments.unwrap_or_default(),
+                comment: comment.unwrap_or_default(),
                 cov_ref_frame,
                 cx_x: PositionCovariance::new(cx_x, None),
                 cy_x: PositionCovariance::new(cy_x, None),

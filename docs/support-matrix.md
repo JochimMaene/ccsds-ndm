@@ -3,7 +3,8 @@
 Every current message family below uses the same
 [conformance verification criteria](conformance/README.md#verification-criteria) on both the Rust
 and Python APIs. **Verified** means the stated publication baseline, self-contained requirements,
-notation rules, public workflows, and packaged artifacts have been reviewed and tested. Each
+notation rules, public workflows, and packaged artifacts have been reviewed and tested. This
+definition applies to the current-support rows below, within their linked limits. Each
 family record states its authority and limits; this is not certification of mission truth or of
 behavior governed by an external algorithm, registry, or ICD.
 
@@ -24,8 +25,9 @@ behavior governed by an external algorithm, registry, or ICD.
 | Combined NDM | XML envelope | Not defined | Parse and write | [Combined instantiation](conformance/combined-ndm.md) |
 
 Conversion preserves the supported model subject to documented normalization: ordinary numbers
-may round to KVN's 16-digit precision, optional fixed-unit annotations may be omitted, and OPM's
-data/state-vector comment positions merge in KVN. It is not an exact model or byte round trip;
+may round to KVN's 16-digit precision and optional fixed-unit annotations may be normalized.
+CDM and RDM KVN always supply their book-required units. OPM data/state-vector and OMM
+data/mean-elements comment positions merge in KVN. It is not an exact model or byte round trip;
 see [preservation and normalization](design/validation-contract.md#preservation-and-normalization).
 Other information the target cannot represent causes an explicit refusal. For
 example, OCM's June 2026 technical corrigendum adds contact fields, covariance-to-trajectory
@@ -38,6 +40,13 @@ Combined NDM is XML-only. Requests for combined KVN fail with `unsupported.notat
 messages need application framing, such as one file per message. Constituents must satisfy their
 standalone requirements and the bundled NDM/XML 4.0.0 envelope's edition constraints: OPM, OMM,
 and OEM constituents must be 3.0. Standalone ODM 2.0 XML remains supported separately.
+
+Space-Track-style ODM 2.0 `<ndm>` exports are outside this envelope baseline and are rejected;
+support for their older envelope requires a separate edition review. Documents with undeclared
+`xsi` prefixes are invalid XML and remain rejected. CelesTrak-style OMM inputs with empty
+creation/originator fields also fail mandatory provenance checks. Extract a valid standalone
+constituent with its namespace bindings or obtain a supported export; relabelling a version or
+inventing provenance does not establish conformance.
 
 ## Legacy compatibility
 
@@ -53,6 +62,12 @@ library accepts its defined 2.0 representation. A version label on a newer-forma
 evidence of an older format's support. Unsupported versions fail explicitly with
 `parse.unsupported_input_version`, checked after encoding/character checks and before structural
 parsing, rather than being silently treated as current messages.
+
+This excludes genuine APM/AEM 1.0 producer files, including legacy Orekit corpus examples;
+implementation coverage of attitude 2.0 is not a claim to accept every attitude fixture.
+TDM 1.0 is restricted KVN input only, retains its edition, and rejects the later fields listed
+in the [TDM record](conformance/tdm-2.0.md). TDM 1.0 XML and generation remain unsupported;
+successful parsing after relabelling a sample does not verify its original edition.
 
 ## Common guarantees and boundaries
 
@@ -82,10 +97,6 @@ Run `just verify` for the quality suite and installed-artifact checks. The
 [conformance index](conformance/README.md) maps shared checks to the family records; resource tests
 and benchmarks measure implementation behavior without turning timing observations into
 standards requirements.
-
-TDM 1.0 has a restricted KVN input-only reader. It retains the 1.0 version and rejects
-2.0-only observation families and metadata listed in the [TDM record](conformance/tdm-2.0.md).
-It does not support TDM 1.0 XML or generation; relabelling is an explicit caller action.
 
 PRM (CCSDS 509.0) is outside the supported families. The files in data/prm are research
 inputs, not a claim of parser or generator support.

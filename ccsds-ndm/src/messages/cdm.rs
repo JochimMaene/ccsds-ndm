@@ -86,8 +86,17 @@ impl Ndm for Cdm {
         xml::validate_xml_sequences(xml)?;
         let values = xml::without_unavailable_values(xml)?;
         let mut cdm: Self = crate::xml::from_str_with_context(&values, "CDM")?;
-        cdm.header.originator = cdm.header.originator.trim().to_owned();
+        for value in [&mut cdm.header.originator, &mut cdm.header.message_id] {
+            *value = value.trim_matches([' ', '\t', '\r', '\n']).to_owned();
+        }
         for segment in &mut cdm.body.segments {
+            for value in [
+                &mut segment.metadata.object_designator,
+                &mut segment.metadata.catalog_name,
+                &mut segment.metadata.international_designator,
+            ] {
+                *value = value.trim_matches([' ', '\t', '\r', '\n']).to_owned();
+            }
             segment.data.drop_empty_blocks();
         }
         crate::traits::Validate::validate(&cdm)?;

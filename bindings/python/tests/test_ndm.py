@@ -11,6 +11,7 @@ from pathlib import Path
 import ccsds_ndm
 import pytest
 
+
 from ccsds_ndm import (
     Cdm,
     CdmBody,
@@ -31,6 +32,16 @@ from ccsds_ndm import (
     StateVectorAcc,  # Verified class name
     Tdm,
 )
+
+
+def test_combined_messages_reject_nested_or_cyclic_constituents_before_conversion():
+    message = ccsds_ndm.CombinedNdm([])
+    message.messages.append(message)
+    for operation in (message.validate, lambda: message.to_str("xml")):
+        with pytest.raises(ValueError, match="Nested combined"):
+            operation()
+    with pytest.raises(ValueError, match="Nested combined"):
+        message.messages = [ccsds_ndm.CombinedNdm([])]
 
 
 def test_combined_envelope_preserves_decoded_text_and_empty_fields():

@@ -185,10 +185,8 @@ impl AemBody {
         let object_name = &first.metadata.object_name;
         let object_id = &first.metadata.object_id;
         for (index, segment) in self.segment.iter().enumerate().skip(1) {
-            if !segment
-                .metadata
-                .object_name
-                .eq_ignore_ascii_case(object_name)
+            if !crate::types::enum_token(&segment.metadata.object_name)
+                .eq_ignore_ascii_case(&crate::types::enum_token(object_name))
                 || segment.metadata.object_id != *object_id
             {
                 return Some(

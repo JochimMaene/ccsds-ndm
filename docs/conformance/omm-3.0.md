@@ -18,7 +18,7 @@ The `omm` suite establishes:
 
 | Concern | Evidence |
 | --- | --- |
-| KVN lexical and structural strictness | The shared ODM assignment scanner rejects non-ASCII or control input other than TAB, malformed assignments, unknown and duplicate keywords, fixed-order violations, and comments outside the beginning of a logical block. OMM registers only its standard-derived keyword ranks and choice/repetition transitions. Members of a keyword choice share a rank, so the scanner compares keys as well as ranks: the other alternative may follow, a repeat of the same keyword may not. |
+| KVN lexical and structural strictness | The shared ODM assignment scanner rejects non-ASCII outside comments and control input other than TAB, malformed assignments, unknown and duplicate singleton keywords, fixed-order violations, and comments outside the beginning of a logical block. OMM registers only its standard-derived keyword ranks and choice/repetition transitions. Members of a keyword choice share a rank, so the scanner compares keys as well as ranks: the other alternative may follow, a repeat of the same singleton keyword may not. User-parameter names may repeat and retain their ordered values. |
 | XML structure | The OMM sequence registration rejects unknown, duplicate, and reordered children throughout the root, header, metadata, data, mean-elements, spacecraft, TLE, covariance, and user-defined structures. It rejects non-schema attributes while allowing only the fixed unit and user-defined parameter attributes at their applicable leaves. |
 | Valid input and preservation | All three shipped KVN fixtures and the shipped XML fixture parse through the public strict API. Generated KVN and XML reparse to the same typed model. |
 | XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
@@ -145,7 +145,9 @@ overflow, and nonzero values below the double range are rejected. KVN output ret
 sixteen-significant-digit limit. GM must be positive (`gmType`) in every notation and in the
 model, under the shared [facet rule](../design/validation-contract.md#authority-and-representability);
 the book states no range. `NORAD_CAT_ID` is stored as `u32`, so ten-digit values up to
-4,294,967,295 are read although table 4-3 says "up to nine digits"; KVN still writes them only
+4,294,967,295 are read although table 4-3 says "up to nine digits". Negative catalog numbers
+are rejected despite `xsd:integer`; this is the documented unsigned storage profile. XML `-0`
+is accepted as zero. KVN still writes these fields only
 within the shared [integer limit](../design/validation-contract.md#integer-storage-limits).
 
 Empty mandatory XML strings (`<OBJECT_ID/>`) are rejected as empty values, book over XSD, per
@@ -215,3 +217,14 @@ TLE line helpers use the stored TLE fields for `MEAN_MOTION_DOT` and
 The bundled `omm1_ct.xml` also uses an ODM 2.0 `<ndm>` wrapper and therefore encounters
 that envelope refusal before provenance validation. Extracting it as standalone XML does not
 waive the requirement for populated CREATION_DATE and ORIGINATOR.
+
+TLE export needs explicitly populated `MEAN_MOTION_DOT`, `MEAN_MOTION_DDOT`, `BSTAR`,
+`NORAD_CAT_ID`, `ELEMENT_SET_NO`, `REV_AT_EPOCH`, `CLASSIFICATION_TYPE`, and `EPHEMERIS_TYPE`.
+It does not populate the book's U/0 classification/ephemeris defaults or invent zero derivatives.
+Missing fields raise validation errors naming the field, not an instruction to infer a propagator.
+The ordinary metadata and mean-elements requirements also continue to apply.
+
+Repeated user-defined names retain every value in order in KVN and XML. Empty suffixes are
+rejected; empty user values are literal user content and remain distinct from missing standard
+fields. General validation runs edition restrictions before theory-dependent required fields,
+so a 2.0 BTERM/AGOM field is reported as forbidden instead of first asking for a 2.0 BSTAR.

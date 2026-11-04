@@ -137,3 +137,26 @@ fn missing_xml_covariance_epoch_reports_where_deserialization_failed() {
         );
     }
 }
+
+#[test]
+fn model_header_errors_have_paths_and_unclosed_covariance_names_its_block() {
+    use ccsds_ndm::Validate;
+    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    message.header.originator = "".into();
+    assert_eq!(
+        message.validate().unwrap_err().field_path().as_deref(),
+        Some("header.originator")
+    );
+    let mut message = Oem::from_xml(XML).unwrap();
+    for segment in &mut message.body.segment {
+        segment.data.covariance_matrix.clear();
+    }
+    let input = format!("{}COVARIANCE_START\n", message.to_kvn().unwrap());
+    let error = Oem::from_kvn(&input).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("incomplete OEM covariance block"),
+        "{error}"
+    );
+}

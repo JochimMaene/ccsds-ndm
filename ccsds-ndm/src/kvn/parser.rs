@@ -1519,6 +1519,13 @@ pub fn user_defined_parameters(input: &mut &str) -> KvnResult<Option<UserDefined
             input.reset(&checkpoint);
             break;
         };
+        if parameter.is_empty() {
+            input.reset(&checkpoint);
+            return Err(cut_err(
+                input,
+                "USER_DEFINED_ requires a nonempty parameter name",
+            ));
+        }
         entries.extend(comments.into_iter().map(UserDefinedEntry::Comment));
         let value = kv_string.parse_next(input)?;
         entries.push(UserDefinedEntry::Parameter(UserDefinedParameter {

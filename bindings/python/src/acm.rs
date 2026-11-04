@@ -10,6 +10,26 @@ use ccsds_ndm::types::{AcmAttitudeType, AcmCovarianceLineType, AttRateType, RotS
 /// A history line as exposed to Python: `(time_tag, values)`.
 type HistoryLine = (String, Vec<f64>);
 
+fn attitude_state_count(att_lines: &[HistoryLine]) -> PyResult<u32> {
+    let number_states = att_lines
+        .first()
+        .map(|line| line.1.len())
+        .filter(|count| *count > 0)
+        .ok_or_else(|| {
+            PyValueError::new_err(
+                "att_lines must contain a time tag followed by at least one state",
+            )
+        })?;
+    if att_lines.iter().any(|line| line.1.len() != number_states) {
+        return Err(PyValueError::new_err(
+            "all att_lines must contain the same number of states",
+        ));
+    }
+    let number_states = u32::try_from(number_states)
+        .map_err(|_| PyValueError::new_err("attitude state count exceeds u32"))?;
+    Ok(number_states)
+}
+
 fn att_lines_from_py(lines: Vec<HistoryLine>) -> PyResult<Vec<core_acm::AttLine>> {
     lines
         .into_iter()
@@ -172,6 +192,8 @@ impl Acm {
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
     ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Multiple KVN message headers require separate files or an XML envelope.
     /// ValueError
     ///     Unsupported format argument.
     #[staticmethod]
@@ -207,6 +229,8 @@ impl Acm {
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
     ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Multiple KVN message headers require separate files or an XML envelope.
     /// ValueError
     ///     Unsupported format argument.
     /// NdmIoError
@@ -999,7 +1023,8 @@ impl AcmData {
 
 /// ACM Data: Attitude State Time History Section.
 ///
-/// NUMBER_STATES is derived from the first row. An omitted rate_type means attitude-only rows.
+/// NUMBER_STATES is derived from the first row on construction and att_lines assignment.
+/// An omitted rate_type means attitude-only rows.
 ///
 /// Parameters
 /// ----------
@@ -1043,28 +1068,12 @@ impl AcmAttitudeState {
     ) -> PyResult<Self> {
         let att_type = AcmAttitudeType::from_str(&att_type)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        let number_states = att_lines
-            .first()
-            .map(|line| line.1.len())
-            .filter(|count| *count > 0)
-            .ok_or_else(|| {
-                PyValueError::new_err(
-                    "att_lines must contain a time tag followed by at least one state",
-                )
-            })?;
-        if att_lines.iter().any(|line| line.1.len() != number_states) {
-            return Err(PyValueError::new_err(
-                "all att_lines must contain the same number of states",
-            ));
-        }
-        let number_states = u32::try_from(number_states)
-            .map_err(|_| PyValueError::new_err("attitude state count exceeds u32"))?;
         Ok(Self {
             inner: core_acm::AcmAttitudeState {
                 comment: comment.unwrap_or_default(),
                 ref_frame_a,
                 ref_frame_b,
-                number_states,
+                number_states: attitude_state_count(&att_lines)?,
                 att_type,
                 att_lines: att_lines_from_py(att_lines)?,
                 att_id: None,
@@ -1289,7 +1298,10 @@ impl AcmAttitudeState {
 
     #[setter]
     fn set_att_lines(&mut self, value: Vec<HistoryLine>) -> PyResult<()> {
-        self.inner.att_lines = att_lines_from_py(value)?;
+        let number_states = attitude_state_count(&value)?;
+        let lines = att_lines_from_py(value)?;
+        self.inner.att_lines = lines;
+        self.inner.number_states = number_states;
         Ok(())
     }
 }

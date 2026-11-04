@@ -42,7 +42,7 @@ use ccsds_ndm::{from_file, Message};
 
 fn main() -> ccsds_ndm::error::Result<()> {
     // Auto-detect format (KVN/XML) and message type
-    let msg = from_file("example.ndm")?;
+    let msg = from_file("example.opm")?;
 
     if let Message::Opm(opm) = msg {
         opm.validate()?;
@@ -60,7 +60,8 @@ Parse a specific type directly when you already know it:
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::Ndm;
 
-let opm = Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...").unwrap();
+let text = std::fs::read_to_string("example.opm")?;
+let opm = Opm::from_kvn(&text)?;
 ```
 
 ## Features

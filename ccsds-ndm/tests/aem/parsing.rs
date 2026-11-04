@@ -626,6 +626,16 @@ fn aem_uses_canonical_angular_velocity_frame_and_preserves_optional_metadata() {
             Aem::from_kvn(&input.replace("META_STOP", "RATE_FRAME = OTHER\nMETA_STOP")).is_err()
         );
     }
+    for placeholder in ["REF_FRAME_A", "REF_FRAME_B"] {
+        let input = source.replace(
+            "META_STOP",
+            &format!("RATE_FRAME = {placeholder}\nMETA_STOP"),
+        );
+        assert!(Aem::from_kvn(&input)
+            .unwrap_err()
+            .to_string()
+            .contains("actual frame"));
+    }
     for element in [
         "<ANGVEL_FRAME>REF_FRAME_B</ANGVEL_FRAME>",
         "<EULER_ROT_SEQ>XYZ</EULER_ROT_SEQ>",

@@ -613,6 +613,8 @@ impl Oem {
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
     ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Concatenated KVN messages have no combined KVN representation.
     /// ValueError
     ///     Unsupported format argument.
     #[staticmethod]
@@ -648,6 +650,8 @@ impl Oem {
     ///     CCSDS validation failure or unsupported edition.
     /// NdmUnsupportedMessageError
     ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Concatenated KVN messages have no combined KVN representation.
     /// ValueError
     ///     Unsupported format argument.
     /// NdmIoError

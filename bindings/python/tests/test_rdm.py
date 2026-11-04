@@ -138,6 +138,36 @@ class TestRdm:
         with pytest.raises(ccsds_ndm.NdmValidationError):
             rdm.to_str(format="xml")
 
+    def test_unitless_xml_impact_altitude_remains_editable(self):
+        rdm = self._create_valid_rdm()
+        rdm.segment.data.ground_impact_parameters = GroundImpactParameters(
+            impact_ref_frame="ITRF2000",
+            nominal_impact_lon=10.0,
+            nominal_impact_lat=20.0,
+            nominal_impact_alt=1.0,
+        )
+        xml = rdm.to_str("xml").replace(
+            '<NOMINAL_IMPACT_ALT units="m">', "<NOMINAL_IMPACT_ALT>"
+        )
+        assert "<NOMINAL_IMPACT_ALT>" in xml
+        parsed = Rdm.from_str(xml, "xml")
+        assert parsed.segment.data.ground_impact_parameters.nominal_impact_alt == 1.0
+        assert "<NOMINAL_IMPACT_ALT>" in parsed.to_str("xml")
+        parsed.segment.data.ground_impact_parameters.nominal_impact_alt = 2.0
+        parsed.validate()
+        line = next(
+            line
+            for line in parsed.to_str("kvn").splitlines()
+            if line.startswith("NOMINAL_IMPACT_ALT")
+        )
+        assert line.endswith("[m]")
+        assert (
+            Rdm.from_str(
+                parsed.to_str("xml")
+            ).segment.data.ground_impact_parameters.nominal_impact_alt
+            == 2.0
+        )
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

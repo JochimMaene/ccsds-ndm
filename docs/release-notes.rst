@@ -4,6 +4,38 @@ Release notes
 Unreleased
 ----------
 
+Final conformance corrections
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Python combined messages reject nested or self-referencing constituents before conversion,
+  raising ``ValueError`` instead of recursing until the process crashes. XML constituent
+  deserializer errors now report positions in the original combined document.
+- ACM XML input/output checks exact schema spellings for ``ATT_BASIS``, ``COV_BASIS`` and
+  ``AD_METHOD``. ACM metadata rejects impossible absolute dates and incomplete relative time
+  tags while retaining zero and negative offsets. Assigning Python attitude rows derives their count and validates the replacement
+  before changing the existing rows.
+- CDM KVN always writes required fixed units. Empty/nil XML leaves validate supplied units
+  before normalization, decoded empty CDATA follows the same rules as empty text, and restricted
+  identifiers consistently ignore surrounding XML padding.
+- RDM accepts omitted XML ``NOMINAL_IMPACT_ALT`` units. Rust ``AltitudeRequired.units`` is now
+  ``Option<LengthUnits>`` (breaking); Python numeric access is unchanged. KVN supplies ``[m]``.
+- OPM preserves repeated user-defined names through KVN/XML. Empty parameter-name suffixes are
+  rejected on input; empty and literal ``N/A`` user-defined values remain opaque payloads.
+- OMM XML accepts signed integer zero according to XSD value equality. KVN ``DOPPLER_COUNT``
+  output enforces the signed 32-bit integer limit and writes zero without a negative sign.
+  Exact phase counts retain arbitrary precision; only signed-zero spelling is normalized in KVN.
+- All KVN readers accept a missing final newline and printable Unicode in COMMENT payloads.
+  XML preserves those comments; ASCII KVN output refuses them explicitly. Zero epoch offsets
+  ``+00:00`` and ``-00:00`` normalize to ``Z`` without converting the declared time system.
+  Nonzero offsets and the existing fractional-second precision limits remain unchanged.
+- Python ``OpmCovarianceMatrix`` takes ``comment=`` rather than ``comments=`` (breaking),
+  matching its property. AEM compares object names using blank/underscore equivalence and
+  refuses obsolete symbolic ``RATE_FRAME`` placeholders instead of treating them as frame names.
+- Family records and the shared contract distinguish XSD structure/value domains from book
+  conditional requirements. Missing frames, OPM maneuver mass, OEM interpolation degree, and
+  overlapping OEM usable spans remain validation failures. OCM book defaults may remain omitted.
+  Earlier combined ODM envelopes, TDM 1.0 XML, and attitude 1.0 remain outside the supported scope.
+
 Additional conformance corrections
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -82,7 +114,7 @@ Additional conformance corrections
   derivative may be omitted where its theory permits, but XML still enforces its required shape.
 - APM KVN omits metadata delimiters and preserves quaternion-derivative units. AEM data validation
   takes no attitude-type argument; metadata/type matching is checked by the segment or message.
-  ``TdmPath`` is removed; path properties use strings with arbitrary supported participant sequences.
+  The Python ``TdmPath`` class is removed; path properties use strings with arbitrary supported participant sequences.
 - Error codes cover all error categories, including Python file and EOF errors. Typed Python
   readers identify a wrong message family before parsing its body. Unused ``requirement``
   diagnostics are removed; available paths and source lines are retained in diagnostics.
@@ -257,11 +289,11 @@ OEM producer compatibility
 - The shared XML reader accepts equivalent UTF-8 XML 1.0 declarations and
   omission of an unused schema-instance namespace. Used prefixes still need
   valid declarations; generated XML keeps the standard declaration and namespaces.
-- OEM KVN ignores trailing ASCII spaces when checking the input line-length
-  limit, including on comments. Generated lines still fit the 254-character limit.
+- OEM KVN ignores trailing ASCII padding, including on comments, and accepts overlong input
+  records. Generated lines still fit the 254-character limit.
 - OEM KVN reads comments between a covariance epoch or frame and its first
-  numeric row into that matrix. XML preserves them; KVN writing still rejects
-  comments on later matrices when their association cannot be retained.
+  numeric row into that matrix. XML and KVN preserve their associations on later matrices too;
+  canonical KVN places each matrix's comments before its epoch.
 - OEM KVN reads complete covariance matrices without section markers when an
   ``EPOCH`` follows the state records; generated KVN writes the standard markers.
 - XML deserialization errors name a nearby source line and column.

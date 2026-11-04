@@ -8,6 +8,113 @@ use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::{from_str, Ndm};
 
 #[test]
+fn unicode_comments_and_unterminated_final_records_have_one_shared_contract() {
+    for source in [
+        include_str!("../../data/kvn/opm_g2.kvn"),
+        include_str!("../../data/kvn/omm_g9.kvn"),
+        include_str!("../../data/kvn/oem_g13.kvn"),
+        include_str!("../../data/kvn/ocm_g15.kvn"),
+        include_str!("../../data/kvn/cdm_362.kvn"),
+        include_str!("../../data/kvn/tdm_e1.kvn"),
+        include_str!("../../data/kvn/rdm_c1.kvn"),
+        include_str!("../../data/kvn/apm_g1.kvn"),
+        include_str!("../../data/kvn/aem_g4.kvn"),
+        include_str!("../../data/kvn/acm_g6.kvn"),
+    ] {
+        let original = from_str(source).unwrap();
+        assert_eq!(
+            from_str(source.trim_end_matches(['\r', '\n'])).unwrap(),
+            original
+        );
+        let (version, rest) = source.split_once('\n').unwrap();
+        let input = format!("{version}\nCOMMENT Café − producer\n{rest}");
+        let message = from_str(&input).unwrap();
+        let xml = message.to_xml().unwrap();
+        assert!(xml.contains("Café − producer"));
+        assert_eq!(from_str(&xml).unwrap(), message);
+        let mut output = Vec::new();
+        assert!(message.write_kvn_to(&mut output).is_err());
+        assert!(output.is_empty());
+        let input = input.replace("ORIGINATOR =", "ORIGINATOR = é");
+        assert_eq!(
+            from_str(&input).unwrap_err().code(),
+            Some("parse.kvn.syntax")
+        );
+    }
+}
+
+#[test]
+fn zero_epoch_offsets_normalize_without_relabelling_the_time_system() {
+    let source = include_str!("../../data/kvn/opm_g2.kvn");
+    let original = ccsds_ndm::messages::opm::Opm::from_kvn(source).unwrap();
+    for suffix in ["+00:00", "-00:00"] {
+        let epoch = original.header.creation_date.to_string();
+        let alias = format!("{}{suffix}", epoch.trim_end_matches('Z'));
+        let parsed =
+            ccsds_ndm::messages::opm::Opm::from_kvn(&source.replace(&epoch, &alias)).unwrap();
+        assert_eq!(
+            parsed.header.creation_date.to_string(),
+            format!("{}Z", epoch.trim_end_matches('Z'))
+        );
+        assert_eq!(
+            parsed.body.segment.metadata.time_system,
+            original.body.segment.metadata.time_system
+        );
+        let xml = original.to_xml().unwrap().replace(&epoch, &alias);
+        assert_eq!(
+            ccsds_ndm::messages::opm::Opm::from_xml(&xml).unwrap(),
+            parsed
+        );
+        assert!(parsed
+            .to_kvn()
+            .unwrap()
+            .contains(&format!("{}Z", epoch.trim_end_matches('Z'))));
+    }
+}
+
+#[test]
+fn unsigned_xml_integer_zero_uses_xsd_value_equality() {
+    let source = include_str!("../../data/xml/omm_g10.xml");
+    for field in ["NORAD_CAT_ID", "REV_AT_EPOCH"] {
+        let start = source.find(&format!("<{field}>")).unwrap() + field.len() + 2;
+        let end = start + source[start..].find('<').unwrap();
+        for token in ["-0", "-000", "+000", " 000 "] {
+            let xml = format!("{}{token}{}", &source[..start], &source[end..]);
+            let message = Omm::from_xml(&xml).unwrap();
+            let tle = message.body.segment.data.tle_parameters.as_ref().unwrap();
+            assert_eq!(
+                if field == "NORAD_CAT_ID" {
+                    tle.norad_cat_id
+                } else {
+                    tle.rev_at_epoch
+                },
+                Some(0)
+            );
+            let json = serde_json::to_string(&message).unwrap();
+            assert_eq!(serde_json::from_str::<Omm>(&json).unwrap(), message);
+            assert_eq!(Omm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+        }
+        for token in ["-1", "-", "4294967296"] {
+            let xml = format!("{}{token}{}", &source[..start], &source[end..]);
+            assert!(Omm::from_xml(&xml).is_err());
+        }
+    }
+}
+
+#[test]
+fn user_defined_parameter_names_cannot_have_an_empty_suffix() {
+    for source in [
+        include_str!("../../data/kvn/opm_g2.kvn"),
+        include_str!("../../data/kvn/omm_g9.kvn"),
+        include_str!("../../data/kvn/rdm_c1.kvn"),
+    ] {
+        let input = format!("{source}\nUSER_DEFINED_ = value\n");
+        let error = from_str(&input).unwrap_err();
+        assert!(error.to_string().contains("USER_DEFINED_"), "{error}");
+    }
+}
+
+#[test]
 fn unaudited_adm_editions_are_not_advertised_as_supported() {
     let cases = [
         ("AEM", include_str!("../../data/kvn/aem_g4.kvn")),
