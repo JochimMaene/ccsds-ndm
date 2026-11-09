@@ -246,7 +246,7 @@ epoch conversion leaves both the rows and count unchanged. An absent rate_type m
 Known KVN basis/method aliases canonicalize: for example `FILTER  SMOOTHER` becomes
 `FILTER_SMOOTHER`. Unknown open text remains unchanged. OBJECT_NAME is required by the
 XML schema; OBJECT_DESIGNATOR remains optional. Exponent-relative tags are covered through
-both public readers by `exponent_history_tags_expand_exactly_on_both_public_readers`.
+both public readers by `exponent_history_and_covariance_tags_expand_exactly_on_both_public_readers`.
 
 ## Additional caller boundaries
 

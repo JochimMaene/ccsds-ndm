@@ -131,7 +131,7 @@ which formerly required TLE fields became optional:
 
 | Difference | Decision and evidence |
 | --- | --- |
-| No `CLASSIFICATION` or `MESSAGE_ID` in the 2.0 header | Both parse notations and mutated models reject these fields; `conformance::odm2::opm_and_omm_2_reject_new_header_fields_in_both_notations`. |
+| No `CLASSIFICATION` or `MESSAGE_ID` in the 2.0 header | Both parse notations and mutated models reject these fields; `conformance::odm2::odm_2_rejects_odm_3_header_fields_when_reading_and_writing`. |
 | A present 2.0 XML TLE block requires `NORAD_CAT_ID`, `ELEMENT_SET_NO`, `REV_AT_EPOCH`, `BSTAR`, `MEAN_MOTION_DOT`, and `MEAN_MOTION_DDOT` | The XML edition gate enforces the complete old shape independently of theory; KVN and model validation apply the 2.0 book's own theory conditions ([table](#theory-dependent-tle-requirements)), not the 3.0 ones. `conformance::odm2::omm_2_tle_schema_shape_is_xml_only`, `conformance::odm2::omm_2_applies_its_own_theory_table`. |
 | 2.0 `angleRange` is [-180, 360) | The 2.0 common schema narrows `RA_OF_ASC_NODE`, `ARG_OF_PERICENTER`, and `MEAN_ANOMALY` from 3.0's [-360, 360). Like every XSD facet it applies to 2.0 in all notations, to keep the 2.0 angle domain compatible across notations. `conformance::odm2::odm_2_angles_use_the_2_0_range`. |
 | `BTERM` and `AGOM` were introduced in 3.0 | Reject them in 2.0; do not substitute a coefficient with different physical meaning. The same TLE-shape regression covers both input and output notations. |

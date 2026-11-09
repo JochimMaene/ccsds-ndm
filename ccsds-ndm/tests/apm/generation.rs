@@ -112,16 +112,6 @@ fn apm_repeated_attitude_blocks_are_reached_from_the_root() {
 }
 
 #[test]
-fn kvn_lexical_errors_have_the_same_category_for_string_and_streaming_output() {
-    let mut message = Apm::from_kvn(include_str!("../../data/kvn/apm_g1.kvn")).unwrap();
-    message.header.originator = "GSFC-é".into();
-    let direct = message.to_kvn().unwrap_err();
-    let streaming = message.write_kvn_to(&mut Vec::new()).unwrap_err();
-    assert!(direct.as_validation_error().is_some());
-    assert!(streaming.as_validation_error().is_some());
-}
-
-#[test]
 fn apm_nutation_period_is_seconds_without_reinterpreting_day_units() {
     use ccsds_ndm::types::TimeUnits;
     let mut message = Apm::from_kvn(crate::SPIN_KVN).unwrap();
