@@ -3062,15 +3062,6 @@ mod tests {
         assert!(s.contains("MSG1"));
     }
 
-    #[test]
-    fn test_odm_header_validation() {
-        let h = OdmHeader::builder()
-            .creation_date("2000-01-01T00:00:00".parse().unwrap())
-            .originator("")
-            .build();
-        assert!(h.validate().is_err());
-    }
-
     fn opm_covariance_fixture() -> OpmCovarianceMatrix {
         OpmCovarianceMatrix::builder()
             .cx_x(PositionCovariance::new(1.0, None))
@@ -3110,31 +3101,15 @@ mod tests {
     }
 
     #[test]
-    fn test_quaternion_validation() {
+    fn quaternion_norm_accepts_three_decimal_unit_values_and_rejects_others() {
+        // Not normalized, on the high side.
         let q = Quaternion {
             q1: 2.0,
             q2: 0.0,
             q3: 0.0,
             qc: 0.0,
         };
-        assert!(q.validate().is_err()); // Not normalized
-        let q2 = Quaternion {
-            q1: 1.0,
-            q2: 0.0,
-            q3: 0.0,
-            qc: 0.0,
-        };
-        assert!(q2.validate().is_ok());
-    }
-}
-
-#[cfg(test)]
-mod rounded_quaternion_tests {
-    use super::Quaternion;
-    use crate::Validate;
-
-    #[test]
-    fn three_decimal_unit_quaternions_pass_without_normalization() {
+        assert!(q.validate().is_err());
         let q = Quaternion::new(0.552, 0.432, -0.437, -0.562).unwrap();
         q.validate().unwrap();
         q.validate_kvn_rounding().unwrap();

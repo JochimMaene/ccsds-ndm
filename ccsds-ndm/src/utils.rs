@@ -148,28 +148,14 @@ mod tests {
     }
 
     #[test]
-    fn test_vec_f64_space_sep_serialize() {
-        let w = Wrapper {
-            values: vec![1.1, 2.2, 3.3],
-        };
-        let s = serde_json::to_string(&w).unwrap();
-        assert_eq!(s, r#"{"values":"1.1 2.2 3.3"}"#);
-    }
-
-    #[test]
-    fn test_vec_f64_space_sep_deserialize() {
-        let s = r#"{"values":"1.1 2.2 3.3"}"#;
-        let w: Wrapper = serde_json::from_str(s).unwrap();
-        assert_eq!(w.values, vec![1.1, 2.2, 3.3]);
-    }
-
-    #[test]
-    fn test_vec_f64_space_sep_empty() {
-        let w = Wrapper { values: vec![] };
-        let s = serde_json::to_string(&w).unwrap();
-        assert_eq!(s, r#"{"values":""}"#);
-
-        let w2: Wrapper = serde_json::from_str(&s).unwrap();
-        assert_eq!(w2.values, Vec::<f64>::new());
+    fn vec_f64_space_sep_round_trips() {
+        for (values, json) in [
+            (vec![1.1, 2.2, 3.3], r#"{"values":"1.1 2.2 3.3"}"#),
+            (vec![], r#"{"values":""}"#),
+        ] {
+            let wrapper = Wrapper { values };
+            assert_eq!(serde_json::to_string(&wrapper).unwrap(), json);
+            assert_eq!(serde_json::from_str::<Wrapper>(json).unwrap(), wrapper);
+        }
     }
 }

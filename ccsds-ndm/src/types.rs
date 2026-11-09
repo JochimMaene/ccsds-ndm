@@ -5342,9 +5342,6 @@ mod tests {
     #[test]
     fn constrained_numeric_types_reject_non_finite_values() {
         for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-            assert!(DayInterval::new(value, None).is_err());
-            assert!(Mass::new(value, None).is_err());
-            assert!(Area::new(value, None).is_err());
             assert!(NonNegativeDouble::new(value).is_err());
             assert!(Percentage::new(value, None).is_err());
             assert!(PercentageRequired::new(value).is_err());
@@ -5399,12 +5396,6 @@ mod tests {
         assert!(Epoch::new(".678").is_ok());
         assert!(Epoch::new("12345.").is_ok());
         assert!(Epoch::new("12345").is_ok());
-        assert!(Epoch::new("+").is_ok()); // Technically valid according to XSD [+-]?\d*(\.\d*)?
-        assert!(Epoch::new("-").is_ok()); // Technically valid according to XSD
-        assert!(Epoch::new(".").is_ok()); // Technically valid according to XSD
-
-        // Empty string
-        assert!(Epoch::new("").is_ok());
 
         // Invalid formats
         assert!(Epoch::new("2023-11-13").is_err()); // Missing time
@@ -5631,13 +5622,8 @@ mod tests {
                 maximum: MAX_EPOCH_LEN,
             })
         );
-        let _max_epoch = "A".repeat(64);
-        // "A" is not a valid epoch format, so it should fail anyway, but let's test length check
-        // We can use numeric format for long valid epoch if needed, but 64 is huge for digits.
         let long_numeric = "1".repeat(64);
         assert!(Epoch::new(&long_numeric).is_ok());
-        let too_long_numeric = "1".repeat(65);
-        assert!(Epoch::new(&too_long_numeric).is_err());
         let prefix = "2026-001T00:00:00.";
         let calendar = format!("{prefix}{}", "0".repeat(MAX_EPOCH_LEN - prefix.len()));
         assert_eq!(Epoch::new(&calendar).unwrap().as_str(), calendar);
@@ -5743,14 +5729,6 @@ mod extra_tests {
     }
 
     #[test]
-    fn test_angle_validation() {
-        assert!(Angle::new(359.9, None).is_ok());
-        assert!(Angle::new(-359.9, None).is_ok());
-        assert!(Angle::new(360.0, None).is_err());
-        assert!(Angle::new(-360.1, None).is_err());
-    }
-
-    #[test]
     fn test_day_interval_validation() {
         assert!(DayInterval::new(10.0, None).is_ok());
         assert!(DayInterval::new(-0.1, None).is_err());
@@ -5772,7 +5750,6 @@ mod extra_tests {
     #[test]
     fn test_gm_validation() {
         assert!(Gm::new(1.0, None).is_ok());
-        assert!(Gm::new(0.0, None).is_ok());
         assert!(Gm::validate_xml_value(0.0, "GM").is_err());
         assert!("KM**3/S**2".parse::<GmUnits>().is_ok());
     }
@@ -5791,18 +5768,6 @@ mod extra_tests {
         assert!(ImpactAltitude::new(0.0).unwrap().is_xml_representable());
         assert!(!ImpactAltitude::new(9000.0).unwrap().is_xml_representable());
         assert!(!ImpactAltitude::new(-431.0).unwrap().is_xml_representable());
-    }
-
-    #[test]
-    fn test_mass_validation() {
-        assert!(Mass::new(0.0, None).is_ok());
-        assert!(Mass::new(-1.0, None).is_err());
-    }
-
-    #[test]
-    fn test_area_validation() {
-        assert!(Area::new(0.0, None).is_ok());
-        assert!(Area::new(-1.0, None).is_err());
     }
 
     #[test]

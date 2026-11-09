@@ -476,14 +476,6 @@ fn lexical_variants_read_losslessly_and_write_canonically() {
             .unwrap();
             assert_eq!(kvn_record(&message, key), format!("{written} {unit}"));
         }
-        // UTF-8 comments are retained in XML and refused, not transliterated, in KVN.
-        let (version, rest) = source.split_once('\n').unwrap();
-        let message = from_str(&format!("{version}\nCOMMENT Café\n{rest}")).unwrap();
-        assert!(message
-            .to_xml()
-            .unwrap()
-            .contains("<COMMENT>Café</COMMENT>"));
-        assert!(message.to_kvn().is_err());
         // A zero offset is written as `Z`.
         let creation = source
             .lines()

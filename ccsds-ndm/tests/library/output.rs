@@ -376,6 +376,7 @@ fn kvn_generation_rejects_non_ascii_and_control_text_before_streaming() {
     let mut apm = Apm::from_kvn(include_str!("../../data/kvn/apm_g1.kvn")).unwrap();
     apm.header.originator = "GSFC-é".into();
     let error = apm.to_kvn().expect_err("non-ASCII reached KVN generation");
+    crate::common::assert_validation_field(&error, "printable ASCII");
     assert!(
         error
             .to_string()

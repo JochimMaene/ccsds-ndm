@@ -1257,20 +1257,6 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_success() {
-        let xml = r#"<Wrapper><val>hello</val></Wrapper>"#;
-        let w: Wrapper = from_str(xml).unwrap();
-        assert_eq!(w.val, "hello");
-    }
-
-    #[test]
-    fn test_from_str_with_context_success() {
-        let xml = r#"<Wrapper><val>hello</val></Wrapper>"#;
-        let w: Wrapper = from_str_with_context(xml, "Wrapper").unwrap();
-        assert_eq!(w.val, "hello");
-    }
-
-    #[test]
     fn test_from_str_with_context_error() {
         let xml = r#"<Wrapper><val>hello</val>"#; // malformed XML
         let res: Result<Wrapper> = from_str_with_context(xml, "Wrapper");

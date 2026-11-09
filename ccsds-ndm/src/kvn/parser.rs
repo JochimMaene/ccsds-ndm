@@ -1658,18 +1658,25 @@ mod tests {
     }
 
     #[test]
-    fn test_key_value_line() {
-        let mut input = "OBJECT_NAME = SATELLITE-1\n";
-        let (key, value, unit) = key_value_line.parse_next(&mut input).unwrap();
-        assert_eq!(key, "OBJECT_NAME");
-        assert_eq!(value, "SATELLITE-1");
-        assert_eq!(unit, None);
-
-        let mut input = "X = 6503.514 [km]\n";
-        let (key, value, unit) = key_value_line.parse_next(&mut input).unwrap();
-        assert_eq!(key, "X");
-        assert_eq!(value, "6503.514");
-        assert_eq!(unit, Some("km"));
+    fn key_value_line_splits_key_value_and_unit() {
+        for (line, expected) in [
+            (
+                "OBJECT_NAME = SATELLITE-1\n",
+                Some(("OBJECT_NAME", "SATELLITE-1", None)),
+            ),
+            ("X = 6503.514 [km]\n", Some(("X", "6503.514", Some("km")))),
+            (
+                "  KEY  =  value  [unit]  \n",
+                Some(("KEY", "value", Some("unit"))),
+            ),
+            ("KEY =\n", Some(("KEY", "", None))),
+            ("KEY value\n", None),
+            ("KEY = value [unit\n", None),
+        ] {
+            let mut input = line;
+            let parsed = key_value_line.parse_next(&mut input).ok();
+            assert_eq!(parsed, expected, "{line:?}");
+        }
     }
 
     #[test]
@@ -1694,25 +1701,18 @@ mod tests {
     }
 
     #[test]
-    fn test_block_start() {
-        let mut input = "META_START\n";
-        let tag = block_start.parse_next(&mut input).unwrap();
-        assert_eq!(tag, "META");
-
-        let mut input = "COVARIANCE_START\n";
-        let tag = block_start.parse_next(&mut input).unwrap();
-        assert_eq!(tag, "COVARIANCE");
-    }
-
-    #[test]
-    fn test_block_end() {
-        let mut input = "META_STOP\n";
-        let tag = block_end.parse_next(&mut input).unwrap();
-        assert_eq!(tag, "META");
-
-        let mut input = "COVARIANCE_END\n";
-        let tag = block_end.parse_next(&mut input).unwrap();
-        assert_eq!(tag, "COVARIANCE");
+    fn block_tags_strip_start_stop_and_end_suffixes() {
+        for (line, tag) in [
+            ("META_START\n", "META"),
+            ("COVARIANCE_START\n", "COVARIANCE"),
+        ] {
+            let mut input = line;
+            assert_eq!(block_start.parse_next(&mut input).unwrap(), tag);
+        }
+        for (line, tag) in [("META_STOP\n", "META"), ("COVARIANCE_END\n", "COVARIANCE")] {
+            let mut input = line;
+            assert_eq!(block_end.parse_next(&mut input).unwrap(), tag);
+        }
     }
 
     #[test]
@@ -1735,35 +1735,6 @@ mod tests {
         let mut input = "2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0\n";
         let content = raw_line.parse_next(&mut input).unwrap();
         assert_eq!(content, "2023-01-01T00:00:00 1000 2000 3000 1.0 2.0 3.0");
-    }
-
-    #[test]
-    fn test_malformed_key_value() {
-        // Missing equals
-        let mut input = "KEY value\n";
-        assert!(key_value_line.parse_next(&mut input).is_err());
-
-        // Missing value (valid in some contexts? No, value parser expects something)
-        // Actually, empty values might be allowed if line ends?
-        // kvn_value parses `take_till(...)`
-        let mut input_empty = "KEY =\n";
-        let (_, val, _) = key_value_line.parse_next(&mut input_empty).unwrap();
-        assert_eq!(val, ""); // It allows empty values currently
-    }
-
-    #[test]
-    fn test_whitespace_variations() {
-        let mut input = "  KEY  =  value  [unit]  \n";
-        let (key, val, unit) = key_value_line.parse_next(&mut input).unwrap();
-        assert_eq!(key, "KEY");
-        assert_eq!(val, "value");
-        assert_eq!(unit, Some("unit"));
-    }
-
-    #[test]
-    fn test_broken_unit() {
-        let mut input = "KEY = value [unit\n"; // Missing closing bracket
-        assert!(key_value_line.parse_next(&mut input).is_err());
     }
 
     #[test]

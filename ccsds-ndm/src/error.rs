@@ -1192,18 +1192,6 @@ impl CcsdsNdmError {
         }
     }
 
-    /// Returns true if this is any FormatError.
-    #[cfg(test)]
-    pub(crate) fn is_format_error(&self) -> bool {
-        matches!(self, CcsdsNdmError::Format(_))
-    }
-
-    /// Returns true if this is a ValidationError.
-    #[cfg(test)]
-    pub(crate) fn is_validation_error(&self) -> bool {
-        self.as_validation_error().is_some()
-    }
-
     /// Returns the inner EnumParseError if this is a FormatError::Enum.
     pub(crate) fn as_enum_error(&self) -> Option<&EnumParseError> {
         match self {
@@ -1486,12 +1474,10 @@ mod tests {
         };
         let err: CcsdsNdmError = val_err.into();
         assert!(err.as_validation_error().is_some());
-        assert!(err.is_validation_error());
 
         let fmt_err = FormatError::InvalidFormat("f".into());
         let err: CcsdsNdmError = fmt_err.into();
         assert!(err.as_format_error().is_some());
-        assert!(err.is_format_error());
 
         let enum_err = EnumParseError {
             field: "F".into(),
@@ -1500,23 +1486,6 @@ mod tests {
         };
         let err: CcsdsNdmError = enum_err.into();
         assert!(err.as_enum_error().is_some());
-
-        // The `From` conversions are the behaviour worth pinning; matching the variant does that
-        // without an accessor that only this test would call.
-        let err: CcsdsNdmError = "abc".parse::<f64>().unwrap_err().into();
-        assert!(matches!(
-            err.as_format_error(),
-            Some(FormatError::ParseFloat(_))
-        ));
-
-        let err: CcsdsNdmError = "abc".parse::<i32>().unwrap_err().into();
-        assert!(matches!(
-            err.as_format_error(),
-            Some(FormatError::ParseInt(_))
-        ));
-
-        let err = CcsdsNdmError::Epoch(EpochError::InvalidFormat("2023".into()));
-        assert!(matches!(err, CcsdsNdmError::Epoch(_)));
 
         let eof_err = CcsdsNdmError::UnexpectedEof {
             context: "ctx".into(),

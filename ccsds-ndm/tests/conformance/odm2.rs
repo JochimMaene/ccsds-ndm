@@ -106,49 +106,6 @@ fn oem_2_generation_is_schema_valid_and_round_trips() {
 }
 
 #[test]
-fn oem_2_rejects_odm_3_header_fields_when_reading_and_writing() {
-    // The 2.0 schema's ndmHeader has neither CLASSIFICATION nor MESSAGE_ID; annex J lists
-    // MESSAGE_ID as new in 3.0.
-    let base = oem_2_examples().remove(2);
-    for (field, path) in [
-        ("CLASSIFICATION", "header.classification"),
-        ("MESSAGE_ID", "header.message_id"),
-    ] {
-        let mut message = base.clone();
-        match field {
-            "CLASSIFICATION" => message.header.classification = Some("SBU".into()),
-            _ => message.header.message_id = Some("OEM-3-ONLY".into()),
-        }
-        for error in [message.to_kvn().unwrap_err(), message.to_xml().unwrap_err()] {
-            assert_eq!(
-                error.field_path().as_deref(),
-                Some(path),
-                "{field}: {error}"
-            );
-        }
-        let mut as_three = message.clone();
-        as_three.version = "3.0".into();
-        let kvn = as_three.to_kvn().unwrap().replace("= 3.0", "= 2.0");
-        let error = Oem::from_kvn(&kvn).unwrap_err();
-        assert_eq!(
-            error.field_path().as_deref(),
-            Some(path),
-            "KVN {field}: {error}"
-        );
-        let xml = as_three
-            .to_xml()
-            .unwrap()
-            .replace("version=\"3.0\"", "version=\"2.0\"");
-        let error = Oem::from_xml(&xml).unwrap_err();
-        assert_eq!(
-            error.field_path().as_deref(),
-            Some(path),
-            "XML {field}: {error}"
-        );
-    }
-}
-
-#[test]
 fn oem_2_useable_start_may_not_precede_the_previous_useable_stop() {
     // 502.0-B-2 Cor. 1, table 5-3: "The USEABLE_START_TIME time tag at a new block of ephemeris
     // data must be greater than or equal to the USEABLE_STOP_TIME time tag of the previous
@@ -226,18 +183,13 @@ fn omm_2_generation_is_schema_valid_and_round_trips() {
 }
 
 #[test]
-fn odm_2_generation_rejects_odm_3_only_fields() {
-    let mut opm = Opm::from_kvn(&edition_2(include_str!("../../data/kvn/opm_g1.kvn"))).unwrap();
-    opm.header.message_id = Some("OPM-3-ONLY".into());
-    let error = opm.to_xml().unwrap_err();
-    assert_eq!(error.field_path().as_deref(), Some("header.message_id"));
-}
-
-#[test]
-fn opm_and_omm_2_reject_new_header_fields_in_both_notations() {
+fn odm_2_rejects_odm_3_header_fields_when_reading_and_writing() {
+    // The 2.0 schema's ndmHeader has neither CLASSIFICATION nor MESSAGE_ID; annex J lists
+    // MESSAGE_ID as new in 3.0.
     for source in [
         include_str!("../../data/kvn/opm_g1.kvn"),
         include_str!("../../data/kvn/omm_g7.kvn"),
+        include_str!("../../data/kvn/oem_g13.kvn"),
     ] {
         for (keyword, path) in [
             ("CLASSIFICATION", "header.classification"),
@@ -247,6 +199,7 @@ fn opm_and_omm_2_reject_new_header_fields_in_both_notations() {
             let header = match &mut message {
                 ccsds_ndm::Message::Opm(message) => &mut message.header,
                 ccsds_ndm::Message::Omm(message) => &mut message.header,
+                ccsds_ndm::Message::Oem(message) => &mut message.header,
                 _ => unreachable!(),
             };
             match keyword {
@@ -254,11 +207,16 @@ fn opm_and_omm_2_reject_new_header_fields_in_both_notations() {
                 _ => header.message_id = Some("new-only".into()),
             }
             for error in [message.to_kvn().unwrap_err(), message.to_xml().unwrap_err()] {
-                assert_eq!(error.field_path().as_deref(), Some(path));
+                assert_eq!(
+                    error.field_path().as_deref(),
+                    Some(path),
+                    "{keyword}: {error}"
+                );
             }
             match &mut message {
                 ccsds_ndm::Message::Opm(message) => message.version = "3.0".into(),
                 ccsds_ndm::Message::Omm(message) => message.version = "3.0".into(),
+                ccsds_ndm::Message::Oem(message) => message.version = "3.0".into(),
                 _ => unreachable!(),
             }
             for source in [
@@ -269,7 +227,11 @@ fn opm_and_omm_2_reject_new_header_fields_in_both_notations() {
                     .replace("version=\"3.0\"", "version=\"2.0\""),
             ] {
                 let error = ccsds_ndm::from_str(&source).unwrap_err();
-                assert_eq!(error.field_path().as_deref(), Some(path));
+                assert_eq!(
+                    error.field_path().as_deref(),
+                    Some(path),
+                    "{keyword}: {error}"
+                );
             }
         }
     }
