@@ -101,12 +101,6 @@ fn cdm_object_order_frames_and_identifier_repertoire_are_root_checked() {
     crate::common::assert_rejects(&reversed, "OBJECT");
     let mut different = valid.clone();
     different.body.segments[1].metadata.ref_frame = ccsds_ndm::types::ReferenceFrameType::Gcrf;
-    if different.body.segments[0].metadata.ref_frame
-        == different.body.segments[1].metadata.ref_frame
-    {
-        different.body.segments[1].metadata.ref_frame =
-            ccsds_ndm::types::ReferenceFrameType::Eme2000;
-    }
     crate::common::assert_rejects(&different, "REF_FRAME");
     for field in [
         "ORIGINATOR",
@@ -124,7 +118,6 @@ fn cdm_object_order_frames_and_identifier_repertoire_are_root_checked() {
             "CATALOG_NAME" => edited.body.segments[1].metadata.catalog_name = value,
             _ => edited.body.segments[1].metadata.international_designator = value,
         }
-        assert!(edited.validate().is_err());
         crate::common::assert_rejects(&edited, field);
     }
 }

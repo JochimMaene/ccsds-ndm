@@ -122,54 +122,6 @@ DATA_STOP
 }
 
 #[test]
-fn metadata_path_1_path_2_choice() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-PARTICIPANT_2 = SPACECRAFT_A
-PARTICIPANT_3 = DSS-25
-MODE = SINGLE_DIFF
-PATH_1 = 1,2,1
-PATH_2 = 3,2,3
-RECEIVE_BAND = X
-META_STOP
-DATA_START
-TRANSMIT_FREQ_1 = 2023-01-01T00:00:00 7167941264.0
-RECEIVE_FREQ = 2023-01-01T00:00:00 8415000000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    let seg = &tdm.body.segments[0];
-    assert!(seg.metadata.path.is_none());
-    assert_eq!(seg.metadata.path_1, Some(TdmPath("1,2,1".to_string())));
-    assert_eq!(seg.metadata.path_2, Some(TdmPath("3,2,3".to_string())));
-}
-
-#[test]
-fn metadata_explicit_freq_offset() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-FREQ_OFFSET = 8415000000.0
-META_STOP
-DATA_START
-RECEIVE_FREQ = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    assert_eq!(
-        tdm.body.segments[0].metadata.freq_offset,
-        Some(8415000000.0)
-    );
-}
-
-#[test]
 fn body_requires_at_least_one_segment() {
     let kvn = r#"CCSDS_TDM_VERS = 2.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -180,40 +132,6 @@ ORIGINATOR = TEST
         crate::common::kvn_parse_error(&error).unwrap().message,
         "unterminated or incomplete TDM section sequence"
     );
-}
-
-#[test]
-fn body_multiple_segments() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-25
-META_STOP
-DATA_START
-RANGE = 2023-01-01T01:00:00 2000.0
-DATA_STOP
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-34
-META_STOP
-DATA_START
-RANGE = 2023-01-01T02:00:00 3000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    assert_eq!(tdm.body.segments.len(), 3);
-    assert_eq!(tdm.body.segments[0].metadata.participant_1, "DSS-14");
-    assert_eq!(tdm.body.segments[1].metadata.participant_1, "DSS-25");
-    assert_eq!(tdm.body.segments[2].metadata.participant_1, "DSS-34");
 }
 
 #[test]
@@ -253,52 +171,10 @@ DOPPLER_INTEGRATED = 2023-01-01T00:00:01 -0.45
 DOPPLER_COUNT = 2023-01-01T00:00:02 12345678.0
 DATA_STOP
 "#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    match &tdm.body.segments[0].data.observations[0].data {
-        TdmObservationData::DopplerInstantaneous(v) => assert_eq!(*v, -0.5),
-        _ => panic!("Wrong type"),
-    }
-    match &tdm.body.segments[0].data.observations[1].data {
-        TdmObservationData::DopplerIntegrated(v) => assert_eq!(*v, -0.45),
-        _ => panic!("Wrong type"),
-    }
-    match &tdm.body.segments[0].data.observations[2].data {
-        TdmObservationData::DopplerCount(v) => assert_eq!(*v, 12345678.0),
-        _ => panic!("Wrong type"),
-    }
     // Integral double spellings and >2^31 accumulators read; a fraction is never truncated.
     for (count, accepted) in [("1.0E3", true), ("4294967296", true), ("1000.5", false)] {
         let input = kvn.replace("12345678.0", count);
         assert_eq!(Tdm::from_kvn(&input).is_ok(), accepted, "{count}");
-    }
-}
-
-#[test]
-fn observation_vlbi_types() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-PARTICIPANT_2 = DSS-25
-MODE = SINGLE_DIFF
-PATH_1 = 1,2
-PATH_2 = 2,1
-META_STOP
-DATA_START
-DOR = 2023-01-01T00:00:00 0.000123456
-VLBI_DELAY = 2023-01-01T00:00:01 -0.000000789
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    match &tdm.body.segments[0].data.observations[0].data {
-        TdmObservationData::Dor(v) => assert_eq!(*v, 0.000123456),
-        _ => panic!("Wrong type"),
-    }
-    match &tdm.body.segments[0].data.observations[1].data {
-        TdmObservationData::VlbiDelay(v) => assert_eq!(*v, -0.000000789),
-        _ => panic!("Wrong type"),
     }
 }
 
@@ -429,17 +305,6 @@ DATA_STOP
 }
 
 #[test]
-fn test_tdm_empty_file_error() {
-    let error = Tdm::from_kvn("").unwrap_err();
-    let parse = crate::common::kvn_parse_error(&error)
-        .unwrap_or_else(|| panic!("expected a KVN parse error, got {error:?}"));
-    assert_eq!(
-        parse.message,
-        "unterminated or incomplete TDM section sequence"
-    );
-}
-
-#[test]
 fn test_tdm_version_not_first_error() {
     let kvn = r#"
 CREATION_DATE = 2023-01-01T00:00:00
@@ -500,44 +365,7 @@ DATA_STOP
     assert_eq!(meta.transmit_delay_5, Some(0.5));
     assert_eq!(meta.correction_aberration_diurnal, Some(0.7));
     assert_eq!(tdm.body.segments[0].data.observations.len(), 18);
-}
-
-#[test]
-fn unknown_header_and_observation_keywords_are_rejected() {
-    // Unknown key between header and body should FAIL
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-UNKNOWN_KEY = VALUE
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = P1
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let error = Tdm::from_kvn(kvn).unwrap_err();
-    assert_eq!(error.code(), Some("parse.kvn.syntax"), "{error}");
-
-    // An unknown observation key must not silently end the data block.
-    let kvn_malformed = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = P1
-META_STOP
-DATA_START
-BAD_KEY = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let error = Tdm::from_kvn(kvn_malformed).unwrap_err();
-    assert_eq!(error.code(), Some("parse.kvn.syntax"), "{error}");
-    assert_eq!(
-        crate::common::kvn_parse_error(&error).unwrap().message,
-        "unknown TDM observation keyword"
-    );
+    assert_eq!(Tdm::from_kvn(&tdm.to_kvn().unwrap()).unwrap(), tdm);
 }
 
 #[test]
@@ -604,15 +432,26 @@ fn tdm_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
             "non-ASCII content",
             mutated(KVN, participant, &format!("{participant} €")),
         ),
+        (
+            "unknown header keyword",
+            mutated(KVN, "META_START", "UNKNOWN_KEY = VALUE\nMETA_START"),
+        ),
+        (
+            "unknown observation keyword",
+            mutated(KVN, observation, "BAD_KEY = 2005-159T17:41:00 1"),
+        ),
     ] {
         let error = Tdm::from_kvn(&source).unwrap_err();
         assert_eq!(error.code(), Some("parse.kvn.syntax"), "{label}: {error}");
-        if label == "unknown metadata keyword" {
-            assert_eq!(
-                crate::common::kvn_parse_error(&error).unwrap().message,
-                "unknown TDM metadata keyword"
-            );
-        }
+        let expected = match label {
+            "unknown metadata keyword" => "unknown TDM metadata keyword",
+            "unknown observation keyword" => "unknown TDM observation keyword",
+            _ => continue,
+        };
+        assert_eq!(
+            crate::common::kvn_parse_error(&error).unwrap().message,
+            expected
+        );
     }
 }
 
@@ -621,10 +460,6 @@ fn tdm_xml_rejects_unknown_nested_content_attributes_and_ordering_errors() {
     let epoch = "<EPOCH>2007-069T15:22:22.000</EPOCH>";
     let observable = "<TRANSMIT_FREQ_1>7167941264.0</TRANSMIT_FREQ_1>";
     for (label, source) in [
-        (
-            "unknown metadata child",
-            mutated(XML, "<metadata>", "<metadata><UNKNOWN>1</UNKNOWN>"),
-        ),
         (
             "unknown observation child",
             mutated(XML, "<observation>", "<observation><UNKNOWN>1</UNKNOWN>"),

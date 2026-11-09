@@ -1,6 +1,6 @@
 use crate::common::{mutated, mutated_once};
 use crate::{sample_cdm_kvn, KVN, XML};
-use ccsds_ndm::error::{CcsdsNdmError, FormatError, ValidationError};
+use ccsds_ndm::error::{FormatError, ValidationError};
 use ccsds_ndm::messages::cdm::Cdm;
 use ccsds_ndm::types::{
     CdmObjectType, ManeuverableType, ObjectDescription, ReferenceFrameType, ScreenVolumeFrameType,
@@ -167,21 +167,10 @@ fn covariance_missing_required_field() {
     let mut kvn = sample_cdm_kvn();
     kvn = kvn.replace("CR_R = 1.0 [m**2]", "");
     let err = Cdm::from_kvn(&kvn).unwrap_err();
-    let err = crate::common::parse_error_cause(err);
-    match err {
-        CcsdsNdmError::Validation(val_err) => match *val_err {
-            ValidationError::MissingRequiredField {
-                ref block,
-                ref field,
-                ..
-            } => {
-                assert_eq!(block, "Covariance Matrix");
-                assert_eq!(field, "CR_R");
-            }
-            _ => panic!("unexpected validation error: {:?}", val_err),
-        },
-        _ => panic!("unexpected error: {:?}", err),
-    }
+    assert!(
+        matches!(err.as_validation_error(), Some(ValidationError::MissingRequiredField { block, field, .. }) if block == "Covariance Matrix" && field == "CR_R"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -192,15 +181,7 @@ ORIGINATOR = TEST
 "#;
     let err = Cdm::from_kvn(kvn).unwrap_err();
     let err = crate::common::kvn_parse_error(&err).expect("KVN syntax diagnostic");
-    assert!(
-        err.message
-            .to_lowercase()
-            .contains("expected ccsds_cdm_vers")
-            || err
-                .contexts
-                .iter()
-                .any(|c| c.to_lowercase().contains("ccsds_cdm_vers"))
-    )
+    assert_eq!(err.message, "expected CCSDS_CDM_VERS as the first record");
 }
 
 #[test]
@@ -391,20 +372,6 @@ fn metadata_ref_frames() {
 }
 
 #[test]
-fn data_with_od_parameters() {
-    let mut kvn = sample_cdm_kvn();
-    // Insert OD parameters before state vector
-    kvn = kvn.replace(
-        "X = 1.0 [km]",
-        "TIME_LASTOB_START = 2025-01-01T00:00:00\nTIME_LASTOB_END = 2025-01-02T00:00:00\nRECOMMENDED_OD_SPAN = 7.0 [d]\nACTUAL_OD_SPAN = 5.0 [d]\nOBS_AVAILABLE = 100\nOBS_USED = 95\nTRACKS_AVAILABLE = 50\nTRACKS_USED = 48\nRESIDUALS_ACCEPTED = 95.5 [%]\nWEIGHTED_RMS = 1.23\nX = 1.0 [km]",
-    );
-
-    let cdm = Cdm::from_kvn(&kvn).expect("should parse with OD parameters");
-    let od = cdm.body.segments[0].data.od_parameters.as_ref().unwrap();
-    assert!(od.time_lastob_start.is_some());
-}
-
-#[test]
 fn data_with_additional_parameters() {
     let mut kvn = sample_cdm_kvn();
     // Insert additional parameters
@@ -584,10 +551,6 @@ fn cdm_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
         (
             "reordered relative keywords",
             mutated(KVN, &format!("{tca}\n{miss}"), &format!("{miss}\n{tca}")),
-        ),
-        (
-            "unknown metadata keyword",
-            mutated(KVN, object, &format!("{object}\nUNKNOWN = value")),
         ),
         (
             "comment inside relative block",

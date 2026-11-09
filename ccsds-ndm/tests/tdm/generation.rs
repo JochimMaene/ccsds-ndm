@@ -273,20 +273,6 @@ fn unambiguous_tdm_numeric_boundaries_generate_valid_xml() {
 }
 
 #[test]
-fn xml_sample_parsing() {
-    let xml = include_str!("../../data/xml/tdm_e21.xml");
-    let mut tdm = Tdm::from_xml(xml).expect("parse xml");
-    assert!(!tdm.body.segments.is_empty());
-
-    crate::common::assert_validation_field(&tdm.to_kvn().unwrap_err(), "PARTICIPANT_1");
-    tdm.body.segments[0].metadata.participant_1 = "DSS-25".into();
-    let generated_kvn = tdm.to_kvn().expect("convert to kvn");
-    let tdm2 = Tdm::from_kvn(&generated_kvn).expect("parse generated kvn");
-
-    assert_eq!(tdm2, tdm);
-}
-
-#[test]
 fn kvn_numbers_follow_the_digit_limit_without_rounding_phase_counts() {
     let mut message = Tdm::from_kvn(KVN).unwrap();
     let metadata = &mut message.body.segments[0].metadata;

@@ -17,34 +17,22 @@ fn qualified(xml: &str) -> String {
 
 #[test]
 fn empty_optional_kvn_values_are_none() {
-    let kvn = mutated(
-        &mutated(
-            &mutated(
-                &mutated(
-                    &mutated(
-                        &mutated(
-                            &mutated(
-                                include_str!("../../data/kvn/cdm_363.kvn"),
-                                "START_SCREEN_PERIOD = 2010-03-12T18:29:32.212",
-                                "START_SCREEN_PERIOD =",
-                            ),
-                            "STOP_SCREEN_PERIOD = 2010-03-15T18:29:32.212",
-                            "STOP_SCREEN_PERIOD =",
-                        ),
-                        "COLLISION_PROBABILITY = 4.835E-05",
-                        "COLLISION_PROBABILITY =",
-                    ),
-                    "COLLISION_PROBABILITY_METHOD = FOSTER-1992",
-                    "COLLISION_PROBABILITY_METHOD =",
-                ),
-                "TIME_LASTOB_START = 2010-03-12T02:14:12.746",
-                "TIME_LASTOB_START =",
-            ),
-            "TIME_LASTOB_END = 2010-03-12T02:14:12.746",
-            "TIME_LASTOB_END =",
-        ),
+    let kvn = [
+        "START_SCREEN_PERIOD = 2010-03-12T18:29:32.212",
+        "STOP_SCREEN_PERIOD = 2010-03-15T18:29:32.212",
+        "COLLISION_PROBABILITY = 4.835E-05",
+        "COLLISION_PROBABILITY_METHOD = FOSTER-1992",
+        "TIME_LASTOB_START = 2010-03-12T02:14:12.746",
+        "TIME_LASTOB_END = 2010-03-12T02:14:12.746",
         "AREA_PC = 5.2 [m**2]",
-        "AREA_PC =",
+    ]
+    .into_iter()
+    .fold(
+        include_str!("../../data/kvn/cdm_363.kvn").to_string(),
+        |kvn, record| {
+            let key = &record[..=record.find(" =").unwrap() + 1];
+            mutated(&kvn, record, key)
+        },
     );
 
     let cdm = Cdm::from_kvn(&kvn).unwrap();

@@ -290,13 +290,9 @@ fn cdm_kvn_comments_keep_their_normative_block_association() {
         first.data.comment,
         ["Object1 Data", "Object1 OD Parameters"]
     );
-    assert!(first
-        .data
-        .od_parameters
-        .as_ref()
-        .unwrap()
-        .comment
-        .is_empty());
+    let od = first.data.od_parameters.as_ref().unwrap();
+    assert!(od.comment.is_empty());
+    assert!(od.time_lastob_start.is_some());
     assert_eq!(
         first.data.additional_parameters.as_ref().unwrap().comment,
         [
