@@ -1,8 +1,9 @@
 # Combined NDM conformance
 
 The combined instantiation is the XML `ndm` envelope defined by CCSDS 505.0-B-3, section 4.11,
-and `ccsds-ndm/data/xsd/ndmxml-4.0.0-master-4.0.xsd`. It is the only representation this library
-parses or writes.
+and `ccsds-ndm/data/xsd/ndmxml-4.0.0-master-4.0.xsd`. It is the only output representation.
+The NDM/XML 1.0 envelope is also accepted as input only, with its own structure checked; see
+[Legacy envelope input](#legacy-envelope-input).
 
 CCSDS defines no KVN combined instantiation. Section 4.11 lives in the XML specification and
 requires the `<ndm></ndm>` root element tags (NDM/XML §§4.11.3–4.11.5;
@@ -21,6 +22,8 @@ The combined-NDM suites establish:
 - envelope text decoding for XML entities, character references and CDATA, preservation of empty
   `MESSAGE_ID`/`COMMENT` strings, namespace-aware schema-location hints on those fields, and
   rejection of other attributes or nested elements;
+- whitespace character references and CDATA accepted between envelope elements; references and
+  CDATA outside the document root remain invalid XML (`envelope_accepts_decoded_whitespace_only_inside_the_root`);
 - processing instructions and XML comments ignored throughout the envelope, including within
   text fields, consistently with the shared XML contract;
 - ordered typed preservation of the `ndm_g12.xml` and `ndm_g21.xml` constituents, followed by
@@ -47,11 +50,11 @@ CCSDS 505.0-B-3 sections 4.11.3–4.11.8 define the envelope rather than a separ
 
 | Requirement | Decision and evidence |
 | --- | --- |
-| Root element is `ndm` | Exact-root and trailing-content tests reject any other document envelope. |
+| Root element is `ndm` | `ndm::parsing::envelope_text_decodes_entities_cdata_and_empty_elements` and the envelope rejection tests enforce the root and trailing-content boundary. |
 | Root carries no `id`/`version`; they apply to constituents | `ndmxml-4.0.0-ndm-4.0.xsd` `ndmType` declares no attributes and shipped `ndm_g12/g21.xml` carry none on the root; the strict root contract therefore accepts only namespace/schema attributes and rejects `id`/`version` there. Constituent `id`/`version` remain required per child. |
 | Constituent application elements use only their own `id` and `version` attributes | Every registered child family is sequence-validated by its standalone parser; envelope tests reject illegal constituent attributes and nested message roots. |
-| Any combination of constituent NDM types is permitted, in document order | The typed `Vec<Message>` preserves heterogeneous order; G12 and G21 prove multi-message and multi-family preservation. |
-| A combined message should contain at least one constituent | This is a `SHOULD`, while the official XSD permits zero children. The parser accepts an empty envelope and documents the recommendation rather than inventing a schema-incompatible `SHALL`. |
+| Any combination of constituent NDM types is permitted, in document order | The typed `Vec<Message>` preserves heterogeneous order; `ndm::parsing::combined_ndm_xml` fixture roundtrips for G12 and G21 prove multi-message and multi-family preservation. |
+| A combined message should contain at least one constituent | This is a `SHOULD`, while the official XSD permits zero children. The parser accepts an empty envelope and documents the recommendation rather than inventing a schema-incompatible `SHALL` (`ndm::generation::empty_combined_envelope_is_accepted_and_generated_despite_the_should`). |
 
 The book's generic XML guidance calls for namespace declarations, while shipped combined examples
 are inconsistent: G12 includes the `ndm` namespace and G21/G22 omit it. Parsing therefore accepts
@@ -64,14 +67,18 @@ and `package-rust` are the shared built-artifact gates.
 
 ## Constituent editions in the bundled envelope
 
-The supported envelope is NDM/XML 4.0.0. Its included `opmType`, `ommType`, and `oemType`
-fix `version` to `3.0`; the other included families use their current editions. Standalone
+The output envelope is NDM/XML 4.0.0. Its included `opmType`, `ommType`, and `oemType`
+fix `version` to `3.0`; `tdmType` fixes it to `2.0`. The other included families use their current editions. Standalone
 ODM 2.0 parsing/generation remains supported with its own schema, but a 2.0 ODM constituent
-cannot be represented in this combined envelope. Combined XML input rejects that combination,
-and materialized/streaming output refuses it before writing bytes. The model is not silently
-upgraded or relabeled. Earlier combined schema sets are not an additional supported envelope.
+cannot be written in the current combined envelope. XML input accepts the separate legacy
+profile; materialized/streaming output refuses legacy constituents before writing bytes. The model is not silently
+upgraded or relabeled. NDM/XML 1.0 is an additional input-only envelope profile.
 `combined_schema_refuses_standalone_odm2_constituents_before_output` covers all three ODM families,
-standalone controls, model validation, XML input, and both output paths.
+standalone controls, model validation, legacy XML input, and both output paths.
+Standalone TDM 1.0 input also remains supported, but the 4.0.0 envelope rejects a TDM 1.0
+constituent. `combined_schema_refuses_legacy_tdm_but_standalone_input_remains_supported`
+checks typed/generic input and refusal before output. Notation-neutral model validation
+can still succeed for valid standalone constituents; it does not promise envelope representability.
 
 ## Verification outcome
 
@@ -94,15 +101,46 @@ constituent consistently with standalone OPM.
 Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
 
-Space-Track ODM 2.0 `<ndm>` exports are rejected before parsing constituent content,
-so an edition mismatch takes precedence over later constituent-content errors. XML well-formedness
-and namespace checks still run first; a sample with an undeclared xsi prefix fails on that prefix. Extract the constituent
-as standalone XML with its namespace bindings or request an ODM 3.0 export. CelesTrak
-OMM with empty creation/originator fields is also rejected under ODM 7.5.1; obtain real
-provenance rather than filling dummy values.
+Space-Track ODM 2.0 `<ndm>` exports are accepted under the legacy input profile. XML
+well-formedness and namespace checks still run first; undeclared prefixes remain errors.
+CelesTrak OMM with empty creation/originator fields remains rejected under ODM 7.5.1;
+accepting its envelope never waives the requirement for populated provenance.
 
 Namespace declarations on constituents are accepted because XML Namespaces does not
 class them as ordinary application attributes. Constituent schema-location hints,
-including `xsi:noNamespaceSchemaLocation`, are rejected under ODM 8.12.7. Empty `<ndm/>`
-can be read and generated. The published G22 OCM constituent independently violates
-MAN_COMPOSITION table order (6.2.8.16), in addition to the OPM MASS issue recorded above.
+including `xsi:noNamespaceSchemaLocation`, are rejected under ODM 8.12.7
+(`ndm::generation::constituent_namespace_declarations_are_namespace_scope_not_attributes`).
+Empty `<ndm/>` can be read and generated. The published G22 OCM constituent independently violates
+MAN_COMPOSITION table order (6.2.8.16), in addition to the OPM MASS issue recorded above
+(`ndm::generation::shipped_g22_ocm_constituent_violates_man_composition_order`).
+
+## Legacy envelope input
+
+NDM/XML 1.0 envelopes (Space-Track exports) are accepted as **input only**. Reading one checks
+the envelope against `ndmxml-1.0-ndm-1.0.xsd` and `ndmxml-1.0-master.xsd`, not merely each
+constituent's standalone rules:
+
+- the root and constituents are in no namespace: the 1.0 master schema declares `ndm` without
+  a target namespace and `elementFormDefault="unqualified"`, so a root or constituent qualified
+  with `urn:ccsds:schema:ndmxml` or with the 1.0 types URN
+  `urn:ccsds:recommendation:navigation:schema:ndmxml` is rejected;
+- the root carries no `id`/`version` (namespace declarations and schema hints only, as in 4.0.0);
+- `ndmType` is `COMMENT*` followed by any of `aem`, `apm`, `oem`, `omm`, `opm`, `tdm`; there is
+  no `MESSAGE_ID`, comments may not follow a constituent, and 4.0.0-only families (ACM, CDM,
+  OCM, RDM) cannot appear;
+- constituent editions are those the 1.0 schema includes: ODM 2.0 (OPM/OMM/OEM) and TDM 1.0.
+  APM/AEM 1.0 remain rejected by their own edition decision, so an envelope containing them fails.
+
+The envelope edition is inferred from the constituents: any 1.0-era constituent selects the 1.0
+profile, and 1.0 and 4.0.0 editions cannot be mixed. An empty envelope is read under 4.0.0.
+
+Output support is explicitly scoped: generation writes only the NDM/XML 4.0.0 envelope, so a
+model holding ODM 2.0 or TDM 1.0 constituents is refused before any bytes are written. Model
+`validate()` does not check this envelope representability. Reading a 1.0 envelope therefore
+never promises that it can be regenerated unchanged; extract the constituents as standalone
+ODM 2.0/TDM 1.0 XML or convert them to current editions explicitly.
+
+Evidence: `ndm::parsing::ndm_xml_1_0_envelope_is_input_only_and_checked_against_its_own_schema`
+(Space-Track-shaped fixture accepted, envelope violations and APM 1.0 rejected, output refusal),
+`pre_release::legacy_envelopes_are_input_only_and_cannot_mix_editions`, and
+`ndm::generation::combined_schema_refuses_standalone_odm2_constituents_before_output`.

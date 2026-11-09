@@ -478,7 +478,10 @@ fn maneuver_units_and_deploy_device_are_checked_on_input_and_generation() {
             .to_string()
             .contains(key));
         let invalid = xml.replace(
-            &format!("<{key}>{old}</{key}>"),
+            &format!(
+                "<{key}>{}</{key}>",
+                if key == "MAN_UNITS" { "[km/s]" } else { old }
+            ),
             &format!("<{key}>{value}</{key}>"),
         );
         assert!(Ocm::from_xml(&invalid)

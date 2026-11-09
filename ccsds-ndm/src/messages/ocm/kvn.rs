@@ -22,7 +22,6 @@ use winnow::ascii::{space1, till_line_ending};
 use winnow::combinator::{peek, repeat, terminated};
 use winnow::error::{AddContext, ErrMode, FromExternalError};
 use winnow::prelude::*;
-use winnow::stream::Offset;
 
 // These two ODM fields have wider KVN domains than their XML measure types.
 fn kv_phase_angle(input: &mut &str) -> KvnResult<Angle> {
@@ -449,7 +448,7 @@ pub fn ocm_traj_state(input: &mut &str) -> KvnResult<Option<OcmTrajState>> {
         // ODM 6.2.1.3 / table 6-4 default; the XSD requires the element.
         traj_type: traj_type.unwrap_or_else(|| "CARTPV".to_string()),
         orb_averaging,
-        traj_units,
+        traj_units: traj_units.as_deref().map(super::xml::canonical_units),
         traj_lines,
     }))
 }
@@ -692,23 +691,38 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<Option<OcmCovarianceMatrix>> {
     }, |i| at_block_end("COV", i), "Unexpected OCM Covariance key");
 
     loop {
-        let checkpoint = input.checkpoint();
         let comments = collect_comments.parse_next(input)?;
+        comment.extend(comments);
 
         if at_block_end("COV", input) {
-            comment.extend(comments);
             expect_block_end("COV").parse_next(input)?;
             break;
         }
 
-        if let Ok(line) = ocm_cov_line.parse_next(input) {
-            cov_lines.push(line);
-            continue;
+        if input.is_empty() {
+            return Err(cut_err(input, "Missing COV_STOP before end of input"));
         }
 
-        // Otherwise break or handle error
-        if input.offset_from(&checkpoint) == 0 {
-            break;
+        let checkpoint = input.checkpoint();
+        match ocm_cov_line.parse_next(input) {
+            Ok(line) => {
+                cov_lines.push(line);
+                continue;
+            }
+            Err(ErrMode::Cut(error)) => return Err(ErrMode::Cut(error)),
+            Err(_) => {}
+        }
+
+        input.reset(&checkpoint);
+        let raw = peek(till_line_ending).parse_next(input)?;
+        if !raw.trim().is_empty() {
+            return Err(cut_err(input, "Malformed OCM covariance record"));
+        }
+        let remaining = input.len();
+        let _ = till_line_ending.parse_next(input)?;
+        opt_line_ending.parse_next(input)?;
+        if input.len() == remaining {
+            return Err(cut_err(input, "OCM covariance parser made no progress"));
         }
     }
 
@@ -753,7 +767,7 @@ pub fn ocm_cov(input: &mut &str) -> KvnResult<Option<OcmCovarianceMatrix>> {
         // ODM 6.2.1.3 / table 6-6 default; the XSD requires the element.
         cov_type: cov_type.unwrap_or_else(|| "CARTPV".to_string()),
         cov_ordering: cov_ordering.unwrap_or(CovOrder::Ltm),
-        cov_units,
+        cov_units: cov_units.as_deref().map(super::xml::canonical_units),
         cov_lines,
     }))
 }
@@ -794,12 +808,13 @@ fn kv_man_composition(input: &mut &str) -> KvnResult<String> {
     Ok(canonical_man_composition(&composition))
 }
 
-/// Canonical MAN_COMPOSITION spelling: uppercase keywords separated by ", ". Reading accepts any
-/// case and blanks instead of commas (table 6-7 asks for a comma-separated list).
+/// Canonical MAN_COMPOSITION spelling: uppercase keywords separated by ", ". Reading accepts
+/// all-lowercase keywords and blanks instead of commas (table 6-7 asks for a comma-separated
+/// list); mixed case is kept so validation can reject it (ODM 7.5.3).
 pub(super) fn canonical_man_composition(composition: &str) -> String {
     super::parse_man_composition(composition)
         .iter()
-        .map(|column| column.to_ascii_uppercase())
+        .map(|column| crate::types::enum_token(column).into_owned())
         .collect::<Vec<_>>()
         .join(", ")
 }
@@ -938,7 +953,7 @@ pub fn ocm_man(input: &mut &str) -> KvnResult<OcmManeuverParameters> {
         dc_pa_stop_angle,
         man_composition: man_composition
             .ok_or_else(|| missing_field_err(input, "Maneuver", "MAN_COMPOSITION"))?,
-        man_units,
+        man_units: man_units.as_deref().map(super::xml::canonical_units),
         man_lines,
     })
 }
@@ -1887,6 +1902,13 @@ pub(super) fn validate_syntax(kvn: &str) -> Result<()> {
 impl Ocm {
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
         if let Some(user) = &self.body.segment.data.user {
+            if user.parameters().next().is_none() {
+                return Err(crate::error::ValidationError::Generic {
+                    message: super::EMPTY_USER_BLOCK.into(),
+                    line: None,
+                }
+                .into());
+            }
             let mut parameter_seen = false;
             for entry in &user.entries {
                 match entry {
@@ -2272,10 +2294,10 @@ impl ToKvn for OcmTrajState {
             writer.write_pair("ORB_AVERAGING", v);
         }
         if let Some(v) = &self.traj_units {
-            writer.write_pair("TRAJ_UNITS", v);
+            writer.write_pair("TRAJ_UNITS", super::xml::canonical_units(v));
         }
         for line in &self.traj_lines {
-            writer.write_ocm_numeric_history(&line.epoch, &line.values);
+            writer.write_numeric_history(&line.epoch, &line.values);
         }
         writer.write_section("TRAJ_STOP");
     }
@@ -2477,10 +2499,10 @@ impl ToKvn for OcmCovarianceMatrix {
         writer.write_pair("COV_TYPE", &self.cov_type);
         writer.write_pair("COV_ORDERING", self.cov_ordering.to_string());
         if let Some(v) = &self.cov_units {
-            writer.write_pair("COV_UNITS", v);
+            writer.write_pair("COV_UNITS", super::xml::canonical_units(v));
         }
         for line in &self.cov_lines {
-            writer.write_ocm_numeric_history(&line.epoch, &line.values);
+            writer.write_numeric_history(&line.epoch, &line.values);
         }
         writer.write_section("COV_STOP");
     }
@@ -2572,7 +2594,7 @@ impl ToKvn for OcmManeuverParameters {
             canonical_man_composition(&self.man_composition),
         );
         if let Some(v) = &self.man_units {
-            writer.write_pair("MAN_UNITS", v);
+            writer.write_pair("MAN_UNITS", super::xml::canonical_units(v));
         }
         let numeric_columns: Vec<_> = composition
             .iter()

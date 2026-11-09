@@ -3,6 +3,18 @@ use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::{convert, Ndm, Notation, Validate};
 
 #[test]
+fn empty_interpolation_needs_no_degree_and_keeps_its_presence() {
+    let mut message = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
+    for segment in &mut message.body.segment {
+        segment.metadata.interpolation = Some(String::new());
+        segment.metadata.interpolation_degree = None;
+    }
+    let xml = message.to_xml().unwrap();
+    assert_eq!(Oem::from_xml(&xml).unwrap(), message);
+    assert!(message.to_kvn().is_err());
+}
+
+#[test]
 fn both_directions_reproduce_the_generated_text() {
     for source in KVN_FIXTURES {
         let kvn = Oem::from_kvn(source).unwrap().to_kvn().unwrap();
@@ -108,4 +120,26 @@ fn xml_whitespace_around_text_values_is_padding_in_both_notations() {
         message.to_kvn().unwrap_err().field_path().as_deref(),
         Some("body.segment[1].metadata.center_name")
     );
+}
+
+#[test]
+fn xml_header_padding_is_dropped_on_kvn_output() {
+    let message = Oem::from_xml(XML).unwrap();
+    let xml = message.to_xml().unwrap();
+    let originator = message.header.originator;
+    let padded = xml.replace(
+        &format!("<ORIGINATOR>{originator}</ORIGINATOR>"),
+        &format!("<ORIGINATOR>\n  {originator}\n</ORIGINATOR>"),
+    );
+    assert_ne!(padded, xml);
+    let kvn = convert(&padded, Notation::Kvn).unwrap();
+    assert_eq!(Oem::from_kvn(&kvn).unwrap().header.originator, originator);
+}
+
+#[test]
+fn xml_comment_tab_becomes_a_blank_on_kvn_output() {
+    let mut message = Oem::from_xml(XML).unwrap();
+    message.header.comment = vec!["a\tb".into()];
+    let kvn = convert(&message.to_xml().unwrap(), Notation::Kvn).unwrap();
+    assert_eq!(Oem::from_kvn(&kvn).unwrap().header.comment, vec!["a b"]);
 }

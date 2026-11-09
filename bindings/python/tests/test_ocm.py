@@ -119,30 +119,12 @@ class TestOcm:
             parsed = Ocm.from_str(message.to_str(format=notation), format=notation)
             assert parsed.segment.data.man[0].man_lines[0].values == expected
 
-    def test_roundtrip_kvn(self):
-        try:
-            ocm = self._create_valid_ocm()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        kvn = ocm.to_str(format="kvn")
-        assert "CCSDS_OCM_VERS" in kvn
-
-        ocm2 = Ocm.from_str(kvn, format="kvn")
-        assert ocm2.header.originator == "TEST"
-        assert len(ocm2.segment.data.traj) == 1
-
-    def test_roundtrip_xml(self):
-        try:
-            ocm = self._create_valid_ocm()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        xml = ocm.to_str(format="xml")
-        assert "<ocm" in xml
-
-        ocm2 = Ocm.from_str(xml, format="xml")
-        assert len(ocm2.segment.data.traj) == 1
+    @pytest.mark.parametrize("format", ["kvn", "xml"])
+    def test_constructed_message_roundtrips(self, format):
+        message = self._create_valid_ocm()
+        parsed = Ocm.from_str(message.to_str(format), format=format)
+        assert parsed.header.originator == "TEST"
+        assert len(parsed.segment.data.traj) == 1
 
     def test_history_time_tags_use_one_epoch_branch(self):
         ocm = self._create_valid_ocm()
@@ -210,16 +192,6 @@ class TestOcm:
         for field in ("useable_start_time", "useable_stop_time"):
             setattr(trajectory, field, "123.5")
             assert getattr(trajectory, field) == "123.5"
-
-    def test_file_io(self, tmp_path):
-        ocm = self._create_valid_ocm()
-        path = tmp_path / "test.ocm"
-
-        ocm.to_file(str(path), "kvn")
-        assert path.exists()
-
-        ocm2 = ccsds_ndm.from_file(str(path), format="kvn")
-        assert ocm2.header.originator == "TEST"
 
     def test_ocm_covariance_and_maneuver_setters(self):
         cov = OcmCovarianceMatrix(
@@ -352,45 +324,18 @@ class TestOcm:
             setattr(traj, name, value)  # must not raise
             assert getattr(traj, name) == value
 
-    def test_traj_line_epoch_is_validated_without_changing_string_api(self):
-        line = TrajLine(epoch="2023-001T00:00:00", values=[1.0])
+    @pytest.mark.parametrize(
+        "cls, values", [(TrajLine, [1.0]), (CovLine, [1.0]), (ManLine, ["1.0"])]
+    )
+    def test_line_epoch_is_validated_without_changing_string_api(self, cls, values):
+        line = cls(epoch="2023-001T00:00:00", values=values)
         assert line.epoch == "2023-001T00:00:00"
-
         line.epoch = "123.5"
         assert line.epoch == "123.5"
-
         with pytest.raises(NdmEpochError):
-            TrajLine(epoch="not-an-epoch", values=[1.0])
-        with pytest.raises(NdmEpochError):
-            line.epoch = "not-an-epoch"
-
-    def test_cov_line_epoch_is_validated_without_changing_string_api(self):
-        line = CovLine(epoch="2023-001T00:00:00", values=[1.0])
-        assert line.epoch == "2023-001T00:00:00"
-
-        line.epoch = "123.5"
-        assert line.epoch == "123.5"
-
-        with pytest.raises(NdmEpochError):
-            CovLine(epoch="not-an-epoch", values=[1.0])
+            cls(epoch="not-an-epoch", values=values)
         with pytest.raises(NdmEpochError):
             line.epoch = "not-an-epoch"
-
-    def test_man_line_epoch_is_validated_without_changing_string_api(self):
-        line = ManLine(epoch="2023-001T00:00:00", values=["1.0"])
-        assert line.epoch == "2023-001T00:00:00"
-
-        line.epoch = "123.5"
-        assert line.epoch == "123.5"
-
-        with pytest.raises(NdmEpochError):
-            ManLine(epoch="not-an-epoch", values=["1.0"])
-        with pytest.raises(NdmEpochError):
-            line.epoch = "not-an-epoch"
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
 
 
 class TestOcmCorrigendum:

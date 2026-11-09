@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::error::{CcsdsNdmError, Result};
+use crate::validation::MessageKind;
 use crate::Message;
 use winnow::ascii::multispace1;
 use winnow::combinator::{alt, repeat};
@@ -178,7 +179,7 @@ fn detect_kind(
             input,
         )
     })?;
-    Ok(kind.message_kind())
+    Ok(kind)
 }
 
 pub(crate) fn detect_message_type(s: &str) -> Result<Message> {
@@ -210,39 +211,7 @@ pub(crate) fn detect_message_type_as(s: &str, notation: Option<Notation>) -> Res
     })
 }
 
-#[derive(Clone, Copy)]
-enum NdmKind {
-    Opm,
-    Omm,
-    Oem,
-    Ocm,
-    Acm,
-    Cdm,
-    Tdm,
-    Rdm,
-    Aem,
-    Apm,
-    Ndm,
-}
-
-impl NdmKind {
-    fn message_kind(self) -> crate::validation::MessageKind {
-        use crate::validation::MessageKind;
-        match self {
-            Self::Opm => MessageKind::Opm,
-            Self::Omm => MessageKind::Omm,
-            Self::Oem => MessageKind::Oem,
-            Self::Ocm => MessageKind::Ocm,
-            Self::Acm => MessageKind::Acm,
-            Self::Cdm => MessageKind::Cdm,
-            Self::Tdm => MessageKind::Tdm,
-            Self::Rdm => MessageKind::Rdm,
-            Self::Aem => MessageKind::Aem,
-            Self::Apm => MessageKind::Apm,
-            Self::Ndm => MessageKind::Ndm,
-        }
-    }
-
+impl MessageKind {
     fn from_xml_root(name: &[u8]) -> Option<Self> {
         match name {
             b"opm" => Some(Self::Opm),
@@ -319,7 +288,7 @@ fn with_xml_parse_context<T>(
 }
 
 /// Winnow parser to identify the KVN message type from the header
-fn parse_kvn_kind(input: &mut &str) -> PResult<NdmKind> {
+fn parse_kvn_kind(input: &mut &str) -> PResult<MessageKind> {
     // Skip whitespace and comments
     // Using explicit type annotation for the accumulated value to ensure type inference works
     let _: () = repeat(
@@ -334,24 +303,24 @@ fn parse_kvn_kind(input: &mut &str) -> PResult<NdmKind> {
     // Check for CCSDS_..._VERS header
     alt((
         alt((
-            "CCSDS_OPM_VERS".value(NdmKind::Opm),
-            "CCSDS_OMM_VERS".value(NdmKind::Omm),
-            "CCSDS_OEM_VERS".value(NdmKind::Oem),
-            "CCSDS_OCM_VERS".value(NdmKind::Ocm),
-            "CCSDS_ACM_VERS".value(NdmKind::Acm),
+            "CCSDS_OPM_VERS".value(MessageKind::Opm),
+            "CCSDS_OMM_VERS".value(MessageKind::Omm),
+            "CCSDS_OEM_VERS".value(MessageKind::Oem),
+            "CCSDS_OCM_VERS".value(MessageKind::Ocm),
+            "CCSDS_ACM_VERS".value(MessageKind::Acm),
         )),
         alt((
-            "CCSDS_CDM_VERS".value(NdmKind::Cdm),
-            "CCSDS_TDM_VERS".value(NdmKind::Tdm),
-            "CCSDS_RDM_VERS".value(NdmKind::Rdm),
-            "CCSDS_AEM_VERS".value(NdmKind::Aem),
-            "CCSDS_APM_VERS".value(NdmKind::Apm),
+            "CCSDS_CDM_VERS".value(MessageKind::Cdm),
+            "CCSDS_TDM_VERS".value(MessageKind::Tdm),
+            "CCSDS_RDM_VERS".value(MessageKind::Rdm),
+            "CCSDS_AEM_VERS".value(MessageKind::Aem),
+            "CCSDS_APM_VERS".value(MessageKind::Apm),
         )),
     ))
     .parse_next(input)
 }
 
-fn detect_kvn_kind(s: &str) -> Result<NdmKind> {
+fn detect_kvn_kind(s: &str) -> Result<MessageKind> {
     let kind = detect_kvn_header(s)?;
 
     if has_multiple_kvn_messages(s) {
@@ -361,7 +330,7 @@ fn detect_kvn_kind(s: &str) -> Result<NdmKind> {
     Ok(kind)
 }
 
-fn detect_kvn_header(s: &str) -> Result<NdmKind> {
+fn detect_kvn_header(s: &str) -> Result<MessageKind> {
     let mut input = s;
     parse_kvn_kind
         .parse_next(&mut input)
@@ -374,12 +343,7 @@ fn detect_kvn_type(s: &str) -> Result<Message> {
 
     let result = kind.parse_kvn(s);
     result.map_err(|error| {
-        ensure_parse_context(
-            error,
-            kind.message_kind(),
-            crate::error::DiagnosticNotation::Kvn,
-            s,
-        )
+        ensure_parse_context(error, kind, crate::error::DiagnosticNotation::Kvn, s)
     })
 }
 
@@ -389,10 +353,10 @@ use quick_xml::reader::Reader;
 
 fn detect_xml_type(s: &str) -> Result<Message> {
     let kind = detect_xml_kind(s)?;
-    with_xml_parse_context(kind.parse_xml(s), kind.message_kind(), s)
+    with_xml_parse_context(kind.parse_xml(s), kind, s)
 }
 
-fn detect_xml_kind(s: &str) -> Result<NdmKind> {
+fn detect_xml_kind(s: &str) -> Result<MessageKind> {
     let mut reader = Reader::from_str(s);
     reader.config_mut().trim_text_start = true;
     reader.config_mut().trim_text_end = true;
@@ -403,7 +367,7 @@ fn detect_xml_kind(s: &str) -> Result<NdmKind> {
                 // Dispatch on the local name so qualified `ndm:`-prefixed roots (NDM/XML 4.3.5)
                 // reach their parser, which validates the namespace.
                 let root_name = e.local_name();
-                let kind = NdmKind::from_xml_root(root_name.as_ref()).ok_or_else(|| {
+                let kind = MessageKind::from_xml_root(root_name.as_ref()).ok_or_else(|| {
                     CcsdsNdmError::UnsupportedMessage(format!(
                         "Unknown or unsupported XML root tag: <{}>",
                         String::from_utf8_lossy(root_name.as_ref())

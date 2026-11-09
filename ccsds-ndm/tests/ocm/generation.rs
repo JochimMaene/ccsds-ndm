@@ -7,7 +7,7 @@ use ccsds_ndm::types::{
 };
 use ccsds_ndm::{Ndm, Validate};
 /// A fixture maneuver promoted to `TIME_AND_ANGLE`, whose required companion fields are all
-/// populated. Three tests need this same starting point and then diverge on one value.
+/// populated. Tests start here and then diverge on one value.
 fn time_and_angle_message() -> Ocm {
     let mut message = Ocm::from_kvn(KVN).unwrap();
     let maneuver = &mut message.body.segment.data.man[0];
@@ -37,9 +37,47 @@ fn time_and_angle_vectors_use_the_schema_lexical_form_across_notations() {
     assert!(!xml.contains("<DC_REF_DIR><x>"));
     validate_xml("TIME_AND_ANGLE vectors", &xml);
     assert_eq!(Ocm::from_xml(&xml).unwrap(), message);
+    for separator in ['\u{a0}', '\u{2003}'] {
+        let input = mutated(
+            &xml,
+            "<DC_REF_DIR>1 0 0</DC_REF_DIR>",
+            &format!("<DC_REF_DIR>1{separator}0 0</DC_REF_DIR>"),
+        );
+        let parsed = Ocm::from_xml(&input).unwrap();
+        assert_eq!(parsed, message);
+        assert_eq!(parsed.to_xml().unwrap(), xml);
+    }
 
     let kvn = message.to_kvn().unwrap();
     assert_eq!(Ocm::from_kvn(&kvn).unwrap(), message);
+}
+
+#[test]
+fn duty_cycle_direction_vectors_reject_supplied_kvn_units() {
+    let kvn = time_and_angle_message().to_kvn().unwrap();
+    for field in ["DC_REF_DIR", "DC_BODY_TRIGGER"] {
+        let line = kvn.lines().find(|line| line.starts_with(field)).unwrap();
+        assert!(Ocm::from_kvn(&mutated(&kvn, line, &format!("{line} [km]"))).is_err());
+    }
+}
+
+#[test]
+fn time_and_angle_requires_a_nonblank_body_frame() {
+    let original = time_and_angle_message();
+    let xml = original.to_xml().unwrap();
+    for frame in ["", " \t\n", "\u{a0}"] {
+        let mut message = original.clone();
+        message.body.segment.data.man[0].dc_body_frame = Some(frame.into());
+        assert_rejects(&message, "DC_BODY_FRAME");
+        let input = mutated(&xml, ">SC_BODY<", &format!(">{frame}<"));
+        crate::common::assert_validation_field(
+            &Ocm::from_xml(&input).unwrap_err(),
+            "DC_BODY_FRAME",
+        );
+        message.body.segment.data.man[0].dc_type = ManDc::Continuous;
+        message.validate().unwrap();
+        message.to_xml().unwrap();
+    }
 }
 
 /// `Vec3Double` has three public `f64` components and a constructor that checks nothing, so it
@@ -384,9 +422,7 @@ fn ocm_block_value_boundaries_generate_valid_xml() {
 
 /// `ManLine::values` is `Vec<String>` because maneuver columns are heterogeneous, and the XSD
 /// types `manLine` as `xsd:string`, so the schema oracle accepts text in a numeric column. Every
-/// column that MAN_COMPOSITION declares numeric must therefore be checked directly. Matches
-/// Orekit's `ManeuverFieldType`, which parses declared-numeric columns as doubles and likewise
-/// imposes no per-column domain.
+/// column that MAN_COMPOSITION declares numeric must therefore be checked directly.
 #[test]
 fn maneuver_line_numeric_columns_must_hold_numbers() {
     for bad in [
@@ -456,6 +492,43 @@ fn maneuver_rows_require_exactly_one_token_per_declared_column() {
 }
 
 #[test]
+fn deployment_mass_sign_uses_the_retained_decimal_before_double_rounding() {
+    let mut original = Ocm::from_kvn(KVN).unwrap();
+    let maneuver = &mut original.body.segment.data.man[0];
+    maneuver.man_composition = "TIME_RELATIVE, DEPLOY_ID, DEPLOY_MASS".into();
+    maneuver.man_units = None;
+    maneuver.man_lines.truncate(2);
+    for (index, line) in maneuver.man_lines.iter_mut().enumerate() {
+        line.epoch = index.to_string().parse().unwrap();
+        line.values = vec!["CubeSat_001".into(), "-0.25".into()];
+    }
+    let kvn = original.to_kvn().unwrap();
+    let xml = original.to_xml().unwrap();
+
+    for value in ["1.0", "+1e-324", "1e-999", "0.001E-999"] {
+        let mut message = original.clone();
+        message.body.segment.data.man[0].man_lines[1].values[1] = value.into();
+        assert_rejects(&message, "MAN data line DEPLOY_MASS");
+        for error in [
+            Ocm::from_kvn(&mutated(&kvn, "-0.25", value)).unwrap_err(),
+            Ocm::from_xml(&mutated(&xml, "-0.25", value)).unwrap_err(),
+        ] {
+            crate::common::assert_validation_field(&error, "MAN data line DEPLOY_MASS");
+        }
+    }
+
+    for value in [
+        "-1e-324", "-1e-999", "-5e-324", "-0", "0", "+0e99", "0e-999",
+    ] {
+        let mut message = original.clone();
+        message.body.segment.data.man[0].man_lines[1].values[1] = value.into();
+        message.validate().unwrap();
+        assert_eq!(Ocm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+        Ocm::from_kvn(&mutated(&kvn, "-0.25", value)).unwrap();
+    }
+}
+
+#[test]
 fn maneuver_numeric_precision_keeps_text_identifiers_and_legal_spellings() {
     for composition in [
         "TIME_RELATIVE, DEPLOY_ID, DEPLOY_MASS",
@@ -469,6 +542,11 @@ fn maneuver_numeric_precision_keeps_text_identifiers_and_legal_spellings() {
         maneuver.man_lines[0].epoch = "0".parse().unwrap();
         maneuver.man_lines[0].values =
             vec!["12345678901234567".into(), "-0.30000000000000004".into()];
+        message.body.segment.data.man[0].man_composition = composition
+            .split(|c: char| c == ',' || c.is_whitespace())
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join(", ");
         assert_eq!(Ocm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
         let kvn = message.to_kvn().unwrap();
         let parsed = Ocm::from_kvn(&kvn).unwrap();
@@ -615,31 +693,6 @@ fn ocm_reports_the_unrepresentable_value_path_compactly() {
 }
 
 #[test]
-fn kvn_roundtrip() {
-    // Full roundtrip: KVN -> Ocm -> KVN
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
-CENTER_NAME = EARTH
-TRAJ_REF_FRAME = GCRF
-TRAJ_TYPE = CARTPV
-2023-01-01T00:00:00 1000 2000 3000 4 5 6
-TRAJ_STOP
-"#;
-    let ocm = Ocm::from_kvn(kvn).unwrap();
-    let output = ocm.to_kvn().unwrap();
-
-    // Parse output again
-    let ocm2 = Ocm::from_kvn(&output).unwrap();
-    assert_eq!(ocm2, ocm);
-}
-
-#[test]
 fn od_optional_fields_roundtrip() {
     let kvn = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -686,6 +739,9 @@ OD_STOP
     let od = ocm.body.segment.data.od.as_ref().unwrap();
 
     // Verify all fields were parsed
+    assert_eq!(od.od_id, "OD1");
+    assert_eq!(od.od_method, "BATCH_LS");
+    assert_eq!(od.od_epoch.as_str(), "2023-01-01T00:00:00");
     assert_eq!(od.od_prev_id, Some("OD0".to_string()));
     assert!(od.actual_od_span.is_some());
     assert_eq!(od.obs_available, Some(1000));
@@ -712,6 +768,21 @@ OD_STOP
 
     let output = ocm.to_kvn().unwrap();
     assert_eq!(Ocm::from_kvn(&output).unwrap(), ocm);
+    let xml = ocm.to_xml().unwrap();
+    validate_xml("OCM OD units", &xml);
+    assert_eq!(Ocm::from_xml(&xml).unwrap(), ocm);
+    for units in ["banana", "1"] {
+        let input = mutated(
+            &xml,
+            "<WEIGHTED_RMS>",
+            &format!("<WEIGHTED_RMS units=\"{units}\">"),
+        );
+        let error = Ocm::from_xml(&input).unwrap_err().to_string();
+        assert!(
+            error.contains("unknown attribute 'units' on 'WEIGHTED_RMS'"),
+            "{error}"
+        );
+    }
 }
 
 #[test]
@@ -757,6 +828,9 @@ USER_DEFINED_CUSTOM_PARAM = custom_value
 USER_STOP
 "#;
     let ocm = Ocm::from_kvn(kvn).unwrap();
+    assert_eq!(ocm.body.segment.data.traj.len(), 1);
+    assert_eq!(ocm.body.segment.data.cov.len(), 1);
+    assert_eq!(ocm.body.segment.data.man.len(), 1);
     let output = ocm.to_kvn().unwrap();
     assert_eq!(Ocm::from_kvn(&output).unwrap(), ocm);
 }
@@ -859,6 +933,7 @@ MAN_STOP
 
     // Verify optional fields
     assert_eq!(man.man_prev_id, Some("MAN_0".to_string()));
+    assert_eq!(man.man_purpose.as_deref(), Some("ORBIT_RAISING"));
     assert_eq!(man.man_next_id, Some("MAN_2".to_string()));
     assert!(man.man_basis.is_some());
     assert!(man.grav_assist_name.is_some());
@@ -917,6 +992,9 @@ PERT_STOP
     let pert = ocm.body.segment.data.pert.as_ref().unwrap();
 
     // Verify all fields
+    assert_eq!(pert.atmospheric_model.as_deref(), Some("NRLMSISE-00"));
+    assert!(pert.gravity_model.is_some());
+    assert!(pert.gm.is_some());
     assert!(pert.central_body_rotation.is_some());
     assert!(pert.oblate_flattening.is_some());
     assert!(pert.albedo_grid_size.is_some());
@@ -988,7 +1066,19 @@ META_STOP
     let meta = &ocm.body.segment.metadata;
     assert_eq!(meta.object_name, Some("SAT1".to_string()));
     assert_eq!(meta.object_type.as_deref(), Some("PAYLOAD"));
+    assert_eq!(meta.international_designator.as_deref(), Some("2023-001A"));
+    assert_eq!(meta.operator.as_deref(), Some("OPS_TEAM"));
+    assert_eq!(meta.country.as_deref(), Some("USA"));
     assert!(meta.sclk_offset_at_epoch.is_some());
+
+    let data = &ocm.body.segment.data;
+    assert!(data.traj.is_empty());
+    assert!(data.cov.is_empty());
+    assert!(data.man.is_empty());
+    assert!(data.phys.is_none());
+    assert!(data.pert.is_none());
+    assert!(data.od.is_none());
+    assert!(data.user.is_none());
 
     let output = ocm.to_kvn().unwrap();
     let ocm2 = Ocm::from_kvn(&output).unwrap();
@@ -1030,6 +1120,9 @@ TRAJ_STOP
     let ocm = Ocm::from_kvn(kvn).unwrap();
     let traj = &ocm.body.segment.data.traj[0];
     assert_eq!(traj.traj_id, Some("T1".to_string()));
+    assert_eq!(traj.interpolation.as_deref(), Some("LINEAR"));
+    assert_eq!(traj.interpolation_degree, Some(1));
+    assert_eq!(traj.propagator.as_deref(), Some("SGP4"));
     assert_eq!(traj.traj_basis.as_deref(), Some("PREDICTED"));
     assert_eq!(traj.orb_revnum_basis, Some(RevNumBasis::One));
 
@@ -1103,6 +1196,10 @@ PHYS_STOP
     let phys = ocm.body.segment.data.phys.as_ref().unwrap();
     assert_eq!(phys.manufacturer, Some("ACME".to_string()));
     assert_eq!(phys.ixx.as_ref().unwrap().value, 100.0);
+    assert_eq!(phys.iyy.as_ref().unwrap().value, 150.0);
+    assert_eq!(phys.izz.as_ref().unwrap().value, 150.0);
+    assert_eq!(phys.wet_mass.as_ref().unwrap().value, 900.0);
+    assert_eq!(phys.dry_mass.as_ref().unwrap().value, 800.0);
 
     let output = ocm.to_kvn().unwrap();
     assert_eq!(Ocm::from_kvn(&output).unwrap(), ocm);
@@ -1353,6 +1450,38 @@ fn user_defined_xml_interleaving_is_preserved_and_kvn_refused() {
 }
 
 #[test]
+fn user_defined_empty_and_whitespace_xml_values_read_back_with_documented_normalization() {
+    use ccsds_ndm::messages::ocm::{OcmUserDefined, OcmUserDefinedEntry, OcmUserDefinedParameter};
+
+    for (value, expected) in [("", ""), ("   ", ""), ("\t\n", ""), (" x ", " x ")] {
+        let mut message = Ocm::from_kvn(include_str!("../../data/kvn/ocm_g15.kvn")).unwrap();
+        message.body.segment.data.user = Some(OcmUserDefined {
+            entries: vec![OcmUserDefinedEntry::Parameter(OcmUserDefinedParameter {
+                parameter: "X".into(),
+                value: value.into(),
+                records: vec![],
+            })],
+        });
+        let xml = message.to_xml().unwrap();
+        validate_xml("OCM empty user value", &xml);
+        let parsed = Ocm::from_xml(&xml).unwrap();
+        message
+            .body
+            .segment
+            .data
+            .user
+            .as_mut()
+            .unwrap()
+            .parameters_mut()
+            .next()
+            .unwrap()
+            .value = expected.into();
+        assert_eq!(parsed, message);
+        assert_eq!(Ocm::from_xml(&parsed.to_xml().unwrap()).unwrap(), parsed);
+    }
+}
+
+#[test]
 fn positive_integer_schema_counts_refuse_zero_in_every_notation() {
     let mut message = Ocm::from_kvn(KVN).unwrap();
     message.body.segment.data.od.as_mut().unwrap().consider_n = Some(0);
@@ -1513,4 +1642,103 @@ fn international_designator_is_preserved_without_certifying_cospar_syntax() {
     validate_xml("free-text international designator", &xml);
     assert_eq!(Ocm::from_xml(&xml).unwrap(), message);
     assert_eq!(Ocm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+}
+
+#[test]
+fn maneuver_switch_dimensionless_and_text_columns_require_na_units() {
+    for (column, value) in [
+        ("ACC_INTERP", "ON"),
+        ("THR_EFFIC", "0.95"),
+        ("THR_INTERP", "OFF"),
+        ("DEPLOY_ID", "child"),
+        ("DEPLOY_DV_RATIO", "-0.05"),
+    ] {
+        let source = format!("CCSDS_OCM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\nMETA_START\nTIME_SYSTEM = UTC\nEPOCH_TZERO = 2023-01-01T00:00:00\nMETA_STOP\nMAN_START\nMAN_ID = M1\nMAN_DEVICE_ID = THRUSTER\nMAN_REF_FRAME = GCRF\nMAN_COMPOSITION = TIME_RELATIVE, {column}\nMAN_UNITS = [n/a]\n0 {value}\nMAN_STOP\n");
+        let mut message = Ocm::from_kvn(&source).unwrap();
+        let xml = message.to_xml().unwrap();
+        validate_xml(column, &xml);
+        assert_eq!(Ocm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+        assert_eq!(Ocm::from_xml(&xml).unwrap(), message);
+        message.body.segment.data.man[0].man_units = Some("[kg]".into());
+        assert_rejects(&message, "MAN_UNITS");
+        crate::common::assert_validation_field(
+            &Ocm::from_kvn(&mutated(&source, "[n/a]", "[kg]")).unwrap_err(),
+            "MAN_UNITS",
+        );
+        crate::common::assert_validation_field(
+            &Ocm::from_xml(&mutated(&xml, "[n/a]", "[kg]")).unwrap_err(),
+            "MAN_UNITS",
+        );
+    }
+}
+
+#[test]
+fn maneuver_composition_and_units_lists_are_written_in_book_form() {
+    let mut message = Ocm::from_kvn(KVN).unwrap();
+    let maneuver = &mut message.body.segment.data.man[0];
+    maneuver.man_composition =
+        "time_relative man_dura thr_x thr_y thr_z thr_effic thr_interp thr_isp thr_mag_sigma"
+            .into();
+    maneuver.man_units = Some("s N N N n/a n/a s %".into());
+    message.body.segment.data.traj[0].traj_units =
+        Some("km km km km/s km/s km/s km/s**2 km/s**2 km/s**2".into());
+    let composition = "TIME_RELATIVE, MAN_DURA, THR_X, THR_Y, THR_Z, THR_EFFIC, THR_INTERP, THR_ISP, THR_MAG_SIGMA";
+    let xml = message.to_xml().unwrap();
+    validate_xml("OCM canonical lists", &xml);
+    let kvn = message.to_kvn().unwrap();
+    for output in [&xml, &kvn] {
+        assert!(output.contains(composition), "{output}");
+        assert!(output.contains("[s,N,N,N,n/a,n/a,s,%]"), "{output}");
+        assert!(output.contains("[km,km,km,km/s,km/s,km/s,km/s**2,km/s**2,km/s**2]"));
+    }
+    let maneuver = &mut message.body.segment.data.man[0];
+    maneuver.man_composition = "time relative, dv x".into();
+    maneuver.man_units = Some("km/s".into());
+    for line in &mut maneuver.man_lines {
+        line.values.truncate(1);
+    }
+    let xml = message.to_xml().unwrap();
+    assert!(xml.contains("<MAN_COMPOSITION>TIME_RELATIVE, DV_X</MAN_COMPOSITION>"));
+    assert!(xml.contains("<MAN_UNITS>[km/s]</MAN_UNITS>"));
+    assert_eq!(Ocm::from_xml(&xml).unwrap().to_xml().unwrap(), xml);
+}
+
+#[test]
+fn mixed_case_maneuver_composition_is_rejected() {
+    let kvn = Ocm::from_kvn(KVN).unwrap().to_kvn().unwrap();
+    let lower = mutated(&kvn, "TIME_RELATIVE, MAN_DURA", "time_relative, man_dura");
+    assert!(Ocm::from_kvn(&lower).is_ok());
+    let mixed = mutated(&kvn, "TIME_RELATIVE, MAN_DURA", "Time_Relative, Man_Dura");
+    crate::common::assert_validation_field(&Ocm::from_kvn(&mixed).unwrap_err(), "MAN_COMPOSITION");
+    let xml = Ocm::from_kvn(KVN).unwrap().to_xml().unwrap();
+    let mixed = mutated(&xml, "TIME_RELATIVE, MAN_DURA", "Time_Relative, Man_Dura");
+    crate::common::assert_validation_field(&Ocm::from_xml(&mixed).unwrap_err(), "MAN_COMPOSITION");
+}
+
+#[test]
+fn empty_user_block_is_read_but_not_generated() {
+    let kvn = include_str!("../../data/kvn/ocm_g16.kvn");
+    let empty = mutated(
+        kvn,
+        "USER_DEFINED_CONSOLE_POC = MAXWELL RAFERTY\nUSER_DEFINED_EARTH_MODEL = WGS-84\n",
+        "COMMENT only a comment\n",
+    );
+    let message = Ocm::from_kvn(&empty).unwrap();
+    assert!(message.body.segment.data.user.is_some());
+    let error = message.to_kvn().unwrap_err().to_string();
+    assert!(error.contains("USER_DEFINED"), "{error}");
+    let error = message.to_xml().unwrap_err().to_string();
+    assert!(error.contains("USER_DEFINED"), "{error}");
+    for write in [Ocm::write_kvn_to::<Vec<u8>>, Ocm::write_xml_to::<Vec<u8>>] {
+        let mut bytes = Vec::new();
+        assert!(write(&message, &mut bytes).is_err());
+        assert!(bytes.is_empty());
+    }
+
+    let xml = Ocm::from_kvn(kvn).unwrap().to_xml().unwrap();
+    let start = xml.find("<user>").unwrap();
+    let end = xml.find("</user>").unwrap() + "</user>".len();
+    let parsed = Ocm::from_xml(&xml.replace(&xml[start..end], "<user/>")).unwrap();
+    assert!(parsed.to_xml().is_err());
+    assert!(parsed.to_kvn().is_err());
 }

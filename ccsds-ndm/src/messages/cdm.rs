@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 mod kvn;
-mod xml;
+pub(crate) mod xml;
 
 use crate::common::OdParameters;
 use crate::error::{Result, ValidationError};
@@ -65,15 +65,25 @@ impl Ndm for Cdm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::kvn::prepare_input(
-            crate::detect::without_utf8_bom(kvn),
-            crate::validation::MessageKind::Cdm,
-        )?;
-        let kvn = kvn.as_ref();
-        kvn::validate_kvn_syntax(kvn)?;
-        let cdm = Self::from_kvn_str(kvn)?;
-        crate::traits::Validate::validate(&cdm)?;
-        Ok(cdm)
+        (|| {
+            let kvn = crate::kvn::prepare_input(
+                crate::detect::without_utf8_bom(kvn),
+                crate::validation::MessageKind::Cdm,
+            )?;
+            let kvn = kvn.as_ref();
+            kvn::validate_kvn_syntax(kvn)?;
+            let cdm = Self::from_kvn_str(kvn)?;
+            crate::traits::Validate::validate(&cdm)?;
+            Ok(cdm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Cdm,
+                crate::error::DiagnosticNotation::Kvn,
+                kvn,
+                None,
+            )
+        })
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -81,26 +91,36 @@ impl Ndm for Cdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        let xml = xml::normalize_missing_values(xml)?;
-        let xml = xml.as_ref();
-        xml::validate_xml_sequences(xml)?;
-        let values = xml::without_unavailable_values(xml)?;
-        let mut cdm: Self = crate::xml::from_str_with_context(&values, "CDM")?;
-        for value in [&mut cdm.header.originator, &mut cdm.header.message_id] {
-            *value = value.trim_matches([' ', '\t', '\r', '\n']).to_owned();
-        }
-        for segment in &mut cdm.body.segments {
-            for value in [
-                &mut segment.metadata.object_designator,
-                &mut segment.metadata.catalog_name,
-                &mut segment.metadata.international_designator,
-            ] {
+        (|| {
+            let xml = xml::normalize_missing_values(xml)?;
+            let xml = xml.as_ref();
+            xml::validate_xml_sequences(xml)?;
+            let values = xml::without_unavailable_values(xml)?;
+            let mut cdm: Self = crate::xml::from_str_with_context(&values, "CDM")?;
+            for value in [&mut cdm.header.originator, &mut cdm.header.message_id] {
                 *value = value.trim_matches([' ', '\t', '\r', '\n']).to_owned();
             }
-            segment.data.drop_empty_blocks();
-        }
-        crate::traits::Validate::validate(&cdm)?;
-        Ok(cdm)
+            for segment in &mut cdm.body.segments {
+                for value in [
+                    &mut segment.metadata.object_designator,
+                    &mut segment.metadata.catalog_name,
+                    &mut segment.metadata.international_designator,
+                ] {
+                    *value = value.trim_matches([' ', '\t', '\r', '\n']).to_owned();
+                }
+                segment.data.drop_empty_blocks();
+            }
+            crate::traits::Validate::validate(&cdm)?;
+            Ok(cdm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Cdm,
+                crate::error::DiagnosticNotation::Xml,
+                xml,
+                None,
+            )
+        })
     }
 
     fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
@@ -113,17 +133,39 @@ impl Ndm for Cdm {
 }
 
 impl Cdm {
+    /// Table 3-3 layout `YYYY-NNNP{PP}` or `UNKNOWN`, enforced on output only.
+    pub(crate) fn validate_output_designators(&self) -> Result<()> {
+        for segment in &self.body.segments {
+            let value = segment.metadata.international_designator.as_str();
+            let bytes = value.as_bytes();
+            let cospar = matches!(bytes.len(), 9..=11)
+                && bytes[..4].iter().all(u8::is_ascii_digit)
+                && bytes[4] == b'-'
+                && bytes[5..8].iter().all(u8::is_ascii_digit)
+                && bytes[8..].iter().all(u8::is_ascii_uppercase);
+            if !cospar && value != "UNKNOWN" {
+                return Err(ValidationError::invalid_value(
+                    "INTERNATIONAL_DESIGNATOR",
+                    value,
+                    "YYYY-NNNP{PP} or UNKNOWN (CDM table 3-3)",
+                )
+                .into());
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn validate_xml_available_values(&self) -> Result<()> {
+        self.validate_output_designators()?;
         fn check(field: &'static str, value: Option<&str>) -> Result<()> {
             if value.is_some_and(|value| {
-                value
-                    .trim_matches([' ', '\t', '\r', '\n'])
-                    .eq_ignore_ascii_case("N/A")
+                let value = value.trim_matches([' ', '\t', '\r', '\n']);
+                value.is_empty() || value.eq_ignore_ascii_case("N/A")
             }) {
                 return Err(ValidationError::invalid_value(
                     field,
-                    "N/A",
-                    "an available value; only optional fields may be omitted",
+                    value.unwrap_or_default(),
+                    "a nonempty available value; use None for an absent optional field",
                 )
                 .into());
             }

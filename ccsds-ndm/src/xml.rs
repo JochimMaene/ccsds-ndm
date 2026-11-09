@@ -30,6 +30,33 @@ use std::io::Write as IoWrite;
 pub(crate) const XML_HEADER: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
 pub(crate) const XML_DEPTH_LIMIT: usize = 16;
 
+/// XML children of the shared `OpmCovarianceMatrix`, in schema order.
+pub(crate) const OPM_COVARIANCE_CHILDREN: &[&[u8]] = &[
+    b"COMMENT",
+    b"COV_REF_FRAME",
+    b"CX_X",
+    b"CY_X",
+    b"CY_Y",
+    b"CZ_X",
+    b"CZ_Y",
+    b"CZ_Z",
+    b"CX_DOT_X",
+    b"CX_DOT_Y",
+    b"CX_DOT_Z",
+    b"CX_DOT_X_DOT",
+    b"CY_DOT_X",
+    b"CY_DOT_Y",
+    b"CY_DOT_Z",
+    b"CY_DOT_X_DOT",
+    b"CY_DOT_Y_DOT",
+    b"CZ_DOT_X",
+    b"CZ_DOT_Y",
+    b"CZ_DOT_Z",
+    b"CZ_DOT_X_DOT",
+    b"CZ_DOT_Y_DOT",
+    b"CZ_DOT_Z_DOT",
+];
+
 /// Namespace of NDM/XML elements in the qualified schema set (NDM/XML 4.3.4-4.3.5).
 const NDM_NAMESPACE: &[u8] = b"urn:ccsds:schema:ndmxml";
 /// XML Schema instance namespace used by schema-location hints.
@@ -93,7 +120,12 @@ impl Namespaces {
             let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
             let prefix: &[u8] = match attribute.key.as_namespace_binding() {
                 Some(quick_xml::name::PrefixDeclaration::Default) => b"",
-                Some(quick_xml::name::PrefixDeclaration::Named(prefix)) => prefix,
+                Some(quick_xml::name::PrefixDeclaration::Named(prefix)) => {
+                    if !std::str::from_utf8(prefix).is_ok_and(is_ncname) {
+                        return Err(invalid("invalid XML namespace prefix".into()));
+                    }
+                    prefix
+                }
                 None => continue,
             };
             let name = attribute
@@ -149,6 +181,24 @@ impl Namespaces {
             None => Resolved::Unknown,
         }
     }
+}
+
+/// XML 1.0 Name without colons (Namespaces in XML 1.0, NCName).
+fn is_ncname(name: &str) -> bool {
+    fn is_start(character: char) -> bool {
+        matches!(character,
+            'A'..='Z' | '_' | 'a'..='z'
+            | '\u{C0}'..='\u{D6}' | '\u{D8}'..='\u{F6}' | '\u{F8}'..='\u{2FF}'
+            | '\u{370}'..='\u{37D}' | '\u{37F}'..='\u{1FFF}' | '\u{200C}'..='\u{200D}'
+            | '\u{2070}'..='\u{218F}' | '\u{2C00}'..='\u{2FEF}' | '\u{3001}'..='\u{D7FF}'
+            | '\u{F900}'..='\u{FDCF}' | '\u{FDF0}'..='\u{FFFD}' | '\u{10000}'..='\u{EFFFF}')
+    }
+    let mut characters = name.chars();
+    characters.next().is_some_and(is_start)
+        && characters.all(|character| {
+            is_start(character)
+                || matches!(character, '-' | '.' | '0'..='9' | '\u{B7}' | '\u{300}'..='\u{36F}' | '\u{203F}'..='\u{2040}')
+        })
 }
 
 /// Whether an element uses the unqualified or the qualified NDM/XML schema set.

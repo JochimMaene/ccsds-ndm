@@ -56,40 +56,12 @@ class TestRdm:
         # new(*, header, segment)
         return Rdm(header=header, segment=seg)
 
-    def test_roundtrip_kvn(self):
-        try:
-            rdm = self._create_valid_rdm()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        kvn = rdm.to_str(format="kvn")
-        assert "CCSDS_RDM_VERS" in kvn
-
-        rdm2 = Rdm.from_str(kvn, format="kvn")
-        assert rdm2.header.originator == "TEST"
-        assert rdm2.segment.data.atmospheric_reentry_parameters.orbit_lifetime == 5.0
-
-    def test_roundtrip_xml(self):
-        try:
-            rdm = self._create_valid_rdm()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        xml = rdm.to_str(format="xml")
-        assert "<rdm" in xml
-
-        rdm2 = Rdm.from_str(xml, format="xml")
-        assert rdm2.segment.data.atmospheric_reentry_parameters.orbit_lifetime == 5.0
-
-    def test_file_io(self, tmp_path):
-        rdm = self._create_valid_rdm()
-        path = tmp_path / "test.rdm"
-
-        rdm.to_file(str(path), "kvn")
-        assert path.exists()
-
-        rdm2 = ccsds_ndm.from_file(str(path), format="kvn")
-        assert rdm2.header.originator == "TEST"
+    @pytest.mark.parametrize("format", ["kvn", "xml"])
+    def test_constructed_message_roundtrips(self, format):
+        message = self._create_valid_rdm()
+        parsed = Rdm.from_str(message.to_str(format), format=format)
+        assert parsed.header.originator == "TEST"
+        assert parsed.segment.data.atmospheric_reentry_parameters.orbit_lifetime == 5.0
 
     def test_metadata_requires_controlled_reentry(self):
         # CONTROLLED_REENTRY is mandatory (RDM 3.4); it must not default to UNKNOWN.
@@ -167,7 +139,3 @@ class TestRdm:
             ).segment.data.ground_impact_parameters.nominal_impact_alt
             == 2.0
         )
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

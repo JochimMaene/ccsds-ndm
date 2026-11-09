@@ -131,9 +131,8 @@ shared epoch contract. This is a deliberate restriction of the library's elapsed
 representation, not an additional XSD constraint.
 
 - **Epochs.** The schema's `epochType` also allows time-zone offsets like `+01:00`, years with
-  more than four digits, an empty fraction, and a bare number. 7.5.10 only allows `Z`. The shared reader additionally accepts zero-offset
-  aliases `+00:00`/`-00:00` and canonicalizes them without changing `TIME_SYSTEM`. Nonzero
-  offsets, expanded/negative years and empty fractions remain rejected.
+  more than four digits, an empty fraction, and a bare number. 7.5.10 only allows `Z`. Nonzero offsets, expanded/negative years and empty fractions are
+  rejected. (The zero-offset alias is a relaxation; see [More lenient than the book](#more-lenient-than-the-book).)
 - **Empty mandatory values in XML.** The schema's `epochType` pattern and its plain strings
   admit an empty element (`<OBJECT_NAME/>`, `<START_TIME></START_TIME>`, `<EPOCH/>`). 7.5.1
   requires a value for every mandatory keyword and 7.5.10 defines no empty time tag, so we
@@ -142,6 +141,11 @@ representation, not an additional XSD constraint.
   parsing code; the shared diagnostic contract documents route-dependent categories. This is the shared
   book-over-XSD rule of the
   [validation contract](../design/validation-contract.md#authority-and-representability).
+- **Useable span inside the total span.** 3.0 table 5-3 and the 3.0 schema don't state that
+  `USEABLE_START_TIME`/`USEABLE_STOP_TIME` lie within `START_TIME`..`STOP_TIME`. We infer it from
+  the TOTAL/USEABLE wording (B-2 table 5-3 and B-1 table 4-3 describe the useable span as part of
+  the total span) and enforce it in every edition and notation. Test:
+  `oem::validation::oem_time_tags_are_absolute_and_metadata_ranges_are_consistent`.
 - **OEM 1.0** is read only, and some valid 1.0 files are rejected; see [OEM 1.0](#oem-10).
 - **`INTERPOLATION_DEGREE`.** Table 5-3 only asks for "an integer value", while the schema wants
   a positive integer. We require a positive degree in both notations, so every degree can also be
@@ -175,16 +179,19 @@ follows the book, so everything the library writes is valid.
   namespace attributes. Tests: `oem::parsing::xml_declaration_opens_the_document`,
   `oem::parsing::xml_schema_instance_namespace_is_needed_only_when_used`, and
   `library::xml::xml_reading_accepts_equivalent_declarations_and_unused_namespace_omission`.
-- **Long KVN lines.** 7.3.2 limits the entire line to 254 characters, excluding line
-  terminators. As in every family, reading accepts longer lines, including trailing padding; TAB
-  reads as a blank, and other control characters are still rejected. Comment trailing spaces are
-  normalized away. Output remains at most 254 characters. Tests:
+- **Lexical variants.** TAB as a blank, lines longer than 254 characters (7.3.2), `.5`/`1.`
+  number spellings, UTF-8 comment text and the `+00:00`/`-00:00` epoch alias (7.5.10) are read
+  under the shared [lexical-variant policy](../design/validation-contract.md#lexical-variants);
+  output stays canonical. Comment trailing spaces are normalized away. OEM tests:
   `oem::parsing::kvn_ignores_excess_trailing_padding_but_keeps_payload_limits`,
   `oem::parsing::kvn_reads_overlong_lines_and_rejects_short_covariance_rows`.
 - **Covariance section markers.** 5.2.5.2 requires both `COVARIANCE_START` and
   `COVARIANCE_STOP`. Reading accepts a complete covariance matrix sequence starting
   with `EPOCH` immediately after state records, even if both section markers are absent. Each
-  matrix still needs its epoch and six correctly sized rows. Writing always emits the markers.
+  matrix still needs its epoch and six correctly sized rows. Only the fully unmarked form is
+  read: a lone marker is rejected rather than guessing the intended grammar, and a leading
+  covariance COMMENT needs an explicit `COVARIANCE_START` so that it has a block owner. Writing
+  always emits the markers. No producer file in the reviewed corpus (`data/`) relies on this.
   Test: `oem::parsing::complete_covariance_without_section_markers_is_read`.
 - **Comments and assignment order.** 7.4.8 fixes KVN assignment order, and 7.8.9 restricts
   comments to the beginning of their blocks. The `odmHeader` type in
@@ -197,7 +204,10 @@ follows the book, so everything the library writes is valid.
   unknown keywords, and comments between state or covariance rows remain errors. So does a
   comment after the last covariance matrix, which opens no block and has no place in the model
   or schema (`COMMENT after the last covariance matrix must precede another EPOCH`). Writing uses the
-  book's order and places comments at the start of their blocks.
+  book's order and places comments at the start of their blocks. Producer evidence: Orekit's
+  `data/ccsds/odm/oem/OEMExample5.txt` writes `STOP_TIME` before `USEABLE_STOP_TIME`. No file
+  in the reviewed corpus reorders header keywords or XML children, or puts comments between
+  assignments.
   Tests in `oem::parsing`: `kvn_rejects_duplicate_trailing_and_non_ascii_content`,
   `classification_is_read_between_the_version_and_creation_date`,
   `xml_rejects_wrong_envelope_unknown_duplicate_and_trailing_content`, and
@@ -214,8 +224,7 @@ follows the book, so everything the library writes is valid.
   limits integers to the signed 32-bit range. Many producers write the shortest spelling that
   reproduces a double exactly, which often has 17 digits (for example `-2757.3016318893897`).
   Reading accepts any number of digits, and integer-form values of any size, in ephemeris and
-  covariance lines. Reading also accepts unambiguous decimal/exponent spellings such as `1e3`,
-  `12.5e3`, `.5`, and `1.`. Writing rounds to 16 significant digits, so the last digit of such a value can change
+  covariance lines. Exponent spellings such as `1e3` are read too. Writing rounds to 16 significant digits, so the last digit of such a value can change
   when it is written back to KVN. `INTERPOLATION_DEGREE` keeps the 32-bit range, and epochs keep
   the 16-digit fraction cap.
 
@@ -224,7 +233,8 @@ follows the book, so everything the library writes is valid.
   matrix's comments before its `EPOCH` (for the first matrix, right after `COVARIANCE_START`).
   This extends ODM 7.8.9's section-leading comment rule so real producer input and XML matrix
   comments keep their association, including on later matrices. Comments within numeric rows
-  remain invalid. `oem::conversion::xml_to_kvn_preserves_comments_on_later_covariance_matrices` checks
+  remain invalid. No producer file in the reviewed corpus puts a comment after a matrix's `EPOCH`.
+  `oem::conversion::xml_to_kvn_preserves_comments_on_later_covariance_matrices` checks
   both materialized and streaming output and reparsing.
 
 
@@ -266,7 +276,7 @@ follows the book, so everything the library writes is valid.
 | 1–7 | Header | Version, creation date and originator are required. Comments, classification and message ID are optional, subject to edition rules. The KVN version record must come first; other unique header fields may be read in any order. Writing uses the book's order. Optional XML strings are kept exactly as written; separated comment groups remain unsupported (see [Limits](#limits)). |
 | 8–16, 23 | Metadata | Identity, frame and time fields are required. Frame epoch and comments are optional. Block markers must be exact. Object and time system must match across segments. Text values keep their case. Frame-specific rules depend on the agreement between the parties. |
 | 17–20 | Time bounds | Total and useable times must be in order, and useable times must fall inside the total span (the TOTAL/USEABLE wording in B-2 table 5-3 and B-1 table 4-3). State records must fall inside the total span. Complete useable spans of consecutive segments may touch but not overlap. In 2.0, a useable start may not precede the previous segment's useable stop (see [OEM 2.0](#oem-20)). |
-| 21–22 | Interpolation | A method requires a degree, in Rust, Python and both notations. The degree must be positive (see [Stricter than required](#stricter-than-required)). Whether there are enough records is not checked, because the book doesn't define it (see [Where the book is unclear](#where-the-book-is-unclear)). |
+| 21–22 | Interpolation | A nonempty method requires a degree, in Rust, Python and both notations. The degree must be positive (see [Stricter than required](#stricter-than-required)). Whether there are enough records is not checked, because the book doesn't define it (see [Where the book is unclear](#where-the-book-is-unclear)). |
 | 24–25 | Ephemeris | At least one state record per segment, epochs valid for the time system, position and velocity with optional acceleration, and fixed units. KVN lines must have exactly 7 or 10 fields. In XML each acceleration component is optional on its own. Unlike AEM, OEM doesn't require increasing epochs. |
 | 26–31 | Covariance | Optional section, which may be empty (row 30). Each matrix has all 21 lower-triangle values, an epoch, an optional frame and comments. KVN rows must have the right number of values. Epochs increase; they are not bounded by the total span. XML units are optional. Python accepts a full 6×6 matrix and uses its lower triangle. |
 
@@ -355,22 +365,9 @@ These edition-specific rules do not impose an invented epoch-order requirement o
 This reader is a restricted legacy compatibility path, separate from the current verified
 editions. It cannot write or convert a message while its version remains 1.0, and never changes
 its edition automatically. A caller may deliberately relabel it to 2.0/3.0, validate, and generate,
-as described below; relabelling alone does not establish validity in the target edition.
+after which comments are written at the start of their blocks; relabelling alone does not
+establish validity in the target edition.
 
-KVN reading tolerates lines longer than the book's 254-character limit where applicable;
-writing enforces that limit, so an accepted overlong record can require shortening before
-regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
-are specified in the [validation contract](../design/validation-contract.md).
-
-The covariance-marker tolerance covers the unmarked form only when both markers are
-absent; a lone marker is rejected. This deliberately avoids guessing whether the producer
-intended the marked or unmarked grammar. A leading covariance COMMENT needs an explicit
-COVARIANCE_START so that it has an unambiguous block owner; later comments follow the
-existing matrix rules. Marker generation is always explicit (ODM §5.2.5.2).
-
-OEM 1.0 is input-only while its version remains 1.0. The public version field is mutable:
-a caller may deliberately relabel to 2.0/3.0, validate, and generate, with the documented
-comment merging/movement. Relabelling is an explicit caller action, not automatic conversion.
 The legacy reader uses the shared epoch syntax, which is looser than B-1's six fractional
 digits and no-Z spelling. TAB is accepted as a blank despite B-1 4.3.1b. Negative MET/MRT
 elapsed-time durations remain outside the supported profile.
@@ -384,10 +381,12 @@ retained without inventing a method. Complete usable spans may touch but must no
 bounds to lie inside total bounds follows their total/usable meaning and older edition tables;
 the 3.0 schema does not encode that relationship.
 
-The 2.0/3.0 KVN readers reject comments after the last ephemeris row, after
-`COVARIANCE_STOP`, or at EOF unless a following record gives them a supported block owner.
-The restricted 1.0 reader has its separately documented comment-placement rules. The library
-does not silently move these trailing comments between blocks.
+The 2.0/3.0 KVN readers reject a comment after the last state row, even when
+`COVARIANCE_START` or the next `META_START` follows: it leads no block (7.8.9). A comment
+between covariance matrices is accepted and belongs to the next matrix; one after the last
+matrix, after `COVARIANCE_STOP`, or at EOF is rejected. The restricted 1.0 reader has its
+separately documented comment-placement rules. The library does not silently move comments
+between blocks.
 
 KVN output also refuses empty or literal `N/A` standard strings, non-ASCII content,
 embedded line breaks, lines longer than 254 characters, integers outside the KVN range,
@@ -396,3 +395,25 @@ notation-specific representability checks, not proof that an XML model is invali
 Model header failures expose their `header.<field>` paths. Low-level deserializer failures can
 still lack canonical paths. Unclosed/incomplete covariance sections name their block and expected
 record shape; the parser does not invent a missing epoch or matrix.
+
+Known producer files rejected (Orekit samples under `data/ccsds/odm/oem/`):
+
+- `OEMExample1.txt`, `OEMExample3.txt`, `OEMExampleWithHeaderComment.txt`, `OEM-Issue839.txt`:
+  the third segment repeats the second segment's useable span, so consecutive useable spans
+  overlap (5.2.4.4).
+- `OEMExample8.txt`: the first segment has `INTERPOLATION = HERMITE` without
+  `INTERPOLATION_DEGREE` (table 5-3).
+
+Overlap is not a lexical variant, and a populated INTERPOLATION without a degree stays invalid. Empty XML
+INTERPOLATION is retained as an explicitly empty optional string and does not declare a method,
+so it needs no degree; KVN output refuses it because a blank KVN value would read as absent.
+`oem::conversion::empty_interpolation_needs_no_degree_and_keeps_its_presence` covers this case.
+
+XML header and metadata padding are trimmed on KVN output. TAB in XML comments becomes a
+blank when writing KVN; it no longer causes a refusal. Source XML comment grouping and padding
+are not promised across a KVN hop. Trailing data comments follow their explicit block ownership:
+a comment cannot be silently relocated merely to make conversion succeed.
+
+OEM permits comments between header and metadata assignments as a documented structural
+input extension. OPM/OMM retain section-leading comments only. The common lexical compatibility
+policy does not make these structural grammars identical; all writers use their canonical order.

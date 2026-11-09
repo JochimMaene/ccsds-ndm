@@ -67,13 +67,6 @@ LIVE_LIST_CASES = [
 ]
 
 
-def test_top_level_file_api_accepts_pathlike(tmp_path):
-    source = ROOT / "ccsds-ndm/data/kvn/opm_g1.kvn"
-    destination = tmp_path / "opm.xml"
-    ccsds_ndm.convert_file(source, destination, "xml")
-    assert isinstance(ccsds_ndm.from_file(destination), Opm)
-
-
 def test_public_exceptions_follow_python_error_categories():
     value_errors = [
         ccsds_ndm.NdmFormatError,
@@ -314,8 +307,11 @@ def test_covariance_constructor_requires_all_entries():
         "cy_dot_x cy_dot_y cy_dot_z cz_dot_x cz_dot_y cz_dot_z "
         "cx_dot_x_dot cy_dot_x_dot cy_dot_y_dot cz_dot_x_dot cz_dot_y_dot cz_dot_z_dot"
     ).split()
-    covariance = ccsds_ndm.OpmCovarianceMatrix(**dict.fromkeys(names, 0.0))
-    assert covariance.cx_x == 0.0
+    assert ccsds_ndm.OpmCovarianceMatrix(**dict.fromkeys(names, 0.0)).cx_x == 0.0
+    covariance = ccsds_ndm.OpmCovarianceMatrix(
+        **dict.fromkeys(names, 0.0), comment=["caller comment"]
+    )
+    assert covariance.comment == ["caller comment"]
 
 
 def test_user_defined_entries_keep_comment_and_parameter_order():
@@ -468,19 +464,6 @@ def test_typed_and_generic_files_agree_on_wide_encodings(tmp_path, encoding, sou
     assert errors[0][2] == "parse"
 
 
-def test_typed_and_generic_files_preserve_invalid_utf8_io_details(tmp_path):
-    path = tmp_path / "invalid.ndm"
-    path.write_bytes(b"\xff")
-    for reader in (ccsds_ndm.from_file, ccsds_ndm.Opm.from_file):
-        with pytest.raises(ccsds_ndm.NdmIoError) as caught:
-            reader(path)
-        assert caught.value.code == "io.error"
-        assert caught.value.filename == str(path)
-        assert caught.value.line == 1
-        assert caught.value.column == 1
-        assert caught.value.byte_offset == 0
-
-
 @pytest.mark.parametrize("cls", [ccsds_ndm, ccsds_ndm.Acm])
 def test_semantic_input_errors_keep_the_parse_operation(cls):
     source = (ROOT / "ccsds-ndm/data/kvn/acm_g6.kvn").read_text()
@@ -492,13 +475,7 @@ def test_semantic_input_errors_keep_the_parse_operation(cls):
     assert caught.value.message_kind == "acm"
 
 
-def test_release_error_hierarchy_and_epoch_codes():
-    for kind in (
-        ccsds_ndm.NdmFormatError,
-        ccsds_ndm.NdmEpochError,
-        ccsds_ndm.NdmIoError,
-    ):
-        assert issubclass(kind, ccsds_ndm.NdmError)
+def test_invalid_epoch_exposes_its_code():
     with pytest.raises(ccsds_ndm.NdmEpochError) as caught:
         ccsds_ndm.AdmHeader("bad", "TEST")
     assert caught.value.code == "parse.invalid_epoch"
@@ -610,18 +587,22 @@ def test_cdm_covariance_rejects_nonfinite_before_reporting_symmetry():
         ccsds_ndm.CdmCovarianceMatrix.from_numpy(matrix)
 
 
-def test_invalid_utf8_has_byte_line_and_column_in_both_file_readers(tmp_path):
+@pytest.mark.parametrize(
+    "source, location",
+    [(b"\xff", (1, 1, 0)), (b"CCSDS_OPM_VERS = 3.0\nORIGINATOR = \xff", (2, 14, 34))],
+)
+def test_invalid_utf8_has_byte_line_and_column_in_both_file_readers(
+    tmp_path, source, location
+):
     path = tmp_path / "invalid.kvn"
-    path.write_bytes(b"CCSDS_OPM_VERS = 3.0\nORIGINATOR = \xff")
+    path.write_bytes(source)
     for reader in (ccsds_ndm.from_file, ccsds_ndm.Opm.from_file):
         with pytest.raises(ccsds_ndm.NdmIoError) as caught:
             reader(path)
         error = caught.value
         assert error.code == "io.error"
         assert error.filename == str(path)
-        assert error.line == 2
-        assert error.column == 14
-        assert error.byte_offset == 34
+        assert (error.line, error.column, error.byte_offset) == location
         assert error.errno is None
 
 

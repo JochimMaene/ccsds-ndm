@@ -428,7 +428,7 @@ fn replace_element(xml: &str, tag: &str, value: &str) -> String {
 }
 
 #[test]
-fn xml_parsing_rejects_non_calendar_opm_epochs() {
+fn xml_parsing_rejects_non_calendar_and_offset_opm_epochs() {
     let xml = mutated_once(
         &opm_with_maneuvers()
             .to_xml()
@@ -436,37 +436,18 @@ fn xml_parsing_rejects_non_calendar_opm_epochs() {
         "</REF_FRAME>",
         "</REF_FRAME><REF_FRAME_EPOCH>2023-01-01T00:00:00</REF_FRAME_EPOCH>",
     );
-    for tag in ["REF_FRAME_EPOCH", "EPOCH", "MAN_EPOCH_IGNITION"] {
-        let invalid = replace_element(&xml, tag, "12345.5");
-        crate::common::assert_invalid_epoch(&Opm::from_xml(&invalid).unwrap_err(), "12345.5");
+    for (tag, value) in [
+        ("CREATION_DATE", "12345"),
+        ("REF_FRAME_EPOCH", "12345.5"),
+        ("EPOCH", "12345.5"),
+        ("MAN_EPOCH_IGNITION", "12345.5"),
+        ("CREATION_DATE", "2023-01-01T00:00:00+05:00"),
+        ("EPOCH", "2023-01-01T00:00:00+05:00"),
+        ("MAN_EPOCH_IGNITION", "2023-01-01T00:00:00+05:00"),
+    ] {
+        let invalid = replace_element(&xml, tag, value);
+        crate::common::assert_invalid_epoch(&Opm::from_xml(&invalid).unwrap_err(), value);
     }
-}
-
-#[test]
-fn xml_parsing_rejects_book_forbidden_timezone_offsets() {
-    let xml = opm_with_maneuvers()
-        .to_xml()
-        .expect("fixture should serialize");
-    for tag in ["CREATION_DATE", "EPOCH", "MAN_EPOCH_IGNITION"] {
-        let invalid = replace_element(&xml, tag, "2023-01-01T00:00:00+05:00");
-        crate::common::assert_invalid_epoch(
-            &Opm::from_xml(&invalid).unwrap_err(),
-            "2023-01-01T00:00:00+05:00",
-        );
-    }
-}
-
-#[test]
-fn xml_parsing_rejects_non_calendar_odm_creation_date() {
-    let xml = opm_with_maneuvers()
-        .to_xml()
-        .expect("fixture should serialize");
-    let invalid = mutated_once(
-        &xml,
-        "<CREATION_DATE>2021-06-03T05:33:00.000</CREATION_DATE>",
-        "<CREATION_DATE>12345</CREATION_DATE>",
-    );
-    crate::common::assert_invalid_epoch(&Opm::from_xml(&invalid).unwrap_err(), "12345");
 }
 
 #[test]
@@ -585,38 +566,67 @@ fn required_metadata_and_state_fields_cannot_be_omitted() {
     }
 }
 
-fn sample_opm_kvn() -> String {
-    r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2022-11-06T09:23:57
-ORIGINATOR = JAXA
-MESSAGE_ID = OPM 201113719185
-COMMENT GEOCENTRIC, CARTESIAN, EARTH FIXED
-OBJECT_NAME = OSPREY 5
-OBJECT_ID = 2022-999A
-CENTER_NAME = EARTH
-REF_FRAME = ITRF1997
-TIME_SYSTEM = UTC
-EPOCH = 2022-12-18T14:28:15.1172
-X = 6503.514000 [km]
-Y = 1239.647000 [km]
-Z = -717.490000 [km]
-X_DOT = -0.873160 [km/s]
-Y_DOT = 8.740420 [km/s]
-Z_DOT = -4.191076 [km/s]
-MASS = 3000.000000 [kg]
-SOLAR_RAD_AREA = 18.770000 [m**2]
-SOLAR_RAD_COEFF = 1.000000
-DRAG_AREA = 18.770000 [m**2]
-DRAG_COEFF = 2.500000
+#[test]
+fn parse_opm_with_maneuvers() {
+    let kvn = &format!(
+        "{MINIMAL}{}",
+        r#"MASS = 1000.0 [kg]
+MAN_EPOCH_IGNITION = 2000-06-03T04:23:00
+MAN_DURATION = 1500.0 [s]
+MAN_DELTA_MASS = -10.5 [kg]
+MAN_REF_FRAME = RSW
+MAN_DV_1 = 10.5 [km/s]
+MAN_DV_2 = 0.0 [km/s]
+MAN_DV_3 = 0.0 [km/s]
+MAN_EPOCH_IGNITION = 2000-06-05T06:00:00
+MAN_DURATION = 1500.0 [s]
+MAN_DELTA_MASS = -10.5 [kg]
+MAN_REF_FRAME = RSW
+MAN_DV_1 = -10.5 [km/s]
+MAN_DV_2 = 0.0 [km/s]
+MAN_DV_3 = 0.0 [km/s]
 "#
-    .to_string()
+    );
+    let opm = Opm::from_kvn(kvn).expect("OPM maneuver parse failed");
+    assert_eq!(opm.body.segment.data.maneuver_parameters.len(), 2);
+    assert_eq!(
+        opm.body.segment.data.maneuver_parameters[0].man_dv_1.value,
+        10.5
+    );
+    assert_eq!(
+        opm.body.segment.data.maneuver_parameters[1].man_dv_1.value,
+        -10.5
+    );
 }
 
 #[test]
-fn parse_opm_success() {
-    let kvn = sample_opm_kvn();
-    let opm = Opm::from_kvn(&kvn).expect("OPM parse failed");
+fn opm_maneuver_requires_mass_in_strict_mode() {
+    let kvn = &format!(
+        "{MINIMAL}{}",
+        r#"MAN_EPOCH_IGNITION = 2023-01-01T00:00:00
+MAN_DURATION = 10.0
+MAN_DELTA_MASS = -1.0
+MAN_REF_FRAME = RSW
+MAN_DV_1 = 0.1
+MAN_DV_2 = 0.0
+MAN_DV_3 = 0.0
+"#
+    );
+    let err = Opm::from_kvn(kvn).unwrap_err();
+    let ok = err.as_validation_error().is_some_and(|e| {
+        matches!(
+            e,
+            ValidationError::MissingRequiredField { block, field, .. }
+            if block.as_ref() == "Spacecraft Parameters" && field.as_ref() == "MASS"
+        )
+    });
+    assert!(ok, "expected MASS missing validation error, got {err}");
+}
 
+#[test]
+fn state_vector_all_mandatory() {
+    // XSD: stateVectorType requires all position and velocity components
+    let opm = Opm::from_kvn(crate::KVN).unwrap();
     assert_eq!(opm.version, "3.0");
     assert_eq!(opm.header.originator, "JAXA");
     assert_eq!(opm.body.segment.metadata.object_name, "OSPREY 5");
@@ -634,137 +644,6 @@ fn parse_opm_success() {
             .value,
         3000.0
     );
-}
-
-#[test]
-fn parse_opm_with_maneuvers() {
-    let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2000-06-03T05:33:00
-ORIGINATOR = NASA
-OBJECT_NAME = EUTELSAT W4
-OBJECT_ID = 2000-028A
-CENTER_NAME = EARTH
-REF_FRAME = TOD
-TIME_SYSTEM = UTC
-EPOCH = 2000-06-03T00:00:00.000
-X = 6655.9942 [km]
-Y = -40218.5751 [km]
-Z = -82.9177 [km]
-X_DOT = 3.11548207 [km/s]
-Y_DOT = 0.47042605 [km/s]
-Z_DOT = -0.00101490 [km/s]
-MASS = 1000.0 [kg]
-MAN_EPOCH_IGNITION = 2000-06-03T04:23:00
-MAN_DURATION = 1500.0 [s]
-MAN_DELTA_MASS = -10.5 [kg]
-MAN_REF_FRAME = RSW
-MAN_DV_1 = 10.5 [km/s]
-MAN_DV_2 = 0.0 [km/s]
-MAN_DV_3 = 0.0 [km/s]
-MAN_EPOCH_IGNITION = 2000-06-05T06:00:00
-MAN_DURATION = 1500.0 [s]
-MAN_DELTA_MASS = -10.5 [kg]
-MAN_REF_FRAME = RSW
-MAN_DV_1 = -10.5 [km/s]
-MAN_DV_2 = 0.0 [km/s]
-MAN_DV_3 = 0.0 [km/s]
-"#;
-    let opm = Opm::from_kvn(kvn).expect("OPM maneuver parse failed");
-    assert_eq!(opm.body.segment.data.maneuver_parameters.len(), 2);
-    assert_eq!(
-        opm.body.segment.data.maneuver_parameters[0].man_dv_1.value,
-        10.5
-    );
-    assert_eq!(
-        opm.body.segment.data.maneuver_parameters[1].man_dv_1.value,
-        -10.5
-    );
-}
-
-#[test]
-fn opm_maneuver_requires_mass_in_strict_mode() {
-    let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2022-11-06T09:23:57
-ORIGINATOR = JAXA
-OBJECT_NAME = SAT
-OBJECT_ID = 1
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2022-12-18T14:28:15.1172
-X = 6503.514
-Y = 1239.647
-Z = -717.490
-X_DOT = -0.873160
-Y_DOT = 8.740420
-Z_DOT = -4.191076
-MAN_EPOCH_IGNITION = 2023-01-01T00:00:00
-MAN_DURATION = 10.0
-MAN_DELTA_MASS = -1.0
-MAN_REF_FRAME = RSW
-MAN_DV_1 = 0.1
-MAN_DV_2 = 0.0
-MAN_DV_3 = 0.0
-"#;
-    let err = Opm::from_kvn(kvn).unwrap_err();
-    let ok = err.as_validation_error().is_some_and(|e| {
-        matches!(
-            e,
-            ValidationError::MissingRequiredField { block, field, .. }
-            if block.as_ref() == "Spacecraft Parameters" && field.as_ref() == "MASS"
-        )
-    });
-    assert!(ok, "expected MASS missing validation error, got {err}");
-}
-
-#[test]
-fn metadata_optional_ref_frame_epoch() {
-    // XSD: REF_FRAME_EPOCH has minOccurs="0" - it's optional
-    let kvn_without = MINIMAL;
-    let opm = Opm::from_kvn(kvn_without).unwrap();
-    assert!(opm.body.segment.metadata.ref_frame_epoch.is_none());
-
-    let kvn_with = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-REF_FRAME_EPOCH = 2000-01-01T12:00:00
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 1000 [km]
-Y = 2000 [km]
-Z = 3000 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-"#;
-    let opm = Opm::from_kvn(kvn_with).unwrap();
-    assert!(opm.body.segment.metadata.ref_frame_epoch.is_some());
-}
-
-#[test]
-fn state_vector_all_mandatory() {
-    // XSD: stateVectorType requires all position and velocity components
-    let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 6503.514 [km]
-Y = 1239.647 [km]
-Z = -717.490 [km]
-X_DOT = -0.873160 [km/s]
-Y_DOT = 8.740420 [km/s]
-Z_DOT = -4.191076 [km/s]
-"#;
-    let opm = Opm::from_kvn(kvn).unwrap();
     let sv = &opm.body.segment.data.state_vector;
     assert_eq!(sv.x.value, 6503.514);
     assert_eq!(sv.y.value, 1239.647);
@@ -775,255 +654,68 @@ Z_DOT = -4.191076 [km/s]
 }
 
 #[test]
-fn keplerian_with_true_anomaly() {
-    // XSD: keplerianElementsType choice: TRUE_ANOMALY path
-    let kvn = &format!(
-        "{MINIMAL}{}",
-        r#"SEMI_MAJOR_AXIS = 7000 [km]
-ECCENTRICITY = 0.001
-INCLINATION = 45 [deg]
-RA_OF_ASC_NODE = 90 [deg]
-ARG_OF_PERICENTER = 180 [deg]
-TRUE_ANOMALY = 270 [deg]
-GM = 398600.4 [km**3/s**2]
-"#
-    );
-    let opm = Opm::from_kvn(kvn).unwrap();
-    let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
-    assert!(kep.true_anomaly.is_some());
-    assert!(kep.mean_anomaly.is_none());
-    assert_eq!(kep.true_anomaly.as_ref().unwrap().value, 270.0);
+fn keplerian_choices_and_numeric_boundaries() {
+    for (eccentricity, inclination, node, pericenter, anomaly_field, anomaly, gm) in [
+        (0.001, 45.0, 90.0, 180.0, "TRUE_ANOMALY", 270.0, 398600.4),
+        (0.001, 45.0, 90.0, 180.0, "MEAN_ANOMALY", 120.0, 398600.4),
+        (0.0, 45.0, 90.0, 0.0, "TRUE_ANOMALY", 0.0, 398600.4),
+        (0.001, 0.0, 0.0, 0.0, "TRUE_ANOMALY", 0.0, 398600.4),
+        (0.001, 180.0, 0.0, 0.0, "TRUE_ANOMALY", 0.0, 398600.4),
+        (0.001, 45.0, -180.0, -90.0, "TRUE_ANOMALY", -45.0, 398600.4),
+        (0.001, 45.0, 90.0, 180.0, "TRUE_ANOMALY", 0.0, 0.001),
+    ] {
+        let kvn = format!("{MINIMAL}SEMI_MAJOR_AXIS = 7000 [km]\nECCENTRICITY = {eccentricity}\nINCLINATION = {inclination} [deg]\nRA_OF_ASC_NODE = {node} [deg]\nARG_OF_PERICENTER = {pericenter} [deg]\n{anomaly_field} = {anomaly} [deg]\nGM = {gm} [km**3/s**2]\n");
+        let opm = Opm::from_kvn(&kvn).unwrap();
+        let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
+        assert_eq!(kep.eccentricity.value, eccentricity);
+        assert_eq!(kep.inclination.angle.value, inclination);
+        assert_eq!(kep.ra_of_asc_node.value, node);
+        assert_eq!(kep.arg_of_pericenter.value, pericenter);
+        assert_eq!(kep.gm.value, gm);
+        assert_eq!(
+            kep.true_anomaly.as_ref().map(|v| v.value),
+            (anomaly_field == "TRUE_ANOMALY").then_some(anomaly)
+        );
+        assert_eq!(
+            kep.mean_anomaly.as_ref().map(|v| v.value),
+            (anomaly_field == "MEAN_ANOMALY").then_some(anomaly)
+        );
+    }
 }
 
 #[test]
-fn keplerian_with_mean_anomaly() {
-    // XSD: keplerianElementsType choice: MEAN_ANOMALY path
-    let kvn = &format!(
-        "{MINIMAL}{}",
-        r#"SEMI_MAJOR_AXIS = 7000 [km]
-ECCENTRICITY = 0.001
-INCLINATION = 45 [deg]
-RA_OF_ASC_NODE = 90 [deg]
-ARG_OF_PERICENTER = 180 [deg]
-MEAN_ANOMALY = 120 [deg]
-GM = 398600.4 [km**3/s**2]
-"#
-    );
-    let opm = Opm::from_kvn(kvn).unwrap();
-    let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
-    assert!(kep.mean_anomaly.is_some());
-    assert!(kep.true_anomaly.is_none());
-    assert_eq!(kep.mean_anomaly.as_ref().unwrap().value, 120.0);
+fn spacecraft_parameters_with_all_fields_and_zero_coefficients() {
+    for (records, mass, areas, solar_coeff, drag_coeff) in [
+        ("MASS = 500 [kg]\nSOLAR_RAD_AREA = 10.0 [m**2]\nSOLAR_RAD_COEFF = 1.2\nDRAG_AREA = 8.0 [m**2]\nDRAG_COEFF = 2.2\n", 500.0, Some((10.0, 8.0)), 1.2, 2.2),
+        ("MASS = 100 [kg]\nSOLAR_RAD_COEFF = 0.0\nDRAG_COEFF = 0.0\n", 100.0, None, 0.0, 0.0),
+    ] {
+        let opm = Opm::from_kvn(&format!("{MINIMAL}{records}")).unwrap();
+        let sp = opm.body.segment.data.spacecraft_parameters.as_ref().unwrap();
+        assert_eq!(sp.mass.as_ref().unwrap().value, mass);
+        assert_eq!(sp.solar_rad_area.as_ref().map(|v| v.value), areas.map(|v| v.0));
+        assert_eq!(sp.drag_area.as_ref().map(|v| v.value), areas.map(|v| v.1));
+        assert_eq!(sp.solar_rad_coeff.as_ref().unwrap(), &NonNegativeDouble::new(solar_coeff).unwrap());
+        assert_eq!(sp.drag_coeff.as_ref().unwrap(), &NonNegativeDouble::new(drag_coeff).unwrap());
+    }
 }
 
 #[test]
-fn keplerian_eccentricity_zero_valid() {
-    // XSD: nonNegativeDouble - minInclusive=0.0 (circular orbit)
-    let kvn = &format!(
-        "{MINIMAL}{}",
-        r#"SEMI_MAJOR_AXIS = 7000 [km]
-ECCENTRICITY = 0.0
-INCLINATION = 45 [deg]
-RA_OF_ASC_NODE = 90 [deg]
-ARG_OF_PERICENTER = 0 [deg]
-TRUE_ANOMALY = 0 [deg]
-GM = 398600.4 [km**3/s**2]
-"#
-    );
-    let opm = Opm::from_kvn(kvn).unwrap();
-    let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
-    assert_eq!(kep.eccentricity, NonNegativeDouble::new(0.0).unwrap());
-}
-
-#[test]
-fn keplerian_inclination_boundaries() {
-    // XSD: inclinationType - 0 to 180 degrees inclusive
-    let kvn_zero = &format!(
-        "{MINIMAL}{}",
-        r#"SEMI_MAJOR_AXIS = 7000 [km]
-ECCENTRICITY = 0.001
-INCLINATION = 0 [deg]
-RA_OF_ASC_NODE = 0 [deg]
-ARG_OF_PERICENTER = 0 [deg]
-TRUE_ANOMALY = 0 [deg]
-GM = 398600.4 [km**3/s**2]
-"#
-    );
-    let opm = Opm::from_kvn(kvn_zero).unwrap();
-    let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
-    assert_eq!(kep.inclination.angle.value, 0.0);
-
-    let kvn_180 = &format!(
-        "{MINIMAL}{}",
-        r#"SEMI_MAJOR_AXIS = 7000 [km]
-ECCENTRICITY = 0.001
-INCLINATION = 180 [deg]
-RA_OF_ASC_NODE = 0 [deg]
-ARG_OF_PERICENTER = 0 [deg]
-TRUE_ANOMALY = 0 [deg]
-GM = 398600.4 [km**3/s**2]
-"#
-    );
-    let opm = Opm::from_kvn(kvn_180).unwrap();
-    let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
-    assert_eq!(kep.inclination.angle.value, 180.0);
-}
-
-#[test]
-fn keplerian_angle_range_negative() {
-    // XSD: angleRange - can be negative (minInclusive=-360.0)
-    let kvn = &format!(
-        "{MINIMAL}{}",
-        r#"SEMI_MAJOR_AXIS = 7000 [km]
-ECCENTRICITY = 0.001
-INCLINATION = 45 [deg]
-RA_OF_ASC_NODE = -180 [deg]
-ARG_OF_PERICENTER = -90 [deg]
-TRUE_ANOMALY = -45 [deg]
-GM = 398600.4 [km**3/s**2]
-"#
-    );
-    let opm = Opm::from_kvn(kvn).unwrap();
-    let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
-    assert_eq!(kep.ra_of_asc_node.value, -180.0);
-    assert_eq!(kep.arg_of_pericenter.value, -90.0);
-    assert_eq!(kep.true_anomaly.as_ref().unwrap().value, -45.0);
-}
-
-#[test]
-fn keplerian_gm_positive() {
-    // XSD: positiveDouble for GM - minExclusive=0.0
-    let kvn = &format!(
-        "{MINIMAL}{}",
-        r#"SEMI_MAJOR_AXIS = 7000 [km]
-ECCENTRICITY = 0.001
-INCLINATION = 45 [deg]
-RA_OF_ASC_NODE = 90 [deg]
-ARG_OF_PERICENTER = 180 [deg]
-TRUE_ANOMALY = 0 [deg]
-GM = 0.001 [km**3/s**2]
-"#
-    );
-    let opm = Opm::from_kvn(kvn).unwrap();
-    let kep = opm.body.segment.data.keplerian_elements.as_ref().unwrap();
-    assert_eq!(kep.gm.value, 0.001);
-}
-
-#[test]
-fn spacecraft_parameters_with_all_fields() {
-    // XSD: spacecraftParametersType has MASS, SOLAR_RAD_AREA, SOLAR_RAD_COEFF, DRAG_AREA, DRAG_COEFF
-    let kvn = &format!(
-        "{MINIMAL}{}",
-        r#"MASS = 500 [kg]
-SOLAR_RAD_AREA = 10.0 [m**2]
-SOLAR_RAD_COEFF = 1.2
-DRAG_AREA = 8.0 [m**2]
-DRAG_COEFF = 2.2
-"#
-    );
-    let opm = Opm::from_kvn(kvn).unwrap();
-    let sp = opm
-        .body
-        .segment
-        .data
-        .spacecraft_parameters
-        .as_ref()
-        .unwrap();
-    assert_eq!(sp.mass.as_ref().unwrap().value, 500.0);
-    assert_eq!(sp.solar_rad_area.as_ref().unwrap().value, 10.0);
-    assert_eq!(
-        sp.solar_rad_coeff.as_ref().unwrap(),
-        &NonNegativeDouble::new(1.2).unwrap()
-    );
-    assert_eq!(sp.drag_area.as_ref().unwrap().value, 8.0);
-    assert_eq!(
-        sp.drag_coeff.as_ref().unwrap(),
-        &NonNegativeDouble::new(2.2).unwrap()
-    );
-}
-
-#[test]
-fn spacecraft_zero_coefficients() {
-    // XSD: nonNegativeDouble allows 0 for coefficients
-    let kvn = &format!(
-        "{MINIMAL}{}",
-        r#"MASS = 100 [kg]
-SOLAR_RAD_COEFF = 0.0
-DRAG_COEFF = 0.0
-"#
-    );
-    let opm = Opm::from_kvn(kvn).unwrap();
-    let sp = opm
-        .body
-        .segment
-        .data
-        .spacecraft_parameters
-        .as_ref()
-        .unwrap();
-    assert_eq!(
-        sp.solar_rad_coeff.as_ref().unwrap(),
-        &NonNegativeDouble::new(0.0).unwrap()
-    );
-    assert_eq!(
-        sp.drag_coeff.as_ref().unwrap(),
-        &NonNegativeDouble::new(0.0).unwrap()
-    );
-}
-
-#[test]
-fn covariance_matrix_present() {
-    // XSD: covarianceMatrixType when present
-    let kvn = &format!(
-        "{MINIMAL}{}",
-        r#"COV_REF_FRAME = RSW
-CX_X = 1.0e-6 [km**2]
-CY_X = 0.0 [km**2]
-CY_Y = 1.0e-6 [km**2]
-CZ_X = 0.0 [km**2]
-CZ_Y = 0.0 [km**2]
-CZ_Z = 1.0e-6 [km**2]
-CX_DOT_X = 0.0 [km**2/s]
-CX_DOT_Y = 0.0 [km**2/s]
-CX_DOT_Z = 0.0 [km**2/s]
-CX_DOT_X_DOT = 1.0e-9 [km**2/s**2]
-CY_DOT_X = 0.0 [km**2/s]
-CY_DOT_Y = 0.0 [km**2/s]
-CY_DOT_Z = 0.0 [km**2/s]
-CY_DOT_X_DOT = 0.0 [km**2/s**2]
-CY_DOT_Y_DOT = 1.0e-9 [km**2/s**2]
-CZ_DOT_X = 0.0 [km**2/s]
-CZ_DOT_Y = 0.0 [km**2/s]
-CZ_DOT_Z = 0.0 [km**2/s]
-CZ_DOT_X_DOT = 0.0 [km**2/s**2]
-CZ_DOT_Y_DOT = 0.0 [km**2/s**2]
-CZ_DOT_Z_DOT = 1.0e-9 [km**2/s**2]
-"#
-    );
-    let opm = Opm::from_kvn(kvn).unwrap();
-    let cov = opm.body.segment.data.covariance_matrix.as_ref().unwrap();
-    assert!(cov.cov_ref_frame.is_some());
-}
-
-#[test]
-fn single_maneuver() {
-    // XSD: maneuverParametersType with mandatory fields
-    let kvn = &format!(
-        "{MINIMAL}{}",
-        r#"MASS = 3000.000000 [kg]
-MAN_EPOCH_IGNITION = 2023-01-02T00:00:00
-MAN_DURATION = 100 [s]
-MAN_DELTA_MASS = -5.0 [kg]
-MAN_REF_FRAME = RSW
-MAN_DV_1 = 0.1 [km/s]
-MAN_DV_2 = 0.0 [km/s]
-MAN_DV_3 = 0.0 [km/s]
-"#
-    );
-    let opm = Opm::from_kvn(kvn).unwrap();
-    assert_eq!(opm.body.segment.data.maneuver_parameters.len(), 1);
-    let man = &opm.body.segment.data.maneuver_parameters[0];
-    assert_eq!(man.man_duration.value, 100.0);
-    assert_eq!(man.man_delta_mass.value, -5.0);
+fn maneuver_delta_mass_domain() {
+    for delta_mass in [-100.0, -5.0, 0.0, 5.0] {
+        let kvn = format!("{MINIMAL}MASS = 3000 [kg]\nMAN_EPOCH_IGNITION = 2023-01-02T00:00:00\nMAN_DURATION = 100 [s]\nMAN_DELTA_MASS = {delta_mass} [kg]\nMAN_REF_FRAME = RSW\nMAN_DV_1 = 0.1 [km/s]\nMAN_DV_2 = 0.0 [km/s]\nMAN_DV_3 = 0.0 [km/s]\n");
+        if delta_mass > 0.0 {
+            crate::common::assert_validation_field(
+                &Opm::from_kvn(&kvn).unwrap_err(),
+                "MAN_DELTA_MASS",
+            );
+        } else {
+            let opm = Opm::from_kvn(&kvn).unwrap();
+            let maneuvers = &opm.body.segment.data.maneuver_parameters;
+            assert_eq!(maneuvers.len(), 1);
+            assert_eq!(maneuvers[0].man_duration.value, 100.0);
+            assert_eq!(maneuvers[0].man_delta_mass.value, delta_mass);
+        }
+    }
 }
 
 #[test]
@@ -1057,65 +749,6 @@ MAN_DV_3 = 0.0 [km/s]
     );
     let opm = Opm::from_kvn(kvn).unwrap();
     assert_eq!(opm.body.segment.data.maneuver_parameters.len(), 3);
-}
-
-#[test]
-fn maneuver_delta_mass_zero_allowed() {
-    // XSD: deltamassTypeZ is nonPositiveDouble (≤0), so zero is allowed
-    // This represents attitude maneuvers that don't use propellant
-    let kvn = &format!(
-        "{MINIMAL}{}",
-        r#"MASS = 3000.000000 [kg]
-MAN_EPOCH_IGNITION = 2023-01-02T00:00:00
-MAN_DURATION = 100 [s]
-MAN_DELTA_MASS = 0.0 [kg]
-MAN_REF_FRAME = RSW
-MAN_DV_1 = 0.1 [km/s]
-MAN_DV_2 = 0.0 [km/s]
-MAN_DV_3 = 0.0 [km/s]
-"#
-    );
-    // XSD allows zero for attitude maneuvers
-    let opm = Opm::from_kvn(kvn).unwrap();
-    let man = &opm.body.segment.data.maneuver_parameters[0];
-    assert_eq!(man.man_delta_mass.value, 0.0);
-}
-
-#[test]
-fn maneuver_delta_mass_positive_rejected() {
-    let kvn = &format!(
-        "{MINIMAL}{}",
-        r#"MAN_EPOCH_IGNITION = 2023-01-02T00:00:00
-MAN_DURATION = 100 [s]
-MAN_DELTA_MASS = 5.0 [kg]
-MAN_REF_FRAME = RSW
-MAN_DV_1 = 0.1 [km/s]
-MAN_DV_2 = 0.0 [km/s]
-MAN_DV_3 = 0.0 [km/s]
-"#
-    );
-    // Should fail - positive MAN_DELTA_MASS is not allowed (must be <= 0)
-    crate::common::assert_validation_field(&Opm::from_kvn(kvn).unwrap_err(), "MAN_DELTA_MASS");
-}
-
-#[test]
-fn maneuver_delta_mass_negative() {
-    // XSD: deltamassTypeZ - negative values are valid (mass loss)
-    let kvn = &format!(
-        "{MINIMAL}{}",
-        r#"MASS = 3000.000000 [kg]
-MAN_EPOCH_IGNITION = 2023-01-02T00:00:00
-MAN_DURATION = 100 [s]
-MAN_DELTA_MASS = -100.0 [kg]
-MAN_REF_FRAME = RSW
-MAN_DV_1 = 0.1 [km/s]
-MAN_DV_2 = 0.0 [km/s]
-MAN_DV_3 = 0.0 [km/s]
-"#
-    );
-    let opm = Opm::from_kvn(kvn).unwrap();
-    let man = &opm.body.segment.data.maneuver_parameters[0];
-    assert_eq!(man.man_delta_mass.value, -100.0);
 }
 
 #[test]

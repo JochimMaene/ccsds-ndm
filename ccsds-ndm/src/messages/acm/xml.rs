@@ -244,6 +244,16 @@ fn acm_xml_children(parent: &[u8]) -> Option<&'static [&'static [u8]]> {
 
 impl Acm {
     pub(crate) fn validate_xml_representability(&self) -> Result<()> {
+        self.body.segment.data.validate_user_for_output()?;
+        if self.body.segment.metadata.classification.is_some() {
+            return Err(ValidationError::invalid_value(
+                "CLASSIFICATION",
+                "ACM metadata",
+                "header classification only in XML",
+            )
+            .at_path("body.segment.metadata.classification")
+            .into());
+        }
         // ATT_BASIS/COV_BASIS are open text in the book (suggested values) but an XSD enum.
         let data = &self.body.segment.data;
         let bases = data

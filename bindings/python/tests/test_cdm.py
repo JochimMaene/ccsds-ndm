@@ -135,42 +135,12 @@ class TestCdm:
 
         return Cdm(header=header, body=body)
 
-    def test_roundtrip_kvn(self):
-        try:
-            cdm = self._create_valid_cdm()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        kvn = cdm.to_str(format="kvn")
-        assert "CCSDS_CDM_VERS" in kvn
-
-        cdm2 = Cdm.from_str(kvn, format="kvn")
-        assert cdm2.header.originator == "TEST"
-        assert len(cdm2.body.segments) == 2
-
-    def test_roundtrip_xml(self):
-        try:
-            cdm = self._create_valid_cdm()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        xml = cdm.to_str(format="xml")
-        assert "<cdm" in xml
-
-        cdm2 = Cdm.from_str(xml, format="xml")
-        assert cdm2.header.originator == "TEST"
-
-    def test_file_io(self, tmp_path):
-        cdm = self._create_valid_cdm()
-        kvn_path = tmp_path / "test.cdm"
-
-        # Test to_file
-        cdm.to_file(str(kvn_path), "kvn")
-        assert kvn_path.exists()
-
-        # Test from_file
-        cdm2 = ccsds_ndm.from_file(str(kvn_path), format="kvn")
-        assert cdm2.header.originator == "TEST"
+    @pytest.mark.parametrize("format", ["kvn", "xml"])
+    def test_constructed_message_roundtrips(self, format):
+        message = self._create_valid_cdm()
+        parsed = Cdm.from_str(message.to_str(format), format=format)
+        assert parsed.header.originator == "TEST"
+        assert len(parsed.body.segments) == 2
 
     def test_cdm_data_numpy_api(self):
         state = np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 0.0], dtype=float)
@@ -369,10 +339,6 @@ class TestCdmRealWorldCorpus:
         )
         with pytest.raises(ccsds_ndm.NdmFormatError):
             ccsds_ndm.from_str(meaningful, format="xml")
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
 
 
 @pytest.mark.parametrize(

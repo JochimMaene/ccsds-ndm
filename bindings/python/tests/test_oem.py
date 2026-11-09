@@ -514,7 +514,3 @@ class TestOem:
     def test_covariance_matrix_takes_exactly_one_matrix(self, shape):
         with pytest.raises(ValueError, match=r"\(21,\) or \(6,6\)"):
             OemCovarianceMatrix("2023-01-01T00:00:00", np.ones(shape))
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

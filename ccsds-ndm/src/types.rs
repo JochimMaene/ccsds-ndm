@@ -1398,7 +1398,7 @@ where
 fn reject_kvn_unit(unit: Option<&str>) -> Result<()> {
     match unit {
         Some(value) => Err(crate::error::EnumParseError {
-            field: "unit",
+            field: "unit".into(),
             value: value.to_owned(),
             expected: "no unit",
         }
@@ -1605,7 +1605,7 @@ macro_rules! define_unit_enum {
             type Err = crate::error::EnumParseError;
             fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
                 match s { $($str_rep => Ok(Self::$variant)),+, _ => Err(crate::error::EnumParseError {
-                    field: "unit",
+                    field: "unit".into(),
                     value: s.to_string(),
                     expected: stringify!($($str_rep),+),
                 }) }
@@ -1696,50 +1696,11 @@ impl std::str::FromStr for Angle {
 }
 
 impl<'de> serde::Deserialize<'de> for Angle {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct AngleVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for AngleVisitor {
-            type Value = Angle;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a primitive value or a map with $value and optionally @units")
-            }
-
-            fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                v.parse::<Angle>().map_err(E::custom)
-            }
-
-            fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
-            where
-                A: serde::de::MapAccess<'de>,
-            {
-                let mut value = None;
-                let mut units = None;
-
-                while let Some(key) = map.next_key::<String>()? {
-                    if key == "$value" || key == "$text" {
-                        value = Some(map.next_value()?);
-                    } else if key == "@units" {
-                        units = Some(map.next_value()?);
-                    } else {
-                        let _: serde::de::IgnoredAny = map.next_value()?;
-                    }
-                }
-
-                let value = value
-                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
-                Angle::new(value, units).map_err(serde::de::Error::custom)
-            }
-        }
-
-        deserializer.deserialize_any(AngleVisitor)
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let value = UnitValue::<f64, AngleUnits>::deserialize(deserializer)?;
+        Self::new(value.value, value.units).map_err(serde::de::Error::custom)
     }
 }
 
@@ -1810,50 +1771,11 @@ impl std::str::FromStr for DayInterval {
 }
 
 impl<'de> serde::Deserialize<'de> for DayInterval {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct DayIntervalVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for DayIntervalVisitor {
-            type Value = DayInterval;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a primitive value or a map with $value and optionally @units")
-            }
-
-            fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                v.parse::<DayInterval>().map_err(E::custom)
-            }
-
-            fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
-            where
-                A: serde::de::MapAccess<'de>,
-            {
-                let mut value = None;
-                let mut units = None;
-
-                while let Some(key) = map.next_key::<String>()? {
-                    if key == "$value" || key == "$text" {
-                        value = Some(map.next_value::<f64>()?);
-                    } else if key == "@units" {
-                        units = Some(map.next_value::<DayIntervalUnits>()?);
-                    } else {
-                        let _: serde::de::IgnoredAny = map.next_value()?;
-                    }
-                }
-
-                let value = value
-                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
-                DayInterval::new(value, units).map_err(serde::de::Error::custom)
-            }
-        }
-
-        deserializer.deserialize_any(DayIntervalVisitor)
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let value = UnitValue::<f64, DayIntervalUnits>::deserialize(deserializer)?;
+        Self::new(value.value, value.units).map_err(serde::de::Error::custom)
     }
 }
 
@@ -2132,53 +2054,15 @@ impl std::str::FromStr for Gm {
 }
 
 impl<'de> serde::Deserialize<'de> for Gm {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct GmVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for GmVisitor {
-            type Value = Gm;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a primitive value or a map with $value and optionally @units")
-            }
-
-            fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                let value = v.parse::<Gm>().map_err(E::custom)?;
-                Gm::validate_xml_value(value.value, "GM").map_err(E::custom)?;
-                Ok(value)
-            }
-
-            fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
-            where
-                A: serde::de::MapAccess<'de>,
-            {
-                let mut value = None;
-                let mut units = None;
-
-                while let Some(key) = map.next_key::<String>()? {
-                    if key == "$value" || key == "$text" {
-                        value = Some(map.next_value::<f64>()?);
-                    } else if key == "@units" {
-                        units = Some(map.next_value::<GmUnits>()?);
-                    } else {
-                        let _: serde::de::IgnoredAny = map.next_value()?;
-                    }
-                }
-
-                let value = value
-                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
-                Gm::validate_xml_value(value, "GM").map_err(serde::de::Error::custom)?;
-                Gm::new(value, units).map_err(serde::de::Error::custom)
-            }
-        }
-
-        deserializer.deserialize_any(GmVisitor)
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let value = UnitValue::<f64, GmUnits>::deserialize(deserializer)?;
+        Self::validate_xml_value(value.value, "GM").map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            value: value.value,
+            units: value.units,
+        })
     }
 }
 
@@ -2222,7 +2106,7 @@ define_unit_type!(
 
 /// Altitude with an optional XML length unit annotation; the owning field defines its range.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct AltitudeRequired {
+pub struct ImpactAltitude {
     /// Numeric value; the containing type defines its unit and permitted domain.
     #[serde(rename = "$value")]
     pub value: f64,
@@ -2230,17 +2114,17 @@ pub struct AltitudeRequired {
     #[serde(rename = "@units", default, skip_serializing_if = "Option::is_none")]
     pub units: Option<LengthUnits>,
 }
-impl AltitudeRequired {
+impl ImpactAltitude {
     /// The common 4.0 XSD's `altRange`, which is Earth-derived.
     ///
     /// RDM states no numeric range for `NOMINAL_IMPACT_ALT` and permits non-Earth body-fixed
     /// frames, so this is a representability limit of the XML edition rather than a semantic rule.
-    /// The model keeps any finite value; XML generation rejects one this range cannot express.
+    /// The model and KVN keep any finite value; XML input and output reject one outside it.
     pub const XML_RANGE: std::ops::RangeInclusive<f64> = -430.5..=8848.0;
 
     /// Accepts any finite altitude, because the book imposes no range.
     pub fn new(value: f64) -> Result<Self> {
-        require_finite("Altitude", value)?;
+        require_finite("ImpactAltitude", value)?;
         Ok(Self {
             value,
             units: Some(LengthUnits::M),
@@ -2259,14 +2143,14 @@ impl AltitudeRequired {
         }
     }
 }
-impl FromKvnFloat for AltitudeRequired {
+impl FromKvnFloat for ImpactAltitude {
     fn from_kvn_float(value: f64, unit: Option<&str>) -> Result<Self> {
         let mut parsed = Self::new(value)?;
         parsed.units = Some(kvn_unit_or_default(unit, LengthUnits::M)?);
         Ok(parsed)
     }
 }
-impl std::fmt::Display for AltitudeRequired {
+impl std::fmt::Display for ImpactAltitude {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value)
     }
@@ -2300,50 +2184,11 @@ impl std::str::FromStr for Mass {
 }
 
 impl<'de> serde::Deserialize<'de> for Mass {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct MassVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for MassVisitor {
-            type Value = Mass;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a primitive value or a map with $value and optionally @units")
-            }
-
-            fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                v.parse::<Mass>().map_err(E::custom)
-            }
-
-            fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
-            where
-                A: serde::de::MapAccess<'de>,
-            {
-                let mut value = None;
-                let mut units = None;
-
-                while let Some(key) = map.next_key::<String>()? {
-                    if key == "$value" || key == "$text" {
-                        value = Some(map.next_value()?);
-                    } else if key == "@units" {
-                        units = Some(map.next_value()?);
-                    } else {
-                        let _: serde::de::IgnoredAny = map.next_value()?;
-                    }
-                }
-
-                let value = value
-                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
-                Mass::new(value, units).map_err(serde::de::Error::custom)
-            }
-        }
-
-        deserializer.deserialize_any(MassVisitor)
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let value = UnitValue::<f64, MassUnits>::deserialize(deserializer)?;
+        Self::new(value.value, value.units).map_err(serde::de::Error::custom)
     }
 }
 
@@ -2400,50 +2245,11 @@ impl std::str::FromStr for Area {
 }
 
 impl<'de> serde::Deserialize<'de> for Area {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct AreaVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for AreaVisitor {
-            type Value = Area;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a primitive value or a map with $value and optionally @units")
-            }
-
-            fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                v.parse::<Area>().map_err(E::custom)
-            }
-
-            fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
-            where
-                A: serde::de::MapAccess<'de>,
-            {
-                let mut value = None;
-                let mut units = None;
-
-                while let Some(key) = map.next_key::<String>()? {
-                    if key == "$value" || key == "$text" {
-                        value = Some(map.next_value()?);
-                    } else if key == "@units" {
-                        units = Some(map.next_value()?);
-                    } else {
-                        let _: serde::de::IgnoredAny = map.next_value()?;
-                    }
-                }
-
-                let value = value
-                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
-                Area::new(value, units).map_err(serde::de::Error::custom)
-            }
-        }
-
-        deserializer.deserialize_any(AreaVisitor)
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let value = UnitValue::<f64, AreaUnits>::deserialize(deserializer)?;
+        Self::new(value.value, value.units).map_err(serde::de::Error::custom)
     }
 }
 
@@ -3028,43 +2834,8 @@ impl<'de> serde::Deserialize<'de> for ElementSetNo {
     where
         D: serde::Deserializer<'de>,
     {
-        struct ElementSetNoVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for ElementSetNoVisitor {
-            type Value = ElementSetNo;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a primitive value or a map with $value")
-            }
-
-            fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                v.parse::<ElementSetNo>().map_err(E::custom)
-            }
-
-            fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error>
-            where
-                A: serde::de::MapAccess<'de>,
-            {
-                let mut value = None;
-
-                while let Some(key) = map.next_key::<String>()? {
-                    if key == "$value" || key == "$text" {
-                        value = Some(map.next_value()?);
-                    } else {
-                        let _: serde::de::IgnoredAny = map.next_value()?;
-                    }
-                }
-
-                let value = value
-                    .ok_or_else(|| serde::de::Error::custom("an empty element is not a number"))?;
-                ElementSetNo::new(value).map_err(serde::de::Error::custom)
-            }
-        }
-
-        deserializer.deserialize_any(ElementSetNoVisitor)
+        let value = crate::utils::XmlU32::deserialize(deserializer)?;
+        Self::new(value.0).map_err(serde::de::Error::custom)
     }
 }
 
@@ -3417,7 +3188,7 @@ impl std::str::FromStr for ObjectDescription {
             "UNKNOWN" => Ok(Self::Unknown),
             "OTHER" => Ok(Self::Other),
             _ => Err(crate::error::EnumParseError {
-                field: "OBJECT_TYPE",
+                field: "OBJECT_TYPE".into(),
                 value: s.to_string(),
                 expected: "PAYLOAD, ROCKET BODY, DEBRIS, UNKNOWN, or OTHER",
             }),
@@ -3499,7 +3270,7 @@ impl std::str::FromStr for RotSeq {
             "ZYX" => Ok(Self::ZYX),
             "ZYZ" => Ok(Self::ZYZ),
             _ => Err(crate::error::EnumParseError {
-                field: "EULER_ROT_SEQ",
+                field: "EULER_ROT_SEQ".into(),
                 value: s.to_string(),
                 expected: "XYX, XYZ, XZX, XZY, YXY, YXZ, YZX, YZY, ZXY, ZXZ, ZYX, ZYZ",
             }),
@@ -3564,7 +3335,7 @@ impl std::str::FromStr for AdMethod {
             "FILTER_SMOOTHER" => Ok(Self::FilterSmoother),
             "OTHER" => Ok(Self::Other),
             _ => Err(crate::error::EnumParseError {
-                field: "AD_METHOD",
+                field: "AD_METHOD".into(),
                 value: s.to_owned(),
                 expected: "EKF, TRIAD, QUEST, BATCH, Q_METHOD, FILTER_SMOOTHER, or OTHER",
             }),
@@ -3598,7 +3369,7 @@ impl std::str::FromStr for YesNo {
             "YES" | "yes" => Ok(YesNo::Yes),
             "NO" | "no" => Ok(YesNo::No),
             _ => Err(crate::error::EnumParseError {
-                field: "YES/NO",
+                field: "YES/NO".into(),
                 value: s.to_string(),
                 expected: "YES or NO",
             }),
@@ -3643,7 +3414,7 @@ impl std::str::FromStr for RevNumBasis {
             Ok(0) => Ok(Self::Zero),
             Ok(1) => Ok(Self::One),
             _ => Err(crate::error::EnumParseError {
-                field: "ORB_REVNUM_BASIS",
+                field: "ORB_REVNUM_BASIS".into(),
                 value: s.to_string(),
                 expected: "0 or 1",
             }),
@@ -3712,7 +3483,7 @@ impl std::str::FromStr for ManBasis {
             "SIMULATED" => Ok(Self::Simulated),
             "OTHER" => Ok(Self::Other),
             _ => Err(crate::error::EnumParseError {
-                field: "MAN_BASIS",
+                field: "MAN_BASIS".into(),
                 value: s.to_string(),
                 expected:
                     "CANDIDATE, PLANNED, ANTICIPATED, TELEMETRY, DETERMINED, SIMULATED, or OTHER",
@@ -3756,7 +3527,7 @@ impl std::str::FromStr for ManDc {
             "TIME" => Ok(Self::Time),
             "TIME_AND_ANGLE" => Ok(Self::TimeAndAngle),
             _ => Err(crate::error::EnumParseError {
-                field: "DC_TYPE",
+                field: "DC_TYPE".into(),
                 value: s.to_string(),
                 expected: "CONTINUOUS, TIME, or TIME_AND_ANGLE",
             }),
@@ -3809,7 +3580,7 @@ impl std::str::FromStr for CovOrder {
             "LTMWCC" => Ok(Self::LtmWcc),
             "UTMWCC" => Ok(Self::UtmWcc),
             _ => Err(crate::error::EnumParseError {
-                field: "COV_ORDERING",
+                field: "COV_ORDERING".into(),
                 value: s.to_string(),
                 expected: "LTM, UTM, FULL, LTMWCC, or UTMWCC",
             }),
@@ -3848,7 +3619,7 @@ impl std::str::FromStr for ControlledType {
             "NO" | "no" => Ok(ControlledType::No),
             "UNKNOWN" | "unknown" => Ok(ControlledType::Unknown),
             _ => Err(crate::error::EnumParseError {
-                field: "CONTROLLED_TYPE",
+                field: "CONTROLLED_REENTRY".into(),
                 value: s.to_string(),
                 expected: "YES, NO, or UNKNOWN",
             }),
@@ -4050,7 +3821,7 @@ impl std::str::FromStr for AcmAttitudeType {
             "EULER_RATE" | "euler_rate" => Ok(Self::EulerRate),
             "GYRO_BIAS" | "gyro_bias" => Ok(Self::GyroBias),
             _ => Err(crate::error::EnumParseError {
-                field: "ATT_TYPE",
+                field: "ATT_TYPE".into(),
                 value: s.to_string(),
                 expected: "QUATERNION, EULER_ANGLES, DCM, ANGVEL, Q_DOT, EULER_RATE, or GYRO_BIAS",
             }),
@@ -4099,7 +3870,7 @@ impl std::str::FromStr for AttRateType {
             "EULER_RATE" | "euler_rate" => Ok(Self::EulerRate),
             "GYRO_BIAS" | "gyro_bias" => Ok(Self::GyroBias),
             _ => Err(crate::error::EnumParseError {
-                field: "RATE_TYPE",
+                field: "RATE_TYPE".into(),
                 value: s.to_string(),
                 expected: "ANGVEL, Q_DOT, EULER_RATE, or GYRO_BIAS",
             }),
@@ -4145,7 +3916,7 @@ impl std::str::FromStr for AttBasisType {
             "DETERMINED_OBC" | "determined_obc" => Ok(Self::DeterminedObc),
             "SIMULATED" | "simulated" => Ok(Self::Simulated),
             _ => Err(crate::error::EnumParseError {
-                field: "ATT_BASIS",
+                field: "ATT_BASIS".into(),
                 value: s.to_string(),
                 expected: "PREDICTED, DETERMINED_GND, DETERMINED_OBC, or SIMULATED",
             }),
@@ -4199,7 +3970,7 @@ impl std::str::FromStr for AcmCovarianceLineType {
             "QUATERNION_GYROBIAS" | "quaternion_gyrobias" => Ok(Self::QuaternionGyroBias),
             "QUATERNION_ANGVEL" | "quaternion_angvel" => Ok(Self::QuaternionAngVel),
             _ => Err(crate::error::EnumParseError {
-                field: "COV_TYPE",
+                field: "COV_TYPE".into(),
                 value: s.to_string(),
                 expected: "ANGLE, ANGLE_GYROBIAS, ANGLE_ANGVEL, QUATERNION, QUATERNION_GYROBIAS, or QUATERNION_ANGVEL",
             }),
@@ -4269,7 +4040,7 @@ impl AttitudeTypeType {
 impl std::str::FromStr for AttitudeTypeType {
     type Err = crate::error::EnumParseError;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
+        match enum_token(s).as_ref() {
             "quaternion" | "QUATERNION" => Ok(Self::Quaternion),
             "quaternion/derivative" | "QUATERNION/DERIVATIVE" => {
                 Ok(Self::QuaternionDerivative)
@@ -4284,7 +4055,7 @@ impl std::str::FromStr for AttitudeTypeType {
             "spin/nutation" | "SPIN/NUTATION" => Ok(Self::SpinNutation),
             "spin/nutation_mom" | "SPIN/NUTATION_MOM" => Ok(Self::SpinNutationMom),
             _ => Err(crate::error::EnumParseError {
-                field: "ATTITUDE_TYPE",
+                field: "ATTITUDE_TYPE".into(),
                 value: s.to_string(),
                 expected: "QUATERNION, QUATERNION/DERIVATIVE, QUATERNION/ANGVEL, EULER_ANGLE, EULER_ANGLE/DERIVATIVE, EULER_ANGLE/ANGVEL, SPIN, SPIN/NUTATION, or SPIN/NUTATION_MOM",
             }),
@@ -4309,29 +4080,17 @@ impl std::fmt::Display for AttitudeTypeType {
     }
 }
 
-// APM rate frame
-/// Euler frame used for attitude rate components (ADM table 3-3).
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub enum ApmRateFrame {
-    /// Rates expressed in the first Euler frame.
-    #[serde(rename = "EULER_FRAME_A")]
-    EulerFrameA,
-    /// Rates expressed in the second Euler frame.
-    #[serde(rename = "EULER_FRAME_B")]
-    EulerFrameB,
-}
-
 // SigmaU / SigmaV units and types
 define_unit_enum!(SigmaUUnits, DegPerS15, { DegPerS15 => "deg/s**1.5" });
-/// Uncertainty component along the U axis, with optional units.
+/// Rate random walk with optional units (ADM table 5-8).
 pub type SigmaU = UnitValue<f64, SigmaUUnits>;
 
 define_unit_enum!(SigmaVUnits, DegPerS05, { DegPerS05 => "deg/s**0.5" });
-/// Uncertainty component along the V axis, with optional units.
+/// Angle random walk with optional units (ADM table 5-8).
 pub type SigmaV = UnitValue<f64, SigmaVUnits>;
 
 // Sensor noise (string with optional angle units)
-/// Sensor noise standard deviations with optional angular units (ADM table 5-9).
+/// Sensor noise standard deviations with optional angular units (ADM table 5-8).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SensorNoise {
     /// Noise standard deviations in sensor-defined component order.
@@ -4378,7 +4137,7 @@ impl DisintegrationType {
 
     fn parse_error(s: &str) -> crate::error::EnumParseError {
         crate::error::EnumParseError {
-            field: "REENTRY_DISINTEGRATION",
+            field: "REENTRY_DISINTEGRATION".into(),
             value: s.to_string(),
             expected: "NONE, MASS-LOSS, BREAK-UP, or MASS-LOSS + BREAK-UP",
         }
@@ -4440,7 +4199,7 @@ impl std::str::FromStr for ImpactUncertaintyType {
             "STOCHASTIC" | "stochastic" => Ok(Self::Stochastic),
             "EMPIRICAL" | "empirical" => Ok(Self::Empirical),
             _ => Err(crate::error::EnumParseError {
-                field: "IMPACT_UNCERTAINTY_METHOD",
+                field: "IMPACT_UNCERTAINTY_METHOD".into(),
                 value: s.to_string(),
                 expected: "NONE, ANALYTICAL, STOCHASTIC, or EMPIRICAL",
             }),
@@ -4485,7 +4244,7 @@ impl std::str::FromStr for ReentryUncertaintyMethodType {
             "STOCHASTIC" | "stochastic" => Ok(Self::Stochastic),
             "EMPIRICAL" | "empirical" => Ok(Self::Empirical),
             _ => Err(crate::error::EnumParseError {
-                field: "REENTRY_UNCERTAINTY_METHOD",
+                field: "REENTRY_UNCERTAINTY_METHOD".into(),
                 value: s.to_string(),
                 expected: "NONE, ANALYTICAL, STOCHASTIC, or EMPIRICAL",
             }),
@@ -4648,6 +4407,7 @@ impl crate::traits::ToKvn for UserDefined {
 #[serde(deny_unknown_fields)]
 pub struct UserDefinedParameter {
     /// Value of the user-defined parameter.
+    // shortcut: serde collapses whitespace-only XML to empty; use raw text if exact blanks are needed.
     #[serde(rename = "$value", default)]
     pub value: String,
     /// Name of the user-defined parameter.
@@ -4710,7 +4470,7 @@ impl std::str::FromStr for CdmObjectType {
             "OBJECT1" => Ok(Self::Object1),
             "OBJECT2" => Ok(Self::Object2),
             _ => Err(crate::error::EnumParseError {
-                field: "OBJECT",
+                field: "OBJECT".into(),
                 value: s.to_string(),
                 expected: "OBJECT1 or OBJECT2",
             }),
@@ -4745,7 +4505,7 @@ impl std::str::FromStr for ScreenVolumeFrameType {
             "RTN" => Ok(Self::Rtn),
             "TVN" => Ok(Self::Tvn),
             _ => Err(crate::error::EnumParseError {
-                field: "SCREEN_VOLUME_FRAME",
+                field: "SCREEN_VOLUME_FRAME".into(),
                 value: s.to_string(),
                 expected: "RTN or TVN",
             }),
@@ -4780,7 +4540,7 @@ impl std::str::FromStr for ScreenVolumeShapeType {
             "ELLIPSOID" => Ok(Self::Ellipsoid),
             "BOX" => Ok(Self::Box),
             _ => Err(crate::error::EnumParseError {
-                field: "SCREEN_VOLUME_SHAPE",
+                field: "SCREEN_VOLUME_SHAPE".into(),
                 value: s.to_string(),
                 expected: "ELLIPSOID or BOX",
             }),
@@ -4820,7 +4580,7 @@ impl std::str::FromStr for ReferenceFrameType {
             "EME2000" => Ok(Self::Eme2000),
             "ITRF" => Ok(Self::Itrf),
             _ => Err(crate::error::EnumParseError {
-                field: "REF_FRAME",
+                field: "REF_FRAME".into(),
                 value: s.to_string(),
                 expected: "GCRF, EME2000, or ITRF",
             }),
@@ -4855,7 +4615,7 @@ impl std::str::FromStr for CovarianceMethodType {
             "CALCULATED" => Ok(Self::Calculated),
             "DEFAULT" => Ok(Self::Default),
             _ => Err(crate::error::EnumParseError {
-                field: "COVARIANCE_METHOD",
+                field: "COVARIANCE_METHOD".into(),
                 value: s.to_string(),
                 expected: "CALCULATED or DEFAULT",
             }),
@@ -4895,7 +4655,7 @@ impl std::str::FromStr for ManeuverableType {
             "NO" => Ok(Self::No),
             "N/A" => Ok(Self::NA),
             _ => Err(crate::error::EnumParseError {
-                field: "MANEUVERABLE",
+                field: "MANEUVERABLE".into(),
                 value: s.to_string(),
                 expected: "YES, NO, or N/A",
             }),
@@ -5074,7 +4834,7 @@ impl std::str::FromStr for TdmAngleType {
             "XSYE" => Ok(Self::Xsye),
             _ if !s.trim().is_empty() => Ok(Self::Other(s.to_owned())),
             _ => Err(crate::error::EnumParseError {
-                field: "ANGLE_TYPE",
+                field: "ANGLE_TYPE".into(),
                 value: s.to_string(),
                 expected: "AZEL, RADEC, XEYN, or XSYE",
             }),
@@ -5104,7 +4864,8 @@ impl TryFrom<String> for TdmAngleType {
             "xeyn" => Ok(Self::Xeyn),
             "xsye" => Ok(Self::Xsye),
             _ if value.bytes().any(|byte| byte.is_ascii_lowercase()) => Ok(Self::Other(value)),
-            _ => value.parse(),
+            "AZEL" | "RADEC" | "XEYN" | "XSYE" => value.parse(),
+            _ => Ok(Self::Other(value)),
         }
     }
 }
@@ -5137,7 +4898,7 @@ impl std::str::FromStr for TdmDataQuality {
             "VALIDATED" => Ok(Self::Validated),
             "DEGRADED" => Ok(Self::Degraded),
             _ => Err(crate::error::EnumParseError {
-                field: "DATA_QUALITY",
+                field: "DATA_QUALITY".into(),
                 value: s.to_string(),
                 expected: "RAW, VALIDATED, or DEGRADED",
             }),
@@ -5177,7 +4938,7 @@ impl std::str::FromStr for TdmIntegrationRef {
             "MIDDLE" => Ok(Self::Middle),
             "END" => Ok(Self::End),
             _ => Err(crate::error::EnumParseError {
-                field: "INTEGRATION_REF",
+                field: "INTEGRATION_REF".into(),
                 value: s.to_string(),
                 expected: "START, MIDDLE, or END",
             }),
@@ -5216,7 +4977,7 @@ impl std::str::FromStr for TdmMode {
             "SEQUENTIAL" => Ok(Self::Sequential),
             "SINGLE_DIFF" => Ok(Self::SingleDiff),
             _ => Err(crate::error::EnumParseError {
-                field: "MODE",
+                field: "MODE".into(),
                 value: s.to_string(),
                 expected: "SEQUENTIAL or SINGLE_DIFF",
             }),
@@ -5255,7 +5016,7 @@ impl std::str::FromStr for TdmRangeMode {
             "CONSTANT" => Ok(Self::Constant),
             "ONE_WAY" => Ok(Self::OneWay),
             _ => Err(crate::error::EnumParseError {
-                field: "RANGE_MODE",
+                field: "RANGE_MODE".into(),
                 value: s.to_string(),
                 expected: "COHERENT, CONSTANT, or ONE_WAY",
             }),
@@ -5295,7 +5056,7 @@ impl std::str::FromStr for TdmRangeUnits {
             "s" => Ok(Self::Seconds),
             "ru" => Ok(Self::Ru),
             _ => Err(crate::error::EnumParseError {
-                field: "RANGE_UNITS",
+                field: "RANGE_UNITS".into(),
                 value: s.to_string(),
                 expected: "km, s, or RU",
             }),
@@ -5355,7 +5116,7 @@ impl std::str::FromStr for TdmReferenceFrame {
             // authority looking for a mistake that is not there.
             _ if !s.trim().is_empty() => Ok(Self::Other(s.to_owned())),
             _ => Err(crate::error::EnumParseError {
-                field: "REFERENCE_FRAME",
+                field: "REFERENCE_FRAME".into(),
                 value: s.to_string(),
                 expected: "EME2000, ICRF, ITRF2000, ITRF-93 (or ITRF1993), ITRF-97, \
                            or TOD (or TOD_EARTH)",
@@ -5390,7 +5151,9 @@ impl TryFrom<String> for TdmReferenceFrame {
             "itrf-97" => Ok(Self::Itrf97),
             "tod" => Ok(Self::Tod),
             _ if value.bytes().any(|byte| byte.is_ascii_lowercase()) => Ok(Self::Other(value)),
-            _ => value.parse(),
+            "EME2000" | "ICRF" | "ITRF2000" | "ITRF-93" | "ITRF-97" | "TOD" | "ITRF1993"
+            | "ITRF93" | "ITRF1997" | "ITRF97" | "TOD_EARTH" => value.parse(),
+            _ => Ok(Self::Other(value)),
         }
     }
 }
@@ -5419,7 +5182,7 @@ impl std::str::FromStr for TdmTimetagRef {
             "TRANSMIT" => Ok(Self::Transmit),
             "RECEIVE" => Ok(Self::Receive),
             _ => Err(crate::error::EnumParseError {
-                field: "TIMETAG_REF",
+                field: "TIMETAG_REF".into(),
                 value: s.to_string(),
                 expected: "TRANSMIT or RECEIVE",
             }),
@@ -5486,6 +5249,46 @@ impl std::fmt::Display for TdmPath {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn constrained_quantities_share_lexical_and_duplicate_field_rules() {
+        fn check<T: serde::de::DeserializeOwned + std::fmt::Debug>(unit: &str, invalid: &[&str]) {
+            for value in ["1", "+1.5", "1e1", " 1.0 "] {
+                for units in [String::new(), format!(" units=\"{unit}\"")] {
+                    let xml = format!("<value{units}>{value}</value>");
+                    quick_xml::de::from_str::<T>(&xml).unwrap();
+                }
+            }
+            for value in invalid.iter().copied().chain(["inf", "1_0", "1D0", ""]) {
+                assert!(
+                    quick_xml::de::from_str::<T>(&format!("<value>{value}</value>")).is_err(),
+                    "{value}"
+                );
+            }
+            for json in [
+                r#"{"$value":1,"$value":2}"#.to_owned(),
+                r#"{"$value":1,"$text":2}"#.to_owned(),
+                format!(r#"{{"$value":1,"@units":"{unit}","@units":"{unit}"}}"#),
+            ] {
+                assert!(serde_json::from_str::<T>(&json)
+                    .unwrap_err()
+                    .to_string()
+                    .contains("duplicate field"));
+            }
+            assert!(quick_xml::de::from_str::<T>("<value units=\"invalid\">1</value>").is_err());
+            serde_json::from_str::<T>(&format!(r#"{{"$value":1.5,"@units":"{unit}"}}"#)).unwrap();
+        }
+        check::<Angle>("deg", &["360", "-361", "NaN", "INF", "-INF"]);
+        check::<DayInterval>("d", &["-1", "NaN", "INF", "-INF"]);
+        check::<Gm>("km**3/s**2", &["0", "-1", "NaN", "INF", "-INF"]);
+        check::<Mass>("kg", &["-1", "NaN", "INF", "-INF"]);
+        check::<Area>("m**2", &["-1", "NaN", "INF", "-INF"]);
+        assert!(quick_xml::de::from_str::<Angle>("<value>-360</value>").is_ok());
+        assert!(quick_xml::de::from_str::<DayInterval>("<value>0</value>").is_ok());
+        assert!(quick_xml::de::from_str::<Mass>("<value>0</value>").is_ok());
+        assert!(quick_xml::de::from_str::<Area>("<value>0</value>").is_ok());
+        assert!(Gm::new(0.0, None).is_ok());
+    }
 
     #[test]
     fn closed_enums_reject_unknown_values_and_mixed_case() {
@@ -5978,20 +5781,16 @@ mod extra_tests {
     fn test_altitude_required_validation() {
         // RDM states no range, so the model accepts any finite altitude, including values only a
         // non-Earth body-fixed frame would produce.
-        assert!(AltitudeRequired::new(0.0).is_ok());
-        assert!(AltitudeRequired::new(9000.0).is_ok());
-        assert!(AltitudeRequired::new(-431.0).is_ok());
-        assert!(AltitudeRequired::new(f64::NAN).is_err());
-        assert!(AltitudeRequired::new(f64::INFINITY).is_err());
+        assert!(ImpactAltitude::new(0.0).is_ok());
+        assert!(ImpactAltitude::new(9000.0).is_ok());
+        assert!(ImpactAltitude::new(-431.0).is_ok());
+        assert!(ImpactAltitude::new(f64::NAN).is_err());
+        assert!(ImpactAltitude::new(f64::INFINITY).is_err());
 
         // The XSD's Earth-derived range is a representability limit, reported separately.
-        assert!(AltitudeRequired::new(0.0).unwrap().is_xml_representable());
-        assert!(!AltitudeRequired::new(9000.0)
-            .unwrap()
-            .is_xml_representable());
-        assert!(!AltitudeRequired::new(-431.0)
-            .unwrap()
-            .is_xml_representable());
+        assert!(ImpactAltitude::new(0.0).unwrap().is_xml_representable());
+        assert!(!ImpactAltitude::new(9000.0).unwrap().is_xml_representable());
+        assert!(!ImpactAltitude::new(-431.0).unwrap().is_xml_representable());
     }
 
     #[test]
@@ -6106,6 +5905,12 @@ mod text_alias_regressions {
 
     #[test]
     fn categorical_aliases_collapse_blanks_and_underscores() {
+        for alias in ["EULER ANGLE", "EULER  ANGLE", "EULER__ANGLE", "euler angle"] {
+            assert_eq!(
+                alias.parse::<AttitudeTypeType>().unwrap(),
+                AttitudeTypeType::EulerAngle
+            );
+        }
         assert_eq!(
             "ROCKET  BODY".parse::<ObjectDescription>().unwrap(),
             ObjectDescription::RocketBody

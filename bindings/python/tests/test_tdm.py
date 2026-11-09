@@ -47,45 +47,15 @@ class TestTdm:
 
         return Tdm(header=header, body=body)
 
-    def test_roundtrip_kvn(self):
-        try:
-            tdm = self._create_valid_tdm()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        kvn = tdm.to_str(format="kvn")
-        assert "CCSDS_TDM_VERS" in kvn
-
-        tdm2 = Tdm.from_str(kvn, format="kvn")
-        assert tdm2.header.originator == "TEST"
-        assert len(tdm2.body.segments) == 1
-        obs = tdm2.body.segments[0].data.observations[0]
-        assert obs.keyword == "RANGE"
-        assert obs.value == 1000.0
-
-    def test_roundtrip_xml(self):
-        try:
-            tdm = self._create_valid_tdm()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        xml = tdm.to_str(format="xml")
-        assert "<tdm" in xml
-
-        tdm2 = Tdm.from_str(xml, format="xml")
-        assert len(tdm2.body.segments) == 1
-        obs = tdm2.body.segments[0].data.observations[0]
-        assert obs.keyword == "RANGE"
-
-    def test_file_io(self, tmp_path):
-        tdm = self._create_valid_tdm()
-        path = tmp_path / "test.tdm"
-
-        tdm.to_file(str(path), "kvn")
-        assert path.exists()
-
-        tdm2 = ccsds_ndm.from_file(str(path), format="kvn")
-        assert tdm2.header.originator == "TEST"
+    @pytest.mark.parametrize("format", ["kvn", "xml"])
+    def test_constructed_message_roundtrips(self, format):
+        message = self._create_valid_tdm()
+        parsed = Tdm.from_str(message.to_str(format), format=format)
+        assert parsed.header.originator == "TEST"
+        assert len(parsed.body.segments) == 1
+        observation = parsed.body.segments[0].data.observations[0]
+        assert observation.keyword == "RANGE"
+        assert observation.value == 1000.0
 
     def test_epoch_fields_reject_numeric_xsd_branch(self):
         with pytest.raises(NdmEpochError):
@@ -152,10 +122,6 @@ class TestTdm:
         assert metadata.mode == "SINGLE_DIFF"
         with pytest.raises(ValueError):
             metadata.path = "1,6"
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
 
 
 @pytest.mark.parametrize("direction", ["RECEIVE", "TRANSMIT"])

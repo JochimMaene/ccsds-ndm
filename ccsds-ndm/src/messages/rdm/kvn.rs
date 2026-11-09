@@ -921,6 +921,33 @@ impl Rdm {
     /// [`RdmData::comment`]).
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
         let data = &self.body.segment.data;
+        self.validate_impact_frame_for_output()?;
+        if let Some(ground) = &data.ground_impact_parameters {
+            let confidences = [
+                &ground.impact_1_confidence,
+                &ground.impact_2_confidence,
+                &ground.impact_3_confidence,
+            ]
+            .map(|confidence| {
+                confidence.as_ref().map(|value| {
+                    crate::kvn::ser::OdmFloat::rounded_value(value.value).unwrap_or(value.value)
+                })
+            });
+            for pair in confidences.windows(2) {
+                if let [Some(lower), Some(upper)] = pair {
+                    if lower >= upper {
+                        return Err(crate::error::ValidationError::InvalidValue {
+                            field: "IMPACT_*_CONFIDENCE".into(),
+                            value: format!("{lower} followed by {upper}"),
+                            expected: "strictly increasing confidence levels after KVN rounding (RDM 3.5.16); use XML to retain precision".into(),
+                            line: None,
+                        }
+                        .at_path("body.segment.data.ground_impact_parameters.impact_*_confidence")
+                        .into());
+                    }
+                }
+            }
+        }
         // KVN attaches a comment to the block of the keyword that follows it, so the comments of
         // a block without values would move to the next block or trail the message.
         let comment_only = [

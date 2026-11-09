@@ -8,9 +8,6 @@ This inventory records maintainer evidence for standalone ACM 2.0. The
 - Message edition: ACM 2.0.
 - Semantic and KVN authority: CCSDS 504.0-B-2, principally sections 5 and 6.
 - XML authority: NDM/XML schema set 4.0.0 and ACM schema 2.0.
-- The local ADM text extraction omits some table 5-7 maneuver rows, including duration and
-  block delimiters. The source publication and schema, not that incomplete extraction, govern
-  those fields; the model and parsers retain them.
 - Profile: validated standalone parsing, complete logical-block preservation, deterministic
   generation, and bounded notation conversion through the shared Rust generation gate.
 
@@ -35,7 +32,7 @@ Annex A, section A2.2.3 contains 110 ACM implementation-conformance statement ro
 | ICS rows | Subject | Reconciled implementation evidence |
 | --- | --- | --- |
 | 1–6 | Header | Strict version-first parsing, common required header fields, leading comments, ordering, and duplicate rejection. |
-| 7–29 | Metadata | Typed object/time/frame fields, data-element ordering declarations, required fields, comments, units, and strict XML/KVN order. |
+| 7–29 | Metadata | Metadata `CLASSIFICATION` preserved in model/KVN and refused by XML generation (absent from `acmMetadataType`); typed object/time/frame fields, data-element ordering declarations, required fields, comments, units, and strict XML/KVN order. |
 | 30–43 | Attitude state history | Typed attitude/rate choices, fixed `NUMBER_STATES` record shape, epoch/value ordering, legal units, block comments, and history representability. |
 | 44–58 | Physical description | Complete typed scalar/vector physical model, CP frame dependency, fixed vector shape/units, schema order, and fixture preservation. Value validation covers `DRAG_COEFF` finiteness, `WET_MASS`/`DRY_MASS` as non-negative masses, and per-component finiteness of the fixed three-element `CP`. |
 | 59–68 | Covariance history | Covariance type/basis identifiers, fixed row shape/count, epochs, units, comments, and history representability. |
@@ -71,8 +68,13 @@ sign-only, and decimal-point-only present XML/model tags are invalid; an empty o
 assignment means absence under the shared input rule. Zero and negative offsets remain valid. They are compared
 when they use the same epoch branch; reversed bounds fail. Relative
 `MAN_END_TIME` cannot precede `MAN_BEGIN_TIME`, a local consistency check. Calendar/relative bounds are not
-converted or inferred from histories. The declaration, interval and edited-model regressions
+converted or inferred from histories. Declared bounds are never checked against history rows,
+including directly comparable tags; that consistency check is the caller’s responsibility
+(`acm_declared_bounds_do_not_constrain_history_rows`). The declaration, interval and edited-model regressions
 in `acm::generation` and `acm::epochs` cover these boundaries.
+
+`TARGET_ATTITUDE` is dimensionless (ADM table 5-7 and §6.9.3.5); supplied KVN units
+are rejected (`target_attitude_rejects_supplied_kvn_units`).
 
 **Seconds and finite offsets.** Tables 5-3 and 5-7 and XSD `timeUnits` require seconds
 for leap offsets and maneuver durations/times. Days are rejected rather than reinterpreted;
@@ -82,7 +84,10 @@ preserves its number spelling; optional fixed seconds annotations normalize to o
 `acm::generation::acm_seconds_and_time_offsets_are_checked_at_every_boundary` exercises these rules.
 
 **Frames are one-way dependencies.** Tables 5-5 and 5-7 require `CP_REF_FRAME` when
-CP exists and `TARGET_MOM_FRAME` when TARGET_MOMENTUM exists. A frame supplied without
+CP exists and `TARGET_MOM_FRAME` when TARGET_MOMENTUM exists. A required frame must contain
+nonblank text; empty or whitespace-only XML/model values do not satisfy the dependency.
+`conditional_frames_must_be_nonblank_when_their_vectors_are_present` checks these cases on
+input and through both generation paths. A frame supplied without
 its optional vector is permitted, matching the independently optional schema elements. The
 library does not infer a missing frame from other declarations.
 
@@ -106,15 +111,18 @@ and ascending in that order; omitted numbers are neither filled in nor used to r
 This permissive reading avoids inventing mandatory identifiers.
 `acm::generation::acm_supplied_sensor_numbers_are_in_ascending_order_and_may_be_omitted` covers it.
 
-**Supported profile limits.** The book's table 5-3 repeats `CLASSIFICATION` in metadata,
-while the bundled `acmMetadataType` has no such element. The library supports the standard header
-classification only; the additional metadata spelling is rejected in both notations. It does not
-move a metadata classification into the header.
+**Metadata classification and attitude types.** The book's table 5-3 repeats `CLASSIFICATION` in metadata,
+while the bundled `acmMetadataType` has no such element. KVN and the model preserve metadata classification independently of header classification.
+XML generation refuses a populated metadata classification rather than dropping or moving it.
 ATT histories currently require an orientation primary type (`QUATERNION`, `EULER_ANGLES` or
 `DCM`), optionally followed by RATE_TYPE rate states. Annex B4's rate-only primary state types
 are not supported in ATT histories, despite their presence in the shared enum/schema vocabulary;
-they fail explicitly instead of being interpreted as orientation data. This is a library profile
-restriction, not a claim that the publication forbids those states.
+they fail explicitly. Table 5-4 defines `ATT_TYPE` as the type of *attitude* data, always listed
+before rate data, with orientation examples only, and selects rate data separately through
+`RATE_TYPE`; the library reads B4's rate entries as `RATE_TYPE` values. The XSD's shared
+`acmAttitudeType` enumeration does not distinguish the two keywords, so this is a book-based
+restriction on schema-valid input. Orekit applies the same split (its ACM `AttitudeElementsType`
+has only these three values; rate types are a separate `RateElementsType`).
 
 **History time rules.** ADM §5.3.4.4 forbids duplicate time tags; §5.3.7.5 additionally
 requires covariance histories to increase monotonically. Covariance time tags are therefore
@@ -126,9 +134,9 @@ ADM §6.8.5 excludes negative zero. Reading nevertheless accepts signed zero as 
 producer-compatibility choice: its numeric zero value is preserved, and a sign cannot make
 an otherwise duplicate time tag unique. This acceptance is not a claim that negative zero
 is a normative spelling. Floating-point KVN output canonicalizes either signed zero to `0.0`.
-History tags use lexical `Epoch` values independently of their numerical state columns. KVN
-and XML retain the tag spelling, including absolute calendar and ordinal tags, rather than
-rounding tags through `f64`. A block must use one form (relative or calendar), and comparisons
+History tags use lexical `Epoch` values independently of their numerical state columns. XML retains the stored tag spelling, including absolute calendar and ordinal tags. KVN
+repairs decimal-point aliases and refuses overprecision; neither path rounds tags through `f64`.
+Exponent source spelling is expanded exactly at input. A block must use one form (relative or calendar), and comparisons
 use `Epoch::cmp_same_branch` without time-scale conversion. This implements ADM §§5.3.4.3–5
 and the XSD's string-valued history rows.
 `acm::epochs::history_time_tags_are_relative_or_absolute_one_form_per_block` covers absolute
@@ -202,7 +210,8 @@ axis letters in any case in KVN/Python and write uppercase. Mixed case is a deli
 producer alias; XML still requires the schema's uppercase spelling. Euler histories place
 `EULER_ROT_SEQ` before `RATE_TYPE` in XML, matching `acmAttitudeStateType`.
 `ATT_BASIS` and `COV_BASIS` retain book-suggested free text in KVN/model form; XML requires the
-schema enumeration. AD `COV_TYPE = NONE` normalizes to omission, as does `RATE_TYPE = NONE`.
+schema enumeration. AD `COV_TYPE = NONE` is a KVN alias that normalizes to omission, as does `RATE_TYPE = NONE`;
+XML reading rejects explicit `NONE` because it is outside the schema enumeration.
 
 **User comments.** ADM §5.3.10.5 permits comments between user parameters. Their order survives
 both notations. Empty user-parameter suffixes are rejected, and blank separators inside histories
@@ -222,9 +231,7 @@ are specified in the [validation contract](../design/validation-contract.md).
 
 Relative ATT/COV history tags accept exponent doubles (5.3.4.3), using the same exact
 exponent-to-decimal expansion as OCM; no binary floating-point time conversion is involved.
-The shared 64-byte epoch-storage limit still applies. ACM also accepts ADM 1.0 numeric
-EULER_ROT_SEQ aliases through the shared rotation type despite having no 1.0 ACM edition;
-this harmless lexical alias does not enable an earlier message version. EULER_ROT_SEQ on
+The shared 64-byte epoch-storage limit still applies. EULER_ROT_SEQ on
 non-Euler histories is retained without semantic use. Rate-only ATT_TYPEs are rejected in
 attitude histories; AD_METHOD remains open in KVN but XML has its schema enumeration.
 The acm_g7 fixture corrects the book's SENSOR_USED_ typo to SENSOR_USED.
@@ -243,6 +250,18 @@ both public readers by `exponent_history_tags_expand_exactly_on_both_public_read
 
 ## Additional caller boundaries
 
+ACM uses the shared KVN comment writer: multiline XML/model comments become separate
+`COMMENT` records in their original block and order. XML regeneration keeps the original
+comment entries; a KVN hop normalizes their grouping. Non-ASCII comment text still causes
+KVN generation to fail before output. `multiline_comments_use_shared_normalization_in_every_acm_block`
+covers all comment positions, including interleaved user-defined comments.
+
+An explicitly present empty `SENSOR_NOISE_STDDEV` is valid XML when
+`NUMBER_SENSOR_NOISE_COVARIANCE` is absent (`sensorNoiseType` extends `xsd:string`, ADM
+table 5-8). KVN generation refuses it rather than emitting a blank value that reads as absent.
+`empty_sensor_noise_is_xml_only_and_kvn_refuses_before_output` covers schema-valid XML
+preservation and zero-byte KVN refusal.
+
 Frame dependencies (`CP_REF_FRAME` for `CP`, `TARGET_MOM_FRAME` for `TARGET_MOMENTUM`)
 remain enforced on read and write even though the XSD marks each leaf optional: the book's
 conditional requirements determine how those vectors are interpreted. No frame is guessed.
@@ -256,9 +275,32 @@ AD `NUMBER_STATES`, when present, must be positive and at least six if `RATE_STA
 supplied. It is not checked against an exact sum of attitude/rate widths as in ATT histories. `RATE_TYPE=NONE` is the
 documented no-rate alias; `RATE_STATES=NONE` is not a recognized keyword.
 
-An empty USER, PHYS, or SENSOR block is accepted where its optional fields permit emptiness.
+An empty PHYS or SENSOR block is accepted where its optional fields permit emptiness.
+ADM table 5-9 marks USER_DEFINED mandatory, while XSD `userDefinedType` admits an empty `<user/>`.
+Reading follows the schema: empty or comment-only USER blocks are accepted in KVN and XML.
+Both generation paths refuse them before writing any bytes.
 Repeated user-parameter names preserve their order; empty values and text such as `[unit]`
 inside a user value are literal user content. Tabs in numeric histories are accepted as blanks.
 Free-text fields retain trailing bracketed text rather than treating it as a unit annotation.
 Absolute history tags compare by date/time value across calendar and ordinal spellings,
 including different fractional precision; no time-scale conversion occurs.
+
+## Pre-release corrections and producer boundaries
+
+ATT/COV numeric time tags retain exact decimal values. Exponent input expands exactly to plain
+decimal at parsing, so its source spelling is not retained. KVN generation adds a digit beside a
+bare decimal point (`.5` → `0.5`, `5.` → `5.0`) and refuses tags exceeding the ADM §6.8.4.1
+16-digit limit or the integer range, before writing bytes. It never rounds distinct time tags
+together. XML preserves the stored decimal spelling. See
+`pre_release::acm_history_output_repairs_decimal_aliases_but_never_rounds_time_tags` and
+`acm::generation::overprecision_history_time_tags_are_xml_only`.
+
+`pre_release::acm_metadata_classification_is_preserved_in_kvn_and_refused_in_xml` covers the
+book/schema classification conflict. `pre_release::empty_user_blocks_are_read_but_never_generated`
+covers empty and comment-only USER blocks.
+
+**Known producer files rejected.** Orekit's `data/ccsds/adm/acm/ACMExample03.txt` (CP without
+`CP_REF_FRAME`, table 5-5) and `ACMExample09.txt` (TARGET_MOMENTUM without `TARGET_MOM_FRAME`,
+table 5-7) are rejected; missing frames cannot be inferred. Orekit also writes AD
+`NUMBER_STATES = -1` when unset, which is rejected (XSD `positiveInteger`; a state count cannot be negative).
+`acm::parsing::known_orekit_samples_with_missing_conditional_values_are_rejected` covers all three.

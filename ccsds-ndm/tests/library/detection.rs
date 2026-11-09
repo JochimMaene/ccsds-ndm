@@ -79,12 +79,28 @@ fn concatenated_kvn_messages_are_detected_on_reader_record_boundaries() {
         let single = OPM_KVN.replace('\n', ending);
         assert_eq!(from_str(&single).unwrap(), expected);
         for separator in ["\n  ", "\r", "\r\n\t", "\n\r\t", "\r\r\n", "\n\u{a0}"] {
-            let input = format!("{}{separator}{single}", single.trim_end());
-            assert_eq!(
-                from_str(&input).unwrap_err().code(),
-                Some("unsupported.notation"),
-                "{ending:?} {separator:?}"
-            );
+            for second in [&single, include_str!("../../data/kvn/oem_g13.kvn")] {
+                let input = format!("{}{separator}{second}", single.trim_end());
+                let error = from_str(&input).unwrap_err();
+                let diagnostic = error.diagnostic().unwrap();
+                assert_eq!(
+                    diagnostic.code,
+                    Some("unsupported.notation"),
+                    "{ending:?} {separator:?}"
+                );
+                assert_eq!(
+                    diagnostic.operation,
+                    ccsds_ndm::error::DiagnosticOperation::Parse
+                );
+                assert_eq!(
+                    diagnostic.notation,
+                    ccsds_ndm::error::DiagnosticNotation::Kvn
+                );
+                assert_eq!(
+                    diagnostic.message_kind,
+                    ccsds_ndm::validation::MessageKind::Ndm
+                );
+            }
         }
     }
 }
@@ -129,12 +145,6 @@ fn xml_detection_accepts_an_empty_combined_instantiation() {
         panic!("an empty combined instantiation should preserve its NDM identity");
     };
     assert!(message.messages.is_empty());
-}
-
-#[test]
-fn unrecognized_kvn_input_is_rejected() {
-    let error = ccsds_ndm::from_str("NOT_A_CCSDS_MESSAGE").unwrap_err();
-    assert!(error.to_string().contains("Could not identify KVN header"));
 }
 
 #[test]

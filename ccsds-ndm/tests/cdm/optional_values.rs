@@ -44,7 +44,7 @@ fn empty_optional_kvn_values_are_none() {
             "TIME_LASTOB_END =",
         ),
         "AREA_PC = 5.2 [m**2]",
-        "AREA_PC = [m**2]",
+        "AREA_PC =",
     );
 
     let cdm = Cdm::from_kvn(&kvn).unwrap();
@@ -174,7 +174,7 @@ fn blank_optional_kvn_values_create_no_block() {
     let mut kvn = crate::KVN.to_owned();
     kvn.replace_range(
         start..end,
-        "COMMENT od\nOBS_USED =\nCOMMENT additional\nMASS = [kg]\n",
+        "COMMENT od\nOBS_USED =\nCOMMENT additional\nMASS =\n",
     );
     let cdm = Cdm::from_kvn(&kvn).unwrap();
     let data = &cdm.body.segments[0].data;
@@ -288,17 +288,6 @@ fn nil_cannot_hide_required_values_content_or_unknown_attributes() {
         input.replace_range(start..end, replacement);
         assert!(Cdm::from_xml(&input).is_err(), "{replacement}");
     }
-}
-
-#[test]
-fn velocity_only_kvn_is_rejected_instead_of_silently_discarded() {
-    let input = crate::KVN
-        .lines()
-        .filter(|line| !line.starts_with("RELATIVE_POSITION_"))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let error = Cdm::from_kvn(&input).unwrap_err();
-    assert!(error.to_string().contains("RELATIVE_POSITION_R"), "{error}");
 }
 
 #[test]

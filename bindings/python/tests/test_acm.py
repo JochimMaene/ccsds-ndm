@@ -439,22 +439,12 @@ class TestAcm:
         segment = AcmSegment(metadata=meta, data=data)
         return Acm(header=header, segment=segment)
 
-    def test_roundtrip_kvn(self):
-        acm = self._create_valid_acm()
-        kvn = acm.to_str(format="kvn")
-        assert "CCSDS_ACM_VERS" in kvn
-
-        acm2 = Acm.from_str(kvn, format="kvn")
-        assert acm2.header.originator == "TEST"
-        assert acm2.segment.metadata.object_name == "SAT1"
-
-    def test_roundtrip_xml(self):
-        acm = self._create_valid_acm()
-        xml = acm.to_str(format="xml")
-        assert "<acm" in xml
-
-        acm2 = Acm.from_str(xml, format="xml")
-        assert acm2.header.originator == "TEST"
+    @pytest.mark.parametrize("format", ["kvn", "xml"])
+    def test_constructed_message_roundtrips(self, format):
+        message = self._create_valid_acm()
+        parsed = Acm.from_str(message.to_str(format), format=format)
+        assert parsed.header.originator == "TEST"
+        assert parsed.segment.metadata.object_name == "SAT1"
 
     def test_live_physical_edits_are_revalidated_before_generation(self):
         acm = self._create_valid_acm()
@@ -477,18 +467,6 @@ class TestAcm:
             segment.metadata.validate()
         with pytest.raises(ccsds_ndm.NdmValidationError, match="OBJECT_NAME"):
             segment.validate()
-
-    def test_file_io(self, tmp_path):
-        acm = self._create_valid_acm()
-        kvn_path = tmp_path / "test.acm"
-
-        # Test to_file
-        acm.to_file(str(kvn_path), "kvn")
-        assert kvn_path.exists()
-
-        # Test from_file
-        acm2 = ccsds_ndm.from_file(str(kvn_path), format="kvn")
-        assert acm2.header.originator == "TEST"
 
     def test_acm_setter_parity_for_nested_sections(self):
         acm = self._create_valid_acm()
@@ -557,5 +535,12 @@ class TestAcm:
         assert len(acm.segment.data.att) == 1
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+def test_metadata_classification_is_kvn_only_and_survives_edits():
+    source = (KVN_DIR / "acm_g6.kvn").read_text()
+    message = Acm.from_str(source, format="kvn")
+    assert message.segment.metadata.classification is None
+    message.segment.metadata.classification = "PUBLIC"
+    reparsed = Acm.from_str(message.to_str("kvn"), format="kvn")
+    assert reparsed.segment.metadata.classification == "PUBLIC"
+    with pytest.raises(ccsds_ndm.NdmValidationError, match="CLASSIFICATION"):
+        message.to_str("xml")

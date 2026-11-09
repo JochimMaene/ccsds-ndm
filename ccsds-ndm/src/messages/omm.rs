@@ -38,7 +38,7 @@ impl FromStr for InvErUnits {
         match s {
             "1/ER" => Ok(InvErUnits::InvEr),
             _ => Err(EnumParseError {
-                field: "unit",
+                field: "unit".into(),
                 value: s.to_string(),
                 expected: "1/ER",
             }),
@@ -67,7 +67,7 @@ impl FromStr for RevPerDayUnits {
         match s {
             "rev/day" | "REV/DAY" => Ok(RevPerDayUnits::RevPerDay),
             _ => Err(EnumParseError {
-                field: "unit",
+                field: "unit".into(),
                 value: s.to_string(),
                 expected: "rev/day or REV/DAY",
             }),
@@ -96,7 +96,7 @@ impl FromStr for RevPerDay2Units {
         match s {
             "rev/day**2" | "REV/DAY**2" => Ok(RevPerDay2Units::RevPerDay2),
             _ => Err(EnumParseError {
-                field: "unit",
+                field: "unit".into(),
                 value: s.to_string(),
                 expected: "rev/day**2 or REV/DAY**2",
             }),
@@ -125,7 +125,7 @@ impl FromStr for RevPerDay3Units {
         match s {
             "rev/day**3" | "REV/DAY**3" => Ok(RevPerDay3Units::RevPerDay3),
             _ => Err(EnumParseError {
-                field: "unit",
+                field: "unit".into(),
                 value: s.to_string(),
                 expected: "rev/day**3 or REV/DAY**3",
             }),
@@ -240,11 +240,21 @@ impl Ndm for Omm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        xml::validate_xml_sequences(xml)?;
-        let omm: Self = crate::xml::from_str_with_context(xml, "OMM")?;
-        crate::traits::Validate::validate(&omm)?;
-        omm.validate_xml_representability()?;
-        Ok(omm)
+        (|| {
+            xml::validate_xml_sequences(xml)?;
+            let omm: Self = crate::xml::from_str_with_context(xml, "OMM")?;
+            crate::traits::Validate::validate(&omm)?;
+            omm.validate_xml_representability()?;
+            Ok(omm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Omm,
+                crate::error::DiagnosticNotation::Xml,
+                xml,
+                None,
+            )
+        })
     }
 
     fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
@@ -500,6 +510,19 @@ impl OmmData {
                 .into())
             }
             None => {}
+        }
+
+        // ODM 4.2.4.6: TLE-based elements use Earth, TEME and UTC without transformation.
+        if matches!(theory, "SGP" | "SGP4" | "SGP/SGP4") {
+            for (field, value, expected) in [
+                ("CENTER_NAME", metadata.center_name.as_str(), "EARTH"),
+                ("REF_FRAME", metadata.ref_frame.as_str(), "TEME"),
+                ("TIME_SYSTEM", metadata.time_system.as_str(), "UTC"),
+            ] {
+                if !value.trim().eq_ignore_ascii_case(expected) {
+                    return Err(ValidationError::invalid_value(field, value, expected).into());
+                }
+            }
         }
 
         // ODM 4.2.4.6: a TLE-based (SGP/SGP4) OMM uses MEAN_MOTION, not SEMI_MAJOR_AXIS.
@@ -844,8 +867,8 @@ impl TleParameters {
     /// | `SGP` | `MEAN_MOTION_DOT`, `MEAN_MOTION_DDOT` | `NORAD_CAT_ID`, `BSTAR`, `MEAN_MOTION_DOT`, `MEAN_MOTION_DDOT` |
     /// | `SGP4` | `BSTAR` | `NORAD_CAT_ID`, `BSTAR` |
     /// | `SGP/SGP4` | none | `NORAD_CAT_ID`, `BSTAR` |
-    /// | `PPT3` | `MEAN_MOTION_DOT`, `MEAN_MOTION_DDOT` | none (not a 2.0 theory) |
-    /// | `SGP4-XP` | `BTERM`, `AGOM` | none (not a 2.0 theory) |
+    /// | `PPT3` | `MEAN_MOTION_DOT`, `MEAN_MOTION_DDOT` | none (open theory string in 2.0) |
+    /// | `SGP4-XP` | `BTERM`, `AGOM` | none (open theory string in 2.0) |
     ///
     /// Any other theory requires nothing here.
     pub fn validate(&self, theory: &str, version: &str) -> Result<()> {

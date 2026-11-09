@@ -86,31 +86,6 @@ fn validate_xml_envelope(xml: &str, source_edition: &mut Option<String>) -> Resu
         b"DRAG_AREA",
         b"DRAG_COEFF",
     ];
-    const COVARIANCE: &[&[u8]] = &[
-        b"COMMENT",
-        b"COV_REF_FRAME",
-        b"CX_X",
-        b"CY_X",
-        b"CY_Y",
-        b"CZ_X",
-        b"CZ_Y",
-        b"CZ_Z",
-        b"CX_DOT_X",
-        b"CX_DOT_Y",
-        b"CX_DOT_Z",
-        b"CX_DOT_X_DOT",
-        b"CY_DOT_X",
-        b"CY_DOT_Y",
-        b"CY_DOT_Z",
-        b"CY_DOT_X_DOT",
-        b"CY_DOT_Y_DOT",
-        b"CZ_DOT_X",
-        b"CZ_DOT_Y",
-        b"CZ_DOT_Z",
-        b"CZ_DOT_X_DOT",
-        b"CZ_DOT_Y_DOT",
-        b"CZ_DOT_Z_DOT",
-    ];
     const MANEUVER: &[&[u8]] = &[
         b"COMMENT",
         b"MAN_EPOCH_IGNITION",
@@ -134,7 +109,7 @@ fn validate_xml_envelope(xml: &str, source_edition: &mut Option<String>) -> Resu
             b"stateVector" => STATE_VECTOR,
             b"keplerianElements" => KEPLERIAN,
             b"spacecraftParameters" => SPACECRAFT,
-            b"covarianceMatrix" => COVARIANCE,
+            b"covarianceMatrix" => crate::xml::OPM_COVARIANCE_CHILDREN,
             b"maneuverParameters" => MANEUVER,
             b"userDefinedParameters" => USER_DEFINED,
             _ => return None,
@@ -164,50 +139,32 @@ fn validate_xml_envelope(xml: &str, source_edition: &mut Option<String>) -> Resu
         crate::xml::MessageSchema {
             child_rule: rule,
             attribute_allowed: |element: &[u8], attribute: &[u8]| match attribute {
-                b"units" => matches!(
-                    element,
-                    b"X" | b"Y"
-                        | b"Z"
-                        | b"X_DOT"
-                        | b"Y_DOT"
-                        | b"Z_DOT"
-                        | b"SEMI_MAJOR_AXIS"
-                        | b"INCLINATION"
-                        | b"RA_OF_ASC_NODE"
-                        | b"ARG_OF_PERICENTER"
-                        | b"TRUE_ANOMALY"
-                        | b"MEAN_ANOMALY"
-                        | b"GM"
-                        | b"MASS"
-                        | b"SOLAR_RAD_AREA"
-                        | b"DRAG_AREA"
-                        | b"CX_X"
-                        | b"CY_X"
-                        | b"CY_Y"
-                        | b"CZ_X"
-                        | b"CZ_Y"
-                        | b"CZ_Z"
-                        | b"CX_DOT_X"
-                        | b"CX_DOT_Y"
-                        | b"CX_DOT_Z"
-                        | b"CX_DOT_X_DOT"
-                        | b"CY_DOT_X"
-                        | b"CY_DOT_Y"
-                        | b"CY_DOT_Z"
-                        | b"CY_DOT_X_DOT"
-                        | b"CY_DOT_Y_DOT"
-                        | b"CZ_DOT_X"
-                        | b"CZ_DOT_Y"
-                        | b"CZ_DOT_Z"
-                        | b"CZ_DOT_X_DOT"
-                        | b"CZ_DOT_Y_DOT"
-                        | b"CZ_DOT_Z_DOT"
-                        | b"MAN_DURATION"
-                        | b"MAN_DELTA_MASS"
-                        | b"MAN_DV_1"
-                        | b"MAN_DV_2"
-                        | b"MAN_DV_3"
-                ),
+                b"units" => {
+                    crate::xml::OPM_COVARIANCE_CHILDREN[2..].contains(&element)
+                        || matches!(
+                            element,
+                            b"X" | b"Y"
+                                | b"Z"
+                                | b"X_DOT"
+                                | b"Y_DOT"
+                                | b"Z_DOT"
+                                | b"SEMI_MAJOR_AXIS"
+                                | b"INCLINATION"
+                                | b"RA_OF_ASC_NODE"
+                                | b"ARG_OF_PERICENTER"
+                                | b"TRUE_ANOMALY"
+                                | b"MEAN_ANOMALY"
+                                | b"GM"
+                                | b"MASS"
+                                | b"SOLAR_RAD_AREA"
+                                | b"DRAG_AREA"
+                                | b"MAN_DURATION"
+                                | b"MAN_DELTA_MASS"
+                                | b"MAN_DV_1"
+                                | b"MAN_DV_2"
+                                | b"MAN_DV_3"
+                        )
+                }
                 b"parameter" => element == b"USER_DEFINED",
                 _ => false,
             },

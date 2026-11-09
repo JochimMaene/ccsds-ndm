@@ -41,10 +41,11 @@ wire/model evidence in these groups:
 | 63–68 | Covariance matrix | Required lower-triangular RTN terms, optional drag/SRP/thrust extensions, fixed units, ordering, and generated-schema validation. |
 
 The parser enforces the complete structural inventory and the self-contained
-two-object/cardinality and required-field rules represented by the typed model. CDM's exceptions to
-the shared policy on [externally governed values](../design/validation-contract.md#registry-governed-values) are externally established object identity and the choice of collision
-probability methodology; note that `OBJECT_TYPE` is *not* an exception, being a closed list whose
-unknown values are rejected.
+two-object/cardinality and required-field rules represented by the typed model. `ORIGINATOR` and
+`CATALOG_NAME` values are not checked against the SANA registries; only the 5.2.9 character set is
+enforced (see Object identity below). Object identity assignments and the choice of collision
+probability method are likewise not checked against any external source. `OBJECT_TYPE` is a closed
+list whose unknown values are rejected.
 
 ## Physical consistency boundary
 
@@ -120,7 +121,10 @@ A relative-state vector is absent or contains all six position and velocity comp
 Although the book table independently marks the components optional, the XSD's optional
 `relativeStateVector` group requires all six once present. The model uses that complete group in
 both notations: any incomplete subset, including velocity-only content or an empty XML vector,
-is rejected rather than filling missing components. Missing required metadata and state/covariance
+is rejected rather than filling missing components. `<relativeStateVector>N/A</…>` is the 1.4.3.1
+explicit not-available marker and means absent; an empty vector carries no such marker and is an XSD
+violation (all six children are required) with no known producer, so it stays an error.
+Missing required metadata and state/covariance
 values are errors; the reader does not fabricate values from defaults.
 
 All four book line endings (LF, CR, CRLF and LFCR) are accepted with identical models and
@@ -129,8 +133,9 @@ byte-position-preserving normalization.
 ## Categorical aliases and OD count profile
 
 XML accepts the uppercase and lowercase spellings explicitly enumerated by the bundled
-CDM XSD for `OBJECT`, screening volume frame/shape, `REF_FRAME`, `COVARIANCE_METHOD`, and
-`MANEUVERABLE`; generation uses canonical uppercase. Arbitrary mixed case is not an XML alias.
+CDM XSD for `OBJECT`, screening volume frame/shape, `REF_FRAME`, `COVARIANCE_METHOD`,
+`OBJECT_TYPE`, `MANEUVERABLE`, and the YES/NO fields `SOLAR_RAD_PRESSURE`, `EARTH_TIDES`, and
+`INTRACK_THRUST`; generation uses canonical uppercase. Arbitrary mixed case is not an XML alias.
 `cdm::parsing::xml_accepts_schema_listed_lowercase_categories` checks full-message preservation.
 
 Shared `OBS_AVAILABLE`, `OBS_USED`, `TRACKS_AVAILABLE`, and `TRACKS_USED` use positive
@@ -140,7 +145,11 @@ The book's table calls these integer counts without separately requiring positiv
 This is a deliberate shared CDM/RDM profile choice: a supplied count must also fit XML;
 zero is rejected even in KVN/model form, rather than being silently omitted on conversion.
 This follows the shared policy of adopting XSD facets in all notations to keep those
-value domains compatible with XML.
+value domains compatible with XML. The other XSD facets applied in KVN, XML, and edited models
+alike are: negative `RECOMMENDED_OD_SPAN`/`ACTUAL_OD_SPAN` (`dayIntervalTypeUO`) and
+`WEIGHTED_RMS` (`nonNegativeDouble`) are rejected; `RESIDUALS_ACCEPTED` is bounded to
+`[0, 100]`; negative `AREA_PC`, `AREA_DRG`, `AREA_SRP`, `MASS`, `CD_AREA_OVER_MASS`,
+`CR_AREA_OVER_MASS`, and `SEDR` are rejected (`THRUST_ACCELERATION` stays signed).
 
 ## KVN comment merge
 
@@ -157,8 +166,14 @@ and nested OD comments are covered by `xml_nested_comments_merge_canonically_int
 Namespace-qualified XML introduced by Cor.2 is supported. All epochs use the calendar
 branch; the shared [validation contract](../design/validation-contract.md) records the
 book-over-XSD policy for empty mandatory values and epoch lexical forms.
-`INTERNATIONAL_DESIGNATOR` enforces its character repertoire but not its external layout,
-and `TIME_LASTOB_START`/`TIME_LASTOB_END` are not compared. Covariance is optional only
+`INTERNATIONAL_DESIGNATOR` input enforces only the 5.2.9 character repertoire, not the table 3-3
+layout, because the CARA Alfano test-case CDMs use values such as `1001`/`1002`; those producer
+identifiers stay readable rather than being rewritten to UNKNOWN. Generation (KVN and XML) is
+strict: it refuses any value other than `YYYY-NNNP{PP}` (four digits, `-`, three digits, one to
+three capital letters) or `UNKNOWN`, so such a message must be edited before output. The external
+COSPAR assignment itself is not checked.
+`generation::generation_enforces_the_international_designator_layout` covers this.
+`TIME_LASTOB_START`/`TIME_LASTOB_END` are not compared. Covariance is optional only
 during incremental construction: validation and generation require it.
 
 KVN reading tolerates lines longer than the book's 254-character limit where applicable;
@@ -176,11 +191,14 @@ OBJECT_TYPE and YES/NO values and read lowercase in KVN (6.2.3.3); free text ret
 internal blank runs despite 6.3.2.5's text equivalence rule, avoiding changes to names.
 Any incomplete subset of relative-state components is rejected.
 
+Python state arrays carry the existing CDM field units: the six state-vector entries are
+kilometres and km/s, while the relative state vector (miss geometry) is in metres and m/s.
+No unit conversion occurs.
+
 Python covariance arrays must be square, symmetric, and 6x6 through 9x9. The added
 Drag/SRP/Thrust rows must be complete (5.2.8); from_numpy and the convenience setter use
-one checked constructor. All entries carry the existing CDM field units; the six state-vector
-entries are kilometres and km/s, while relative miss geometry is in metres. No unit conversion
-or implicit averaging of asymmetric entries occurs.
+one checked constructor. All entries carry the existing CDM covariance units; no unit
+conversion or implicit averaging of asymmetric entries occurs.
 
 Case rules are field-specific: KVN MANEUVERABLE accepts YES/NO/N/A and their all-lowercase
 spellings, but not Yes/No. KVN SOLAR_RAD_PRESSURE, EARTH_TIDES, and INTRACK_THRUST use the
@@ -211,3 +229,32 @@ therefore populates fixed-unit annotations. Dimensionless fields remain unitless
 `generation::kvn_generation_supplies_fixed_units_missing_from_the_model` covers both output
 paths, reparsing, and generated XML schema validity. `optional_values` also checks empty/nil
 unit validation and decoded empty scalar normalization.
+
+## XML output and schema baseline
+
+CDM 6.2.2 (lines of at most 254 ASCII characters, printable ASCII only) applies to both
+notations. XML generation writes one indented element per line and refuses non-ASCII text and
+lines longer than 254 characters before any caller-visible output; a long scalar is refused
+rather than split or truncated. This also applies to CDM constituents of combined NDM output,
+which is buffered for the check. XML input stays lenient: overlong lines and non-ASCII text in
+otherwise valid XML are accepted, because XML producers commonly emit a single line and the
+document is still unambiguous; regeneration then enforces the limit.
+`generation::cdm_xml_output_is_printable_ascii_with_bounded_lines` covers both output paths.
+
+Present empty or whitespace-only optional strings (for example `MESSAGE_FOR`, `OPERATOR_PHONE`,
+`COLLISION_PROBABILITY_METHOD`) are refused on XML output, like `N/A`, because the XML reader's
+missing-value compatibility would read them back as absent; use None instead.
+`generation::xml_generation_refuses_present_empty_optional_strings` covers this.
+
+Exactly empty XML unit attributes (`units=""`) on unit-bearing fields are treated as an absent
+unit annotation. This is a producer-compatibility exception to the XSD unit enumerations for the
+18 SDS file `CDMExample_issue1458.xml`, which writes `<RESIDUALS_ACCEPTED units=""/>`. Only the
+empty string is accepted; nonempty incompatible units still fail, including on unavailable leaves.
+Output always writes the fixed unit. `parsing::xml_empty_units_attribute_is_an_absent_annotation`
+covers empty, valued, and incompatible cases.
+
+The XML baseline is the bundled NDM/XML 4.0.0 CDM 1.0 schema. 508.0-B-1 Cor.2 cites NDM/XML
+2.0.0; the library uses 4.0.0 because it is the current published schema set, shared with the
+other message families. The 2.0.0 CDM schema is not bundled, so whether the CDM content differs
+between the two sets has not been determined; validation against 4.0.0 is not a claim of 2.0.0
+conformance.

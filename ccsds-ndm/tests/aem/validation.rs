@@ -144,17 +144,7 @@ fn aem_quaternion_magnitude_is_checked_on_later_records() {
     state.quaternion.q2 = 0.0;
     state.quaternion.q3 = 0.0;
     state.quaternion.qc = 0.0;
-    assert!(message
-        .validate()
-        .unwrap_err()
-        .to_string()
-        .contains("QUATERNION"));
-    assert!(message.to_kvn().is_err());
-    assert!(message.to_xml().is_err());
-    let mut output = Vec::new();
-    assert!(message.write_kvn_to(&mut output).is_err());
-    assert!(message.write_xml_to(&mut output).is_err());
-    assert!(output.is_empty());
+    crate::common::assert_rejects(&message, "QUATERNION");
 }
 
 #[test]

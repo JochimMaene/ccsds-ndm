@@ -143,9 +143,9 @@ fn from_str(
 /// Raises
 /// ------
 /// NdmIoError
-///     The file could not be read.
+///     The file could not be read or contains invalid UTF-8 bytes.
 /// NdmFormatError
-///     Malformed document or invalid text encoding.
+///     Malformed document or explicitly unsupported UTF-16/UTF-32 encoding.
 /// NdmValidationError
 ///     Validation failed or the edition is unsupported.
 /// NdmUnsupportedMessageError

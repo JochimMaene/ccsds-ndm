@@ -34,6 +34,15 @@ fn frame_without_optional_cp_is_preserved() {
 }
 
 #[test]
+fn rejects_missing_object_name_kvn() {
+    Acm::from_kvn(KVN).expect("valid control");
+    let input = mutated(KVN, "OBJECT_NAME = TEST\n", "");
+    let error = Acm::from_kvn(&input).unwrap_err();
+    assert_eq!(error.code(), Some("validation.missing_required_field"));
+    crate::common::assert_validation_field(&error, "OBJECT_NAME");
+}
+
+#[test]
 fn rejects_spurious_metadata_kvn() {
     let input = mutated(KVN, "META_STOP", "BAD_KEY = 1\nMETA_STOP");
     let error = Acm::from_kvn(&input).unwrap_err();

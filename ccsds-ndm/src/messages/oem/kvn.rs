@@ -99,23 +99,16 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
 
     Ok(OemMetadata {
         comment,
-        object_name: object_name
-            .ok_or_else(|| missing_field_err(input, "OEM Metadata", "OBJECT_NAME"))?,
-        object_id: object_id
-            .ok_or_else(|| missing_field_err(input, "OEM Metadata", "OBJECT_ID"))?,
-        center_name: center_name
-            .ok_or_else(|| missing_field_err(input, "OEM Metadata", "CENTER_NAME"))?,
-        ref_frame: ref_frame
-            .ok_or_else(|| missing_field_err(input, "OEM Metadata", "REF_FRAME"))?,
+        object_name: require_field(input, "OEM Metadata", "OBJECT_NAME", object_name)?,
+        object_id: require_field(input, "OEM Metadata", "OBJECT_ID", object_id)?,
+        center_name: require_field(input, "OEM Metadata", "CENTER_NAME", center_name)?,
+        ref_frame: require_field(input, "OEM Metadata", "REF_FRAME", ref_frame)?,
         ref_frame_epoch,
-        time_system: time_system
-            .ok_or_else(|| missing_field_err(input, "OEM Metadata", "TIME_SYSTEM"))?,
-        start_time: start_time
-            .ok_or_else(|| missing_field_err(input, "OEM Metadata", "START_TIME"))?,
+        time_system: require_field(input, "OEM Metadata", "TIME_SYSTEM", time_system)?,
+        start_time: require_field(input, "OEM Metadata", "START_TIME", start_time)?,
         useable_start_time,
         useable_stop_time,
-        stop_time: stop_time
-            .ok_or_else(|| missing_field_err(input, "OEM Metadata", "STOP_TIME"))?,
+        stop_time: require_field(input, "OEM Metadata", "STOP_TIME", stop_time)?,
         interpolation,
         interpolation_degree,
     })
@@ -392,16 +385,9 @@ fn oem_data(input: &mut &str, legacy_comments: bool) -> KvnResult<OemData> {
 
 /// Parses a single OEM segment (META_START ... META_STOP + data).
 fn oem_segment(input: &mut &str, legacy_comments: bool) -> KvnResult<OemSegment> {
-    // Expect META_START
     expect_block_start("META").parse_next(input)?;
-
-    // Parse metadata
     let metadata = oem_metadata.parse_next(input)?;
-
-    // Expect META_STOP
     expect_block_end("META").parse_next(input)?;
-
-    // Parse data
     let data = oem_data(input, legacy_comments)?;
 
     Ok(OemSegment { metadata, data })
@@ -449,16 +435,12 @@ fn oem_body(input: &mut &str, legacy_comments: bool) -> KvnResult<OemBody> {
 
 /// Parses a complete OEM message.
 pub fn parse_oem(input: &mut &str) -> KvnResult<Oem> {
-    // 1. Version
     let version = oem_version.parse_next(input)?;
-
-    // 2. Header
     let legacy_comments = version == "1.0";
     // Real producers place header comments between assignments. Keep them in the header; the
     // serializer writes them immediately after CCSDS_OEM_VERS.
     let header = odm_header_with_comments(input, true)?;
 
-    // 3. Body (segments)
     let body = oem_body(input, legacy_comments)?;
 
     Ok(Oem {
@@ -554,7 +536,8 @@ impl Oem {
         }
         fn comments(values: &[String], path: impl FnOnce() -> String) -> Result<()> {
             for value in values {
-                if let Some(error) = crate::validation::kvn_comment_error(value) {
+                let value = value.replace('\t', " ");
+                if let Some(error) = crate::validation::kvn_comment_error(&value) {
                     return Err(error.at_path(path()).into());
                 }
             }
@@ -570,17 +553,26 @@ impl Oem {
         validate_within_path(self.body.validate_identity(), || "body".into())?;
         validate_within_path(self.body.validate_useable_spans(), || "body".into())?;
         comments(&self.header.comment, || "header.comment".into())?;
-        if let Some(value) = &self.header.classification {
-            text("CLASSIFICATION", value, || "header.classification".into())?;
+        // XML padding around header strings is dropped, as for metadata strings below.
+        let mut header = self.header.clone();
+        header.originator = xml_trimmed(&header.originator).into();
+        for value in [&mut header.classification, &mut header.message_id]
+            .into_iter()
+            .flatten()
+        {
+            *value = xml_trimmed(value).into();
         }
-        text("ORIGINATOR", &self.header.originator, || {
+        if let Some(value) = &header.classification {
+            optional_text("CLASSIFICATION", value, || "header.classification".into())?;
+        }
+        text("ORIGINATOR", &header.originator, || {
             "header.originator".into()
         })?;
-        if let Some(value) = &self.header.message_id {
-            text("MESSAGE_ID", value, || "header.message_id".into())?;
+        if let Some(value) = &header.message_id {
+            optional_text("MESSAGE_ID", value, || "header.message_id".into())?;
         }
         writer.write_pair("CCSDS_OEM_VERS", &self.version);
-        self.header.write_kvn(writer);
+        header.write_kvn(writer);
         for (segment_index, segment) in self.body.segment.iter().enumerate() {
             let base = format!("body.segment[{segment_index}]");
             let metadata = &segment.metadata;

@@ -1,43 +1,12 @@
-use ccsds_ndm::common::OdmHeader;
-use ccsds_ndm::messages::ocm::{
-    CovLine, ManLine, Ocm, OcmBody, OcmData, OcmMetadata, OcmSegment, OcmTrajState, TrajLine,
-};
+use ccsds_ndm::messages::ocm::{CovLine, ManLine, Ocm, OcmMetadata, TrajLine};
 use ccsds_ndm::types::{Duration, TimeOffset, TimeUnits};
-use ccsds_ndm::Validate;
+use ccsds_ndm::{Ndm, Validate};
 #[test]
 fn ocm_validation_traj_lines() {
-    let mut ocm = Ocm::builder()
-        .header(
-            OdmHeader::builder()
-                .originator("TEST")
-                .creation_date("2000-01-01T00:00:00".parse().unwrap())
-                .build(),
-        )
-        .body(
-            OcmBody::builder()
-                .segment(Box::new(
-                    OcmSegment::builder()
-                        .metadata(
-                            OcmMetadata::builder()
-                                .time_system("UTC")
-                                .epoch_tzero("2000-01-01T00:00:00".parse().unwrap())
-                                .build(),
-                        )
-                        .data(OcmData::default())
-                        .build(),
-                ))
-                .build(),
-        )
-        .version("3.0")
-        .build();
-
-    let traj = OcmTrajState::builder()
-        .center_name("EARTH")
-        .traj_ref_frame("GCRF")
-        .traj_type("CARTPV")
-        .build();
+    let mut ocm = Ocm::from_kvn(crate::minimal::KVN).unwrap();
+    ocm.body.segment.metadata.epoch_tzero = "2000-01-01T00:00:00".parse().unwrap();
+    ocm.body.segment.data.traj[0].traj_lines.clear();
     // Missing lines
-    ocm.body.segment.data.traj.push(traj);
     crate::common::assert_rejects(&ocm, "TRAJ data line");
 
     // Fix it

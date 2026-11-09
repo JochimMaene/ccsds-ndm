@@ -4,8 +4,136 @@ Release notes
 Unreleased
 ----------
 
+Pre-release conformance fixes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Data loss and output correctness:
+
+- OCM KVN covariance rows that fail to parse (``abc``, underflow such as ``1e-400``) now fail
+  the parse instead of being silently dropped.
+- KVN unit annotations without a value (``MASS = [kg]``, ``MASS = N/A [kg]``) are errors in every
+  family instead of being read as absent with the unit discarded (ODM 7.7.1.1, CDM 6.3.3).
+- CDM XML output is written one element per line and satisfies CDM 6.2.2: non-ASCII text and
+  records over 254 characters are refused before any bytes are written, also inside combined NDM
+  output. CDM XML generation refuses present empty or whitespace-only optional strings instead of
+  losing them. XML input stays lenient.
+- ACM KVN output writes ATT/COV time tags with a digit on both sides of the decimal point
+  (``.5`` → ``0.5``) and refuses tags over 16 digits (ADM 6.8.4.1) instead of copying them. XML
+  keeps the stored spelling.
+- OCM output writes ``MAN_COMPOSITION`` as uppercase comma-separated names and ``TRAJ_UNITS``,
+  ``COV_UNITS`` and ``MAN_UNITS`` as bracketed comma-separated lists in KVN and XML (ODM 6.2.8.15,
+  tables 6-4/6-6/6-7). Reading still accepts blank-separated and unbracketed forms.
+- The TLE helper (``Omm.from_tle_lines``) emits OMM 3.0 (was 2.0, which became invalid when
+  ``message_id`` was given). Its CREATION_DATE (TLE epoch) and ORIGINATOR/OBJECT_NAME (``UNKNOWN``)
+  defaults are documented placeholders. ``to_tle_lines`` writes the table 4-3 defaults U/0 when
+  CLASSIFICATION_TYPE/EPHEMERIS_TYPE are omitted.
+
+Book requirements now enforced:
+
+- OMM with ``MEAN_ELEMENT_THEORY`` SGP, SGP4 or SGP/SGP4 requires CENTER_NAME EARTH, REF_FRAME
+  TEME and TIME_SYSTEM UTC (ODM 4.2.4.6) in parsing, validation and generation (breaking).
+- TDM requires a ``TRANSMIT_FREQ_n`` history when a message contains two-way or three-way
+  SINGLE_DIFF ``RECEIVE_FREQ`` data (TDM 3.3.2.5.6).
+- CDM generation requires INTERNATIONAL_DESIGNATOR as ``YYYY-NNNP{PP}`` or ``UNKNOWN``
+  (table 3-3, breaking for output); parsing still accepts producer values such as CARA's ``1001``.
+- OCM rejects mixed-case ``MAN_COMPOSITION`` names (ODM 7.5.3); all-upper and all-lower remain.
+- ACM/OCM USER blocks without a USER_DEFINED parameter are read (the XSD admits ``<user/>``) but
+  refused by KVN and XML generation (ADM table 5-9, ODM table 6-12).
+- RDM reads impact confidence regions without IMPACT_REF_FRAME (table 3-3 requires the frame only
+  with a nominal location) but refuses to write their coordinates without a frame. RDM XML input
+  rejects ``NOMINAL_IMPACT_ALT`` outside the schema range, as XML output already did.
+- TDM XML ``ANGLE_TYPE`` and ``REFERENCE_FRAME`` accept only exact schema spellings; KVN keeps
+  its blank/underscore and case lookup.
+
+Real-world input:
+
+- NDM/XML 1.0 ``<ndm>`` envelopes (e.g. Space-Track) are read as input only, checked against the
+  1.0 envelope schema: unqualified elements, no MESSAGE_ID, ``COMMENT*`` then
+  ``aem/apm/oem/omm/opm/tdm``, constituents ODM 2.0 or TDM 1.0 (APM/AEM 1.0 stay rejected).
+  Generation writes only the NDM/XML 4.0.0 envelope and refuses 1.0-era constituents.
+- CDM XML input accepts exactly ``units=""`` as an absent unit annotation (18 SDS producer case);
+  nonempty incompatible units are still rejected.
+- ACM metadata CLASSIFICATION (ADM table 5-3) is read, stored (``AcmMetadata.classification``,
+  also in Python) and written in KVN; XML generation refuses it because the schema has no element.
+- APM/AEM KVN ``ATTITUDE_TYPE`` applies blank/underscore equivalence (``EULER ANGLE``).
+- OEM: an empty or whitespace-only XML INTERPOLATION no longer requires INTERPOLATION_DEGREE (KVN
+  output refuses the empty value). XML→KVN trims padding around ORIGINATOR, CLASSIFICATION and
+  MESSAGE_ID and writes TABs in comments as blanks instead of failing.
+
+API:
+
+- Typed Rust parsing now supplies the same structured diagnostic context as generic parsing.
+  Callers matching errors directly must account for ``CcsdsNdmError::Parsing``; the error
+  accessors still expose the underlying cause. Invalid optional CDM enums point to their own
+  values, and XML diagnostic locations count CR, LF and CRLF line endings correctly.
+- Angle, day-interval, GM, mass and area deserialization shares the quantity reader's XML
+  numeric spelling rules and rejects duplicate value or unit fields. XML namespace declarations
+  reject malformed prefixes while retaining valid Unicode prefixes.
+- Rust: ``AltitudeRequired`` is renamed ``ImpactAltitude``; its units remain optional.
+  ``EnumParseError.field`` is ``Cow<'static, str>`` so KVN errors name the actual keyword. The unused
+  ADM 1.0 ``ApmRateFrame`` enum is removed. RDM ``CONTROLLED_REENTRY`` errors name that keyword;
+  APM comment errors cite ADM 6.10.2.
+- Python: ``CombinedNdm.id`` is settable; ``AcmMetadata.classification`` is new.
+
+Documentation:
+
+- The validation contract has a table of unambiguous lexical variants (TAB, long KVN lines,
+  ``7000[km]``, ``.5``, UTF-8 comments, ``±00:00``, BOM, XML declarations) giving for each the
+  clause relaxed, accepted shape, canonical output and test. It also records that epoch checks are
+  lexical (``ss=60`` at any minute), the free-text case deviation, and per-family COMMENT placement.
+- Family records list known producer files the library rejects and why (Orekit OEM/ACM samples),
+  the producer evidence for structural relaxations, the TDM ``DOPPLER_COUNT`` read tolerance, the
+  OMM ``MEAN_MOTION`` reading for non-SGP4 theories, and the SANA Delaunay element order. Broken
+  anchors, stale statements and Python docstrings are reconciled.
+
 Final conformance corrections
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- RDM KVN generation refuses confidence levels whose 16-digit rounding would collapse
+  their required strict ordering, before writing bytes. XML retains the original precision.
+- TLE export refuses launch years and rounded epoch years outside 1957–2056 instead of
+  silently changing centuries, and rejects non-ASCII launch identifiers without panicking.
+  Ordinary OMM validation and XML retain their wider date and identifier domains.
+- OCM XML now reads back empty user-defined values. The validation contract records the shared
+  XML reader's whitespace-only-to-empty normalization; padding around nonblank values remains
+  preserved. ACM rate-only ATT_TYPE errors cite ADM table 5-4.
+
+- OCM rejects positive ``DEPLOY_MASS`` text even when its magnitude underflows to double
+  zero. Negative underflow text remains supported in the model/XML.
+- Documentation clarifies mandatory root identifiers, file-encoding exception categories,
+  numeric rounding and NaN checks, and edition-specific OMM theory requirements.
+- OCM validates ``OD_EPOCH`` and supplied ``SW_DATA_EPOCH`` as real calendar/ordinal dates
+  or complete relative numbers in parsing, model validation, and generation. Empty supplied
+  XML/model epochs, impossible dates, and incomplete numbers are rejected; zero and negative
+  relative tags remain supported. Blank optional KVN values still mean absent.
+- The shared contract documents multiline-comment splitting versus CDM/TDM KVN refusal;
+  OMM comment preservation and TDM's uncapped fractional-second precision are clarified.
+- ACM KVN generation refuses explicitly empty ``SENSOR_NOISE_STDDEV`` values rather than
+  losing them; XML retains them. Multiline comments use the shared writer in every ACM block,
+  splitting into separate KVN records while retaining ASCII checks and streaming preflight.
+- OCM requires nonblank ``DC_BODY_FRAME`` for ``TIME_AND_ANGLE`` and rejects the non-schema
+  ``units`` attribute on ``WEIGHTED_RMS``. Its documentation now distinguishes Unicode-comment
+  input acceptance from KVN output refusal.
+- Rust ``SigmaU``/``SigmaV`` documentation now identifies rate/angle random walk and cites
+  ADM table 5-8. The sensor-noise citation is corrected to the same table.
+- TDM documents and tests its reader limitation: whitespace-only content defaults to zero
+  in twelve numeric metadata elements, while clock observations require truly empty elements.
+
+- Combined XML generation rejects TDM 1.0 constituents under the current envelope's TDM 2.0 schema;
+  standalone TDM 1.0 input remains supported.
+- ACM requires nonblank ``CP_REF_FRAME`` and ``TARGET_MOM_FRAME`` when their vectors are supplied.
+- OCM checks the required ``n/a`` maneuver-unit labels for switches, dimensionless and text columns.
+- OMM ``ELEMENT_SET_NO`` accepts XML signed integer zero while retaining its 0–9999 range.
+- Documentation records Unicode whitespace tolerance in XML numeric vectors, field-specific XML
+  underflow behavior, and OCM clock defaults and descriptive data-element declarations.
+
+- KVN rejects supplied units on OCM ``DC_REF_DIR``/``DC_BODY_TRIGGER`` and ACM
+  ``TARGET_ATTITUDE`` instead of silently dropping them.
+- Combined XML accepts whitespace character references and CDATA between envelope elements;
+  these constructs remain invalid outside the document root.
+- TDM XML ``DATA_QUALITY`` requires the schema's exact uppercase/lowercase spellings;
+  mixed case and padded values are rejected. Empty elements still default to ``RAW``,
+  and KVN remains case-insensitive.
 
 - XML attribute values follow XML 1.0 whitespace normalization: literal TAB/LF/CR become
   spaces (CRLF counts once), while character references retain their characters. Output
@@ -24,7 +152,7 @@ Final conformance corrections
 - CDM KVN always writes required fixed units. Empty/nil XML leaves validate supplied units
   before normalization, decoded empty CDATA follows the same rules as empty text, and restricted
   identifiers consistently ignore surrounding XML padding.
-- RDM accepts omitted XML ``NOMINAL_IMPACT_ALT`` units. Rust ``AltitudeRequired.units`` is now
+- RDM accepts omitted XML ``NOMINAL_IMPACT_ALT`` units. Rust ``ImpactAltitude.units`` is
   ``Option<LengthUnits>`` (breaking); Python numeric access is unchanged. KVN supplies ``[m]``.
 - OPM preserves repeated user-defined names through KVN/XML. Empty parameter-name suffixes are
   rejected on input; empty and literal ``N/A`` user-defined values remain opaque payloads.
@@ -389,7 +517,7 @@ Newly rejected:
   TDM (ODM 7.5.10 and the matching ADM, CDM and RDM rules).
 - Empty XML values for optional numbers, epochs and enumerations, except the documented
   CDM compatibility and schema defaults. CDM standard-field ``n/a`` is treated as absent;
-  optional XML strings retain empty text literally. A
+  optional XML strings outside CDM retain empty text literally. A
   malformed optional value can no longer silently drop its ``units`` attribute.
 - XML special values spelled other than ``INF``, ``-INF`` or ``NaN`` (for
   example ``inf`` or ``+INF``), in every family.
@@ -439,8 +567,8 @@ OEM review follow-up:
   comments join the data comments.
 - An empty OEM KVN ``COV_REF_FRAME`` is absent, like other empty optional
   values.
-- Mixed-case ``RSW``, ``RTN`` and ``TNW`` (ODM 3.2.4.11) are rejected in OEM
-  KVN ``COV_REF_FRAME``.
+- Mixed-case ``RSW``, ``RTN`` and ``TNW`` (ODM 3.2.4.11) are accepted and
+  preserved as written in OEM KVN ``COV_REF_FRAME``.
 - KVN syntax errors in every family carry their reason as the message instead
   of an empty message.
 - Python: assigning an empty snapshot back to an empty ``OemData`` is a no-op

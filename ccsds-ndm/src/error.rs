@@ -122,8 +122,16 @@ pub struct Diagnostic<'a> {
 
 pub(crate) fn line_column(input: &str, offset: usize) -> (usize, usize) {
     let prefix = &input[..offset.min(input.len())];
-    let line = prefix.as_bytes().iter().filter(|&&b| b == b'\n').count() + 1;
-    let line_start = prefix.rfind('\n').map_or(0, |index| index + 1);
+    let mut line = 1;
+    let mut line_start = 0;
+    for (index, byte) in prefix.bytes().enumerate() {
+        if byte == b'\r' || byte == b'\n' && (index == 0 || prefix.as_bytes()[index - 1] != b'\r') {
+            line += 1;
+        }
+        if matches!(byte, b'\r' | b'\n') {
+            line_start = index + 1;
+        }
+    }
     (line, prefix[line_start..].chars().count() + 1)
 }
 
@@ -158,7 +166,7 @@ impl std::fmt::Display for KvnParseError {
 #[error("Invalid value '{value}' for field '{field}'; expected one of: {expected}")]
 pub struct EnumParseError {
     /// CCSDS keyword or field whose value failed.
-    pub field: &'static str,
+    pub field: std::borrow::Cow<'static, str>,
     /// Rejected value as text.
     pub value: String,
     /// Expected token supplied by the parser, when available; excludes internal parser labels.
@@ -1249,6 +1257,17 @@ mod tests {
     use super::*;
 
     #[test]
+    fn line_columns_count_cr_lf_crlf_and_unicode() {
+        for ending in ["\n", "\r", "\r\n"] {
+            let input = format!("é{ending}π{ending}bad");
+            assert_eq!(line_column(&input, input.find("bad").unwrap()), (3, 1));
+            assert_eq!(line_column(&input, "é".len()), (1, 2));
+            assert_eq!(line_column(&input, input.len()), (3, 4));
+        }
+        assert_eq!(line_column("a\r\nb\rc\nd", 8), (4, 2));
+    }
+
+    #[test]
     fn semantic_parse_diagnostics_retain_the_record_and_model_path() {
         for ending in ["\n", "\r", "\r\n", "\n\r"] {
             let input = format!("HEADER{ending}X = bad{ending}");
@@ -1298,7 +1317,7 @@ mod tests {
             ),
             (
                 EnumParseError {
-                    field: "KEY",
+                    field: "KEY".into(),
                     value: "bad".into(),
                     expected: "A",
                 }
@@ -1350,7 +1369,7 @@ mod tests {
     #[test]
     fn test_enum_parse_error_display() {
         let err = EnumParseError {
-            field: "FIELD",
+            field: "FIELD".into(),
             value: "VAL".into(),
             expected: "A or B",
         };
@@ -1475,7 +1494,7 @@ mod tests {
         assert!(err.is_format_error());
 
         let enum_err = EnumParseError {
-            field: "F",
+            field: "F".into(),
             value: "V".into(),
             expected: "E",
         };
@@ -1575,7 +1594,7 @@ mod tests {
         // Test from_external_error for InternalParserError
         use winnow::error::FromExternalError;
         let enum_err = EnumParseError {
-            field: "F",
+            field: "F".into(),
             value: "V".into(),
             expected: "E",
         };

@@ -146,7 +146,12 @@ fn version_lines_and_epochs_carry_no_units() {
 #[test]
 fn opm_and_omm_elapsed_time_profile_is_explicit() {
     for fixture in ["opm_g1.kvn", "omm_g9.kvn"] {
-        let input = std::fs::read_to_string(data_dir().join("kvn").join(fixture)).unwrap();
+        let input = std::fs::read_to_string(data_dir().join("kvn").join(fixture))
+            .unwrap()
+            .replace(
+                "MEAN_ELEMENT_THEORY = SGP/SGP4",
+                "MEAN_ELEMENT_THEORY = DSST",
+            );
         let epoch_line = input
             .lines()
             .find(|line| line.starts_with("EPOCH ="))

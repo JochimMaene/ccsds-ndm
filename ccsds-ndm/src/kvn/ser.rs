@@ -600,8 +600,8 @@ impl<'a> KvnWriter<'a> {
         });
     }
 
-    /// Writes an OCM numeric history record without per-value or per-record temporary strings.
-    pub(crate) fn write_ocm_numeric_history<E: Display>(&mut self, epoch: &E, values: &[f64]) {
+    /// Writes an epoch followed by numeric history values without per-value or per-record temporary strings.
+    pub(crate) fn write_numeric_history<E: Display>(&mut self, epoch: &E, values: &[f64]) {
         self.unrepresentable_number |= values.iter().any(|value| !OdmFloat::is_valid(*value));
         let build = |line: &mut String| {
             let _ = write!(line, "{epoch}");
@@ -613,17 +613,35 @@ impl<'a> KvnWriter<'a> {
         self.write_built_line(build);
     }
 
-    /// Write one AEM attitude-state record without allocating intermediate strings.
-    pub(crate) fn write_aem_attitude_state<E: Display>(&mut self, epoch: &E, values: &[f64]) {
-        self.unrepresentable_number |= values.iter().any(|value| !OdmFloat::is_valid(*value));
-        let build = |line: &mut String| {
-            let _ = write!(line, "{epoch}");
-            for value in values {
-                line.push(' ');
-                let _ = OdmFloat(*value).write_to(line);
+    /// Preserve exact ACM time tags; repair decimal-point aliases and refuse excess precision.
+    pub(crate) fn write_acm_numeric_history(
+        &mut self,
+        epoch: &crate::types::Epoch,
+        values: &[f64],
+    ) {
+        let tag = epoch.as_str();
+        if epoch.kind() == crate::types::EpochKind::Numeric {
+            let mut canonical = std::borrow::Cow::Borrowed(tag);
+            let unsigned = tag.trim_start_matches(['+', '-']);
+            if unsigned.starts_with('.') {
+                let sign = &tag[..tag.len() - unsigned.len()];
+                canonical = std::borrow::Cow::Owned(format!("{sign}0{unsigned}"));
             }
-        };
-        self.write_built_line(build);
+            if canonical.ends_with('.') {
+                canonical.to_mut().push('0');
+            }
+            if canonical.starts_with('-')
+                && !canonical.bytes().any(|byte| matches!(byte, b'1'..=b'9'))
+            {
+                canonical = std::borrow::Cow::Owned(canonical[1..].to_owned());
+            }
+            let digits = canonical.bytes().filter(u8::is_ascii_digit).count();
+            self.unrepresentable_number |=
+                digits > 16 || (!canonical.contains('.') && canonical.parse::<i32>().is_err());
+            self.write_numeric_history(&canonical, values);
+        } else {
+            self.write_numeric_history(epoch, values);
+        }
     }
 
     /// Write a numeric vector assignment and optional unit without temporary joins.
@@ -704,7 +722,12 @@ impl<'a> KvnWriter<'a> {
                 continue;
             }
             for line in c.lines() {
-                self.check_text("COMMENT", line);
+                let line = if line.contains('\t') {
+                    std::borrow::Cow::Owned(line.replace('\t', " "))
+                } else {
+                    std::borrow::Cow::Borrowed(line)
+                };
+                self.check_text("COMMENT", &line);
                 let normalized = Self::normalize_inline_value(line.trim_end());
                 let _ = writeln!(self, "COMMENT {}", normalized);
             }
@@ -817,16 +840,6 @@ mod tests {
     }
 
     #[test]
-    fn odm_float_preserves_exact_values_when_they_fit() {
-        for value in [-0.0, 0.0, 1.0, -12.5, 1.0e15, 1.25e-20, f64::from_bits(1)] {
-            assert!(OdmFloat::is_valid(value));
-            let spelling = OdmFloat(value).to_string();
-            assert!(spelling.contains('.'));
-            assert!(OdmFloat::significant_digits(&spelling) <= 16);
-        }
-    }
-
-    #[test]
     fn kvn_normalizes_signed_zero_without_changing_its_numeric_value() {
         for value in [0.0, -0.0] {
             assert_eq!(OdmFloat(value).to_string(), "0.0");
@@ -880,6 +893,7 @@ mod tests {
     fn odm_float_write_matches_its_display_spelling() {
         for value in [
             -0.0,
+            0.0,
             1.0,
             -12.5,
             1.0e15,
@@ -891,6 +905,7 @@ mod tests {
             let mut output = String::new();
             assert!(OdmFloat::write_if_valid(value, &mut output));
             assert_eq!(output, OdmFloat(value).to_string());
+            assert!(output.contains('.'));
             assert!(OdmFloat::significant_digits(&output) <= 16);
         }
         for value in [f64::NAN, f64::INFINITY, f64::MAX] {

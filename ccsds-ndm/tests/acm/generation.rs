@@ -5,6 +5,93 @@ use ccsds_ndm::types::{AngleRate, Vec4Double};
 use ccsds_ndm::Ndm;
 
 #[test]
+fn empty_sensor_noise_is_xml_only_and_kvn_refuses_before_output() {
+    use ccsds_ndm::types::SensorNoise;
+    let mut message = Acm::from_kvn(ATT_KVN).unwrap();
+    let sensor = &mut message.body.segment.data.ad.as_mut().unwrap().sensors[0];
+    sensor.number_sensor_noise_covariance = None;
+    sensor.sensor_noise_stddev = Some(SensorNoise {
+        values: vec![],
+        units: None,
+    });
+    ccsds_ndm::Validate::validate(&message).unwrap();
+    let xml = message.to_xml().unwrap();
+    validate_xml("empty ACM sensor noise", &xml);
+    assert_eq!(Acm::from_xml(&xml).unwrap(), message);
+    crate::common::assert_validation_field(&message.to_kvn().unwrap_err(), "SENSOR_NOISE_STDDEV");
+    let mut output = Vec::new();
+    crate::common::assert_validation_field(
+        &message.write_kvn_to(&mut output).unwrap_err(),
+        "SENSOR_NOISE_STDDEV",
+    );
+    assert!(output.is_empty());
+}
+
+#[test]
+fn multiline_comments_use_shared_normalization_in_every_acm_block() {
+    use ccsds_ndm::types::{UserDefined, UserDefinedEntry, UserDefinedParameter};
+    let mut message = Acm::from_kvn(ATT_KVN).unwrap();
+    let segment = &mut message.body.segment;
+    segment.metadata.acm_data_elements = None;
+    let data = &mut segment.data;
+    data.phys = Acm::from_kvn(include_str!("../../data/kvn/acm_g8.kvn"))
+        .unwrap()
+        .body
+        .segment
+        .data
+        .phys;
+    data.cov = Acm::from_kvn(COV_KVN).unwrap().body.segment.data.cov;
+    let determination = data.ad.as_mut().unwrap();
+    for comments in [
+        &mut message.header.comment,
+        &mut segment.metadata.comment,
+        &mut data.att[0].comment,
+        &mut data.phys.as_mut().unwrap().comment,
+        &mut data.cov[0].comment,
+        &mut data.man[0].comment,
+        &mut determination.comment,
+    ] {
+        *comments = vec!["first\nsecond".into()];
+    }
+    data.user = Some(UserDefined {
+        entries: vec![
+            UserDefinedEntry::Parameter(UserDefinedParameter {
+                parameter: "TEST".into(),
+                value: "value".into(),
+            }),
+            UserDefinedEntry::Comment("first\nsecond".into()),
+        ],
+    });
+    let xml = message.to_xml().unwrap();
+    let mut expected = Acm::from_xml(&mutated(
+        &xml,
+        "first\nsecond",
+        "first</COMMENT><COMMENT>second",
+    ))
+    .unwrap();
+    // Sensor comments have no XML representation, so compare their KVN normalization directly.
+    message.body.segment.data.ad.as_mut().unwrap().sensors[0].comment =
+        vec!["first\nsecond".into()];
+    expected.body.segment.data.ad.as_mut().unwrap().sensors[0].comment =
+        vec!["first".into(), "second".into()];
+    let kvn = message.to_kvn().unwrap();
+    assert_eq!(Acm::from_kvn(&kvn).unwrap(), expected);
+    let mut output = Vec::new();
+    message.write_kvn_to(&mut output).unwrap();
+    assert_eq!(output, kvn.as_bytes());
+
+    message.header.comment = vec!["first\nη".into()];
+    assert!(message
+        .to_kvn()
+        .unwrap_err()
+        .to_string()
+        .contains("COMMENT"));
+    output.clear();
+    assert!(message.write_kvn_to(&mut output).is_err());
+    assert!(output.is_empty());
+}
+
+#[test]
 fn kvn_refuses_rounding_that_invalidates_history_or_target_quaternions() {
     use ccsds_ndm::messages::acm::AcmManeuverParameters;
     let values = [0.47047595604435294, 0.8767282217335952, 0.0, 0.0];
@@ -54,16 +141,23 @@ fn user_defined_punctuation_survives_generated_kvn() {
 }
 
 #[test]
-fn history_time_tags_are_written_with_their_stored_spelling() {
+fn overprecision_history_time_tags_are_xml_only() {
     // Time tags are lexical epochs, so 16-digit number rounding cannot merge them.
     let source = include_str!("../../data/kvn/acm_g6.kvn");
+    for (input, output) in [(".75", "0.75"), ("5.", "5.0")] {
+        let message =
+            Acm::from_kvn(&mutated(source, "0.0 0.73566", &format!("{input} 0.73566"))).unwrap();
+        assert!(message
+            .to_kvn()
+            .unwrap()
+            .contains(&format!("\n{output} 0.73566")));
+    }
     let kvn = mutated(source, "0.25 0.73529", "0.12345678901234567 0.73529");
     let kvn = mutated(&kvn, "0.50 0.73492", "0.12345678901234568 0.73492");
     let message = Acm::from_kvn(&kvn).unwrap();
-    let generated = message.to_kvn().unwrap();
-    assert!(generated.contains("\n0.12345678901234567 "), "{generated}");
-    assert!(generated.contains("\n0.12345678901234568 "), "{generated}");
-    assert_eq!(Acm::from_kvn(&generated).unwrap(), message);
+    let mut output = Vec::new();
+    assert!(message.write_kvn_to(&mut output).is_err());
+    assert!(output.is_empty());
     let xml = message.to_xml().unwrap();
     assert!(xml.contains("<attLine>0.12345678901234568 "), "{xml}");
     assert_eq!(Acm::from_xml(&xml).unwrap(), message);
@@ -90,7 +184,10 @@ fn euler_history_with_rates_writes_schema_order() {
 fn acm_vectors_and_units_survive_both_notations() {
     let physical = Acm::from_kvn(include_str!("../../data/kvn/acm_g8.kvn")).unwrap();
     let normalized = Acm::from_xml(&physical.to_xml().unwrap()).unwrap();
-    let cp = normalized.body.segment.data.phys.unwrap().cp.unwrap();
+    let physical = normalized.body.segment.data.phys.unwrap();
+    assert_eq!(physical.wet_mass.as_ref().unwrap().value, 1916.0);
+    assert_eq!(physical.cp_ref_frame.as_deref(), Some("SC_BODY_1"));
+    let cp = physical.cp.unwrap();
     assert_eq!(cp.elements, [0.04, -0.78, -0.023]);
     assert_eq!(cp.units.unwrap().to_string(), "m");
 
@@ -271,56 +368,6 @@ fn xml_generation_rejects_kvn_only_sensor_comments_before_output() {
         "SENSOR COMMENT",
     );
     assert!(output.is_empty());
-}
-
-#[test]
-fn acm_physical_description_survives_kvn_to_xml_conversion() {
-    let message = Acm::from_kvn(include_str!("../../data/kvn/acm_g8.kvn")).unwrap();
-    let xml = message.to_xml().unwrap();
-    let acm = Acm::from_xml(&xml).unwrap();
-    let physical = acm
-        .body
-        .segment
-        .data
-        .phys
-        .expect("ACM physical description was dropped");
-    assert_eq!(physical.wet_mass.unwrap().value, 1916.0);
-    assert_eq!(physical.cp_ref_frame.as_deref(), Some("SC_BODY_1"));
-}
-
-#[test]
-fn acm_sensor_xml_roundtrip() {
-    let kvn = r#"CCSDS_ACM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-OBJECT_NAME = SAT1
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-AD_START
-ATTITUDE_STATES = QUATERNION
-REF_FRAME_A = GCRF
-REF_FRAME_B = SC_BODY_1
-SENSOR_START
-SENSOR_NUMBER = 1
-SENSOR_USED = AST
-SENSOR_STOP
-AD_STOP
-"#;
-
-    let acm = Acm::from_kvn(kvn).expect("failed to parse ACM KVN");
-    let xml = acm.to_xml().expect("failed to serialize ACM XML");
-    let parsed = Acm::from_xml(&xml).expect("failed to parse ACM XML");
-    assert_eq!(parsed, acm);
-    assert_eq!(
-        parsed.body.segment.data.ad.as_ref().unwrap().sensors.len(),
-        1
-    );
-    assert_eq!(
-        parsed.body.segment.data.ad.as_ref().unwrap().sensors[0].sensor_number,
-        Some(1)
-    );
 }
 
 #[test]
@@ -582,7 +629,7 @@ fn acm_supplied_sensor_numbers_are_in_ascending_order_and_may_be_omitted() {
 
 #[test]
 fn sensor_frequency_schema_bound_applies_in_every_notation() {
-    use ccsds_ndm::{types::Frequency, Validate};
+    use ccsds_ndm::types::Frequency;
     let mut message = Acm::from_kvn(COV_KVN).unwrap();
     let sensor = &mut message.body.segment.data.ad.as_mut().unwrap().sensors[0];
     assert!(Frequency::new(0.0, None).is_err());
@@ -590,12 +637,7 @@ fn sensor_frequency_schema_bound_applies_in_every_notation() {
         value: 0.0,
         units: None,
     });
-    assert!(message.validate().is_err());
-    assert!(message.to_kvn().is_err());
-    assert!(message.to_xml().is_err());
-    let mut output = Vec::new();
-    assert!(message.write_xml_to(&mut output).is_err());
-    assert!(output.is_empty());
+    assert_rejects(&message, "SENSOR_FREQUENCY");
 }
 
 #[test]
@@ -711,4 +753,80 @@ fn xml_history_basis_requires_the_exact_schema_spelling() {
             assert!(Acm::from_xml(&invalid).is_err());
         }
     }
+}
+
+#[test]
+fn target_attitude_rejects_supplied_kvn_units() {
+    let mut message = Acm::from_kvn(ATT_KVN).unwrap();
+    let man = &mut message.body.segment.data.man[0];
+    man.man_purpose = Some("ATT_ADJUST".into());
+    man.target_momentum = None;
+    man.target_mom_frame = None;
+    man.target_attitude = Some(Vec4Double {
+        values: vec![0.0, 0.0, 0.0, 1.0],
+    });
+    let kvn = message.to_kvn().unwrap();
+    assert_eq!(Acm::from_kvn(&kvn).unwrap(), message);
+    let line = kvn
+        .lines()
+        .find(|line| line.starts_with("TARGET_ATTITUDE"))
+        .unwrap();
+    for unit in ["km", "deg", "1/s"] {
+        let invalid = mutated(&kvn, line, &format!("{line} [{unit}]"));
+        assert!(Acm::from_kvn(&invalid).is_err());
+    }
+}
+
+#[test]
+fn conditional_frames_must_be_nonblank_when_their_vectors_are_present() {
+    use ccsds_ndm::types::Vector3;
+    let mut original = Acm::from_kvn(include_str!("../../data/kvn/acm_g7.kvn")).unwrap();
+    let phys = original
+        .body
+        .segment
+        .data
+        .phys
+        .get_or_insert_with(Default::default);
+    phys.cp = Some(Vector3::new([1.0, 2.0, 3.0], None));
+    phys.cp_ref_frame = Some("SC_BODY_1".into());
+    let xml = original.to_xml().unwrap();
+    for (field, valid) in [("CP_REF_FRAME", "SC_BODY_1"), ("TARGET_MOM_FRAME", "J2000")] {
+        for frame in [None, Some(""), Some(" "), Some("\t")] {
+            let mut message = original.clone();
+            if field == "CP_REF_FRAME" {
+                message
+                    .body
+                    .segment
+                    .data
+                    .phys
+                    .as_mut()
+                    .unwrap()
+                    .cp_ref_frame = frame.map(str::to_owned);
+            } else {
+                message.body.segment.data.man[0].target_mom_frame = frame.map(str::to_owned);
+            }
+            assert_rejects(&message, field);
+            let replacement =
+                frame.map_or_else(String::new, |value| format!("<{field}>{value}</{field}>"));
+            let invalid = mutated(&xml, &format!("<{field}>{valid}</{field}>"), &replacement);
+            crate::common::assert_validation_field(&Acm::from_xml(&invalid).unwrap_err(), field);
+        }
+    }
+}
+
+#[test]
+fn xml_vectors_accept_unicode_separators_and_write_schema_whitespace() {
+    let original = Acm::from_kvn(include_str!("../../data/kvn/acm_g7.kvn")).unwrap();
+    let xml = original.to_xml().unwrap();
+    for separator in ['\u{a0}', '\u{2003}'] {
+        let input = mutated(
+            &xml,
+            "1.3 -16.4 -11.35",
+            &format!("1.3{separator}-16.4 -11.35"),
+        );
+        let parsed = Acm::from_xml(&input).unwrap();
+        assert_eq!(parsed, original);
+        assert_eq!(parsed.to_xml().unwrap(), xml);
+    }
+    validate_xml("canonical ACM vector separators", &xml);
 }

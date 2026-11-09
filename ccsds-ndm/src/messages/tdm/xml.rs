@@ -5,9 +5,10 @@
 use super::{TdmObservation, TdmObservationData};
 use crate::error::Result;
 use crate::types::CalendarEpoch;
-use serde::Deserialize;
+use serde::{de::IntoDeserializer, Deserialize};
 
 // XSD element defaults apply to present, empty elements, not omitted optional fields.
+// shortcut: quick-xml also drops whitespace-only map text; use raw XML text if strict defaults are needed.
 pub(super) fn default_zero<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> std::result::Result<Option<f64>, D::Error> {
@@ -42,7 +43,7 @@ pub(super) fn default_quality<'de, D: serde::Deserializer<'de>>(
             if value.is_empty() {
                 Ok(crate::types::TdmDataQuality::Raw)
             } else {
-                value.parse().map_err(serde::de::Error::custom)
+                crate::types::TdmDataQuality::deserialize(value.into_deserializer())
             }
         })
         .transpose()

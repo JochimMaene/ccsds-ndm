@@ -1294,6 +1294,7 @@ impl ToKvn for CdmCovarianceMatrix {
 
 impl Cdm {
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        self.validate_output_designators()?;
         // Keep the content-loss check independent of the documented 16-digit numeric rounding.
         let mut writer = KvnWriter::for_model_comparison();
         self.write_kvn(&mut writer);

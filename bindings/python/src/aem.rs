@@ -248,7 +248,7 @@ impl Aem {
     /// ValueError
     ///     Unsupported format argument.
     /// NdmIoError
-    ///     Input file could not be read.
+    ///     Input file could not be read or contains invalid UTF-8 bytes.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
@@ -592,7 +592,7 @@ impl AemMetadata {
     /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
     /// system barycenter. The set of allowed values is described in annex B, subsection B8.
     ///
-    /// Examples: EARTH, STS-106
+    /// Examples: EARTH, STS 106
     ///
     /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
@@ -819,7 +819,7 @@ impl AemMetadata {
     /// Recommended interpolation method for attitude ephemeris data in the block immediately
     /// following this metadata block.
     ///
-    /// Examples: LINEAR, HERMITE, LAGRANGE
+    /// Examples: linear, HERMITE, LAGRANGE
     ///
     /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///

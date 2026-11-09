@@ -96,74 +96,39 @@ pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {
                 (b"tleParameters", b"BSTAR" | b"BTERM") => rule(6, false),
                 (b"tleParameters", b"MEAN_MOTION_DOT") => rule(7, false),
                 (b"tleParameters", b"MEAN_MOTION_DDOT" | b"AGOM") => rule(8, false),
-                (b"covarianceMatrix", b"COMMENT") => rule(0, true),
-                (b"covarianceMatrix", b"COV_REF_FRAME") => rule(1, false),
-                (b"covarianceMatrix", b"CX_X") => rule(2, false),
-                (b"covarianceMatrix", b"CY_X") => rule(3, false),
-                (b"covarianceMatrix", b"CY_Y") => rule(4, false),
-                (b"covarianceMatrix", b"CZ_X") => rule(5, false),
-                (b"covarianceMatrix", b"CZ_Y") => rule(6, false),
-                (b"covarianceMatrix", b"CZ_Z") => rule(7, false),
-                (b"covarianceMatrix", b"CX_DOT_X") => rule(8, false),
-                (b"covarianceMatrix", b"CX_DOT_Y") => rule(9, false),
-                (b"covarianceMatrix", b"CX_DOT_Z") => rule(10, false),
-                (b"covarianceMatrix", b"CX_DOT_X_DOT") => rule(11, false),
-                (b"covarianceMatrix", b"CY_DOT_X") => rule(12, false),
-                (b"covarianceMatrix", b"CY_DOT_Y") => rule(13, false),
-                (b"covarianceMatrix", b"CY_DOT_Z") => rule(14, false),
-                (b"covarianceMatrix", b"CY_DOT_X_DOT") => rule(15, false),
-                (b"covarianceMatrix", b"CY_DOT_Y_DOT") => rule(16, false),
-                (b"covarianceMatrix", b"CZ_DOT_X") => rule(17, false),
-                (b"covarianceMatrix", b"CZ_DOT_Y") => rule(18, false),
-                (b"covarianceMatrix", b"CZ_DOT_Z") => rule(19, false),
-                (b"covarianceMatrix", b"CZ_DOT_X_DOT") => rule(20, false),
-                (b"covarianceMatrix", b"CZ_DOT_Y_DOT") => rule(21, false),
-                (b"covarianceMatrix", b"CZ_DOT_Z_DOT") => rule(22, false),
+                (b"covarianceMatrix", child) => {
+                    return crate::xml::OPM_COVARIANCE_CHILDREN
+                        .iter()
+                        .position(|name| *name == child)
+                        .map(|rank| rule(rank as u16, child == b"COMMENT"));
+                }
                 (b"userDefinedParameters", b"COMMENT") => repeating(0, true),
                 (b"userDefinedParameters", b"USER_DEFINED") => repeating(1, true),
                 _ => return None,
             })
         },
         |element, attribute| match attribute {
-            b"units" => matches!(
-                element,
-                b"SEMI_MAJOR_AXIS"
-                    | b"MEAN_MOTION"
-                    | b"INCLINATION"
-                    | b"RA_OF_ASC_NODE"
-                    | b"ARG_OF_PERICENTER"
-                    | b"MEAN_ANOMALY"
-                    | b"GM"
-                    | b"MASS"
-                    | b"SOLAR_RAD_AREA"
-                    | b"DRAG_AREA"
-                    | b"BSTAR"
-                    | b"BTERM"
-                    | b"MEAN_MOTION_DOT"
-                    | b"MEAN_MOTION_DDOT"
-                    | b"AGOM"
-                    | b"CX_X"
-                    | b"CY_X"
-                    | b"CY_Y"
-                    | b"CZ_X"
-                    | b"CZ_Y"
-                    | b"CZ_Z"
-                    | b"CX_DOT_X"
-                    | b"CX_DOT_Y"
-                    | b"CX_DOT_Z"
-                    | b"CX_DOT_X_DOT"
-                    | b"CY_DOT_X"
-                    | b"CY_DOT_Y"
-                    | b"CY_DOT_Z"
-                    | b"CY_DOT_X_DOT"
-                    | b"CY_DOT_Y_DOT"
-                    | b"CZ_DOT_X"
-                    | b"CZ_DOT_Y"
-                    | b"CZ_DOT_Z"
-                    | b"CZ_DOT_X_DOT"
-                    | b"CZ_DOT_Y_DOT"
-                    | b"CZ_DOT_Z_DOT"
-            ),
+            b"units" => {
+                crate::xml::OPM_COVARIANCE_CHILDREN[2..].contains(&element)
+                    || matches!(
+                        element,
+                        b"SEMI_MAJOR_AXIS"
+                            | b"MEAN_MOTION"
+                            | b"INCLINATION"
+                            | b"RA_OF_ASC_NODE"
+                            | b"ARG_OF_PERICENTER"
+                            | b"MEAN_ANOMALY"
+                            | b"GM"
+                            | b"MASS"
+                            | b"SOLAR_RAD_AREA"
+                            | b"DRAG_AREA"
+                            | b"BSTAR"
+                            | b"BTERM"
+                            | b"MEAN_MOTION_DOT"
+                            | b"MEAN_MOTION_DDOT"
+                            | b"AGOM"
+                    )
+            }
             b"parameter" => element == b"USER_DEFINED",
             _ => false,
         },

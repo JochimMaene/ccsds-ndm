@@ -277,45 +277,17 @@ impl Message {
     }
 
     pub(crate) fn validate_for_generation(&self, format: generation::OutputFormat) -> Result<()> {
-        fn validate<T: generation::GenerationMetadata + traits::ToKvn>(
-            message: &T,
-            format: generation::OutputFormat,
-        ) -> Result<()> {
-            let result = generation::validate_output_version(T::KIND, message.version(), format)
-                .and_then(|()| match format {
-                    // A validation-only API is asking "would generation succeed?", so it runs
-                    // the model checks and the serialization pass, exactly as streaming does.
-                    generation::OutputFormat::Kvn => message
-                        .validate_kvn_model()
-                        .and_then(|()| traits::ToKvn::validate_kvn(message)),
-                    generation::OutputFormat::Xml => {
-                        message.validate_xml_semantics()?;
-                        message.validate_xml_output()
-                    }
-                });
-            result.map_err(|error| {
-                error.with_generation_context(
-                    T::KIND,
-                    match format {
-                        generation::OutputFormat::Kvn => error::DiagnosticNotation::Kvn,
-                        generation::OutputFormat::Xml => error::DiagnosticNotation::Xml,
-                    },
-                    message.version(),
-                )
-            })
-        }
-
         match self {
-            Message::Oem(message) => validate(message, format),
-            Message::Cdm(message) => validate(message, format),
-            Message::Opm(message) => validate(message, format),
-            Message::Omm(message) => validate(message, format),
-            Message::Rdm(message) => validate(message, format),
-            Message::Tdm(message) => validate(message, format),
-            Message::Ocm(message) => validate(message, format),
-            Message::Acm(message) => validate(message, format),
-            Message::Aem(message) => validate(message, format),
-            Message::Apm(message) => validate(message, format),
+            Message::Oem(message) => generation::validate_for_generation(message, format),
+            Message::Cdm(message) => generation::validate_for_generation(message, format),
+            Message::Opm(message) => generation::validate_for_generation(message, format),
+            Message::Omm(message) => generation::validate_for_generation(message, format),
+            Message::Rdm(message) => generation::validate_for_generation(message, format),
+            Message::Tdm(message) => generation::validate_for_generation(message, format),
+            Message::Ocm(message) => generation::validate_for_generation(message, format),
+            Message::Acm(message) => generation::validate_for_generation(message, format),
+            Message::Aem(message) => generation::validate_for_generation(message, format),
+            Message::Apm(message) => generation::validate_for_generation(message, format),
             Message::Ndm(msg) => {
                 for message in &msg.messages {
                     message.validate_for_generation(format)?;

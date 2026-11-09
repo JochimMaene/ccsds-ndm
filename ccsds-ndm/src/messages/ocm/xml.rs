@@ -366,7 +366,6 @@ pub(super) fn validate_sequences(xml: &str) -> Result<()> {
                             | b"OD_MIN_PRED_EIGMIN"
                             | b"OD_CONFIDENCE"
                             | b"SEDR"
-                            | b"WEIGHTED_RMS"
                     ))
         },
     )
@@ -652,4 +651,55 @@ impl<'de> Deserialize<'de> for ManLine {
             },
         )
     }
+}
+
+pub(super) fn canonical_units(value: &str) -> String {
+    if value.starts_with('[') && value.ends_with(']') && value.contains(',') {
+        value.to_owned()
+    } else {
+        format!("[{}]", super::parse_units_list(value).join(","))
+    }
+}
+
+pub(super) fn serialize_units<S: serde::Serializer>(
+    value: &Option<String>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    value.as_deref().map(canonical_units).serialize(serializer)
+}
+
+pub(super) fn deserialize_units<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Option<String>, D::Error> {
+    Ok(Option::<String>::deserialize(deserializer)?
+        .as_deref()
+        .map(canonical_units))
+}
+
+pub(super) fn serialize_composition<S: serde::Serializer>(
+    value: &str,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    super::kvn::canonical_man_composition(value).serialize(serializer)
+}
+
+pub(super) fn deserialize_composition<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<String, D::Error> {
+    Ok(super::kvn::canonical_man_composition(&String::deserialize(
+        deserializer,
+    )?))
+}
+
+pub(super) fn serialize_user<S: serde::Serializer>(
+    value: &Option<super::OcmUserDefined>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    if value
+        .as_ref()
+        .is_some_and(|user| user.parameters().next().is_none())
+    {
+        return Err(serde::ser::Error::custom(super::EMPTY_USER_BLOCK));
+    }
+    value.serialize(serializer)
 }

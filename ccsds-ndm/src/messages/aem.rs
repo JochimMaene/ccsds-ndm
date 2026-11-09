@@ -39,7 +39,7 @@ pub struct Aem {
     pub header: AdmHeader,
     /// Message segments and their data.
     pub body: AemBody,
-    /// XML root identifier; when present it must match this message family.
+    /// Required XML root identifier, `CCSDS_AEM_VERS`; `None` is invalid.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_AEM_VERS".to_string()))]
     pub id: Option<String>,
@@ -87,14 +87,24 @@ impl Ndm for Aem {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let normalized = crate::kvn::prepare_input(
-            crate::detect::without_utf8_bom(kvn),
-            crate::validation::MessageKind::Aem,
-        )?;
-        kvn::validate_kvn_syntax(&normalized)?;
-        let aem = Self::from_kvn_str(&normalized)?;
-        crate::traits::Validate::validate(&aem)?;
-        Ok(aem)
+        (|| {
+            let normalized = crate::kvn::prepare_input(
+                crate::detect::without_utf8_bom(kvn),
+                crate::validation::MessageKind::Aem,
+            )?;
+            kvn::validate_kvn_syntax(&normalized)?;
+            let aem = Self::from_kvn_str(&normalized)?;
+            crate::traits::Validate::validate(&aem)?;
+            Ok(aem)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Aem,
+                crate::error::DiagnosticNotation::Kvn,
+                kvn,
+                None,
+            )
+        })
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -102,7 +112,14 @@ impl Ndm for Aem {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        Self::from_xml_strict(xml)
+        Self::from_xml_strict(xml).map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Aem,
+                crate::error::DiagnosticNotation::Xml,
+                xml,
+                None,
+            )
+        })
     }
 
     fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
@@ -345,7 +362,7 @@ pub struct AemMetadata {
     /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
     /// system barycenter. The set of allowed values is described in annex B, subsection B8.
     ///
-    /// **Examples**: EARTH, STS-106
+    /// **Examples**: EARTH, STS 106
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -444,7 +461,7 @@ pub struct AemMetadata {
     /// Recommended interpolation method for attitude ephemeris data in the block immediately
     /// following this metadata block.
     ///
-    /// **Examples**: LINEAR, HERMITE, LAGRANGE
+    /// **Examples**: linear, HERMITE, LAGRANGE
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]

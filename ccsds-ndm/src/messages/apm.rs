@@ -33,7 +33,7 @@ pub struct Apm {
     pub header: AdmHeader,
     /// Message segments and their data.
     pub body: ApmBody,
-    /// XML root identifier; when present it must match this message family.
+    /// Required XML root identifier, `CCSDS_APM_VERS`; `None` is invalid.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_APM_VERS".to_string()))]
     pub id: Option<String>,
@@ -70,14 +70,24 @@ impl Ndm for Apm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let normalized = crate::kvn::prepare_input(
-            crate::detect::without_utf8_bom(kvn),
-            crate::validation::MessageKind::Apm,
-        )?;
-        kvn::validate_kvn_syntax(&normalized)?;
-        let apm = Self::from_kvn_str(&normalized)?;
-        crate::traits::Validate::validate(&apm)?;
-        Ok(apm)
+        (|| {
+            let normalized = crate::kvn::prepare_input(
+                crate::detect::without_utf8_bom(kvn),
+                crate::validation::MessageKind::Apm,
+            )?;
+            kvn::validate_kvn_syntax(&normalized)?;
+            let apm = Self::from_kvn_str(&normalized)?;
+            crate::traits::Validate::validate(&apm)?;
+            Ok(apm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Apm,
+                crate::error::DiagnosticNotation::Kvn,
+                kvn,
+                None,
+            )
+        })
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -85,10 +95,20 @@ impl Ndm for Apm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        xml::validate_xml_sequences(xml)?;
-        let apm: Self = crate::xml::from_str_with_context(xml, "APM")?;
-        crate::traits::Validate::validate(&apm)?;
-        Ok(apm)
+        (|| {
+            xml::validate_xml_sequences(xml)?;
+            let apm: Self = crate::xml::from_str_with_context(xml, "APM")?;
+            crate::traits::Validate::validate(&apm)?;
+            Ok(apm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Apm,
+                crate::error::DiagnosticNotation::Xml,
+                xml,
+                None,
+            )
+        })
     }
 
     fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {

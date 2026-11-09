@@ -173,11 +173,11 @@ pub struct Tdm {
     pub header: TdmHeader,
     /// Message segments and their data.
     pub body: TdmBody,
-    /// XML root identifier; when present it must match this message family.
+    /// Required XML root identifier, `CCSDS_TDM_VERS`; `None` is invalid.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_TDM_VERS".to_string()))]
     pub id: Option<String>,
-    /// Supported message edition, "2.0".
+    /// Message edition: "2.0", or "1.0" from the restricted input-only KVN/XML reader.
     #[serde(rename = "@version")]
     #[builder(default = "2.0".to_string(), into)]
     pub version: String,
@@ -204,15 +204,25 @@ impl Ndm for Tdm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::kvn::prepare_input(
-            crate::detect::without_utf8_bom(kvn),
-            crate::validation::MessageKind::Tdm,
-        )?;
-        let kvn = kvn.as_ref();
-        kvn::validate_kvn_syntax(kvn)?;
-        let tdm = Self::from_kvn_str(kvn)?;
-        crate::traits::Validate::validate(&tdm)?;
-        Ok(tdm)
+        (|| {
+            let kvn = crate::kvn::prepare_input(
+                crate::detect::without_utf8_bom(kvn),
+                crate::validation::MessageKind::Tdm,
+            )?;
+            let kvn = kvn.as_ref();
+            kvn::validate_kvn_syntax(kvn)?;
+            let tdm = Self::from_kvn_str(kvn)?;
+            crate::traits::Validate::validate(&tdm)?;
+            Ok(tdm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Tdm,
+                crate::error::DiagnosticNotation::Kvn,
+                kvn,
+                None,
+            )
+        })
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -220,14 +230,24 @@ impl Ndm for Tdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        xml::validate_xml_sequences(xml)?;
-        let tdm: Self = crate::xml::from_str_with_context(xml, "TDM")?;
-        crate::traits::Validate::validate(&tdm)?;
-        tdm.validate_xml_representability()?;
-        if tdm.version == "1.0" {
-            tdm.validate_xml_1_0_schema()?;
-        }
-        Ok(tdm)
+        (|| {
+            xml::validate_xml_sequences(xml)?;
+            let tdm: Self = crate::xml::from_str_with_context(xml, "TDM")?;
+            crate::traits::Validate::validate(&tdm)?;
+            tdm.validate_xml_representability()?;
+            if tdm.version == "1.0" {
+                tdm.validate_xml_1_0_schema()?;
+            }
+            Ok(tdm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Tdm,
+                crate::error::DiagnosticNotation::Xml,
+                xml,
+                None,
+            )
+        })
     }
 
     fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
@@ -478,6 +498,42 @@ impl crate::traits::Validate for TdmBody {
         }
         for segment in &self.segments {
             segment.validate()?;
+        }
+        // §3.3.2.5.6: two-way or three-way (two-leg, three-participant path, §3.3.2.4.3)
+        // differenced Doppler (SINGLE_DIFF RECEIVE_FREQ, §3.3.2.5.5) needs TRANSMIT_FREQ_n
+        // somewhere in the message.
+        let needs_uplink = self.segments.iter().any(|segment| {
+            let metadata = &segment.metadata;
+            metadata.mode == Some(TdmMode::SingleDiff)
+                && [&metadata.path_1, &metadata.path_2]
+                    .into_iter()
+                    .flatten()
+                    .any(|path| path.0.split(',').count() == 3)
+                && segment
+                    .data
+                    .observations
+                    .iter()
+                    .any(|o| matches!(o.data, TdmObservationData::ReceiveFreq(_)))
+        });
+        let has_uplink = self
+            .segments
+            .iter()
+            .flat_map(|s| &s.data.observations)
+            .any(|o| {
+                o.data
+                    .key()
+                    .strip_prefix("TRANSMIT_FREQ_")
+                    .is_some_and(|index| index.len() == 1)
+            });
+        if needs_uplink && !has_uplink {
+            return Err(ValidationError::MissingRequiredField {
+                block: "TDM Data".into(),
+                field: "TRANSMIT_FREQ_n (required for two-way or three-way differenced Doppler, \
+                        TDM 3.3.2.5.6)"
+                    .into(),
+                line: None,
+            }
+            .into());
         }
         Ok(())
     }

@@ -365,7 +365,7 @@ impl Cdm {
     /// ValueError
     ///     Unsupported format argument.
     /// NdmIoError
-    ///     Input file could not be read.
+    ///     Input file could not be read or contains invalid UTF-8 bytes.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
@@ -390,7 +390,9 @@ impl Cdm {
     /// Raises
     /// ------
     /// NdmValidationError
-    ///     Invalid model or unsupported output edition.
+    ///     Invalid model or unsupported output edition; an INTERNATIONAL_DESIGNATOR not in
+    ///     YYYY-NNNP{PP} form or UNKNOWN; in XML, a present empty/whitespace-only or N/A
+    ///     optional string (use None), non-ASCII text, or a line over 254 characters (6.2.2).
     /// NdmFormatError
     ///     Content cannot be represented in the requested notation.
     /// NdmUnsupportedNotationError
@@ -428,7 +430,9 @@ impl Cdm {
     /// Raises
     /// ------
     /// NdmValidationError
-    ///     Invalid model or unsupported output edition.
+    ///     Invalid model or unsupported output edition; an INTERNATIONAL_DESIGNATOR not in
+    ///     YYYY-NNNP{PP} form or UNKNOWN; in XML, a present empty/whitespace-only or N/A
+    ///     optional string (use None), non-ASCII text, or a line over 254 characters (6.2.2).
     /// NdmFormatError
     ///     Content cannot be represented in the requested notation.
     /// NdmUnsupportedNotationError
@@ -1396,7 +1400,7 @@ impl CdmSegment {
 /// object_name : str
 ///     Spacecraft name for the object.
 /// international_designator : str
-///     The full international designator (YYYY-NNNP{PP}).
+///     The full international designator (YYYY-NNNP{PP} or UNKNOWN; enforced on output).
 /// ephemeris_name : str
 ///     Unique name of the external ephemeris file or 'NONE'.
 /// covariance_method : Union[CovarianceMethodType, str]
@@ -1619,6 +1623,8 @@ impl CdmMetadata {
     /// (with leading zeros); P{PP} = At least one capital letter for the identification of the
     /// part brought into space by the launch. In cases where the object has no international
     /// designator, the value UNKNOWN should be used. (See 5.2.9 for further formatting rules.)
+    ///
+    /// Parsing keeps other producer values (e.g. CARA's ``1001``); generation rejects them.
     ///
     /// Examples: 2002-021A, UNKNOWN
     ///

@@ -72,30 +72,12 @@ class TestOmm:
 
         return Omm(header=header, segment=seg)
 
-    def test_roundtrip_kvn(self):
-        try:
-            omm = self._create_valid_omm()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        kvn = omm.to_str(format="kvn")
-        assert "CCSDS_OMM_VERS" in kvn
-
-        omm2 = Omm.from_str(kvn, format="kvn")
-        assert omm2.header.originator == "TEST"
-        assert omm2.segment.data.mean_elements.eccentricity == 0.001
-
-    def test_roundtrip_xml(self):
-        try:
-            omm = self._create_valid_omm()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        xml = omm.to_str(format="xml")
-        assert "<omm" in xml
-
-        omm2 = Omm.from_str(xml, format="xml")
-        assert omm2.segment.data.mean_elements.eccentricity == 0.001
+    @pytest.mark.parametrize("format", ["kvn", "xml"])
+    def test_constructed_message_roundtrips(self, format):
+        message = self._create_valid_omm()
+        parsed = Omm.from_str(message.to_str(format), format=format)
+        assert parsed.header.originator == "TEST"
+        assert parsed.segment.data.mean_elements.eccentricity == 0.001
 
     def test_ref_frame_epoch_requires_calendar_form(self):
         with pytest.raises(NdmEpochError):
@@ -112,16 +94,6 @@ class TestOmm:
         omm = self._create_valid_omm()
         with pytest.raises(NdmEpochError):
             omm.segment.data.mean_elements.epoch = "123.5"
-
-    def test_file_io(self, tmp_path):
-        omm = self._create_valid_omm()
-        path = tmp_path / "test.omm"
-
-        omm.to_file(str(path), "kvn")
-        assert path.exists()
-
-        omm2 = ccsds_ndm.from_file(str(path), format="kvn")
-        assert omm2.header.originator == "TEST"
 
     def test_tle_lines_roundtrip(self):
         line1 = "1 25544U 98067A   20348.69171878  .00000888  00000-0  24124-4 0  9995"
@@ -209,7 +181,3 @@ MEAN_MOTION_DDOT = 0.0
         line1, line2 = omm.to_tle_lines()
         assert line1.startswith("1 23581U 95025A")
         assert line2.startswith("2 23581")
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

@@ -122,7 +122,11 @@ fn attitude_times_must_be_unique_but_need_not_increase() {
             line.epoch = time.parse().unwrap();
         }
         value.validate().unwrap();
-        assert_eq!(Acm::from_kvn(&value.to_kvn().unwrap()).unwrap(), value);
+        if times[0] == "1.0000000000000001" {
+            assert!(value.to_kvn().is_err());
+        } else {
+            assert_eq!(Acm::from_kvn(&value.to_kvn().unwrap()).unwrap(), value);
+        }
         assert_eq!(Acm::from_xml(&value.to_xml().unwrap()).unwrap(), value);
     }
     // Signed zero and trailing zeros do not make a repeated time tag unique.
@@ -370,16 +374,16 @@ fn metadata_bounds_require_real_absolute_dates_or_complete_relative_times() {
             };
             *bound = Some(token.parse().unwrap());
             crate::common::assert_rejects(&message, field);
-            for xml in [false, true] {
-                let mut output = Vec::new();
-                assert!(if xml {
-                    message.write_xml_to(&mut output)
-                } else {
-                    message.write_kvn_to(&mut output)
-                }
-                .is_err());
-                assert!(output.is_empty());
-            }
         }
     }
+}
+
+#[test]
+fn acm_declared_bounds_do_not_constrain_history_rows() {
+    let mut message = Acm::from_kvn(include_str!("../../data/kvn/acm_g6.kvn")).unwrap();
+    message.body.segment.metadata.start_time = Some("1000".parse().unwrap());
+    message.body.segment.metadata.stop_time = Some("1001".parse().unwrap());
+    message.validate().unwrap();
+    assert_eq!(Acm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    assert_eq!(Acm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
 }

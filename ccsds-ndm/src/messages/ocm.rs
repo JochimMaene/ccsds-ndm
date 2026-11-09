@@ -14,6 +14,10 @@ use std::cmp::Ordering;
 mod kvn;
 mod xml;
 
+/// ODM table 6-12 makes USER_DEFINED_x mandatory; the XSD allows an empty `user` element.
+const EMPTY_USER_BLOCK: &str =
+    "USER block requires at least one USER_DEFINED parameter for generation (ODM table 6-12)";
+
 //----------------------------------------------------------------------
 // Root OCM Structure
 //----------------------------------------------------------------------
@@ -39,7 +43,7 @@ pub struct Ocm {
     pub header: OdmHeader,
     /// The message segment and its data.
     pub body: OcmBody,
-    /// XML root identifier; when present it must match this family.
+    /// Required XML root identifier, `CCSDS_OCM_VERS`; `None` is invalid.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_OCM_VERS".to_string()))]
     pub id: Option<String>,
@@ -75,15 +79,25 @@ impl Ndm for Ocm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let normalized = crate::kvn::prepare_input(
-            crate::detect::without_utf8_bom(kvn),
-            crate::validation::MessageKind::Ocm,
-        )?;
-        let kvn = normalized.as_ref();
-        kvn::validate_syntax(kvn)?;
-        let ocm = Self::from_kvn_str(kvn)?;
-        crate::traits::Validate::validate(&ocm)?;
-        Ok(ocm)
+        (|| {
+            let normalized = crate::kvn::prepare_input(
+                crate::detect::without_utf8_bom(kvn),
+                crate::validation::MessageKind::Ocm,
+            )?;
+            let kvn = normalized.as_ref();
+            kvn::validate_syntax(kvn)?;
+            let ocm = Self::from_kvn_str(kvn)?;
+            crate::traits::Validate::validate(&ocm)?;
+            Ok(ocm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Ocm,
+                crate::error::DiagnosticNotation::Kvn,
+                kvn,
+                None,
+            )
+        })
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -91,11 +105,21 @@ impl Ndm for Ocm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        xml::validate_sequences(xml)?;
-        let ocm: Self = crate::xml::from_str_with_context(xml, "OCM")?;
-        ocm.validate_content()?;
-        ocm.validate_xml_representability()?;
-        Ok(ocm)
+        (|| {
+            xml::validate_sequences(xml)?;
+            let ocm: Self = crate::xml::from_str_with_context(xml, "OCM")?;
+            ocm.validate_content()?;
+            ocm.validate_xml_representability()?;
+            Ok(ocm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Ocm,
+                crate::error::DiagnosticNotation::Xml,
+                xml,
+                None,
+            )
+        })
     }
 
     fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
@@ -790,6 +814,18 @@ impl OcmManeuverParameters {
             .into());
         }
         let tokens = parse_man_composition(&self.man_composition);
+        // ODM 7.5.3 admits all-uppercase or all-lowercase values, not arbitrary mixed case.
+        if tokens.iter().any(|token| {
+            token.bytes().any(|byte| byte.is_ascii_lowercase())
+                && token.bytes().any(|byte| byte.is_ascii_uppercase())
+        }) {
+            return Err(ValidationError::invalid_value(
+                "MAN_COMPOSITION",
+                &self.man_composition,
+                "all-uppercase or all-lowercase column names (ODM 7.5.3)",
+            )
+            .into());
+        }
         let Some(time_tag) = tokens.first().and_then(|token| man_time_tag(token)) else {
             return Err(ValidationError::InvalidValue {
                 field: Cow::Borrowed("MAN_COMPOSITION"),
@@ -874,9 +910,7 @@ impl OcmManeuverParameters {
                 )
                 .into());
             }
-        }
-        if let Some(units) = &self.man_units {
-            for (column, unit) in tokens.iter().skip(1).zip(parse_units_list(units)) {
+            for (column, unit) in tokens.iter().skip(1).zip(unit_tokens) {
                 let expected = match column.to_ascii_uppercase().as_str() {
                     "MAN_DURA" | "THR_ISP" => "s",
                     "DELTA_MASS" | "DEPLOY_MASS" => "kg",
@@ -890,6 +924,9 @@ impl OcmManeuverParameters {
                         "deg"
                     }
                     "DEPLOY_DV_CDA" => "m**2",
+                    "ACC_INTERP" | "THR_EFFIC" | "THR_INTERP" | "DEPLOY_ID" | "DEPLOY_DV_RATIO" => {
+                        "n/a"
+                    }
                     _ => continue,
                 };
                 if !unit.eq_ignore_ascii_case(expected) {
@@ -1058,8 +1095,7 @@ fn is_numeric_man_column(token: &str) -> bool {
 ///
 /// `ManLine::values` is `Vec<String>` because the columns are heterogeneous, so nothing else stops
 /// text reaching a numeric column: the XSD types `manLine` as `xsd:string`, so the schema oracle
-/// accepts it. This matches Orekit, whose `ManeuverFieldType` parses each declared-numeric column
-/// as a double and likewise enforces no per-column domain.
+/// accepts it. Numeric columns and book-only domains therefore require direct validation.
 fn validate_man_line_values(
     numeric_columns: &[bool],
     tokens: &[Cow<'_, str>],
@@ -1093,8 +1129,17 @@ fn validate_man_line_values(
             continue;
         }
         let parsed = fast_float::parse::<f64, _>(value);
-        // ODM table 6-9: DEPLOY_MASS is a host-mass decrement and "shall be <= 0.0".
-        if column.eq_ignore_ascii_case("DEPLOY_MASS") && parsed.as_ref().is_ok_and(|v| *v > 0.0) {
+        // ODM table 6-9: test the retained decimal sign so positive underflow cannot become zero.
+        if column.eq_ignore_ascii_case("DEPLOY_MASS")
+            && parsed.as_ref().is_ok_and(|number| number.is_finite())
+            && !value.starts_with('-')
+            && value
+                .split(['e', 'E'])
+                .next()
+                .unwrap_or(value)
+                .bytes()
+                .any(|byte| matches!(byte, b'1'..=b'9'))
+        {
             return Err(ValidationError::invalid_value(
                 "MAN data line DEPLOY_MASS",
                 value,
@@ -1186,7 +1231,12 @@ fn validate_man_duty_cycle(man: &OcmManeuverParameters) -> Result<()> {
     if matches!(man.dc_type, ManDc::TimeAndAngle) {
         for (field, present) in [
             ("DC_REF_DIR", man.dc_ref_dir.is_some()),
-            ("DC_BODY_FRAME", man.dc_body_frame.is_some()),
+            (
+                "DC_BODY_FRAME",
+                man.dc_body_frame
+                    .as_ref()
+                    .is_some_and(|frame| !frame.trim().is_empty()),
+            ),
             ("DC_BODY_TRIGGER", man.dc_body_trigger.is_some()),
             ("DC_PA_START_ANGLE", man.dc_pa_start_angle.is_some()),
             ("DC_PA_STOP_ANGLE", man.dc_pa_stop_angle.is_some()),
@@ -1978,9 +2028,10 @@ pub struct OcmMetadata {
     pub object_type: Option<String>,
     /// Time system for all absolute time stamps in this OCM including EPOCH_TZERO. Select from
     /// the accepted set of values indicated in annex B, subsection B3. This field is used by
-    /// all OCM data blocks. If the SCLK timescale is selected, then 'EPOCH_TZERO' shall be
-    /// interpreted as the spacecraft clock epoch and both SCLK_OFFSET_AT_EPOCH and
-    /// SCLK_SEC_PER_SI_SEC shall be supplied.
+    /// all OCM data blocks. Under SCLK, omitted SCLK_OFFSET_AT_EPOCH and SCLK_SEC_PER_SI_SEC
+    /// use defaults 0.0 and 1.0 respectively (ODM 6.2.1.3). The table's TIME_SYSTEM and
+    /// EPOCH_TZERO rows disagree on the anchor's interpretation; the library preserves
+    /// EPOCH_TZERO as supplied and performs no clock conversion.
     ///
     /// **Default**: UTC. KVN input omitting the keyword adopts it (ODM 6.2.1.3); XML requires
     /// the element.
@@ -2023,6 +2074,9 @@ pub struct OcmMetadata {
     /// be confined to the following list: ORB, PHYS, COV, MAN, PERT, OD, and USER. If the OCM
     /// contains multiple ORB, COV, or MAN data blocks (as allowed by table 6-1), the
     /// corresponding ORB, COV, or MAN entry shall be duplicated to match.
+    ///
+    /// Library behavior: retained as descriptive text. Inventory matching, entry order and
+    /// listed-token membership are caller checks.
     ///
     /// **Examples**: ORB, ORB, PHYS, COV, MAN, MAN, PERT, OD, USER
     ///
@@ -2324,8 +2378,14 @@ pub struct OcmData {
     /// Orbit determination data.
     #[serde(rename = "od", default, skip_serializing_if = "Option::is_none")]
     pub od: Option<OcmOdParameters>,
-    /// User-defined parameters.
-    #[serde(rename = "user", default, skip_serializing_if = "Option::is_none")]
+    /// User-defined parameters. A block without any parameter is read (the XSD allows it) but
+    /// refused on generation (ODM table 6-12 makes USER_DEFINED_x mandatory).
+    #[serde(
+        rename = "user",
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "xml::serialize_user"
+    )]
     pub user: Option<OcmUserDefined>,
 }
 
@@ -2385,7 +2445,7 @@ pub struct OcmUserDefinedParameter {
     #[serde(rename = "@parameter")]
     pub parameter: String,
     /// Scalar value, or comma-delimited composition for `COMPOSITION_<sequence ID>`.
-    #[serde(rename = "$value")]
+    #[serde(rename = "$value", default)]
     pub value: String,
     /// Opaque ICD-defined sequence rows, in producer order. Empty for scalar parameters.
     #[serde(skip)]
@@ -2634,6 +2694,10 @@ pub struct OcmTrajState {
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
+    #[serde(
+        serialize_with = "xml::serialize_units",
+        deserialize_with = "xml::deserialize_units"
+    )]
     pub traj_units: Option<String>,
     /// Contiguous set of trajectory state data lines.
     #[serde(rename = "trajLine")]
@@ -3290,6 +3354,10 @@ pub struct OcmCovarianceMatrix {
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
+    #[serde(
+        serialize_with = "xml::serialize_units",
+        deserialize_with = "xml::deserialize_units"
+    )]
     pub cov_units: Option<String>,
     /// Contiguous set of covariance matrix data lines.
     #[serde(rename = "covLine")]
@@ -3572,6 +3640,10 @@ pub struct OcmManeuverParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[builder(into)]
+    #[serde(
+        serialize_with = "xml::serialize_composition",
+        deserialize_with = "xml::deserialize_composition"
+    )]
     pub man_composition: String,
     /// A comma-delimited set of SI unit designations for each and every element of the
     /// maneuver time history following the maneuver time tag(s), solely for informational
@@ -3585,6 +3657,10 @@ pub struct OcmManeuverParameters {
     /// **CCSDS Reference**: 502.0-B-3, Section 6.2.8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
+    #[serde(
+        serialize_with = "xml::serialize_units",
+        deserialize_with = "xml::deserialize_units"
+    )]
     pub man_units: Option<String>,
     /// Maneuver time history data lines.
     #[serde(rename = "manLine")]
@@ -4098,6 +4174,9 @@ pub struct OcmOdParameters {
 impl OcmPerturbations {
     fn validate(&self) -> Result<()> {
         crate::validation::epoch_precision(&[("SW_DATA_EPOCH", &self.sw_data_epoch)])?;
+        if let Some(epoch) = &self.sw_data_epoch {
+            validate_ocm_history_epoch(epoch, "SW_DATA_EPOCH")?;
+        }
         // GM is `gmType`, a `positiveDouble`, adopted in every notation.
         if let Some(value) = &self.gm {
             Gm::validate_xml_value(value.value, "GM")?;
@@ -4172,6 +4251,7 @@ impl OcmPerturbations {
 impl OcmOdParameters {
     fn validate(&self) -> Result<()> {
         crate::validation::epoch_precision(&[("OD_EPOCH", &self.od_epoch)])?;
+        validate_ocm_history_epoch(&self.od_epoch, "OD_EPOCH")?;
         for (field, value) in [("OD_ID", &self.od_id), ("OD_METHOD", &self.od_method)] {
             if value.trim().is_empty() {
                 return Err(ValidationError::missing_required("OD", field).into());

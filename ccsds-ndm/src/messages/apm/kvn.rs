@@ -576,7 +576,11 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
                 return fail("COMMENT is not at the beginning of a logical block");
             }
             if current_block.is_none() && !matches!(top_previous, Some(0 | 3 | 4 | 13)) {
-                return fail("COMMENT must precede the first field of its logical block; header comments precede CREATION_DATE");
+                return fail(if top_previous == Some(20) {
+                    "APM data comments are allowed only before EPOCH or immediately after a block's _START (ADM 6.10.2)"
+                } else {
+                    "COMMENT must lead the APM header or metadata section (ADM 6.10.2)"
+                });
             }
             pending_comment = true;
             offset += raw_line.len() + 1;

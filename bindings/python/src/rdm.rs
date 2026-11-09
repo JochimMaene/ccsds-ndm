@@ -196,7 +196,7 @@ impl Rdm {
     /// ValueError
     ///     Unsupported format argument.
     /// NdmIoError
-    ///     Input file could not be read.
+    ///     Input file could not be read or contains invalid UTF-8 bytes.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(

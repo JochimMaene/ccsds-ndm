@@ -41,7 +41,7 @@ pub struct CombinedNdm {
     /// Message Identifier (optional).
     ///
     /// :type: Optional[str]
-    #[pyo3(get)]
+    #[pyo3(get, set)]
     id: Option<String>,
 
     /// Comments (optional).
@@ -140,7 +140,9 @@ impl CombinedNdm {
         })
     }
 
-    /// Validate the combined message against CCSDS rules.
+    /// Validate each constituent model and reject nested envelopes.
+    /// This does not certify XML output representability or supported output editions; writers
+    /// also check the envelope, constituent editions and notation-specific restrictions.
     ///
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
         crate::api::validate_message(py, &self.to_core(py)?)
@@ -209,7 +211,7 @@ impl CombinedNdm {
     /// ValueError
     ///     Unsupported format argument.
     /// NdmIoError
-    ///     Input file could not be read.
+    ///     Input file could not be read or contains invalid UTF-8 bytes.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(

@@ -7,13 +7,12 @@ use crate::{
     assert_invalid_value_diagnostic, assert_missing_required, opm, opm_with_maneuvers,
     validation_error_source, MINIMAL, OPM_3_KVN_FIXTURES,
 };
-use ccsds_ndm::common::StateVector;
 use ccsds_ndm::error::{Result, ValidationError};
-use ccsds_ndm::messages::opm::{KeplerianElements, Opm, OpmBody, OpmData, OpmMetadata, OpmSegment};
+use ccsds_ndm::messages::opm::{KeplerianElements, Opm};
 use ccsds_ndm::types::{
-    Angle, CalendarEpoch, Distance, Gm, GmUnits, Inclination, NonNegativeDouble, Velocity,
+    Angle, CalendarEpoch, Distance, Gm, GmUnits, Inclination, NonNegativeDouble,
 };
-use ccsds_ndm::{Message, Ndm, Validate};
+use ccsds_ndm::{Message, Ndm};
 use std::str::FromStr;
 
 fn assert_missing_object_name<T: std::fmt::Debug>(surface: &str, result: Result<T>) {
@@ -547,10 +546,19 @@ fn annex_g_opm_fixtures_generate_printable_ordered_kvn_with_preserved_units() {
         include_str!("../../data/kvn/opm_g3.kvn"),
         include_str!("../../data/kvn/opm_g4.kvn"),
     ] {
-        let generated = Opm::from_kvn(source)
-            .expect("Annex G OPM fixture should parse")
-            .to_kvn()
-            .expect("Annex G OPM should generate");
+        let message = Opm::from_kvn(source).expect("Annex G OPM fixture should parse");
+        if source.contains("COV_REF_FRAME") {
+            assert!(message
+                .body
+                .segment
+                .data
+                .covariance_matrix
+                .as_ref()
+                .unwrap()
+                .cov_ref_frame
+                .is_some());
+        }
+        let generated = message.to_kvn().expect("Annex G OPM should generate");
 
         assert_eq!(assignment_keys(&generated), assignment_keys(source));
         assert_eq!(assignment_units(&generated), assignment_units(source));
@@ -689,17 +697,24 @@ fn opm_kvn_rounds_numbers_in_every_optional_numeric_block() {
 
 #[test]
 fn opm_kvn_canonicalizes_gm_units_to_the_odm_spelling() {
-    let mut message =
-        Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).expect("fixture should parse");
-    message
-        .body
-        .segment
-        .data
-        .keplerian_elements
-        .as_mut()
-        .unwrap()
-        .gm
-        .units = Some(GmUnits::KM3PerS2);
+    let source = mutated(
+        include_str!("../../data/kvn/opm_g2.kvn"),
+        "GM = 398600.4415 [km**3/s**2]",
+        "GM = 398600.4415 [KM**3/S**2]",
+    );
+    let message = Opm::from_kvn(&source).expect("uppercase GM units should parse");
+    assert_eq!(
+        message
+            .body
+            .segment
+            .data
+            .keplerian_elements
+            .as_ref()
+            .unwrap()
+            .gm
+            .units,
+        Some(GmUnits::KM3PerS2)
+    );
 
     // ODM 7.7.1 admits only the keyword table spelling in KVN, so the uppercase spelling the
     // XML schema also permits is rewritten rather than rejected.
@@ -708,24 +723,13 @@ fn opm_kvn_canonicalizes_gm_units_to_the_odm_spelling() {
         .expect("uppercase GM units should be canonicalized, not rejected");
     assert!(kvn.contains("[km**3/s**2]"), "{kvn}");
     assert!(!kvn.contains("KM**3/S**2"), "{kvn}");
+    Opm::from_kvn(&kvn).expect("regenerated KVN should parse");
 
     // The uppercase spelling stays valid on the XML side.
     assert!(message
         .to_xml()
         .expect("XML generation")
         .contains("KM**3/S**2"));
-}
-
-#[test]
-fn opm_kvn_gm_units_survive_a_kvn_round_trip() {
-    let source = mutated(
-        include_str!("../../data/kvn/opm_g2.kvn"),
-        "GM = 398600.4415 [km**3/s**2]",
-        "GM = 398600.4415 [KM**3/S**2]",
-    );
-    let message = Opm::from_kvn(&source).expect("uppercase GM units should parse");
-    let regenerated = message.to_kvn().expect("regeneration should succeed");
-    Opm::from_kvn(&regenerated).expect("regenerated KVN should parse");
 }
 
 #[test]
@@ -1006,7 +1010,9 @@ fn xml_generation_accepts_calendar_ordinal_and_leap_second_boundaries() {
 fn minimal_message_omits_optional_blocks_and_roundtrips() {
     let message = Opm::from_kvn(MINIMAL).unwrap();
     let data = &message.body.segment.data;
+    assert!(message.body.segment.metadata.ref_frame_epoch.is_none());
     assert!(data.keplerian_elements.is_none());
+    assert!(!message.to_kvn().unwrap().contains("SEMI_MAJOR_AXIS"));
     assert!(data.spacecraft_parameters.is_none());
     assert!(data.covariance_matrix.is_none());
     assert!(data.maneuver_parameters.is_empty());
@@ -1015,143 +1021,25 @@ fn minimal_message_omits_optional_blocks_and_roundtrips() {
 }
 
 #[test]
-fn kvn_roundtrip() {
-    let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 6503.514 [km]
-Y = 1239.647 [km]
-Z = -717.490 [km]
-X_DOT = -0.873160 [km/s]
-Y_DOT = 8.740420 [km/s]
-Z_DOT = -4.191076 [km/s]
-"#;
-    let opm = Opm::from_kvn(kvn).unwrap();
-    let output = opm.to_kvn().unwrap();
-
-    // Parse output again
-    let opm2 = Opm::from_kvn(&output).unwrap();
-    assert_eq!(opm2, opm);
-}
-
-#[test]
 fn kvn_preserves_reference_epoch_and_mean_anomaly() {
-    use ccsds_ndm::common::OdmHeader;
-    let opm = Opm::builder()
-        .version("3.0")
-        .header(
-            OdmHeader::builder()
-                .creation_date("2023-01-01T00:00:00".parse().unwrap())
-                .originator("TEST")
-                .build(),
-        )
-        .body(
-            OpmBody::builder()
-                .segment(
-                    OpmSegment::builder()
-                        .metadata(
-                            OpmMetadata::builder()
-                                .object_name("SAT")
-                                .object_id("1")
-                                .center_name("EARTH")
-                                .ref_frame("GCRF")
-                                .ref_frame_epoch("2000-01-01T12:00:00".parse().unwrap())
-                                .time_system("UTC")
-                                .build(),
-                        )
-                        .data(
-                            OpmData::builder()
-                                .state_vector(
-                                    StateVector::builder()
-                                        .epoch("2023-01-01T00:00:00".parse().unwrap())
-                                        .x(Distance::new(1.0, None))
-                                        .y(Distance::new(1.0, None))
-                                        .z(Distance::new(1.0, None))
-                                        .x_dot(Velocity::new(1.0, None))
-                                        .y_dot(Velocity::new(1.0, None))
-                                        .z_dot(Velocity::new(1.0, None))
-                                        .build(),
-                                )
-                                .keplerian_elements(
-                                    KeplerianElements::builder()
-                                        .semi_major_axis(Distance::new(7000.0, None))
-                                        .eccentricity(NonNegativeDouble::new(0.0).unwrap())
-                                        .inclination(Inclination::new(0.0, None).unwrap())
-                                        .ra_of_asc_node(Angle::new(0.0, None).unwrap())
-                                        .arg_of_pericenter(Angle::new(0.0, None).unwrap())
-                                        .mean_anomaly(Angle::new(0.0, None).unwrap())
-                                        .gm(Gm::new(398600.44, None).unwrap())
-                                        .build(),
-                                )
-                                .build(),
-                        )
-                        .build(),
-                )
-                .build(),
-        )
-        .build();
+    let mut opm = Opm::from_kvn(MINIMAL).unwrap();
+    opm.body.segment.metadata.ref_frame_epoch = Some("2000-01-01T12:00:00".parse().unwrap());
+    opm.body.segment.data.keplerian_elements = Some(
+        KeplerianElements::builder()
+            .semi_major_axis(Distance::new(7000.0, None))
+            .eccentricity(NonNegativeDouble::new(0.0).unwrap())
+            .inclination(Inclination::new(0.0, None).unwrap())
+            .ra_of_asc_node(Angle::new(0.0, None).unwrap())
+            .arg_of_pericenter(Angle::new(0.0, None).unwrap())
+            .mean_anomaly(Angle::new(0.0, None).unwrap())
+            .gm(Gm::new(398600.44, None).unwrap())
+            .build(),
+    );
 
     let kvn = opm.to_kvn().unwrap();
     let reparsed = Opm::from_kvn(&kvn).unwrap();
     assert_eq!(reparsed.body, opm.body);
     assert_eq!(reparsed.header, opm.header);
-}
-
-#[test]
-fn minimal_kvn_omits_optional_keplerian_elements() {
-    use ccsds_ndm::common::OdmHeader;
-    // Minimal OPM without Keplerian Elements or optional Spacecraft Params
-    let opm = Opm::builder()
-        .version("3.0")
-        .header(
-            OdmHeader::builder()
-                .creation_date("2023-01-01T00:00:00".parse().unwrap())
-                .originator("TEST")
-                .build(),
-        )
-        .body(
-            OpmBody::builder()
-                .segment(
-                    OpmSegment::builder()
-                        .metadata(
-                            OpmMetadata::builder()
-                                .object_name("SAT")
-                                .object_id("1")
-                                .center_name("EARTH")
-                                .ref_frame("GCRF")
-                                .time_system("UTC")
-                                .build(),
-                        )
-                        .data(
-                            OpmData::builder()
-                                .state_vector(
-                                    StateVector::builder()
-                                        .epoch("2023-01-01T00:00:00".parse().unwrap())
-                                        .x(Distance::new(1.0, None))
-                                        .y(Distance::new(1.0, None))
-                                        .z(Distance::new(1.0, None))
-                                        .x_dot(Velocity::new(1.0, None))
-                                        .y_dot(Velocity::new(1.0, None))
-                                        .z_dot(Velocity::new(1.0, None))
-                                        .build(),
-                                )
-                                .build(),
-                        )
-                        .build(),
-                )
-                .build(),
-        )
-        .build();
-
-    let kvn = opm.to_kvn().unwrap();
-    assert!(!kvn.contains("SEMI_MAJOR_AXIS"));
-    assert!(opm.validate().is_ok());
 }
 
 #[test]

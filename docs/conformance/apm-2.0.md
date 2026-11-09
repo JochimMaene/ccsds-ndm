@@ -74,6 +74,74 @@ readers, edited models and generation, rather than silently reinterpreted as sec
 `apm::generation::apm_nutation_period_is_seconds_without_reinterpreting_day_units` covers that boundary.
 
 
+**Angle domain.** ADM §6.8.1 gives angles in degrees "between −360 and 360"; the XSD
+`angleRange` makes this `[-360, 360)` (upper bound exclusive). The XSD interval applies in KVN,
+XML and model validation alike, to keep that value domain compatible across notations (the shared rule on
+[XSD facets](../design/validation-contract.md#authority-and-representability)). Radians require an
+exchange-partner ICD and are outside this supported profile; unit annotations on dimensionless quaternion components are rejected.
+They are not discarded or treated as conversion requests.
+
+**Numbers.** KVN number reading and 16-significant-digit writing follow the shared
+[KVN number rule](../design/validation-contract.md#shared-lexical-decisions). ADM §6.8.5 says
+`-0` is not a supported value. That sentence sits in the KVN chapter, and the KVN writer already
+writes negative zero as `0.0`. XML follows the XSD `xsd:double`, which admits `-0`, so XML keeps the
+sign ([preservation rules](../design/validation-contract.md#preservation-and-normalization)).
+
+**Units on output.** KVN output keeps every unit annotation the model carries, including
+`[1/s]` on `Q1_DOT`..`QC_DOT` (table 3-3).
+
+**Quaternion derivatives are all-or-none.** Table 3-3 marks each of `Q1_DOT`, `Q2_DOT`, `Q3_DOT`
+and `QC_DOT` optional on its own. The XSD `quaternionDotType` requires all four together. The
+library follows the XSD in every notation, so a partial set is rejected rather than a message being
+produced that XML cannot represent.
+
+**Rotation sequences.** XML accepts only the twelve uppercase `rotseqType` letters. KVN and Python
+also read lowercase (`zxz`, ADM §6.8.6) and mixed-case letters (`Zxz`, a lossless producer alias).
+ADM 1.0 numeric spellings (`313`) are 1.0 syntax and are rejected in every notation. Every writer
+emits the uppercase letters (`apm::parsing::euler_rot_seq_reads_lowercase_in_kvn_only_and_rejects_adm_1_digits`).
+
+**Logical-block order.** Table 3-3 and the XSD `apmData` sequence list the blocks in a fixed
+order (quaternion, Euler, angular velocity, spin, inertia, maneuver). ADM §3.2.4.4 makes these
+blocks repeatable but does not say how repeats of different types are ordered (for example
+quaternion, Euler, quaternion), so KVN reading accepts the self-delimited blocks in any order and
+interleaved. The model stores each block type in its own list: the order within one block type
+is kept, while cross-type order is normalized, and output is always written in table order.
+
+**Comments.** XML allows a line break inside one `<COMMENT>`; KVN has one comment per line. On
+KVN output such a comment becomes several `COMMENT` lines, which read back as several comment
+entries, so the model differs after an XML-to-KVN hop. Without metadata delimiters, KVN comments
+after the header belong to the metadata and comments after `TIME_SYSTEM` to the data section
+(ADM 6.10.2; `apm::parsing::apm_comments_without_metadata_delimiters_stay_in_their_section`).
+
+**Spin choice: schema versus prose.** ADM §3.2.4.6 says a spin block contains either the complete nutation triple or the complete
+momentum triple. Bundled `spinStateType` instead sets the choice's `minOccurs` to zero.
+The library follows the schema in both notations: omitting both triples is allowed;
+supplying exactly one complete triple is allowed. Partial or simultaneous triples fail. It does not
+invent nutation or momentum values to complete a bare spin state. The regression
+`apm::generation::spin_without_optional_triples_follows_the_schema` checks preservation and schema validity.
+
+ADM annex F implies unit quaternions. Shared validation requires components in `[-1, 1]`
+and squared norm in `[0.99, 1.01]`, an implementation tolerance accommodating rounded
+three-decimal data. Violations name `QUATERNION` and report an out-of-range error;
+no normalization is applied. KVN generation rechecks after numeric rounding.
+
+KVN reading tolerates lines longer than the book's 254-character limit where applicable;
+writing enforces that limit, so an accepted overlong record can require shortening before
+regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
+are specified in the [validation contract](../design/validation-contract.md).
+
+An APM needs at least one logical data block (3.2.4.3), although XSD permits an empty
+data container; this is an explicit book-over-XSD choice. COMMENT placement follows
+6.10.2: comments between EPOCH and a block start, or after a block stop, are rejected.
+Python QuaternionState checks component domains at construction, like Rust Quaternion::new;
+assignments are rechecked by complete-message validation. Mutable records can be temporarily incomplete.
+
+Within a KVN logical block the keywords still follow table order, including Q1/Q2/Q3/QC.
+Relaxing the order of self-delimited blocks does not permit arbitrary keyword reordering.
+Python APM objects have identity equality rather than value-based `__eq__`; compare fields or
+canonical generated output when a value comparison is needed. Quaternion derivative constructor
+arguments are scalars, while the model exposes the complete derivative components together.
+
 ## APM and AEM 1.0
 
 APM and AEM 1.0 input (CCSDS 504.0-B-1 with Cor. 1, https://public.ccsds.org/Pubs/504x0b1c1s.pdf)
@@ -102,82 +170,11 @@ and SPIN/NUTATION.
 | Inertia `I11` … `I23` | 1.0 calls the cross terms a "negative double integral" while 2.0 annex F6 writes the tensor with `-IXY`, so the sign mapping is ambiguous; 1.0 also makes `INERTIA_REF_FRAME` optional where 2.0 requires it. |
 | Spin and nutation | 1.0 leaves the spin-angle and nutation conventions to an ICD (Cor. 1 also redefines nutation); 2.0 annex F5 fixes them, so mapping asserts a meaning the file does not state. |
 
-A partial reader limited to quaternions, Euler angles without rates and maneuvers was
-considered. It would read 12 of the 43 1.0 KVN samples in the repository (19 if `B2A` frame
-swapping and spin were accepted), none of the 1.0 XML samples (all carry rates) and none of the
-files from the only real producer in the corpus (GSFC, 2007), which use rates. The original
-NDM/XML 1.0 APM/AEM schemas survive only in an Internet Archive capture of the SANA registry.
-That benefit does not justify the risk of misread attitude data, so 1.0 stays rejected. A 2.0
-message with a changed version header is not proof of 1.0 support.
+The NDM/XML 1.0 APM/AEM schemas are now archived in the repository as
+`ccsds-ndm/data/xsd/ndmxml-1.0-apm-1.0.xsd` and `ndmxml-1.0-aem-1.0.xsd`.
+Schema availability resolves structure, not the attitude-convention ambiguities above. A partial
+reader has not been accepted; sample counts from earlier exploratory probes are not release
+evidence. A 2.0 message with a changed version header is not proof of 1.0 support.
 
 Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
 artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
-
-**Angle domain.** ADM §6.8.1 gives angles in degrees "between −360 and 360"; the XSD
-`angleRange` makes this `[-360, 360)` (upper bound exclusive). The XSD interval applies in KVN,
-XML and model validation alike, to keep that value domain compatible across notations (the shared rule on
-[XSD facets](../design/validation-contract.md#authority-and-representability)). Radians require an
-exchange-partner ICD and are outside this supported profile; unit annotations are never ignored
-on dimensionless quaternion components.
-
-**Numbers.** KVN number reading and 16-significant-digit writing follow the shared
-[KVN number rule](../design/validation-contract.md#shared-lexical-decisions). ADM §6.8.5 says
-`-0` is not a supported value. That sentence sits in the KVN chapter, and the KVN writer already
-writes negative zero as `0.0`. XML follows the XSD `xsd:double`, which admits `-0`, so XML keeps the
-sign ([preservation rules](../design/validation-contract.md#preservation-and-normalization)).
-
-**Units on output.** KVN output keeps every unit annotation the model carries, including
-`[1/s]` on `Q1_DOT`..`QC_DOT` (table 3-3).
-
-**Quaternion derivatives are all-or-none.** Table 3-3 marks each of `Q1_DOT`, `Q2_DOT`, `Q3_DOT`
-and `QC_DOT` optional on its own. The XSD `quaternionDotType` requires all four together. The
-library follows the XSD in every notation, so a partial set is rejected rather than a message being
-produced that XML cannot represent.
-
-**Rotation sequences.** XML accepts only the twelve uppercase `rotseqType` letters. KVN and Python
-also read lowercase (`zxz`, ADM §6.8.6) and mixed-case letters (`Zxz`, a lossless producer alias).
-ADM 1.0 numeric spellings (`313`) are 1.0 syntax and are rejected in every notation. Every writer
-emits the uppercase letters (`apm::parsing::euler_rot_seq_reads_lowercase_in_kvn_only_and_rejects_adm_1_digits`).
-
-**Logical-block order.** Table 3-3 and the XSD `apmData` sequence list the blocks in a fixed
-order (quaternion, Euler, angular velocity, spin, inertia, maneuver). KVN reading accepts the
-blocks in any order and interleaved, since each block is self-delimited and no value is lost.
-The model stores each block type in its own list, so the order within one block type is kept but
-the relative order across block types is not: output is always written in table order.
-
-**Comments.** XML allows a line break inside one `<COMMENT>`; KVN has one comment per line. On
-KVN output such a comment becomes several `COMMENT` lines, which read back as several comment
-entries, so the model differs after an XML-to-KVN hop. Without metadata delimiters, KVN comments
-after the header belong to the metadata and comments after `TIME_SYSTEM` to the data section
-(ADM 6.10.2; `apm::parsing::apm_comments_without_metadata_delimiters_stay_in_their_section`).
-
-## Spin choice: schema versus prose
-
-ADM §3.2.4.6 says a spin block contains either the complete nutation triple or the complete
-momentum triple. Bundled `spinStateType` instead sets the choice's `minOccurs` to zero.
-The library follows the schema in both notations: omitting both triples is allowed;
-supplying exactly one complete triple is allowed. Partial or simultaneous triples fail. It does not
-invent nutation or momentum values to complete a bare spin state. The regression
-`apm::generation::spin_without_optional_triples_follows_the_schema` checks preservation and schema validity.
-
-ADM annex F implies unit quaternions. Shared validation requires components in `[-1, 1]`
-and squared norm in `[0.99, 1.01]`, an implementation tolerance accommodating rounded
-three-decimal data. Violations name `QUATERNION` and report an out-of-range error;
-no normalization is applied. KVN generation rechecks after numeric rounding.
-
-KVN reading tolerates lines longer than the book's 254-character limit where applicable;
-writing enforces that limit, so an accepted overlong record can require shortening before
-regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
-are specified in the [validation contract](../design/validation-contract.md).
-
-An APM needs at least one logical data block (3.2.4.3), although XSD permits an empty
-data container; this is an explicit book-over-XSD choice. COMMENT placement follows
-6.10.2: comments between EPOCH and a block start, or after a block stop, are rejected.
-Python QuaternionState checks component domains at construction, like Rust Quaternion::new;
-assignments are rechecked by complete-message validation. Mutable records can be temporarily incomplete.
-
-Within a KVN logical block the keywords still follow table order, including Q1/Q2/Q3/QC.
-Relaxing the order of self-delimited blocks does not permit arbitrary keyword reordering.
-Python APM objects have identity equality rather than value-based `__eq__`; compare fields or
-canonical generated output when a value comparison is needed. Quaternion derivative constructor
-arguments are scalars, while the model exposes the complete derivative components together.

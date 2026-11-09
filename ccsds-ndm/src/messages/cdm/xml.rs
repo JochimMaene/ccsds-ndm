@@ -47,6 +47,21 @@ pub(super) fn normalize_missing_values(xml: &str) -> Result<Cow<'_, str>> {
                     .unwrap_or_default();
                 let name = element.local_name().into_inner();
                 let leaf = classify_leaf(parent, name);
+                if allows_units(name) {
+                    for attribute in element.attributes() {
+                        let attribute = attribute.map_err(quick_xml::Error::from)?;
+                        if attribute.key.as_ref() == b"units"
+                            && attribute.unescape_value()?.is_empty()
+                        {
+                            let begin =
+                                attribute.key.as_ref().as_ptr() as usize - xml.as_ptr() as usize;
+                            let end = attribute.value.as_ptr() as usize - xml.as_ptr() as usize
+                                + attribute.value.len()
+                                + 1;
+                            missing.push(begin..end);
+                        }
+                    }
+                }
                 if leaf == Leaf::Required {
                     for attribute in element.attributes().flatten() {
                         if attribute.key.as_ref() == b"nil" {
@@ -71,7 +86,7 @@ pub(super) fn normalize_missing_values(xml: &str) -> Result<Cow<'_, str>> {
                             b"nil" if matches!(attribute.value.as_ref(), b"true" | b"1") => {}
                             b"units" if allows_units(name) => {
                                 let unit = attribute.unescape_value()?;
-                                if expected_unit(name) != Some(unit.as_ref()) {
+                                if !unit.is_empty() && expected_unit(name) != Some(unit.as_ref()) {
                                     return Err(unit_error(
                                         xml,
                                         start,
@@ -563,4 +578,66 @@ fn unit_error(xml: &str, offset: usize, message: String) -> crate::error::CcsdsN
         }),
         source: Box::new(FormatError::XmlDe(quick_xml::DeError::Custom(message)).into()),
     }
+}
+
+/// Apply CDM 6.2.2 to serialized XML, including constituents in a combined envelope.
+pub(crate) fn format_output(xml: &str) -> Result<String> {
+    use quick_xml::{events::Event, Reader, Writer};
+    let mut reader = Reader::from_str(xml);
+    let mut writer = Writer::new_with_indent(Vec::new(), b' ', 2);
+    let mut cdm_depth = None;
+    let mut cdm_start = 0;
+    let mut regions = Vec::new();
+    let mut depth = 0;
+    loop {
+        let event = reader.read_event()?;
+        if let Event::Start(start) = &event {
+            depth += 1;
+            if start.local_name().as_ref() == b"cdm" {
+                cdm_depth = Some(depth);
+                cdm_start = writer.get_ref().len();
+            }
+        }
+        if cdm_depth.is_some()
+            && event
+                .as_ref()
+                .iter()
+                .any(|byte| !byte.is_ascii() || (*byte < b' ' && !matches!(*byte, b'\r' | b'\n')))
+        {
+            return Err(crate::error::ValidationError::invalid_value(
+                "CDM XML",
+                "non-ASCII text",
+                "printable ASCII (CDM 6.2.2)",
+            )
+            .into());
+        }
+        let end_cdm = matches!(&event, Event::End(_)) && cdm_depth == Some(depth);
+        let end = matches!(&event, Event::End(_));
+        let eof = matches!(&event, Event::Eof);
+        writer.write_event(event)?;
+        if end {
+            depth -= 1;
+        }
+        if end_cdm {
+            cdm_depth = None;
+            regions.push(cdm_start..writer.get_ref().len());
+        }
+        if eof {
+            break;
+        }
+    }
+    let output = String::from_utf8(writer.into_inner()).expect("XML writer retains UTF-8");
+    // A scalar too long for one record must be shortened by the caller; never split its text.
+    if regions
+        .iter()
+        .any(|range| output[range.clone()].lines().any(|line| line.len() > 254))
+    {
+        return Err(crate::error::ValidationError::invalid_value(
+            "CDM XML",
+            "overlong line",
+            "at most 254 ASCII characters per line (CDM 6.2.2)",
+        )
+        .into());
+    }
+    Ok(output)
 }

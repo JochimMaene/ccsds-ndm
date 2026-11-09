@@ -188,7 +188,7 @@ impl Omm {
     /// ValueError
     ///     Unsupported format argument.
     /// NdmIoError
-    ///     Input file could not be read.
+    ///     Input file could not be read or contains invalid UTF-8 bytes.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
@@ -271,7 +271,10 @@ impl Omm {
     /// MEAN_MOTION_DOT/DDOT are the stored TLE fields (already n-dot/2 and n-double-dot/6),
     /// without additional scaling (ODM 4.2.4.7 note 2).
     ///
-    /// Requires Earth-centered TEME elements and UTC epochs; no coordinate/time conversion.
+    /// Requires MEAN_ELEMENT_THEORY SGP, SGP4 or SGP/SGP4 (PPT3 and SGP4-XP are refused),
+    /// Earth-centered TEME elements and UTC epochs; no conversion. TLE parameters must include
+    /// NORAD_CAT_ID, ELEMENT_SET_NO, REV_AT_EPOCH, MEAN_MOTION_DOT, MEAN_MOTION_DDOT and BSTAR.
+    /// Omitted EPHEMERIS_TYPE and CLASSIFICATION_TYPE use the table 4-3 defaults 0 and U.
     /// Cyclic angles round to four decimals, with a rounded 360 degrees emitted as zero.
     ///
     /// Returns
@@ -284,7 +287,9 @@ impl Omm {
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
-    /// Build a minimal OMM from NORAD TLE line 1 and line 2.
+    /// Build a minimal OMM 3.0 from NORAD TLE line 1 and line 2.
+    /// Default provenance is a placeholder: creation date is the TLE epoch and originator
+    /// is UNKNOWN. Supply known header values when original provenance matters.
     ///
     /// MEAN_MOTION_DOT/DDOT retain the TLE n-dot/2 and n-double-dot/6 fields without rescaling
     /// (CCSDS 502.0-B-3, 4.2.4.7 note 2).
@@ -304,7 +309,7 @@ impl Omm {
     /// message_id : str, optional
     ///     Header MESSAGE_ID override.
     /// creation_date : str, optional
-    ///     Header CREATION_DATE override in CCSDS epoch format.
+    ///     Header CREATION_DATE override in CCSDS epoch format (default: TLE epoch).
     #[staticmethod]
     #[pyo3(signature = (
         line1,

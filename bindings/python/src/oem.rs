@@ -655,7 +655,7 @@ impl Oem {
     /// ValueError
     ///     Unsupported format argument.
     /// NdmIoError
-    ///     Input file could not be read.
+    ///     Input file could not be read or contains invalid UTF-8 bytes.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
@@ -968,7 +968,8 @@ impl OemMetadata {
     }
 
     /// Epoch of reference frame, if not intrinsic to the definition of the reference frame.
-    /// (See 7.5.10 for formatting rules.)
+    /// Interpreted in TIME_SYSTEM (ODM 7.5.11); MET/MRT values are elapsed durations
+    /// under 3.2.3.2. See 7.5.10 for absolute formatting.
     ///
     /// Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
@@ -1002,7 +1003,8 @@ impl OemMetadata {
     ///
     /// :type: Optional[str]
     ///
-    /// Enforced: inside start_time..stop_time and no later than useable_stop_time; consecutive useable spans may touch but not overlap (ODM 5.2.4.4).
+    /// Interpreted in TIME_SYSTEM, including MET/MRT elapsed durations.
+    /// Enforced: inside start_time..stop_time and no later than useable_stop_time; consecutive useable spans may touch but not overlap (ODM 5.2.4.4); in OEM 2.0 a useable start may not precede the previous segment's useable stop.
     #[getter]
     fn get_useable_start_time(&self) -> Option<String> {
         self.inner
@@ -1030,7 +1032,8 @@ impl OemMetadata {
     ///
     /// :type: Optional[str]
     ///
-    /// Enforced: inside start_time..stop_time and no earlier than useable_start_time (ODM table 5-3).
+    /// Interpreted in TIME_SYSTEM, including MET/MRT elapsed durations.
+    /// Enforced: inside start_time..stop_time and no earlier than useable_start_time; consecutive useable spans may touch but not overlap (ODM 5.2.4.4); in OEM 2.0 a useable start may not precede the previous segment's useable stop.
     #[getter]
     fn get_useable_stop_time(&self) -> Option<String> {
         self.inner
@@ -1073,7 +1076,7 @@ impl OemMetadata {
     ///
     /// :type: Optional[int]
     ///
-    /// Enforced: positive integer, required with INTERPOLATION; known methods require the documented minimum node count (ODM 5.2.3).
+    /// Enforced: positive integer, required with a nonempty INTERPOLATION method (ODM 5.2.3).
     #[getter]
     fn get_interpolation_degree(&self) -> Option<u32> {
         self.inner.interpolation_degree.map(|d| d.0.get())

@@ -7,101 +7,6 @@ use ccsds_ndm::types::{
     ScreenVolumeShapeType, YesNo,
 };
 use ccsds_ndm::Ndm;
-// From CCSDS Blue Book 508.0-B-1 Annex D (modified for KVN)
-const CDM_BLUE_BOOK_SAMPLE: &str = r###"CCSDS_CDM_VERS = 1.0
-CREATION_DATE = 2010-03-12T22:31:12.000
-ORIGINATOR = JSPOC
-MESSAGE_FOR = SATELLITE A
-MESSAGE_ID = 201113719185
-
-TCA = 2010-03-13T22:31:12.000
-MISS_DISTANCE = 123.4 [m]
-RELATIVE_SPEED = 12.3 [m/s]
-RELATIVE_POSITION_R = 10.0 [m]
-RELATIVE_POSITION_T = 20.0 [m]
-RELATIVE_POSITION_N = 30.0 [m]
-RELATIVE_VELOCITY_R = 0.1 [m/s]
-RELATIVE_VELOCITY_T = 0.2 [m/s]
-RELATIVE_VELOCITY_N = 0.3 [m/s]
-SCREEN_VOLUME_SHAPE = ELLIPSOID
-
-OBJECT = OBJECT1
-OBJECT_DESIGNATOR = 12345
-CATALOG_NAME = SATCAT
-OBJECT_NAME = SAT A
-INTERNATIONAL_DESIGNATOR = 1998-067A
-OBJECT_TYPE = PAYLOAD
-EPHEMERIS_NAME = EPH1
-COVARIANCE_METHOD = CALCULATED
-MANEUVERABLE = YES
-REF_FRAME = GCRF
-X = 1000.0 [km]
-Y = 2000.0 [km]
-Z = 3000.0 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-CR_R = 1.0 [m**2]
-CT_R = 0.0 [m**2]
-CT_T = 1.0 [m**2]
-CN_R = 0.0 [m**2]
-CN_T = 0.0 [m**2]
-CN_N = 1.0 [m**2]
-CRDOT_R = 0.0 [m**2/s]
-CRDOT_T = 0.0 [m**2/s]
-CRDOT_N = 0.0 [m**2/s]
-CRDOT_RDOT = 1.0 [m**2/s**2]
-CTDOT_R = 0.0 [m**2/s]
-CTDOT_T = 0.0 [m**2/s]
-CTDOT_N = 0.0 [m**2/s]
-CTDOT_RDOT = 0.0 [m**2/s**2]
-CTDOT_TDOT = 1.0 [m**2/s**2]
-CNDOT_R = 0.0 [m**2/s]
-CNDOT_T = 0.0 [m**2/s]
-CNDOT_N = 0.0 [m**2/s]
-CNDOT_RDOT = 0.0 [m**2/s**2]
-CNDOT_TDOT = 0.0 [m**2/s**2]
-CNDOT_NDOT = 1.0 [m**2/s**2]
-
-OBJECT = OBJECT2
-OBJECT_DESIGNATOR = 67890
-CATALOG_NAME = SATCAT
-OBJECT_NAME = SAT B
-INTERNATIONAL_DESIGNATOR = 2000-001A
-OBJECT_TYPE = PAYLOAD
-EPHEMERIS_NAME = EPH1
-COVARIANCE_METHOD = CALCULATED
-MANEUVERABLE = NO
-REF_FRAME = GCRF
-X = 1500.0 [km]
-Y = 2500.0 [km]
-Z = 3500.0 [km]
-X_DOT = 1.5 [km/s]
-Y_DOT = 2.5 [km/s]
-Z_DOT = 3.5 [km/s]
-CR_R = 1.0 [m**2]
-CT_R = 0.0 [m**2]
-CT_T = 1.0 [m**2]
-CN_R = 0.0 [m**2]
-CN_T = 0.0 [m**2]
-CN_N = 1.0 [m**2]
-CRDOT_R = 0.0 [m**2/s]
-CRDOT_T = 0.0 [m**2/s]
-CRDOT_N = 0.0 [m**2/s]
-CRDOT_RDOT = 1.0 [m**2/s**2]
-CTDOT_R = 0.0 [m**2/s]
-CTDOT_T = 0.0 [m**2/s]
-CTDOT_N = 0.0 [m**2/s]
-CTDOT_RDOT = 0.0 [m**2/s**2]
-CTDOT_TDOT = 1.0 [m**2/s**2]
-CNDOT_R = 0.0 [m**2/s]
-CNDOT_T = 0.0 [m**2/s]
-CNDOT_N = 0.0 [m**2/s]
-CNDOT_RDOT = 0.0 [m**2/s**2]
-CNDOT_TDOT = 0.0 [m**2/s**2]
-CNDOT_NDOT = 1.0 [m**2/s**2]
-"###;
-
 const DRAG_COVARIANCE_ROW: &str = "\
 CDRG_R = 0.001 [m**3/kg]
 CDRG_T = 0.002 [m**3/kg]
@@ -140,26 +45,18 @@ fn with_optional_covariance_rows(kvn: &str, rows: &str) -> String {
 }
 
 #[test]
-fn test_parse_cdm_blue_book_example() {
-    let result = Cdm::from_kvn(CDM_BLUE_BOOK_SAMPLE);
-    assert!(result.is_ok(), "Failed to parse CDM: {:?}", result.err());
-
-    let cdm = result.unwrap();
-    assert_eq!(cdm.version, "1.0");
-    assert_eq!(cdm.header.originator, "JSPOC");
-    assert_eq!(cdm.body.segments.len(), 2);
-    assert_eq!(cdm.body.segments[0].metadata.object_name, "SAT A");
-    assert_eq!(cdm.body.segments[1].metadata.object_name, "SAT B");
-    assert_eq!(cdm.body.relative_metadata_data.miss_distance.value, 123.4);
-}
-
-#[test]
 fn parse_cdm_kvn_success() {
     let kvn = sample_cdm_kvn();
     let cdm = Cdm::from_kvn(&kvn).expect("CDM should parse");
     assert_eq!(cdm.version, "1.0");
     assert_eq!(cdm.header.originator, "TEST");
+    assert_eq!(cdm.header.message_for.as_deref(), Some("OPERATOR"));
+    assert_eq!(cdm.body.segments[0].metadata.object, CdmObjectType::Object1);
+    assert_eq!(cdm.body.segments[1].metadata.object, CdmObjectType::Object2);
     assert_eq!(cdm.body.segments.len(), 2);
+    assert_eq!(cdm.body.segments[0].metadata.object_name, "OBJ1");
+    assert_eq!(cdm.body.segments[1].metadata.object_name, "OBJ2");
+    assert_eq!(cdm.body.relative_metadata_data.miss_distance.value, 100.0);
     assert!(cdm
         .body
         .relative_metadata_data
@@ -176,6 +73,32 @@ fn parse_cdm_kvn_success() {
 }
 
 #[test]
+fn ellipsoid_screen_volume_does_not_require_a_frame() {
+    let kvn = sample_cdm_kvn()
+        .lines()
+        .filter(|line| {
+            !line.starts_with("SCREEN_VOLUME_") || line.starts_with("SCREEN_VOLUME_SHAPE")
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let kvn = mutated(
+        &kvn,
+        "SCREEN_VOLUME_SHAPE = BOX",
+        "SCREEN_VOLUME_SHAPE = ELLIPSOID",
+    );
+    let cdm = Cdm::from_kvn(&kvn).unwrap();
+    assert_eq!(
+        cdm.body.relative_metadata_data.screen_volume_shape,
+        Some(ScreenVolumeShapeType::Ellipsoid)
+    );
+    assert!(cdm
+        .body
+        .relative_metadata_data
+        .screen_volume_frame
+        .is_none());
+}
+
+#[test]
 fn header_missing_fields_error() {
     let kvn = r###"CCSDS_CDM_VERS = 1.0
 ORIGINATOR = TEST
@@ -183,15 +106,10 @@ MESSAGE_FOR = SAT
 MESSAGE_ID = MSG-001
 "###;
     let err = Cdm::from_kvn(kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Validation(val_err) => match *val_err {
-            ValidationError::MissingRequiredField { ref field, .. } => {
-                assert_eq!(field, "CREATION_DATE");
-            }
-            _ => panic!("unexpected validation error: {:?}", val_err),
-        },
-        _ => panic!("unexpected error: {:?}", err),
-    }
+    assert!(
+        matches!(err.as_validation_error(), Some(ValidationError::MissingRequiredField { field, .. }) if field == "CREATION_DATE"),
+        "{err}"
+    );
 }
 
 /// A CDM describes exactly two objects, so a message truncated before the second one must be
@@ -210,9 +128,8 @@ fn validate_exactly_two_segments() {
         .expect_err("single-segment CDM accepted");
     assert!(
         matches!(
-            &error,
-            CcsdsNdmError::Validation(validation)
-                if matches!(&**validation, ValidationError::MissingRequiredField { field, .. } if field == "OBJECT")
+            error.as_validation_error(),
+            Some(ValidationError::MissingRequiredField { field, .. }) if field == "OBJECT"
         ),
         "single-segment CDM was refused for an unrelated reason: {error}"
     );
@@ -220,104 +137,27 @@ fn validate_exactly_two_segments() {
 
 #[test]
 fn relative_state_vector_must_be_complete() {
-    let kvn = r###"CCSDS_CDM_VERS = 1.0
-CREATION_DATE = 2025-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_FOR = SAT
-MESSAGE_ID = MSG-001
-
-TCA = 2025-01-02T12:00:00
-MISS_DISTANCE = 100.0 [m]
-RELATIVE_POSITION_R = 10.0 [m]
-RELATIVE_POSITION_T = -20.0 [m]
-RELATIVE_POSITION_N = 5.0 [m]
-RELATIVE_VELOCITY_R = 0.1 [m/s]
-RELATIVE_VELOCITY_T = -0.2 [m/s]
-SCREEN_VOLUME_SHAPE = BOX
-OBJECT = OBJECT1
-OBJECT_DESIGNATOR = 1
-CATALOG_NAME = CAT
-OBJECT_NAME = O1
-INTERNATIONAL_DESIGNATOR = 1998-067A
-OBJECT_TYPE = PAYLOAD
-EPHEMERIS_NAME = EPH1
-COVARIANCE_METHOD = CALCULATED
-MANEUVERABLE = YES
-REF_FRAME = EME2000
-X = 0 [km]
-Y = 0 [km]
-Z = 0 [km]
-X_DOT = 0 [km/s]
-Y_DOT = 0 [km/s]
-Z_DOT = 0 [km/s]
-CR_R = 1 [m**2]
-CT_R = 0 [m**2]
-CT_T = 1 [m**2]
-CN_R = 0 [m**2]
-CN_T = 0 [m**2]
-CN_N = 1 [m**2]
-CRDOT_R = 0 [m**2/s]
-CRDOT_T = 0 [m**2/s]
-CRDOT_N = 0 [m**2/s]
-CRDOT_RDOT = 1 [m**2/s**2]
-CTDOT_R = 0 [m**2/s]
-CTDOT_T = 0 [m**2/s]
-CTDOT_N = 0 [m**2/s]
-CTDOT_RDOT = 0 [m**2/s**2]
-CTDOT_TDOT = 1 [m**2/s**2]
-CNDOT_R = 0 [m**2/s]
-CNDOT_T = 0 [m**2/s]
-CNDOT_N = 0 [m**2/s]
-CNDOT_RDOT = 0 [m**2/s**2]
-CNDOT_TDOT = 0 [m**2/s**2]
-CNDOT_NDOT = 1 [m**2/s**2]
-OBJECT = OBJECT2
-OBJECT_DESIGNATOR = 2
-CATALOG_NAME = CAT
-OBJECT_NAME = O2
-INTERNATIONAL_DESIGNATOR = 1998-067B
-OBJECT_TYPE = PAYLOAD
-EPHEMERIS_NAME = EPH2
-COVARIANCE_METHOD = DEFAULT
-MANEUVERABLE = NO
-REF_FRAME = EME2000
-X = 0 [km]
-Y = 0 [km]
-Z = 0 [km]
-X_DOT = 0 [km/s]
-Y_DOT = 0 [km/s]
-Z_DOT = 0 [km/s]
-CR_R = 1 [m**2]
-CT_R = 0 [m**2]
-CT_T = 1 [m**2]
-CN_R = 0 [m**2]
-CN_T = 0 [m**2]
-CN_N = 1 [m**2]
-CRDOT_R = 0 [m**2/s]
-CRDOT_T = 0 [m**2/s]
-CRDOT_N = 0 [m**2/s]
-CRDOT_RDOT = 1 [m**2/s**2]
-CTDOT_R = 0 [m**2/s]
-CTDOT_T = 0 [m**2/s]
-CTDOT_N = 0 [m**2/s]
-CTDOT_RDOT = 0 [m**2/s**2]
-CTDOT_TDOT = 1 [m**2/s**2]
-CNDOT_R = 0 [m**2/s]
-CNDOT_T = 0 [m**2/s]
-CNDOT_N = 0 [m**2/s]
-CNDOT_RDOT = 0 [m**2/s**2]
-CNDOT_TDOT = 0 [m**2/s**2]
-CNDOT_NDOT = 1 [m**2/s**2]
-"###;
-    let err = Cdm::from_kvn(kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Validation(val_err) => match *val_err {
-            ValidationError::MissingRequiredField { ref field, .. } => {
-                assert_eq!(field, "RELATIVE_VELOCITY_N");
-            }
-            _ => panic!("unexpected validation error: {:?}", val_err),
-        },
-        _ => panic!("unexpected error: {:?}", err),
+    let base = sample_cdm_kvn();
+    Cdm::from_kvn(&base).unwrap();
+    for missing in [
+        "RELATIVE_VELOCITY_N",
+        "RELATIVE_POSITION_T",
+        "RELATIVE_POSITION_R",
+    ] {
+        let input = base
+            .lines()
+            .filter(|line| {
+                if missing == "RELATIVE_POSITION_R" {
+                    !line.starts_with("RELATIVE_POSITION_")
+                } else {
+                    !line.starts_with(missing)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let error = Cdm::from_kvn(&input).unwrap_err();
+        assert_eq!(error.code(), Some("validation.missing_required_field"));
+        crate::common::assert_validation_field(&error, missing);
     }
 }
 
@@ -327,6 +167,7 @@ fn covariance_missing_required_field() {
     let mut kvn = sample_cdm_kvn();
     kvn = kvn.replace("CR_R = 1.0 [m**2]", "");
     let err = Cdm::from_kvn(&kvn).unwrap_err();
+    let err = crate::common::parse_error_cause(err);
     match err {
         CcsdsNdmError::Validation(val_err) => match *val_err {
             ValidationError::MissingRequiredField {
@@ -344,50 +185,22 @@ fn covariance_missing_required_field() {
 }
 
 #[test]
-fn screen_frame_shape_validation() {
-    // Invalid SCREEN_VOLUME_FRAME
-    let mut kvn = sample_cdm_kvn();
-    kvn = kvn.replace("SCREEN_VOLUME_FRAME = RTN", "SCREEN_VOLUME_FRAME = BAD");
-    let err = Cdm::from_kvn(&kvn).unwrap_err();
-    assert!(
-        matches!(err.as_format_error(), Some(FormatError::Enum(_))),
-        "{err:?}"
-    );
-
-    // Invalid SCREEN_VOLUME_SHAPE
-    let mut kvn2 = sample_cdm_kvn();
-    kvn2 = kvn2.replace("SCREEN_VOLUME_SHAPE = BOX", "SCREEN_VOLUME_SHAPE = BALL");
-    let err2 = Cdm::from_kvn(&kvn2).unwrap_err();
-    match err2 {
-        e if matches!(e.as_format_error(), Some(FormatError::Enum(_))) => {}
-        _ => panic!("unexpected error: {:?}", err2),
-    }
-}
-
-#[test]
 fn version_must_be_first() {
     let kvn = r#"CREATION_DATE = 2025-01-01T00:00:00
 CCSDS_CDM_VERS = 1.0
 ORIGINATOR = TEST
 "#;
     let err = Cdm::from_kvn(kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) => match *format_err {
-            FormatError::Kvn(ref err) => {
-                assert!(
-                    err.message
-                        .to_lowercase()
-                        .contains("expected ccsds_cdm_vers")
-                        || err
-                            .contexts
-                            .iter()
-                            .any(|c| c.to_lowercase().contains("ccsds_cdm_vers"))
-                )
-            }
-            _ => panic!("unexpected format error: {:?}", format_err),
-        },
-        _ => panic!("unexpected error: {:?}", err),
-    }
+    let err = crate::common::kvn_parse_error(&err).expect("KVN syntax diagnostic");
+    assert!(
+        err.message
+            .to_lowercase()
+            .contains("expected ccsds_cdm_vers")
+            || err
+                .contexts
+                .iter()
+                .any(|c| c.to_lowercase().contains("ccsds_cdm_vers"))
+    )
 }
 
 #[test]
@@ -397,14 +210,6 @@ fn empty_file_error() {
         .unwrap_or_else(|| panic!("expected a KVN parse error, got {error:?}"));
     assert_eq!(parse.message, "missing CCSDS_CDM_VERS");
     assert_eq!((parse.line, parse.column), (1, 1));
-}
-
-#[test]
-fn header_with_message_for() {
-    let mut kvn = sample_cdm_kvn();
-    kvn = kvn.replace("MESSAGE_FOR = OPERATOR", "MESSAGE_FOR = NEW_OPERATOR");
-    let cdm = Cdm::from_kvn(&kvn).expect("should parse with MESSAGE_FOR");
-    assert_eq!(cdm.header.message_for, Some("NEW_OPERATOR".to_string()));
 }
 
 #[test]
@@ -444,35 +249,33 @@ fn relative_metadata_collision_probability_parse_error() {
     );
 
     let err = Cdm::from_kvn(&kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) if matches!(*format_err, FormatError::Kvn(_)) => {} // Expected error
-        _ => panic!("unexpected error: {:?}", err),
-    }
+    assert!(crate::common::kvn_parse_error(&err).is_some(), "{err}");
 }
 
 #[test]
-fn relative_metadata_unexpected_field() {
-    let mut kvn = sample_cdm_kvn();
-    kvn = kvn.replace(
-        "COLLISION_PROBABILITY = 0.001",
-        "COLLISION_PROBABILITY = 0.001\nUNKNOWN_FIELD = VALUE",
-    );
-
-    let err = Cdm::from_kvn(&kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) => match *format_err {
-            FormatError::Kvn(ref err) => {
-                assert!(err.message.contains("unknown CDM keyword"))
-            }
-            _ => panic!("unexpected format error: {:?}", format_err),
-        },
-        _ => panic!("unexpected error: {:?}", err),
+fn unknown_keywords_are_rejected_in_relative_metadata_metadata_and_covariance() {
+    for (record, unknown) in [
+        ("COLLISION_PROBABILITY = 0.001", "UNKNOWN_FIELD = VALUE"),
+        ("REF_FRAME = EME2000", "UNKNOWN_META_KEY = VALUE"),
+        ("CNDOT_NDOT = 1.0 [m**2/s**2]", "UNKNOWN_COV = 0.001"),
+    ] {
+        let input = mutated(&sample_cdm_kvn(), record, &format!("{record}\n{unknown}"));
+        let error = Cdm::from_kvn(&input).unwrap_err();
+        assert_eq!(error.code(), Some("parse.kvn.syntax"));
+        assert!(crate::common::kvn_parse_error(&error)
+            .unwrap()
+            .message
+            .contains("unknown CDM keyword"));
     }
 }
 
 #[test]
 fn metadata_with_optional_fields() {
-    let mut kvn = sample_cdm_kvn();
+    let mut kvn = mutated(
+        &sample_cdm_kvn(),
+        "CCSDS_CDM_VERS = 1.0",
+        "CCSDS_CDM_VERS = 1.0\nCOMMENT Header comment",
+    );
     // Add optional metadata fields
     kvn = kvn.replace(
         "OBJECT_TYPE = PAYLOAD\nEPHEMERIS_NAME = EPH1\nCOVARIANCE_METHOD = CALCULATED\nMANEUVERABLE = YES\nREF_FRAME = EME2000",
@@ -511,74 +314,53 @@ fn metadata_with_optional_fields() {
     assert_eq!(seg1.metadata.solar_rad_pressure, Some(YesNo::Yes));
     assert_eq!(seg1.metadata.earth_tides, Some(YesNo::Yes));
     assert_eq!(seg1.metadata.intrack_thrust, Some(YesNo::Yes));
+    assert_eq!(Cdm::from_kvn(&cdm.to_kvn().unwrap()).unwrap(), cdm);
+    assert_eq!(Cdm::from_xml(&cdm.to_xml().unwrap()).unwrap(), cdm);
+}
+
+#[test]
+fn closed_metadata_vocabularies_reject_unknown_tokens() {
+    for (from, to) in [
+        ("SCREEN_VOLUME_FRAME = RTN", "SCREEN_VOLUME_FRAME = BAD"),
+        ("SCREEN_VOLUME_SHAPE = BOX", "SCREEN_VOLUME_SHAPE = BALL"),
+        ("OBJECT = OBJECT1", "OBJECT = OBJECT3"),
+        (
+            "COVARIANCE_METHOD = CALCULATED",
+            "COVARIANCE_METHOD = INVALID",
+        ),
+        ("MANEUVERABLE = YES", "MANEUVERABLE = MAYBE"),
+        ("REF_FRAME = EME2000", "REF_FRAME = INVALID"),
+        ("OBJECT_TYPE = PAYLOAD", "OBJECT_TYPE = SATELLITE"),
+    ] {
+        let kvn = mutated(&sample_cdm_kvn(), from, to);
+        let error = Cdm::from_kvn(&kvn).unwrap_err();
+        assert!(
+            matches!(error.as_format_error(), Some(FormatError::Enum(_))),
+            "{to}: {error}"
+        );
+    }
 }
 
 #[test]
 fn metadata_object_types() {
-    // Test ROCKET BODY
-    let mut kvn = sample_cdm_kvn();
-    kvn = kvn.replace("OBJECT_TYPE = PAYLOAD", "OBJECT_TYPE = ROCKET BODY");
-    let cdm = Cdm::from_kvn(&kvn).expect("parse");
-    assert_eq!(
-        cdm.body.segments[0].metadata.object_type,
-        Some(ObjectDescription::RocketBody)
-    );
-
-    // Test DEBRIS
-    let mut kvn = sample_cdm_kvn();
-    kvn = kvn.replace("OBJECT_TYPE = PAYLOAD", "OBJECT_TYPE = DEBRIS");
-    let cdm = Cdm::from_kvn(&kvn).expect("parse");
-    assert_eq!(
-        cdm.body.segments[0].metadata.object_type,
-        Some(ObjectDescription::Debris)
-    );
-
-    // Test UNKNOWN
-    let mut kvn = sample_cdm_kvn();
-    kvn = kvn.replace("OBJECT_TYPE = PAYLOAD", "OBJECT_TYPE = UNKNOWN");
-    let cdm = Cdm::from_kvn(&kvn).expect("parse");
-    assert_eq!(
-        cdm.body.segments[0].metadata.object_type,
-        Some(ObjectDescription::Unknown)
-    );
-
-    // Test OTHER
-    let mut kvn = sample_cdm_kvn();
-    kvn = kvn.replace("OBJECT_TYPE = PAYLOAD", "OBJECT_TYPE = OTHER");
-    let cdm = Cdm::from_kvn(&kvn).expect("parse");
-    assert_eq!(
-        cdm.body.segments[0].metadata.object_type,
-        Some(ObjectDescription::Other)
-    );
-
-    // A closed vocabulary must not erase an unknown token by substituting OTHER.
-    let kvn = sample_cdm_kvn().replace("OBJECT_TYPE = PAYLOAD", "OBJECT_TYPE = SATELLITE");
-    assert!(Cdm::from_kvn(&kvn).is_err());
-}
-
-#[test]
-fn metadata_invalid_object() {
-    let mut kvn = sample_cdm_kvn();
-    kvn = kvn.replace("OBJECT = OBJECT1", "OBJECT = OBJECT3");
-    let err = Cdm::from_kvn(&kvn).unwrap_err();
-    assert!(
-        matches!(err.as_format_error(), Some(FormatError::Enum(_))),
-        "{err:?}"
-    );
-}
-
-#[test]
-fn metadata_invalid_covariance_method() {
-    let mut kvn = sample_cdm_kvn();
-    kvn = kvn.replace(
-        "COVARIANCE_METHOD = CALCULATED",
-        "COVARIANCE_METHOD = INVALID",
-    );
-    let err = Cdm::from_kvn(&kvn).unwrap_err();
-    assert!(
-        matches!(err.as_format_error(), Some(FormatError::Enum(_))),
-        "{err:?}"
-    );
+    for (token, expected) in [
+        ("ROCKET BODY", ObjectDescription::RocketBody),
+        ("DEBRIS", ObjectDescription::Debris),
+        ("UNKNOWN", ObjectDescription::Unknown),
+        ("OTHER", ObjectDescription::Other),
+    ] {
+        let kvn = mutated(
+            &sample_cdm_kvn(),
+            "OBJECT_TYPE = PAYLOAD",
+            &format!("OBJECT_TYPE = {token}"),
+        );
+        let cdm = Cdm::from_kvn(&kvn).unwrap();
+        assert_eq!(
+            cdm.body.segments[0].metadata.object_type,
+            Some(expected),
+            "{token}"
+        );
+    }
 }
 
 #[test]
@@ -593,64 +375,18 @@ fn metadata_maneuverable_na() {
 }
 
 #[test]
-fn metadata_invalid_maneuverable() {
-    let mut kvn = sample_cdm_kvn();
-    kvn = kvn.replace("MANEUVERABLE = YES", "MANEUVERABLE = MAYBE");
-    let err = Cdm::from_kvn(&kvn).unwrap_err();
-    assert!(
-        matches!(err.as_format_error(), Some(FormatError::Enum(_))),
-        "{err:?}"
-    );
-}
-
-#[test]
 fn metadata_ref_frames() {
-    // Test GCRF
-    let mut kvn = sample_cdm_kvn();
-    kvn = kvn.replace("REF_FRAME = EME2000", "REF_FRAME = GCRF");
-    let cdm = Cdm::from_kvn(&kvn).expect("parse");
-    assert_eq!(
-        cdm.body.segments[0].metadata.ref_frame,
-        ReferenceFrameType::Gcrf
-    );
-
-    // Test ITRF
-    let mut kvn = sample_cdm_kvn();
-    kvn = kvn.replace("REF_FRAME = EME2000", "REF_FRAME = ITRF");
-    let cdm = Cdm::from_kvn(&kvn).expect("parse");
-    assert_eq!(
-        cdm.body.segments[0].metadata.ref_frame,
-        ReferenceFrameType::Itrf
-    );
-}
-
-#[test]
-fn metadata_invalid_ref_frame() {
-    let mut kvn = sample_cdm_kvn();
-    kvn = kvn.replace("REF_FRAME = EME2000", "REF_FRAME = INVALID");
-    let err = Cdm::from_kvn(&kvn).unwrap_err();
-    assert!(
-        matches!(err.as_format_error(), Some(FormatError::Enum(_))),
-        "{err:?}"
-    );
-}
-
-#[test]
-fn metadata_unknown_key() {
-    let mut kvn = sample_cdm_kvn();
-    kvn = kvn.replace(
-        "REF_FRAME = EME2000",
-        "REF_FRAME = EME2000\nUNKNOWN_META_KEY = VALUE",
-    );
-    let err = Cdm::from_kvn(&kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) => match *format_err {
-            FormatError::Kvn(ref err) => {
-                assert!(err.message.contains("unknown CDM keyword"))
-            }
-            _ => panic!("unexpected format error: {:?}", format_err),
-        },
-        _ => panic!("unexpected error: {:?}", err),
+    for (token, expected) in [
+        ("GCRF", ReferenceFrameType::Gcrf),
+        ("ITRF", ReferenceFrameType::Itrf),
+    ] {
+        let kvn = mutated(
+            &sample_cdm_kvn(),
+            "REF_FRAME = EME2000",
+            &format!("REF_FRAME = {token}"),
+        );
+        let cdm = Cdm::from_kvn(&kvn).unwrap();
+        assert_eq!(cdm.body.segments[0].metadata.ref_frame, expected);
     }
 }
 
@@ -691,6 +427,8 @@ fn data_with_additional_parameters() {
     assert!(ap.cr_area_over_mass.is_some());
     assert!(ap.thrust_acceleration.is_some());
     assert!(ap.sedr.is_some());
+    assert_eq!(Cdm::from_kvn(&cdm.to_kvn().unwrap()).unwrap(), cdm);
+    assert_eq!(Cdm::from_xml(&cdm.to_xml().unwrap()).unwrap(), cdm);
 }
 
 #[test]
@@ -753,6 +491,8 @@ fn covariance_with_thrust_fields() {
     assert!(cov.cthr_drg.is_some());
     assert!(cov.cthr_srp.is_some());
     assert!(cov.cthr_thr.is_some());
+    assert_eq!(Cdm::from_kvn(&cdm.to_kvn().unwrap()).unwrap(), cdm);
+    assert_eq!(Cdm::from_xml(&cdm.to_xml().unwrap()).unwrap(), cdm);
 }
 
 #[test]
@@ -770,36 +510,6 @@ fn covariance_rejects_optional_rows_without_preceding_rows() {
         assert_eq!(error.code(), Some("validation.missing_required_field"));
         assert!(error.to_string().contains(missing), "{label}: {error}");
     }
-}
-
-#[test]
-fn covariance_unknown_field_error() {
-    let mut kvn = sample_cdm_kvn();
-    // Add unknown covariance field
-    kvn = kvn.replace(
-        "CNDOT_NDOT = 1.0 [m**2/s**2]",
-        "CNDOT_NDOT = 1.0 [m**2/s**2]\nUNKNOWN_COV = 0.001",
-    );
-    let err = Cdm::from_kvn(&kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) => match *format_err {
-            FormatError::Kvn(ref err) => {
-                assert!(err.message.contains("unknown CDM keyword"))
-            }
-            _ => panic!("unexpected format error: {:?}", format_err),
-        },
-        _ => panic!("unexpected error: {:?}", err),
-    }
-}
-
-#[test]
-fn metadata_object_default_fallback() {
-    // Test what happens if OBJECT isn't OBJECT1 or OBJECT2 in serialization
-    let kvn = sample_cdm_kvn();
-    let cdm = Cdm::from_kvn(&kvn).expect("parse");
-    // Verify both objects are parsed correctly
-    assert_eq!(cdm.body.segments[0].metadata.object, CdmObjectType::Object1);
-    assert_eq!(cdm.body.segments[1].metadata.object, CdmObjectType::Object2);
 }
 
 #[test]
@@ -845,93 +555,20 @@ TCA = 2025-01-02T12:00:00
         "unexpected diagnostic: {validation:?}"
     );
 }
-#[test]
-fn test_parse_cdm_missing_relative_metadata() {
-    let input = r#"CCSDS_CDM_VERS = 1.0
-CREATION_DATE = 2025-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_FOR = OPERATOR
-MESSAGE_ID = MSG-001
-
-TCA = 2025-01-02T12:00:00
-MISS_DISTANCE = 100.0 [m]
-RELATIVE_SPEED = 7.5 [m/s]
-RELATIVE_POSITION_R = 10.0 [m]
-SCREEN_VOLUME_FRAME = RTN
-"#;
-    let err = Cdm::from_kvn(input).unwrap_err();
-    match err {
-        CcsdsNdmError::Validation(val_err) => match *val_err {
-            ValidationError::MissingRequiredField { field, .. } => {
-                assert_eq!(field, "RELATIVE_POSITION_T");
-            }
-            _ => panic!("Expected missing field error, got {:?}", val_err),
-        },
-        _ => panic!("Expected Validation error, got {:?}", err),
-    }
-}
 
 #[test]
 fn test_parse_cdm_missing_covariance() {
-    // Verify we can parse CDM without covariance matrix (it is optional)
-    let cdm_no_cov = r#"CCSDS_CDM_VERS = 1.0
-CREATION_DATE = 2025-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
-
-TCA = 2025-01-02T12:00:00
-MISS_DISTANCE = 100.0 [m]
-RELATIVE_POSITION_R = 10.0 [m]
-RELATIVE_POSITION_T = 20.0 [m]
-RELATIVE_POSITION_N = 30.0 [m]
-RELATIVE_VELOCITY_R = 0.1 [m/s]
-RELATIVE_VELOCITY_T = 0.2 [m/s]
-RELATIVE_VELOCITY_N = 0.3 [m/s]
-
-OBJECT = OBJECT1
-OBJECT_DESIGNATOR = 12345
-CATALOG_NAME = SATCAT
-OBJECT_NAME = SAT A
-INTERNATIONAL_DESIGNATOR = 1998-067A
-OBJECT_TYPE = PAYLOAD
-EPHEMERIS_NAME = EPH1
-COVARIANCE_METHOD = CALCULATED
-MANEUVERABLE = YES
-REF_FRAME = GCRF
-X = 1000.0 [km]
-Y = 2000.0 [km]
-Z = 3000.0 [km]
-X_DOT = 1.0 [km/s]
-Y_DOT = 2.0 [km/s]
-Z_DOT = 3.0 [km/s]
-
-OBJECT = OBJECT2
-OBJECT_DESIGNATOR = 67890
-CATALOG_NAME = SATCAT
-OBJECT_NAME = SAT B
-INTERNATIONAL_DESIGNATOR = 2000-001A
-OBJECT_TYPE = PAYLOAD
-EPHEMERIS_NAME = EPH1
-COVARIANCE_METHOD = CALCULATED
-MANEUVERABLE = NO
-REF_FRAME = GCRF
-X = 1500.0 [km]
-Y = 2500.0 [km]
-Z = 3500.0 [km]
-X_DOT = 1.5 [km/s]
-Y_DOT = 2.5 [km/s]
-Z_DOT = 3.5 [km/s]
-"#;
-    let err = Cdm::from_kvn(cdm_no_cov).unwrap_err();
-    match err {
-        CcsdsNdmError::Validation(val_err) => match *val_err {
-            ValidationError::MissingRequiredField { field, .. } => {
-                assert_eq!(field, "covarianceMatrix");
-            }
-            _ => panic!("Expected missing field error, got {:?}", val_err),
-        },
-        _ => panic!("Expected Validation error, got {:?}", err),
-    }
+    let base = sample_cdm_kvn();
+    let cdm_no_cov = base
+        .lines()
+        .filter(|line| !line.contains("[m**2"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let err = Cdm::from_kvn(&cdm_no_cov).unwrap_err();
+    assert!(
+        matches!(err.as_validation_error(), Some(ValidationError::MissingRequiredField { field, .. }) if field == "covarianceMatrix"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -1035,7 +672,7 @@ fn cdm_kvn_rejects_a_state_vector_with_metre_units() {
         .expect_err("CDM state-vector positions are kilometres, not arbitrary length units");
     assert!(
         matches!(error.as_format_error(), Some(FormatError::Enum(cause))
-            if cause.field == "unit" && cause.value == "m" && cause.expected == "\"km\""),
+            if cause.field == "X" && cause.value == "m" && cause.expected == "\"km\""),
         "{error}"
     );
 }
@@ -1243,4 +880,30 @@ fn xml_identifier_padding_is_normalized_without_allowing_internal_blanks() {
     }
     assert_eq!(Cdm::from_xml(&xml).unwrap(), message);
     assert!(Cdm::from_xml(&xml.replace("<MESSAGE_ID> \t", "<MESSAGE_ID> A B")).is_err());
+}
+
+#[test]
+fn xml_empty_units_attribute_is_an_absent_annotation() {
+    // 18 SDS CDMExample_issue1458.xml writes `<RESIDUALS_ACCEPTED units=""/>`.
+    let original = r#"<RESIDUALS_ACCEPTED units="%" >97.8</RESIDUALS_ACCEPTED>"#;
+    let absent = crate::XML.replacen(original, r#"<RESIDUALS_ACCEPTED units=""/>"#, 1);
+    let cdm = Cdm::from_xml(&absent).unwrap();
+    let od = cdm.body.segments[0].data.od_parameters.as_ref().unwrap();
+    assert!(od.residuals_accepted.is_none());
+
+    let valued = crate::XML.replacen(
+        original,
+        r#"<RESIDUALS_ACCEPTED units="">97.8</RESIDUALS_ACCEPTED>"#,
+        1,
+    );
+    let cdm = Cdm::from_xml(&valued).unwrap();
+    let od = cdm.body.segments[0].data.od_parameters.as_ref().unwrap();
+    assert_eq!(od.residuals_accepted.as_ref().unwrap().value, 97.8);
+    let unannotated = mutated_once(&valued, r#" units="""#, "");
+    assert_eq!(cdm, Cdm::from_xml(&unannotated).unwrap());
+    let incompatible = mutated_once(&valued, r#"units="""#, r#"units="m""#);
+    Cdm::from_xml(&incompatible).expect_err("valued incompatible units still fail");
+
+    let wrong = crate::XML.replacen(original, r#"<RESIDUALS_ACCEPTED units="m"/>"#, 1);
+    Cdm::from_xml(&wrong).expect_err("nonempty incompatible units still fail");
 }

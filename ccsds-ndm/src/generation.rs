@@ -79,7 +79,12 @@ pub(crate) fn to_xml_string<T: GenerationMetadata>(message: &T) -> Result<String
         message.validate_xml_semantics()?;
         message.validate_xml_model()?;
         // Buffered output checks XML characters during serialization, before returning bytes.
-        crate::xml::to_string(message)
+        let xml = crate::xml::to_string(message)?;
+        if T::KIND == MessageKind::Cdm {
+            crate::messages::cdm::xml::format_output(&xml)
+        } else {
+            Ok(xml)
+        }
     })()
     .map_err(|error| generation_error(error, T::KIND, OutputFormat::Xml, message.version()))
 }
@@ -123,15 +128,34 @@ pub(crate) trait GenerationMetadata: Ndm {
     }
 }
 
+/// Check edition, model, and notation constraints before streaming or preparing a constituent.
+/// CDM XML formatting (ASCII and line widths) is checked later by its buffered writer.
+pub(crate) fn validate_for_generation<T: GenerationMetadata + ToKvn>(
+    message: &T,
+    format: OutputFormat,
+) -> Result<()> {
+    (|| {
+        validate_output_version(T::KIND, message.version(), format)?;
+        match format {
+            OutputFormat::Kvn => {
+                message.validate_kvn_model()?;
+                ToKvn::validate_kvn(message)
+            }
+            OutputFormat::Xml => {
+                message.validate_xml_semantics()?;
+                message.validate_xml_output()
+            }
+        }
+    })()
+    .map_err(|error| generation_error(error, T::KIND, format, message.version()))
+}
+
 pub(crate) fn write_kvn_to<T: GenerationMetadata + ToKvn, W: Write>(
     message: &T,
     output: &mut W,
 ) -> Result<()> {
     (|| {
-        validate_output_version(T::KIND, message.version(), OutputFormat::Kvn)?;
-        message.validate_kvn_model()?;
-        // Preflight serialization so an invalid message emits zero bytes to the caller's sink.
-        ToKvn::validate_kvn(message)?;
+        validate_for_generation(message, OutputFormat::Kvn)?;
         let mut writer = crate::kvn::ser::KvnWriter::from_io(output);
         ToKvn::write_kvn(message, &mut writer);
         writer.finish_io()
@@ -139,14 +163,20 @@ pub(crate) fn write_kvn_to<T: GenerationMetadata + ToKvn, W: Write>(
     .map_err(|error| generation_error(error, T::KIND, OutputFormat::Kvn, message.version()))
 }
 
-pub(crate) fn write_xml_to<T: GenerationMetadata, W: Write>(
+pub(crate) fn write_xml_to<T: GenerationMetadata + ToKvn, W: Write>(
     message: &T,
     output: &mut W,
 ) -> Result<()> {
+    if T::KIND == MessageKind::Cdm {
+        output
+            .write_all(to_xml_string(message)?.as_bytes())
+            .map_err(|error| {
+                generation_error(error.into(), T::KIND, OutputFormat::Xml, message.version())
+            })?;
+        return Ok(());
+    }
     (|| {
-        validate_output_version(T::KIND, message.version(), OutputFormat::Xml)?;
-        message.validate_xml_semantics()?;
-        message.validate_xml_output()?;
+        validate_for_generation(message, OutputFormat::Xml)?;
         crate::xml::to_writer(output, message)
     })()
     .map_err(|error| generation_error(error, T::KIND, OutputFormat::Xml, message.version()))
@@ -247,9 +277,7 @@ impl GenerationMetadata for crate::messages::opm::Opm {
         self.validate_xml_text()
     }
 
-    // The model walk above covers every text value this family can emit, so neither entry point
-    // runs a serialization preflight. Streaming XML writes the prolog before serializing, so it
-    // never promised zero bytes here in the first place.
+    // Model checks cover every emitted text value, so no serialization preflight is needed.
     fn validate_xml_output(&self) -> Result<()> {
         self.validate_xml_model()
     }
@@ -274,9 +302,7 @@ impl GenerationMetadata for crate::messages::oem::Oem {
         self.validate_xml_text()
     }
 
-    // The model walk above covers every text value this family can emit, so neither entry point
-    // runs a serialization preflight. Streaming XML writes the prolog before serializing, so it
-    // never promised zero bytes here in the first place.
+    // Model checks cover every emitted text value, so no serialization preflight is needed.
     fn validate_xml_output(&self) -> Result<()> {
         self.validate_xml_model()
     }

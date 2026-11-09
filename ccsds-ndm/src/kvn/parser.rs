@@ -136,8 +136,8 @@ pub fn to_ccsds_error(
         }
         crate::error::ParserErrorKind::Enum(mut e) => {
             if let Some(key) = assignment_key(input, offset) {
-                if e.field == "RATE_TYPE" && key == "RATE_STATES" {
-                    e.field = "RATE_STATES";
+                if e.field != key {
+                    e.field = key.to_owned().into();
                 }
             }
             CcsdsNdmError::Format(Box::new(FormatError::Enum(e)))
@@ -728,24 +728,17 @@ pub fn kv_enum_opt<T: FromStr>(input: &mut &str) -> KvnResult<Option<T>>
 where
     EnumParseError: From<T::Err>,
 {
-    let v = terminated(till_line_ending, opt_line_ending).parse_next(input)?;
-    let trimmed = v.trim();
-    if trimmed.is_null() {
-        Ok(None)
-    } else {
-        T::from_str(trimmed).map(Some).map_err(|e| {
-            ErrMode::Cut(InternalParserError::from_external_error(
-                input,
-                EnumParseError::from(e),
-            ))
-        })
-    }
+    kv_optional(kv_enum)(input)
 }
 
-/// Parses a value from a KVN line using the `FromKvnValue` trait.
+/// Parses a unitless value from a KVN line using the `FromKvnValue` trait.
 pub fn kv_from_kvn_value<T: FromKvnValue>(input: &mut &str) -> KvnResult<T> {
     let value_start = *input;
-    let (v, _) = kv_rest.parse_next(input)?;
+    let (v, unit) = kv_rest.parse_next(input)?;
+    if unit.is_some() {
+        *input = value_start;
+        return Err(cut_err(input, "units are not allowed on this keyword"));
+    }
     T::from_kvn_value(v).map_err(|e| external_error_at(input, value_start, e))
 }
 
@@ -764,6 +757,12 @@ pub fn kv_from_kvn_opt<T: FromKvnFloat>(input: &mut &str) -> KvnResult<Option<T>
         T::from_kvn_float(val, u)
             .map(Some)
             .map_err(|e| external_error_at(input, value_start, e))
+    } else if u.is_some() {
+        *input = value_start;
+        Err(cut_err(
+            input,
+            "Invalid unit annotation without a numeric value",
+        ))
     } else {
         Ok(None)
     }
@@ -1571,25 +1570,6 @@ mod tests {
     }
 
     #[test]
-    fn numeric_reader_rejects_overflow_underflow_and_malformed_tokens() {
-        for token in [
-            ".5",
-            "5.",
-            "1e3",
-            "12.5e-3",
-            "1.2345678901234567",
-            "5e-324",
-            "0e-999",
-            "-0.0",
-        ] {
-            assert!(parse_ccsds_number(token).is_some(), "{token}");
-        }
-        for token in ["1e999", "1e-999", "1..0", ".", "+", "1e", "NaN", "INF"] {
-            assert!(parse_ccsds_number(token).is_none(), "{token}");
-        }
-    }
-
-    #[test]
     fn partial_covariance_is_an_error_and_spacecraft_coefficients_are_preserved() {
         assert!(covariance_matrix(&mut "CY_Y = 1.0\n").is_err());
         assert!(covariance_matrix(&mut "COV_REF_FRAME = GCRF\n").is_err());
@@ -1623,6 +1603,11 @@ mod tests {
             "12e3",
             "1e3",
             "12.5e3",
+            "5.",
+            "12.5e-3",
+            "5e-324",
+            "0e-999",
+            "-0.0",
         ] {
             assert!(parse_ccsds_number(value).is_some(), "{value}");
         }
@@ -1649,6 +1634,12 @@ mod tests {
             "-inf",
             "Infinity",
             "+Infinity",
+            "1e999",
+            "1e-999",
+            "1..0",
+            "1e",
+            "NaN",
+            "INF",
         ] {
             assert!(parse_ccsds_number(value).is_none(), "{value}");
         }
@@ -1664,22 +1655,6 @@ mod tests {
 
         let mut input = "X_DOT";
         assert_eq!(keyword.parse_next(&mut input).unwrap(), "X_DOT");
-    }
-
-    #[test]
-    fn test_kvn_value_without_unit() {
-        let mut input = "SATELLITE-1\n";
-        let (value, unit) = kvn_value.parse_next(&mut input).unwrap();
-        assert_eq!(value, "SATELLITE-1");
-        assert_eq!(unit, None);
-    }
-
-    #[test]
-    fn test_kvn_value_with_unit() {
-        let mut input = "6503.514 [km]\n";
-        let (value, unit) = kvn_value.parse_next(&mut input).unwrap();
-        assert_eq!(value, "6503.514");
-        assert_eq!(unit, Some("km"));
     }
 
     #[test]

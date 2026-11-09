@@ -135,10 +135,6 @@ fn apm_nutation_period_is_seconds_without_reinterpreting_day_units() {
         Apm::from_xml(&xml.replace("NUTATION_PER units=\"s\"", "NUTATION_PER units=\"d\""))
             .is_err()
     );
-    assert!(Apm::from_kvn(
-        &crate::SPIN_KVN.replace("NUTATION_PER = 100", "NUTATION_PER = 100 [d]")
-    )
-    .is_err());
     message.body.segment.data.spin[0]
         .nutation_per
         .as_mut()

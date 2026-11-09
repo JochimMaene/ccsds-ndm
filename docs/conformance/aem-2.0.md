@@ -22,7 +22,7 @@ The `aem`, `aem_kvn_allocations`, and `library::output` suites establish:
 | Fixture and typed-state preservation | Both KVN fixtures preserve their complete typed model through KVN and XML. Both XML fixtures preserve their XML model; the all-types fixture covers all nine attitude-state choices. Generated XML validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
 | Optional fixed units | AEM KVN history records forbid unit annotations (504.0-B-2 section 6.9.2) while the fixed XML unit attributes are optional (section 7.6.10). Optional fixed XML units on derivative, angle, rate, nutation, and momentum values are therefore deliberately normalized to omission on an XML-to-KVN-to-XML hop, while values, choices, and record counts remain preserved. A dedicated regression verifies the output stays schema-valid. |
 | History numbers | Reading accepts unambiguous finite producer spellings (`.5`, `5.`, and exponent notation), without the book's 16-digit cap or 32-bit integer range, so the 17-digit shortest spelling of a double parses; this is the same lenient reading as [OEM](oem-3.0.md#more-lenient-than-the-book). Generation still rounds to 16 significant digits. |
-| Generation boundary | Materialized and streaming KVN generation reject non-ASCII/overlong text and history numbers exceeding the ODM significant-digit representation before writing bytes. |
+| Generation boundary | Materialized and streaming KVN generation round history numbers to at most 16 significant digits and reject non-ASCII/overlong text or numbers whose rounded spelling would overflow before writing bytes. |
 | Resource behaviour | History parsing uses a fixed eight-number stack buffer rather than a heap vector per record; owned epoch/state storage remains linear. Validation and streaming generation avoid per-record temporary allocation. Materialized output remains output-proportional. |
 | Reproducible workloads | `aem_kvn_history_scaling` registers 100, 10,000 and 50,000-record parse/generate workloads and `aem_xml_history_scaling` the first two, the sizes every history-carrying family shares. |
 | Self-contained timeline semantics | Metadata requires an ordered total span; usable bounds must lie within it and be ordered. Every state epoch must lie within the total span and state epochs must be strictly increasing without repetition. Adjacent blocks cannot move usable time backwards. Invalid timelines fail materialized and streaming generation before output. |
@@ -39,6 +39,22 @@ Annex A, section A2.2.2 contains 25 AEM implementation-conformance statement row
 
 Section 4.2.4.8.1's strictly increasing, non-repeated epoch requirement and the metadata/cross-block
 usable-span rules have direct semantic regression tests in `aem::validation`.
+
+## Public-surface and artifact evidence
+
+`bindings/python/tests/test_aem.py`, `test_api_consistency.py`, and
+`test_parse_and_generation_options.py` cover typed choices and NumPy construction, KVN/XML
+parsing/generation, generic identity, shared limits, and core-error propagation. `package-python`
+and `package-rust` provide the common built-artifact gates.
+
+## Verification outcome
+
+AEM 2.0 meets the common [verification criteria](README.md#verification-criteria) for
+self-contained format and model validation on Rust and Python. The interpolation decision
+below is part of that scope; no interpolation algorithm is implemented or certified.
+
+Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
+artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
 
 ## Decisions and limits
 
@@ -80,33 +96,15 @@ with OEM's interpolation policy, rather than an unresolved numeric capacity rule
 **AEM 1.0 is rejected.** AEM 1.0 input is refused with `parse.unsupported_input_version`
 because some 1.0 values (rates, `ATTITUDE_DIR = B2A`, spin conventions) cannot be given their
 2.0 meaning without guessing. The full 1.0-versus-2.0 comparison, the reasons and the corpus
-evidence are in [APM and AEM 1.0](apm-2.0.md#apm-and-aem-1-0). Relabelling a 2.0 fixture does not
+evidence are in [APM and AEM 1.0](apm-2.0.md#apm-and-aem-10). Relabelling a 2.0 fixture does not
 verify 1.0.
 
-## Quaternion magnitude
-
-ADM annex F defines a rotation quaternion through sine/cosine components of a rotation axis and
+**Quaternion magnitude.** ADM annex F defines a rotation quaternion through sine/cosine components of a rotation axis and
 angle, implying unit magnitude. APM, AEM, and known quaternion ACM histories use the same shared
 validator: finite components in `[-1, 1]` and squared norm in `[0.99, 1.01]`. The book gives no
 numeric tolerance; this interval is an implementation choice to allow rounded published samples.
 The library rejects values outside it and never silently normalizes caller data. The common
 policy and its source are recorded in the [validation contract](../design/validation-contract.md).
-
-## Public-surface and artifact evidence
-
-`bindings/python/tests/test_aem.py`, `test_api_consistency.py`, and
-`test_parse_and_generation_options.py` cover typed choices and NumPy construction, KVN/XML
-parsing/generation, generic identity, shared limits, and core-error propagation. `package-python`
-and `package-rust` provide the common built-artifact gates.
-
-## Verification outcome
-
-AEM 2.0 meets the common [verification criteria](README.md#verification-criteria) for
-self-contained format and model validation on Rust and Python. The interpolation decision
-above is part of that scope; no interpolation algorithm is implemented or certified.
-
-Shared Rust/Python route coverage, including `test_conformance_matrix.py`, and installed
-artifact checks are indexed once in the [common evidence table](README.md#shared-evidence).
 
 **Angle domain.** ADM §6.8.1 gives angles in degrees "between −360 and 360"; the XSD
 `angleRange` makes this `[-360, 360)` (upper bound exclusive). The XSD interval applies in KVN,
@@ -140,9 +138,7 @@ entries, so the model differs after an XML-to-KVN hop. ADM §6.10.3 forbids comm
 `META_STOP` or `DATA_STOP`; the diagnostic names that rule
 (`aem::parsing::aem_comment_after_data_stop_names_the_rule`).
 
-## Cross-segment time systems
-
-ADM §4.2.4.8.2 fixes `TIME_SYSTEM` within a segment, not across the entire message.
+**Cross-segment time systems.** ADM §4.2.4.8.2 fixes `TIME_SYSTEM` within a segment, not across the entire message.
 Adjacent usable bounds are compared only when both the previous usable stop and the next
 usable start are supplied and the segments declare the same time system (case-insensitively).
 Total spans of separate segments are not compared. The library does not compare calendar labels from different time

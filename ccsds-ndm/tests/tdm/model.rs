@@ -62,11 +62,11 @@ fn exhaustive_observation_data() {
     // Exercise every variant of TdmObservationData
     use ccsds_ndm::types::Percentage;
     let cases = vec![
-        ("ANGLE_1", TdmObservationData::Angle1(1.0)),
-        ("ANGLE_2", TdmObservationData::Angle2(2.0)),
-        ("CARRIER_POWER", TdmObservationData::CarrierPower(3.0)),
-        ("CLOCK_BIAS", TdmObservationData::ClockBias(4.0)),
-        ("CLOCK_DRIFT", TdmObservationData::ClockDrift(5.0)),
+        ("ANGLE_1", TdmObservationData::Angle1(45.5)),
+        ("ANGLE_2", TdmObservationData::Angle2(30.25)),
+        ("CARRIER_POWER", TdmObservationData::CarrierPower(-150.5)),
+        ("CLOCK_BIAS", TdmObservationData::ClockBias(0.000001234)),
+        ("CLOCK_DRIFT", TdmObservationData::ClockDrift(0.0000000001)),
         ("DOPPLER_COUNT", TdmObservationData::DopplerCount(6.0)),
         (
             "DOPPLER_INSTANTANEOUS",
@@ -77,21 +77,27 @@ fn exhaustive_observation_data() {
             TdmObservationData::DopplerIntegrated(8.0),
         ),
         ("DOR", TdmObservationData::Dor(9.0)),
-        ("MAG", TdmObservationData::Mag(10.0)),
-        ("PC_N0", TdmObservationData::PcN0(11.0)),
-        ("PR_N0", TdmObservationData::PrN0(12.0)),
-        ("PRESSURE", TdmObservationData::Pressure(13.0)),
+        ("MAG", TdmObservationData::Mag(12.5)),
+        ("PC_N0", TdmObservationData::PcN0(45.5)),
+        ("PR_N0", TdmObservationData::PrN0(35.2)),
+        ("PRESSURE", TdmObservationData::Pressure(1013.25)),
         ("RANGE", TdmObservationData::Range(14.0)),
-        ("RCS", TdmObservationData::Rcs(15.0)),
-        ("RECEIVE_FREQ", TdmObservationData::ReceiveFreq(16.0)),
-        ("RECEIVE_FREQ_1", TdmObservationData::ReceiveFreq1(17.0)),
+        ("RCS", TdmObservationData::Rcs(1.5)),
+        (
+            "RECEIVE_FREQ",
+            TdmObservationData::ReceiveFreq(8415000000.0),
+        ),
+        (
+            "RECEIVE_FREQ_1",
+            TdmObservationData::ReceiveFreq1(8415000001.0),
+        ),
         ("RECEIVE_FREQ_2", TdmObservationData::ReceiveFreq2(18.0)),
         ("RECEIVE_FREQ_3", TdmObservationData::ReceiveFreq3(19.0)),
         ("RECEIVE_FREQ_4", TdmObservationData::ReceiveFreq4(20.0)),
         ("RECEIVE_FREQ_5", TdmObservationData::ReceiveFreq5(21.0)),
         (
             "RECEIVE_PHASE_CT_1",
-            TdmObservationData::ReceivePhaseCt1("22.0".into()),
+            TdmObservationData::ReceivePhaseCt1("8429753135.986102".into()),
         ),
         (
             "RECEIVE_PHASE_CT_2",
@@ -111,12 +117,18 @@ fn exhaustive_observation_data() {
         ),
         (
             "RHUMIDITY",
-            TdmObservationData::Rhumidity(Percentage::new(50.0, None).unwrap()),
+            TdmObservationData::Rhumidity(Percentage::new(65.5, None).unwrap()),
         ),
-        ("STEC", TdmObservationData::Stec(27.0)),
-        ("TEMPERATURE", TdmObservationData::Temperature(28.0)),
-        ("TRANSMIT_FREQ_1", TdmObservationData::TransmitFreq1(29.0)),
-        ("TRANSMIT_FREQ_2", TdmObservationData::TransmitFreq2(30.0)),
+        ("STEC", TdmObservationData::Stec(50.0)),
+        ("TEMPERATURE", TdmObservationData::Temperature(293.15)),
+        (
+            "TRANSMIT_FREQ_1",
+            TdmObservationData::TransmitFreq1(7167941264.0),
+        ),
+        (
+            "TRANSMIT_FREQ_2",
+            TdmObservationData::TransmitFreq2(7167941265.0),
+        ),
         ("TRANSMIT_FREQ_3", TdmObservationData::TransmitFreq3(31.0)),
         ("TRANSMIT_FREQ_4", TdmObservationData::TransmitFreq4(32.0)),
         ("TRANSMIT_FREQ_5", TdmObservationData::TransmitFreq5(33.0)),
@@ -142,7 +154,7 @@ fn exhaustive_observation_data() {
         ),
         (
             "TRANSMIT_PHASE_CT_1",
-            TdmObservationData::TransmitPhaseCt1("39.0".into()),
+            TdmObservationData::TransmitPhaseCt1("7175173383.615373".into()),
         ),
         (
             "TRANSMIT_PHASE_CT_2",
@@ -160,16 +172,39 @@ fn exhaustive_observation_data() {
             "TRANSMIT_PHASE_CT_5",
             TdmObservationData::TransmitPhaseCt5("43.0".into()),
         ),
-        ("TROPO_DRY", TdmObservationData::TropoDry(44.0)),
-        ("TROPO_WET", TdmObservationData::TropoWet(45.0)),
+        ("TROPO_DRY", TdmObservationData::TropoDry(2.3)),
+        ("TROPO_WET", TdmObservationData::TropoWet(0.15)),
         ("VLBI_DELAY", TdmObservationData::VlbiDelay(46.0)),
     ];
 
-    for (expected_key, data) in cases {
-        assert_eq!(data.key(), expected_key);
-        let val_str = data.value_to_string();
-        let parsed = TdmObservationData::from_key_val(expected_key, &val_str).unwrap();
-        assert_eq!(data, parsed);
+    let mut kvn_rows = String::new();
+    let mut xml_rows = String::new();
+    for (expected_key, data) in &cases {
+        assert_eq!(data.key(), *expected_key);
+        let value = data.value_to_string();
+        assert_eq!(
+            TdmObservationData::from_key_val(expected_key, &value).unwrap(),
+            *data
+        );
+        kvn_rows.push_str(&format!("{expected_key} = 2023-01-01T00:00:00 {value}\n"));
+        xml_rows.push_str(&format!("<observation><EPOCH>2023-01-01T00:00:00</EPOCH><{expected_key}>{value}</{expected_key}></observation>"));
+    }
+    let kvn = format!("CCSDS_TDM_VERS = 2.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\nMETA_START\nTIME_SYSTEM = UTC\nPARTICIPANT_1 = P1\nPARTICIPANT_2 = P2\nPARTICIPANT_3 = P3\nPARTICIPANT_4 = P4\nPARTICIPANT_5 = P5\nMETA_STOP\nDATA_START\n{kvn_rows}DATA_STOP\n");
+    let xml = format!(
+        r#"<tdm id="CCSDS_TDM_VERS" version="2.0">
+<header><CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE><ORIGINATOR>TEST</ORIGINATOR></header>
+<body><segment><metadata><TIME_SYSTEM>UTC</TIME_SYSTEM>
+<PARTICIPANT_1>P1</PARTICIPANT_1><PARTICIPANT_2>P2</PARTICIPANT_2><PARTICIPANT_3>P3</PARTICIPANT_3>
+<PARTICIPANT_4>P4</PARTICIPANT_4><PARTICIPANT_5>P5</PARTICIPANT_5>
+</metadata><data>{xml_rows}</data></segment></body></tdm>"#
+    );
+    use ccsds_ndm::{messages::tdm::Tdm, Ndm};
+    for message in [Tdm::from_kvn(&kvn).unwrap(), Tdm::from_xml(&xml).unwrap()] {
+        let observations = &message.body.segments[0].data.observations;
+        assert_eq!(observations.len(), cases.len());
+        for (observation, (_, expected)) in observations.iter().zip(&cases) {
+            assert_eq!(&observation.data, expected);
+        }
     }
 }
 

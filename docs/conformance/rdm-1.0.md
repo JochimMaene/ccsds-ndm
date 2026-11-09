@@ -22,9 +22,15 @@ The `rdm` suite establishes:
 | XML structure | The shared XML sequence engine is registered for the complete RDM root, header, metadata, data, and seven nested logical-block families. It rejects unknown, duplicate, and reordered children and non-schema attributes. |
 | Conversion preservation | The routed-comment parser associates KVN comments with the logical block selected by the following keyword. RDM 5.2.4.1 requires applicable units to be displayed, so KVN generation writes the fixed unit of every unit-bearing keyword (atmospheric, impact, metadata altitude, state, covariance, spacecraft, and OD measures) even when the model holds none, for example after reading XML that omitted an XSD-optional `units` attribute; such a value reads back from KVN with its unit set. Unitless keywords (probabilities, coefficients, `WEIGHTED_RMS`) are written without a unit. The Annex C XML fixture survives XML-to-KVN conversion modulo the KVN COMMENT separator's non-semantic surrounding-whitespace normalization. |
 | XML-only comment positions | KVN has no `<data>` comment position. Following the OPM/OMM canonical merge, KVN generation writes XML `<data><COMMENT>` lines first, directly before the atmospheric block's own comments, so a KVN reparse returns them at the start of `atmosphericReentryParameters.comment` (`generation::rdm_kvn_merges_an_xml_outer_data_comment_into_the_atmospheric_block`). A comment-only `groundImpactParameters`, `spacecraftParameters`, `odParameters`, or `userDefinedParameters` block has no KVN position (its comment would attach to the next block or trail the message); all materialized and streaming KVN gates refuse it, naming the block, before writing bytes. An empty, comment-free optional XML block (`<odParameters/>`) is read as absent, as KVN would read it (`parsing::rdm_xml_empty_optional_blocks_read_as_absent_and_comment_only_blocks_are_refused_for_kvn`). |
-| KVN numeric precision | Sections 5.3.3.2 and 5.3.3.3(b) limit ordinary KVN numbers to 16 decimal digits. Numeric fields use the shared number writer, rounding a value such as `0.30000000000000004` to `3.0e-1`; reparsing can change its stored `f64`. XML retains the original double. Values whose rounded spelling would overflow are refused before output. `rdm_kvn_rounds_scalars_to_sixteen_digits_and_xml_retains_precision` covers metadata, spacecraft and atmospheric fields, schema-valid XML preservation, and streaming/materialized output agreement. |
+| KVN numeric precision | Sections 5.3.3.2 and 5.3.3.3(b) limit ordinary KVN numbers to 16 decimal digits. Numeric fields use the shared number writer, rounding a value such as `0.30000000000000004` to `0.3`; reparsing can change its stored `f64`. XML retains the original double. Values whose rounded spelling would overflow are refused before output. `rdm_kvn_rounds_scalars_to_sixteen_digits_and_xml_retains_precision` covers metadata, spacecraft and atmospheric fields, schema-valid XML preservation, and streaming/materialized output agreement. |
 | Valid input and generation | Both shipped KVN and both shipped XML fixtures preserve their typed model in their source notation; every generated XML document validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
 | Shared surface contract | `library::parsing` and `library::output`, `conformance::generation`, the Python API tests, and family Criterion matrices provide common parsing, generation, diagnostics, dispatch, and workload evidence linked from the [conformance review index](README.md). |
+
+KVN generation also checks both adjacent `IMPACT_*_CONFIDENCE` pairs after numeric rounding.
+If two distinct levels would become equal, generation refuses before writing bytes rather than
+violating the strict ordering required by §3.5.16. XML retains their original precision.
+`generation::kvn_refuses_confidence_levels_that_round_to_the_same_value` covers both pairs,
+schema-valid XML preservation, and string/streaming KVN refusal.
 
 The existing RDM unit suite separately covers required metadata and atmospheric data, controlled
 re-entry/object choices, reference epochs, ground-impact confidence intervals and bounds, state and
@@ -40,7 +46,7 @@ logical ranges:
 | 1-6 | Mandatory header and message ID | `Rdm`, `RdmHeader`, strict required/root tests |
 | 7-20 | Object identity, controlled-reentry, center, time and reference epoch metadata | `RdmMetadata`, enums, required-field and epoch tests |
 | 21-41 | Optional orbit, propagator, uncertainty, previous/next-message metadata | complete optional metadata roundtrip and strict sequence evidence |
-| 42-52 | Mandatory atmospheric-reentry block and optional windows/confidence | `AtmosphericReentryParameters`, whose validator checks positive numeric lifetime values and lifetime-window ordering; absolute epoch-window limits are stated below |
+| 42-52 | Mandatory atmospheric-reentry block and optional windows/confidence | `AtmosphericReentryParameters`, whose validator checks positive numeric lifetime values; `RdmData::validate` checks lifetime-window ordering; absolute epoch-window limits are stated below |
 | 53-84 | Ground-impact probabilities, location, and three confidence regions | `GroundImpactParameters`, whose validator covers the probabilities and every latitude/longitude bound, the nominal-impact frame/longitude/latitude co-requirement, all-or-none population and consecutive numbering per confidence interval, and strictly increasing `IMPACT_*_CONFIDENCE` |
 | 85-93 | Optional state vector | `StateVector`, completeness/reference-frame tests |
 | 94-117 | Optional 6x6 covariance | `OpmCovarianceMatrix`, state dependency and complete 21-element roundtrips |
@@ -48,10 +54,10 @@ logical ranges:
 | 130-141 | Optional orbit-determination information | `OdParameters`, shared with CDM and routed from `RdmData::validate`; its validator covers the counts, spans, and percentages |
 | 142 | User-defined parameters | ordered user-defined entries, scanner and roundtrips |
 
-No annex-A RDM feature is absent. `OBJECT_TYPE` is the exception to caller-supplied vocabulary:
-RDM defines it as a closed edition-specific list, so unknown values are rejected rather than
-preserved — see "Registry-governed values" in the [validation contract](../design/validation-contract.md).
-Other SANA-sourced vocabulary remains external and caller supplied, while locally decidable
+No annex-A RDM feature is absent. `OBJECT_TYPE` is not registry-governed: RDM defines it as a
+closed edition-specific list, so unknown values are rejected rather than preserved — see
+"Registry-governed values" in the [validation contract](../design/validation-contract.md).
+SANA-sourced vocabulary remains external and caller supplied, while locally decidable
 controlled values and numeric ranges are typed and validated.
 
 RDM §§3.5.8–3.5.9 say the orbit-lifetime and re-entry epochs *should* resolve consistently. That
@@ -61,11 +67,12 @@ not supply, so the two are not compared. Recorded here as a deliberate non-claim
 `NOMINAL_IMPACT_ALT` separates semantics from representability. RDM states no numeric range and
 permits non-Earth body-fixed frames, while the common 4.0 XSD applies an Earth-derived range, so
 the model preserves any finite altitude and validation enforces only finiteness. KVN writes such a
-value; XML generation refuses it with the offending field path rather than altering it to fit.
-Both XSD boundaries generate schema-valid XML. `altType` makes the metre `units` annotation
+value; XML input rejects it and XML generation refuses it with the offending field path rather
+than altering it to fit, because the XSD governs XML value domains. Both XSD boundaries generate
+schema-valid XML. `altType` makes the metre `units` annotation
 optional: XML input retains omission, XML output may omit it, and KVN output supplies `[m]`
-under §5.2.4.1. The public Rust `AltitudeRequired` name is retained for compatibility, but its
-`units` field is `Option<LengthUnits>`. Python continues to expose the numeric altitude.
+under §5.2.4.1. The Rust measure is `ImpactAltitude`, whose `units` field is
+`Option<LengthUnits>`. Python exposes the numeric altitude.
 `parsing::nominal_impact_altitude_units_are_optional_in_xml_but_displayed_in_kvn` covers the
 schema-valid omission, XML preservation, and canonical KVN output.
 
@@ -90,10 +97,16 @@ covers the variant.
 [validation contract](../design/validation-contract.md#shared-lexical-decisions)); XML follows the
 XSD enumeration.
 
-Other accepted deviations, each read losslessly and written in canonical form:
+Other accepted spellings and compatibility exceptions. Normalization is field-specific: closed
+enumerations are written in canonical form, while free text, `INTERNATIONAL_DESIGNATOR`, and
+`IMPACT_REF_FRAME` are written as read:
 
-- a missing optional unit in KVN or XML (KVN output displays the fixed unit, see above);
-- mixed-case free text (`OBJECT_NAME`, frames, registry-sourced names), preserved as written;
+- a missing unit in KVN, which 5.2.4.1 says to display (KVN output displays the fixed unit, see
+  above; omission of XSD-optional XML `units` is schema-valid, not a deviation);
+- mixed-case free text (`OBJECT_NAME`, frames, registry-sourced names), read and also written as
+  given, although KVN §5.2.3.3 requires uppercase text values and XML §5.4.3.5 forbids mixing
+  cases: under the shared policy the library does not alter the case of free text, since
+  case-folding a caller's identifier would change data the library cannot reinterpret;
 - `_` for a blank in multi-word enumeration values (`ROCKET_BODY`) in KVN and Python
   categorical lookup, per RDM 5.3.3.4; XML uses its schema spellings, except the explicitly
   documented disintegration transcription alias above;
@@ -161,8 +174,10 @@ apply in every notation (see the
 lifetime fields, to keep that value domain compatible across notations. Model-validation errors
 name the keyword. Typed XML measures can fail deserialization first with a common type name
 and structured source location instead of a model path; see the shared diagnostics contract.
-Numeric lifetime-window start/end ordering is an additional library consistency check:
-START is required to be no later than END, following the interval meanings in table 3-3 and §3.5.9.
+Numeric lifetime-window start/end ordering is checked in `RdmData::validate`: START must be no
+later than END. Table 3-3 defines them as the start and end of one window, so a reversed pair is
+inconsistent message semantics, which the
+[validation contract](../design/validation-contract.md#authority-and-representability) rejects.
 The XSD has no cross-field constraint; this is not a claim that it enforces the relationship.
 `generation::orbit_lifetime_rule_is_enforced_at_every_public_boundary` and
 `generation::lifetime_window_offsets_are_positive_in_every_notation` cover the rule.
@@ -185,15 +200,16 @@ always available at that boundary.
 
 The nominal-location dependency in RDM §3.5.10 is applied when any nominal impact
 longitude, latitude, or altitude is supplied, including `NOMINAL_IMPACT_ALT` alone: frame,
-nominal longitude, and nominal latitude are then required together. A complete
-confidence-region block (`IMPACT_n_*`) alone does not trigger that dependency, so confidence
-coordinates without `IMPACT_REF_FRAME` are accepted. This explicitly follows the schema's independently optional fields rather than
-requiring an additional nominal solution. The broader prose phrase "ground impact location"
-could also be read to include a confidence-only region; this library takes the permissive
-reading. If its frame is omitted, the caller must establish the coordinate interpretation
-with the exchange partner; the library supplies no implicit frame.
+nominal longitude, and nominal latitude are then required together. For confidence regions
+(`IMPACT_n_*`) without a nominal location the book is ambiguous: table 3-3 makes
+IMPACT_REF_FRAME mandatory only "if NOMINAL_IMPACT_LON and NOMINAL_IMPACT_LAT are present", and
+§3.5.10's "if a ground impact location is given" does not say whether a region alone is one, yet
+table 3-3 gives the `IMPACT_n_*` longitudes and latitudes "with respect to the value of
+IMPACT_REF_FRAME". Reading therefore accepts a frameless region (no frame or nominal value is
+invented), while KVN and XML generation refuse one, naming IMPACT_REF_FRAME, so the library
+never writes coordinates without their frame.
 `rdm::generation::confidence_only_region_follows_the_schema_without_inventing_a_nominal_solution`
-records this boundary.
+checks frameless reading in both notations, output refusal, and preservation with a frame.
 
 Longitude and latitude ranges are cited as RDM §3.5.11 and §3.5.12, the numbering in the
 corrigendum-1 text used here (3.5.14 and 3.5.15 there cover which `IMPACT_n_*` sets to use).
@@ -224,3 +240,6 @@ WET_MASS, observation/track counts are not compared to their available counts, a
 impact/reentry windows are not ordered or checked for enclosure. These relationships remain
 the caller's responsibility. This does not relax the positive count and nonnegative mass domains, nominal
 location dependencies, confidence-region completeness, or increasing confidence levels.
+
+XML input and output both enforce the bundled NOMINAL_IMPACT_ALT range −430.5…8848 m.
+The model and KVN preserve any finite altitude under the documented book/schema conflict.

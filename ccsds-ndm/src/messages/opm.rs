@@ -615,14 +615,12 @@ pub struct ManeuverParameters {
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub man_duration: Duration,
-    /// Mass change during maneuver (value is < 0)
+    /// Mass change during maneuver: < 0 in edition 2.0; <= 0 in edition 3.0.
     ///
     /// **Units**: kg
     ///
-    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
-    ///
-    /// The applicable XML schema uses `deltamassTypeZ`, so zero is allowed.
-    /// In edition 2.0 the negativeDouble domain excludes zero; 3.0 permits zero.
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4 (`deltamassTypeZ`); 2.0 uses
+    /// `negativeDouble`, which excludes zero.
     pub man_delta_mass: DeltaMassZ,
     /// Reference frame in which the velocity increment vector data are given. The user must
     /// select from the accepted set of values indicated in 3.2.4.11.

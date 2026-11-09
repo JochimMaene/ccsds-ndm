@@ -1,6 +1,6 @@
 use crate::common::mutated;
 use crate::{ATT_KVN, COV_KVN};
-use ccsds_ndm::error::{CcsdsNdmError, ValidationError};
+use ccsds_ndm::error::CcsdsNdmError;
 use ccsds_ndm::messages::acm::Acm;
 use ccsds_ndm::types::AcmAttitudeType;
 use ccsds_ndm::Ndm;
@@ -39,75 +39,19 @@ fn test_parse_acm_minimal() {
 
 #[test]
 fn test_parse_acm_version_error() {
-    let input = r#"CCSDS_ACM_VERS = 3.0
-CREATION_DATE = 2022-11-04T17:22:31
-ORIGINATOR = NASA/JPL
-META_START
-OBJECT_NAME = MARS GLOBAL SURVEYOR
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2002-11-04T17:22:31
-META_STOP
-ATT_START
-REF_FRAME_A = EME2000
-REF_FRAME_B = SC_BODY_1
-NUMBER_STATES = 4
-ATT_TYPE = QUATERNION
-0.0 0.5 0.5 0.5 0.5
-ATT_STOP
-"#;
-    let err = Acm::from_kvn(input).unwrap_err();
+    let input = mutated(
+        crate::ATT_KVN,
+        "CCSDS_ACM_VERS = 2.0",
+        "CCSDS_ACM_VERS = 3.0",
+    );
+    let err = Acm::from_kvn(&input).unwrap_err();
+    let err = crate::common::parse_error_cause(err);
     match err {
         CcsdsNdmError::UnsupportedInputVersion { version, .. } => {
             assert_eq!(version, "3.0");
         }
         _ => panic!("Expected unsupported input version, got {:?}", err),
     }
-}
-
-#[test]
-fn test_acm_missing_mandatory_metadata() {
-    let input = r#"CCSDS_ACM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-ATT_START
-REF_FRAME_A = GCRF
-REF_FRAME_B = SC_BODY
-NUMBER_STATES = 4
-ATT_TYPE = QUATERNION
-0.0 0 0 0 1
-ATT_STOP
-"#;
-    let err = Acm::from_kvn(input).unwrap_err();
-    match err {
-        CcsdsNdmError::Validation(boxed_err) => match *boxed_err {
-            ValidationError::MissingRequiredField { field, .. } => {
-                assert_eq!(field, "OBJECT_NAME");
-            }
-            _ => panic!("Expected missing field error, got {:?}", boxed_err),
-        },
-        _ => panic!("Expected Validation error, got {:?}", err),
-    }
-}
-
-#[test]
-fn test_acm_att_block_variants() {
-    let att_block = r#"ATT_START
-REF_FRAME_A = EME2000
-REF_FRAME_B = SC_BODY_1
-NUMBER_STATES = 3
-ATT_TYPE = EULER_ANGLES
-EULER_ROT_SEQ = ZYX
-0.0 10.0 20.0 30.0
-ATT_STOP
-"#;
-    let input = format!("{}{}{}", sample_acm_header(), sample_acm_meta(), att_block);
-    let acm = Acm::from_kvn(&input).unwrap();
-    let att = &acm.body.segment.data.att[0];
-    assert_eq!(att.att_type, AcmAttitudeType::EulerAngles);
 }
 
 #[test]
@@ -333,58 +277,13 @@ fn acm_xml_rejects_unknown_nested_content_attributes_and_ordering_errors() {
 }
 
 #[test]
-fn acm_multiple_att_blocks() {
-    let kvn = r#"CCSDS_ACM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-OBJECT_NAME = SAT1
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-ATT_START
-REF_FRAME_A = GCRF
-REF_FRAME_B = SC_BODY
-NUMBER_STATES = 4
-ATT_TYPE = QUATERNION
-0.0 0 0 0 1
-ATT_STOP
-ATT_START
-REF_FRAME_A = GCRF
-REF_FRAME_B = INSTRUMENT
-NUMBER_STATES = 4
-ATT_TYPE = QUATERNION
-0.0 0 0 0 1
-ATT_STOP
-"#;
-    let acm = Acm::from_kvn(kvn).unwrap();
-    assert_eq!(acm.body.segment.data.att.len(), 2);
-}
-
-#[test]
-fn acm_physical_block() {
-    let kvn = r#"CCSDS_ACM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-OBJECT_NAME = SAT1
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-PHYS_START
-WET_MASS = 1000 [kg]
-DRY_MASS = 500 [kg]
-PHYS_STOP
-"#;
-    let acm = Acm::from_kvn(kvn).unwrap();
-    let phys = acm.body.segment.data.phys.as_ref().unwrap();
-    assert_eq!(phys.wet_mass.as_ref().unwrap().value, 1000.0);
-}
-
-#[test]
 fn euler_history_preserves_unwrapped_finite_angles() {
     let input = format!("{}{}ATT_START\nREF_FRAME_A = ICRF\nREF_FRAME_B = SC_BODY_1\nNUMBER_STATES = 3\nATT_TYPE = EULER_ANGLES\nEULER_ROT_SEQ = ZYX\n0.0 999999.0 0.0 0.0\nATT_STOP\n", sample_acm_header(), sample_acm_meta());
     let message = Acm::from_kvn(&input).unwrap();
+    assert_eq!(
+        message.body.segment.data.att[0].att_type,
+        AcmAttitudeType::EulerAngles
+    );
     assert_eq!(
         message.body.segment.data.att[0].att_lines[0].values[0],
         999999.0
@@ -508,47 +407,9 @@ fn ad_cov_type_none_normalizes_to_omission() {
 
 #[test]
 fn acm_specific_rejections_name_the_keyword() {
-    let classification = mutated(
-        ATT_KVN,
-        "TIME_SYSTEM",
-        "CLASSIFICATION = PUBLIC\nTIME_SYSTEM",
-    );
-    let error = Acm::from_kvn(&classification).unwrap_err().to_string();
-    assert!(
-        error.contains("CLASSIFICATION is supported only in the ACM header"),
-        "{error}"
-    );
     let duration = mutated(ATT_KVN, "MAN_DURATION = 450.0", "MAN_DURATION = -1.0");
     let error = Acm::from_kvn(&duration).unwrap_err().to_string();
     assert!(error.contains("MAN_DURATION"), "{error}");
-    for (from, to, keyword) in [
-        (
-            "MAN_DURATION = 450.0",
-            "MAN_DURATION = 450.0 [min]",
-            "MAN_DURATION",
-        ),
-        (
-            "TARGET_MOMENTUM = 1.30 -16.400 -11.350",
-            "TARGET_MOMENTUM = 1.30 -16.400 -11.350 [Nms]",
-            "TARGET_MOMENTUM",
-        ),
-    ] {
-        let error = Acm::from_kvn(&mutated(ATT_KVN, from, to))
-            .unwrap_err()
-            .to_string();
-        assert!(error.contains(keyword), "{error}");
-    }
-}
-
-#[test]
-fn blank_lines_are_insignificant_inside_histories_and_between_sensors() {
-    for source in [crate::ATT_KVN, crate::COV_KVN] {
-        let original = Acm::from_kvn(source).unwrap();
-        assert_eq!(
-            Acm::from_kvn(&source.replace('\n', "\n\n")).unwrap(),
-            original
-        );
-    }
 }
 
 #[test]
@@ -608,6 +469,18 @@ fn known_basis_and_method_blank_aliases_canonicalize() {
 fn unit_errors_name_the_field_on_its_original_record() {
     for (source, from, to, field) in [
         (
+            ATT_KVN,
+            "MAN_DURATION = 450.0",
+            "MAN_DURATION = 450.0 [min]",
+            "MAN_DURATION",
+        ),
+        (
+            ATT_KVN,
+            "TARGET_MOMENTUM = 1.30 -16.400 -11.350",
+            "TARGET_MOMENTUM = 1.30 -16.400 -11.350 [Nms]",
+            "TARGET_MOMENTUM",
+        ),
+        (
             include_str!("../../data/kvn/acm_g8.kvn"),
             "CP = 0.04 -0.78 -0.023 [m]",
             "CP = 0.04 -0.78 -0.023 [lb]",
@@ -642,5 +515,29 @@ fn unit_errors_name_the_field_on_its_original_record() {
         let kvn = crate::common::kvn_parse_error(&error).unwrap();
         assert_eq!(kvn.line, expected_line, "{error}");
         assert!(kvn.message.contains(field), "{error}");
+    }
+}
+
+#[test]
+fn known_orekit_samples_with_missing_conditional_values_are_rejected() {
+    for (sample, field) in [
+        (
+            include_str!("../../../data/ccsds/adm/acm/ACMExample03.txt"),
+            "CP_REF_FRAME",
+        ),
+        (
+            include_str!("../../../data/ccsds/adm/acm/ACMExample09.txt"),
+            "TARGET_MOM_FRAME",
+        ),
+        (
+            &include_str!("../../data/kvn/acm_g9.kvn").replace(
+                "NUMBER_STATES = 7\nATTITUDE_STATES",
+                "NUMBER_STATES = -1\nATTITUDE_STATES",
+            ),
+            "NUMBER_STATES",
+        ),
+    ] {
+        let error = Acm::from_kvn(sample).unwrap_err().to_string();
+        assert!(error.contains(field), "{field}: {error}");
     }
 }

@@ -210,7 +210,3 @@ class TestAssignmentDefersToRootValidation:
         assert_all_surfaces_reject(ocm, "GM")
         ocm.segment.data.pert.gm = float("nan")
         assert_all_surfaces_reject(ocm, "GM")
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

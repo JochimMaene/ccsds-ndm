@@ -182,7 +182,7 @@ impl Opm {
     /// ValueError
     ///     Unsupported format argument.
     /// NdmIoError
-    ///     Input file could not be read.
+    ///     Input file could not be read or contains invalid UTF-8 bytes.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
@@ -1589,7 +1589,7 @@ impl OpmData {
 /// man_duration : float
 ///     Duration of maneuver (s).
 /// man_delta_mass : float
-///     Mass change during maneuver (kg).
+///     Mass change during maneuver (kg): < 0 in 2.0; <= 0 in 3.0.
 /// man_ref_frame : str
 ///     Reference frame for velocity change.
 /// man_dv_1 : float
@@ -1691,7 +1691,7 @@ impl OpmManeuverParameters {
         self.inner.man_duration.value = value;
     }
 
-    /// Mass change during maneuver (value is < 0)
+    /// Mass change during maneuver: negative in 2.0; nonpositive in 3.0.
     ///
     /// Units: kg
     ///

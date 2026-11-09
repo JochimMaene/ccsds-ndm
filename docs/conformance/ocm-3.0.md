@@ -21,15 +21,27 @@ The `ocm` and `ocm_kvn_allocations` suites establish:
 | --- | --- |
 | KVN lexical and marked-block structure | The OCM scanner rejects non-ASCII values outside comments and forbidden controls, malformed or unknown assignments, duplicate and reordered keywords, unknown/nested/mismatched blocks, invalid logical-block order, and comments outside the beginning of a block. OCM permits arbitrary line lengths under ODM §7.3.3; reading and generation preserve this family exception. |
 | XML structure | The shared XML sequence engine is registered for the complete OCM root, header, metadata, data, trajectory, physical, covariance, maneuver, perturbation, orbit-determination, and user-defined structures. It rejects unknown, duplicate, reordered, and non-schema nested content and attributes. |
-| Silent-loss corrections | Complex `pert`, `od`, and `user` elements no longer use the scalar nullable adapter, so they survive XML parsing. KVN retains optional GM units. `DC_REF_DIR` and `DC_BODY_TRIGGER` use the schema's single three-number lexical value rather than generating nested Rust field elements. |
+| Silent-loss corrections | Complex `pert`, `od`, and `user` elements no longer use the scalar nullable adapter, so they survive XML parsing. KVN retains optional GM units. `DC_REF_DIR` and `DC_BODY_TRIGGER` use the schema's single three-number lexical value rather than generating nested Rust field elements. Supplied KVN units on either dimensionless vector are rejected (`duty_cycle_direction_vectors_reject_supplied_kvn_units`). |
 | Fixture and history preservation | The five current KVN fixtures and the shipped XML fixture retain their typed model under source-notation regeneration. KVN/XML crossings retain trajectory, physical, covariance, maneuver, perturbation, OD, and user blocks represented by the corpus. G19 is adapted for current covariance linkage and cannot cross to the older XML schema. Every generated XML document validates against the official 4.0.0 master schema. Schema validation runs through libxml2, which establishes structure, ordering, and lexical form; it is not evidence of numeric domain validity, because libxml2 accepts NaN against bounding facets (see the XSD oracle policy in the [validation contract](../design/validation-contract.md)). |
 | Generation boundary | Materialized and streaming KVN generation reject non-ASCII free text while preserving OCM's arbitrary line lengths. Typed scalar, measure, fixed-vector, trajectory and covariance values use the shared 16-significant-digit formatter, rounding when needed and refusing values whose rounded spelling would overflow. `kvn_scalar_measures_wrappers_and_vectors_use_the_same_digit_limit` checks representative scalar/vector paths and zero-output refusal; the TIME_AND_ANGLE vector regression proves both notation paths. |
 | Resource behaviour | Parsing 10 versus 1,000 trajectory and covariance records uses one owned numeric vector allocation per record without per-record reallocation. Maneuver parsing is bounded by its owned strings/vectors. Validated streaming generation has record-independent temporary allocation overhead for trajectory, covariance, and maneuver histories; materialized storage stays output-proportional. |
 | Reproducible workloads | `ocm_{trajectory,covariance,maneuver}_{kvn,xml}_history_scaling` measure parse and generation of each history kind — CARTPV trajectory, CARTP covariance, relative-time maneuver — at 100, 10,000 and 50,000 records in KVN and the first two in XML, the sizes every history-carrying family shares. The shared family matrices add representative small-message comparisons. |
 | Shared surfaces | `library::parsing` and `library::output`, Python API tests, and the shared generation plumbing exercise parsing, generation, structured diagnostics, and Rust-core delegation. |
 
-The two shipped KVN comments that used a Greek eta were normalized to the ASCII word `eta`; strict
-KVN processing does not silently accept or regenerate the non-ASCII spelling.
+The two shipped KVN comments that used a Greek eta were normalized to the ASCII word `eta`.
+Non-ASCII comments are accepted on read; XML preserves them, while KVN generation refuses them,
+as specified by the shared lexical contract.
+
+`DC_BODY_FRAME` must be nonblank when `DC_TYPE=TIME_AND_ANGLE`: ODM §6.2.8.20.7 and
+table 6-7 require the trigger vector's frame, and §7.5.1 requires a nonempty mandatory value.
+The XSD's optional string cannot express this dependency. Other duty-cycle types keep the
+optional XML string domain. `time_and_angle_requires_a_nonblank_body_frame` covers both
+XML input and edited-model generation.
+
+XML `WEIGHTED_RMS` has no `units` attribute (`nonNegativeDouble`); supplied annotations
+are rejected rather than discarded. `od_optional_fields_roundtrip` checks this boundary and
+schema-valid unitless output. The complete OCM units allowlist was compared with the bundled
+schema's unit-bearing types; no other mismatch was found.
 
 ## Normative inventory reconciliation
 
@@ -162,7 +174,10 @@ The trajectory `USEABLE_START_TIME` and `USEABLE_STOP_TIME` fields accept relati
 seconds or real calendar/ordinal epochs, as allowed by ODM §6.2.2.3 and XSD `epochType`.
 The model retains those spellings without converting between forms. Their syntax is checked,
 but the library does not prove that the bounds cover the history rows or reject reversed
-trajectory usable bounds; callers must establish the intended usable interval. Regression:
+trajectory usable bounds; callers must establish the intended usable interval. Pairing a
+calendar bound with relative history rows is accepted: ODM §6.2.2.5 forbids mixing relative and
+absolute "time-tags" within a data block, which the library reads leniently as the history
+records' time tags only. Regression:
 `epochs::trajectory_useable_times_accept_relative_tags`.
 
 ## Numerical record contracts
@@ -178,6 +193,10 @@ unit, and physical interpretation cannot be established without a registry defin
 
 - Known trajectory records have exactly the declared number of elements; known `TRAJ_UNITS`
   lists have the corresponding cardinality and standard units.
+- The two registries order Delaunay elements differently, and the library follows each as
+  published (rechecked 2026-11-06): Orbital Elements `DELAUNAY`/`DELAUNAYMOD` list the actions
+  first (`3 × km**2/s` or `3 × km**0.5`, then `3 × deg`); Orbital Covariance Matrix Types
+  `TDELAUNAY`/`TDELAUNAYMOD` list `s`, then the angles, then the actions.
 - Known covariance matrix records have `N(N+1)/2` entries for LTM/UTM and `N²` for FULL,
   LTMWCC, and UTMWCC. Covariance `COV_UNITS` describes standard deviations, not squared
   covariance entries, and must list all diagonal components with their standard units.
@@ -279,12 +298,15 @@ KVN/model form and refuse incompatible XML. GM must be positive in every notatio
 Omitted optional trajectory `INTERPOLATION_DEGREE`, `ORB_REVNUM_BASIS`, and `ORB_AVERAGING`
 remain absent in the model and regenerated output. The book's defaults describe interpretation;
 parsing does not insert optional assignments. Required concrete frame/center fields still use the
-book's documented defaults when omitted. Validation applies the interpolation-degree default
-without pretending that the producer supplied it.
+book's documented defaults when omitted. An omitted `INTERPOLATION_DEGREE` means degree 3
+(table 6-4); no library check depends on that value, and it is not inserted into the model.
 
 `OcmUserDefined.entries` retains scalar parameters and comments in XML order, including
 interleaving; composition parameters retain their opaque sequence rows. XML-to-XML preserves
 entry order. KVN conversion refuses comments after parameters rather than relocating them.
+Empty XML user values read back successfully; whitespace-only values normalize to empty while
+padding around nonblank values remains intact, following the documented
+[shared XML payload limit](../design/validation-contract.md#shared-lexical-decisions).
 
 OCM count fields using XSD `positiveInteger` (`DC_MAX_CYCLES`, `ALBEDO_GRID_SIZE`,
 observation/track counts, `SOLVE_N`, `CONSIDER_N`, and `SENSORS_N`) must be positive in every
@@ -316,11 +338,36 @@ enumerations. `OBJECT_TYPE` preserves open SANA tokens, canonicalizing known val
 
 `TRAJ_FRAME_EPOCH`, `COV_FRAME_EPOCH`, and `MAN_FRAME_EPOCH` permit relative or calendar
 forms, as do `OEB_PARENT_FRAME_EPOCH` and `USEABLE_*` (6.2.2.3). Maneuver metadata epochs
-can independently use either form; data-line tags follow `MAN_COMPOSITION`.
+can independently use either form; data-line tags follow `MAN_COMPOSITION`. This is the
+lenient reading of ODM §6.2.2.5 ("all time-tags" of a block use one form): the rule is applied
+to the data records only, not to `DC_WIN_OPEN`, `DC_WIN_CLOSE`, `DC_EXEC_*`, `MAN_*_EPOCH` or
+the trajectory `USEABLE_*` bounds.
+
+Required `OD_EPOCH` and supplied `SW_DATA_EPOCH` likewise require a real calendar/ordinal
+date or a complete relative number (ODM §6.2.2.3, tables 6-10 and 6-11). The XSD's
+`epochType` pattern also admits empty values, incomplete numbers such as `+` and `.`, and
+impossible dates; these fail the shared semantic epoch check in parsing, model validation,
+and both output notations. Valid zero and negative relative tags remain supported. A blank
+optional KVN `SW_DATA_EPOCH` still means absent under the shared missing-value policy.
+`epochs::od_and_space_weather_epochs_require_valid_values_in_all_routes` covers these
+boundaries, including zero-byte streaming failures.
+
+Book over XSD: `EPOCH_TZERO`, `NEXT_LEAP_EPOCH`, `PREVIOUS_MESSAGE_EPOCH` and
+`NEXT_MESSAGE_EPOCH` accept calendar/ordinal epochs only, narrower than the XSD `epochType`
+union that also admits relative numbers. They are absolute anchors in table 6-3, not
+offsets from EPOCH_TZERO; relative spellings are rejected in every notation.
 
 An omitted `ORB_REVNUM_BASIS` implicitly means 0 (6.2.1.3 and table 6-4). An OD block requires PERT (table 6-1),
 and `OD_ID`/`OD_METHOD` cannot be blank. `MAN_UNITS`, when present, has one entry for each
-composition element after the time tag, using its mandatory units in tables 6-8/6-9. `DEPLOY_MASS` must be nonpositive and `THR_INTERP` /
+composition element after the time tag, using its mandatory units in tables 6-8/6-9.
+Switches (`ACC_INTERP`, `THR_INTERP`), dimensionless values (`THR_EFFIC`, `DEPLOY_DV_RATIO`)
+and text (`DEPLOY_ID`) require `n/a` under table 6-7; labels never change the values' units.
+`maneuver_switch_dimensionless_and_text_columns_require_na_units` checks parsing, edits and
+both output paths. `DEPLOY_MASS` must be nonpositive, checked against the retained decimal
+even when a tiny positive value would round to double zero. Negative underflow text and
+signed zero remain valid in the model/XML; KVN still refuses nonzero underflow.
+`deployment_mass_sign_uses_the_retained_decimal_before_double_rounding` covers input, edited
+models, and zero-byte output refusal. `THR_INTERP` /
 `ACC_INTERP` must be `ON` or `OFF`. `OEB_QC` is nonnegative except the book's tumbling sentinel
 `-999`; partial OEB quaternions remain accepted. `OCM_DATA_ELEMENTS` remains descriptive text
 without enforcing an exact block inventory, preserving real producer messages.
@@ -344,9 +391,8 @@ are not silently repaired. `KEPLERIANMEANSGP-4` is provisional in the SANA regis
 preserves the token without certifying the external model. The TC1 document is linked above
 because the bundled base ODM text predates it.
 
-KVN reading tolerates lines longer than the book's 254-character limit where applicable;
-writing enforces that limit, so an accepted overlong record can require shortening before
-regeneration. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
+OCM reading and writing permit lines longer than 254 characters (ODM §7.3.3; §7.3.2 limits only OPM, OMM and OEM). `allow_long_records` disables the shared 254-character writer check for OCM, so
+wide trajectory and covariance histories are deliberately not wrapped. Shared encoding, namespace, epoch, `N/A`, whitespace and categorical rules
 are specified in the [validation contract](../design/validation-contract.md).
 
 TC1 does not specify insertion positions for OWNER_URL and covariance TRAJ_ID, so KVN
@@ -401,3 +447,27 @@ follow `DC_WIN_CLOSE` (table 6-7); `DC_TIME_PULSE_PERIOD` must not be shorter th
 `DC_MAX_CYCLES` are not ordered. Consumers must check those operational relationships, as well as trajectory usable bounds and record coverage. Native unsigned count
 fields can retain values such as OBS_USED=3000000000 in XML/model form, while KVN integer
 output refuses values above its signed 32-bit maximum.
+
+## Pre-release corrections
+
+Malformed covariance rows and a missing COV_STOP fail parsing; a bad middle row (non-numeric,
+underflowing such as `1e-400`, or with trailing text) is never silently dropped.
+`parsing::malformed_covariance_rows_never_disappear` covers these cases.
+
+Generation writes MAN_COMPOSITION as uppercase comma-separated column names, and TRAJ_UNITS,
+COV_UNITS and MAN_UNITS as bracketed comma-separated lists, in both KVN and XML (ODM
+§6.2.8.15, tables 6-4, 6-6 and 6-7; the XSD types these elements as `xsd:string`, so the book
+form governs). Reading leniently accepts blank-separated or unbracketed lists and all-lowercase
+column names and normalizes them to that form; already bracketed comma lists keep their
+internal spacing. `generation::maneuver_composition_and_units_lists_are_written_in_book_form`
+covers both notations after model edits.
+
+MAN_COMPOSITION column names must be all uppercase or all lowercase (ODM 7.5.3); mixed case
+such as `Time_Relative, Dv_X` is rejected like other OCM enumerations
+(`generation::mixed_case_maneuver_composition_is_rejected`).
+
+A USER block with no USER_DEFINED parameter (empty, or comments only; KVN
+`USER_START`/`USER_STOP` or XML `<user/>`) is read because the XSD allows zero parameters, but
+both KVN and XML generation refuse it because table 6-12 makes USER_DEFINED_x mandatory.
+Consequently such an XML document does not round-trip until a parameter is added or the block
+removed. `generation::empty_user_block_is_read_but_not_generated` covers both notations.

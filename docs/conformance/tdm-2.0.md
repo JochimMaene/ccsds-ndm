@@ -49,8 +49,9 @@ the deliberate signal-context exceptions below, define the acceptance boundary.
 Concretely, every populated `PATH`, `PATH_1`, and `PATH_2` is re-parsed at
 validation and each index is checked against the `PARTICIPANT_n` fields actually supplied, so the
 XML and tuple-field routes no longer bypass the path parser; and the `SINGLE_DIFF` requirement for
-`RECEIVE_BAND` depends on whether the segment actually carries differenced frequency or range
-observations rather than on metadata alone. All six schema spellings of `RANGE_UNITS` (`km`, `KM`, `s`, `S`, `RU`, `ru`) are accepted
+`RECEIVE_BAND` depends on whether the segment actually carries the non-indexed `RECEIVE_FREQ` or
+`RANGE` observations that §§3.3.2.5.5 and 3.3.2.5.7 use for differenced data, rather than on
+metadata alone. All six schema spellings of `RANGE_UNITS` (`km`, `KM`, `s`, `S`, `RU`, `ru`) are accepted
 in XML. KVN reads `RANGE_UNITS` in any letter case (`Km`, `rU`): table 3-3 lists the three values
 without a case rule, and each case variant names exactly one unit. Every writer emits the book
 spellings `km`, `s`, and `RU`. This is a TDM alias set in the sense of the shared
@@ -178,14 +179,15 @@ Other field-specific precision rules still apply where documented. See the share
 [epoch storage policy](../design/validation-contract.md#epoch-storage-limit).
 
 The primary implementation and full output evidence cover edition 2.0. A restricted
-input-only 1.0 reader is also supported in KVN and XML; see [TDM 1.0 input](#tdm-1-0-input).
+input-only 1.0 reader is also supported in KVN and XML; see [TDM 1.0 input](#tdm-10-input).
 
 Time-system and frame registry membership, calibration truth, and the correctness of an
 exchange-partner path are outside the message. Local participant-index existence, path/mode
 choices, observation domains, and conditional metadata remain library checks.
 
-Metadata `START_TIME`/`STOP_TIME` are checked for epoch syntax and precision, but the library
-does not compare their ordering or check that they enclose every observation. Table 3-3
+Metadata `START_TIME`/`STOP_TIME` are checked for calendar syntax and the shared 64-byte storage
+limit; no fractional-digit cap applies. The library does not compare their ordering or check
+that they enclose every observation. Table 3-3
 describes these bounds in UTC while observations use `TIME_SYSTEM`; observation enclosure
 can require time-scale conversion, which the library does not perform. The XSD permits
 independently optional bounds. Callers must establish coverage and window consistency;
@@ -233,11 +235,16 @@ limit, so such a message still converts to XML.
 
 Optional XML `ANGLE_1`/`ANGLE_2` unit annotations are checked against the schema's `deg`
 spelling; `rad` is rejected rather than ignored or converted. Their fixed degree annotation
-may be omitted by the writer. Ordinary observation numbers use the shared finite-number reader,
-including nonzero-underflow rejection; exact phase counts retain their separate decimal model.
+may be omitted by the writer. KVN observation numbers and ordinary XML observations such as
+`RANGE` and `DOPPLER_INSTANTANEOUS` use the shared finite-number reader, including
+nonzero-underflow rejection. XML `ANGLE_1`, `ANGLE_2`, and `RHUMIDITY` use the unit-bearing
+double reader: `1e-999` and `-1e-999` round to positive and negative zero respectively,
+following XML double value mapping. Both paths retain representable subnormals such as `5e-324`.
+Exact phase counts retain their separate decimal model.
 `tdm_xml_accepts_the_schema_defined_optional_observation_units` covers incompatible annotations,
 and `observation_numbers_use_shared_reading_rules_without_underflow` covers observation spelling
 and range boundaries.
+`xml_unit_bearing_observations_follow_double_underflow_mapping` records the XML distinction.
 
 ## XML default elements and numeric storage
 
@@ -245,9 +252,24 @@ The bundled TDM schema assigns zero defaults to present, empty `FREQ_OFFSET`, `R
 all five `TRANSMIT_DELAY_*` and all five `RECEIVE_DELAY_*` elements, and observation
 `CLOCK_BIAS`/`CLOCK_DRIFT`. Empty `DATA_QUALITY` means `RAW`. Readers materialize those
 values; writers emit them explicitly. Omitted optional metadata remains absent rather
-than being populated. Empty elements without a schema default remain invalid.
+than being populated. Nonempty XML `DATA_QUALITY` values use only the exact schema
+spellings (`RAW`/`raw`, `VALIDATED`/`validated`, `DEGRADED`/`degraded`); mixed case and
+padding are rejected like other schema string enumerations. KVN remains case-insensitive.
+`xml_data_quality_uses_schema_spellings_while_kvn_remains_case_insensitive` covers this boundary.
+Empty elements without a schema default remain invalid.
 `tdm::parsing::present_empty_xml_elements_use_schema_defaults_and_omissions_stay_absent`
 checks every default-bearing field, both empty element spellings, and nearby invalid cases.
+
+**Metadata whitespace exception:** `FREQ_OFFSET`, `RANGE_MODULUS`, `TRANSMIT_DELAY_1` through
+`TRANSMIT_DELAY_5`, and `RECEIVE_DELAY_1` through `RECEIVE_DELAY_5` also read whitespace-only
+XML content as zero, including character references and CDATA. This is a library limitation,
+not an XSD default rule or a known-producer requirement: quick-xml drops whitespace-only text
+while buffering these metadata elements, before their default handler sees it. Preserving the
+distinction would require additional XML-specific parsing while retaining numeric model
+deserialization. Writers emit explicit zeroes. `CLOCK_BIAS` and `CLOCK_DRIFT` use a direct
+text reader and reject whitespace-only content; only truly empty elements default to zero.
+`DATA_QUALITY` retains its exact string-domain rules above. The same regression checks all
+twelve metadata fields and the stricter clock observations.
 
 The [integer storage limits](../design/validation-contract.md#integer-storage-limits) apply:
 `INTERPOLATION_DEGREE` is positive `u32` and `DOPPLER_COUNT_SCALE` is positive `u64`,
@@ -294,14 +316,18 @@ signal/reference path. This deliberately follows the schema's permissive structu
 book §§3.5.3.2–3.5.3.3's requirement to supply the beacon/uplink or interferometer reference
 frequency. Callers must establish that frequency and signal context; validation does not certify
 that the measurements can be reconstructed from this message alone.
+Two-way and three-way differenced Doppler is different: §3.3.2.5.6's trigger is decidable from
+the message, so it is enforced (see [below](#additional-input-and-signal-context-boundaries)).
 `DATA_TYPES` checks keyword vocabulary, not correspondence with actual observations. Angle
 observations may omit `ANGLE_TYPE`; custom conventions remain the exchange partners' context.
 When MODE is absent, either PATH form is retained and no mode-specific companion rule is inferred.
 
-Present but empty `DATA_TYPES` is invalid: the declaration must name one or more observation
-keywords. Empty list members and trailing commas are rejected. This is field-specific validation,
-not a rule that all optional strings are interchangeable. All implemented numeric/conditional
-checks also apply to restricted 1.0 input; the 1.0 book states the same rules (see below).
+Present but empty XML/model `DATA_TYPES` is invalid: the declaration must name one or more
+observation keywords. A blank optional KVN DATA_TYPES record reads as absent under the shared
+missing-value rule. Empty list members and trailing commas are rejected. This is field-specific validation,
+not a rule that all optional strings are interchangeable. Implemented shared numeric/conditional
+checks also apply to restricted 1.0 input. These checks have not been independently reconciled
+against the unavailable TDM 1.0 book; the bundled 1.0 XSD is the reproducible XML authority.
 
 Phase-count text accepts a sign and preserves leading zeros and decimal digits. KVN output
 fills a missing digit beside a decimal point and canonicalizes negative zero; exponent text
@@ -336,7 +362,8 @@ metadata `TRACK_ID`, `DATA_TYPES`, `EPHEMERIS_NAME_n`, `INTERPOLATION`,
 `INTERPOLATION_DEGREE`, `DOPPLER_COUNT_BIAS`/`SCALE`/`ROLLOVER`, `CORRECTION_MAG`,
 `CORRECTION_RCS`, `CORRECTION_ABERRATION_YEARLY`/`DIURNAL`; observations `DOPPLER_COUNT`,
 `MAG`, `RCS` and the phase counts. Every 2.0 value domain and conditional rule that runs on 1.0
-input has the same text in the 1.0 book, so no 2.0-only rule applies to 1.0 content.
+input is reused as an explicit compatibility profile. Independent confirmation against the
+1.0 book remains unavailable; no equivalence with that book is claimed.
 
 **XML follows the NDM/XML 1.0 schema.** NDM/XML 505.0-B-1 (December 2010,
 https://public.ccsds.org/Pubs/505x0b1s.pdf) defined TDM 1.0 XML in
@@ -353,17 +380,16 @@ enforces for 1.0 XML:
 | `RHUMIDITY` is `percentType` with no `units` attribute | `units` on `RHUMIDITY` is rejected in 1.0 XML |
 | Only the unqualified schema set exists | A namespaced (qualified) root or descendant element is rejected in 1.0 XML |
 
-**KVN and XML differ on TIME_SYSTEM by design.** The 1.0 book (annex A1) lists the same time
-systems but also admits other values defined in an ICD, so 1.0 KVN keeps `TIME_SYSTEM` open, as
-2.0 does. The 1.0 XML schema closes the list, and XML follows its schema. A 1.0 KVN file using
+**KVN and XML differ on TIME_SYSTEM by design.** The restricted KVN compatibility profile keeps `TIME_SYSTEM` open, as 2.0 does;
+this has not been independently checked against the unavailable 1.0 book. The 1.0 XML schema closes the list, and XML follows its schema. A 1.0 KVN file using
 an ICD-defined time system therefore reads, while the same content in 1.0 XML is rejected.
 
-**Evidence.** The 1.0 book's annex D examples were checked: 11 of 15 read; the other four contain
-errors in the book itself (duplicate keyword/epoch pairs in D-4 and D-5, a `CREATION_DATE`
+**Evidence.** The repository's legacy annex-D example corpus was checked: 11 of 15 read; the other four contain
+invalid records in the retained samples (duplicate keyword/epoch pairs in D-4 and D-5, a `CREATION_DATE`
 without seconds in D-7, and `PARTICIPANT 3` without its underscore in D-10), three of which
 2.0 corrected. Every schema-valid 1.0 XML sample in the repository reads; the two that fail are
 also invalid under the 1.0 schema (`TIME_SYSTEM` `TCG` and `WRONG-TIME-SYSTEM`). The 1.0
-combined `<ndm>` envelope is not supported.
+combined `<ndm>` envelope accepts supported 1.0 constituents as input only.
 
 Tests: `conformance::tdm1::tdm_1_0_xml_input_follows_the_ndm_xml_1_0_schema` validates the
 505.0-B-1 figure B-9 fixture (`data/legacy/tdm_1_0_b9.xml`) against the bundled 1.0 schema and
@@ -371,3 +397,32 @@ checks that each rejection above is also a schema rejection;
 `tdm::parsing::legacy_kvn_is_input_only_and_rejects_version_two_content` covers typed/generic
 input, refused output and later-edition content; and
 `legacy_tables_exclude_every_later_edition_metadata_keyword` covers the 1.0 table boundary.
+
+## Additional input and signal-context boundaries
+
+§3.5.2.4 requires an integer DOPPLER_COUNT and §4.3.2 gives KVN integers a signed 32-bit
+range. KVN input nevertheless accepts integral finite double spellings such as `1000.0` and
+`1.0E3`, and integral values beyond 2^31: cycle-count accumulators routinely exceed 32 bits and
+these spellings name the same integer, so reading them loses nothing. A non-integral count such
+as `1000.5` is rejected on every route, never truncated. XML uses the XSD's double domain with the
+same integral rule. KVN output is strict: it writes integer digits and refuses values outside the
+signed 32-bit range (use XML for those), so not every accepted count can be regenerated as KVN.
+
+XML ANGLE_TYPE and REFERENCE_FRAME use exact schema spellings and the explicitly recorded
+frame aliases. KVN padding and blank/underscore aliases are not XML enum spellings.
+`pre_release::tdm_xml_does_not_accept_kvn_category_padding_or_blank_aliases` checks that boundary.
+
+TDM §3.3.2.5.6 requires a `TRANSMIT_FREQ_n` uplink-frequency history when the TDM contains
+two-way or three-way differenced Doppler. Validation enforces it at message level: when any
+segment has `MODE = SINGLE_DIFF`, `RECEIVE_FREQ` observations (the differenced-Doppler observable,
+§3.3.2.5.5), and a `PATH_1` or `PATH_2` of three participants (one uplink and one downlink leg,
+§3.3.2.4.3 notation, e.g. `2,1,2` or `2,1,3`), some segment of the message must carry a
+`TRANSMIT_FREQ_n` observation. One-way paths such as Figure E-10's `1,2`/`1,3` are not affected.
+The library does not establish that the supplied series covers the observation interval or is
+sufficient for processing; that remains signal-processing context, and missing frequencies are
+never inferred.
+
+The implemented RECEIVE_BAND condition is SINGLE_DIFF with RECEIVE_FREQ or RANGE observations;
+metadata alone does not trigger it. Other frequency-family observables and whether the supplied
+band is physically appropriate remain exchange-partner context; validation does not certify
+frequency-dependent corrections.

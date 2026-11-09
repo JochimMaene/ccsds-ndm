@@ -262,7 +262,7 @@ class Acm:
         ValueError
             Unsupported format argument.
         NdmIoError
-            Input file could not be read.
+            Input file could not be read or contains invalid UTF-8 bytes.
         """
     def to_file(
         self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
@@ -657,6 +657,9 @@ class AcmAttitudeState:
         listed before rate data. The units that shall be used are given in annex B, subsection B4.
 
         Examples: QUATERNION, EULER_ANGLES, DCM
+
+        Only QUATERNION, EULER_ANGLES and DCM are accepted: table 5-4 makes ATT_TYPE the attitude
+        data, and rate-only B4 values (ANGVEL, Q_DOT, EULER_RATE, GYRO_BIAS) belong in rate_type.
 
         CCSDS Reference: 504.0-B-2, Section 5.3.5.
 
@@ -1146,6 +1149,15 @@ class AcmMetadata:
     NdmEpochError
         If epoch_tzero is not a CCSDS calendar epoch.
     """
+    @property
+    def classification(self) -> typing.Optional[builtins.str]:
+        r"""
+        Metadata classification (ADM table 5-3). KVN only; XML output refuses it.
+
+        :type: str | None
+        """
+    @classification.setter
+    def classification(self, value: typing.Optional[builtins.str]) -> None: ...
     @property
     def object_name(self) -> builtins.str:
         r"""
@@ -2141,7 +2153,7 @@ class Aem:
         ValueError
             Unsupported format argument.
         NdmIoError
-            Input file could not be read.
+            Input file could not be read or contains invalid UTF-8 bytes.
         """
     def to_file(
         self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
@@ -2417,7 +2429,7 @@ class AemMetadata:
         asteroids, comets, and natural satellites), including any planet barycenter or the solar
         system barycenter. The set of allowed values is described in annex B, subsection B8.
 
-        Examples: EARTH, STS-106
+        Examples: EARTH, STS 106
 
         CCSDS Reference: 504.0-B-2, Section 4.2.3.
 
@@ -2584,7 +2596,7 @@ class AemMetadata:
         Recommended interpolation method for attitude ephemeris data in the block immediately
         following this metadata block.
 
-        Examples: LINEAR, HERMITE, LAGRANGE
+        Examples: linear, HERMITE, LAGRANGE
 
         CCSDS Reference: 504.0-B-2, Section 4.2.3.
 
@@ -2961,7 +2973,7 @@ class Apm:
         ValueError
             Unsupported format argument.
         NdmIoError
-            Input file could not be read.
+            Input file could not be read or contains invalid UTF-8 bytes.
         """
     def to_file(
         self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
@@ -3807,7 +3819,7 @@ class Cdm:
         ValueError
             Unsupported format argument.
         NdmIoError
-            Input file could not be read.
+            Input file could not be read or contains invalid UTF-8 bytes.
         """
     def to_file(
         self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
@@ -3825,7 +3837,9 @@ class Cdm:
         Raises
         ------
         NdmValidationError
-            Invalid model or unsupported output edition.
+            Invalid model or unsupported output edition; an INTERNATIONAL_DESIGNATOR not in
+            YYYY-NNNP{PP} form or UNKNOWN; in XML, a present empty/whitespace-only or N/A
+            optional string (use None), non-ASCII text, or a line over 254 characters (6.2.2).
         NdmFormatError
             Content cannot be represented in the requested notation.
         NdmUnsupportedNotationError
@@ -3852,7 +3866,9 @@ class Cdm:
         Raises
         ------
         NdmValidationError
-            Invalid model or unsupported output edition.
+            Invalid model or unsupported output edition; an INTERNATIONAL_DESIGNATOR not in
+            YYYY-NNNP{PP} form or UNKNOWN; in XML, a present empty/whitespace-only or N/A
+            optional string (use None), non-ASCII text, or a line over 254 characters (6.2.2).
         NdmFormatError
             Content cannot be represented in the requested notation.
         NdmUnsupportedNotationError
@@ -4833,7 +4849,7 @@ class CdmMetadata:
     object_name : str
         Spacecraft name for the object.
     international_designator : str
-        The full international designator (YYYY-NNNP{PP}).
+        The full international designator (YYYY-NNNP{PP} or UNKNOWN; enforced on output).
     ephemeris_name : str
         Unique name of the external ephemeris file or 'NONE'.
     covariance_method : Union[CovarianceMethodType, str]
@@ -4918,6 +4934,8 @@ class CdmMetadata:
         (with leading zeros); P{PP} = At least one capital letter for the identification of the
         part brought into space by the launch. In cases where the object has no international
         designator, the value UNKNOWN should be used. (See 5.2.9 for further formatting rules.)
+
+        Parsing keeps other producer values (e.g. CARA's ``1001``); generation rejects them.
 
         Examples: 2002-021A, UNKNOWN
 
@@ -5403,6 +5421,13 @@ class CombinedNdm:
 
         :type: Optional[str]
         """
+    @id.setter
+    def id(self, value: typing.Optional[builtins.str]) -> None:
+        r"""
+        Message Identifier (optional).
+
+        :type: Optional[str]
+        """
     @property
     def comments(self) -> builtins.list[builtins.str]:
         r"""
@@ -5443,7 +5468,9 @@ class CombinedNdm:
     ) -> CombinedNdm: ...
     def validate(self) -> None:
         r"""
-        Validate the combined message against CCSDS rules.
+        Validate each constituent model and reject nested envelopes.
+        This does not certify XML output representability or supported output editions; writers
+        also check the envelope, constituent editions and notation-specific restrictions.
         """
     @staticmethod
     def from_str(
@@ -5510,7 +5537,7 @@ class CombinedNdm:
         ValueError
             Unsupported format argument.
         NdmIoError
-            Input file could not be read.
+            Input file could not be read or contains invalid UTF-8 bytes.
         """
     def to_file(
         self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
@@ -7139,7 +7166,7 @@ class Ocm:
     @property
     def id(self) -> typing.Optional[builtins.str]:
         r"""
-        Constant XML root identifier, `CCSDS_OCM_VERS`.
+        Required XML root identifier, `CCSDS_OCM_VERS`; None is invalid.
 
         :type: Optional[str]
         """
@@ -7245,7 +7272,7 @@ class Ocm:
         ValueError
             Unsupported format argument.
         NdmIoError
-            Input file could not be read.
+            Input file could not be read or contains invalid UTF-8 bytes.
         """
     def to_file(
         self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
@@ -8411,9 +8438,10 @@ class OcmMetadata:
         r"""
         Time system for all absolute time stamps in this OCM including EPOCH_TZERO. Select from
         the accepted set of values indicated in annex B, subsection B3. This field is used by
-        all OCM data blocks. If the SCLK timescale is selected, then 'EPOCH_TZERO' shall be
-        interpreted as the spacecraft clock epoch and both SCLK_OFFSET_AT_EPOCH and
-        SCLK_SEC_PER_SI_SEC shall be supplied.
+        all OCM data blocks. Under SCLK, omitted SCLK_OFFSET_AT_EPOCH and SCLK_SEC_PER_SI_SEC
+        use defaults 0.0 and 1.0 respectively (ODM 6.2.1.3). The table's TIME_SYSTEM and
+        EPOCH_TZERO rows disagree on the anchor's interpretation; the library preserves
+        EPOCH_TZERO as supplied and performs no clock conversion.
 
         Examples: UTC
 
@@ -9011,6 +9039,9 @@ class OcmMetadata:
         be confined to the following list: ORB, PHYS, COV, MAN, PERT, OD, and USER. If the OCM
         contains multiple ORB, COV, or MAN data blocks (as allowed by table 6-1), the
         corresponding ORB, COV, or MAN entry shall be duplicated to match.
+
+        Library behavior: retained as descriptive text. Inventory matching, entry order and
+        listed-token membership are caller checks.
 
         Examples: ORB, ORB, PHYS, COV, MAN, MAN, PERT, OD, USER
 
@@ -11707,8 +11738,8 @@ class OdParameters:
     @property
     def time_lastob_start(self) -> typing.Optional[builtins.str]:
         r"""
-        The start of a time interval (UTC) that contains the time of the last accepted
-        observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+        The start of a time interval (UTC for CDM; metadata TIME_SYSTEM for RDM) that contains the time of the last accepted
+        observation. (See CDM 6.3.2.6 or RDM 5.3.3.5 for formatting rules.) For an exact time, the time interval is
         of zero duration (i.e., same value as that of TIME_LASTOB_END).
 
         CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
@@ -11720,8 +11751,8 @@ class OdParameters:
     @property
     def time_lastob_end(self) -> typing.Optional[builtins.str]:
         r"""
-        The end of a time interval (UTC) that contains the time of the last accepted
-        observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+        The end of a time interval (UTC for CDM; metadata TIME_SYSTEM for RDM) that contains the time of the last accepted
+        observation. (See CDM 6.3.2.6 or RDM 5.3.3.5 for formatting rules.) For an exact time, the time interval is
         of zero duration (i.e., same value as that of TIME_LASTOB_START).
 
         CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
@@ -12088,7 +12119,7 @@ class Oem:
         ValueError
             Unsupported format argument.
         NdmIoError
-            Input file could not be read.
+            Input file could not be read or contains invalid UTF-8 bytes.
         """
     def to_file(
         self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
@@ -12882,7 +12913,8 @@ class OemMetadata:
     def ref_frame_epoch(self) -> typing.Optional[builtins.str]:
         r"""
         Epoch of reference frame, if not intrinsic to the definition of the reference frame.
-        (See 7.5.10 for formatting rules.)
+        Interpreted in TIME_SYSTEM (ODM 7.5.11); MET/MRT values are elapsed durations
+        under 3.2.3.2. See 7.5.10 for absolute formatting.
 
         Examples: 2001-11-06T11:17:33, 2002-204T15:56:23Z
 
@@ -12908,7 +12940,8 @@ class OemMetadata:
 
         :type: Optional[str]
 
-        Enforced: inside start_time..stop_time and no later than useable_stop_time; consecutive useable spans may touch but not overlap (ODM 5.2.4.4).
+        Interpreted in TIME_SYSTEM, including MET/MRT elapsed durations.
+        Enforced: inside start_time..stop_time and no later than useable_stop_time; consecutive useable spans may touch but not overlap (ODM 5.2.4.4); in OEM 2.0 a useable start may not precede the previous segment's useable stop.
         """
     @useable_start_time.setter
     def useable_start_time(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -12928,7 +12961,8 @@ class OemMetadata:
 
         :type: Optional[str]
 
-        Enforced: inside start_time..stop_time and no earlier than useable_start_time (ODM table 5-3).
+        Interpreted in TIME_SYSTEM, including MET/MRT elapsed durations.
+        Enforced: inside start_time..stop_time and no earlier than useable_start_time; consecutive useable spans may touch but not overlap (ODM 5.2.4.4); in OEM 2.0 a useable start may not precede the previous segment's useable stop.
         """
     @useable_stop_time.setter
     def useable_stop_time(self, value: typing.Optional[builtins.str]) -> None: ...
@@ -12959,7 +12993,7 @@ class OemMetadata:
 
         :type: Optional[int]
 
-        Enforced: positive integer, required with INTERPOLATION; known methods require the documented minimum node count (ODM 5.2.3).
+        Enforced: positive integer, required with a nonempty INTERPOLATION method (ODM 5.2.3).
         """
     @interpolation_degree.setter
     def interpolation_degree(self, value: typing.Optional[builtins.int]) -> None: ...
@@ -13183,7 +13217,7 @@ class Omm:
         ValueError
             Unsupported format argument.
         NdmIoError
-            Input file could not be read.
+            Input file could not be read or contains invalid UTF-8 bytes.
         """
     def to_file(
         self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
@@ -13243,7 +13277,10 @@ class Omm:
         MEAN_MOTION_DOT/DDOT are the stored TLE fields (already n-dot/2 and n-double-dot/6),
         without additional scaling (ODM 4.2.4.7 note 2).
 
-        Requires Earth-centered TEME elements and UTC epochs; no coordinate/time conversion.
+        Requires MEAN_ELEMENT_THEORY SGP, SGP4 or SGP/SGP4 (PPT3 and SGP4-XP are refused),
+        Earth-centered TEME elements and UTC epochs; no conversion. TLE parameters must include
+        NORAD_CAT_ID, ELEMENT_SET_NO, REV_AT_EPOCH, MEAN_MOTION_DOT, MEAN_MOTION_DDOT and BSTAR.
+        Omitted EPHEMERIS_TYPE and CLASSIFICATION_TYPE use the table 4-3 defaults 0 and U.
         Cyclic angles round to four decimals, with a rounded 360 degrees emitted as zero.
 
         Returns
@@ -13262,7 +13299,9 @@ class Omm:
         creation_date: typing.Optional[builtins.str] = None,
     ) -> Omm:
         r"""
-        Build a minimal OMM from NORAD TLE line 1 and line 2.
+        Build a minimal OMM 3.0 from NORAD TLE line 1 and line 2.
+        Default provenance is a placeholder: creation date is the TLE epoch and originator
+        is UNKNOWN. Supply known header values when original provenance matters.
 
         MEAN_MOTION_DOT/DDOT retain the TLE n-dot/2 and n-double-dot/6 fields without rescaling
         (CCSDS 502.0-B-3, 4.2.4.7 note 2).
@@ -13282,7 +13321,7 @@ class Omm:
         message_id : str, optional
             Header MESSAGE_ID override.
         creation_date : str, optional
-            Header CREATION_DATE override in CCSDS epoch format.
+            Header CREATION_DATE override in CCSDS epoch format (default: TLE epoch).
         """
 
 @typing.final
@@ -13744,7 +13783,7 @@ class Opm:
         ValueError
             Unsupported format argument.
         NdmIoError
-            Input file could not be read.
+            Input file could not be read or contains invalid UTF-8 bytes.
         """
     def to_file(
         self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
@@ -14314,7 +14353,7 @@ class OpmManeuverParameters:
     man_duration : float
         Duration of maneuver (s).
     man_delta_mass : float
-        Mass change during maneuver (kg).
+        Mass change during maneuver (kg): < 0 in 2.0; <= 0 in 3.0.
     man_ref_frame : str
         Reference frame for velocity change.
     man_dv_1 : float
@@ -14362,7 +14401,7 @@ class OpmManeuverParameters:
     @property
     def man_delta_mass(self) -> builtins.float:
         r"""
-        Mass change during maneuver (value is < 0)
+        Mass change during maneuver: negative in 2.0; nonpositive in 3.0.
 
         Units: kg
 
@@ -14955,7 +14994,7 @@ class Rdm:
         ValueError
             Unsupported format argument.
         NdmIoError
-            Input file could not be read.
+            Input file could not be read or contains invalid UTF-8 bytes.
         """
     def to_file(
         self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
@@ -17179,7 +17218,7 @@ class Tdm:
         ValueError
             Unsupported format argument.
         NdmIoError
-            Input file could not be read.
+            Input file could not be read or contains invalid UTF-8 bytes.
         """
     def to_file(
         self, path: builtins.str | os.PathLike[builtins.str], format: builtins.str
@@ -19152,9 +19191,9 @@ def from_file(
     Raises
     ------
     NdmIoError
-        The file could not be read.
+        The file could not be read or contains invalid UTF-8 bytes.
     NdmFormatError
-        Malformed document or invalid text encoding.
+        Malformed document or explicitly unsupported UTF-16/UTF-32 encoding.
     NdmValidationError
         Validation failed or the edition is unsupported.
     NdmUnsupportedMessageError

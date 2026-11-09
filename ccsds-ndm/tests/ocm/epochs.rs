@@ -8,6 +8,81 @@ use ccsds_ndm::{Ndm, Validate};
 
 const OCM_XML: &str = include_str!("../../data/xml/ocm_g20.xml");
 
+#[test]
+fn od_and_space_weather_epochs_require_valid_values_in_all_routes() {
+    for field in ["OD_EPOCH", "SW_DATA_EPOCH"] {
+        let mut valid = Ocm::from_kvn(super::KVN).unwrap();
+        for value in ["0", "-1.5", "2024-02-29T00:00:00", "2024-366T00:00:00"] {
+            if field == "OD_EPOCH" {
+                valid.body.segment.data.od.as_mut().unwrap().od_epoch = value.parse().unwrap();
+            } else {
+                valid.body.segment.data.pert.as_mut().unwrap().sw_data_epoch =
+                    Some(value.parse().unwrap());
+            }
+            valid.validate().unwrap();
+            for output in [valid.to_kvn().unwrap(), valid.to_xml().unwrap()] {
+                ccsds_ndm::from_str(&output).unwrap();
+            }
+        }
+        let kvn = valid.to_kvn().unwrap();
+        let xml = valid.to_xml().unwrap();
+        let record = kvn.lines().find(|line| line.starts_with(field)).unwrap();
+        for value in [
+            "2023-02-30T00:00:00",
+            "2023-999T00:00:00",
+            "+",
+            "-",
+            ".",
+            "",
+        ] {
+            let mut edited = valid.clone();
+            if field == "OD_EPOCH" {
+                edited.body.segment.data.od.as_mut().unwrap().od_epoch = value.parse().unwrap();
+            } else {
+                edited
+                    .body
+                    .segment
+                    .data
+                    .pert
+                    .as_mut()
+                    .unwrap()
+                    .sw_data_epoch = Some(value.parse().unwrap());
+            }
+            crate::common::assert_rejects(&edited, field);
+            let invalid_xml = mutated(
+                &xml,
+                &format!(">2024-366T00:00:00</{field}>"),
+                &format!(">{value}</{field}>"),
+            );
+            for error in [
+                Ocm::from_xml(&invalid_xml).unwrap_err(),
+                ccsds_ndm::from_str(&invalid_xml).unwrap_err(),
+            ] {
+                crate::common::assert_validation_field(&error, field);
+            }
+            let invalid_kvn = mutated(&kvn, record, &format!("{field} = {value}"));
+            if value.is_empty() && field == "SW_DATA_EPOCH" {
+                assert!(Ocm::from_kvn(&invalid_kvn)
+                    .unwrap()
+                    .body
+                    .segment
+                    .data
+                    .pert
+                    .unwrap()
+                    .sw_data_epoch
+                    .is_none());
+            } else {
+                for error in [
+                    Ocm::from_kvn(&invalid_kvn).unwrap_err(),
+                    ccsds_ndm::from_str(&invalid_kvn).unwrap_err(),
+                ] {
+                    crate::common::assert_validation_field(&error, field);
+                }
+            }
+        }
+    }
+}
+
 fn relative_metadata_message() -> Ocm {
     let source = include_str!("../../data/kvn/ocm_g15.kvn").replace(
         "META_STOP",
@@ -317,24 +392,20 @@ fn xml_frame_epochs_accept_relative_tags_including_oeb_parent() {
 
     // TRAJ/COV/MAN_FRAME_EPOCH are XSD `epochType` and table 6-4/6-6/6-7 frame epochs, which
     // ODM 6.2.2.3 lets be relative; OEB_PARENT_FRAME_EPOCH uses the same relative branch.
-    for (tag, relative_ok) in [
-        ("TRAJ_FRAME_EPOCH", true),
-        ("OEB_PARENT_FRAME_EPOCH", true),
-        ("COV_FRAME_EPOCH", true),
-        ("MAN_FRAME_EPOCH", true),
+    for tag in [
+        "TRAJ_FRAME_EPOCH",
+        "OEB_PARENT_FRAME_EPOCH",
+        "COV_FRAME_EPOCH",
+        "MAN_FRAME_EPOCH",
     ] {
         let needle = format!("<{tag}>2023-01-01T00:00:00</{tag}>");
         let replacement = format!("<{tag}>123.5</{tag}>");
         let edited = mutated(&xml, &needle, &replacement);
         assert!(xml.contains(&needle), "generated XML should contain {tag}");
-        if relative_ok {
-            let parsed = Ocm::from_xml(&edited).unwrap_or_else(|error| panic!("{tag}: {error}"));
-            assert!(parsed.to_kvn().unwrap().lines().any(|line| line
-                .split_once('=')
-                .is_some_and(|(key, value)| key.trim() == tag && value.trim() == "123.5")));
-        } else {
-            crate::common::assert_invalid_epoch(&Ocm::from_xml(&edited).unwrap_err(), "123.5");
-        }
+        let parsed = Ocm::from_xml(&edited).unwrap_or_else(|error| panic!("{tag}: {error}"));
+        assert!(parsed.to_kvn().unwrap().lines().any(|line| line
+            .split_once('=')
+            .is_some_and(|(key, value)| key.trim() == tag && value.trim() == "123.5")));
     }
 }
 
@@ -497,40 +568,7 @@ META_STOP
 
 #[test]
 fn frame_epochs_accept_relative_tags_including_oeb_parent_in_kvn() {
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
-CENTER_NAME = EARTH
-TRAJ_REF_FRAME = GCRF
-TRAJ_FRAME_EPOCH = 2023-01-01T00:00:00
-TRAJ_TYPE = CARTPV
-2023-01-01T00:00:00 1 2 3 4 5 6
-TRAJ_STOP
-PHYS_START
-OEB_PARENT_FRAME_EPOCH = 2023-01-01T00:00:00
-PHYS_STOP
-COV_START
-COV_REF_FRAME = GCRF
-COV_FRAME_EPOCH = 2023-01-01T00:00:00
-COV_TYPE = CARTPV
-COV_ORDERING = LTM
-2023-01-01T00:00:00 0.000001 0 0.000001 0 0 0.000001 0 0 0 0.000001 0 0 0 0 0.000001 0 0 0 0 0 0.000001
-COV_STOP
-MAN_START
-MAN_ID = MAN-1
-MAN_DEVICE_ID = THR-1
-MAN_REF_FRAME = GCRF
-MAN_FRAME_EPOCH = 2023-01-01T00:00:00
-MAN_COMPOSITION = TIME_ABSOLUTE, DV_X
-2023-01-01T00:00:00 1
-MAN_STOP
-"#;
-
+    let kvn = OCM_FRAME_EPOCH_KVN;
     let ocm = Ocm::from_kvn(kvn).expect("calendar frame epochs should parse");
     let segment = &ocm.body.segment;
     assert_eq!(
@@ -557,21 +595,17 @@ MAN_STOP
         "2023-01-01T00:00:00"
     );
 
-    for (key, relative_ok) in [
-        ("TRAJ_FRAME_EPOCH", true),
-        ("OEB_PARENT_FRAME_EPOCH", true),
-        ("COV_FRAME_EPOCH", true),
-        ("MAN_FRAME_EPOCH", true),
+    for key in [
+        "TRAJ_FRAME_EPOCH",
+        "OEB_PARENT_FRAME_EPOCH",
+        "COV_FRAME_EPOCH",
+        "MAN_FRAME_EPOCH",
     ] {
         let edited = kvn.replace(
             &format!("{key} = 2023-01-01T00:00:00"),
             &format!("{key} = 123.5"),
         );
-        if relative_ok {
-            Ocm::from_kvn(&edited).unwrap_or_else(|error| panic!("{key}: {error}"));
-        } else {
-            crate::common::assert_invalid_epoch(&Ocm::from_kvn(&edited).unwrap_err(), "123.5");
-        }
+        Ocm::from_kvn(&edited).unwrap_or_else(|error| panic!("{key}: {error}"));
     }
 }
 

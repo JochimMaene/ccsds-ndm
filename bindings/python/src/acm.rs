@@ -234,7 +234,7 @@ impl Acm {
     /// ValueError
     ///     Unsupported format argument.
     /// NdmIoError
-    ///     Input file could not be read.
+    ///     Input file could not be read or contains invalid UTF-8 bytes.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
@@ -421,6 +421,7 @@ impl AcmMetadata {
         Ok(Self {
             inner: core_acm::AcmMetadata {
                 comment: comment.unwrap_or_default(),
+                classification: None,
                 object_name,
                 international_designator,
                 time_system,
@@ -442,6 +443,19 @@ impl AcmMetadata {
                 next_leap_taimutc: None,
             },
         })
+    }
+
+    /// Metadata classification (ADM table 5-3). KVN only; XML output refuses it.
+    ///
+    /// :type: str | None
+    #[getter]
+    fn get_classification(&self) -> Option<String> {
+        self.inner.classification.clone()
+    }
+
+    #[setter]
+    fn set_classification(&mut self, value: Option<String>) {
+        self.inner.classification = value;
     }
 
     /// Free-text field containing the name of the object. There is no CCSDS-based restriction on
@@ -1223,6 +1237,9 @@ impl AcmAttitudeState {
     /// listed before rate data. The units that shall be used are given in annex B, subsection B4.
     ///
     /// Examples: QUATERNION, EULER_ANGLES, DCM
+    ///
+    /// Only QUATERNION, EULER_ANGLES and DCM are accepted: table 5-4 makes ATT_TYPE the attitude
+    /// data, and rate-only B4 values (ANGVEL, Q_DOT, EULER_RATE, GYRO_BIAS) belong in rate_type.
     ///
     /// CCSDS Reference: 504.0-B-2, Section 5.3.5.
     ///

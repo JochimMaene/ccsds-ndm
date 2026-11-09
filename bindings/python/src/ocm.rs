@@ -34,7 +34,7 @@ use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pymethods};
 #[gen_stub_pyclass]
 #[pyclass(module = "ccsds_ndm")]
 pub struct Ocm {
-    /// Constant XML root identifier, `CCSDS_OCM_VERS`.
+    /// Required XML root identifier, `CCSDS_OCM_VERS`; None is invalid.
     ///
     /// :type: Optional[str]
     #[pyo3(get)]
@@ -153,7 +153,7 @@ impl Ocm {
     /// ValueError
     ///     Unsupported format argument.
     /// NdmIoError
-    ///     Input file could not be read.
+    ///     Input file could not be read or contains invalid UTF-8 bytes.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
@@ -719,9 +719,10 @@ impl OcmMetadata {
 
     /// Time system for all absolute time stamps in this OCM including EPOCH_TZERO. Select from
     /// the accepted set of values indicated in annex B, subsection B3. This field is used by
-    /// all OCM data blocks. If the SCLK timescale is selected, then 'EPOCH_TZERO' shall be
-    /// interpreted as the spacecraft clock epoch and both SCLK_OFFSET_AT_EPOCH and
-    /// SCLK_SEC_PER_SI_SEC shall be supplied.
+    /// all OCM data blocks. Under SCLK, omitted SCLK_OFFSET_AT_EPOCH and SCLK_SEC_PER_SI_SEC
+    /// use defaults 0.0 and 1.0 respectively (ODM 6.2.1.3). The table's TIME_SYSTEM and
+    /// EPOCH_TZERO rows disagree on the anchor's interpretation; the library preserves
+    /// EPOCH_TZERO as supplied and performs no clock conversion.
     ///
     /// Examples: UTC
     ///
@@ -1450,6 +1451,9 @@ impl OcmMetadata {
     /// be confined to the following list: ORB, PHYS, COV, MAN, PERT, OD, and USER. If the OCM
     /// contains multiple ORB, COV, or MAN data blocks (as allowed by table 6-1), the
     /// corresponding ORB, COV, or MAN entry shall be duplicated to match.
+    ///
+    /// Library behavior: retained as descriptive text. Inventory matching, entry order and
+    /// listed-token membership are caller checks.
     ///
     /// Examples: ORB, ORB, PHYS, COV, MAN, MAN, PERT, OD, USER
     ///

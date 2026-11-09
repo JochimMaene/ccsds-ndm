@@ -152,6 +152,41 @@ fn xml_rejects_mixed_content_and_invalid_references_without_losing_valid_text() 
 const XML_DECL: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
 
 #[test]
+fn xml_user_values_normalize_only_whitespace_only_payloads() {
+    use ccsds_ndm::messages::opm::Opm;
+
+    let baseline = Opm::from_kvn(include_str!("../../data/kvn/opm_g1.kvn"))
+        .unwrap()
+        .to_xml()
+        .unwrap();
+    for (source, expected) in [
+        ("", ""),
+        ("   ", ""),
+        ("\t\n", ""),
+        ("&#32;&#32;", ""),
+        ("<![CDATA[   ]]>", ""),
+        (" x ", " x "),
+        (" N/A ", " N/A "),
+    ] {
+        let input = mutated_once(
+            &baseline,
+            "</data>",
+            &format!("<userDefinedParameters><USER_DEFINED parameter=\"X\">{source}</USER_DEFINED></userDefinedParameters></data>"),
+        );
+        let message = Opm::from_xml(&input).unwrap();
+        let user = message
+            .body
+            .segment
+            .data
+            .user_defined_parameters
+            .as_ref()
+            .unwrap();
+        assert_eq!(user.parameters().next().unwrap().value, expected);
+        assert_eq!(Opm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    }
+}
+
+#[test]
 fn xml_rejects_malformed_text_namespaces_and_processing_instructions() {
     for input in [
         include_str!("../../data/xml/oem_g14.xml"),
@@ -199,6 +234,59 @@ fn xml_rejects_malformed_text_namespaces_and_processing_instructions() {
         assert_eq!(from_str(&valid).unwrap(), from_str(input).unwrap());
         let valid = mutated_once(input, "<OBJECT_NAME>", "<OBJECT_NAME>]]&gt;");
         assert!(from_str(&valid).unwrap().to_xml().is_ok());
+    }
+}
+
+#[test]
+fn namespace_prefixes_must_be_valid_nc_names() {
+    for source in [
+        include_str!("../../data/xml/oem_g14.xml"),
+        include_str!("../../data/xml/opm_g5.xml"),
+        CDM,
+    ] {
+        for prefix in [
+            "",
+            "1p",
+            "p:q",
+            "p:",
+            "-p",
+            ".p",
+            "p?",
+            "\u{B7}p",
+            "p\u{F0000}",
+        ] {
+            let input = mutated_once(
+                source,
+                "<header>",
+                &format!("<header xmlns:{prefix}=\"urn:test\">"),
+            );
+            assert_eq!(
+                from_str(&input).unwrap_err().code(),
+                Some("parse.xml.syntax"),
+                "{prefix:?}"
+            );
+        }
+        for prefix in [
+            "p",
+            "_p",
+            "π",
+            "p1",
+            "p-q.x",
+            "p\u{B7}",
+            "p\u{300}",
+            "\u{10000}",
+        ] {
+            let input = mutated_once(
+                source,
+                "<header>",
+                &format!("<header xmlns:{prefix}=\"urn:test\">"),
+            );
+            assert_eq!(
+                from_str(&input).unwrap(),
+                from_str(source).unwrap(),
+                "{prefix:?}"
+            );
+        }
     }
 }
 

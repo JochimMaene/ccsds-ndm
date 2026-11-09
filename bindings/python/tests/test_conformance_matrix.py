@@ -57,7 +57,7 @@ def test_public_workflow_is_consistent_in_every_supported_notation(
             assert isinstance(parsed, cls)
             parsed.validate()
             assert parsed.to_str("xml") == expected
-        path = tmp_path / f"message.{format}"
+        path = tmp_path / "message.ndm"
         original.to_file(path, format)
         for parsed in (
             cls.from_file(path),

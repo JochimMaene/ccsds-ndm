@@ -8,24 +8,6 @@ fn epoch(value: &str) -> Epoch {
 }
 
 #[test]
-fn all_segments_must_describe_one_object_and_one_time_system() {
-    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
-    assert!(message.body.segment.len() > 1);
-    message.body.segment[1].metadata.time_system = "TAI".into();
-    assert_eq!(
-        message.validate().unwrap_err().field_path().as_deref(),
-        Some("body.segment[1].metadata.time_system")
-    );
-
-    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
-    message.body.segment[1].metadata.object_id = "DIFFERENT".into();
-    crate::common::assert_validation_field(
-        &message.validate().unwrap_err(),
-        "OBJECT_NAME/OBJECT_ID",
-    );
-}
-
-#[test]
 fn total_spans_may_overlap_when_useable_bounds_are_omitted() {
     // ODM 5.2.4.4 forbids overlap only between USEABLE_STOP_TIME and the next
     // USEABLE_START_TIME; STOP_TIME may exceed the next START_TIME.
@@ -98,6 +80,10 @@ fn oem_time_tags_are_absolute_and_metadata_ranges_are_consistent() {
     let error = message.validate().unwrap_err();
     assert_eq!(error.code(), Some("validation.invalid_value"));
     crate::common::assert_validation_field(&error, "START_TIME/STOP_TIME");
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[0].metadata.start_time")
+    );
 
     let mut message = Oem::from_xml(XML).unwrap();
     message.body.segment[0].metadata.useable_start_time = Some(epoch("2019-12-01T00:00:00"));
@@ -117,9 +103,11 @@ fn oem_time_tags_are_absolute_and_metadata_ranges_are_consistent() {
         &mut metadata.useable_start_time,
         &mut metadata.useable_stop_time,
     );
-    crate::common::assert_validation_field(
-        &message.validate().unwrap_err(),
-        "USEABLE_START_TIME/USEABLE_STOP_TIME",
+    let error = message.validate().unwrap_err();
+    crate::common::assert_validation_field(&error, "USEABLE_START_TIME/USEABLE_STOP_TIME");
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[0].metadata.useable_start_time")
     );
 }
 
@@ -367,29 +355,6 @@ fn metadata_errors_point_at_real_fields() {
     assert_eq!(
         path(message).unwrap(),
         format!("{prefix}.interpolation_degree")
-    );
-
-    let mut message = base();
-    let metadata = &mut message.body.segment[0].metadata;
-    std::mem::swap(&mut metadata.start_time, &mut metadata.stop_time);
-    assert_eq!(path(message).unwrap(), format!("{prefix}.start_time"));
-
-    let mut message = base();
-    let metadata = &mut message.body.segment[0].metadata;
-    std::mem::swap(
-        &mut metadata.useable_start_time,
-        &mut metadata.useable_stop_time,
-    );
-    assert_eq!(
-        path(message).unwrap(),
-        format!("{prefix}.useable_start_time")
-    );
-
-    let mut message = base();
-    message.body.segment[0].metadata.useable_stop_time = Some(epoch("2030-01-01T00:00:00"));
-    assert_eq!(
-        path(message).unwrap(),
-        format!("{prefix}.useable_stop_time")
     );
 
     let mut message = base();

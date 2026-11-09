@@ -1,11 +1,11 @@
 # OMM 3.0 and 2.0 conformance
 
-This inventory records maintainer evidence for standalone OMM 3.0. The
+This inventory records maintainer evidence for standalone OMM 3.0 and 2.0. The
 [support matrix](../support-matrix.md) is the user-facing statement of current support.
 
 ## Scope and authorities
 
-- Message edition: OMM 3.0.
+- Message editions: OMM 3.0 and 2.0; see the edition reconciliation below.
 - Semantic and KVN authority: CCSDS 502.0-B-3 plus editorial corrigendum 1, principally sections
   4 and 7 and the OMM implementation-conformance statement in annex A.
 - XML authority: NDM/XML schema set 4.0.0 and OMM schema 3.0.
@@ -22,8 +22,8 @@ The `omm` suite establishes:
 | XML structure | The OMM sequence registration rejects unknown, duplicate, and reordered children throughout the root, header, metadata, data, mean-elements, spacecraft, TLE, covariance, and user-defined structures. It rejects non-schema attributes while allowing only the fixed unit and user-defined parameter attributes at their applicable leaves. |
 | Valid input and preservation | All three shipped KVN fixtures and the shipped XML fixture parse through the public strict API. Generated KVN and XML reparse to the same typed model. |
 | XML generation | XML generated from every shipped fixture validates against the official 4.0.0 master schema. Numeric domains have direct validation tests in addition to the [shared XSD oracle](../design/validation-contract.md#xsd-oracle-policy). |
-| Numeric values in every block | Validation rejects non-finite values in the mean-elements, spacecraft, TLE, and covariance blocks before either notation is generated, and restates the `inclinationType` and `elementSetNoType` ranges that the typed wrappers enforce only in their constructors. Schema range facets are comparisons, which NaN passes, so finiteness is checked in its own right. |
-| KVN number spelling | Every OMM floating-point field — mean elements, spacecraft parameters, TLE parameters, and the shared covariance block — uses the shared ODM number writer. It writes at most 16 significant decimal digits, rounding values whose shortest round-trip spelling needs 17 digits: `0.30000000000000004` becomes `3.0e-1`, and `1.2345678901234567` becomes `1.234567890123457e0`. This can change the stored `f64` when reparsed; it is not lossless binary-value preservation. Values whose rounded spelling would overflow `f64` are rejected before generation. `omm_kvn_generation_spells_numbers_as_ccsds_numbers` and the shared `OdmFloat` tests cover rounding and representability. |
+| Numeric values in every block | Validation rejects non-finite values in the mean-elements, spacecraft, TLE, and covariance blocks before either notation is generated, and restates the `inclinationType` and `elementSetNoType` ranges that the typed wrappers enforce only in their constructors. XSD bounding facets exclude NaN, but libxml2 can incorrectly accept it; explicit finite-number checks and the shared Xerces oracle cover that boundary. |
+| KVN number spelling | Every OMM floating-point field — mean elements, spacecraft parameters, TLE parameters, and the shared covariance block — uses the shared ODM number writer. It writes at most 16 significant decimal digits, rounding values whose shortest round-trip spelling needs 17 digits: `0.30000000000000004` becomes `0.3`, and `1.2345678901234567` becomes `1.234567890123457`. This can change the stored `f64` when reparsed; it is not lossless binary-value preservation. Values whose rounded spelling would overflow `f64` are rejected before generation. `omm_kvn_generation_spells_numbers_as_ccsds_numbers` and the shared `OdmFloat` tests cover rounding and representability. |
 | Shared surface contract | `library::parsing` and `library::output`, `conformance::generation`, the Python API tests, and family Criterion matrices provide common parsing, generation, diagnostics, dispatch, and workload evidence linked from the [conformance review index](README.md). |
 
 The existing OMM unit suite separately covers the mean-elements choice, TLE theory-dependent
@@ -60,9 +60,13 @@ own edition, and both editions reject `BSTAR` with `BTERM` and `MEAN_MOTION_DDOT
 | `SGP` | required | `MEAN_MOTION`, `MEAN_MOTION_DOT`, `MEAN_MOTION_DDOT` | `MEAN_MOTION`, `NORAD_CAT_ID`, `BSTAR`, `MEAN_MOTION_DOT`, `MEAN_MOTION_DDOT` |
 | `SGP4` | required | `MEAN_MOTION`, `BSTAR` | `MEAN_MOTION`, `NORAD_CAT_ID`, `BSTAR` |
 | `SGP/SGP4` | required | `MEAN_MOTION` | `MEAN_MOTION`, `NORAD_CAT_ID`, `BSTAR` |
-| `PPT3` | 3.0 only | `MEAN_MOTION_DOT`, `MEAN_MOTION_DDOT` | none: not a 2.0 theory |
-| `SGP4-XP` | 3.0 only | `BTERM`, `AGOM` | none: not a 2.0 theory |
+| `PPT3` | required in 3.0; optional in 2.0 | `MEAN_MOTION_DOT`, `MEAN_MOTION_DDOT` | none: treated as an open theory string |
+| `SGP4-XP` | required in 3.0; optional in 2.0 | `BTERM`, `AGOM` | none: treated as an open theory string |
 | other | optional | none | none |
+
+`MEAN_ELEMENT_THEORY` remains an open string in both editions. Edition 2.0 preserves
+`PPT3` and `SGP4-XP` without applying their 3.0 conditional requirements; its edition gate
+still refuses the later `BTERM` and `AGOM` fields.
 
 `MEAN_MOTION` comes from 4.2.4.6 (a TLE-based OMM uses it instead of `SEMI_MAJOR_AXIS`).
 The 2.0 table marks every TLE keyword "No" and states each condition in its description
@@ -89,8 +93,10 @@ notation-specific boundary and schema-valid complete XML.
 XML has separate outer-data and mean-elements comment lists; flattened KVN has one leading
 mean-elements comment position. KVN generation writes outer-data comments followed by
 mean-elements comments. KVN parsing stores the combined list in `OmmData.comment` and leaves
-`MeanElements.comment` empty. Text and relative order in the combined list survive, but the
-original XML ownership cannot be reconstructed.
+`MeanElements.comment` empty. Relative order is retained, subject to the shared
+[comment normalization](../design/validation-contract.md#preservation-and-normalization),
+including splitting multiline entries and trimming trailing blanks. Original XML ownership
+and multiline grouping cannot be reconstructed.
 
 Shared `UserDefined.entries` retains XML comments and parameters in their original order,
 including interleaving. XML regeneration keeps that order. KVN generation refuses interleaving
@@ -146,9 +152,15 @@ sixteen-significant-digit limit. GM must be positive (`gmType`) in every notatio
 model, under the shared [facet rule](../design/validation-contract.md#authority-and-representability);
 the book states no range. `NORAD_CAT_ID` is stored as `u32`, so ten-digit values up to
 4,294,967,295 are read although table 4-3 says "up to nine digits". Negative catalog numbers
-are rejected despite `xsd:integer`; this is the documented unsigned storage profile. XML `-0`
-is accepted as zero. KVN still writes these fields only
-within the shared [integer limit](../design/validation-contract.md#integer-storage-limits).
+are rejected despite `xsd:integer`; this is the documented unsigned storage profile. KVN still
+writes these fields only within the shared
+[integer limit](../design/validation-contract.md#integer-storage-limits).
+
+XML `ELEMENT_SET_NO`, `NORAD_CAT_ID` and `REV_AT_EPOCH` accept signed integer zero
+(`-0`, `-000`) under XSD integer value equality, retaining their field-specific bounds.
+KVN unsigned integers still reject a leading minus. The shared
+`unsigned_xml_integer_zero_uses_xsd_value_equality` regression covers both standalone editions,
+combined 3.0 XML, invalid negatives, range limits and model preservation.
 
 Empty mandatory XML strings (`<OBJECT_ID/>`) are rejected as empty values, book over XSD, per
 the [shared rule](../design/validation-contract.md#authority-and-representability).
@@ -173,12 +185,33 @@ its presence or distinguish those comments from the previous logical block.
 
 ## TLE export and recognized theories
 
-`to_tle_lines` requires Earth-centered TEME elements and UTC epochs (ODM §4.2.4.6).
-It refuses other centers/frames rather than transforming or relabeling orbital elements.
-General OMM parsing and generation retain their open center/frame domains. This is an explicit
-producer-compatibility exception to the book's TLE-based OMM profile: parsing preserves the
-producer's declarations for inspection, and model validation does not certify a propagator/frame
-combination. The Earth/TEME/UTC requirement is enforced when producing a TLE. Cyclic TLE
+ODM 3.0 §4.2.4.6 (2.0 §4.2.4.6 is the same apart from its reference) reads: "For operations
+in Earth orbit with a TLE-based OMM, some special conventions must be observed":
+
+- "The value associated with the CENTER_NAME keyword shall be 'EARTH'."
+- "The value associated with the REF_FRAME keyword shall be 'TEME'."
+- "The value associated with the TIME_SYSTEM keyword shall be 'UTC'."
+- "The format of the OBJECT_NAME and OBJECT_ID keywords shall be that of the UN Office of
+  Outer Space Affairs designator index" (2.0: "of the SPACEWARN bulletin").
+- "The MEAN_MOTION keyword must be used instead of SEMI_MAJOR_AXIS."
+
+For `SGP`, `SGP4` and `SGP/SGP4` (case-insensitive), in both editions, parsing, model
+validation, both writers and `to_tle_lines` enforce `CENTER_NAME = EARTH`, `REF_FRAME = TEME`,
+`TIME_SYSTEM = UTC` and `MEAN_MOTION`. No conversion or relabeling is performed. There is no
+producer-compatibility exception. The designator bullet is not enforced: table 4-2 says "there
+is no CCSDS-based restriction on the value" of OBJECT_ID, lists `UNKNOWN`, and tells producers
+to use `UNKNOWN` for names absent from the index. That conflict is unclear, so the library is
+lenient. `pre_release::sgp4_semantics_apply_before_every_generation_route` and
+`omm::conversion::tle_export_requires_earth_teme_and_rounds_cyclic_angle_boundaries` cover it.
+
+**MEAN_MOTION for other theories.** Table 4-3 describes SEMI_MAJOR_AXIS/MEAN_MOTION as
+"Semi-major axis (preferred), or, if MEAN_ELEMENT_THEORY = SGP/SGP4, the Keplerian mean
+motion", while the XSD choice is unconditional. §4.2.4.6 requires MEAN_MOTION for TLE-based
+elements but does not prohibit it elsewhere, and "preferred" is not a "shall". The library
+reads this leniently: `PPT3`, `SGP4-XP` and unknown theories may use either alternative.
+Unknown theory strings remain open and do not imply that the library certifies a propagator.
+
+Cyclic TLE
 angles are rounded to four decimals and a rounded 360 degrees is emitted as zero;
 `omm::conversion::tle_export_requires_earth_teme_and_rounds_cyclic_angle_boundaries`
 covers both boundaries and rereads the produced TLE.
@@ -204,27 +237,42 @@ are specified in the [validation contract](../design/validation-contract.md).
 
 CelesTrak GP OMM exports may have empty `CREATION_DATE` and
 `ORIGINATOR`. These remain rejected under ODM 7.5.1: obtain populated provenance from
-the producer or supply known, truthful values before parsing; the library does not invent them.
-Space-Track exports such as `omm1_st.xml` wrap ODM 2.0 in `<ndm>`. The supported combined
-schema fixes ODM constituents to 3.0. Extract each OMM as standalone XML, preserving its
-namespace declarations, or obtain an ODM 3.0 export; changing the version label alone
-is not a conversion. The standalone 2.0 reader remains supported.
+the producer or supply known, truthful values before parsing; parsing does not invent them (the TLE helper below is the only documented placeholder path).
+Space-Track ODM 2.0 exports wrapped in `<ndm>` are accepted as NDM/XML 1.0 input.
+The envelope's legacy constituent set and editions are checked; mixed legacy/current envelopes
+are rejected. Output remains NDM/XML 4.0.0 and refuses stored ODM 2.0 constituents.
+`pre_release::legacy_envelopes_are_input_only_and_cannot_mix_editions` uses distributed
+fixtures to reproduce this boundary without relying on ignored producer files.
+
 
 TLE parameters are required for `SGP`, `SGP4`, and (3.0) `PPT3`/`SGP4-XP` theories.
 TLE line helpers use the stored TLE fields for `MEAN_MOTION_DOT` and
 `MEAN_MOTION_DDOT`: these are already ṅ/2 and n̈/6 (ODM 4.2.4.7 note 2), without further scaling.
 
-The bundled `omm1_ct.xml` also uses an ODM 2.0 `<ndm>` wrapper and therefore encounters
-that envelope refusal before provenance validation. Extracting it as standalone XML does not
-waive the requirement for populated CREATION_DATE and ORIGINATOR.
-
-TLE export needs explicitly populated `MEAN_MOTION_DOT`, `MEAN_MOTION_DDOT`, `BSTAR`,
-`NORAD_CAT_ID`, `ELEMENT_SET_NO`, `REV_AT_EPOCH`, `CLASSIFICATION_TYPE`, and `EPHEMERIS_TYPE`.
-It does not populate the book's U/0 classification/ephemeris defaults or invent zero derivatives.
-Missing fields raise validation errors naming the field, not an instruction to infer a propagator.
-The ordinary metadata and mean-elements requirements also continue to apply.
+`to_tle_lines` accepts only `SGP`, `SGP4` and `SGP/SGP4`; `PPT3`, `SGP4-XP` and other theories
+are refused. It needs explicitly populated `NORAD_CAT_ID`, `ELEMENT_SET_NO`, `REV_AT_EPOCH`,
+`MEAN_MOTION_DOT`, `MEAN_MOTION_DDOT` and `BSTAR`. Omitted `CLASSIFICATION_TYPE` and
+`EPHEMERIS_TYPE` are written as their table 4-3 defaults `U` and `0`, as the
+[validation contract](../design/validation-contract.md) allows when the target format needs a
+value. Those defaults affect export only; they do not fill the model's fields or invent zero
+derivatives. Missing fields raise validation errors naming the field, not an instruction to
+infer a propagator. The ordinary metadata and mean-elements requirements also continue to
+apply. TLE export requires launch years and the final rounded epoch year in 1957–2056; ordinary
+OMM retains its wider date domain.
 
 Repeated user-defined names retain every value in order in KVN and XML. Empty suffixes are
 rejected; empty user values are literal user content and remain distinct from missing standard
 fields. General validation runs edition restrictions before theory-dependent required fields,
 so a 2.0 BTERM/AGOM field is reported as forbidden instead of first asking for a 2.0 BSTAR.
+
+## TLE conversion edition and provenance
+
+The TLE helper emits OMM 3.0, including when MESSAGE_ID is supplied. Parsing ordinary OMM
+input requires producer provenance. TLE conversion is an explicit exception: unless overridden,
+it uses CREATION_DATE equal to the TLE epoch, ORIGINATOR UNKNOWN and OBJECT_NAME UNKNOWN.
+These are documented convenience placeholders, not evidence of the original file creation or
+producer. Supply known provenance with TleToOmmOptions when it matters.
+
+`pre_release::tle_helper_emits_valid_omm3_with_message_id_and_export_uses_book_defaults`
+covers both the helper edition and export defaults; `pre_release::sgp4_semantics_apply_before_every_generation_route`
+covers the shared semantic checks.

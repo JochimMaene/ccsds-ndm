@@ -45,7 +45,7 @@ def test_numpy_inputs_name_their_expected_dimensions():
             call()
 
 
-def test_errors_carry_their_file_and_family(tmp_path):
+def test_file_and_epoch_errors_keep_their_python_details(tmp_path):
     import errno
     from pathlib import Path
 
@@ -59,12 +59,6 @@ def test_errors_carry_their_file_and_family(tmp_path):
     assert excinfo.value.filename == str(missing)
 
     kvn = Path(__file__).resolve().parents[3] / "ccsds-ndm" / "data" / "kvn"
-    opm = kvn / "opm_g1.kvn"
-    with pytest.raises(
-        ccsds_ndm.NdmUnsupportedMessageError, match="expected OEM, found OPM"
-    ):
-        Oem.from_file(opm)
-
     # NdmEpochError is a ValueError, so existing handlers keep working.
     metadata = Oem.from_file(kvn / "oem_g11.kvn").segments[0].metadata
     with pytest.raises(ccsds_ndm.NdmEpochError):

@@ -8,7 +8,10 @@ use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
     if let Ok(s) = std::str::from_utf8(data) {
-        // Parsing should never panic, only return Result
-        let _ = ccsds_ndm::from_str(s);
+        if let Ok(message) = ccsds_ndm::from_str(s) {
+            for output in [message.to_kvn(), message.to_xml()].into_iter().flatten() {
+                assert!(ccsds_ndm::from_str(&output).is_ok());
+            }
+        }
     }
 });

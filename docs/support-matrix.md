@@ -22,7 +22,7 @@ behavior governed by an external algorithm, registry, or ICD.
 | APM | 2.0 | Parse, write, convert | Parse, write, convert | [Attitude parameters](conformance/apm-2.0.md) |
 | AEM | 2.0 | Parse, write, convert | Parse, write, convert | [Attitude ephemerides](conformance/aem-2.0.md) |
 | ACM | 2.0 | Parse, write, convert; relative or absolute histories | Parse, write, convert; relative or absolute histories | [Comprehensive attitude data](conformance/acm-2.0.md) |
-| Combined NDM | XML envelope | Not defined | Parse and write | [Combined instantiation](conformance/combined-ndm.md) |
+| Combined NDM | NDM/XML 4.0.0 envelope; 1.0 envelope input only | Not defined | Parse and write (4.0.0); parse only (1.0) | [Combined instantiation](conformance/combined-ndm.md) |
 
 Conversion preserves the supported model subject to documented normalization: ordinary numbers
 may round to KVN's 16-digit precision and optional fixed-unit annotations may be normalized.
@@ -39,14 +39,20 @@ conversion to succeed.
 Combined NDM is XML-only. Requests for combined KVN fail with `unsupported.notation`; several KVN
 messages need application framing, such as one file per message. Constituents must satisfy their
 standalone requirements and the bundled NDM/XML 4.0.0 envelope's edition constraints: OPM, OMM,
-and OEM constituents must be 3.0. Standalone ODM 2.0 XML remains supported separately.
+and OEM constituents must be 3.0, and TDM constituents must be 2.0. Standalone ODM 2.0 XML
+and restricted standalone TDM 1.0 input remain supported. NDM/XML 1.0 envelopes containing
+supported ODM 2.0 or TDM 1.0 constituents are accepted as input only; legacy and current
+constituent editions cannot be mixed.
 
-Space-Track-style ODM 2.0 `<ndm>` exports are outside this envelope baseline and are rejected;
-support for their older envelope requires a separate edition review. Documents with undeclared
-`xsi` prefixes are invalid XML and remain rejected. CelesTrak-style OMM inputs with empty
-creation/originator fields also fail mandatory provenance checks. Extract a valid standalone
-constituent with its namespace bindings or obtain a supported export; relabelling a version or
-inventing provenance does not establish conformance.
+Space-Track-style ODM 2.0 `<ndm>` exports use the supported input-only NDM/XML 1.0 envelope, whose
+own structure is checked ([legacy envelope input](conformance/combined-ndm.md#legacy-envelope-input)).
+Documents with undeclared `xsi` prefixes remain invalid XML. CelesTrak-style OMM inputs with
+empty creation/originator fields still fail mandatory provenance checks; envelope support does
+not supply missing values or upgrade constituent editions.
+
+ACM ATT histories require a QUATERNION, EULER_ANGLES or DCM orientation primary state,
+optionally with rate columns. Rate-only primary ATT_TYPEs are outside the implemented profile;
+see the [ACM profile limits](conformance/acm-2.0.md).
 
 ## Legacy compatibility
 
@@ -59,7 +65,7 @@ rejected. See [the complete compatibility limits](conformance/oem-3.0.md#oem-10)
 OPM 1.0 input is not supported: its older requirements and syntax have not been implemented
 and verified as a separate edition. APM and AEM 1.0 input is rejected by decision, because some
 1.0 values (rates, `B2A` directions, inertia signs, spin conventions) cannot be given their 2.0
-meaning without guessing; see [APM and AEM 1.0](conformance/apm-2.0.md#apm-and-aem-1-0). ACM was introduced in ADM issue 2; the
+meaning without guessing; see [APM and AEM 1.0](conformance/apm-2.0.md#apm-and-aem-10). ACM was introduced in ADM issue 2; the
 library accepts its defined 2.0 representation. A version label on a newer-format example is not
 evidence of an older format's support. Unsupported versions fail explicitly with
 `parse.unsupported_input_version`, checked after encoding/character checks and before structural
@@ -70,7 +76,7 @@ implementation coverage of attitude 2.0 is not a claim to accept every attitude 
 TDM 1.0 has a restricted **input-only reader in KVN and XML**. It retains the 1.0 edition,
 rejects the later fields, and applies the NDM/XML 1.0 schema's narrower XML rules (closed
 `TIME_SYSTEM` list, no `RHUMIDITY` units, unqualified form only). Generation and conversion of a
-stored 1.0 message are refused. See [TDM 1.0 input](conformance/tdm-2.0.md#tdm-1-0-input).
+stored 1.0 message are refused. See [TDM 1.0 input](conformance/tdm-2.0.md#tdm-10-input).
 
 ## Common guarantees and boundaries
 

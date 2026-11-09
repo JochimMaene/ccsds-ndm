@@ -42,6 +42,7 @@ pub fn acm_version(input: &mut &str) -> KvnResult<String> {
 
 pub fn acm_metadata(input: &mut &str) -> KvnResult<AcmMetadata> {
     let mut comment = Vec::new();
+    let mut classification = None;
     let mut object_name = None;
     let mut international_designator = None;
     let mut catalog_name = None;
@@ -65,6 +66,7 @@ pub fn acm_metadata(input: &mut &str) -> KvnResult<AcmMetadata> {
     expect_block_start("META").parse_next(input)?;
 
     parse_block!(input, comment, {
+        "CLASSIFICATION" => val: kv_string => { classification = Some(val); },
         "OBJECT_NAME" => val: kv_string => { object_name = Some(val); },
         "INTERNATIONAL_DESIGNATOR" => val: kv_string => { international_designator = Some(val); },
         "CATALOG_NAME" => val: kv_string => { catalog_name = Some(val); },
@@ -90,6 +92,7 @@ pub fn acm_metadata(input: &mut &str) -> KvnResult<AcmMetadata> {
 
     Ok(AcmMetadata {
         comment,
+        classification,
         object_name: require_field(input, "ACM Metadata", "OBJECT_NAME", object_name)?,
         international_designator,
         catalog_name,
@@ -624,6 +627,7 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
         "MESSAGE_ID",
     ];
     const META: &[&str] = &[
+        "CLASSIFICATION",
         "OBJECT_NAME",
         "INTERNATIONAL_DESIGNATOR",
         "CATALOG_NAME",
@@ -904,11 +908,6 @@ pub(super) fn validate_kvn_syntax(kvn: &str) -> Result<()> {
                     return fail("expected one ACM block assignment");
                 }
                 let key = line.split_once('=').unwrap().0.trim();
-                if current == "META" && key == "CLASSIFICATION" {
-                    return fail(
-                        "CLASSIFICATION is supported only in the ACM header (ADM table 5-3 repeats it in metadata, but XSD acmMetadata has no such element)",
-                    );
-                }
                 let keys = block_keys(current)
                     .ok_or_else(|| invalid(number, offset, "unknown ACM marked block".into()))?;
                 let position = |name: &str| keys.iter().position(|candidate| *candidate == name);
@@ -972,6 +971,9 @@ impl ToKvn for AcmMetadata {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_section("META_START");
         writer.write_comments(&self.comment);
+        if let Some(value) = &self.classification {
+            writer.write_pair("CLASSIFICATION", value);
+        }
         writer.write_pair("OBJECT_NAME", &self.object_name);
         if let Some(v) = &self.international_designator {
             writer.write_pair("INTERNATIONAL_DESIGNATOR", v);
@@ -1079,7 +1081,7 @@ impl ToKvn for AcmAttitudeState {
             writer.write_pair("RATE_TYPE", v);
         }
         for line in &self.att_lines {
-            writer.write_ocm_numeric_history(&line.epoch, &line.values);
+            writer.write_acm_numeric_history(&line.epoch, &line.values);
         }
         writer.write_section("ATT_STOP");
     }
@@ -1150,7 +1152,7 @@ impl ToKvn for AcmCovarianceMatrix {
         }
         writer.write_pair("COV_TYPE", &self.cov_type);
         for line in &self.cov_lines {
-            writer.write_ocm_numeric_history(&line.epoch, &line.values);
+            writer.write_acm_numeric_history(&line.epoch, &line.values);
         }
         writer.write_section("COV_STOP");
     }
@@ -1287,6 +1289,7 @@ impl ParseKvn for Acm {
 
 impl Acm {
     pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        self.body.segment.data.validate_user_for_output()?;
         let invalid_number = || {
             CcsdsNdmError::Validation(Box::new(ValidationError::Generic {
                 message: Cow::Borrowed("ACM KVN numbers must be representable CCSDS numbers"),
@@ -1328,14 +1331,6 @@ impl Acm {
             }
         };
 
-        for value in self
-            .header
-            .comment
-            .iter()
-            .chain(self.body.segment.metadata.comment.iter())
-        {
-            check_text(value)?;
-        }
         for value in [
             self.header.classification.as_ref(),
             Some(&self.header.originator),
@@ -1368,18 +1363,17 @@ impl Acm {
 
         let data = &self.body.segment.data;
         for attitude in &data.att {
-            for value in attitude.comment.iter().chain(
-                [
-                    attitude.att_id.as_ref(),
-                    attitude.att_prev_id.as_ref(),
-                    attitude.att_basis.as_ref(),
-                    attitude.att_basis_id.as_ref(),
-                    Some(&attitude.ref_frame_a),
-                    Some(&attitude.ref_frame_b),
-                ]
-                .into_iter()
-                .flatten(),
-            ) {
+            for value in [
+                attitude.att_id.as_ref(),
+                attitude.att_prev_id.as_ref(),
+                attitude.att_basis.as_ref(),
+                attitude.att_basis_id.as_ref(),
+                Some(&attitude.ref_frame_a),
+                Some(&attitude.ref_frame_b),
+            ]
+            .into_iter()
+            .flatten()
+            {
                 check_text(value)?;
             }
             for line in &attitude.att_lines {
@@ -1396,14 +1390,13 @@ impl Acm {
             }
         }
         if let Some(physical) = &data.phys {
-            for value in physical.comment.iter().chain(
-                [
-                    physical.cp_ref_frame.as_ref(),
-                    physical.inertia_ref_frame.as_ref(),
-                ]
-                .into_iter()
-                .flatten(),
-            ) {
+            for value in [
+                physical.cp_ref_frame.as_ref(),
+                physical.inertia_ref_frame.as_ref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
                 check_text(value)?;
             }
             for value in [
@@ -1427,17 +1420,16 @@ impl Acm {
             }
         }
         for covariance in &data.cov {
-            for value in covariance.comment.iter().chain(
-                [
-                    covariance.cov_id.as_ref(),
-                    covariance.cov_prev_id.as_ref(),
-                    covariance.cov_basis.as_ref(),
-                    covariance.cov_basis_id.as_ref(),
-                    covariance.cov_ref_frame.as_ref(),
-                ]
-                .into_iter()
-                .flatten(),
-            ) {
+            for value in [
+                covariance.cov_id.as_ref(),
+                covariance.cov_prev_id.as_ref(),
+                covariance.cov_basis.as_ref(),
+                covariance.cov_basis_id.as_ref(),
+                covariance.cov_ref_frame.as_ref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
                 check_text(value)?;
             }
             for line in &covariance.cov_lines {
@@ -1445,17 +1437,16 @@ impl Acm {
             }
         }
         for maneuver in &data.man {
-            for value in maneuver.comment.iter().chain(
-                [
-                    maneuver.man_id.as_ref(),
-                    maneuver.man_prev_id.as_ref(),
-                    maneuver.man_purpose.as_ref(),
-                    maneuver.actuator_used.as_ref(),
-                    maneuver.target_mom_frame.as_ref(),
-                ]
-                .into_iter()
-                .flatten(),
-            ) {
+            for value in [
+                maneuver.man_id.as_ref(),
+                maneuver.man_prev_id.as_ref(),
+                maneuver.man_purpose.as_ref(),
+                maneuver.actuator_used.as_ref(),
+                maneuver.target_mom_frame.as_ref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
                 check_text(value)?;
             }
             if let Some(value) = &maneuver.man_duration {
@@ -1479,18 +1470,17 @@ impl Acm {
             }
         }
         if let Some(determination) = &data.ad {
-            for value in determination.comment.iter().chain(
-                [
-                    determination.ad_id.as_ref(),
-                    determination.ad_prev_id.as_ref(),
-                    determination.ad_method.as_ref(),
-                    determination.attitude_source.as_ref(),
-                    determination.ref_frame_a.as_ref(),
-                    determination.ref_frame_b.as_ref(),
-                ]
-                .into_iter()
-                .flatten(),
-            ) {
+            for value in [
+                determination.ad_id.as_ref(),
+                determination.ad_prev_id.as_ref(),
+                determination.ad_method.as_ref(),
+                determination.attitude_source.as_ref(),
+                determination.ref_frame_a.as_ref(),
+                determination.ref_frame_b.as_ref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
                 check_text(value)?;
             }
             for value in [
@@ -1507,10 +1497,18 @@ impl Acm {
                 check_number(value)?;
             }
             for sensor in &determination.sensors {
-                for value in sensor.comment.iter().chain(sensor.sensor_used.iter()) {
+                if let Some(value) = &sensor.sensor_used {
                     check_text(value)?;
                 }
                 if let Some(value) = &sensor.sensor_noise_stddev {
+                    if value.values.is_empty() {
+                        return Err(ValidationError::invalid_value(
+                            "SENSOR_NOISE_STDDEV",
+                            "empty vector",
+                            "a nonempty vector for KVN; XML can retain an empty vector",
+                        )
+                        .into());
+                    }
                     check_values(&value.values)?;
                 }
                 if let Some(value) = &sensor.sensor_frequency {
@@ -1521,10 +1519,10 @@ impl Acm {
         if let Some(user) = &data.user {
             // ADM 5.3.10.5 lets comments precede any parameter, so entry order is KVN-safe.
             user.validate_kvn_parameter_names()?;
-            for value in user.comments().chain(
-                user.parameters()
-                    .flat_map(|parameter| [&parameter.parameter, &parameter.value]),
-            ) {
+            for value in user
+                .parameters()
+                .flat_map(|parameter| [&parameter.parameter, &parameter.value])
+            {
                 check_text(value)?;
             }
         }

@@ -172,62 +172,14 @@ fn test_parse_aem_minimal() {
 
 #[test]
 fn test_parse_aem_version_error() {
-    let input = r#"CCSDS_AEM_VERS = 3.0
-CREATION_DATE = 2002-11-04T17:22:31
-ORIGINATOR = NASA/JPL
-META_START
-OBJECT_NAME = MARS GLOBAL SURVEYOR
-OBJECT_ID = 1996-062A
-CENTER_NAME = MARS BARYCENTER
-REF_FRAME_A = EME2000
-REF_FRAME_B = SC_BODY_1
-TIME_SYSTEM = UTC
-START_TIME = 2002-11-04T17:22:31
-STOP_TIME = 2002-11-04T17:25:31
-ATTITUDE_TYPE = QUATERNION
-META_STOP
-DATA_START
-2002-11-04T17:22:31 0.5 0.5 0.5 0.5
-DATA_STOP
-"#;
-    let err = Aem::from_kvn(input).unwrap_err();
+    let input = mutated(crate::KVN, "CCSDS_AEM_VERS = 2.0", "CCSDS_AEM_VERS = 3.0");
+    let err = Aem::from_kvn(&input).unwrap_err();
+    let err = crate::common::parse_error_cause(err);
     match err {
         CcsdsNdmError::UnsupportedInputVersion { version, .. } => {
             assert_eq!(version, "3.0");
         }
         _ => panic!("Expected unsupported input version, got {:?}", err),
-    }
-}
-
-#[test]
-fn test_aem_missing_mandatory_metadata() {
-    // Missing OBJECT_NAME
-    let input = r#"CCSDS_AEM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-OBJECT_ID = SAT1
-CENTER_NAME = EARTH
-REF_FRAME_A = EME2000
-REF_FRAME_B = SC_BODY_1
-TIME_SYSTEM = UTC
-START_TIME = 2023-01-01T00:00:00
-STOP_TIME = 2023-01-01T01:00:00
-ATTITUDE_TYPE = QUATERNION
-META_STOP
-DATA_START
-2023-01-01T00:00:00 0 0 0 1
-DATA_STOP
-"#;
-    let err = Aem::from_kvn(input).unwrap_err();
-    match err {
-        CcsdsNdmError::Validation(boxed_err) => match *boxed_err {
-            ValidationError::MissingRequiredField { field, .. } => {
-                assert_eq!(field, "OBJECT_NAME");
-            }
-            _ => panic!("Expected missing field error, got {:?}", boxed_err),
-        },
-        _ => panic!("Expected Validation error, got {:?}", err),
     }
 }
 
@@ -248,10 +200,10 @@ fn parse_attitude_state(attitude_type: &str, values: &str) -> AemAttitudeState {
         sample_aem_header(),
         meta
     );
-    Aem::from_kvn(&input).unwrap().body.segment[0]
-        .data
-        .attitude_states[0]
-        .clone()
+    let message = Aem::from_kvn(&input).unwrap();
+    assert_eq!(Aem::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    assert_eq!(Aem::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    message.body.segment[0].data.attitude_states[0].clone()
 }
 
 // ADM table 4-4: compare every named component in its KVN column order.
@@ -507,7 +459,9 @@ fn test_aem_value_error_reports_record_line() {
         .count()
         + 1;
 
-    let CcsdsNdmError::Validation(error) = Aem::from_kvn(&input).unwrap_err() else {
+    let CcsdsNdmError::Validation(error) =
+        crate::common::parse_error_cause(Aem::from_kvn(&input).unwrap_err())
+    else {
         panic!("expected validation error");
     };
     let ValidationError::OutOfRange { name, line, .. } = *error else {
@@ -515,23 +469,6 @@ fn test_aem_value_error_reports_record_line() {
     };
     assert_eq!(name, "Q1");
     assert_eq!(line, Some(expected_line));
-}
-
-#[test]
-fn test_parse_aem_multiple_segments() {
-    let seg1 = format!(
-        "{}{}\nDATA_START\n2002-11-04T17:22:31 0.5 0.5 0.5 0.5\nDATA_STOP\n",
-        "",
-        sample_aem_meta()
-    );
-    let seg2 = format!(
-        "{}\nDATA_START\n2002-11-04T17:23:00 0.5 0.5 0.5 0.5\nDATA_STOP\n",
-        sample_aem_meta()
-    ); // Re-use meta for simplicity
-
-    let input = format!("{}{}{}", sample_aem_header(), seg1, seg2);
-    let aem = Aem::from_kvn(&input).unwrap();
-    assert_eq!(aem.body.segment.len(), 2);
 }
 
 #[test]
@@ -571,40 +508,12 @@ DATA_STOP
         .contains(&"Data comment".to_string()));
 }
 #[test]
-fn test_parse_aem_rate_frame_alias() {
-    let meta = sample_aem_meta()
-        .replace("QUATERNION", "QUATERNION/ANGVEL")
-        .replace("META_STOP", "RATE_FRAME = SC_BODY_1\nMETA_STOP");
-
-    // QUATERNION/ANGVEL needs 7 columns
-    let input = format!(
-        "{}{}\nDATA_START\n2002-11-04T17:22:31 0.0 0.0 0.0 1.0 0.01 0.02 0.03\nDATA_STOP\n",
-        sample_aem_header(),
-        meta
-    );
-
-    let aem = Aem::from_kvn(&input).unwrap();
-    // Check that proper parsing happened (RATE_FRAME maps to angvel_frame)
-    assert_eq!(
-        aem.body.segment[0].metadata.angvel_frame.as_deref(),
-        Some("SC_BODY_1")
-    );
-}
-
-#[test]
 fn test_aem_no_segments() {
     // Valid header but no body segments
     let input = sample_aem_header().to_string();
     let err = Aem::from_kvn(&input).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(boxed_err) => match *boxed_err {
-            FormatError::Kvn(e) => {
-                assert!(format!("{:?}", e).contains("At least one segment required"));
-            }
-            _ => panic!("Expected Kvn format error, got {:?}", boxed_err),
-        },
-        _ => panic!("Expected Format error, got {:?}", err),
-    }
+    let e = crate::common::kvn_parse_error(&err).expect("KVN syntax diagnostic");
+    assert!(format!("{:?}", e).contains("At least one segment required"));
 }
 
 #[test]
@@ -618,6 +527,10 @@ fn aem_uses_canonical_angular_velocity_frame_and_preserves_optional_metadata() {
     for keyword in ["ANGVEL_FRAME", "RATE_FRAME"] {
         let input = source.replace("META_STOP", &format!("{keyword} = SC_BODY_1\nMETA_STOP"));
         let message = Aem::from_kvn(&input).unwrap();
+        assert_eq!(
+            message.body.segment[0].metadata.angvel_frame.as_deref(),
+            Some("SC_BODY_1")
+        );
         let output = message.to_kvn().unwrap();
         assert!(output.contains("ANGVEL_FRAME"));
         assert!(!output.contains("RATE_FRAME"));

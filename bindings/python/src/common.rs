@@ -1231,8 +1231,8 @@ impl OdParameters {
         self.inner.comment = v;
     }
 
-    /// The start of a time interval (UTC) that contains the time of the last accepted
-    /// observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+    /// The start of a time interval (UTC for CDM; metadata TIME_SYSTEM for RDM) that contains the time of the last accepted
+    /// observation. (See CDM 6.3.2.6 or RDM 5.3.3.5 for formatting rules.) For an exact time, the time interval is
     /// of zero duration (i.e., same value as that of TIME_LASTOB_END).
     ///
     /// CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
@@ -1248,8 +1248,8 @@ impl OdParameters {
         Ok(())
     }
 
-    /// The end of a time interval (UTC) that contains the time of the last accepted
-    /// observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+    /// The end of a time interval (UTC for CDM; metadata TIME_SYSTEM for RDM) that contains the time of the last accepted
+    /// observation. (See CDM 6.3.2.6 or RDM 5.3.3.5 for formatting rules.) For an exact time, the time interval is
     /// of zero duration (i.e., same value as that of TIME_LASTOB_START).
     ///
     /// CCSDS Reference: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
@@ -1539,7 +1539,7 @@ impl GroundImpactParameters {
     ) -> PyResult<Self> {
         let comment = comment.unwrap_or_default();
         use ccsds_ndm::types::{
-            AltitudeRequired, Distance, LatitudeRequired, LongitudeRequired, PercentageRequired,
+            Distance, ImpactAltitude, LatitudeRequired, LongitudeRequired, PercentageRequired,
             Probability,
         };
         Ok(Self {
@@ -1582,7 +1582,7 @@ impl GroundImpactParameters {
                     .transpose()?,
                 nominal_impact_alt: nominal_impact_alt
                     .map(|v| {
-                        AltitudeRequired::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
+                        ImpactAltitude::new(v).map_err(|e| PyValueError::new_err(e.to_string()))
                     })
                     .transpose()?,
                 impact_1_confidence: impact_1_confidence
@@ -1901,7 +1901,7 @@ impl GroundImpactParameters {
     }
     #[setter]
     fn set_nominal_impact_alt(&mut self, v: Option<f64>) {
-        self.inner.nominal_impact_alt = v.map(|value| ccsds_ndm::types::AltitudeRequired {
+        self.inner.nominal_impact_alt = v.map(|value| ccsds_ndm::types::ImpactAltitude {
             value,
             units: Some(ccsds_ndm::types::LengthUnits::M),
         });

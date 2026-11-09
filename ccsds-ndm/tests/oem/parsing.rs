@@ -548,14 +548,27 @@ fn kvn_empty_optional_values_are_absent() {
 }
 
 #[test]
-fn kvn_accepts_an_empty_covariance_section() {
-    // Annex A2.5.3 row 30 makes covariance lines optional inside the covariance block.
+fn kvn_accepts_empty_or_comment_only_covariance_sections() {
+    // Annex A2.5.3 makes matrices optional; comments without a matrix join data comments.
     let source = KVN_FIXTURES[2];
     let start = source.find("COVARIANCE_START").unwrap();
     let stop = source.find("COVARIANCE_STOP").unwrap();
-    let input = format!("{}COVARIANCE_START\n{}", &source[..start], &source[stop..]);
-    let parsed = Oem::from_kvn(&input).unwrap();
-    assert!(parsed.body.segment[0].data.covariance_matrix.is_empty());
+    for comment in ["", "COMMENT no covariance available\n"] {
+        let input = format!(
+            "{}COVARIANCE_START\n{comment}{}",
+            &source[..start],
+            &source[stop..]
+        );
+        let message = Oem::from_kvn(&input).unwrap();
+        let data = &message.body.segment[0].data;
+        assert!(data.covariance_matrix.is_empty());
+        if !comment.is_empty() {
+            assert_eq!(
+                data.comment.last().map(String::as_str),
+                Some("no covariance available")
+            );
+        }
+    }
 }
 
 #[test]
@@ -964,26 +977,6 @@ fn kvn_numbers_stay_within_the_double_range() {
     let padded = Oem::from_kvn(&mutated_once(source, "-2432.166", "+00000000000000000001"))
         .expect("7.5.4 permits leading zeroes without the real-number digit cap");
     assert_eq!(padded.body.segment[0].data.state_vector[0].x.value, 1.0);
-}
-
-#[test]
-fn kvn_covariance_section_may_hold_only_comments() {
-    // 7.8.9 admits comments right after COVARIANCE_START and A2.5.3 makes the matrices
-    // optional. With no matrix to carry them, the comments join the data comments.
-    let source = KVN_FIXTURES[2];
-    let start = source.find("COVARIANCE_START").unwrap();
-    let stop = source.find("COVARIANCE_STOP").unwrap();
-    let input = format!(
-        "{}COVARIANCE_START\nCOMMENT no covariance available\n{}",
-        &source[..start],
-        &source[stop..]
-    );
-    let data = &Oem::from_kvn(&input).unwrap().body.segment[0].data;
-    assert!(data.covariance_matrix.is_empty());
-    assert_eq!(
-        data.comment.last().map(String::as_str),
-        Some("no covariance available")
-    );
 }
 
 #[test]

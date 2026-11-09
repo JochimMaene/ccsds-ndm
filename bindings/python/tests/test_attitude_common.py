@@ -179,7 +179,3 @@ class TestAttitudeStates:
         assert is_.ixz == 0.5
         assert is_.iyz == 0.6
         assert is_.comment == ["Updated"]
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

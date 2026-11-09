@@ -25,11 +25,23 @@ fn minimal_kvn_parses() {
 }
 
 #[test]
+fn builder_defaults_validate_and_roundtrip() {
+    let parsed = Opm::from_kvn(KVN).unwrap();
+    let built = Opm::builder()
+        .header(parsed.header.clone())
+        .body(parsed.body.clone())
+        .build();
+    assert_eq!(built, parsed);
+    ccsds_ndm::Validate::validate(&built).unwrap();
+    assert_eq!(Opm::from_kvn(&built.to_kvn().unwrap()).unwrap(), built);
+}
+
+#[test]
 fn rejects_invalid_units_kvn() {
     let input = mutated(KVN, "X = 1 [km]", "X = 1 [m]");
     let error = Opm::from_kvn(&input).unwrap_err();
     assert!(
-        matches!(error.as_format_error(), Some(ccsds_ndm::error::FormatError::Enum(cause)) if cause.field == "unit" && cause.value == "m"),
+        matches!(error.as_format_error(), Some(ccsds_ndm::error::FormatError::Enum(cause)) if cause.field == "X" && cause.value == "m"),
         "{error}"
     );
 }

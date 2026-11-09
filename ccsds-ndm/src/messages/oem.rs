@@ -84,7 +84,7 @@ fn validate_within_path(
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "oem")]
 pub struct Oem {
-    /// XML root identifier; when present it must match this message family.
+    /// Required XML root identifier, `CCSDS_OEM_VERS`; `None` is invalid.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_OEM_VERS".to_string()))]
     pub id: Option<String>,
@@ -408,7 +408,12 @@ impl crate::traits::Validate for OemMetadata {
                 return Err(error.at_path(member).into());
             }
         }
-        if self.interpolation.is_some() && self.interpolation_degree.is_none() {
+        if self
+            .interpolation
+            .as_ref()
+            .is_some_and(|value| !value.trim().is_empty())
+            && self.interpolation_degree.is_none()
+        {
             return Err(ValidationError::missing_required(
                 "OEM Metadata",
                 "INTERPOLATION_DEGREE (required when INTERPOLATION is present)",
@@ -703,7 +708,7 @@ pub struct OemMetadata {
     /// ephemeris lines. Must be an integer value. This keyword must be used if the
     /// ‘INTERPOLATION’ keyword is used.
     ///
-    /// Enforced: required when `interpolation` is present, and positive (the XSD's
+    /// Enforced: required when `interpolation` names a nonempty method, and positive (the XSD's
     /// `positiveInteger`; table 5-3 only says "integer"). KVN reads and writes 1 to `i32::MAX`
     /// (7.5.4); XML reads up to `u32::MAX`.
     ///

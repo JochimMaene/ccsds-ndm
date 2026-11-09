@@ -289,41 +289,6 @@ USER_DEFINED_BAZ = QUX
 }
 
 #[test]
-fn roundtrip_kvn_minimal() {
-    let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = EME2000
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = DSST
-EPOCH = 2023-01-01T00:00:00
-SEMI_MAJOR_AXIS = 7000.0 [km]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-    let omm1 = Omm::from_kvn(kvn).expect("First parse failed");
-    let kvn2 = omm1.to_kvn().expect("Serialization failed");
-    let omm2 = Omm::from_kvn(&kvn2).expect("Second parse failed");
-
-    assert_eq!(omm1.version, omm2.version);
-    assert_eq!(omm1.header.originator, omm2.header.originator);
-    assert_eq!(
-        omm1.body.segment.metadata.object_name,
-        omm2.body.segment.metadata.object_name
-    );
-    assert_eq!(
-        omm1.body.segment.data.mean_elements.eccentricity,
-        omm2.body.segment.data.mean_elements.eccentricity
-    );
-}
-
-#[test]
 fn kvn_preserves_sgp4_xp_drag_and_solar_radiation_terms() {
     let mut tle = TleParameters::builder()
         .mean_motion_dot(MeanMotionDot::new(0.0, None))

@@ -45,7 +45,9 @@ const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 
 #[test]
 fn minimal_kvn_parses() {
-    Tdm::from_kvn(KVN).unwrap();
+    let message = Tdm::from_kvn(KVN).unwrap();
+    assert!(message.body.segments[0].metadata.freq_offset.is_none());
+    assert!(message.body.segments[0].metadata.range_modulus.is_none());
 }
 
 #[test]

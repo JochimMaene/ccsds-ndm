@@ -60,21 +60,60 @@ impl crate::traits::Validate for Rdm {
     }
 }
 
+impl Rdm {
+    /// Table 3-3 gives `IMPACT_n_*` longitudes/latitudes "with respect to the value of
+    /// IMPACT_REF_FRAME" but makes the frame mandatory only with NOMINAL_IMPACT_LON/LAT
+    /// (§3.5.10), so reading tolerates a frameless confidence region; output refuses one.
+    pub(crate) fn validate_impact_frame_for_output(&self) -> Result<()> {
+        let Some(ground) = &self.body.segment.data.ground_impact_parameters else {
+            return Ok(());
+        };
+        let has_region = ground.impact_1_start_lon.is_some()
+            || ground.impact_2_start_lon.is_some()
+            || ground.impact_3_start_lon.is_some();
+        if has_region
+            && ground
+                .impact_ref_frame
+                .as_deref()
+                .is_none_or(|frame| frame.trim().is_empty())
+        {
+            return Err(crate::error::ValidationError::MissingRequiredField {
+                block: "Ground Impact Parameters".into(),
+                field: "IMPACT_REF_FRAME".into(),
+                line: None,
+            }
+            .at_path("body.segment.data.ground_impact_parameters.impact_ref_frame")
+            .into());
+        }
+        Ok(())
+    }
+}
+
 impl Ndm for Rdm {
     fn to_kvn(&self) -> Result<String> {
         crate::generation::to_kvn_string(self)
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::kvn::prepare_input(
-            crate::detect::without_utf8_bom(kvn),
-            crate::validation::MessageKind::Rdm,
-        )?;
-        let kvn = kvn.as_ref();
-        kvn::validate_kvn_syntax(kvn)?;
-        let rdm = Self::from_kvn_str(kvn)?;
-        crate::traits::Validate::validate(&rdm)?;
-        Ok(rdm)
+        (|| {
+            let kvn = crate::kvn::prepare_input(
+                crate::detect::without_utf8_bom(kvn),
+                crate::validation::MessageKind::Rdm,
+            )?;
+            let kvn = kvn.as_ref();
+            kvn::validate_kvn_syntax(kvn)?;
+            let rdm = Self::from_kvn_str(kvn)?;
+            crate::traits::Validate::validate(&rdm)?;
+            Ok(rdm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Rdm,
+                crate::error::DiagnosticNotation::Kvn,
+                kvn,
+                None,
+            )
+        })
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -82,11 +121,22 @@ impl Ndm for Rdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        xml::validate_xml_sequences(xml)?;
-        let mut rdm: Self = crate::xml::from_str_with_context(xml, "RDM")?;
-        rdm.body.segment.data.drop_empty_blocks();
-        crate::traits::Validate::validate(&rdm)?;
-        Ok(rdm)
+        (|| {
+            xml::validate_xml_sequences(xml)?;
+            let mut rdm: Self = crate::xml::from_str_with_context(xml, "RDM")?;
+            rdm.body.segment.data.drop_empty_blocks();
+            crate::traits::Validate::validate(&rdm)?;
+            rdm.validate_xml_altitude()?;
+            Ok(rdm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Rdm,
+                crate::error::DiagnosticNotation::Xml,
+                xml,
+                None,
+            )
+        })
     }
 
     fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {

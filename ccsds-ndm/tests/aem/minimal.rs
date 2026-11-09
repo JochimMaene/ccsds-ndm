@@ -26,15 +26,21 @@ fn minimal_kvn_parses() {
 }
 
 #[test]
-fn rejects_missing_attitude_type_kvn() {
-    let input = mutated(KVN, "ATTITUDE_TYPE = QUATERNION\n", "");
-    let error = Aem::from_kvn(&input).unwrap_err();
-    assert_eq!(
-        error.code(),
-        Some("validation.missing_required_field"),
-        "{error}"
-    );
-    crate::common::assert_validation_field(&error, "ATTITUDE_TYPE");
+fn rejects_missing_required_metadata_kvn() {
+    Aem::from_kvn(KVN).unwrap();
+    for (record, field) in [
+        ("ATTITUDE_TYPE = QUATERNION\n", "ATTITUDE_TYPE"),
+        ("OBJECT_NAME = TEST\n", "OBJECT_NAME"),
+    ] {
+        let input = mutated(KVN, record, "");
+        let error = Aem::from_kvn(&input).unwrap_err();
+        assert_eq!(
+            error.code(),
+            Some("validation.missing_required_field"),
+            "{error}"
+        );
+        crate::common::assert_validation_field(&error, field);
+    }
 }
 
 #[test]

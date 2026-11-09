@@ -42,7 +42,7 @@ impl ToKvn for NdmHeader {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         writer.write_pair("CREATION_DATE", self.creation_date);
-        writer.write_pair("ORIGINATOR", &self.originator);
+        writer.write_pair("ORIGINATOR", self.originator.trim());
     }
 }
 
@@ -119,12 +119,12 @@ impl ToKvn for AdmHeader {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         if let Some(ref cls) = self.classification {
-            writer.write_pair("CLASSIFICATION", cls);
+            writer.write_pair("CLASSIFICATION", cls.trim());
         }
         writer.write_pair("CREATION_DATE", self.creation_date);
         writer.write_pair("ORIGINATOR", &self.originator);
         if let Some(ref msg_id) = self.message_id {
-            writer.write_pair("MESSAGE_ID", msg_id);
+            writer.write_pair("MESSAGE_ID", msg_id.trim());
         }
     }
 }
@@ -376,16 +376,16 @@ pub struct OdParameters {
     #[builder(default)]
     pub comment: Vec<String>,
 
-    /// The start of a time interval (UTC) that contains the time of the last accepted
-    /// observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+    /// The start of a time interval (UTC for CDM; metadata TIME_SYSTEM for RDM) that contains the time of the last accepted
+    /// observation. (See CDM 6.3.2.6 or RDM 5.3.3.5 for formatting rules.) For an exact time, the time interval is
     /// of zero duration (i.e., same value as that of TIME_LASTOB_END).
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub time_lastob_start: Option<CalendarEpoch>,
 
-    /// The end of a time interval (UTC) that contains the time of the last accepted
-    /// observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+    /// The end of a time interval (UTC for CDM; metadata TIME_SYSTEM for RDM) that contains the time of the last accepted
+    /// observation. (See CDM 6.3.2.6 or RDM 5.3.3.5 for formatting rules.) For an exact time, the time interval is
     /// of zero duration (i.e., same value as that of TIME_LASTOB_START).
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
@@ -1399,7 +1399,7 @@ pub struct QuaternionEphemeris {
 
 impl ToKvn for QuaternionEphemeris {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[
                 self.quaternion.q1,
@@ -1427,7 +1427,7 @@ pub struct QuaternionDerivative {
 
 impl ToKvn for QuaternionDerivative {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[
                 self.quaternion.q1,
@@ -1460,7 +1460,7 @@ pub struct QuaternionAngVel {
 
 impl ToKvn for QuaternionAngVel {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[
                 self.quaternion.q1,
@@ -1491,7 +1491,7 @@ pub struct EulerAngle {
 
 impl ToKvn for EulerAngle {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[self.angle_1.value, self.angle_2.value, self.angle_3.value],
         );
@@ -1520,7 +1520,7 @@ pub struct EulerAngleDerivative {
 
 impl ToKvn for EulerAngleDerivative {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[
                 self.angle_1.value,
@@ -1559,7 +1559,7 @@ pub struct EulerAngleAngVel {
 
 impl ToKvn for EulerAngleAngVel {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[
                 self.angle_1.value,
@@ -1591,7 +1591,7 @@ pub struct Spin {
 
 impl ToKvn for Spin {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[
                 self.spin_alpha.value,
@@ -1627,7 +1627,7 @@ pub struct SpinNutation {
 
 impl ToKvn for SpinNutation {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[
                 self.spin_alpha.value,
@@ -1666,7 +1666,7 @@ pub struct SpinNutationMom {
 
 impl ToKvn for SpinNutationMom {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[
                 self.spin_alpha.value,
@@ -2528,7 +2528,7 @@ pub struct GroundImpactParameters {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub nominal_impact_alt: Option<AltitudeRequired>,
+    pub nominal_impact_alt: Option<ImpactAltitude>,
     /// First (lowest) confidence interval for the impact location.
     ///
     /// **Units**: %
@@ -3161,179 +3161,6 @@ mod tests {
         assert!(h.validate().is_err());
     }
 
-    #[test]
-    fn test_odm_header_kvn() {
-        let h = OdmHeader::builder()
-            .creation_date("2000-01-01T00:00:00".parse().unwrap())
-            .originator("JAXA")
-            .build();
-        let mut w = KvnWriter::new();
-        h.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("ORIGINATOR"));
-        assert!(s.contains("JAXA"));
-    }
-
-    #[test]
-    fn test_state_vector_kvn() {
-        let sv = StateVector::builder()
-            .epoch("2000-01-01T00:00:00".parse().unwrap())
-            .x(Position::new(1.0, None))
-            .y(Position::new(2.0, None))
-            .z(Position::new(3.0, None))
-            .x_dot(Velocity::new(4.0, None))
-            .y_dot(Velocity::new(5.0, None))
-            .z_dot(Velocity::new(6.0, None))
-            .build();
-
-        let mut w = KvnWriter::new();
-        sv.write_kvn(&mut w);
-        let s = w.finish();
-        // check output
-        assert!(s.contains("EPOCH"));
-        assert!(s.contains("2000-01-01T00:00:00"));
-        assert!(s.contains("X"));
-        assert!(s.contains("1"));
-        assert!(s.contains("Z_DOT"));
-        assert!(s.contains("6"));
-    }
-
-    #[test]
-    fn test_quaternion_state_kvn() {
-        let qs = QuaternionState::builder()
-            .ref_frame_a("A")
-            .ref_frame_b("B")
-            .quaternion(Quaternion {
-                q1: 1.0,
-                q2: 0.0,
-                q3: 0.0,
-                qc: 0.0,
-            })
-            .build();
-        let mut w = KvnWriter::new();
-        qs.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("REF_FRAME_A"));
-        assert!(s.contains("A"));
-        assert!(s.contains("Q1"));
-        assert!(s.contains("1"));
-    }
-
-    #[test]
-    fn test_euler_angle_state_kvn() {
-        let es = EulerAngleState::builder()
-            .ref_frame_a("A")
-            .ref_frame_b("B")
-            .euler_rot_seq(RotSeq::XYZ)
-            .angle_1(Angle::new(10.0, None).unwrap())
-            .angle_2(Angle::new(20.0, None).unwrap())
-            .angle_3(Angle::new(30.0, None).unwrap())
-            .build();
-        let mut w = KvnWriter::new();
-        es.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("EULER_ROT_SEQ"));
-        assert!(s.contains("XYZ"));
-        assert!(s.contains("ANGLE_1"));
-        assert!(s.contains("10"));
-    }
-
-    #[test]
-    fn test_ang_vel_state_kvn() {
-        let avs = AngVelState::builder()
-            .ref_frame_a("A")
-            .ref_frame_b("B")
-            .angvel_frame(AngVelFrameType("FRAME".into()))
-            .angvel_x(AngleRate::new(0.1, None))
-            .angvel_y(AngleRate::new(0.2, None))
-            .angvel_z(AngleRate::new(0.3, None))
-            .build();
-        let mut w = KvnWriter::new();
-        avs.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("ANGVEL_FRAME"));
-        assert!(s.contains("FRAME"));
-        assert!(s.contains("ANGVEL_X"));
-        assert!(s.contains("0.1"));
-    }
-
-    #[test]
-    fn test_spin_state_kvn() {
-        let ss = SpinState::builder()
-            .ref_frame_a("A")
-            .ref_frame_b("B")
-            .spin_alpha(Angle::new(10.0, None).unwrap())
-            .spin_delta(Angle::new(20.0, None).unwrap())
-            .spin_angle(Angle::new(30.0, None).unwrap())
-            .spin_angle_vel(AngleRate::new(0.1, None))
-            .build();
-        let mut w = KvnWriter::new();
-        ss.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("SPIN_ALPHA"));
-        assert!(s.contains("10"));
-        assert!(s.contains("SPIN_ANGLE_VEL"));
-        assert!(s.contains("0.1"));
-    }
-
-    #[test]
-    fn test_inertia_state_kvn() {
-        let is = InertiaState::builder()
-            .inertia_ref_frame("FRAME")
-            .ixx(Moment::new(100.0, None))
-            .iyy(Moment::new(200.0, None))
-            .izz(Moment::new(300.0, None))
-            .ixy(Moment::new(10.0, None))
-            .ixz(Moment::new(20.0, None))
-            .iyz(Moment::new(30.0, None))
-            .build();
-        let mut w = KvnWriter::new();
-        is.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("IXX"));
-        assert!(s.contains("100"));
-        assert!(s.contains("IXY"));
-        assert!(s.contains("10"));
-    }
-
-    #[test]
-    fn test_ephemeris_kvn() {
-        let epoch = "2000-01-01T00:00:00".parse().unwrap();
-        let qe = QuaternionEphemeris {
-            epoch,
-            quaternion: Quaternion {
-                q1: 1.0,
-                q2: 0.0,
-                q3: 0.0,
-                qc: 0.0,
-            },
-        };
-        let mut w = KvnWriter::new();
-        qe.write_kvn(&mut w);
-        assert!(w.finish().contains("2000-01-01T00:00:00 1.0 0.0 0.0 0.0"));
-
-        let qd = QuaternionDerivative {
-            epoch,
-            quaternion: Quaternion {
-                q1: 1.0,
-                q2: 0.0,
-                q3: 0.0,
-                qc: 0.0,
-            },
-            quaternion_dot: QuaternionDot {
-                q1_dot: QuaternionDotComponent::new(0.1, None),
-                q2_dot: QuaternionDotComponent::new(0.2, None),
-                q3_dot: QuaternionDotComponent::new(0.3, None),
-                qc_dot: QuaternionDotComponent::new(0.4, None),
-            },
-        };
-        let mut w = KvnWriter::new();
-        qd.write_kvn(&mut w);
-        assert!(w
-            .finish()
-            .contains("2000-01-01T00:00:00 1.0 0.0 0.0 0.0 0.1 0.2 0.3 0.4"));
-    }
-
     fn opm_covariance_fixture() -> OpmCovarianceMatrix {
         OpmCovarianceMatrix::builder()
             .cx_x(PositionCovariance::new(1.0, None))
@@ -3373,33 +3200,6 @@ mod tests {
     }
 
     #[test]
-    fn test_opm_covariance_kvn() {
-        let cov = opm_covariance_fixture();
-        let mut w = KvnWriter::new();
-        cov.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("CX_X"));
-        assert!(s.contains("1"));
-        assert!(s.contains("CZ_DOT_Z_DOT"));
-        assert!(s.contains("21"));
-    }
-
-    #[test]
-    fn test_reentry_params_kvn() {
-        // AtmosphericReentryParameters
-        // GroundImpactParameters
-        let gi = GroundImpactParameters::builder()
-            .comment(vec![])
-            .probability_of_impact(Probability::new(0.5).unwrap())
-            .build();
-        let mut w = KvnWriter::new();
-        gi.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("PROBABILITY_OF_IMPACT"));
-        assert!(s.contains("0.5"));
-    }
-
-    #[test]
     fn test_header_validation_missing_date() {
         let h = NdmHeader::builder()
             .creation_date(Epoch::new("").unwrap())
@@ -3408,75 +3208,6 @@ mod tests {
         assert!(h.validate().is_err());
 
         assert!(CalendarEpoch::new("").is_err());
-    }
-
-    #[test]
-    fn test_aem_attitude_state_variants_kvn() {
-        let epoch = "2000-01-01T00:00:00".parse().unwrap();
-
-        // QuaternionAngVel
-        let qav = QuaternionAngVel {
-            epoch,
-            quaternion: Quaternion {
-                q1: 1.0,
-                q2: 0.0,
-                q3: 0.0,
-                qc: 0.0,
-            },
-            ang_vel: AngVel {
-                angvel_x: AngleRate::new(0.1, None),
-                angvel_y: AngleRate::new(0.2, None),
-                angvel_z: AngleRate::new(0.3, None),
-            },
-        };
-        let mut w = KvnWriter::new();
-        AemAttitudeState::QuaternionAngVel(qav).write_kvn(&mut w);
-        assert!(w.finish().contains("1.0 0.0 0.0 0.0"));
-
-        // EulerAngleDerivative
-        let ead = EulerAngleDerivative {
-            epoch,
-            angle_1: Angle::new(10.0, None).unwrap(),
-            angle_2: Angle::new(20.0, None).unwrap(),
-            angle_3: Angle::new(30.0, None).unwrap(),
-            angle_1_dot: AngleRate::new(0.1, None),
-            angle_2_dot: AngleRate::new(0.2, None),
-            angle_3_dot: AngleRate::new(0.3, None),
-        };
-        let mut w = KvnWriter::new();
-        AemAttitudeState::EulerAngleDerivative(ead).write_kvn(&mut w);
-        assert!(w.finish().contains("10.0 20.0 30.0"));
-
-        // SpinNutation
-        let sn = SpinNutation {
-            epoch,
-            spin_alpha: Angle::new(10.0, None).unwrap(),
-            spin_delta: Angle::new(20.0, None).unwrap(),
-            spin_angle: Angle::new(30.0, None).unwrap(),
-            spin_angle_vel: AngleRate::new(0.1, None),
-            nutation: Angle::new(5.0, None).unwrap(),
-            nutation_per: Duration::new(1.0, Some(TimeUnits::Day)).unwrap(),
-            nutation_phase: Angle::new(0.0, None).unwrap(),
-        };
-        let mut w = KvnWriter::new();
-        AemAttitudeState::SpinNutation(sn).write_kvn(&mut w);
-        let kvn = w.finish();
-        assert!(kvn.contains("10.0 20.0 30.0 0.1 5.0 1.0 0.0"));
-
-        // SpinNutationMom
-        let snm = SpinNutationMom {
-            epoch,
-            spin_alpha: Angle::new(10.0, None).unwrap(),
-            spin_delta: Angle::new(20.0, None).unwrap(),
-            spin_angle: Angle::new(30.0, None).unwrap(),
-            spin_angle_vel: AngleRate::new(0.1, None),
-            momentum_alpha: Angle::new(5.0, None).unwrap(),
-            momentum_delta: Angle::new(5.0, None).unwrap(),
-            nutation_vel: AngleRate::new(0.01, None),
-        };
-        let mut w = KvnWriter::new();
-        AemAttitudeState::SpinNutationMom(snm).write_kvn(&mut w);
-        assert!(w.finish().contains("0.01"));
     }
 
     #[test]
@@ -3495,60 +3226,6 @@ mod tests {
             qc: 0.0,
         };
         assert!(q2.validate().is_ok());
-    }
-
-    #[test]
-    fn test_quaternion_xml_repro() {
-        let xml = r#"<quaternion>
-            <Q1>-0.005068</Q1>
-            <Q2>0.906506</Q2>
-            <Q3>0.002360</Q3>
-            <QC>0.422157</QC>
-        </quaternion>"#;
-        let q: Quaternion = quick_xml::de::from_str(xml).expect("Failed to parse Quaternion");
-        assert_eq!(q.q1, -0.005068);
-    }
-
-    #[test]
-    fn test_quaternion_ephemeris_xml_repro() {
-        let xml = r#"<quaternionEphemeris>
-            <EPOCH>2000-100T00:00:00.000</EPOCH>
-            <quaternion>
-                <Q1>-0.005068</Q1>
-                <Q2>0.906506</Q2>
-                <Q3>0.002360</Q3>
-                <QC>0.422157</QC>
-            </quaternion>
-        </quaternionEphemeris>"#;
-        // quick-xml usually expects root tag to match
-        let qe: QuaternionEphemeris =
-            quick_xml::de::from_str(xml).expect("Failed to parse QuaternionEphemeris");
-        assert_eq!(qe.quaternion.q1, -0.005068);
-    }
-
-    #[test]
-    fn test_nested_wrapper_xml_repro() {
-        #[derive(Deserialize, Debug)]
-        struct Wrapper {
-            #[serde(rename = "quaternionEphemeris")]
-            pub qe: Option<QuaternionEphemeris>,
-        }
-
-        let xml = r#"<attitudeState>
-            <quaternionEphemeris>
-                <EPOCH>2000-100T00:00:00.000</EPOCH>
-                <quaternion>
-                    <Q1>-0.005068</Q1>
-                    <Q2>0.906506</Q2>
-                    <Q3>0.002360</Q3>
-                    <QC>0.422157</QC>
-                </quaternion>
-            </quaternionEphemeris>
-        </attitudeState>"#;
-
-        let w: Wrapper = quick_xml::de::from_str(xml).expect("Failed to parse Wrapper");
-        assert!(w.qe.is_some());
-        assert_eq!(w.qe.unwrap().quaternion.q1, -0.005068);
     }
 }
 

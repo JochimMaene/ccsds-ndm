@@ -6,7 +6,6 @@
 Unit tests for Orbit Parameter Message (OPM) Python bindings.
 """
 
-import ccsds_ndm
 import pytest
 
 from ccsds_ndm import (
@@ -66,40 +65,12 @@ class TestOpm:
 
         return Opm(header=header, segment=seg)
 
-    def test_roundtrip_kvn(self):
-        try:
-            opm = self._create_valid_opm()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        kvn = opm.to_str(format="kvn")
-        assert "CCSDS_OPM_VERS" in kvn
-
-        opm2 = Opm.from_str(kvn, format="kvn")
-        assert opm2.header.originator == "TEST"
-        assert opm2.segment.data.state_vector.x == 7000.0
-
-    def test_roundtrip_xml(self):
-        try:
-            opm = self._create_valid_opm()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        xml = opm.to_str(format="xml")
-        assert "<opm" in xml
-
-        opm2 = Opm.from_str(xml, format="xml")
-        assert opm2.segment.data.state_vector.x == 7000.0
-
-    def test_file_io(self, tmp_path):
-        opm = self._create_valid_opm()
-        path = tmp_path / "test.opm"
-
-        opm.to_file(str(path), "kvn")
-        assert path.exists()
-
-        opm2 = ccsds_ndm.from_file(str(path), format="kvn")
-        assert opm2.header.originator == "TEST"
+    @pytest.mark.parametrize("format", ["kvn", "xml"])
+    def test_constructed_message_roundtrips(self, format):
+        message = self._create_valid_opm()
+        parsed = Opm.from_str(message.to_str(format), format=format)
+        assert parsed.header.originator == "TEST"
+        assert parsed.segment.data.state_vector.x == 7000.0
 
     def test_epoch_fields_require_calendar_form(self):
         with pytest.raises(NdmEpochError):
@@ -123,19 +94,3 @@ class TestOpm:
                 z_dot=0.0,
                 comment=None,
             )
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
-
-
-def test_covariance_constructor_uses_comment_keyword():
-    fields = (
-        "cx_x cy_x cy_y cz_x cz_y cz_z cx_dot_x cx_dot_y cx_dot_z "
-        "cy_dot_x cy_dot_y cy_dot_z cz_dot_x cz_dot_y cz_dot_z "
-        "cx_dot_x_dot cy_dot_x_dot cy_dot_y_dot cz_dot_x_dot cz_dot_y_dot cz_dot_z_dot"
-    ).split()
-    covariance = ccsds_ndm.OpmCovarianceMatrix(
-        **dict.fromkeys(fields, 0.0), comment=["caller comment"]
-    )
-    assert covariance.comment == ["caller comment"]

@@ -16,10 +16,14 @@ impl Omm {
     /// scaling is applied (CCSDS 502.0-B-3, 4.2.4.7 note 2).
     ///
     /// This method requires:
-    /// - `MEAN_ELEMENT_THEORY` to be `SGP`, `SGP4`, or `SGP/SGP4` (case-insensitive)
+    /// - `MEAN_ELEMENT_THEORY` to be `SGP`, `SGP4`, or `SGP/SGP4` (case-insensitive);
+    ///   `PPT3` and `SGP4-XP` are refused
     /// - Earth-centered TEME elements with UTC epochs (no coordinate/time conversion)
-    /// - presence of `TLE_PARAMETERS`
+    /// - presence of `TLE_PARAMETERS` with `NORAD_CAT_ID`, `ELEMENT_SET_NO`, `REV_AT_EPOCH`,
+    ///   `MEAN_MOTION_DOT`, `MEAN_MOTION_DDOT` and `BSTAR`; omitted `EPHEMERIS_TYPE` and
+    ///   `CLASSIFICATION_TYPE` are written as the table 4-3 defaults `0` and `U`
     /// - either a launch designator in `OBJECT_ID` (`YYYY-NNN[PPP]`) or `OBJECT_ID=UNKNOWN`
+    /// - launch years and the final rounded epoch year in 1957–2056
     /// - strict field-width compliance for NORAD fixed-width line formats
     pub fn to_tle_lines(&self) -> Result<(String, String)> {
         self.validate()?;
@@ -47,40 +51,16 @@ impl Omm {
             .into());
         }
 
-        if metadata.time_system.trim().to_uppercase() != "UTC" {
-            return Err(ValidationError::InvalidValue {
-                field: Cow::Borrowed("TIME_SYSTEM"),
-                value: metadata.time_system.clone(),
-                expected: Cow::Borrowed("UTC"),
-                line: None,
-            }
-            .into());
-        }
-
-        for (field, value, expected) in [
-            ("CENTER_NAME", metadata.center_name.as_str(), "EARTH"),
-            ("REF_FRAME", metadata.ref_frame.as_str(), "TEME"),
-        ] {
-            if !value.trim().eq_ignore_ascii_case(expected) {
-                return Err(ValidationError::invalid_value(field, value, expected).into());
-            }
-        }
+        // `validate` already enforced EARTH/TEME/UTC for these theories (ODM 4.2.4.6).
 
         let launch = parse_object_id_launch_designator(&metadata.object_id)?;
         let norad_cat_id = require_tle_field(tle.norad_cat_id, "NORAD_CAT_ID")?;
         let norad_cat_id_field = format_tle_satellite_number(norad_cat_id)?;
 
-        let classification =
-            tle.classification_type
-                .as_ref()
-                .ok_or(ValidationError::MissingRequiredField {
-                    block: Cow::Borrowed("TLE Parameters"),
-                    field: Cow::Borrowed("CLASSIFICATION_TYPE"),
-                    line: None,
-                })?;
+        let classification = tle.classification_type.as_deref().unwrap_or("U");
         let classification_char = parse_classification_char(classification)?;
 
-        let ephemeris_type = require_tle_field(tle.ephemeris_type, "EPHEMERIS_TYPE")?;
+        let ephemeris_type = tle.ephemeris_type.unwrap_or(0);
         if !(0..=9).contains(&ephemeris_type) {
             return Err(ValidationError::OutOfRange {
                 name: Cow::Borrowed("EPHEMERIS_TYPE"),
@@ -235,7 +215,9 @@ impl Omm {
         Self::from_tle_lines_with_options(line1, line2, &TleToOmmOptions::default())
     }
 
-    /// Parse NORAD TLE line 1/2 into a minimal OMM with metadata/header overrides.
+    /// Parse NORAD TLE line 1/2 into an OMM 3.0 with metadata/header overrides.
+    /// Without overrides, creation date is the TLE epoch and originator is UNKNOWN; these
+    /// placeholders do not establish the source file provenance.
     pub fn from_tle_lines_with_options(
         line1: &str,
         line2: &str,
@@ -373,7 +355,7 @@ impl Omm {
                 },
             },
             id: Some("CCSDS_OMM_VERS".to_string()),
-            version: "2.0".to_string(),
+            version: "3.0".to_string(),
         })
     }
 }
@@ -474,7 +456,7 @@ fn parse_object_id_launch_designator(object_id: &str) -> Result<Option<LaunchDes
         }
         .into());
     }
-    if rest.len() < 3 {
+    if rest.len() < 3 || !id.is_ascii() {
         return Err(ValidationError::InvalidValue {
             field: Cow::Borrowed("OBJECT_ID"),
             value: id.to_string(),
@@ -508,6 +490,15 @@ fn parse_object_id_launch_designator(object_id: &str) -> Result<Option<LaunchDes
     }
 
     let launch_year = year_str.parse::<u32>()?;
+    if !(1957..=2056).contains(&launch_year) {
+        return Err(ValidationError::OutOfRange {
+            name: Cow::Borrowed("OBJECT_ID launch year"),
+            value: launch_year.to_string(),
+            expected: Cow::Borrowed("[1957, 2056] for TLE export"),
+            line: None,
+        }
+        .into());
+    }
     let launch_number = launch_number_str.parse::<u32>()?;
     if launch_number > 999 {
         return Err(ValidationError::OutOfRange {
@@ -1291,16 +1282,6 @@ fn parse_time_to_ns_of_day(time: &str) -> Result<i128> {
 
 fn format_tle_epoch_components(epoch: &str) -> Result<(u32, String)> {
     let (mut year, mut doy, utc_ns_of_day) = parse_om_epoch_to_utc_ydns(epoch)?;
-    if !(0..=9999).contains(&year) {
-        return Err(ValidationError::OutOfRange {
-            name: Cow::Borrowed("EPOCH year"),
-            value: year.to_string(),
-            expected: Cow::Borrowed("[0, 9999]"),
-            line: None,
-        }
-        .into());
-    }
-
     let mut frac_scaled = ((utc_ns_of_day * 100_000_000 + (NS_PER_DAY / 2)) / NS_PER_DAY) as u32;
     if frac_scaled == 100_000_000 {
         frac_scaled = 0;
@@ -1310,6 +1291,16 @@ fn format_tle_epoch_components(epoch: &str) -> Result<(u32, String)> {
         } else {
             doy += 1;
         }
+    }
+
+    if !(1957..=2056).contains(&year) {
+        return Err(ValidationError::OutOfRange {
+            name: Cow::Borrowed("EPOCH year"),
+            value: year.to_string(),
+            expected: Cow::Borrowed("[1957, 2056] after rounding for TLE export"),
+            line: None,
+        }
+        .into());
     }
 
     if doy == 0 || doy > days_in_year(year) {

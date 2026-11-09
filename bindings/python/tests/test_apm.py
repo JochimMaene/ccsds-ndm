@@ -142,26 +142,12 @@ class TestApm:
         segment = ApmSegment(metadata=meta, data=data)
         return Apm(header=header, segment=segment)
 
-    def test_construct_full_apm(self):
-        apm = self._create_valid_apm()
-        assert apm.header.originator == "TEST"
-        assert apm.segment is not None
-
-    def test_roundtrip_kvn(self):
-        apm = self._create_valid_apm()
-        kvn = apm.to_str(format="kvn")
-        assert "CCSDS_APM_VERS" in kvn
-
-        apm2 = Apm.from_str(kvn, format="kvn")
-        assert apm2.header.originator == "TEST"
-
-    def test_roundtrip_xml(self):
-        apm = self._create_valid_apm()
-        xml = apm.to_str(format="xml")
-        assert "<apm" in xml
-
-        apm2 = Apm.from_str(xml, format="xml")
-        assert apm2.header.originator == "TEST"
+    @pytest.mark.parametrize("format", ["kvn", "xml"])
+    def test_constructed_message_roundtrips(self, format):
+        message = self._create_valid_apm()
+        parsed = Apm.from_str(message.to_str(format), format=format)
+        assert parsed.header.originator == "TEST"
+        assert parsed.segment is not None
 
     def test_live_spin_angle_setter_defers_to_root_validation(self):
         apm = self._create_valid_apm()
@@ -198,18 +184,6 @@ class TestApm:
 
         data.spin[0].spin_alpha = -360.0  # inclusive lower bound
         apm.validate()
-
-    def test_file_io(self, tmp_path):
-        apm = self._create_valid_apm()
-        kvn_path = tmp_path / "test.apm"
-
-        # Test to_file
-        apm.to_file(str(kvn_path), "kvn")
-        assert kvn_path.exists()
-
-        # Test from_file
-        apm2 = ccsds_ndm.from_file(str(kvn_path), format="kvn")
-        assert apm2.header.originator == "TEST"
 
     def test_apm_setters(self):
         apm = self._create_valid_apm()
@@ -295,7 +269,3 @@ class TestApm:
         segment.data = data
         apm.segment = segment
         assert apm.segment.metadata.object_name == "SAT2"
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

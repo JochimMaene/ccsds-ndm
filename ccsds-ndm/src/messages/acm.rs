@@ -39,7 +39,7 @@ pub struct Acm {
     pub header: AdmHeader,
     /// The message segment and its data.
     pub body: AcmBody,
-    /// XML root identifier; when present it must match this family.
+    /// Required XML root identifier, `CCSDS_ACM_VERS`; `None` is invalid.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_ACM_VERS".to_string()))]
     pub id: Option<String>,
@@ -67,14 +67,24 @@ impl Ndm for Acm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let normalized = crate::kvn::prepare_input(
-            crate::detect::without_utf8_bom(kvn),
-            crate::validation::MessageKind::Acm,
-        )?;
-        kvn::validate_kvn_syntax(&normalized)?;
-        let acm = Self::from_kvn_str(&normalized)?;
-        crate::traits::Validate::validate(&acm)?;
-        Ok(acm)
+        (|| {
+            let normalized = crate::kvn::prepare_input(
+                crate::detect::without_utf8_bom(kvn),
+                crate::validation::MessageKind::Acm,
+            )?;
+            kvn::validate_kvn_syntax(&normalized)?;
+            let acm = Self::from_kvn_str(&normalized)?;
+            crate::traits::Validate::validate(&acm)?;
+            Ok(acm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Acm,
+                crate::error::DiagnosticNotation::Kvn,
+                kvn,
+                None,
+            )
+        })
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -82,11 +92,21 @@ impl Ndm for Acm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        xml::validate_xml_sequences(xml)?;
-        let acm: Self = crate::xml::from_str_with_context(xml, "ACM")?;
-        crate::traits::Validate::validate(&acm)?;
-        acm.validate_xml_representability()?;
-        Ok(acm)
+        (|| {
+            xml::validate_xml_sequences(xml)?;
+            let acm: Self = crate::xml::from_str_with_context(xml, "ACM")?;
+            crate::traits::Validate::validate(&acm)?;
+            acm.validate_xml_representability()?;
+            Ok(acm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Acm,
+                crate::error::DiagnosticNotation::Xml,
+                xml,
+                None,
+            )
+        })
     }
 
     fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
@@ -147,6 +167,10 @@ pub struct AcmMetadata {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default)]
     pub comment: Vec<String>,
+    /// Metadata classification allowed by ADM table 5-3; the XML schema cannot represent it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub classification: Option<String>,
     /// Free-text field containing the name of the object. There is no CCSDS-based restriction on
     /// the value for this keyword, but it is recommended to use names from either the UN Office of
     /// Outer Space Affairs designator index (reference `[2]`), which include Object name and
@@ -457,6 +481,26 @@ pub struct AcmData {
     pub user: Option<UserDefined>,
 }
 
+impl AcmData {
+    /// ADM table 5-9 makes USER_DEFINED mandatory; the XSD admits `<user/>`, so reading
+    /// accepts an empty block and only generation refuses it.
+    pub(crate) fn validate_user_for_output(&self) -> Result<()> {
+        if self
+            .user
+            .as_ref()
+            .is_some_and(|user| user.parameters().next().is_none())
+        {
+            return Err(ValidationError::MissingRequiredField {
+                block: "USER".into(),
+                field: "USER_DEFINED".into(),
+                line: None,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
 impl crate::traits::Validate for AcmData {
     fn validate(&self) -> Result<()> {
         for att in &self.att {
@@ -672,7 +716,7 @@ impl AcmAttitudeState {
                 return Err(ValidationError::InvalidValue {
                     field: "ATT_TYPE".into(),
                     value: self.att_type.to_string(),
-                    expected: "QUATERNION, EULER_ANGLES, or DCM (ADM table 5-4)".into(),
+                    expected: "QUATERNION, EULER_ANGLES, or DCM (ADM table 5-4: ATT_TYPE is attitude data; rate types belong in RATE_TYPE)".into(),
                     line: None,
                 }
                 .into());
@@ -837,7 +881,9 @@ fn validate_history_time_tags<L>(
 pub struct AttLine {
     /// Time tag: either a signed relative time in seconds from `EPOCH_TZERO` (e.g. `20157.26`)
     /// or an absolute CCSDS calendar/ordinal epoch (ADM 5.3.4.3). One form is used throughout a
-    /// block (ADM 5.3.4.5). The lexical spelling is preserved and written back unchanged.
+    /// block (ADM 5.3.4.5).
+    /// XML keeps the stored spelling; exponent input is expanded exactly at parsing. KVN output
+    /// repairs `.5`/`5.` to `0.5`/`5.0` and refuses tags over 16 digits (ADM 6.8.4.1).
     pub epoch: Epoch,
     /// Attitude states followed by any rate states, in the units of annex B, subsection B4.
     pub values: Vec<f64>,
@@ -994,7 +1040,12 @@ impl AcmPhysicalDescription {
                 Mass::validate_value(value.value, field)?;
             }
         }
-        if self.cp.is_some() && self.cp_ref_frame.is_none() {
+        if self.cp.is_some()
+            && self
+                .cp_ref_frame
+                .as_ref()
+                .is_none_or(|frame| frame.trim().is_empty())
+        {
             return Err(ValidationError::MissingRequiredField {
                 block: "ACM Physical Description".into(),
                 field: "CP_REF_FRAME".into(),
@@ -1158,7 +1209,9 @@ impl AcmCovarianceMatrix {
 pub struct CovLine {
     /// Time tag: either a signed relative time in seconds from `EPOCH_TZERO` or an absolute
     /// CCSDS calendar/ordinal epoch (ADM 5.3.4.3), one form per block (ADM 5.3.4.5). The
-    /// lexical spelling is preserved and written back unchanged.
+    /// lexical form is not rounded through `f64`.
+    /// XML keeps the stored spelling; exponent input is expanded exactly at parsing. KVN output
+    /// repairs `.5`/`5.` to `0.5`/`5.0` and refuses tags over 16 digits (ADM 6.8.4.1).
     pub epoch: Epoch,
     /// Diagonal covariance elements in the order and units of annex B, subsection B6.
     pub values: Vec<f64>,
@@ -1336,7 +1389,12 @@ impl AcmManeuverParameters {
                 .into());
             }
         }
-        if self.target_momentum.is_some() && self.target_mom_frame.is_none() {
+        if self.target_momentum.is_some()
+            && self
+                .target_mom_frame
+                .as_ref()
+                .is_none_or(|frame| frame.trim().is_empty())
+        {
             return Err(ValidationError::MissingRequiredField {
                 block: "ACM Maneuver".into(),
                 field: "TARGET_MOM_FRAME".into(),
