@@ -619,8 +619,9 @@ pub struct ManeuverParameters {
     ///
     /// **Units**: kg
     ///
-    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4 (`deltamassTypeZ`); 2.0 uses
-    /// `negativeDouble`, which excludes zero.
+    /// The 3.0 schema uses `deltamassTypeZ`; 2.0 uses `negativeDouble`, which excludes zero.
+    ///
+    /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     pub man_delta_mass: DeltaMassZ,
     /// Reference frame in which the velocity increment vector data are given. The user must
     /// select from the accepted set of values indicated in 3.2.4.11.
