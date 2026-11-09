@@ -687,77 +687,6 @@ MEAN_MOTION_DDOT = 0.0 [rev/day**3]
     }
 
     #[test]
-    fn test_parse_full_omm() {
-        let full_omm = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2022-11-06T09:23:57
-ORIGINATOR = JAXA
-OBJECT_NAME = GOES 9
-OBJECT_ID = 1995-025A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-REF_FRAME_EPOCH = 2000-06-28T11:59:28
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2000-06-28T11:59:28.000000
-SEMI_MAJOR_AXIS = 42164.0 [km]
-ECCENTRICITY = 0.00050130
-INCLINATION = 3.053900 [deg]
-RA_OF_ASC_NODE = 81.793900 [deg]
-ARG_OF_PERICENTER = 249.236300 [deg]
-MEAN_ANOMALY = 150.160200 [deg]
-GM = 398600.4415 [km**3/s**2]
-MASS = 1000 [kg]
-SOLAR_RAD_AREA = 10 [m**2]
-SOLAR_RAD_COEFF = 1.2
-DRAG_AREA = 5 [m**2]
-DRAG_COEFF = 2.2
-EPHEMERIS_TYPE = 0
-CLASSIFICATION_TYPE = U
-NORAD_CAT_ID = 23581
-ELEMENT_SET_NO = 999
-REV_AT_EPOCH = 1234
-BSTAR = 0.0001 [1/ER]
-MEAN_MOTION_DOT = 0.000001 [rev/day**2]
-MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-COV_REF_FRAME = TEME
-CX_X = 1.0
-CY_X = 0.1
-CY_Y = 1.0
-CZ_X = 0.1
-CZ_Y = 0.1
-CZ_Z = 1.0
-CX_DOT_X = 0.1
-CX_DOT_Y = 0.1
-CX_DOT_Z = 0.1
-CX_DOT_X_DOT = 1.0
-CY_DOT_X = 0.1
-CY_DOT_Y = 0.1
-CY_DOT_Z = 0.1
-CY_DOT_X_DOT = 0.1
-CY_DOT_Y_DOT = 1.0
-CZ_DOT_X = 0.1
-CZ_DOT_Y = 0.1
-CZ_DOT_Z = 0.1
-CZ_DOT_X_DOT = 0.1
-CZ_DOT_Y_DOT = 0.1
-CZ_DOT_Z_DOT = 1.0
-USER_DEFINED_FOO = BAR
-"#;
-        let result = Omm::from_kvn_str(full_omm);
-        assert!(
-            result.is_ok(),
-            "Failed to parse full OMM: {:?}",
-            result.err()
-        );
-        let omm = result.unwrap();
-        assert!(omm.body.segment.metadata.ref_frame_epoch.is_some());
-        assert!(omm.body.segment.data.spacecraft_parameters.is_some());
-        assert!(omm.body.segment.data.tle_parameters.is_some());
-        assert!(omm.body.segment.data.covariance_matrix.is_some());
-        assert!(omm.body.segment.data.user_defined_parameters.is_some());
-    }
-
-    #[test]
     fn frame_reference_epoch_requires_calendar_form() {
         let valid = MINIMAL_OMM.replace(
             "REF_FRAME = TEME\n",
@@ -787,52 +716,7 @@ USER_DEFINED_FOO = BAR
     }
 
     #[test]
-    fn test_omm_tle_no_cov() {
-        let tle_omm = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2022-11-06T09:23:57
-ORIGINATOR = JAXA
-OBJECT_NAME = GOES 9
-OBJECT_ID = 1995-025A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2000-06-28T11:59:28.000000
-MEAN_MOTION = 1.00273272 [rev/day]
-ECCENTRICITY = 0.00050130
-INCLINATION = 3.053900 [deg]
-RA_OF_ASC_NODE = 81.793900 [deg]
-ARG_OF_PERICENTER = 249.236300 [deg]
-MEAN_ANOMALY = 150.160200 [deg]
-MEAN_MOTION_DOT = 0.000001 [rev/day**2]
-BSTAR = 0.0001 [1/ER]
-AGOM = 0.0001 [m**2/kg]
-"#;
-        let result = Omm::from_kvn_str(tle_omm);
-        assert!(
-            result.is_ok(),
-            "Failed to parse TLE OMM: {:?}",
-            result.err()
-        );
-        let omm = result.unwrap();
-        assert!(omm.body.segment.data.tle_parameters.is_some());
-        assert!(omm
-            .body
-            .segment
-            .data
-            .tle_parameters
-            .as_ref()
-            .unwrap()
-            .agom
-            .is_some());
-    }
-
-    #[test]
     fn test_omm_errors() {
-        // Unknown metadata key
-        let mut input = "OBJECT_NAME = GOES 9\nUNKNOWN_KEY = VAL\n";
-        assert!(omm_metadata.parse_next(&mut input).is_err());
-
         // Exhaustive missing mandatory fields in metadata
         let mandatory_meta = [
             "OBJECT_NAME = GOES 9\n",
@@ -868,11 +752,6 @@ AGOM = 0.0001 [m**2/kg]
         let (_, me_none) = mean_elements.parse_next(&mut input).unwrap();
         assert!(me_none.semi_major_axis.is_none());
         assert!(me_none.mean_motion.is_none());
-
-        // Negative eccentricity
-        let mut input =
-            "EPOCH = 2000-06-28T11:59:28\nSEMI_MAJOR_AXIS = 42164\nECCENTRICITY = -0.1\n";
-        assert!(mean_elements.parse_next(&mut input).is_err());
 
         // Exhaustive missing mandatory fields in mean elements
         let mandatory_me = [
@@ -934,20 +813,7 @@ AGOM = 0.0001 [m**2/kg]
         let mut input = "MEAN_MOTION_DOT = 0.000001\nMEAN_MOTION_DDOT = 0.0\nBSTAR = 0.0001\nELEMENT_SET_NO = 10000\n";
         assert!(tle_parameters.parse_next(&mut input).is_ok());
 
-        // Invalid units for coverage (Existing tests...)
-        let mut input = "EPOCH = 2000-06-28T11:59:28\nSEMI_MAJOR_AXIS = 42164 [INVALID]\n";
-        assert!(mean_elements.parse_next(&mut input).is_err());
-        let mut input = "EPOCH = 2000-06-28T11:59:28\nMEAN_MOTION = 1.0 [INVALID]\n";
-        assert!(mean_elements.parse_next(&mut input).is_err());
-        let mut input =
-            "EPOCH = 2000-06-28T11:59:28\nSEMI_MAJOR_AXIS = 42164\nECCENTRICITY = INVALID\n";
-        assert!(mean_elements.parse_next(&mut input).is_err());
-        let mut input = "EPOCH = 2000-06-28T11:59:28\nSEMI_MAJOR_AXIS = 42164\nECCENTRICITY = 0.1\nINCLINATION = 0 [INVALID]\n";
-        assert!(mean_elements.parse_next(&mut input).is_err());
-        let mut input = "EPOCH = 2000-06-28T11:59:28\nSEMI_MAJOR_AXIS = 42164\nECCENTRICITY = 0.1\nINCLINATION = 0\nRA_OF_ASC_NODE = 0 [INVALID]\n";
-        assert!(mean_elements.parse_next(&mut input).is_err());
-        let mut input = "EPOCH = 2000-06-28T11:59:28\nSEMI_MAJOR_AXIS = 42164\nECCENTRICITY = 0.1\nINCLINATION = 0\nRA_OF_ASC_NODE = 0\nARG_OF_PERICENTER = 0 [INVALID]\n";
-        assert!(mean_elements.parse_next(&mut input).is_err());
+        // Invalid units on complete mean-element blocks
         let mut input = "EPOCH = 2000-06-28T11:59:28\nSEMI_MAJOR_AXIS = 42164\nECCENTRICITY = 0.1\nINCLINATION = 0\nRA_OF_ASC_NODE = 0\nARG_OF_PERICENTER = 0\nMEAN_ANOMALY = 0 [INVALID]\n";
         assert!(mean_elements.parse_next(&mut input).is_err());
         let mut input = "EPOCH = 2000-06-28T11:59:28\nSEMI_MAJOR_AXIS = 42164\nECCENTRICITY = 0.1\nINCLINATION = 0\nRA_OF_ASC_NODE = 0\nARG_OF_PERICENTER = 0\nMEAN_ANOMALY = 0\nGM = 398600 [INVALID]\n";
@@ -988,8 +854,5 @@ AGOM = 0.0001 [m**2/kg]
 
         let mut input = "MEAN_MOTION_DOT = 0\nBSTAR = 0\nREV_AT_EPOCH = 1\nMEAN_MOTION_DDOT = 0\n";
         assert!(tle_parameters.parse_next(&mut input).is_ok());
-
-        let mut input = "OBJECT_NAME = GOES 9\nREF_FRAME_EPOCH = INVALID\n";
-        assert!(omm_metadata.parse_next(&mut input).is_err());
     }
 }

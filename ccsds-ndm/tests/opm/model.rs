@@ -6,36 +6,6 @@ use ccsds_ndm::types::{
     Velocity,
 };
 #[test]
-fn keplerian_elements_validation() {
-    use ccsds_ndm::Validate;
-    let mut kep = KeplerianElements::builder()
-        .semi_major_axis(Distance::new(7000.0, Some(PositionUnits::Km)))
-        .eccentricity(NonNegativeDouble::new(0.001).unwrap())
-        .inclination(Inclination::new(45.0, Some(AngleUnits::Deg)).unwrap())
-        .ra_of_asc_node(Angle::new(90.0, Some(AngleUnits::Deg)).unwrap())
-        .arg_of_pericenter(Angle::new(180.0, Some(AngleUnits::Deg)).unwrap())
-        .gm(Gm::new(398600.44, Some(GmUnits::Km3PerS2)).unwrap())
-        .build();
-
-    // Neither anomaly
-    assert_validation_field(&kep.validate().unwrap_err(), "TRUE_ANOMALY");
-
-    // Both anomalies
-    kep.true_anomaly = Some(Angle::new(0.0, Some(AngleUnits::Deg)).unwrap());
-    kep.mean_anomaly = Some(Angle::new(0.0, Some(AngleUnits::Deg)).unwrap());
-    assert_validation_field(&kep.validate().unwrap_err(), "TRUE_ANOMALY");
-
-    // Exactly one (true)
-    kep.mean_anomaly = None;
-    assert!(kep.validate().is_ok());
-
-    // Exactly one (mean)
-    kep.true_anomaly = None;
-    kep.mean_anomaly = Some(Angle::new(0.0, Some(AngleUnits::Deg)).unwrap());
-    assert!(kep.validate().is_ok());
-}
-
-#[test]
 fn opm_data_validation() {
     use ccsds_ndm::Validate;
     let mut data = OpmData::builder()

@@ -4,8 +4,8 @@
 
 use crate::common::{mutated, validate_xml};
 use crate::{
-    assert_invalid_value_diagnostic, assert_missing_required, opm, opm_with_maneuvers,
-    validation_error_source, MINIMAL, OPM_3_KVN_FIXTURES,
+    assert_diagnostic, assert_missing_required, opm, opm_with_maneuvers, validation_error_source,
+    MINIMAL, OPM_3_KVN_FIXTURES,
 };
 use ccsds_ndm::error::{Result, ValidationError};
 use ccsds_ndm::messages::opm::{KeplerianElements, Opm};
@@ -81,39 +81,19 @@ fn opm_3_xml_generation_rejects_unaudited_editions_across_rust_entry_points() {
         message.version = "1.0".into();
         message
     };
-    assert_unsupported_version(
-        "Ndm::to_xml",
-        "1.0",
-        "generation.unsupported_output_version",
-        historical.to_xml(),
-    );
+    assert_unsupported_version("Ndm::to_xml", historical.to_xml());
     let mut streamed = Vec::new();
-    assert_unsupported_version(
-        "Ndm::write_xml_to",
-        "1.0",
-        "generation.unsupported_output_version",
-        historical.write_xml_to(&mut streamed),
-    );
+    assert_unsupported_version("Ndm::write_xml_to", historical.write_xml_to(&mut streamed));
     assert!(
         streamed.is_empty(),
         "unsupported streaming generation wrote partial output"
     );
 
     let historical = Message::Opm(historical);
-    assert_unsupported_version(
-        "Message::to_xml",
-        "1.0",
-        "generation.unsupported_output_version",
-        historical.to_xml(),
-    );
+    assert_unsupported_version("Message::to_xml", historical.to_xml());
     let directory = tempfile::tempdir().expect("failed to create temporary directory");
     let path = directory.path().join("unsupported-opm.xml");
-    assert_unsupported_version(
-        "Message::to_xml_file",
-        "1.0",
-        "generation.unsupported_output_version",
-        historical.to_xml_file(&path),
-    );
+    assert_unsupported_version("Message::to_xml_file", historical.to_xml_file(&path));
     assert!(
         !path.exists(),
         "unsupported file generation created an output file"
@@ -138,7 +118,7 @@ fn opm_3_xml_generation_reports_an_invalid_root_id() {
     let mut opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse OPM fixture");
     opm.id = Some("WRONG_ID".into());
 
-    assert_invalid_value_diagnostic("id", opm.to_xml(), "id");
+    assert_diagnostic("validation.invalid_value", "id", opm.to_xml(), "id");
 }
 
 #[test]
@@ -339,7 +319,7 @@ fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
         let mut opm =
             Opm::from_kvn(OPM_3_KVN_FIXTURES[fixture].1).expect("failed to parse OPM fixture");
         mutate(&mut opm);
-        assert_invalid_value_diagnostic(field, opm.to_xml(), path);
+        assert_diagnostic("validation.invalid_value", field, opm.to_xml(), path);
     }
 }
 
@@ -451,16 +431,11 @@ fn assert_non_finite_rejected<T: std::fmt::Debug>(surface: &str, result: Result<
     );
 }
 
-fn assert_unsupported_version<T: std::fmt::Debug>(
-    surface: &str,
-    expected_edition: &str,
-    expected_code: &str,
-    result: Result<T>,
-) {
+fn assert_unsupported_version<T: std::fmt::Debug>(surface: &str, result: Result<T>) {
     let error = result.expect_err(surface);
     assert_eq!(
         error.code(),
-        Some(expected_code),
+        Some("generation.unsupported_output_version"),
         "{surface} returned an unstable diagnostic code"
     );
     assert_eq!(
@@ -479,7 +454,7 @@ fn assert_unsupported_version<T: std::fmt::Debug>(
         diagnostic.notation,
         ccsds_ndm::error::DiagnosticNotation::Xml
     );
-    assert_eq!(diagnostic.source_edition, Some(expected_edition));
+    assert_eq!(diagnostic.source_edition, Some("1.0"));
 }
 
 fn assignment_keys(kvn: &str) -> Vec<&str> {

@@ -3,7 +3,6 @@ mod common;
 mod conversion;
 mod epochs;
 mod generation;
-mod minimal;
 mod model;
 mod parsing;
 

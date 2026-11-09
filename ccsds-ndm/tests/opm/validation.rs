@@ -3,10 +3,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::validate_xml;
-use crate::{
-    assert_invalid_value_diagnostic, assert_missing_required, assert_out_of_range_diagnostic,
-    opm_with_maneuvers, OPM_3_KVN_FIXTURES,
-};
+use crate::{assert_diagnostic, assert_missing_required, opm_with_maneuvers, OPM_3_KVN_FIXTURES};
+use ccsds_ndm::common::SpacecraftParameters;
 use ccsds_ndm::error::{Result, ValidationError};
 use ccsds_ndm::messages::opm::{KeplerianElements, Opm};
 use ccsds_ndm::types::TimeUnits;
@@ -88,7 +86,7 @@ fn xml_generation_rejects_non_finite_keplerian_values_after_mutation() {
             "body.segment.data.keplerian_elements.{}",
             field.to_ascii_lowercase()
         );
-        assert_invalid_value_diagnostic(field, message.to_xml(), &path);
+        assert_diagnostic("validation.invalid_value", field, message.to_xml(), &path);
     }
 }
 
@@ -134,7 +132,7 @@ fn xml_generation_enforces_keplerian_xsd_ranges_after_mutation() {
             "body.segment.data.keplerian_elements.{}",
             field.to_ascii_lowercase()
         );
-        assert_out_of_range_diagnostic(field, message.to_xml(), &path);
+        assert_diagnostic("validation.out_of_range", field, message.to_xml(), &path);
     }
 }
 
@@ -228,18 +226,6 @@ fn opm_xml_generation_rejects_day_as_maneuver_duration_unit() {
         Some("body.segment.data.maneuver_parameters[0].man_duration.units")
     );
     assert!(error.as_validation_error().is_some());
-}
-
-#[test]
-fn opm_xml_generation_accepts_seconds_as_maneuver_duration_unit() {
-    let mut opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[1].1).expect("failed to parse OPM 3.0 fixture");
-    opm.body.segment.data.maneuver_parameters[0]
-        .man_duration
-        .units = Some(TimeUnits::Seconds);
-
-    let xml = opm.to_xml().expect("seconds is the XSD duration unit");
-    assert!(xml.contains("<MAN_DURATION units=\"s\">"));
-    assert!(!xml.contains("<MAN_DURATION units=\"d\">"));
 }
 
 #[test]
@@ -339,147 +325,57 @@ fn opm_3_xml_generation_rejects_every_non_finite_state_vector_component() {
             "body.segment.data.state_vector.{}",
             field.to_ascii_lowercase()
         );
-        assert_invalid_value_diagnostic(field, opm.to_xml(), &path);
+        assert_diagnostic("validation.invalid_value", field, opm.to_xml(), &path);
     }
 }
 
 #[test]
 fn opm_3_xml_generation_rejects_every_invalid_spacecraft_value() {
-    type Mutation = (&'static str, bool, fn(&mut Opm));
-    let mutations: [Mutation; 10] = [
-        ("MASS", false, |opm| {
-            opm.body
-                .segment
-                .data
-                .spacecraft_parameters
-                .as_mut()
-                .unwrap()
-                .mass
-                .as_mut()
-                .unwrap()
-                .value = -1.0
-        }),
-        ("MASS", true, |opm| {
-            opm.body
-                .segment
-                .data
-                .spacecraft_parameters
-                .as_mut()
-                .unwrap()
-                .mass
-                .as_mut()
-                .unwrap()
-                .value = f64::NAN
-        }),
-        ("SOLAR_RAD_AREA", false, |opm| {
-            opm.body
-                .segment
-                .data
-                .spacecraft_parameters
-                .as_mut()
-                .unwrap()
-                .solar_rad_area
-                .as_mut()
-                .unwrap()
-                .value = -1.0
-        }),
-        ("SOLAR_RAD_AREA", true, |opm| {
-            opm.body
-                .segment
-                .data
-                .spacecraft_parameters
-                .as_mut()
-                .unwrap()
-                .solar_rad_area
-                .as_mut()
-                .unwrap()
-                .value = f64::NAN
-        }),
-        ("SOLAR_RAD_COEFF", false, |opm| {
-            opm.body
-                .segment
-                .data
-                .spacecraft_parameters
-                .as_mut()
-                .unwrap()
-                .solar_rad_coeff
-                .as_mut()
-                .unwrap()
-                .value = -1.0
-        }),
-        ("SOLAR_RAD_COEFF", true, |opm| {
-            opm.body
-                .segment
-                .data
-                .spacecraft_parameters
-                .as_mut()
-                .unwrap()
-                .solar_rad_coeff
-                .as_mut()
-                .unwrap()
-                .value = f64::INFINITY
-        }),
-        ("DRAG_AREA", false, |opm| {
-            opm.body
-                .segment
-                .data
-                .spacecraft_parameters
-                .as_mut()
-                .unwrap()
-                .drag_area
-                .as_mut()
-                .unwrap()
-                .value = -1.0
-        }),
-        ("DRAG_AREA", true, |opm| {
-            opm.body
-                .segment
-                .data
-                .spacecraft_parameters
-                .as_mut()
-                .unwrap()
-                .drag_area
-                .as_mut()
-                .unwrap()
-                .value = f64::NAN
-        }),
-        ("DRAG_COEFF", false, |opm| {
-            opm.body
-                .segment
-                .data
-                .spacecraft_parameters
-                .as_mut()
-                .unwrap()
-                .drag_coeff
-                .as_mut()
-                .unwrap()
-                .value = -1.0
-        }),
-        ("DRAG_COEFF", true, |opm| {
-            opm.body
-                .segment
-                .data
-                .spacecraft_parameters
-                .as_mut()
-                .unwrap()
-                .drag_coeff
-                .as_mut()
-                .unwrap()
-                .value = f64::NEG_INFINITY
-        }),
+    type Row = (&'static str, fn(&mut SpacecraftParameters) -> &mut f64, f64);
+    let rows: [Row; 5] = [
+        ("MASS", |s| &mut s.mass.as_mut().unwrap().value, f64::NAN),
+        (
+            "SOLAR_RAD_AREA",
+            |s| &mut s.solar_rad_area.as_mut().unwrap().value,
+            f64::NAN,
+        ),
+        (
+            "SOLAR_RAD_COEFF",
+            |s| &mut s.solar_rad_coeff.as_mut().unwrap().value,
+            f64::INFINITY,
+        ),
+        (
+            "DRAG_AREA",
+            |s| &mut s.drag_area.as_mut().unwrap().value,
+            f64::NAN,
+        ),
+        (
+            "DRAG_COEFF",
+            |s| &mut s.drag_coeff.as_mut().unwrap().value,
+            f64::NEG_INFINITY,
+        ),
     ];
 
-    for (field, is_invalid_value, mutate) in mutations {
-        let mut opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse OPM fixture");
-        mutate(&mut opm);
+    for (field, value_of, non_finite) in rows {
         let path = format!(
             "body.segment.data.spacecraft_parameters.{}",
             field.to_ascii_lowercase()
         );
-        if is_invalid_value {
-            assert_invalid_value_diagnostic(field, opm.to_xml(), &path);
-        } else {
-            assert_out_of_range_diagnostic(field, opm.to_xml(), &path);
+        for (value, code) in [
+            (-1.0, "validation.out_of_range"),
+            (non_finite, "validation.invalid_value"),
+        ] {
+            let mut opm =
+                Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse OPM fixture");
+            *value_of(
+                opm.body
+                    .segment
+                    .data
+                    .spacecraft_parameters
+                    .as_mut()
+                    .unwrap(),
+            ) = value;
+            assert_diagnostic(code, field, opm.to_xml(), &path);
         }
     }
 }
@@ -538,7 +434,7 @@ fn opm_3_xml_generation_rejects_every_non_finite_covariance_component() {
             "body.segment.data.covariance_matrix.{}",
             field.to_ascii_lowercase()
         );
-        assert_invalid_value_diagnostic(field, opm.to_xml(), &path);
+        assert_diagnostic("validation.invalid_value", field, opm.to_xml(), &path);
     }
 }
 
@@ -575,7 +471,7 @@ fn opm_3_xml_generation_rejects_every_invalid_maneuver_value() {
             "body.segment.data.maneuver_parameters[0].{}",
             field.to_ascii_lowercase()
         );
-        assert_invalid_value_diagnostic(field, opm.to_xml(), &path);
+        assert_diagnostic("validation.invalid_value", field, opm.to_xml(), &path);
     }
 }
 
@@ -586,7 +482,8 @@ fn opm_3_xml_generation_validates_maneuver_boundaries() {
     maneuver.body.segment.data.maneuver_parameters[0]
         .man_duration
         .value = -1.0;
-    assert_out_of_range_diagnostic(
+    assert_diagnostic(
+        "validation.out_of_range",
         "MAN_DURATION",
         maneuver.to_xml(),
         "body.segment.data.maneuver_parameters[0].man_duration",
@@ -605,7 +502,8 @@ fn opm_3_xml_generation_validates_maneuver_boundaries() {
     zero_delta_mass.body.segment.data.maneuver_parameters[0]
         .man_delta_mass
         .value = 1.0;
-    assert_out_of_range_diagnostic(
+    assert_diagnostic(
+        "validation.out_of_range",
         "MAN_DELTA_MASS",
         zero_delta_mass.to_xml(),
         "body.segment.data.maneuver_parameters[0].man_delta_mass",

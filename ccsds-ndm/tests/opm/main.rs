@@ -69,7 +69,8 @@ fn assert_missing_required<T: std::fmt::Debug>(
     );
 }
 
-fn assert_invalid_value_diagnostic<T: std::fmt::Debug>(
+fn assert_diagnostic<T: std::fmt::Debug>(
+    code: &str,
     surface: &str,
     result: Result<T>,
     expected_path: &str,
@@ -77,26 +78,7 @@ fn assert_invalid_value_diagnostic<T: std::fmt::Debug>(
     let error = result.expect_err(surface);
     assert_eq!(
         error.code(),
-        Some("validation.invalid_value"),
-        "{surface} returned an unstable top-level diagnostic code"
-    );
-    assert_eq!(
-        error.field_path().as_deref(),
-        Some(expected_path),
-        "{surface} returned an incomplete top-level field path"
-    );
-    assert!(error.as_validation_error().is_some());
-}
-
-fn assert_out_of_range_diagnostic<T: std::fmt::Debug>(
-    surface: &str,
-    result: Result<T>,
-    expected_path: &str,
-) {
-    let error = result.expect_err(surface);
-    assert_eq!(
-        error.code(),
-        Some("validation.out_of_range"),
+        Some(code),
         "{surface} returned an unstable top-level diagnostic code"
     );
     assert_eq!(

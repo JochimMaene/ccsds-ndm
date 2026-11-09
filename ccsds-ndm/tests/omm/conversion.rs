@@ -153,34 +153,8 @@ fn tle_roundtrip_with_options() {
 
 #[test]
 fn to_tle_lines_accepts_sgp_slash_sgp4() {
-    let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2020-065T16:00:00
-ORIGINATOR = NOAA
-MESSAGE_ID = OMM 202013719185
-OBJECT_NAME = GOES 9
-OBJECT_ID = 1995-025A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP/SGP4
-EPOCH = 2020-064T10:34:41.4264
-MEAN_MOTION = 1.00273272
-ECCENTRICITY = 0.0005013
-INCLINATION = 3.0539
-RA_OF_ASC_NODE = 81.7939
-ARG_OF_PERICENTER = 249.2363
-MEAN_ANOMALY = 150.1602
-GM = 398600.8
-EPHEMERIS_TYPE = 0
-CLASSIFICATION_TYPE = U
-NORAD_CAT_ID = 23581
-ELEMENT_SET_NO = 0925
-REV_AT_EPOCH = 4316
-BSTAR = 0.0001
-MEAN_MOTION_DOT = -0.00000113
-MEAN_MOTION_DDOT = 0.0
-"#;
-    let omm = Omm::from_kvn(kvn).expect("failed to parse OMM");
+    let omm = Omm::from_kvn(crate::KVN).expect("failed to parse OMM");
+    assert_eq!(omm.body.segment.metadata.mean_element_theory, "SGP/SGP4");
     let (line1, line2) = omm.to_tle_lines().expect("failed to generate TLE");
     assert!(line1.starts_with("1 23581U 95025A"));
     assert!(line2.starts_with("2 23581"));

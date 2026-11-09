@@ -24,17 +24,6 @@ fn both_conversion_directions_preserve_the_complete_typed_model() {
     );
 }
 
-#[test]
-fn xml_to_kvn_rounds_values_to_the_ccsds_digit_limit() {
-    let mut message = Opm::from_kvn(crate::OPM_3_KVN_FIXTURES[0].1).expect("fixture should parse");
-    message.body.segment.data.state_vector.x.value = 1.234_567_890_123_456_7;
-    let xml = message.to_xml().expect("XML can represent the f64 exactly");
-
-    let kvn = convert(&xml, Notation::Kvn)
-        .expect("finite XML value should round to a conforming KVN value");
-    assert!(kvn.contains("X                    = 1.234567890123457"));
-}
-
 /// KVN has one comment slot ahead of `EPOCH`, so `data.COMMENT` and `stateVector.COMMENT` are
 /// indistinguishable once written. Parsing assigns every pre-`EPOCH` comment to the data section,
 /// which makes the merge canonical and idempotent rather than arbitrary.

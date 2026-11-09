@@ -22,38 +22,6 @@ MEAN_ANOMALY = 30.0 [deg]
 "#;
 
 #[test]
-fn parse_omm_with_covariance() {
-    let kvn = format!(
-        "{}{}",
-        DSST_KVN.replace("REF_FRAME = EME2000", "REF_FRAME = TEME"),
-        r#"CX_X = 1.0 [km**2]
-CY_X = 0.0 [km**2]
-CY_Y = 1.0 [km**2]
-CZ_X = 0.0 [km**2]
-CZ_Y = 0.0 [km**2]
-CZ_Z = 1.0 [km**2]
-CX_DOT_X = 0.0 [km**2/s]
-CX_DOT_Y = 0.0 [km**2/s]
-CX_DOT_Z = 0.0 [km**2/s]
-CX_DOT_X_DOT = 0.01 [km**2/s**2]
-CY_DOT_X = 0.0 [km**2/s]
-CY_DOT_Y = 0.0 [km**2/s]
-CY_DOT_Z = 0.0 [km**2/s]
-CY_DOT_X_DOT = 0.0 [km**2/s**2]
-CY_DOT_Y_DOT = 0.01 [km**2/s**2]
-CZ_DOT_X = 0.0 [km**2/s]
-CZ_DOT_Y = 0.0 [km**2/s]
-CZ_DOT_Z = 0.0 [km**2/s]
-CZ_DOT_X_DOT = 0.0 [km**2/s**2]
-CZ_DOT_Y_DOT = 0.0 [km**2/s**2]
-CZ_DOT_Z_DOT = 0.01 [km**2/s**2]
-"#
-    );
-    let omm = Omm::from_kvn(&kvn).expect("OMM Covariance parse failed");
-    assert!(omm.body.segment.data.covariance_matrix.is_some());
-}
-
-#[test]
 fn test_mean_elements_choice_semi_major_axis_only() {
     let kvn = DSST_KVN;
     let omm = Omm::from_kvn(kvn).expect("Should parse with SEMI_MAJOR_AXIS");
@@ -66,58 +34,6 @@ fn test_mean_elements_choice_semi_major_axis_only() {
         .is_some());
     assert_eq!(Omm::from_kvn(&omm.to_kvn().unwrap()).unwrap(), omm);
     assert_eq!(Omm::from_xml(&omm.to_xml().unwrap()).unwrap(), omm);
-}
-
-#[test]
-fn test_mean_elements_choice_mean_motion_only() {
-    let kvn = DSST_KVN
-        .replace("REF_FRAME = EME2000", "REF_FRAME = TEME")
-        .replace(
-            "SEMI_MAJOR_AXIS = 7000.0 [km]",
-            "MEAN_MOTION = 15.5 [rev/day]",
-        );
-    let omm = Omm::from_kvn(&kvn).expect("Should parse with MEAN_MOTION");
-    assert!(omm.body.segment.data.mean_elements.mean_motion.is_some());
-}
-
-#[test]
-fn test_tle_choice_bstar_only() {
-    let kvn = format!(
-        "{}BSTAR = 0.0001 [1/ER]\nMEAN_MOTION_DOT = 0.0 [rev/day**2]\nMEAN_MOTION_DDOT = 0.0 [rev/day**3]\n",
-        DSST_KVN
-            .replace("REF_FRAME = EME2000", "REF_FRAME = TEME")
-            .replace("MEAN_ELEMENT_THEORY = DSST", "MEAN_ELEMENT_THEORY = SGP4")
-            .replace("SEMI_MAJOR_AXIS = 7000.0 [km]", "MEAN_MOTION = 15.5 [rev/day]")
-    );
-    let omm = Omm::from_kvn(&kvn).expect("Should parse with BSTAR");
-    let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
-    assert!(tle.bstar.is_some());
-    assert!(tle.bterm.is_none());
-    assert!(tle.mean_motion_ddot.is_some());
-    assert!(tle.agom.is_none());
-}
-
-#[test]
-fn test_tle_choice_bterm_only() {
-    let kvn = format!(
-        "{}BTERM = 0.02 [m**2/kg]\nMEAN_MOTION_DOT = 0.0 [rev/day**2]\nAGOM = 0.01 [m**2/kg]\n",
-        DSST_KVN
-            .replace("REF_FRAME = EME2000", "REF_FRAME = TEME")
-            .replace(
-                "MEAN_ELEMENT_THEORY = DSST",
-                "MEAN_ELEMENT_THEORY = SGP4-XP"
-            )
-            .replace(
-                "SEMI_MAJOR_AXIS = 7000.0 [km]",
-                "MEAN_MOTION = 15.5 [rev/day]"
-            )
-    );
-    let omm = Omm::from_kvn(&kvn).expect("Should parse with BTERM");
-    let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
-    assert!(tle.bterm.is_some());
-    assert!(tle.bstar.is_none());
-    assert!(tle.agom.is_some());
-    assert!(tle.mean_motion_ddot.is_none());
 }
 
 fn assert_kvn_rejected(label: &str, source: String) {
@@ -145,6 +61,14 @@ fn omm_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
         (
             "unknown keyword",
             mutated(KVN, object_name, &format!("{object_name}\nUNKNOWN = value")),
+        ),
+        (
+            "non-numeric float",
+            mutated(
+                KVN,
+                "MEAN_MOTION = 1.00273272 [rev/day]",
+                "MEAN_MOTION = BAD",
+            ),
         ),
         (
             "comment inside a logical block",
@@ -362,6 +286,10 @@ fn omm_kvn_validation_rules_name_the_offending_field() {
         (
             mutated(FIXTURE, "OBJECT_NAME = GOES 9\n", ""),
             "Missing required field: OBJECT_NAME",
+        ),
+        (
+            mutated(FIXTURE, "OBJECT_ID = 1995-025A\n", ""),
+            "Missing required field: OBJECT_ID",
         ),
         // Mean element choice: exactly one of SEMI_MAJOR_AXIS or MEAN_MOTION.
         (

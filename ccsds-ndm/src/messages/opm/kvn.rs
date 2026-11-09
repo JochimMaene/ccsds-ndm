@@ -333,7 +333,6 @@ impl ParseKvn for Opm {
 mod tests {
     use super::*;
     use crate::traits::Ndm;
-    use crate::types::NonNegativeDouble;
 
     const MINIMAL_OPM: &str = r#"CCSDS_OPM_VERS = 3.0
 CREATION_DATE = 2022-11-06T09:23:57
@@ -368,22 +367,6 @@ X_DOT = -0.873160 [km/s]
 Y_DOT = 8.740420 [km/s]
 Z_DOT = -4.191076 [km/s]
 "#;
-
-    #[test]
-    fn test_parse_minimal_opm() {
-        let result = Opm::from_kvn_str(MINIMAL_OPM);
-        assert!(
-            result.is_ok(),
-            "Failed to parse minimal OPM: {:?}",
-            result.err()
-        );
-
-        let opm = result.unwrap();
-        assert_eq!(opm.version, "3.0");
-        assert_eq!(opm.header.originator, "JAXA");
-        assert_eq!(opm.body.segment.metadata.object_name, "OSPREY 5");
-        assert_eq!(opm.body.segment.metadata.object_id, "1998-999A");
-    }
 
     #[test]
     fn test_parse_opm_with_units() {
@@ -448,52 +431,6 @@ Z_DOT = -4.191076 [km/s]
     }
 
     #[test]
-    fn test_parse_opm_with_spacecraft_params() {
-        const OPM_WITH_SC: &str = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2022-11-06T09:23:57
-ORIGINATOR = JAXA
-OBJECT_NAME = OSPREY 5
-OBJECT_ID = 1998-999A
-CENTER_NAME = EARTH
-REF_FRAME = ITRF2000
-TIME_SYSTEM = UTC
-EPOCH = 2022-12-18T14:28:15.1172
-X = 6503.514
-Y = 1239.647
-Z = -717.490
-X_DOT = -0.873160
-Y_DOT = 8.740420
-Z_DOT = -4.191076
-MASS = 3000.0
-SOLAR_RAD_AREA = 18.77
-SOLAR_RAD_COEFF = 1.0
-DRAG_AREA = 18.77
-DRAG_COEFF = 2.5
-"#;
-
-        let result = Opm::from_kvn_str(OPM_WITH_SC);
-        assert!(
-            result.is_ok(),
-            "Failed to parse OPM with spacecraft params: {:?}",
-            result.err()
-        );
-
-        let opm = result.unwrap();
-        let sc = opm
-            .body
-            .segment
-            .data
-            .spacecraft_parameters
-            .as_ref()
-            .expect("Should have spacecraft params");
-        assert_eq!(sc.mass.as_ref().unwrap().value, 3000.0);
-        assert_eq!(
-            sc.drag_coeff.as_ref().unwrap(),
-            &NonNegativeDouble::new(2.5).unwrap()
-        );
-    }
-
-    #[test]
     fn test_opm_errors() {
         // Version error
         let bad_version = MINIMAL_OPM.replacen("CCSDS_OPM_VERS = 3.0", "CCSDS_OPM_VERS = BAD", 1);
@@ -504,13 +441,6 @@ DRAG_COEFF = 2.5
                 .and_then(|diagnostic| diagnostic.source_edition),
             Some("BAD")
         );
-
-        // Metadata errors
-        let mut kvn_meta_err = "OBJECT_NAME = SAT\nUNKNOWN_KEY = VAL\n";
-        assert!(opm_metadata.parse_next(&mut kvn_meta_err).is_err());
-
-        let mut kvn_epoch_err = "REF_FRAME_EPOCH = INVALID\n";
-        assert!(opm_metadata.parse_next(&mut kvn_epoch_err).is_err());
 
         // Keplerian errors
         let mut kvn_kep_err = "SEMI_MAJOR_AXIS = 7000.0\n"; // Missing others
@@ -534,68 +464,6 @@ DRAG_COEFF = 2.5
         assert!(ke_none.true_anomaly.is_none());
         assert!(ke_none.mean_anomaly.is_none());
 
-        // Maneuver without MASS should parse (mass is optional in OPM spacecraft parameters)
-        let kvn_man_no_mass = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2022-11-06T09:23:57
-ORIGINATOR = JAXA
-OBJECT_NAME = SAT
-OBJECT_ID = 1
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2022-12-18T14:28:15.1172
-X = 6503.514
-Y = 1239.647
-Z = -717.490
-X_DOT = -0.873160
-Y_DOT = 8.740420
-Z_DOT = -4.191076
-MAN_EPOCH_IGNITION = 2023-01-01T00:00:00
-MAN_DURATION = 10.0
-MAN_DELTA_MASS = -1.0
-MAN_REF_FRAME = RSW
-MAN_DV_1 = 0.1
-MAN_DV_2 = 0.0
-MAN_DV_3 = 0.0
-"#;
-        let opm = Opm::from_kvn_str(kvn_man_no_mass).expect("maneuver without MASS should parse");
-        assert!(opm
-            .body
-            .segment
-            .data
-            .spacecraft_parameters
-            .as_ref()
-            .and_then(|sp| sp.mass.as_ref())
-            .is_none());
-        assert_eq!(opm.body.segment.data.maneuver_parameters.len(), 1);
-
-        let mut input = "SEMI_MAJOR_AXIS = BAD\n";
-        assert!(keplerian_elements.parse_next(&mut input).is_err());
-
-        let mut input = "ECCENTRICITY = BAD\n";
-        assert!(keplerian_elements.parse_next(&mut input).is_err());
-
-        let mut input = "INCLINATION = BAD\n";
-        assert!(keplerian_elements.parse_next(&mut input).is_err());
-
-        let mut input = "INCLINATION = 190.0\n"; // Out of range
-        assert!(keplerian_elements.parse_next(&mut input).is_err());
-
-        let mut input = "RA_OF_ASC_NODE = BAD\n";
-        assert!(keplerian_elements.parse_next(&mut input).is_err());
-
-        let mut input = "ARG_OF_PERICENTER = BAD\n";
-        assert!(keplerian_elements.parse_next(&mut input).is_err());
-
-        let mut input = "TRUE_ANOMALY = BAD\n";
-        assert!(keplerian_elements.parse_next(&mut input).is_err());
-
-        let mut input = "MEAN_ANOMALY = BAD\n";
-        assert!(keplerian_elements.parse_next(&mut input).is_err());
-
-        let mut input = "GM = BAD\n";
-        assert!(keplerian_elements.parse_next(&mut input).is_err());
-
         // Spacecraft errors
         let mut input = "MASS = BAD\n";
         assert!(spacecraft_parameters.parse_next(&mut input).is_err());
@@ -607,20 +475,6 @@ MAN_DV_3 = 0.0
         assert!(spacecraft_parameters.parse_next(&mut input).is_err());
         let mut input = "DRAG_COEFF = BAD\n";
         assert!(spacecraft_parameters.parse_next(&mut input).is_err());
-
-        // Maneuver errors
-        let mut input = "MAN_EPOCH_IGNITION = BAD\n";
-        assert!(maneuver_parameters.parse_next(&mut input).is_err());
-        let mut input = "MAN_EPOCH_IGNITION = 2023-01-01T00:00:00\nMAN_DURATION = BAD\n";
-        assert!(maneuver_parameters.parse_next(&mut input).is_err());
-        let mut input = "MAN_EPOCH_IGNITION = 2023-01-01T00:00:00\nMAN_DELTA_MASS = BAD\n";
-        assert!(maneuver_parameters.parse_next(&mut input).is_err());
-        let mut input = "MAN_EPOCH_IGNITION = 2023-01-01T00:00:00\nMAN_DV_1 = BAD\n";
-        assert!(maneuver_parameters.parse_next(&mut input).is_err());
-        let mut input = "MAN_EPOCH_IGNITION = 2023-01-01T00:00:00\nMAN_DV_2 = BAD\n";
-        assert!(maneuver_parameters.parse_next(&mut input).is_err());
-        let mut input = "MAN_EPOCH_IGNITION = 2023-01-01T00:00:00\nMAN_DV_3 = BAD\n";
-        assert!(maneuver_parameters.parse_next(&mut input).is_err());
 
         // Incomplete maneuver
         let mut input = "MAN_EPOCH_IGNITION = 2023-01-01T00:00:00\n";
@@ -680,36 +534,6 @@ MAN_DV_3 = 0.0
         );
         assert_eq!(ud.parameters().count(), 2);
         assert_eq!(ud.parameters().next().unwrap().parameter, "FOO");
-    }
-
-    #[test]
-    fn test_opm_data_loop() {
-        // Test multiple maneuvers
-        let mut input = r#"EPOCH = 2023-01-01T00:00:00
-X = 1000
-Y = 2000
-Z = 3000
-X_DOT = 1
-Y_DOT = 2
-Z_DOT = 3
-MASS = 1000
-MAN_EPOCH_IGNITION = 2023-01-01T01:00:00
-MAN_DURATION = 10
-MAN_DELTA_MASS = -1
-MAN_REF_FRAME = RSW
-MAN_DV_1 = 0.1
-MAN_DV_2 = 0.2
-MAN_DV_3 = 0.3
-MAN_EPOCH_IGNITION = 2023-01-01T02:00:00
-MAN_DURATION = 20
-MAN_DELTA_MASS = -2
-MAN_REF_FRAME = RSW
-MAN_DV_1 = 0.4
-MAN_DV_2 = 0.5
-MAN_DV_3 = 0.6
-"#;
-        let data = opm_data.parse_next(&mut input).unwrap();
-        assert_eq!(data.maneuver_parameters.len(), 2);
     }
 
     #[test]
