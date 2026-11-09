@@ -11,63 +11,6 @@ use crate::kvn::ser::KvnWriter;
 use crate::traits::ToKvn;
 use serde::{Deserialize, Serialize};
 
-/// Represents the `ndmHeader` complex type from the XSD.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub struct NdmHeader {
-    /// User-defined comments.
-    ///
-    /// **Examples**: This is a comment
-    ///
-    /// **CCSDS Reference**: 505.0-B-3, Section 3.2.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[builder(default)]
-    pub comment: Vec<String>,
-    /// File creation date/time in UTC.
-    ///
-    /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
-    ///
-    /// **CCSDS Reference**: 505.0-B-3, Section 3.2.
-    pub creation_date: Epoch,
-    /// Creating agency or operator.
-    ///
-    /// **Examples**: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
-    ///
-    /// **CCSDS Reference**: 505.0-B-3, Section 3.2.
-    #[builder(into)]
-    pub originator: String,
-}
-
-impl ToKvn for NdmHeader {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_comments(&self.comment);
-        writer.write_pair("CREATION_DATE", self.creation_date);
-        writer.write_pair("ORIGINATOR", self.originator.trim());
-    }
-}
-
-impl crate::traits::Validate for NdmHeader {
-    fn validate(&self) -> Result<()> {
-        if self.originator.trim().is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "NDM Header".into(),
-                field: "ORIGINATOR".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.creation_date.is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "NDM Header".into(),
-                field: "CREATION_DATE".into(),
-                line: None,
-            }
-            .into());
-        }
-        Ok(())
-    }
-}
-
 /// Common APM, AEM and ACM header (ADM §§3.2.2, 4.2.2 and 5.3.2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
@@ -3089,39 +3032,6 @@ mod tests {
     use crate::traits::Validate;
 
     #[test]
-    fn test_ndm_header_validation() {
-        let h = NdmHeader::builder()
-            .creation_date("2000-01-01T00:00:00".parse().unwrap())
-            .originator("  ") // empty originator
-            .build();
-        assert!(h.validate().is_err());
-
-        let h2 = NdmHeader::builder()
-            .creation_date("2000-01-01T00:00:00".parse().unwrap())
-            .originator("NASA")
-            .build();
-        assert!(h2.validate().is_ok());
-    }
-
-    #[test]
-    fn test_ndm_header_kvn() {
-        let h = NdmHeader::builder()
-            .creation_date("2000-01-01T00:00:00".parse().unwrap())
-            .originator("NASA")
-            .comment(vec!["msg".into()])
-            .build();
-        let mut w = KvnWriter::new();
-        h.write_kvn(&mut w);
-        let s = w.finish();
-        // Check for presence of key and value separately to avoid whitespace issues
-        assert!(s.contains("COMMENT msg"));
-        assert!(s.contains("CREATION_DATE"));
-        assert!(s.contains("2000-01-01T00:00:00"));
-        assert!(s.contains("ORIGINATOR"));
-        assert!(s.contains("NASA"));
-    }
-
-    #[test]
     fn test_adm_header_validation() {
         let h = AdmHeader::builder()
             .creation_date("2000-01-01T00:00:00".parse().unwrap())
@@ -3197,17 +3107,6 @@ mod tests {
         cov.cz_dot_y.value = -17.0;
         cov.validate()
             .expect("the ODM does not constrain covariance signs");
-    }
-
-    #[test]
-    fn test_header_validation_missing_date() {
-        let h = NdmHeader::builder()
-            .creation_date(Epoch::new("").unwrap())
-            .originator("NASA")
-            .build();
-        assert!(h.validate().is_err());
-
-        assert!(CalendarEpoch::new("").is_err());
     }
 
     #[test]

@@ -74,6 +74,7 @@ API:
   ADM 1.0 ``ApmRateFrame`` enum is removed. RDM ``CONTROLLED_REENTRY`` errors name that keyword;
   APM comment errors cite ADM 6.10.2.
 - Python: ``CombinedNdm.id`` is settable; ``AcmMetadata.classification`` is new.
+- Rust: the unused ``common::NdmHeader`` type is removed (breaking).
 
 Documentation:
 
