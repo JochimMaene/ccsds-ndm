@@ -174,10 +174,9 @@ fn covariance_time_tags_are_ordered_by_increasing_time() {
         .data
         .covariance_matrix
         .push(covariance);
-    let error = message.validate().unwrap_err();
-    crate::common::assert_validation_field(&error, "covarianceMatrix EPOCH");
+    crate::common::assert_rejects(&message, "covarianceMatrix EPOCH");
     assert_eq!(
-        error.field_path().as_deref(),
+        message.validate().unwrap_err().field_path().as_deref(),
         Some("body.segment[0].data.covariance_matrix[2].epoch")
     );
 }

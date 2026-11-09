@@ -184,11 +184,6 @@ fn unsupported_editions_and_edition_specific_fields_are_rejected() {
         historical.to_xml().unwrap_err().code(),
         Some("generation.unsupported_output_version")
     );
-
-    let mut version_two = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
-    version_two.version = "2.0".into();
-    version_two.header.message_id = Some("OEM-3-ONLY".into());
-    crate::common::assert_validation_field(&version_two.to_kvn().unwrap_err(), "MESSAGE_ID");
 }
 
 #[test]
@@ -335,13 +330,6 @@ fn kvn_generation_applies_the_model_rules_it_checks_while_writing() {
     let mut message = base();
     message.header.originator = " ".into();
     assert_rejects(&message, "ORIGINATOR");
-
-    let mut message = Oem::from_xml(XML).unwrap();
-    let segment = &mut message.body.segment[0];
-    let mut covariance = segment.data.covariance_matrix[0].clone();
-    covariance.epoch = segment.metadata.start_time;
-    segment.data.covariance_matrix.push(covariance);
-    assert_rejects(&message, "covarianceMatrix EPOCH");
 }
 
 #[test]

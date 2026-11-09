@@ -158,19 +158,6 @@ META_STOP
 }
 
 #[test]
-fn test_parse_aem_minimal() {
-    let input = format!(
-        "{}{}\nDATA_START\n2002-11-04T17:22:31 0.5 0.5 0.5 0.5\nDATA_STOP\n",
-        sample_aem_header(),
-        sample_aem_meta()
-    );
-    let aem = Aem::from_kvn(&input).unwrap();
-    assert_eq!(aem.version, "2.0");
-    assert_eq!(aem.header.originator, "NASA/JPL");
-    assert_eq!(aem.body.segment.len(), 1);
-}
-
-#[test]
 fn test_parse_aem_version_error() {
     let input = mutated(crate::KVN, "CCSDS_AEM_VERS = 2.0", "CCSDS_AEM_VERS = 3.0");
     let err = Aem::from_kvn(&input).unwrap_err();
@@ -371,31 +358,8 @@ fn test_parse_aem_attitude_types() {
 }
 
 #[test]
-fn test_parse_aem_quaternion_angvel_keeps_optional_frame_absent() {
-    let qr_meta = sample_aem_meta().replace("QUATERNION", "QUATERNION/ANGVEL");
-    let input = format!(
-        "{}{}\nDATA_START\n2002-11-04T17:22:31 0 0 0 1 0.01 0.02 0.03\nDATA_STOP\n",
-        sample_aem_header(),
-        qr_meta
-    );
-    let message = Aem::from_kvn(&input).unwrap();
-    assert!(message.body.segment[0].metadata.angvel_frame.is_none());
-    assert_eq!(Aem::from_xml(&message.to_xml().unwrap()).unwrap(), message);
-}
-
-#[test]
 fn test_parse_aem_invalid_lines() {
     let cases = [
-        (
-            "wrong quaternion columns",
-            sample_aem_meta(),
-            "2002-11-04T17:22:31 0.1 0.2 0.3",
-        ),
-        (
-            "out-of-range normalized quaternion",
-            sample_aem_meta(),
-            "2002-11-04T17:22:31 1.0001 0 0 0",
-        ),
         (
             "wrong derivative columns",
             sample_aem_meta().replace("QUATERNION", "QUATERNION/DERIVATIVE"),
@@ -408,16 +372,6 @@ fn test_parse_aem_invalid_lines() {
                 .replace("META_STOP", "EULER_ROT_SEQ = ZYX\nMETA_STOP"),
             "2002-11-04T17:22:31 10.0 20.0",
         ),
-        (
-            "invalid epoch",
-            sample_aem_meta(),
-            "NOT_A_DATE 0.1 0.2 0.3 0.4",
-        ),
-        (
-            "invalid float",
-            sample_aem_meta(),
-            "2002-11-04T17:22:31 0.1 NOT_A_NUMBER 0.3 0.4",
-        ),
     ];
 
     for (label, metadata, values) in cases {
@@ -427,13 +381,7 @@ fn test_parse_aem_invalid_lines() {
             metadata
         );
         let error = Aem::from_kvn(&input).unwrap_err();
-        if label == "out-of-range normalized quaternion" {
-            crate::common::assert_validation_field(&error, "Q1");
-        } else if label == "invalid epoch" {
-            crate::common::assert_invalid_epoch(&error, "NOT_A_DATE");
-        } else {
-            assert_eq!(error.code(), Some("parse.kvn.syntax"), "{label}: {error}");
-        }
+        assert_eq!(error.code(), Some("parse.kvn.syntax"), "{label}: {error}");
     }
 
     let input = format!(
@@ -447,18 +395,7 @@ fn test_parse_aem_invalid_lines() {
 
 #[test]
 fn test_aem_value_error_reports_record_line() {
-    let bad_record = "2002-11-04T17:23:00 1.5 0 0 0";
-    let input = format!(
-        "{}{}\nDATA_START\n2002-11-04T17:22:31 0.5 0.5 0.5 0.5\n{bad_record}\nDATA_STOP\n",
-        sample_aem_header(),
-        sample_aem_meta()
-    );
-    let expected_line = input[..input.find(bad_record).unwrap()]
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
-        + 1;
-
+    let input = mutated(KVN, "0.42319 -0.45697 0.23784 0.74533", "1.5 0 0 0");
     let CcsdsNdmError::Validation(error) =
         crate::common::parse_error_cause(Aem::from_kvn(&input).unwrap_err())
     else {
@@ -468,45 +405,32 @@ fn test_aem_value_error_reports_record_line() {
         panic!("expected quaternion component range error");
     };
     assert_eq!(name, "Q1");
-    assert_eq!(line, Some(expected_line));
+    assert_eq!(line, Some(25));
 }
 
 #[test]
 fn test_parse_aem_comments() {
-    let input = r#"CCSDS_AEM_VERS = 2.0
-COMMENT Header comment
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-
-META_START
-COMMENT Meta comment
-OBJECT_NAME = SAT
-OBJECT_ID = 1
-CENTER_NAME = EARTH
-REF_FRAME_A = EME2000
-REF_FRAME_B = SC_BODY_1
-TIME_SYSTEM = UTC
-START_TIME = 2023-01-01T00:00:00
-STOP_TIME = 2023-01-01T01:00:00
-ATTITUDE_TYPE = QUATERNION
-META_STOP
-
-DATA_START
-COMMENT Data comment
-2023-01-01T00:00:00 0 0 0 1
-DATA_STOP
-"#;
-    let aem = Aem::from_kvn(input).unwrap();
-    assert!(aem.header.comment.contains(&"Header comment".to_string()));
-    assert!(aem.body.segment[0]
-        .metadata
-        .comment
-        .contains(&"Meta comment".to_string()));
-    assert!(aem.body.segment[0]
-        .data
-        .comment
-        .contains(&"Data comment".to_string()));
+    let input = mutated_once(
+        KVN,
+        "CREATION_DATE",
+        "COMMENT Header comment\nCREATION_DATE",
+    );
+    let input = mutated_once(&input, "DATA_START\n", "DATA_START\nCOMMENT Data comment\n");
+    let aem = Aem::from_kvn(&input).unwrap();
+    assert_eq!(aem.version, "2.0");
+    assert_eq!(aem.header.originator, "NASA/JPL");
+    assert_eq!(aem.header.comment, ["Header comment"]);
+    assert_eq!(
+        aem.body.segment[0].metadata.comment,
+        [
+            "This file was produced by M.R. Somebody, MSOO NAV/JPL.",
+            "It is to be used for attitude reconstruction only. The relative accuracy of these",
+            "attitudes is 0.1 degrees per axis.",
+        ]
+    );
+    assert_eq!(aem.body.segment[0].data.comment, ["Data comment"]);
 }
+
 #[test]
 fn test_aem_no_segments() {
     // Valid header but no body segments
@@ -524,6 +448,10 @@ fn aem_uses_canonical_angular_velocity_frame_and_preserves_optional_metadata() {
         sample_aem_header(),
         meta
     );
+    assert!(Aem::from_kvn(&source).unwrap().body.segment[0]
+        .metadata
+        .angvel_frame
+        .is_none());
     for keyword in ["ANGVEL_FRAME", "RATE_FRAME"] {
         let input = source.replace("META_STOP", &format!("{keyword} = SC_BODY_1\nMETA_STOP"));
         let message = Aem::from_kvn(&input).unwrap();

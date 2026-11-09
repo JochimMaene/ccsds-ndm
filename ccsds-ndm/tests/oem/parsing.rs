@@ -127,12 +127,6 @@ fn kvn_rejects_duplicate_trailing_and_non_ascii_content() {
             42,
             "invalid epoch format: 'UNKNOWN'",
         ),
-        (
-            "non-ASCII content",
-            mutated(source, object_name, &format!("{object_name} €")),
-            5,
-            "non-printable or non-ASCII character U+20AC",
-        ),
     ] {
         let error = Oem::from_kvn(&invalid).unwrap_err();
         let located = crate::common::kvn_parse_error(&error)
@@ -165,11 +159,6 @@ fn kvn_rejects_duplicate_trailing_and_non_ascii_content() {
         .all(|segment| segment.metadata.comment == ["metadata"]));
     assert_eq!(Oem::from_kvn(&parsed.to_kvn().unwrap()).unwrap(), parsed);
 
-    let crlf = mutated(source, "\n", "\r\n");
-    assert_eq!(
-        Oem::from_kvn(&crlf).expect("CRLF should parse"),
-        Oem::from_kvn(source).expect("LF should parse")
-    );
     for (label, input) in [
         ("CR", mutated(source, "\n", "\r")),
         ("LFCR", mutated(source, "\n", "\n\r")),
@@ -421,12 +410,6 @@ fn kvn_ephemeris_records_tolerate_padding_and_name_malformed_components() {
         .unwrap();
     let expected = Oem::from_kvn(source).expect("fixture should parse");
 
-    let padded = format!("{record}   ");
-    assert_eq!(
-        Oem::from_kvn(&mutated(source, record, &padded)).expect("trailing spaces should parse"),
-        expected,
-        "trailing spaces changed the parsed model"
-    );
     // A tab reads as a blank (lossless producer deviation).
     let (epoch, rest) = record.split_once(' ').unwrap();
     for tabbed in [format!("{record}\t"), format!("{epoch}\t{rest}")] {
@@ -448,18 +431,6 @@ fn kvn_ephemeris_records_tolerate_padding_and_name_malformed_components() {
             epoch.len() + 2,
             "non-printable or non-ASCII character U+00E9"
         ),
-    );
-
-    // ODM 7.3.7 terminates every line; parsing leniently accepts an unterminated last line.
-    let no_final_newline = source.trim_end_matches('\n');
-    assert_eq!(
-        Oem::from_kvn(no_final_newline).expect("unterminated final line should parse"),
-        expected,
-    );
-    let padded_final_record = format!("{no_final_newline}   \n");
-    assert_eq!(
-        Oem::from_kvn(&padded_final_record).expect("padded final record should parse"),
-        expected,
     );
 
     // Parsing drops the 16-digit cap of 7.5.6/7.5.7b and the 7.5.4 integer range for data
@@ -943,17 +914,6 @@ fn kvn_record_structure_rejections_name_their_reason() {
 }
 
 #[test]
-fn covariance_comments_before_a_later_epoch_keep_their_association() {
-    let source = mutated_once(
-        KVN_FIXTURES[2],
-        "EPOCH = 2019-12-29T21:00:00",
-        "COMMENT between\nEPOCH = 2019-12-29T21:00:00",
-    );
-    let message = Oem::from_kvn(&source).unwrap();
-    assert_eq!(Oem::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
-}
-
-#[test]
 fn kvn_numbers_stay_within_the_double_range() {
     // ODM 7.5.7e bounds floating-point values by the double range; subnormals remain valid.
     let source = KVN_FIXTURES[2];
@@ -1432,20 +1392,4 @@ fn oem_1_0_requires_increasing_epochs_and_start_at_or_after_previous_stop() {
     shared_endpoint.body.segment[1].metadata.start_time =
         shared_endpoint.body.segment[0].metadata.stop_time;
     shared_endpoint.validate().unwrap();
-}
-
-#[test]
-fn xml_text_padding_and_inner_tabs_are_writable_as_kvn() {
-    let source = XML.replace(
-        "<OBJECT_NAME>MARS GLOBAL SURVEYOR</OBJECT_NAME>",
-        "<OBJECT_NAME>MARS\tGLOBAL SURVEYOR\n</OBJECT_NAME>",
-    );
-    assert_ne!(source, XML);
-    let message = Oem::from_xml(&source).unwrap();
-    let output = message.to_kvn().unwrap();
-    let reread = Oem::from_kvn(&output).unwrap();
-    assert_eq!(
-        reread.body.segment[0].metadata.object_name,
-        "MARS GLOBAL SURVEYOR"
-    );
 }

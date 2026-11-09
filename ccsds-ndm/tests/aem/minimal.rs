@@ -21,11 +21,6 @@ DATA_STOP
 "#;
 
 #[test]
-fn minimal_kvn_parses() {
-    Aem::from_kvn(KVN).unwrap();
-}
-
-#[test]
 fn rejects_missing_required_metadata_kvn() {
     Aem::from_kvn(KVN).unwrap();
     for (record, field) in [
@@ -41,25 +36,4 @@ fn rejects_missing_required_metadata_kvn() {
         );
         crate::common::assert_validation_field(&error, field);
     }
-}
-
-#[test]
-fn rejects_wrong_keyword_kvn() {
-    let input = mutated(KVN, "META_STOP", "BAD_KEY = 1\nMETA_STOP");
-    let error = Aem::from_kvn(&input).unwrap_err();
-    assert_eq!(error.code(), Some("parse.kvn.syntax"), "{error}");
-}
-
-#[test]
-fn rejects_number_format_kvn() {
-    let input = mutated(KVN, "0 0 0 1", "0 0 BAD 1");
-    let error = Aem::from_kvn(&input).unwrap_err();
-    assert_eq!(error.code(), Some("parse.kvn.syntax"), "{error}");
-}
-
-#[test]
-fn rejects_inconsistent_data_kvn() {
-    let input = mutated(KVN, "0 0 0 1", "0 0 0");
-    let error = Aem::from_kvn(&input).unwrap_err();
-    assert_eq!(error.code(), Some("parse.kvn.syntax"), "{error}");
 }

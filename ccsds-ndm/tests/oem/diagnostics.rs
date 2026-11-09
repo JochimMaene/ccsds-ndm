@@ -11,44 +11,26 @@ fn kvn_syntax_diagnostics_are_located_and_machine_readable() {
         .lines()
         .find(|line| line.trim_start().starts_with("OBJECT_NAME"))
         .unwrap();
-    let input = mutated(
+    let source = mutated(
         KVN_FIXTURES[0],
         object_name,
         &format!("{object_name}\nUNKNOWN = value"),
     );
-    let error = Oem::from_kvn(&input).expect_err("unknown keyword should fail");
-    let diagnostic = error.diagnostic().expect("parse context should be present");
+    // A carriage-return-only file keeps the edition and excerpts one record.
+    for line_end in ["\n", "\r"] {
+        let input = source.replace('\n', line_end);
+        let error = Oem::from_kvn(&input).expect_err("unknown keyword should fail");
+        let diagnostic = error.diagnostic().expect("parse context should be present");
 
-    assert_eq!(diagnostic.operation, DiagnosticOperation::Parse);
-    assert_eq!(diagnostic.notation, DiagnosticNotation::Kvn);
-    assert_eq!(diagnostic.message_kind, MessageKind::Oem);
-    assert_eq!(diagnostic.source_edition, Some("3.0"));
-    assert_eq!(diagnostic.code, Some("parse.kvn.syntax"));
-    assert_eq!(diagnostic.original_token, Some("UNKNOWN = value"));
-    assert_eq!(diagnostic.expected, None);
-    assert!(diagnostic.source_location.is_some());
-}
-
-#[test]
-fn carriage_return_diagnostics_keep_the_edition_and_excerpt_to_one_record() {
-    let object_name = KVN_FIXTURES[0]
-        .lines()
-        .find(|line| line.trim_start().starts_with("OBJECT_NAME"))
-        .unwrap();
-    let input = mutated(
-        &mutated(
-            KVN_FIXTURES[0],
-            object_name,
-            &format!("{object_name}\nUNKNOWN = value"),
-        ),
-        "\n",
-        "\r",
-    );
-    let error = Oem::from_kvn(&input).expect_err("unknown keyword should fail");
-    let diagnostic = error.diagnostic().unwrap();
-
-    assert_eq!(diagnostic.source_edition, Some("3.0"));
-    assert_eq!(diagnostic.original_token, Some("UNKNOWN = value"));
+        assert_eq!(diagnostic.operation, DiagnosticOperation::Parse);
+        assert_eq!(diagnostic.notation, DiagnosticNotation::Kvn);
+        assert_eq!(diagnostic.message_kind, MessageKind::Oem);
+        assert_eq!(diagnostic.source_edition, Some("3.0"));
+        assert_eq!(diagnostic.code, Some("parse.kvn.syntax"));
+        assert_eq!(diagnostic.original_token, Some("UNKNOWN = value"));
+        assert_eq!(diagnostic.expected, None);
+        assert!(diagnostic.source_location.is_some());
+    }
 }
 
 #[test]
