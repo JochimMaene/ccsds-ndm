@@ -259,6 +259,15 @@ fn covariance_eigenvectors_units_and_scalar_domains() {
         assert!(message.validate().is_err(), "degenerate eigenvector basis");
     }
     let mut message = Ocm::from_kvn(LINKED).unwrap();
+    let cov_types: Vec<_> = message
+        .body
+        .segment
+        .data
+        .cov
+        .iter()
+        .map(|c| c.cov_type.as_str())
+        .collect();
+    assert_eq!(cov_types, ["ADBARV", "CARTP"]);
     message.body.segment.data.cov[0].cov_scale_min = Some(f64::NAN);
     assert!(message.validate().is_err());
     message.body.segment.data.cov[0].cov_scale_min = None;

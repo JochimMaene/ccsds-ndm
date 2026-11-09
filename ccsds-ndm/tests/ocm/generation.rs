@@ -1,4 +1,5 @@
 use crate::common::{assert_rejects, mutated, validate_xml};
+use crate::minimal::HEADER;
 use crate::KVN;
 use ccsds_ndm::messages::ocm::Ocm;
 use ccsds_ndm::types::{
@@ -694,14 +695,8 @@ fn ocm_reports_the_unrepresentable_value_path_compactly() {
 
 #[test]
 fn od_optional_fields_roundtrip() {
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-PERT_START
+    let kvn = &format!(
+        r#"{HEADER}PERT_START
 PERT_STOP
 OD_START
 OD_ID = OD1
@@ -734,7 +729,8 @@ SENSORS = SENSOR_A SENSOR_B SENSOR_C
 WEIGHTED_RMS = 1.2
 DATA_TYPES = RANGE DOPPLER
 OD_STOP
-"#;
+"#
+    );
     let ocm = Ocm::from_kvn(kvn).unwrap();
     let od = ocm.body.segment.data.od.as_ref().unwrap();
 
@@ -787,20 +783,8 @@ OD_STOP
 
 #[test]
 fn test_ocm_data_write_kvn_all_blocks() {
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
-CENTER_NAME = EARTH
-TRAJ_REF_FRAME = GCRF
-TRAJ_TYPE = CARTPV
-2023-01-01T00:00:00 1 2 3 4 5 6
-TRAJ_STOP
-COV_START
+    let kvn = &format!(
+        r#"{}COV_START
 COV_REF_FRAME = RSW
 COV_TYPE = CARTPV
 COV_ORDERING = LTM
@@ -826,25 +810,24 @@ USER_START
 COMMENT user comment
 USER_DEFINED_CUSTOM_PARAM = custom_value
 USER_STOP
-"#;
+"#,
+        crate::minimal::KVN
+    );
     let ocm = Ocm::from_kvn(kvn).unwrap();
     assert_eq!(ocm.body.segment.data.traj.len(), 1);
     assert_eq!(ocm.body.segment.data.cov.len(), 1);
     assert_eq!(ocm.body.segment.data.man.len(), 1);
+    let user = ocm.body.segment.data.user.as_ref().unwrap();
+    assert_eq!(user.parameters().next().unwrap().parameter, "CUSTOM_PARAM");
+    assert!(user.comments().any(|c| c == "user comment"));
     let output = ocm.to_kvn().unwrap();
     assert_eq!(Ocm::from_kvn(&output).unwrap(), ocm);
 }
 
 #[test]
 fn test_cov_write_kvn_all_optional_fields() {
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-COV_START
+    let kvn = &format!(
+        r#"{HEADER}COV_START
 COMMENT cov comment
 COV_ID = COV_001
 COV_PREV_ID = COV_000
@@ -861,7 +844,8 @@ COV_ORDERING = LTM
 COV_UNITS = [km, km, km, km/s, km/s, km/s]
 2023-01-01T00:00:00 0.000001 0 0.000001 0 0 0.000001 0 0 0 0.000001 0 0 0 0 0.000001 0 0 0 0 0 0.000001
 COV_STOP
-"#;
+"#
+    );
     let ocm = Ocm::from_kvn(kvn).unwrap();
     let cov = &ocm.body.segment.data.cov[0];
 
@@ -887,14 +871,8 @@ COV_STOP
 
 #[test]
 fn test_man_all_optional_fields_write_kvn() {
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-MAN_START
+    let kvn = &format!(
+        r#"{HEADER}MAN_START
 MAN_ID = MAN_1
 MAN_PREV_ID = MAN_0
 MAN_NEXT_ID = MAN_2
@@ -927,7 +905,8 @@ MAN_COMPOSITION = TIME_ABSOLUTE, DV_X, DV_Y, DV_Z
 MAN_UNITS = km/s km/s km/s
 2023-01-01T00:00:00 0.1 0 0
 MAN_STOP
-"#;
+"#
+    );
     let ocm = Ocm::from_kvn(kvn).unwrap();
     let man = &ocm.body.segment.data.man[0];
 
@@ -949,14 +928,8 @@ MAN_STOP
 
 #[test]
 fn test_pert_all_optional_fields_write_kvn() {
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-PERT_START
+    let kvn = &format!(
+        r#"{HEADER}PERT_START
 ATMOSPHERIC_MODEL = NRLMSISE-00
 GRAVITY_MODEL = EGM2008 70x70
 EQUATORIAL_RADIUS = 6378.137 [km]
@@ -987,7 +960,8 @@ FIXED_S10P7_MEAN = 142 [SFU]
 FIXED_Y10P7 = 146 [SFU]
 FIXED_Y10P7_MEAN = 141 [SFU]
 PERT_STOP
-"#;
+"#
+    );
     let ocm = Ocm::from_kvn(kvn).unwrap();
     let pert = ocm.body.segment.data.pert.as_ref().unwrap();
 
@@ -1087,14 +1061,8 @@ META_STOP
 
 #[test]
 fn test_traj_all_fields() {
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
+    let kvn = &format!(
+        r#"{HEADER}TRAJ_START
 COMMENT traj comment
 TRAJ_ID = T1
 TRAJ_PREV_ID = T0
@@ -1116,7 +1084,8 @@ ORB_AVERAGING = NONE
 TRAJ_UNITS = km km km km/s km/s km/s
 2023-01-01T00:00:00 1 2 3 4 5 6
 TRAJ_STOP
-"#;
+"#
+    );
     let ocm = Ocm::from_kvn(kvn).unwrap();
     let traj = &ocm.body.segment.data.traj[0];
     assert_eq!(traj.traj_id, Some("T1".to_string()));
@@ -1132,14 +1101,8 @@ TRAJ_STOP
 
 #[test]
 fn test_phys_all_fields_robust() {
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-PHYS_START
+    let kvn = &format!(
+        r#"{HEADER}PHYS_START
 MANUFACTURER = ACME
 BUS_MODEL = B1
 DOCKED_WITH = SAT2
@@ -1191,7 +1154,8 @@ IXY = 1 [kg*m**2]
 IXZ = 2 [kg*m**2]
 IYZ = 3 [kg*m**2]
 PHYS_STOP
-"#;
+"#
+    );
     let ocm = Ocm::from_kvn(kvn).unwrap();
     let phys = ocm.body.segment.data.phys.as_ref().unwrap();
     assert_eq!(phys.manufacturer, Some("ACME".to_string()));
@@ -1207,23 +1171,12 @@ PHYS_STOP
 
 #[test]
 fn test_traj_orb_revnum_basis_zero() {
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
-CENTER_NAME = EARTH
-TRAJ_REF_FRAME = GCRF
-ORB_REVNUM = 100
-ORB_REVNUM_BASIS = 0
-TRAJ_TYPE = CARTPV
-2023-01-01T00:00:00 1 2 3 4 5 6
-TRAJ_STOP
-"#;
-    let ocm = Ocm::from_kvn(kvn).unwrap();
+    let kvn = mutated(
+        crate::minimal::KVN,
+        "TRAJ_TYPE",
+        "ORB_REVNUM = 100\nORB_REVNUM_BASIS = 0\nTRAJ_TYPE",
+    );
+    let ocm = Ocm::from_kvn(&kvn).unwrap();
     assert_eq!(
         ocm.body.segment.data.traj[0].orb_revnum_basis,
         Some(RevNumBasis::Zero)
@@ -1483,23 +1436,21 @@ fn user_defined_empty_and_whitespace_xml_values_read_back_with_documented_normal
 
 #[test]
 fn positive_integer_schema_counts_refuse_zero_in_every_notation() {
-    let mut message = Ocm::from_kvn(KVN).unwrap();
-    message.body.segment.data.od.as_mut().unwrap().consider_n = Some(0);
-    message
-        .body
-        .segment
-        .data
-        .pert
-        .as_mut()
-        .unwrap()
-        .albedo_grid_size = Some(0);
-    message.body.segment.data.man[0].dc_max_cycles = Some(0);
-    assert!(message.validate().is_err());
-    assert!(message.to_kvn().is_err());
-    assert!(message.to_xml().is_err());
-    let mut bytes = Vec::new();
-    assert!(message.write_xml_to(&mut bytes).is_err());
-    assert!(bytes.is_empty());
+    type Zero = fn(&mut ccsds_ndm::messages::ocm::OcmData);
+    let cases: [(&str, Zero); 3] = [
+        ("CONSIDER_N", |d| {
+            d.od.as_mut().unwrap().consider_n = Some(0)
+        }),
+        ("ALBEDO_GRID_SIZE", |d| {
+            d.pert.as_mut().unwrap().albedo_grid_size = Some(0)
+        }),
+        ("DC_MAX_CYCLES", |d| d.man[0].dc_max_cycles = Some(0)),
+    ];
+    for (field, zero) in cases {
+        let mut message = Ocm::from_kvn(KVN).unwrap();
+        zero(&mut message.body.segment.data);
+        assert_rejects(&message, field);
+    }
 }
 
 #[test]

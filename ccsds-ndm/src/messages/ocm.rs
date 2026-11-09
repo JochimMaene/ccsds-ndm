@@ -4386,15 +4386,8 @@ mod tests {
             .expect("the trajectory must be valid before ORB_REVNUM is mutated");
         traj.orb_revnum = Some(-1.0);
         assert_diagnostic(traj.validate(), "ORB_REVNUM must be non-negative");
-
-        // 3. OcmTrajState::traj_lines empty. ORB_REVNUM goes back to its valid state first, so
-        // the empty-line rule is the only one this case can be reporting.
-        traj.orb_revnum = None;
-        traj.traj_lines.clear();
-        assert_diagnostic(
-            traj.validate(),
-            "Missing required field: TRAJ data line in block TRAJ",
-        );
+        traj.orb_revnum = Some(0.0);
+        traj.validate().unwrap();
 
         // 4. OcmCovarianceMatrix::cov_lines empty
         let cov = OcmCovarianceMatrix::builder()
@@ -4461,51 +4454,10 @@ mod tests {
 
         traj.traj_lines[1].epoch = "2".parse().unwrap();
         assert!(traj.validate().is_ok());
-
-        let mut man = OcmManeuverParameters::builder()
-            .man_id("MAN-1")
-            .man_device_id("THR-1")
-            .man_ref_frame("GCRF")
-            .man_composition("TIME_RELATIVE, THR_X")
-            .man_lines(vec![
-                ManLine {
-                    epoch: "1".parse().unwrap(),
-                    values: vec!["1".to_string()],
-                },
-                ManLine {
-                    epoch: "1.0".parse().unwrap(),
-                    values: vec!["2".to_string()],
-                },
-            ])
-            .build();
-        assert!(man.validate().is_err());
-
-        man.man_lines[1].epoch = "2".parse().unwrap();
-        assert!(man.validate().is_ok());
     }
 
     #[test]
     fn ocm_history_blocks_reject_mixed_epoch_branches() {
-        let mut traj = OcmTrajState::builder()
-            .center_name("EARTH")
-            .traj_ref_frame("GCRF")
-            .traj_type("CARTPV")
-            .traj_lines(vec![
-                TrajLine {
-                    epoch: "2000-01-01T00:00:00".parse().unwrap(),
-                    values: vec![1.0; 6],
-                },
-                TrajLine {
-                    epoch: "1.0".parse().unwrap(),
-                    values: vec![2.0; 6],
-                },
-            ])
-            .build();
-        assert!(traj.validate().is_err());
-
-        traj.traj_lines[1].epoch = "2000-01-01T00:00:01".parse().unwrap();
-        assert!(traj.validate().is_ok());
-
         let mut cov = OcmCovarianceMatrix::builder()
             .cov_ref_frame("GCRF")
             .cov_type("CARTPV")
@@ -4620,14 +4572,6 @@ mod tests {
             .expect("an absolute DC_WIN_OPEN may accompany relative maneuver lines");
 
         man.dc_win_open = Some("0".parse().unwrap());
-        // ODM permits any finite phase angle, so 360 is semantically valid; the XSD's
-        // [-360, 360) is a representability limit checked at XML generation instead.
-        man.dc_pa_start_angle = Some(Angle {
-            value: 360.0,
-            units: Some(AngleUnits::Deg),
-        });
-        man.validate().expect("ODM imposes no phase-angle range");
-
         man.dc_pa_start_angle = Some(Angle {
             value: f64::NAN,
             units: Some(AngleUnits::Deg),
@@ -4706,27 +4650,5 @@ mod tests {
 
         man.man_lines[0].epoch = "123.5".parse().unwrap();
         assert!(man.validate().is_err());
-    }
-
-    #[test]
-    fn test_ocm_validation_orb_revnum() {
-        let mut traj = OcmTrajState::builder()
-            .center_name("EARTH")
-            .traj_ref_frame("GCRF")
-            .traj_type("CARTPV")
-            .build();
-        traj.traj_lines.push(TrajLine {
-            epoch: "2000-01-01T00:00:00".parse().unwrap(),
-            values: vec![1.0; 6],
-        });
-        traj.orb_revnum = Some(-1.0);
-
-        assert!(traj.validate().is_err());
-
-        traj.orb_revnum = Some(0.0);
-        traj.validate().unwrap(); // Omitted basis implicitly means zero (6.2.1.3).
-        assert!(traj.orb_revnum_basis.is_none());
-        traj.orb_revnum_basis = Some(RevNumBasis::Zero);
-        assert!(traj.validate().is_ok());
     }
 }

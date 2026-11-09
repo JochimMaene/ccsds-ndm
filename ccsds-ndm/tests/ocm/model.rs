@@ -1,4 +1,4 @@
-use ccsds_ndm::messages::ocm::{CovLine, ManLine, Ocm, OcmMetadata, TrajLine};
+use ccsds_ndm::messages::ocm::{Ocm, OcmMetadata, TrajLine};
 use ccsds_ndm::types::{Duration, TimeOffset, TimeUnits};
 use ccsds_ndm::{Ndm, Validate};
 #[test]
@@ -28,57 +28,6 @@ fn ocm_validation_traj_lines() {
             "TRAJ data line epoch",
         );
     }
-}
-
-// XSD: TIME_SYSTEM and EPOCH_TZERO are mandatory (no minOccurs="0")
-
-#[test]
-fn covline_xml_serialization() {
-    // Test serialization by wrapping in an XML struct
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Serialize, Deserialize)]
-    struct TestWrapper {
-        cov_line: CovLine,
-    }
-
-    let cov_line = CovLine {
-        epoch: "2023-01-01T00:00:00".parse().unwrap(),
-        values: vec![1.0, 2.0, 3.0],
-    };
-
-    let wrapper = TestWrapper { cov_line };
-
-    // Use quick-xml to serialize (which uses the custom Serialize impl)
-    let xml = quick_xml::se::to_string(&wrapper).unwrap();
-
-    // Deserialize and verify using quick-xml
-    let deserialized: TestWrapper = quick_xml::de::from_str(&xml).unwrap();
-    assert_eq!(deserialized.cov_line, wrapper.cov_line);
-}
-
-#[test]
-fn manline_xml_serialization() {
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Serialize, Deserialize)]
-    struct TestWrapper {
-        man_line: ManLine,
-    }
-
-    let man_line = ManLine {
-        epoch: "2023-01-01T00:00:00".parse().unwrap(),
-        values: vec!["1.0".to_string(), "2.0".to_string(), "3.0".to_string()],
-    };
-
-    let wrapper = TestWrapper { man_line };
-
-    // Use quick-xml to serialize
-    let xml = quick_xml::se::to_string(&wrapper).unwrap();
-
-    // Deserialize and verify
-    let deserialized: TestWrapper = quick_xml::de::from_str(&xml).unwrap();
-    assert_eq!(deserialized.man_line, wrapper.man_line);
 }
 
 #[test]

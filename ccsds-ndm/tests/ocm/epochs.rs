@@ -430,21 +430,12 @@ fn sclk_defaults_omitted_reference_parameters_on_kvn_and_xml_paths() {
     let parsed = Ocm::from_xml(&invalid_xml).unwrap();
     assert!(parsed.body.segment.metadata.sclk_offset_at_epoch.is_none());
 
-    let invalid_kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = SCLK
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
-CENTER_NAME = EARTH
-TRAJ_REF_FRAME = GCRF
-TRAJ_TYPE = CARTPV
-0.0 1 2 3 4 5 6
-TRAJ_STOP
-"#;
-    let parsed = Ocm::from_kvn(invalid_kvn).unwrap();
+    let invalid_kvn = mutated(
+        &mutated(crate::minimal::KVN, "UTC", "SCLK"),
+        "2023-01-01T00:00:00 1",
+        "0.0 1",
+    );
+    let parsed = Ocm::from_kvn(&invalid_kvn).unwrap();
     assert!(parsed.body.segment.metadata.sclk_sec_per_si_sec.is_none());
 
     let valid_xml = mutated(&invalid_xml, "</EPOCH_TZERO>",
@@ -452,7 +443,7 @@ TRAJ_STOP
     );
     assert!(Ocm::from_xml(&valid_xml).is_ok());
 
-    let valid_kvn = mutated(invalid_kvn, "EPOCH_TZERO = 2023-01-01T00:00:00\n",
+    let valid_kvn = mutated(&invalid_kvn, "EPOCH_TZERO = 2023-01-01T00:00:00\n",
         "EPOCH_TZERO = 2023-01-01T00:00:00\nSCLK_OFFSET_AT_EPOCH = 0 [s]\nSCLK_SEC_PER_SI_SEC = 1 [s]\n",
     );
     assert!(Ocm::from_kvn(&valid_kvn).is_ok());

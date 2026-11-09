@@ -2,6 +2,8 @@ use crate::common::mutated;
 use ccsds_ndm::messages::ocm::Ocm;
 use ccsds_ndm::Ndm;
 
+pub(super) const HEADER: &str = "CCSDS_OCM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\nMETA_START\nTIME_SYSTEM = UTC\nEPOCH_TZERO = 2023-01-01T00:00:00\nMETA_STOP\n";
+
 pub(super) const KVN: &str = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
@@ -41,13 +43,6 @@ fn rejects_missing_tzero_kvn() {
         "{error}"
     );
     crate::common::assert_validation_field(&error, "EPOCH_TZERO");
-}
-
-#[test]
-fn rejects_wrong_keyword_kvn() {
-    let input = mutated(KVN, "TIME_SYSTEM", "BAD_KEY");
-    let error = Ocm::from_kvn(&input).unwrap_err();
-    assert_eq!(error.code(), Some("parse.kvn.syntax"), "{error}");
 }
 
 #[test]

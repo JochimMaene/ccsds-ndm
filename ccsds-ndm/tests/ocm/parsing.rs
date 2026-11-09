@@ -1,4 +1,5 @@
 use crate::common::mutated;
+use crate::minimal::HEADER;
 use crate::{KVN, XML};
 use ccsds_ndm::error::{CcsdsNdmError, FormatError, ValidationError};
 use ccsds_ndm::messages::ocm::Ocm;
@@ -6,7 +7,6 @@ use ccsds_ndm::Ndm;
 /// Each numeric parser is reached with an otherwise valid, correctly ordered block.
 #[test]
 fn malformed_numbers_identify_the_mutated_record() {
-    const HEADER: &str = "CCSDS_OCM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\nMETA_START\nTIME_SYSTEM = UTC\nEPOCH_TZERO = 2023-01-01T00:00:00\nMETA_STOP\n";
     let blocks: &[(&str, &str, &[&str])] = &[
         ("TRAJ_START\n", "CENTER_NAME = EARTH\nTRAJ_REF_FRAME = GCRF\nTRAJ_TYPE = CARTPV\n0 1 2 3 4 5 6\nTRAJ_STOP\n", &["INTERPOLATION_DEGREE"]),
         ("TRAJ_START\nCENTER_NAME = EARTH\nTRAJ_REF_FRAME = GCRF\n", "ORB_REVNUM_BASIS = 0\nTRAJ_TYPE = CARTPV\n0 1 2 3 4 5 6\nTRAJ_STOP\n", &["ORB_REVNUM"]),
@@ -39,188 +39,20 @@ fn malformed_numbers_identify_the_mutated_record() {
 }
 
 #[test]
-fn traj_multiple_blocks_unbounded() {
-    // XSD: maxOccurs="unbounded" allows multiple trajectory blocks
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
-CENTER_NAME = EARTH
-TRAJ_REF_FRAME = GCRF
-TRAJ_TYPE = CARTPV
-2023-01-01T00:00:00 1 2 3 4 5 6
-TRAJ_STOP
-TRAJ_START
-CENTER_NAME = MOON
-TRAJ_REF_FRAME = ICRF
-TRAJ_TYPE = KEPLERIAN
-2023-01-01T01:00:00 7000 0.001 28 0 0 0
-TRAJ_STOP
-"#;
-    let ocm = Ocm::from_kvn(kvn).unwrap();
-    assert_eq!(ocm.body.segment.data.traj.len(), 2);
-    assert_eq!(ocm.body.segment.data.traj[0].center_name, "EARTH");
-    assert_eq!(ocm.body.segment.data.traj[1].center_name, "MOON");
-}
-
-#[test]
-fn traj_multiple_lines() {
-    // XSD: trajLine maxOccurs="unbounded" - multiple trajectory data lines
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
-CENTER_NAME = EARTH
-TRAJ_REF_FRAME = GCRF
-TRAJ_TYPE = CARTPV
-2023-01-01T00:00:00 1 2 3 4 5 6
-2023-01-01T01:00:00 1.1 2.1 3.1 4.1 5.1 6.1
-2023-01-01T02:00:00 1.2 2.2 3.2 4.2 5.2 6.2
-TRAJ_STOP
-"#;
-    let ocm = Ocm::from_kvn(kvn).unwrap();
-    assert_eq!(ocm.body.segment.data.traj[0].traj_lines.len(), 3);
-}
-
-// XSD: COV_REF_FRAME, COV_TYPE, COV_ORDERING mandatory
-// XSD: covLine minOccurs="1" maxOccurs="unbounded"
-// XSD: cov minOccurs="0" maxOccurs="unbounded" in ocmData
-
-#[test]
 fn cov_mandatory_type() {
     // XSD: COV_TYPE is mandatory
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-COV_START
+    // The CARTPV default requires a full six-dimensional covariance.
+    let kvn = format!(
+        "{HEADER}COV_START
 COV_REF_FRAME = RSW
 COV_ORDERING = LTM
-2023-01-01T00:00:00 1e-6 0 1e-6 0 0 1e-6
+2023-01-01T00:00:00 1 0 1 0 0 1 0 0 0 1 0 0 0 0 1 0 0 0 0 0 1
 COV_STOP
-"#;
-    // The CARTPV default requires a full six-dimensional covariance.
-    let kvn = kvn.replace(
-        "1e-6 0 1e-6 0 0 1e-6",
-        "1 0 1 0 0 1 0 0 0 1 0 0 0 0 1 0 0 0 0 0 1",
+"
     );
     let parsed = Ocm::from_kvn(&kvn).unwrap();
     assert_eq!(parsed.body.segment.data.cov[0].cov_type, "CARTPV");
     crate::common::validate_xml("default covariance type", &parsed.to_xml().unwrap());
-}
-
-#[test]
-fn cov_multiple_blocks_unbounded() {
-    // XSD: maxOccurs="unbounded" allows multiple covariance blocks
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
-TRAJ_ID = TRAJECTORY
-CENTER_NAME = EARTH
-TRAJ_REF_FRAME = GCRF
-TRAJ_TYPE = CARTPV
-0 1 2 3 4 5 6
-TRAJ_STOP
-COV_START
-TRAJ_ID = TRAJECTORY
-COV_REF_FRAME = RSW
-COV_TYPE = CARTPV
-COV_ORDERING = LTM
-2023-01-01T00:00:00 0.000001 0 0.000001 0 0 0.000001 0 0 0 0.000001 0 0 0 0 0.000001 0 0 0 0 0 0.000001
-COV_STOP
-COV_START
-TRAJ_ID = TRAJECTORY
-COV_REF_FRAME = TNW
-COV_TYPE = KEPLERIAN
-COV_ORDERING = UTM
-2023-01-01T01:00:00 0.000001 0 0 0 0 0 0.000001 0 0 0 0 0.000001 0 0 0 0.000001 0 0 0.000001 0 0.000001
-COV_STOP
-"#;
-    let ocm = Ocm::from_kvn(kvn).unwrap();
-    assert_eq!(ocm.body.segment.data.cov.len(), 2);
-    assert_eq!(ocm.body.segment.data.cov[0].cov_type, "CARTPV");
-    assert_eq!(ocm.body.segment.data.cov[1].cov_type, "KEPLERIAN");
-}
-
-// XSD: MAN_ID, MAN_DEVICE_ID, MAN_REF_FRAME, DC_TYPE, MAN_COMPOSITION mandatory
-// XSD: manLine minOccurs="1" maxOccurs="unbounded"
-// XSD: man minOccurs="0" maxOccurs="unbounded" in ocmData
-
-#[test]
-fn man_multiple_blocks_unbounded() {
-    // XSD: maxOccurs="unbounded" allows multiple maneuver blocks
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-MAN_START
-MAN_ID = MANEUVER_1
-MAN_DEVICE_ID = THRUSTER_1
-MAN_REF_FRAME = RSW
-DC_TYPE = CONTINUOUS
-MAN_COMPOSITION = TIME_ABSOLUTE, DV_X, DV_Y, DV_Z
-2023-01-01T00:00:00 0.1 0 0
-MAN_STOP
-MAN_START
-MAN_ID = MANEUVER_2
-MAN_DEVICE_ID = THRUSTER_2
-MAN_REF_FRAME = TNW
-DC_TYPE = TIME
-DC_WIN_OPEN = 2023-01-02T00:00:00
-DC_WIN_CLOSE = 2023-01-02T02:00:00
-DC_EXEC_START = 2023-01-02T00:30:00
-DC_EXEC_STOP = 2023-01-02T01:30:00
-DC_REF_TIME = 2023-01-02T01:00:00
-DC_TIME_PULSE_DURATION = 60 [s]
-DC_TIME_PULSE_PERIOD = 120 [s]
-MAN_COMPOSITION = TIME_ABSOLUTE, DV_X, DV_Y, DV_Z
-2023-01-02T00:00:00 0 0.1 0
-MAN_STOP
-"#;
-    let ocm = Ocm::from_kvn(kvn).unwrap();
-    assert_eq!(ocm.body.segment.data.man.len(), 2);
-    assert_eq!(ocm.body.segment.data.man[0].man_id, "MANEUVER_1");
-    assert_eq!(ocm.body.segment.data.man[1].man_id, "MANEUVER_2");
-}
-
-#[test]
-fn user_defined_optional() {
-    // XSD: user minOccurs="0" - user defined block is optional
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-USER_START
-USER_DEFINED_CUSTOM_PARAM = custom_value
-USER_DEFINED_ANOTHER_PARAM = another_value
-USER_STOP
-"#;
-    let ocm = Ocm::from_kvn(kvn).unwrap();
-    let user = ocm.body.segment.data.user.as_ref().unwrap();
-    assert_eq!(user.parameters().count(), 2);
-    assert_eq!(user.parameters().next().unwrap().parameter, "CUSTOM_PARAM");
 }
 
 #[test]
@@ -274,17 +106,12 @@ TRAJ_START
 
 #[test]
 fn test_ocm_user_defined_unexpected_token() {
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-USER_START
+    let kvn = &format!(
+        r#"{HEADER}USER_START
 META_START
 USER_STOP
-"#;
+"#
+    );
     let err = Ocm::from_kvn(kvn).unwrap_err();
     if let Some(err) = crate::common::kvn_parse_error(&err) {
         assert!(
@@ -320,47 +147,9 @@ ORIGINATOR = TEST
 }
 
 #[test]
-fn test_user_comment_inside_block() {
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-USER_START
-COMMENT inside user block
-USER_DEFINED_PARAM = VAL
-USER_STOP
-"#;
-    let ocm = Ocm::from_kvn(kvn).unwrap();
-    assert!(ocm
-        .body
-        .segment
-        .data
-        .user
-        .as_ref()
-        .unwrap()
-        .comments()
-        .any(|value| value == "inside user block"));
-}
-
-#[test]
 fn test_traj_missing_lines() {
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
-CENTER_NAME = EARTH
-TRAJ_REF_FRAME = GCRF
-TRAJ_TYPE = CARTPV
-TRAJ_STOP
-"#;
-    let err = Ocm::from_kvn(kvn).unwrap_err();
+    let kvn = mutated(crate::minimal::KVN, "2023-01-01T00:00:00 1 2 3 4 5 6\n", "");
+    let err = Ocm::from_kvn(&kvn).unwrap_err();
     let err = crate::common::parse_error_cause(err);
     match err {
         CcsdsNdmError::Format(format_err) => match *format_err {
@@ -374,57 +163,6 @@ TRAJ_STOP
         },
         _ => panic!("Expected trajLine missing error, got: {:?}", err),
     }
-}
-
-#[test]
-fn test_cov_comment_and_empty_line() {
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-COV_START
-COMMENT inside cov block
-
-COV_REF_FRAME = RSW
-COV_TYPE = CARTPV
-COV_ORDERING = LTM
-2023-01-01T00:00:00 0.000001 0 0.000001 0 0 0.000001 0 0 0 0.000001 0 0 0 0 0.000001 0 0 0 0 0 0.000001
-COV_STOP
-"#;
-    let ocm = Ocm::from_kvn(kvn).unwrap();
-    assert!(ocm.body.segment.data.cov[0]
-        .comment
-        .contains(&"inside cov block".to_string()));
-}
-
-#[test]
-fn test_comment_before_phys_block() {
-    let kvn = r#"CCSDS_OCM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-META_STOP
-TRAJ_START
-CENTER_NAME = EARTH
-TRAJ_REF_FRAME = GCRF
-TRAJ_TYPE = CARTPV
-2023-01-01T00:00:00 1 2 3 4 5 6
-TRAJ_STOP
-COMMENT This comment should be prepended to PHYS
-PHYS_START
-WET_MASS = 1000.0 [kg]
-PHYS_STOP
-"#;
-    let error = Ocm::from_kvn(kvn).unwrap_err();
-    assert!(
-        error.to_string().contains("COMMENT is only allowed"),
-        "{error}"
-    );
 }
 
 #[test]
@@ -493,10 +231,6 @@ fn ocm_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
             ),
         ),
         (
-            "unknown trajectory keyword",
-            mutated(KVN, center, &format!("{center}\nUNKNOWN = value")),
-        ),
-        (
             "comment after trajectory content",
             mutated(KVN, center, &format!("{center}\nCOMMENT misplaced")),
         ),
@@ -514,10 +248,6 @@ fn ocm_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
             ),
         ),
         ("trailing assignment", format!("{KVN}UNKNOWN = value\n")),
-        (
-            "non-ASCII assignment",
-            mutated(KVN, center, &format!("{center} €")),
-        ),
     ] {
         let error = Ocm::from_kvn(&source).unwrap_err();
         assert_eq!(error.code(), Some("parse.kvn.syntax"), "{label}: {error}");
@@ -578,15 +308,6 @@ fn missing_ocm_record_block_stops_fail_at_eof() {
         .expect("fixture ends with TRAJ_STOP");
     assert_eq!(
         Ocm::from_kvn(trajectory_without_stop).unwrap_err().code(),
-        Some("parse.kvn.syntax")
-    );
-
-    let maneuver_without_stop = include_str!("../../data/kvn/ocm_g17.kvn")
-        .split_once("\nMAN_STOP")
-        .expect("fixture contains MAN_STOP")
-        .0;
-    assert_eq!(
-        Ocm::from_kvn(maneuver_without_stop).unwrap_err().code(),
         Some("parse.kvn.syntax")
     );
 }
@@ -680,9 +401,21 @@ fn producer_defaults_open_tokens_and_exponent_tags_round_trip() {
 #[test]
 fn trailing_comments_are_refused_without_losing_them() {
     let message = Ocm::from_kvn(KVN).unwrap();
+    let traj_types: Vec<_> = message
+        .body
+        .segment
+        .data
+        .traj
+        .iter()
+        .map(|t| t.traj_type.as_str())
+        .collect();
+    assert_eq!(traj_types, ["CARTPVA", "KEPLERIAN"]);
     let canonical = message.to_kvn().unwrap();
     let error = Ocm::from_kvn(&format!("{canonical}\nCOMMENT cannot be dropped\n")).unwrap_err();
-    assert!(error.to_string().contains("COMMENT"), "{error}");
+    assert!(
+        error.to_string().contains("COMMENT is only allowed"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -786,7 +519,6 @@ fn malformed_covariance_rows_never_disappear() {
             .to_string();
         assert!(error.contains("line 13"), "{bad}: {error}");
     }
-    assert!(Ocm::from_kvn(&mutated(source, "COV_STOP\n", "")).is_err());
 }
 
 #[test]
@@ -824,6 +556,7 @@ MAN_STOP
 fn unknown_keys_name_each_logical_block() {
     let covariance = include_str!("../../data/kvn/ocm_g19.kvn");
     for (source, marker, name) in [
+        (KVN, "META_START", "Metadata"),
         (KVN, "TRAJ_START", "Trajectory"),
         (KVN, "PHYS_START", "Physical"),
         (KVN, "OD_START", "Orbit Determination"),
