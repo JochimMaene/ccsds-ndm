@@ -1,9 +1,7 @@
 use crate::common::mutated;
+use crate::{KVN as RDM_KVN, XML as RDM_XML};
 use ccsds_ndm::messages::rdm::Rdm;
 use ccsds_ndm::Ndm;
-
-const RDM_KVN: &str = include_str!("../../data/kvn/rdm_c2.kvn");
-const RDM_XML: &str = include_str!("../../data/xml/rdm_c4.xml");
 
 #[test]
 fn rdm_epoch_fields_require_calendar_or_ordinal_form() {

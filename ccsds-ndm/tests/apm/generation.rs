@@ -166,6 +166,15 @@ fn apm_kvn_output_omits_metadata_delimiters_and_keeps_quaternion_rate_units() {
         "QC = 0.5\nQ1_DOT = 0.01 [1/s]\nQ2_DOT = 0.02 [1/s]\nQ3_DOT = 0.03 [1/s]\nQC_DOT = 0.04 [1/s]\n",
     );
     let message = Apm::from_kvn(&input).unwrap();
+    assert_eq!(message.version, "2.0");
+    assert_eq!(
+        message.body.segment.metadata.object_name,
+        "MARS GLOBAL SURVEYOR"
+    );
+    assert_eq!(
+        message.body.segment.data.quaternion_state[0].quaternion.q1,
+        0.5
+    );
     let output = message.to_kvn().unwrap();
     assert!(!output.contains("META_"), "{output}");
     for key in ["Q1_DOT", "Q2_DOT", "Q3_DOT", "QC_DOT"] {

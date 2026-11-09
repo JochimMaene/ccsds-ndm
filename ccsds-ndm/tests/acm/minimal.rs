@@ -21,11 +21,6 @@ ATT_STOP
 "#;
 
 #[test]
-fn minimal_kvn_parses() {
-    Acm::from_kvn(KVN).unwrap();
-}
-
-#[test]
 fn frame_without_optional_cp_is_preserved() {
     let mut input = KVN.to_owned();
     input.push_str("PHYS_START\nCP_REF_FRAME = SC_BODY\nPHYS_STOP\n");

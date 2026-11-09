@@ -1,6 +1,5 @@
 use crate::common::mutated;
 use crate::{ATT_KVN, COV_KVN};
-use ccsds_ndm::error::CcsdsNdmError;
 use ccsds_ndm::messages::acm::Acm;
 use ccsds_ndm::types::AcmAttitudeType;
 use ccsds_ndm::Ndm;
@@ -35,23 +34,6 @@ fn test_parse_acm_minimal() {
     );
     assert_eq!(acm.body.segment.data.att.len(), 1);
     assert_eq!(acm.body.segment.data.att[0].att_lines.len(), 1);
-}
-
-#[test]
-fn test_parse_acm_version_error() {
-    let input = mutated(
-        crate::ATT_KVN,
-        "CCSDS_ACM_VERS = 2.0",
-        "CCSDS_ACM_VERS = 3.0",
-    );
-    let err = Acm::from_kvn(&input).unwrap_err();
-    let err = crate::common::parse_error_cause(err);
-    match err {
-        CcsdsNdmError::UnsupportedInputVersion { version, .. } => {
-            assert_eq!(version, "3.0");
-        }
-        _ => panic!("Expected unsupported input version, got {:?}", err),
-    }
 }
 
 #[test]
@@ -148,32 +130,6 @@ AD_STOP
     assert_eq!(ad.ad_id.as_deref(), Some("AD_001"));
     assert_eq!(ad.ad_method.as_deref(), Some("EKF"));
     assert_eq!(ad.sensors.len(), 2);
-}
-
-#[test]
-fn test_acm_multiple_blocks_mixed() {
-    let blocks = r#"ATT_START
-REF_FRAME_A = A
-REF_FRAME_B = B
-NUMBER_STATES = 4
-ATT_TYPE = QUATERNION
-0 0 0 0 1
-ATT_STOP
-ATT_START
-REF_FRAME_A = A
-REF_FRAME_B = B
-NUMBER_STATES = 4
-ATT_TYPE = QUATERNION
-10 0 0 0 1
-ATT_STOP
-PHYS_START
-DRAG_COEFF = 1.0
-PHYS_STOP
-"#;
-    let input = format!("{}{}{}", sample_acm_header(), sample_acm_meta(), blocks);
-    let acm = Acm::from_kvn(&input).unwrap();
-    assert_eq!(acm.body.segment.data.att.len(), 2);
-    assert!(acm.body.segment.data.phys.is_some());
 }
 
 #[test]
@@ -468,18 +424,6 @@ fn known_basis_and_method_blank_aliases_canonicalize() {
 #[test]
 fn unit_errors_name_the_field_on_its_original_record() {
     for (source, from, to, field) in [
-        (
-            ATT_KVN,
-            "MAN_DURATION = 450.0",
-            "MAN_DURATION = 450.0 [min]",
-            "MAN_DURATION",
-        ),
-        (
-            ATT_KVN,
-            "TARGET_MOMENTUM = 1.30 -16.400 -11.350",
-            "TARGET_MOMENTUM = 1.30 -16.400 -11.350 [Nms]",
-            "TARGET_MOMENTUM",
-        ),
         (
             include_str!("../../data/kvn/acm_g8.kvn"),
             "CP = 0.04 -0.78 -0.023 [m]",

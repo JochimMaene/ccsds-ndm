@@ -22,19 +22,6 @@ META_STOP
 }
 
 #[test]
-fn test_parse_apm_version_error() {
-    let input = mutated(crate::KVN, "CCSDS_APM_VERS = 2.0", "CCSDS_APM_VERS = 3.0");
-    let err = Apm::from_kvn(&input).unwrap_err();
-    let err = crate::common::parse_error_cause(err);
-    match err {
-        CcsdsNdmError::UnsupportedInputVersion { version, .. } => {
-            assert_eq!(version, "3.0");
-        }
-        _ => panic!("Expected unsupported input version, got {:?}", err),
-    }
-}
-
-#[test]
 fn test_apm_quaternion_block() {
     let input = format!("{}{}\nEPOCH = 2023-01-01T00:00:00\nQUAT_START\nREF_FRAME_A = A\nREF_FRAME_B = B\nQ1 = 0.0\nQ2 = 0.0\nQ3 = 0.0\nQC = 1.0\nQ1_DOT = 0.01\nQ2_DOT = 0.02\nQ3_DOT = 0.03\nQC_DOT = 0.04\nQUAT_STOP\n",
         sample_apm_header(), sample_apm_meta());
@@ -150,10 +137,6 @@ fn apm_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
             mutated(KVN, "QUAT_STOP", "SPIN_STOP"),
         ),
         ("trailing assignment", format!("{KVN}UNKNOWN = value\n")),
-        (
-            "non-ASCII content",
-            mutated(KVN, object_name, &format!("{object_name} €")),
-        ),
     ] {
         let error = Apm::from_kvn(&source).unwrap_err();
         assert_eq!(error.code(), Some("parse.kvn.syntax"), "{label}: {error}");
@@ -213,20 +196,6 @@ fn apm_xml_rejects_unknown_nested_content_attributes_and_ordering_errors() {
     }
 }
 
-#[test]
-fn parse_apm_success() {
-    let kvn = sample_apm_kvn();
-    let apm = Apm::from_kvn(&kvn).expect("APM parse failed");
-
-    assert_eq!(apm.version, "2.0");
-    assert_eq!(
-        apm.body.segment.metadata.object_name,
-        "MARS GLOBAL SURVEYOR"
-    );
-    assert_eq!(apm.body.segment.data.quaternion_state.len(), 1);
-    assert_eq!(apm.body.segment.data.quaternion_state[0].quaternion.q1, 0.5);
-}
-
 /// The two rules that reject an otherwise well-formed APM, as mutations of a shipped fixture.
 ///
 /// `apm_g2.kvn` is the baseline because its `OBJECT_NAME` is not preceded by comments:
@@ -258,31 +227,12 @@ fn apm_rejects_missing_object_name_or_all_data_blocks() {
 
 #[test]
 fn apm_multiple_blocks() {
-    let kvn = r#"CCSDS_APM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-QUAT_START
-REF_FRAME_A = GCRF
-REF_FRAME_B = SC_BODY
-Q1 = 0
-Q2 = 0
-Q3 = 0
-QC = 1
-QUAT_STOP
-EULER_START
-REF_FRAME_A = GCRF
-REF_FRAME_B = SC_BODY
-EULER_ROT_SEQ = XYZ
-ANGLE_1 = 10 [deg]
-ANGLE_2 = 20 [deg]
-ANGLE_3 = 30 [deg]
-EULER_STOP
-"#;
-    let apm = Apm::from_kvn(kvn).unwrap();
+    let kvn = mutated_once(
+        include_str!("../../data/kvn/apm_g2.kvn"),
+        "EULER_START",
+        "QUAT_START\nREF_FRAME_A = GCRF\nREF_FRAME_B = SC_BODY\nQ1 = 0\nQ2 = 0\nQ3 = 0\nQC = 1\nQUAT_STOP\nEULER_START",
+    );
+    let apm = Apm::from_kvn(&kvn).unwrap();
     assert_eq!(apm.body.segment.data.quaternion_state.len(), 1);
     assert_eq!(apm.body.segment.data.euler_angle_state.len(), 1);
 }

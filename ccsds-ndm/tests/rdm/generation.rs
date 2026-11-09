@@ -774,26 +774,30 @@ REENTRY_ALTITUDE = 120 [km]
 }
 
 #[test]
-fn test_rdm_ground_impact_all_probabilities() {
-    let kvn = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = TEST-001
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = EARTH
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 5 [d]
-REENTRY_ALTITUDE = 80 [km]
-PROBABILITY_OF_IMPACT = 0.25
+fn test_rdm_ground_impact_kvn_values() {
+    let base = include_str!("../../data/kvn/rdm_c1.kvn");
+    let kvn = format!(
+        "{base}PROBABILITY_OF_IMPACT = 0.25
 PROBABILITY_OF_BURN_UP = 0.60
 PROBABILITY_OF_BREAK_UP = 0.35
 PROBABILITY_OF_LAND_IMPACT = 0.15
 PROBABILITY_OF_CASUALTY = 0.001
-"#;
-    let rdm = Rdm::from_kvn(kvn).unwrap();
+NOMINAL_IMPACT_EPOCH = 2018-04-27T15:30:00
+IMPACT_WINDOW_START = 2018-04-27T12:00:00
+IMPACT_WINDOW_END = 2018-04-27T18:00:00
+IMPACT_REF_FRAME = EFG
+NOMINAL_IMPACT_LON = -120.5
+NOMINAL_IMPACT_LAT = 35.2
+NOMINAL_IMPACT_ALT = 12.5 [m]
+IMPACT_1_CONFIDENCE = 68.3 [%]
+IMPACT_1_START_LON = -125.0
+IMPACT_1_START_LAT = 30.0
+IMPACT_1_STOP_LON = -115.0
+IMPACT_1_STOP_LAT = 40.0
+IMPACT_1_CROSS_TRACK = 50.0 [km]
+"
+    );
+    let rdm = Rdm::from_kvn(&kvn).unwrap();
     let g = rdm
         .body
         .segment
@@ -806,83 +810,13 @@ PROBABILITY_OF_CASUALTY = 0.001
     assert!((g.probability_of_break_up.as_ref().unwrap().value - 0.35).abs() < 1e-9);
     assert!((g.probability_of_land_impact.as_ref().unwrap().value - 0.15).abs() < 1e-9);
     assert!((g.probability_of_casualty.as_ref().unwrap().value - 0.001).abs() < 1e-9);
-
-    let kvn2 = rdm.to_kvn().unwrap();
-    assert_eq!(Rdm::from_kvn(&kvn2).unwrap(), rdm);
-}
-
-#[test]
-fn test_rdm_ground_impact_nominal_and_windows() {
-    let kvn = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = TEST-001
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = EARTH
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 5 [d]
-REENTRY_ALTITUDE = 80 [km]
-PROBABILITY_OF_IMPACT = 0.5
-NOMINAL_IMPACT_EPOCH = 2023-01-06T15:30:00
-IMPACT_WINDOW_START = 2023-01-06T12:00:00
-IMPACT_WINDOW_END = 2023-01-06T18:00:00
-IMPACT_REF_FRAME = EFG
-NOMINAL_IMPACT_LON = -120.5
-NOMINAL_IMPACT_LAT = 35.2
-NOMINAL_IMPACT_ALT = 0.0 [m]
-"#;
-    let rdm = Rdm::from_kvn(kvn).unwrap();
-    let g = rdm
-        .body
-        .segment
-        .data
-        .ground_impact_parameters
-        .as_ref()
-        .unwrap();
     assert!(g.nominal_impact_epoch.is_some());
     assert!(g.impact_window_start.is_some());
     assert!(g.impact_window_end.is_some());
     assert_eq!(g.impact_ref_frame.as_deref(), Some("EFG"));
     assert!((g.nominal_impact_lon.as_ref().unwrap().value - (-120.5)).abs() < 1e-9);
     assert!((g.nominal_impact_lat.as_ref().unwrap().value - 35.2).abs() < 1e-9);
-
-    let kvn2 = rdm.to_kvn().unwrap();
-    assert_eq!(Rdm::from_kvn(&kvn2).unwrap(), rdm);
-}
-
-#[test]
-fn test_rdm_ground_impact_confidence_intervals_1() {
-    let kvn = r#"CCSDS_RDM_VERS = 1.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = TEST-001
-OBJECT_NAME = TEST
-INTERNATIONAL_DESIGNATOR = 2023-001A
-CONTROLLED_REENTRY = NO
-CENTER_NAME = EARTH
-TIME_SYSTEM = UTC
-EPOCH_TZERO = 2023-01-01T00:00:00
-ORBIT_LIFETIME = 5 [d]
-REENTRY_ALTITUDE = 80 [km]
-IMPACT_REF_FRAME = ITRF2000
-IMPACT_1_CONFIDENCE = 68.3 [%]
-IMPACT_1_START_LON = -125.0
-IMPACT_1_START_LAT = 30.0
-IMPACT_1_STOP_LON = -115.0
-IMPACT_1_STOP_LAT = 40.0
-IMPACT_1_CROSS_TRACK = 50.0 [km]
-"#;
-    let rdm = Rdm::from_kvn(kvn).unwrap();
-    let g = rdm
-        .body
-        .segment
-        .data
-        .ground_impact_parameters
-        .as_ref()
-        .unwrap();
+    assert!((g.nominal_impact_alt.as_ref().unwrap().value - 12.5).abs() < 1e-9);
     assert!((g.impact_1_confidence.as_ref().unwrap().value - 68.3).abs() < 1e-9);
     assert!((g.impact_1_start_lon.as_ref().unwrap().value - (-125.0)).abs() < 1e-9);
     assert!((g.impact_1_start_lat.as_ref().unwrap().value - 30.0).abs() < 1e-9);

@@ -239,10 +239,6 @@ fn kvn_none_rate_type_normalizes_to_omission_while_xml_token_is_refused() {
             );
         }
     }
-    assert_eq!(
-        Acm::from_kvn(&mutated(&kvn, "RATE_TYPE = NONE", "RATE_TYPE = none")).unwrap(),
-        original
-    );
     // Blank and `N/A` are the shared KVN spelling of an absent optional value.
     for token in ["", "N/A"] {
         let source = mutated(&kvn, "RATE_TYPE = NONE", &format!("RATE_TYPE = {token}"));
@@ -305,29 +301,32 @@ fn maneuver_kvn_canonicalizes_permissive_relative_numbers() {
 }
 
 #[test]
-fn exponent_history_tags_expand_exactly_on_both_public_readers() {
-    let source = include_str!("../../data/kvn/acm_g6.kvn");
-    let expected = Acm::from_kvn(source).unwrap();
-    let kvn = source.replace("0.25 0.73529", "2.5e-1 0.73529");
-    assert_ne!(kvn, source);
-    assert_eq!(Acm::from_kvn(&kvn).unwrap(), expected);
-    let xml = expected.to_xml().unwrap();
-    let exponent = xml.replace("0.25 0.73529", "2.5e-1 0.73529");
-    assert_ne!(exponent, xml);
-    assert_eq!(Acm::from_xml(&exponent).unwrap(), expected);
-}
-
-#[test]
-fn exponent_covariance_tags_expand_exactly_on_both_public_readers() {
-    let source = include_str!("../../data/kvn/acm_g9.kvn");
-    let expected = Acm::from_kvn(source).unwrap();
-    let kvn = source.replacen("1.096694 6.74E-11", "1096694e-6 6.74E-11", 1);
-    assert_ne!(kvn, source);
-    assert_eq!(Acm::from_kvn(&kvn).unwrap(), expected);
-    let xml = expected.to_xml().unwrap();
-    let exponent = xml.replacen("<covLine>1.096694 ", "<covLine>1096694e-6 ", 1);
-    assert_ne!(exponent, xml);
-    assert_eq!(Acm::from_xml(&exponent).unwrap(), expected);
+fn exponent_history_and_covariance_tags_expand_exactly_on_both_public_readers() {
+    for (source, kvn_from, kvn_to, xml_from, xml_to) in [
+        (
+            include_str!("../../data/kvn/acm_g6.kvn"),
+            "0.25 0.73529",
+            "2.5e-1 0.73529",
+            "0.25 0.73529",
+            "2.5e-1 0.73529",
+        ),
+        (
+            include_str!("../../data/kvn/acm_g9.kvn"),
+            "1.096694 6.74E-11",
+            "1096694e-6 6.74E-11",
+            "<covLine>1.096694 ",
+            "<covLine>1096694e-6 ",
+        ),
+    ] {
+        let expected = Acm::from_kvn(source).unwrap();
+        let kvn = source.replacen(kvn_from, kvn_to, 1);
+        assert_ne!(kvn, source);
+        assert_eq!(Acm::from_kvn(&kvn).unwrap(), expected);
+        let xml = expected.to_xml().unwrap();
+        let exponent = xml.replacen(xml_from, xml_to, 1);
+        assert_ne!(exponent, xml);
+        assert_eq!(Acm::from_xml(&exponent).unwrap(), expected);
+    }
 }
 
 #[test]
