@@ -520,13 +520,15 @@ fn unit_errors_name_the_field_on_its_original_record() {
 
 #[test]
 fn known_orekit_samples_with_missing_conditional_values_are_rejected() {
+    // Orekit ACMExample03 (CP without CP_REF_FRAME) and ACMExample09 (TARGET_MOMENTUM without
+    // TARGET_MOM_FRAME), reproduced on committed fixtures because data/ccsds/ is not in git.
     for (sample, field) in [
         (
-            include_str!("../../../data/ccsds/adm/acm/ACMExample03.txt"),
+            &include_str!("../../data/kvn/acm_g8.kvn").replace("CP_REF_FRAME = SC_BODY_1\n", ""),
             "CP_REF_FRAME",
         ),
         (
-            include_str!("../../../data/ccsds/adm/acm/ACMExample09.txt"),
+            &include_str!("../../data/kvn/acm_g7.kvn").replace("TARGET_MOM_FRAME = J2000\n", ""),
             "TARGET_MOM_FRAME",
         ),
         (
