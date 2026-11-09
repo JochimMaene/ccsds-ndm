@@ -8,24 +8,6 @@ fn epoch(value: &str) -> Epoch {
 }
 
 #[test]
-fn all_segments_must_describe_one_object_and_one_time_system() {
-    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
-    assert!(message.body.segment.len() > 1);
-    message.body.segment[1].metadata.time_system = "TAI".into();
-    assert_eq!(
-        message.validate().unwrap_err().field_path().as_deref(),
-        Some("body.segment[1].metadata.time_system")
-    );
-
-    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
-    message.body.segment[1].metadata.object_id = "DIFFERENT".into();
-    crate::common::assert_validation_field(
-        &message.validate().unwrap_err(),
-        "OBJECT_NAME/OBJECT_ID",
-    );
-}
-
-#[test]
 fn total_spans_may_overlap_when_useable_bounds_are_omitted() {
     // ODM 5.2.4.4 forbids overlap only between USEABLE_STOP_TIME and the next
     // USEABLE_START_TIME; STOP_TIME may exceed the next START_TIME.
@@ -98,6 +80,10 @@ fn oem_time_tags_are_absolute_and_metadata_ranges_are_consistent() {
     let error = message.validate().unwrap_err();
     assert_eq!(error.code(), Some("validation.invalid_value"));
     crate::common::assert_validation_field(&error, "START_TIME/STOP_TIME");
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[0].metadata.start_time")
+    );
 
     let mut message = Oem::from_xml(XML).unwrap();
     message.body.segment[0].metadata.useable_start_time = Some(epoch("2019-12-01T00:00:00"));
@@ -117,9 +103,11 @@ fn oem_time_tags_are_absolute_and_metadata_ranges_are_consistent() {
         &mut metadata.useable_start_time,
         &mut metadata.useable_stop_time,
     );
-    crate::common::assert_validation_field(
-        &message.validate().unwrap_err(),
-        "USEABLE_START_TIME/USEABLE_STOP_TIME",
+    let error = message.validate().unwrap_err();
+    crate::common::assert_validation_field(&error, "USEABLE_START_TIME/USEABLE_STOP_TIME");
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[0].metadata.useable_start_time")
     );
 }
 
@@ -186,10 +174,9 @@ fn covariance_time_tags_are_ordered_by_increasing_time() {
         .data
         .covariance_matrix
         .push(covariance);
-    let error = message.validate().unwrap_err();
-    crate::common::assert_validation_field(&error, "covarianceMatrix EPOCH");
+    crate::common::assert_rejects(&message, "covarianceMatrix EPOCH");
     assert_eq!(
-        error.field_path().as_deref(),
+        message.validate().unwrap_err().field_path().as_deref(),
         Some("body.segment[0].data.covariance_matrix[2].epoch")
     );
 }
@@ -236,49 +223,16 @@ fn elapsed_time_systems_use_three_digit_day_durations() {
 }
 
 #[test]
-fn kvn_values_listed_in_the_book_use_a_single_case() {
-    // ODM 7.5.3 is a KVN rule for normative values: those listed in 3.2.3.2, 3.2.3.3 and, for
-    // COV_REF_FRAME, 3.2.4.11. XML text follows xsd:string (8.13.5), which the schema leaves
-    // unrestricted here.
-    const COV: &str = "COV_REF_FRAME = EME2000";
-    for (from, to, field) in [
-        ("TIME_SYSTEM = UTC", "TIME_SYSTEM = Utc", "TIME_SYSTEM"),
-        ("REF_FRAME = EME2000", "REF_FRAME = Eme2000", "REF_FRAME"),
-        (COV, "COV_REF_FRAME = Eme2000", "COV_REF_FRAME"),
-        (COV, "COV_REF_FRAME = Rsw", "COV_REF_FRAME"),
-        (COV, "COV_REF_FRAME = Rtn", "COV_REF_FRAME"),
-        (COV, "COV_REF_FRAME = Tnw", "COV_REF_FRAME"),
-    ] {
-        let kvn = crate::common::mutated_once(KVN_FIXTURES[2], from, to);
-        crate::common::assert_validation_field(&Oem::from_kvn(&kvn).unwrap_err(), field);
-    }
-    for to in ["COV_REF_FRAME = rtn", "COV_REF_FRAME = TNW"] {
-        Oem::from_kvn(&crate::common::mutated_once(KVN_FIXTURES[2], COV, to)).unwrap();
-    }
-
-    // ICD-defined values and registry centers keep their spelling in KVN.
-    let custom = crate::common::mutated_once(
-        KVN_FIXTURES[0],
-        "REF_FRAME = EME2000",
-        "REF_FRAME = MissionFrame",
-    );
-    let custom = crate::common::mutated_once(
-        &custom,
-        "CENTER_NAME = MARS BARYCENTER",
-        "CENTER_NAME = Mars Barycenter",
-    );
-    Oem::from_kvn(&custom).unwrap();
-
-    // The same spellings are valid XML; only conversion to KVN refuses them.
-    let mut message = Oem::from_xml(XML).unwrap();
-    message.body.segment[0].metadata.time_system = "Utc".into();
-    message.body.segment[0].data.covariance_matrix[0].cov_ref_frame = Some("Icrf".into());
-    message.validate().unwrap();
-    let reparsed = Oem::from_xml(&message.to_xml().unwrap()).unwrap();
-    assert_eq!(reparsed, message);
-    crate::common::assert_validation_field(&message.to_kvn().unwrap_err(), "TIME_SYSTEM");
-    message.body.segment[0].metadata.time_system = "UTC".into();
-    crate::common::assert_validation_field(&message.to_kvn().unwrap_err(), "COV_REF_FRAME");
+fn mixed_case_text_values_are_preserved_in_every_notation() {
+    // ODM 7.5.3's single-case rule is not enforced: mixed case loses nothing, so it is accepted
+    // and preserved in every family and notation (validation contract, shared lexical decisions).
+    let kvn =
+        crate::common::mutated_once(KVN_FIXTURES[2], "TIME_SYSTEM = UTC", "TIME_SYSTEM = Utc");
+    let kvn = crate::common::mutated_once(&kvn, "COV_REF_FRAME = EME2000", "COV_REF_FRAME = Rtn");
+    let message = Oem::from_kvn(&kvn).unwrap();
+    assert_eq!(message.body.segment[0].metadata.time_system, "Utc");
+    assert_eq!(Oem::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+    assert_eq!(Oem::from_xml(&message.to_xml().unwrap()).unwrap(), message);
 }
 
 #[test]
@@ -400,29 +354,6 @@ fn metadata_errors_point_at_real_fields() {
     assert_eq!(
         path(message).unwrap(),
         format!("{prefix}.interpolation_degree")
-    );
-
-    let mut message = base();
-    let metadata = &mut message.body.segment[0].metadata;
-    std::mem::swap(&mut metadata.start_time, &mut metadata.stop_time);
-    assert_eq!(path(message).unwrap(), format!("{prefix}.start_time"));
-
-    let mut message = base();
-    let metadata = &mut message.body.segment[0].metadata;
-    std::mem::swap(
-        &mut metadata.useable_start_time,
-        &mut metadata.useable_stop_time,
-    );
-    assert_eq!(
-        path(message).unwrap(),
-        format!("{prefix}.useable_start_time")
-    );
-
-    let mut message = base();
-    message.body.segment[0].metadata.useable_stop_time = Some(epoch("2030-01-01T00:00:00"));
-    assert_eq!(
-        path(message).unwrap(),
-        format!("{prefix}.useable_stop_time")
     );
 
     let mut message = base();

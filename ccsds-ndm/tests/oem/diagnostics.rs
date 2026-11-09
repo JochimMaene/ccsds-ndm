@@ -11,48 +11,30 @@ fn kvn_syntax_diagnostics_are_located_and_machine_readable() {
         .lines()
         .find(|line| line.trim_start().starts_with("OBJECT_NAME"))
         .unwrap();
-    let input = mutated(
+    let source = mutated(
         KVN_FIXTURES[0],
         object_name,
         &format!("{object_name}\nUNKNOWN = value"),
     );
-    let error = Oem::from_kvn(&input).expect_err("unknown keyword should fail");
-    let diagnostic = error.diagnostic().expect("parse context should be present");
+    // A carriage-return-only file keeps the edition and excerpts one record.
+    for line_end in ["\n", "\r"] {
+        let input = source.replace('\n', line_end);
+        let error = Oem::from_kvn(&input).expect_err("unknown keyword should fail");
+        let diagnostic = error.diagnostic().expect("parse context should be present");
 
-    assert_eq!(diagnostic.operation, DiagnosticOperation::Parse);
-    assert_eq!(diagnostic.notation, DiagnosticNotation::Kvn);
-    assert_eq!(diagnostic.message_kind, MessageKind::Oem);
-    assert_eq!(diagnostic.source_edition, Some("3.0"));
-    assert_eq!(diagnostic.code, Some("parse.kvn.syntax"));
-    assert_eq!(diagnostic.original_token, Some("UNKNOWN = value"));
-    assert_eq!(diagnostic.expected, Some("strict OEM KVN"));
-    assert!(diagnostic.source_location.is_some());
+        assert_eq!(diagnostic.operation, DiagnosticOperation::Parse);
+        assert_eq!(diagnostic.notation, DiagnosticNotation::Kvn);
+        assert_eq!(diagnostic.message_kind, MessageKind::Oem);
+        assert_eq!(diagnostic.source_edition, Some("3.0"));
+        assert_eq!(diagnostic.code, Some("parse.kvn.syntax"));
+        assert_eq!(diagnostic.original_token, Some("UNKNOWN = value"));
+        assert_eq!(diagnostic.expected, None);
+        assert!(diagnostic.source_location.is_some());
+    }
 }
 
 #[test]
-fn carriage_return_diagnostics_keep_the_edition_and_excerpt_to_one_record() {
-    let object_name = KVN_FIXTURES[0]
-        .lines()
-        .find(|line| line.trim_start().starts_with("OBJECT_NAME"))
-        .unwrap();
-    let input = mutated(
-        &mutated(
-            KVN_FIXTURES[0],
-            object_name,
-            &format!("{object_name}\nUNKNOWN = value"),
-        ),
-        "\n",
-        "\r",
-    );
-    let error = Oem::from_kvn(&input).expect_err("unknown keyword should fail");
-    let diagnostic = error.diagnostic().unwrap();
-
-    assert_eq!(diagnostic.source_edition, Some("3.0"));
-    assert_eq!(diagnostic.original_token, Some("UNKNOWN = value"));
-}
-
-#[test]
-fn semantic_paths_survive_parse_context() {
+fn blank_mandatory_value_is_missing_at_its_record() {
     let object_name = KVN_FIXTURES[0]
         .lines()
         .find(|line| line.trim_start().starts_with("OBJECT_NAME"))
@@ -61,9 +43,36 @@ fn semantic_paths_survive_parse_context() {
     let error = Oem::from_kvn(&input).expect_err("empty object name should fail");
     let diagnostic = error.diagnostic().expect("parse context should be present");
     assert_eq!(diagnostic.code, Some("validation.missing_required_field"));
+    // A blank mandatory value is absent under the shared KVN rule; the error names its record.
+    let line = KVN_FIXTURES[0]
+        .lines()
+        .position(|line| line == object_name)
+        .unwrap()
+        + 1;
+    assert!(matches!(
+        crate::common::validation_error_source(error.as_validation_error().unwrap()),
+        ccsds_ndm::error::ValidationError::MissingRequiredField { line: Some(found), .. } if *found == line
+    ));
     assert_eq!(
-        diagnostic.field_path.as_deref(),
+        error.field_path().as_deref(),
         Some("body.segment[0].metadata.object_name")
+    );
+
+    // The path names the segment that holds the blank record.
+    let second = KVN_FIXTURES[0].rfind(object_name).unwrap();
+    let input = format!(
+        "{}OBJECT_NAME ={}",
+        &KVN_FIXTURES[0][..second],
+        &KVN_FIXTURES[0][second + object_name.len()..]
+    );
+    let error = Oem::from_kvn(&input).unwrap_err();
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment[1].metadata.object_name")
+    );
+    assert!(
+        error.to_string().contains("in block OEM Metadata"),
+        "{error}"
     );
 }
 
@@ -97,12 +106,39 @@ fn missing_xml_covariance_epoch_reports_where_deserialization_failed() {
         let line = input[..end].bytes().filter(|&byte| byte == b'\n').count() + 1;
         let error = Oem::from_xml(&input).unwrap_err();
         assert!(
-            error.to_string().contains("missing field `EPOCH`"),
+            error.to_string().contains("Missing required field: EPOCH"),
             "{error}"
         );
         assert!(
-            error.to_string().contains(&format!("near line {line},")),
+            error
+                .diagnostic()
+                .and_then(|diagnostic| diagnostic.source_location)
+                .map(|location| location.0)
+                == Some(line),
             "{error}"
         );
     }
+}
+
+#[test]
+fn model_header_errors_have_paths_and_unclosed_covariance_names_its_block() {
+    use ccsds_ndm::Validate;
+    let mut message = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    message.header.originator = "".into();
+    assert_eq!(
+        message.validate().unwrap_err().field_path().as_deref(),
+        Some("header.originator")
+    );
+    let mut message = Oem::from_xml(XML).unwrap();
+    for segment in &mut message.body.segment {
+        segment.data.covariance_matrix.clear();
+    }
+    let input = format!("{}COVARIANCE_START\n", message.to_kvn().unwrap());
+    let error = Oem::from_kvn(&input).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("incomplete OEM covariance block"),
+        "{error}"
+    );
 }

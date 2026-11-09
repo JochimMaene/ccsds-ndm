@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 mod kvn;
-mod xml;
+pub(crate) mod xml;
 
 use crate::common::OdParameters;
 use crate::error::{Result, ValidationError};
@@ -33,11 +33,15 @@ use std::borrow::Cow;
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "cdm")]
 pub struct Cdm {
+    /// Creation information and message identity (CDM section 3.2).
     pub header: CdmHeader,
+    /// The message payload (CDM section 3).
     pub body: CdmBody,
+    /// Fixed XML root identifier; message identity is carried by MESSAGE_ID.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_CDM_VERS".to_string()))]
     pub id: Option<String>,
+    /// Supported message edition, `1.0`.
     #[serde(rename = "@version")]
     #[builder(default = "1.0".to_string(), into)]
     pub version: String,
@@ -61,11 +65,25 @@ impl Ndm for Cdm {
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::detect::without_utf8_bom(kvn);
-        kvn::validate_kvn_syntax(kvn)?;
-        let cdm = Self::from_kvn_str(kvn)?;
-        crate::traits::Validate::validate(&cdm)?;
-        Ok(cdm)
+        (|| {
+            let kvn = crate::kvn::prepare_input(
+                crate::detect::without_utf8_bom(kvn),
+                crate::validation::MessageKind::Cdm,
+            )?;
+            let kvn = kvn.as_ref();
+            kvn::validate_kvn_syntax(kvn)?;
+            let cdm = Self::from_kvn_str(kvn)?;
+            crate::traits::Validate::validate(&cdm)?;
+            Ok(cdm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Cdm,
+                crate::error::DiagnosticNotation::Kvn,
+                kvn,
+                None,
+            )
+        })
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -73,10 +91,36 @@ impl Ndm for Cdm {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        xml::validate_xml_sequences(xml)?;
-        let cdm: Self = crate::xml::from_str_with_context(xml, "CDM")?;
-        crate::traits::Validate::validate(&cdm)?;
-        Ok(cdm)
+        (|| {
+            let xml = xml::normalize_missing_values(xml)?;
+            let xml = xml.as_ref();
+            xml::validate_xml_sequences(xml)?;
+            let values = xml::without_unavailable_values(xml)?;
+            let mut cdm: Self = crate::xml::from_str_with_context(&values, "CDM")?;
+            for value in [&mut cdm.header.originator, &mut cdm.header.message_id] {
+                *value = value.trim_matches([' ', '\t', '\r', '\n']).to_owned();
+            }
+            for segment in &mut cdm.body.segments {
+                for value in [
+                    &mut segment.metadata.object_designator,
+                    &mut segment.metadata.catalog_name,
+                    &mut segment.metadata.international_designator,
+                ] {
+                    *value = value.trim_matches([' ', '\t', '\r', '\n']).to_owned();
+                }
+                segment.data.drop_empty_blocks();
+            }
+            crate::traits::Validate::validate(&cdm)?;
+            Ok(cdm)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Cdm,
+                crate::error::DiagnosticNotation::Xml,
+                xml,
+                None,
+            )
+        })
     }
 
     fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
@@ -85,6 +129,83 @@ impl Ndm for Cdm {
 
     fn write_xml_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
         crate::generation::write_xml_to(self, output)
+    }
+}
+
+impl Cdm {
+    /// Table 3-3 layout `YYYY-NNNP{PP}` or `UNKNOWN`, enforced on output only.
+    pub(crate) fn validate_output_designators(&self) -> Result<()> {
+        for segment in &self.body.segments {
+            let value = segment.metadata.international_designator.as_str();
+            let bytes = value.as_bytes();
+            let cospar = matches!(bytes.len(), 9..=11)
+                && bytes[..4].iter().all(u8::is_ascii_digit)
+                && bytes[4] == b'-'
+                && bytes[5..8].iter().all(u8::is_ascii_digit)
+                && bytes[8..].iter().all(u8::is_ascii_uppercase);
+            if !cospar && value != "UNKNOWN" {
+                return Err(ValidationError::invalid_value(
+                    "INTERNATIONAL_DESIGNATOR",
+                    value,
+                    "YYYY-NNNP{PP} or UNKNOWN (CDM table 3-3)",
+                )
+                .into());
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn validate_xml_available_values(&self) -> Result<()> {
+        self.validate_output_designators()?;
+        fn check(field: &'static str, value: Option<&str>) -> Result<()> {
+            if value.is_some_and(|value| {
+                let value = value.trim_matches([' ', '\t', '\r', '\n']);
+                value.is_empty() || value.eq_ignore_ascii_case("N/A")
+            }) {
+                return Err(ValidationError::invalid_value(
+                    field,
+                    value.unwrap_or_default(),
+                    "a nonempty available value; use None for an absent optional field",
+                )
+                .into());
+            }
+            Ok(())
+        }
+        check("MESSAGE_FOR", self.header.message_for.as_deref())?;
+        check(
+            "COLLISION_PROBABILITY_METHOD",
+            self.body
+                .relative_metadata_data
+                .collision_probability_method
+                .as_deref(),
+        )?;
+        for segment in &self.body.segments {
+            let metadata = &segment.metadata;
+            for (field, value) in [
+                ("OBJECT_NAME", Some(metadata.object_name.as_str())),
+                ("EPHEMERIS_NAME", Some(metadata.ephemeris_name.as_str())),
+                (
+                    "OPERATOR_CONTACT_POSITION",
+                    metadata.operator_contact_position.as_deref(),
+                ),
+                (
+                    "OPERATOR_ORGANIZATION",
+                    metadata.operator_organization.as_deref(),
+                ),
+                ("OPERATOR_PHONE", metadata.operator_phone.as_deref()),
+                ("OPERATOR_EMAIL", metadata.operator_email.as_deref()),
+                ("ORBIT_CENTER", metadata.orbit_center.as_deref()),
+                ("GRAVITY_MODEL", metadata.gravity_model.as_deref()),
+                ("ATMOSPHERIC_MODEL", metadata.atmospheric_model.as_deref()),
+                (
+                    "N_BODY_PERTURBATIONS",
+                    metadata.n_body_perturbations.as_deref(),
+                ),
+            ] {
+                check(field, value)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -117,7 +238,8 @@ pub struct CdmHeader {
     /// organization that has the Role of 'Conjunction Data Message Originator'. (See 5.2.9
     /// for formatting rules.)
     ///
-    /// **Examples**: JSPOC, ESA SST, CAESAR, JPL, SDC
+    /// **Examples**: JSPOC, ESA SST, CAESAR, JPL, SDC. Blanks are accepted following
+    /// table 3-1 Cor.1 despite the narrower repertoire in section 5.2.9.
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.2.
     #[builder(into)]
@@ -142,38 +264,57 @@ pub struct CdmHeader {
 }
 
 impl Cdm {
+    /// Validate the two-object message, identity, geometry domains, and required data.
     pub fn validate(&self) -> Result<()> {
         crate::traits::Validate::validate(self)
     }
+}
+
+// A present but empty mandatory value (an XSD-valid `<ORIGINATOR/>`): book over XSD, see the
+// validation contract. KVN blanks never get here; they read as absent and fail at the record.
+fn empty_required(field: &'static str) -> crate::error::CcsdsNdmError {
+    ValidationError::empty_value(field).into()
+}
+
+// CDM 5.2.9 defines this closed lexical repertoire for five identifier fields.
+fn validate_identifier(field: &'static str, value: &str) -> Result<()> {
+    if (field == "ORIGINATOR" && value.trim() != value)
+        || !value.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric()
+                || matches!(byte, b'_' | b'-')
+                || (field == "ORIGINATOR" && byte == b' ')
+        })
+    {
+        return Err(ValidationError::InvalidValue {
+            field: field.into(),
+            value: value.into(),
+            expected: if field == "ORIGINATOR" {
+                "ASCII letters, digits, underscores, dashes or embedded blanks"
+            } else {
+                "ASCII letters, digits, underscores or dashes"
+            }
+            .into(),
+            line: None,
+        }
+        .into());
+    }
+    Ok(())
 }
 
 impl crate::traits::Validate for CdmHeader {
     fn validate(&self) -> Result<()> {
         crate::validation::epoch_precision(&[("CREATION_DATE", &self.creation_date)])?;
         if self.creation_date.is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "CDM Header".into(),
-                field: "CREATION_DATE".into(),
-                line: None,
-            }
-            .into());
+            return Err(empty_required("CREATION_DATE"));
         }
         if self.originator.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "CDM Header".into(),
-                field: "ORIGINATOR".into(),
-                line: None,
-            }
-            .into());
+            return Err(empty_required("ORIGINATOR"));
         }
         if self.message_id.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "CDM Header".into(),
-                field: "MESSAGE_ID".into(),
-                line: None,
-            }
-            .into());
+            return Err(empty_required("MESSAGE_ID"));
         }
+        validate_identifier("ORIGINATOR", &self.originator)?;
+        validate_identifier("MESSAGE_ID", &self.message_id)?;
         Ok(())
     }
 }
@@ -182,11 +323,14 @@ impl crate::traits::Validate for CdmHeader {
 // Body
 //----------------------------------------------------------------------
 
+/// Relative conjunction information and two object segments (CDM section 3.3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct CdmBody {
+    /// Event geometry and screening information common to both objects.
     #[serde(rename = "relativeMetadataData")]
     pub relative_metadata_data: RelativeMetadataData,
+    /// Exactly OBJECT1 then OBJECT2; both must use the same reference frame.
     #[serde(rename = "segment")]
     pub segments: Vec<CdmSegment>,
 }
@@ -219,6 +363,24 @@ impl crate::traits::Validate for CdmBody {
             }
             .into());
         }
+        if self.segments[0].metadata.object != CdmObjectType::Object1 {
+            return Err(ValidationError::InvalidValue {
+                field: "OBJECT".into(),
+                value: "OBJECT2 before OBJECT1".into(),
+                expected: "OBJECT1 followed by OBJECT2".into(),
+                line: None,
+            }
+            .into());
+        }
+        if self.segments[0].metadata.ref_frame != self.segments[1].metadata.ref_frame {
+            return Err(ValidationError::InvalidValue {
+                field: "REF_FRAME".into(),
+                value: "different object reference frames".into(),
+                expected: "the same reference frame for both objects (CDM table 3-3)".into(),
+                line: None,
+            }
+            .into());
+        }
         self.relative_metadata_data.validate()?;
         for segment in &self.segments {
             segment.validate()?;
@@ -231,8 +393,9 @@ impl crate::traits::Validate for CdmBody {
 // Relative Metadata/Data
 //----------------------------------------------------------------------
 
+/// Conjunction geometry, screening conditions, and collision probability (CDM section 3.3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct RelativeMetadataData {
     /// Comments (see 6.3.4 for formatting rules).
     ///
@@ -351,14 +514,15 @@ impl crate::traits::Validate for RelativeMetadataData {
             ("SCREEN_ENTRY_TIME", &self.screen_entry_time),
             ("SCREEN_EXIT_TIME", &self.screen_exit_time),
         ])?;
-        // These are plain doubles in the CDM schema, so only finiteness constrains them. The KVN
-        // writer already refused non-finite numbers; `validate` and the XML writer did not, and
-        // an infinity reached the output as the lexical `inf`, which `xsd:double` rejects.
-        let mut numbers: Vec<(&'static str, f64)> =
-            vec![("MISS_DISTANCE", self.miss_distance.value)];
+        // Table 3-2 defines distance and speed as norms despite their unrestricted XSD doubles.
+        require_non_negative(self.miss_distance.value, "MISS_DISTANCE")?;
         if let Some(value) = &self.relative_speed {
-            numbers.push(("RELATIVE_SPEED", value.value));
+            require_non_negative(value.value, "RELATIVE_SPEED")?;
         }
+        if let Some(value) = &self.collision_probability {
+            Probability::validate_value(value.value, "COLLISION_PROBABILITY")?;
+        }
+        let mut numbers: Vec<(&'static str, f64)> = Vec::new();
         if let Some(vector) = &self.relative_state_vector {
             numbers.extend([
                 ("RELATIVE_POSITION_R", vector.relative_position_r.value),
@@ -381,29 +545,25 @@ impl crate::traits::Validate for RelativeMetadataData {
         for (field, value) in numbers {
             require_finite(field, value)?;
         }
-        if let Some(prob) = &self.collision_probability {
-            if !(0.0..=1.0).contains(&prob.value) {
-                return Err(crate::error::ValidationError::OutOfRange {
-                    name: "COLLISION_PROBABILITY".into(),
-                    value: prob.value.to_string(),
-                    expected: "0.0 <= p <= 1.0".into(),
-                    line: None,
-                }
-                .into());
-            }
-        }
         Ok(())
     }
 }
 
+/// Object2 relative to Object1 in the RTN frame at TCA (CDM table 3-2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct RelativeStateVector {
+    /// Relative radial position in metres (CDM table 3-2).
     pub relative_position_r: Length,
+    /// Relative transverse position in metres (CDM table 3-2).
     pub relative_position_t: Length,
+    /// Relative normal position in metres (CDM table 3-2).
     pub relative_position_n: Length,
+    /// Relative radial velocity in metres per second (CDM table 3-2).
     pub relative_velocity_r: Dv,
+    /// Relative transverse velocity in metres per second (CDM table 3-2).
     pub relative_velocity_t: Dv,
+    /// Relative normal velocity in metres per second (CDM table 3-2).
     pub relative_velocity_n: Dv,
 }
 
@@ -411,10 +571,13 @@ pub struct RelativeStateVector {
 // Segment
 //----------------------------------------------------------------------
 
+/// Metadata and data for one conjunction object (CDM sections 3.4 and 3.5).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct CdmSegment {
+    /// Object identity, reference frame, and propagation assumptions.
     pub metadata: CdmMetadata,
+    /// State, covariance, and optional orbit-determination information.
     pub data: CdmData,
 }
 
@@ -426,6 +589,7 @@ impl crate::traits::Validate for CdmSegment {
     }
 }
 
+/// Identity, frames, and propagation assumptions for one object (CDM section 3.4).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct CdmMetadata {
@@ -469,6 +633,8 @@ pub struct CdmMetadata {
     /// (with leading zeros); P{PP} = At least one capital letter for the identification of the
     /// part brought into space by the launch. In cases where the object has no international
     /// designator, the value UNKNOWN should be used. (See 5.2.9 for further formatting rules.)
+    /// Only the 5.2.9 character repertoire is enforced, not the YYYY-NNNP{PP} layout: the value
+    /// is externally established object identity (see `docs/conformance/cdm-1.0.md`).
     ///
     /// **Examples**: 2002-021A, UNKNOWN
     ///
@@ -558,7 +724,7 @@ pub struct CdmMetadata {
     /// The gravity model used for the OD of the object. (See annex E under GRAVITY_MODEL for
     /// definition).
     ///
-    /// **Examples**: EGM-96: 36D 360, WGS-84_GEOID: 24D 240, JGM-2: 41D 410
+    /// **Examples**: EGM-96: 36D 36O, WGS-84_GEOID: 24D 24O, JGM-2: 41D 41O
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.4.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -609,50 +775,29 @@ pub struct CdmMetadata {
 impl crate::traits::Validate for CdmMetadata {
     fn validate(&self) -> Result<()> {
         if self.object_designator.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "CDM Metadata".into(),
-                field: "OBJECT_DESIGNATOR".into(),
-                line: None,
-            }
-            .into());
+            return Err(empty_required("OBJECT_DESIGNATOR"));
         }
         if self.catalog_name.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "CDM Metadata".into(),
-                field: "CATALOG_NAME".into(),
-                line: None,
-            }
-            .into());
+            return Err(empty_required("CATALOG_NAME"));
         }
         if self.object_name.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "CDM Metadata".into(),
-                field: "OBJECT_NAME".into(),
-                line: None,
-            }
-            .into());
+            return Err(empty_required("OBJECT_NAME"));
         }
         if self.international_designator.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "CDM Metadata".into(),
-                field: "INTERNATIONAL_DESIGNATOR".into(),
-                line: None,
-            }
-            .into());
+            return Err(empty_required("INTERNATIONAL_DESIGNATOR"));
         }
         if self.ephemeris_name.trim().is_empty() {
-            return Err(ValidationError::MissingRequiredField {
-                block: "CDM Metadata".into(),
-                field: "EPHEMERIS_NAME".into(),
-                line: None,
-            }
-            .into());
+            return Err(empty_required("EPHEMERIS_NAME"));
         }
+        validate_identifier("OBJECT_DESIGNATOR", &self.object_designator)?;
+        validate_identifier("CATALOG_NAME", &self.catalog_name)?;
+        validate_identifier("INTERNATIONAL_DESIGNATOR", &self.international_designator)?;
         Ok(())
     }
 }
 
 impl CdmMetadata {
+    /// Validate required object identifiers and their CDM section 5.2.9 repertoire.
     pub fn validate(&self) -> Result<()> {
         crate::traits::Validate::validate(self)
     }
@@ -662,6 +807,7 @@ impl CdmMetadata {
 // Data
 //----------------------------------------------------------------------
 
+/// State, covariance, and optional determination information for one object (CDM section 3.5).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct CdmData {
@@ -686,13 +832,75 @@ pub struct CdmData {
     /// State Vector.
     #[serde(rename = "stateVector")]
     pub state_vector: CdmStateVector,
-    /// Covariance Matrix.
+    /// Covariance Matrix (CDM 5.2.8). Required: validation and generation reject `None`; the
+    /// `Option` exists only so a message can be constructed incrementally.
     #[serde(
         rename = "covarianceMatrix",
         default,
         skip_serializing_if = "Option::is_none"
     )]
     pub covariance_matrix: Option<CdmCovarianceMatrix>,
+}
+
+impl CdmData {
+    /// Rewrite comments into the only association a KVN reader can recover.
+    ///
+    /// KVN data is one flat record sequence: the comment run before the first data keyword
+    /// belongs to the outer data block, and every later run belongs to the block of the keyword
+    /// that follows it. An optional block without values has no keyword, so it becomes `None`
+    /// and its comments join the next run. Text and order are kept; this is idempotent.
+    pub(crate) fn canonicalize_kvn_comments(&mut self) {
+        fn has_values<T: Default + PartialEq>(
+            block: &mut T,
+            comment: fn(&mut T) -> &mut Vec<String>,
+        ) -> bool {
+            let saved = std::mem::take(comment(block));
+            let empty = *block == T::default();
+            *comment(block) = saved;
+            !empty
+        }
+        let mut pending = std::mem::take(&mut self.comment);
+        let mut leading = true;
+        let mut settle =
+            |run: &mut Vec<String>, outer: &mut Vec<String>, pending: &mut Vec<String>| {
+                pending.append(run);
+                if leading {
+                    outer.append(pending);
+                    leading = false;
+                } else {
+                    run.append(pending);
+                }
+            };
+        let mut outer = Vec::new();
+        if let Some(od) = &mut self.od_parameters {
+            if has_values(od, |b| &mut b.comment) {
+                settle(&mut od.comment, &mut outer, &mut pending);
+            } else {
+                pending.append(&mut od.comment);
+                self.od_parameters = None;
+            }
+        }
+        if let Some(additional) = &mut self.additional_parameters {
+            if has_values(additional, |b| &mut b.comment) {
+                settle(&mut additional.comment, &mut outer, &mut pending);
+            } else {
+                pending.append(&mut additional.comment);
+                self.additional_parameters = None;
+            }
+        }
+        settle(&mut self.state_vector.comment, &mut outer, &mut pending);
+        self.comment = outer;
+    }
+
+    /// XML `odParameters`/`additionalParameters` holding no value and no comment carry nothing.
+    fn drop_empty_blocks(&mut self) {
+        if self.od_parameters == Some(OdParameters::default()) {
+            self.od_parameters = None;
+        }
+        if self.additional_parameters == Some(AdditionalParameters::default()) {
+            self.additional_parameters = None;
+        }
+    }
 }
 
 impl crate::traits::Validate for CdmData {
@@ -719,8 +927,9 @@ impl crate::traits::Validate for CdmData {
     }
 }
 
+/// Physical properties used for conjunction assessment and propagation (CDM table 3-4).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct AdditionalParameters {
     /// Comments (see 6.3.4 for formatting rules).
     ///
@@ -843,8 +1052,9 @@ impl Validate for AdditionalParameters {
     }
 }
 
+/// Object position and velocity at TCA in its metadata reference frame (CDM section 3.5.2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct CdmStateVector {
     /// Comments (see 6.3.4 for formatting rules).
     ///
@@ -912,11 +1122,14 @@ impl CdmStateVector {
     }
 }
 
+/// Lower-triangular RTN covariance, optionally extended by drag, SRP, and thrust (CDM section 3.5.2).
+/// Extended rows must be complete in order through Drag/SRP/Thrust (CDM 5.2.8).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct CdmCovarianceMatrix {
     /// Comments.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Object covariance matrix `[1,1]`.
     ///

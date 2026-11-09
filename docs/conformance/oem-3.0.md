@@ -6,7 +6,9 @@ at the end; see [OEM 2.0](#oem-20) and [OEM 1.0](#oem-10).
 
 The sources are CCSDS 502.0-B-3 and the NDM/XML 4.0.0 schemas. The later
 [EC2 edition](https://ccsds.org/publications/allpubs/entry/3073/) of the book doesn't change
-anything for OEM. Our local copy, `docs/ccsds-books/odm.rst`, stops at section 8.7.3 and leaves
+anything for OEM. [Technical Corrigendum 1, June 2026 (TC 2603)](https://ccsds.org/wp-content/uploads/gravity_forms/5-448e85c647331d9cbaf66c096458bdd5/2026/10/502x0b3e2tc1_tc2603.pdf)
+was also reviewed: its changes concern OCM section 6.2 only and add no OEM requirements.
+Our local copy, `docs/ccsds-books/odm.rst`, stops at section 8.7.3 and leaves
 out examples G-12 to G-14. Where this page cites those parts, it refers to the published book.
 
 OEM 3.0 is **Verified**; see [Verification outcome](#verification-outcome). [Limits](#limits)
@@ -17,13 +19,13 @@ lists what the library deliberately leaves to the parties exchanging the message
 | Area | Source | Behavior | Tests |
 | --- | --- | --- | --- |
 | Message structure | ODM 5.1–5.2, tables 5-1 to 5-4 | One OEM root with header, body and segments in order. All segments describe the same object and use the same time system. | `oem::parsing`, `oem::diagnostics`, `oem::validation` |
-| KVN layout | ODM 5.2.4–5.2.5, 7.3–7.9, A2.5.3 | Printable ASCII only, lines written at no more than 254 characters, and lines terminated by LF, CR, CRLF or LFCR; reading also accepts an unterminated last line and trailing-space padding (see [More lenient than the book](#more-lenient-than-the-book)). Blank lines may appear anywhere. Writing uses the fixed keyword order; reading accepts unique header and metadata assignments in any order, while `CCSDS_OEM_VERS` must remain first. Comments may appear between header or metadata assignments. Data comments retain the book's placement rules. An ephemeris line has 7 or 10 fields, and each covariance row has as many values as its row number. The covariance section may be empty. An optional keyword with no value counts as absent. | `oem::parsing`, `oem::generation`, `kvn::parser` unit tests |
-| XML layout | ODM 8, NDM/XML 4.2–4.3, `ndmxml-4.0.0-oem-3.0.xsd` | The document must start with an XML 1.0 declaration; equivalent UTF-8 spellings and omission of an unused `xmlns:xsi` are accepted (see below). Elements below the root are either all unqualified or all in the `urn:ccsds:schema:ndmxml` namespace; the root itself may be prefixed or not, as the books show both. Namespace declarations and schema-location hints are allowed on any element. Header and metadata children may be read in any order if unique; writing follows schema order. Other elements remain in schema order. Unknown content, a DTD, or a second document is rejected. | `oem::parsing`, `library::xml` |
+| KVN layout | ODM 5.2.4–5.2.5, 7.3–7.9, A2.5.3 | Printable ASCII outside comment payloads (TAB reads as a blank); UTF-8 comment text is preserved on input and requires XML or ASCII-compatible text for output, lines written at no more than 254 characters (longer lines are read), and lines terminated by LF, CR, CRLF or LFCR; reading also accepts an unterminated last line and trailing-space padding (see [More lenient than the book](#more-lenient-than-the-book)). Blank lines may appear anywhere. Writing uses the fixed keyword order; reading accepts unique header and metadata assignments in any order, while `CCSDS_OEM_VERS` must remain first. Comments may appear between header or metadata assignments. Data comments retain the book's placement rules. An ephemeris line has 7 or 10 fields, and each covariance row has as many values as its row number. The covariance section may be empty. An optional keyword with no value counts as absent; a mandatory keyword with no value is reported missing, with its line and segment path. | `oem::parsing`, `oem::generation`, `kvn::parser` unit tests |
+| XML layout | ODM 8, NDM/XML 4.2–4.3, `ndmxml-4.0.0-oem-3.0.xsd` | An XML 1.0 declaration, when present, must start the document; a missing one, equivalent UTF-8 spellings and omission of an unused `xmlns:xsi` are accepted (see below). Elements below the root are either all unqualified or all in the `urn:ccsds:schema:ndmxml` namespace; the root itself may be prefixed or not, as the books show both. Namespace declarations and schema-location hints are allowed on any element. Header and metadata children may be read in any order if unique; writing follows schema order. Other elements remain in schema order. Unknown content, a DTD, or a second document is rejected. | `oem::parsing`, `library::xml` |
 | Time | ODM 3.2.3.2, 5.1.3, 5.2.3–5.2.5, 7.5.10 | Epochs use the calendar or day-of-year form with at most 16 fraction digits. MET and MRT also accept durations spelled `YYYY-DDDThh:mm:ss` with day 000 to 999. Start and stop times must be in order. Complete useable spans of consecutive segments may touch but not overlap; segments need not be in time order. State epochs must fall inside the segment's total span; covariance epochs need not (see [Where sources conflict](#where-sources-conflict)). Covariance epochs must increase, but equal epochs are allowed. | `oem::validation` |
-| Values | ODM 5.2, 7.5, 8.13 | Required fields must be present. In KVN, the time systems and frames the book lists must be all upper or all lower case. XML numbers follow `xsd:double` (see [Where the book is unclear](#where-the-book-is-unclear)). KVN numbers must be finite and fit in a double; reading accepts more than 16 digits (see [More lenient than the book](#more-lenient-than-the-book)). Units are fixed and filled in when missing, and XML output omits the optional `units` attributes. | `oem::parsing`, `oem::validation`, `oem::conversion` |
+| Values | ODM 5.2, 7.5, 8.13 | Required fields must be present. Text values keep their case as written (see [Where the book is unclear](#where-the-book-is-unclear)). XML numbers follow `xsd:double` (see [Where the book is unclear](#where-the-book-is-unclear)). KVN numbers must be finite and fit in a double; reading accepts more than 16 digits (see [More lenient than the book](#more-lenient-than-the-book)). Units are fixed and filled in when missing, and XML output omits the optional `units` attributes. | `oem::parsing`, `oem::validation`, `oem::conversion` |
 | Writing KVN | ODM 5.2, 7.3–7.9 | The same message always gives the same output, and it is checked before anything is written. Numbers are rounded to at most 16 significant digits. Accelerations are written for all three axes or none. An empty `INTERPOLATION` or `COV_REF_FRAME` is rejected, because KVN would read it back as absent. | `oem::generation`, `oem_kvn_allocations` |
 | Writing XML | OEM 3.0 XSD, NDM/XML 4.2–4.3 | The same message always gives the same output, and it is checked first. The root declares `xmlns:xsi` and `xmlns:ndm`. Output for every shipped OEM example passes the official schema. | `oem::generation`, `oem::validation` |
-| Conversion | ODM 5 | Round trips of the example files keep the whole model and the edition. Converting to KVN fails for data KVN can't hold: partial accelerations, non-finite numbers, an empty `INTERPOLATION` or `COV_REF_FRAME`, and comments on any covariance matrix after the first. KVN also drops some whitespace (see [Conversion between notations](#conversion-between-notations)). | `oem::conversion` |
+| Conversion | ODM 5 | Round trips of the example files keep the whole model and the edition. Converting to KVN fails for data KVN can't hold: partial accelerations, non-finite numbers, an empty `INTERPOLATION` or `COV_REF_FRAME`. KVN also drops some whitespace (see [Conversion between notations](#conversion-between-notations)). | `oem::conversion` |
 | Resources | Project policy | A standalone OEM can't nest beyond its schema, because unknown children are rejected; combined NDM XML has a fixed nesting limit. Files are replaced in one step, so a failed write never leaves half a file behind. Writing KVN doesn't use more memory as the record count grows. Reading XML doesn't use extra memory per state record, unless the input spells out `units` attributes. | `ndm::parsing`, `library::output`, `oem_kvn_allocations`, `oem_xml_allocations` |
 | Scale | Project policy | Benchmarks parse and write 100, 10,000 and 50,000 records in KVN, and 100 and 10,000 in XML. The timings are for information only. | `cargo bench -p ccsds-ndm --bench kvn_benches -- oem_kvn_history_scaling`, `cargo bench -p ccsds-ndm --bench xml_benches -- oem_xml_history_scaling` |
 
@@ -33,7 +35,7 @@ Each decision below names the clause it rests on. When the book is unclear, or t
 disagree, the parser takes the lenient reading. This is the general rule in the
 [validation contract](../design/validation-contract.md#authority-and-representability). The few
 cases where we are stricter are listed under [Stricter than required](#stricter-than-required),
-and the three where reading is looser than a clear rule under
+and the cases where reading is looser than a clear rule under
 [More lenient than the book](#more-lenient-than-the-book).
 
 ### Where the book is unclear
@@ -49,11 +51,10 @@ and the three where reading is looser than a clear rule under
   breaks) around the value, so ` UTC ` names UTC; the text is kept as written.
 - 7.5.3 says every normative KVN text value, meaning anything but comments and free text, is all
   upper or all lower case. Which fields are free text is unclear: the book gives no list, and
-  values such as mission frames are defined by an ICD rather than the book. We read this leniently
-  and check only the values the book itself lists: the time systems in 3.2.3.2, the frames in
-  3.2.3.3, and `RSW`, `RTN` and `TNW` for `COV_REF_FRAME` (3.2.4.11). Mixed-case forms of those,
-  such as `Utc`, are rejected in KVN when reading and writing. Other values keep their spelling,
-  so `CENTER_NAME = Earth` is accepted even though annex B2 lists the natural bodies.
+  values such as mission frames are defined by an ICD rather than the book. A mixed-case value
+  loses nothing, so, as in every family, mixed case is accepted and preserved in KVN and XML
+  (`TIME_SYSTEM = Utc`, `CENTER_NAME = Earth`); see the shared lexical decisions in the
+  [validation contract](../design/validation-contract.md#shared-lexical-decisions).
 - 5.2.4.7 says every segment "must contain enough ephemeris data records to allow the recommended
   interpolation method to be carried out consistently". The book doesn't define the methods:
   `INTERPOLATION` is free text, and HERMITE, LINEAR and LAGRANGE are only examples in table 5-3.
@@ -70,9 +71,8 @@ and the three where reading is looser than a clear rule under
 - 7.5.10 allows as many fraction digits as a fixed-point number, and 7.5.6 caps those at 16. We
   apply the cap to the fraction digits only. Unlike data numbers, epochs keep this cap when
   reading.
-- 7.5.1 only requires values for mandatory keywords. An optional OEM metadata or covariance
-  keyword with an empty value is treated as absent. The shared header parser is the exception: an
-  empty `CLASSIFICATION` or `MESSAGE_ID` read from KVN stays an empty string. In XML an empty
+- 7.5.1 only requires values for mandatory keywords. Under the shared rule, an optional KVN
+  keyword (header, metadata or covariance) with a blank or `N/A` value is absent. In XML an empty
   `<INTERPOLATION/>` is an empty string. KVN can't tell an empty `INTERPOLATION` or
   `COV_REF_FRAME` from a missing one, so writing KVN rejects those empty values instead of
   dropping them.
@@ -85,11 +85,9 @@ and the three where reading is looser than a clear rule under
   and so is a non-zero value that would round to zero. Very small numbers that still fit are
   fine. The 16-digit limit and the 32-bit integer range are not applied when reading (see
   [More lenient than the book](#more-lenient-than-the-book)).
-- 7.5.7 doesn't say whether a mantissa may end in its decimal point. 7.5.7c calls a mantissa
-  without exponent a fixed-point value, and 7.5.6 requires a digit after the point there, so we
-  reject `1.` and `1.e3` in KVN alike.
-- An empty XML element for an optional epoch or number is rejected, not read as absent. The
-  schema's epoch pattern and `xsd:double` don't allow an empty value; omit the element instead.
+- An empty XML element for an optional number is rejected (`an empty element is not a number`),
+  not read as absent: `xsd:double` has no empty value. Omit the element instead. Empty epochs
+  are covered under [Stricter than required](#stricter-than-required).
 - XML numbers follow `xsd:double` (8.13.1, 8.13.4), so state and covariance values may be `INF`,
   `-INF` or `NaN`. They must be spelled exactly that way, whether written directly, as character
   references, or in CDATA, and XML output writes them that way. KVN numbers must be finite
@@ -110,8 +108,8 @@ and the three where reading is looser than a clear rule under
 - NDM/XML 3.6.1 says all XML text values, except comments (3.6.2), must be all upper or all
   lower case. ODM 7.5.2 lets free-text values use any case, and table 5-2's own `CLASSIFICATION`
   example ('Operator-proprietary data; secondary distribution not permitted') is mixed case. The
-  schema leaves these fields as plain strings (ODM 8.13.5). So XML accepts mixed case, and only
-  converting a book-listed value such as `Utc` to KVN fails.
+  schema leaves these fields as plain strings (ODM 8.13.5). So XML accepts mixed case, and so does
+  KVN.
 - NDM/XML 4.3.4 says `xmlns:ndm` "must next be coded", but ODM 8.3.3 and example G-14 leave it
   out. We don't require it when reading, and we always write it. The books show the qualified
   root both with and without a prefix, so both are accepted.
@@ -122,15 +120,32 @@ and the three where reading is looser than a clear rule under
 - The schema lets `X_DDOT`, `Y_DDOT` and `Z_DDOT` appear independently, and it gives every
   covariance matrix its own comments. ODM 8.10.8 says XML follows the same rules as KVN, where
   accelerations are all or nothing (7.4.1.2) and covariance comments only open the section
-  (7.8.9). We follow the schema for XML. Writing such data to KVN fails, because KVN can't
-  represent it.
+  (7.8.9). We follow the schema for XML. Partial acceleration triples cannot cross to KVN.
+  Covariance comments are also accepted and written at the beginning of their associated matrix,
+  including later matrices, as the explicit producer-compatible extension below.
 
 ### Stricter than required
 
+Negative MET/MRT elapsed epochs remain outside the supported profile, as recorded in the
+shared epoch contract. This is a deliberate restriction of the library's elapsed-calendar
+representation, not an additional XSD constraint.
+
 - **Epochs.** The schema's `epochType` also allows time-zone offsets like `+01:00`, years with
-  more than four digits, an empty fraction, and a bare number. 7.5.10 only allows `Z`. We follow
-  7.5.10 in both notations, like OPM. All message types share this rule, so relaxing it has to
-  happen for all of them at once.
+  more than four digits, an empty fraction, and a bare number. 7.5.10 only allows `Z`. Nonzero offsets, expanded/negative years and empty fractions are
+  rejected. (The zero-offset alias is a relaxation; see [More lenient than the book](#more-lenient-than-the-book).)
+- **Empty mandatory values in XML.** The schema's `epochType` pattern and its plain strings
+  admit an empty element (`<OBJECT_NAME/>`, `<START_TIME></START_TIME>`, `<EPOCH/>`). 7.5.1
+  requires a value for every mandatory keyword and 7.5.10 defines no empty time tag, so we
+  reject empty required values with `validation.missing_required_field`. An empty optional
+  epoch such as `<REF_FRAME_EPOCH/>` is also rejected, but can retain a lexical epoch or XML
+  parsing code; the shared diagnostic contract documents route-dependent categories. This is the shared
+  book-over-XSD rule of the
+  [validation contract](../design/validation-contract.md#authority-and-representability).
+- **Useable span inside the total span.** 3.0 table 5-3 and the 3.0 schema don't state that
+  `USEABLE_START_TIME`/`USEABLE_STOP_TIME` lie within `START_TIME`..`STOP_TIME`. We infer it from
+  the TOTAL/USEABLE wording (B-2 table 5-3 and B-1 table 4-3 describe the useable span as part of
+  the total span) and enforce it in every edition and notation. Test:
+  `oem::validation::oem_time_tags_are_absolute_and_metadata_ranges_are_consistent`.
 - **OEM 1.0** is read only, and some valid 1.0 files are rejected; see [OEM 1.0](#oem-10).
 - **`INTERPOLATION_DEGREE`.** Table 5-3 only asks for "an integer value", while the schema wants
   a positive integer. We require a positive degree in both notations, so every degree can also be
@@ -154,25 +169,49 @@ These rules are clear, but real OEM files break them. Reading accepts cases with
 model value; padded comment lines are normalized by trimming their trailing spaces. Writing still
 follows the book, so everything the library writes is valid.
 
-- **XML envelope spelling.** Reading accepts single or double quotes, case-insensitive `UTF-8`,
-  omitted encoding (UTF-8 input), and an optional `standalone="yes"` or `"no"`. XML 1.0 and a
-  declaration at the start are still required; malformed declarations and other encodings are
-  rejected. An unused `xmlns:xsi` may be omitted. Used prefixes must still be declared and schema
+- **XML envelope spelling.** ODM 8.2 and NDM/XML 4.2 require the exact declaration shown in
+  the books; ODM 8.3.3 and NDM/XML 4.3.3 require `xmlns:xsi` on the root. Reading accepts
+  single or double quotes, case-insensitive `UTF-8`, omitted encoding (UTF-8 input), and an
+  optional `standalone="yes"` or `"no"`. A missing declaration is accepted (XML 1.0 makes it
+  optional and UTF-8 is the default); one that is present must start the document, and malformed
+  declarations, XML 1.1 and other encodings are rejected. An unused `xmlns:xsi` may be omitted. Used prefixes must still be declared and schema
   hints must resolve to the schema-instance namespace. Output keeps the book's declaration and
-  namespace attributes. These rules live in the shared XML reader (`library::xml`).
-- **Trailing KVN padding.** Reading measures the 254-character limit after ignoring trailing
-  ASCII spaces, including on comments. Substantive content beyond the limit and trailing control
-  characters are still rejected. Comment trailing spaces are normalized away. Output remains at
-  most 254 characters.
-- **Covariance section markers.** Reading accepts a complete covariance matrix sequence starting
+  namespace attributes. Tests: `oem::parsing::xml_declaration_opens_the_document`,
+  `oem::parsing::xml_schema_instance_namespace_is_needed_only_when_used`, and
+  `library::xml::xml_reading_accepts_equivalent_declarations_and_unused_namespace_omission`.
+- **Lexical variants.** TAB as a blank, lines longer than 254 characters (7.3.2), `.5`/`1.`
+  number spellings, UTF-8 comment text and the `+00:00`/`-00:00` epoch alias (7.5.10) are read
+  under the shared [lexical-variant policy](../design/validation-contract.md#lexical-variants);
+  output stays canonical. Comment trailing spaces are normalized away. OEM tests:
+  `oem::parsing::kvn_ignores_excess_trailing_padding_but_keeps_payload_limits`,
+  `oem::parsing::kvn_reads_overlong_lines_and_rejects_short_covariance_rows`.
+- **Covariance section markers.** 5.2.5.2 requires both `COVARIANCE_START` and
+  `COVARIANCE_STOP`. Reading accepts a complete covariance matrix sequence starting
   with `EPOCH` immediately after state records, even if both section markers are absent. Each
-  matrix still needs its epoch and six correctly sized rows. Writing always emits the markers.
-- **Comments and assignment order.** KVN reading accepts comments between header or metadata
+  matrix still needs its epoch and six correctly sized rows. Only the fully unmarked form is
+  read: a lone marker is rejected rather than guessing the intended grammar, and a leading
+  covariance COMMENT needs an explicit `COVARIANCE_START` so that it has a block owner. Writing
+  always emits the markers. No producer file in the reviewed corpus (`data/`) relies on this.
+  Test: `oem::parsing::complete_covariance_without_section_markers_is_read`.
+- **Comments and assignment order.** 7.4.8 fixes KVN assignment order, and 7.8.9 restricts
+  comments to the beginning of their blocks. The `odmHeader` type in
+  `ndmxml-4.0.0-common-4.0.xsd` and `oemMetadata` in `ndmxml-4.0.0-oem-3.0.xsd` also use
+  ordered `xsd:sequence` children. KVN reading accepts comments between header or metadata
   assignments, plus unique header and metadata assignments in any order. XML reading accepts
-  unique header and metadata children in any order. A comment before a covariance matrix's first
-  numeric row is retained on that matrix. Duplicate assignments or elements, a KVN version other
-  than the first record, unknown keywords, and comments between state or covariance rows remain
-  errors. Writing uses the book's order and places comments at the start of their blocks.
+  unique header and metadata children in any order, subject to the XML comment limitation under
+  [Limits](#limits). A comment before a covariance matrix's first numeric row is retained on that
+  matrix. Duplicate assignments or singleton elements, a KVN version other than the first record,
+  unknown keywords, and comments between state or covariance rows remain errors. So does a
+  comment after the last covariance matrix, which opens no block and has no place in the model
+  or schema (`COMMENT after the last covariance matrix must precede another EPOCH`). Writing uses the
+  book's order and places comments at the start of their blocks. Producer evidence: Orekit's
+  `data/ccsds/odm/oem/OEMExample5.txt` writes `STOP_TIME` before `USEABLE_STOP_TIME`. No file
+  in the reviewed corpus reorders header keywords or XML children, or puts comments between
+  assignments.
+  Tests in `oem::parsing`: `kvn_rejects_duplicate_trailing_and_non_ascii_content`,
+  `classification_is_read_between_the_version_and_creation_date`,
+  `xml_rejects_wrong_envelope_unknown_duplicate_and_trailing_content`, and
+  `kvn_reads_comments_before_covariance_rows_without_losing_their_matrix`.
 - **Leading byte-order mark.** 7.3.4 allows only printable ASCII in KVN, and a UTF-8 byte-order
   mark is not ASCII. Windows tools often write one at the start of a file. Reading skips one
   leading mark in KVN, in every family and on every entry point, as it already did in XML and in
@@ -185,10 +224,19 @@ follows the book, so everything the library writes is valid.
   limits integers to the signed 32-bit range. Many producers write the shortest spelling that
   reproduces a double exactly, which often has 17 digits (for example `-2757.3016318893897`).
   Reading accepts any number of digits, and integer-form values of any size, in ephemeris and
-  covariance lines. The rest of the number grammar still applies: `1e3` and `12.5e3` are still
-  rejected. Writing rounds to 16 significant digits, so the last digit of such a value can change
+  covariance lines. Exponent spellings such as `1e3` are read too. Writing rounds to 16 significant digits, so the last digit of such a value can change
   when it is written back to KVN. `INTERPOLATION_DEGREE` keeps the 32-bit range, and epochs keep
   the 16-digit fraction cap.
+
+- **Covariance matrix comment associations.** Reading KVN permits comments immediately before a
+  matrix's `EPOCH` and between that epoch/frame and its first numeric row. Writing always puts a
+  matrix's comments before its `EPOCH` (for the first matrix, right after `COVARIANCE_START`).
+  This extends ODM 7.8.9's section-leading comment rule so real producer input and XML matrix
+  comments keep their association, including on later matrices. Comments within numeric rows
+  remain invalid. No producer file in the reviewed corpus puts a comment after a matrix's `EPOCH`.
+  `oem::conversion::xml_to_kvn_preserves_comments_on_later_covariance_matrices` checks
+  both materialized and streaming output and reparsing.
+
 
 ### Conversion between notations
 
@@ -202,6 +250,13 @@ follows the book, so everything the library writes is valid.
 
 ### Limits
 
+- XML `COMMENT` elements in a header or metadata block must form one contiguous group.
+  For example, `<COMMENT>a</COMMENT><ORIGINATOR>JPL</ORIGINATOR><COMMENT>b</COMMENT>`
+  is rejected during deserialization with `duplicate field COMMENT`. The schema agrees: its
+  `odmHeader` and `oemMetadata` sequences put all `COMMENT` children first, so such input is
+  XSD-invalid as well; only our otherwise relaxed child order would have admitted it. Support
+  for separated comment groups is deliberately deferred.
+  Generated XML places comments together at the beginning of each block.
 - MET and MRT durations are checked for format and order only. What they are relative to comes
   from a comment or the ICD (3.2.3.2), and we don't read that.
 - Frames, centers, originators and time systems are kept as given, not looked up in a registry.
@@ -218,10 +273,10 @@ follows the book, so everything the library writes is valid.
 
 | Rows | Subject | Coverage |
 | --- | --- | --- |
-| 1–7 | Header | Version, creation date and originator are required. Comments, classification and message ID are optional. Order and edition rules are checked. Optional XML strings are kept exactly as written. |
-| 8–16, 23 | Metadata | Identity, frame and time fields are required. Frame epoch and comments are optional. Block markers must be exact. Object and time system must match across segments. Book-listed time systems and frames must be single-case in KVN. Frame-specific rules depend on the agreement between the parties. |
-| 17–20 | Time bounds | Total and useable times must be in order, and useable times must fall inside the total span (the table 5-3 reading of TOTAL and USEABLE). State records must fall inside the total span. Complete useable spans of consecutive segments may touch but not overlap. In 2.0, a useable start may not precede the previous segment's useable stop (see [OEM 2.0](#oem-20)). |
-| 21–22 | Interpolation | A method requires a degree, in Rust, Python and both notations. The degree must be positive (see [Stricter than required](#stricter-than-required)). Whether there are enough records is not checked, because the book doesn't define it (see [Where the book is unclear](#where-the-book-is-unclear)). |
+| 1–7 | Header | Version, creation date and originator are required. Comments, classification and message ID are optional, subject to edition rules. The KVN version record must come first; other unique header fields may be read in any order. Writing uses the book's order. Optional XML strings are kept exactly as written; separated comment groups remain unsupported (see [Limits](#limits)). |
+| 8–16, 23 | Metadata | Identity, frame and time fields are required. Frame epoch and comments are optional. Block markers must be exact. Object and time system must match across segments. Text values keep their case. Frame-specific rules depend on the agreement between the parties. |
+| 17–20 | Time bounds | Total and useable times must be in order, and useable times must fall inside the total span (the TOTAL/USEABLE wording in B-2 table 5-3 and B-1 table 4-3). State records must fall inside the total span. Complete useable spans of consecutive segments may touch but not overlap. In 2.0, a useable start may not precede the previous segment's useable stop (see [OEM 2.0](#oem-20)). |
+| 21–22 | Interpolation | A nonempty method requires a degree, in Rust, Python and both notations. The degree must be positive (see [Stricter than required](#stricter-than-required)). Whether there are enough records is not checked, because the book doesn't define it (see [Where the book is unclear](#where-the-book-is-unclear)). |
 | 24–25 | Ephemeris | At least one state record per segment, epochs valid for the time system, position and velocity with optional acceleration, and fixed units. KVN lines must have exactly 7 or 10 fields. In XML each acceleration component is optional on its own. Unlike AEM, OEM doesn't require increasing epochs. |
 | 26–31 | Covariance | Optional section, which may be empty (row 30). Each matrix has all 21 lower-triangle values, an epoch, an optional frame and comments. KVN rows must have the right number of values. Epochs increase; they are not bounded by the total span. XML units are optional. Python accepts a full 6×6 matrix and uses its lower triangle. |
 
@@ -256,7 +311,7 @@ section (5.2) and syntax rules (section 6) match 3.0 except in these points:
   `ndmHeader`. Both are rejected in 2.0, when reading and writing.
 - **Case.** 6.5.6 says every text value must be all upper or all lower case, including names
   such as `OBJECT_NAME`. 3.0 narrowed this to normative values (7.5.3), and a mixed-case name
-  loses nothing, so we apply the 3.0 reading to 2.0 as well. This is looser than a clear 2.0 rule.
+  loses nothing, so mixed case is accepted in 2.0 as in 3.0. This is looser than a clear 2.0 rule.
 - **Special numbers.** A note to 6.5.5 says `NaN`, `-Inf`, `+Inf` and `-0` are "not supported in
   the ODM". KVN numbers are already finite. We still read `-0` (producers often write `-0.000000`),
   and 2.0 XML still takes the schema's `xsd:double`, including `NaN` and `INF`. Both are looser
@@ -286,13 +341,79 @@ comments between segments lead the next metadata block; comments at EOF stay wit
 segment's data. Comment text and order within each destination are retained, but the model does
 not retain the original position between individual assignments. Test: `oem::parsing`.
 
-Mixed-case listed time systems and frames are accepted and retain their spelling (4.3.3g).
-Julian Date epochs such as `2451534.29812` (table 4-3) are still rejected: the model's epoch
-comparison and validation require a calendar or day-of-year value, and 2.0 withdrew Julian Dates.
+Everything else is read with the 3.0 KVN rules on this page: layout and line handling, blank
+and `N/A` optional values, number spellings, the time-tag format (7.5.10), metadata checks
+(same object and time system, ordered total and useable spans, interpolation degree) and the
+lenient readings under [More lenient than the book](#more-lenient-than-the-book). The 2.0
+useable-order rule does not apply.
 
-1.0 also requires increasing, non-repeating ephemeris epochs and segments that don't overlap
-(4.3.5c, table 4-3). We don't check either, as for 2.0 and 3.0.
+Mixed-case text values are accepted and retain their spelling (4.3.3g), as in later editions.
+Julian Date epochs such as `2451534.29812` (table 4-3) are still rejected by this reader's
+edition-specific calendar/ordinal profile. The shared lexical `Epoch` can store and compare
+numbers, but OEM does not assign those numbers a Julian-Date interpretation. ODM 2.0 withdrew
+Julian Dates; implementing the older interpretation remains outside this compatibility reader.
 
-Some tools read only 1.0. GMAT R2026a, for example, accepts OEM 2.0 only in its testing run mode
-and rejects 3.0 (`CCSDSOEMReader::IsValidVersion`). Since the library doesn't write 1.0, such
-tools can't read its output.
+1.0 requires strictly increasing, non-repeating ephemeris epochs within a segment (4.3.5c), and
+each segment's `START_TIME` at or after the previous segment's `STOP_TIME` (table 4-3), so a
+shared endpoint is allowed. Both are enforced after the epoch format checks, so a malformed or
+Julian Date epoch is reported as a format error, not an order violation.
+`oem::parsing::oem_1_0_requires_increasing_epochs_and_start_at_or_after_previous_stop` covers
+duplicate/reversed epochs, a start before the previous stop, the shared endpoint and malformed
+epochs.
+These edition-specific rules do not impose an invented epoch-order requirement on 2.0 or 3.0.
+
+This reader is a restricted legacy compatibility path, separate from the current verified
+editions. It cannot write or convert a message while its version remains 1.0, and never changes
+its edition automatically. A caller may deliberately relabel it to 2.0/3.0, validate, and generate,
+after which comments are written at the start of their blocks; relabelling alone does not
+establish validity in the target edition.
+
+The legacy reader uses the shared epoch syntax, which is looser than B-1's six fractional
+digits and no-Z spelling. TAB is accepted as a blank despite B-1 4.3.1b. Negative MET/MRT
+elapsed-time durations remain outside the supported profile.
+
+## Producer and diagnostic boundaries
+
+A supplied `INTERPOLATION` requires `INTERPOLATION_DEGREE` under the book's conditional
+rule even though the XSD makes both independent optional fields. A positive degree alone is
+retained without inventing a method. Complete usable spans may touch but must not overlap
+(§5.2.4.4); this is a book requirement, not an extra library restriction. Requiring usable
+bounds to lie inside total bounds follows their total/usable meaning and older edition tables;
+the 3.0 schema does not encode that relationship.
+
+The 2.0/3.0 KVN readers reject a comment after the last state row, even when
+`COVARIANCE_START` or the next `META_START` follows: it leads no block (7.8.9). A comment
+between covariance matrices is accepted and belongs to the next matrix; one after the last
+matrix, after `COVARIANCE_STOP`, or at EOF is rejected. The restricted 1.0 reader has its
+separately documented comment-placement rules. The library does not silently move comments
+between blocks.
+
+KVN output also refuses empty or literal `N/A` standard strings, non-ASCII content,
+embedded line breaks, lines longer than 254 characters, integers outside the KVN range,
+non-finite state/covariance values, and partial acceleration triples. These are shared or
+notation-specific representability checks, not proof that an XML model is invalid.
+Model header failures expose their `header.<field>` paths. Low-level deserializer failures can
+still lack canonical paths. Unclosed/incomplete covariance sections name their block and expected
+record shape; the parser does not invent a missing epoch or matrix.
+
+Known producer files rejected (Orekit samples under `data/ccsds/odm/oem/`):
+
+- `OEMExample1.txt`, `OEMExample3.txt`, `OEMExampleWithHeaderComment.txt`, `OEM-Issue839.txt`:
+  the third segment repeats the second segment's useable span, so consecutive useable spans
+  overlap (5.2.4.4).
+- `OEMExample8.txt`: the first segment has `INTERPOLATION = HERMITE` without
+  `INTERPOLATION_DEGREE` (table 5-3).
+
+Overlap is not a lexical variant, and a populated INTERPOLATION without a degree stays invalid. Empty XML
+INTERPOLATION is retained as an explicitly empty optional string and does not declare a method,
+so it needs no degree; KVN output refuses it because a blank KVN value would read as absent.
+`oem::conversion::empty_interpolation_needs_no_degree_and_keeps_its_presence` covers this case.
+
+XML header and metadata padding are trimmed on KVN output. TAB in XML comments becomes a
+blank when writing KVN; it no longer causes a refusal. Source XML comment grouping and padding
+are not promised across a KVN hop. Trailing data comments follow their explicit block ownership:
+a comment cannot be silently relocated merely to make conversion succeed.
+
+OEM permits comments between header and metadata assignments as a documented structural
+input extension. OPM/OMM retain section-leading comments only. The common lexical compatibility
+policy does not make these structural grammars identical; all writers use their canonical order.

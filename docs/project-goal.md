@@ -1,67 +1,28 @@
-# Project Goal
+# Project scope
 
-`ccsds-ndm` aims to be the best library for working with CCSDS Navigation Data Messages in Rust
-and Python.
+`ccsds-ndm` handles CCSDS Navigation Data Message representation and exchange: constructing typed
+messages, parsing, editing, validating, converting KVN/XML, and generating output in Rust and
+Python. The Rust core owns the rules; Python exposes the same behavior.
 
-It focuses on the common tasks users need: parsing messages, validating their contents, converting
-between KVN and XML, modifying typed data, and generating valid output.
+Orbit propagation, coordinate-frame and time-scale transformations, conjunction analysis,
+attitude dynamics, and evaluating interpolation algorithms are outside this scope. The library
+preserves the declarations needed by applications performing those tasks.
 
-Users should choose `ccsds-ndm` because it is:
+## Feature bar
 
-- **Correct.** Supported messages follow the applicable CCSDS publications and schemas. The library
-  rejects ambiguous or invalid data instead of guessing, never silently loses information, and
-  validates messages before generating output.
-- **Easy to use.** Installation is straightforward, common workflows require little code, and
-  errors explain what is wrong and where.
-- **Fast and predictable.** Typical messages are processed efficiently, while large messages and
-  malformed inputs have measured and bounded resource behavior where scale requires it.
-- **Dependable.** Supported behavior is documented, tested, and released consistently.
+A change belongs when it solves a normal message workflow, a CCSDS correctness requirement, or a
+measured bottleneck. Prefer the smallest complete design, existing shared mechanisms, and explicit
+caller data over inferred operational facts. Do not add speculative options, compatibility modes,
+or integrations without a concrete use case.
 
-## Scope
+Every supported current message family must meet the same
+[verification criteria](conformance/README.md#verification-criteria). More message names or a
+passing example do not compensate for incomplete rules. Book/schema disagreements need an explicit
+decision, a source, and a regression test; generation must not silently discard information.
 
-The Rust core is the single implementation of parsing, validation, conversion, and generation
-behavior. The Python bindings reuse that behavior rather than developing an independent
-interpretation of the standards.
+Use reproducible representative workloads for performance changes. A faster implementation must
+preserve validation, error handling, data, and the documented ownership semantics.
 
-The project intends to support the CCSDS NDM family in KVN and XML. Work is prioritized by common
-user workflows, correctness risk, and practical value. Complete, well-tested support for important
-message types is more valuable than broad but unreliable coverage.
-
-The project handles NDM representation and exchange. Orbit propagation, frame transformation,
-conjunction analysis, attitude dynamics, and other astrodynamics computations are outside its
-scope.
-
-## Feature Bar
-
-Popularity is an outcome of reliable user success, not feature count. A feature earns its place
-only when it:
-
-1. solves a common workflow, a CCSDS correctness requirement, or a measured bottleneck;
-2. uses the smallest complete design that keeps the safe path easy;
-3. improves correctness, performance, or usability enough to justify its tests, documentation,
-   compatibility cost, and long-term maintenance; and
-4. stays inside NDM representation and exchange.
-
-When comparing this project with another library, use a reproducible workload for performance and
-the shortest realistic workflow for usability. Do not add speculative extension points,
-compatibility modes, or integrations “just in case”; wait for demonstrated demand.
-
-## Current Capabilities
-
-This document describes the direction of the project, not the capabilities of a particular
-release. The [support matrix](support-matrix.md) is the authoritative statement of what is
-currently supported and verified.
-
-## Guiding Principles
-
-1. **CCSDS is authoritative.** Official publications, corrigenda, and schemas define correct
-   behavior.
-2. **No silent data loss.** Unsupported, ambiguous, or invalid data must not be silently discarded
-   or reinterpreted.
-3. **The safe path is the easy path.** Correct parsing and generation should be the default and
-   should not require unnecessary ceremony.
-4. **Generation validates first.** Public writers emit valid output or return an actionable error.
-5. **Performance is measured.** Optimization follows representative workloads and must not weaken
-   correctness or clarity.
-6. **Complexity must earn its place.** Features, abstractions, compatibility modes, and additional
-   integrations are added only when they solve a demonstrated practical need.
+The [support matrix](support-matrix.md) records capabilities and limits of the implementation.
+The [validation contract](design/validation-contract.md) defines enforcement and authority;
+this document sets the scope for future work rather than making additional support claims.

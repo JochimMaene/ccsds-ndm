@@ -5,7 +5,6 @@
 use super::{CovLine, ManLine, Ocm, TrajLine};
 use crate::error::{Result, ValidationError};
 use crate::types::Epoch;
-use fast_float;
 use serde::{Deserialize, Serialize};
 
 fn ocm_xml_children(parent: &[u8]) -> Option<&'static [&'static [u8]]> {
@@ -367,7 +366,6 @@ pub(super) fn validate_sequences(xml: &str) -> Result<()> {
                             | b"OD_MIN_PRED_EIGMIN"
                             | b"OD_CONFIDENCE"
                             | b"SEDR"
-                            | b"WEIGHTED_RMS"
                     ))
         },
     )
@@ -376,6 +374,109 @@ pub(super) fn validate_sequences(xml: &str) -> Result<()> {
 impl Ocm {
     pub(crate) fn validate_xml_representability(&self) -> Result<()> {
         let data = &self.body.segment.data;
+        let metadata = &self.body.segment.metadata;
+        // KVN and the model keep these open (registry token / book "suggested values"); the XML
+        // edition enumerates them.
+        let enumerated = |field: &'static str,
+                          value: Option<&String>,
+                          allowed: &[&str],
+                          path: String|
+         -> Result<()> {
+            match value {
+                Some(value) if !allowed.contains(&value.as_str()) => Err(
+                    ValidationError::invalid_value(field, value, allowed.join(", "))
+                        .at_path(path)
+                        .into(),
+                ),
+                _ => Ok(()),
+            }
+        };
+        enumerated(
+            "OBJECT_TYPE",
+            metadata.object_type.as_ref(),
+            &[
+                "PAYLOAD",
+                "payload",
+                "ROCKET BODY",
+                "rocket body",
+                "DEBRIS",
+                "debris",
+                "UNKNOWN",
+                "unknown",
+                "OTHER",
+                "other",
+            ],
+            "body.segment.metadata".to_string(),
+        )?;
+        for (index, trajectory) in data.traj.iter().enumerate() {
+            enumerated(
+                "TRAJ_BASIS",
+                trajectory.traj_basis.as_ref(),
+                &["PREDICTED", "DETERMINED", "TELEMETRY", "SIMULATED", "OTHER"],
+                format!("body.segment.data.traj[{index}]"),
+            )?;
+        }
+        for (index, covariance) in data.cov.iter().enumerate() {
+            enumerated(
+                "COV_BASIS",
+                covariance.cov_basis.as_ref(),
+                &["PREDICTED", "DETERMINED", "EMPIRICAL", "SIMULATED", "OTHER"],
+                format!("body.segment.data.cov[{index}]"),
+            )?;
+        }
+        for (field, value) in [
+            ("OPERATOR_URL", &metadata.operator_url),
+            ("OPERATOR_EMAIL", &metadata.operator_email),
+            ("OPERATOR_PHONE", &metadata.operator_phone),
+            ("OPERATOR_AUTOMATED_URL", &metadata.operator_automated_url),
+            ("EMERGENCY_EMAIL", &metadata.emergency_email),
+            ("EMERGENCY_PHONE", &metadata.emergency_phone),
+            ("EMERGENCY_AVAILABILITY", &metadata.emergency_availability),
+            ("SSA_EMAIL", &metadata.ssa_email),
+            ("SSA_PHONE", &metadata.ssa_phone),
+            ("OWNER_URL", &metadata.owner_url),
+        ] {
+            if value.is_some() {
+                return Err(ValidationError::InvalidValue {
+                    field: field.into(),
+                    value: "present".into(),
+                    expected: "absent: NDM/XML 4.0.0 predates the June 2026 OCM corrigendum".into(),
+                    line: None,
+                }
+                .at_path("body.segment.metadata")
+                .into());
+            }
+        }
+        for covariance in &data.cov {
+            if covariance.traj_id.is_some() {
+                return Err(ValidationError::InvalidValue {
+                    field: "TRAJ_ID".into(),
+                    value: "present".into(),
+                    expected:
+                        "absent in covariance: NDM/XML 4.0.0 predates the June 2026 OCM corrigendum"
+                            .into(),
+                    line: None,
+                }
+                .at_path("body.segment.data.cov")
+                .into());
+            }
+        }
+        if data.user.as_ref().is_some_and(|user| {
+            user.parameters()
+                .any(|parameter| parameter.parameter.starts_with("COMPOSITION_"))
+        }) {
+            return Err(ValidationError::InvalidValue {
+                field: "USER_DEFINED_COMPOSITION".into(),
+                value: "present".into(),
+                expected:
+                    "scalar parameters only: NDM/XML 4.0.0 has no sequence-row representation"
+                        .into(),
+                line: None,
+            }
+            .at_path("body.segment.data.user")
+            .into());
+        }
+
         if let Some(value) = data.phys.as_ref().and_then(|phys| phys.drag_coeff_nom) {
             if value <= 0.0 {
                 return Err(ValidationError::OutOfRange {
@@ -458,7 +559,10 @@ impl<'de> Deserialize<'de> for TrajLine {
                     .parse::<Epoch>()
                     .map_err(|error| error.to_string())?;
                 let values: std::result::Result<Vec<f64>, _> = parts
-                    .map(|v| fast_float::parse(v).map_err(|error| error.to_string()))
+                    .map(|v| {
+                        crate::kvn::parser::parse_ccsds_number(v)
+                            .ok_or_else(|| format!("invalid or unrepresentable number {v}"))
+                    })
                     .collect();
                 Ok(TrajLine {
                     epoch,
@@ -499,7 +603,10 @@ impl<'de> Deserialize<'de> for CovLine {
                     .parse::<Epoch>()
                     .map_err(|error| error.to_string())?;
                 let values: std::result::Result<Vec<f64>, _> = parts
-                    .map(|v| fast_float::parse(v).map_err(|error| error.to_string()))
+                    .map(|v| {
+                        crate::kvn::parser::parse_ccsds_number(v)
+                            .ok_or_else(|| format!("invalid or unrepresentable number {v}"))
+                    })
                     .collect();
                 Ok(CovLine {
                     epoch,
@@ -544,4 +651,55 @@ impl<'de> Deserialize<'de> for ManLine {
             },
         )
     }
+}
+
+pub(super) fn canonical_units(value: &str) -> String {
+    if value.starts_with('[') && value.ends_with(']') && value.contains(',') {
+        value.to_owned()
+    } else {
+        format!("[{}]", super::parse_units_list(value).join(","))
+    }
+}
+
+pub(super) fn serialize_units<S: serde::Serializer>(
+    value: &Option<String>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    value.as_deref().map(canonical_units).serialize(serializer)
+}
+
+pub(super) fn deserialize_units<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Option<String>, D::Error> {
+    Ok(Option::<String>::deserialize(deserializer)?
+        .as_deref()
+        .map(canonical_units))
+}
+
+pub(super) fn serialize_composition<S: serde::Serializer>(
+    value: &str,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    super::kvn::canonical_man_composition(value).serialize(serializer)
+}
+
+pub(super) fn deserialize_composition<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<String, D::Error> {
+    Ok(super::kvn::canonical_man_composition(&String::deserialize(
+        deserializer,
+    )?))
+}
+
+pub(super) fn serialize_user<S: serde::Serializer>(
+    value: &Option<super::OcmUserDefined>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    if value
+        .as_ref()
+        .is_some_and(|user| user.parameters().next().is_none())
+    {
+        return Err(serde::ser::Error::custom(super::EMPTY_USER_BLOCK));
+    }
+    value.serialize(serializer)
 }

@@ -48,6 +48,12 @@ jobs:
           sudo apt-get install --yes libxml2-utils
       - name: Run tests
         run: just test-rust
+      - name: Smoke-test OCM memory example modes
+        run: |
+          cargo build --manifest-path ccsds-ndm/Cargo.toml --example ocm_memory
+          for mode in model xml-parse kvn-parse cov-model cov-xml-parse cov-kvn-parse man-model man-xml-parse man-kvn-parse; do
+            ccsds-ndm/target/debug/examples/ocm_memory "$mode"
+          done
 
   python-bindings:
     name: Python bindings

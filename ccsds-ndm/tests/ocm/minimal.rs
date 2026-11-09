@@ -2,7 +2,9 @@ use crate::common::mutated;
 use ccsds_ndm::messages::ocm::Ocm;
 use ccsds_ndm::Ndm;
 
-const KVN: &str = r#"CCSDS_OCM_VERS = 3.0
+pub(super) const HEADER: &str = "CCSDS_OCM_VERS = 3.0\nCREATION_DATE = 2023-01-01T00:00:00\nORIGINATOR = TEST\nMETA_START\nTIME_SYSTEM = UTC\nEPOCH_TZERO = 2023-01-01T00:00:00\nMETA_STOP\n";
+
+pub(super) const KVN: &str = r#"CCSDS_OCM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 META_START
@@ -19,7 +21,16 @@ TRAJ_STOP
 
 #[test]
 fn minimal_kvn_parses() {
-    Ocm::from_kvn(KVN).unwrap();
+    let message = Ocm::from_kvn(KVN).unwrap();
+    assert_eq!(message.body.segment.metadata.time_system, "UTC");
+    assert!(message.body.segment.metadata.sclk_offset_at_epoch.is_none());
+    assert!(message.body.segment.metadata.sclk_sec_per_si_sec.is_none());
+    assert_eq!(message.body.segment.data.traj.len(), 1);
+    assert_eq!(
+        message.body.segment.data.traj[0].traj_lines[0].values.len(),
+        6
+    );
+    assert_eq!(Ocm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
 }
 
 #[test]
@@ -32,29 +43,6 @@ fn rejects_missing_tzero_kvn() {
         "{error}"
     );
     crate::common::assert_validation_field(&error, "EPOCH_TZERO");
-}
-
-#[test]
-fn rejects_wrong_keyword_kvn() {
-    let input = mutated(KVN, "TIME_SYSTEM", "BAD_KEY");
-    let error = Ocm::from_kvn(&input).unwrap_err();
-    assert_eq!(error.code(), Some("parse.kvn.syntax"), "{error}");
-}
-
-#[test]
-fn rejects_invalid_trajectory_basis_kvn() {
-    let input = mutated(KVN, "TRAJ_START\n", "TRAJ_START\nTRAJ_BASIS = INVALID\n");
-    Ocm::from_kvn(&mutated(
-        &input,
-        "TRAJ_BASIS = INVALID",
-        "TRAJ_BASIS = PREDICTED",
-    ))
-    .expect("valid control");
-    let error = Ocm::from_kvn(&input).unwrap_err();
-    assert!(
-        matches!(error.as_format_error(), Some(ccsds_ndm::error::FormatError::Enum(cause)) if cause.field == "TRAJ_BASIS" && cause.value == "INVALID"),
-        "{error}"
-    );
 }
 
 #[test]

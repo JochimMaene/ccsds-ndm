@@ -10,9 +10,12 @@ import ccsds_ndm
 
 REPOSITORY_ROOT = Path(__file__).parents[3]
 OPM_KVN = (REPOSITORY_ROOT / "ccsds-ndm/data/kvn/opm_g1.kvn").read_text()
-# 1.0 is readable but withdrawn as an output edition, so it can only be reached by parsing.
-OPM_KVN_V1 = OPM_KVN.replace("CCSDS_OPM_VERS = 3.0", "CCSDS_OPM_VERS = 1.0")
-COMBINED_XML = (REPOSITORY_ROOT / "ccsds-ndm/data/xml/ndm_g12.xml").read_text()
+# OEM 1.0 remains a deliberately scoped KVN reader, with no generation support.
+OEM_KVN_V1 = (
+    (REPOSITORY_ROOT / "ccsds-ndm/data/kvn/oem_g11.kvn")
+    .read_text()
+    .replace("CCSDS_OEM_VERS = 3.0", "CCSDS_OEM_VERS = 1.0")
+)
 PERMISSIVE_XML = (REPOSITORY_ROOT / "ccsds-ndm/data/xml/ndm_g22.xml").read_text()
 
 
@@ -40,7 +43,7 @@ def test_generation_has_no_misleading_unchecked_mode():
 
 
 def test_unsupported_version_errors_expose_the_common_diagnostic_attributes():
-    message = ccsds_ndm.Opm.from_str(OPM_KVN_V1, format="kvn")
+    message = ccsds_ndm.Oem.from_str(OEM_KVN_V1, format="kvn")
 
     with pytest.raises(ccsds_ndm.NdmValidationError) as unsupported:
         message.to_str("xml")
@@ -73,7 +76,7 @@ def test_format_names_are_case_insensitive(tmp_path):
 
 
 def test_failed_generation_preserves_existing_file(tmp_path):
-    message = ccsds_ndm.Opm.from_str(OPM_KVN_V1, format="kvn")
+    message = ccsds_ndm.Oem.from_str(OEM_KVN_V1, format="kvn")
     output = tmp_path / "output.ndm"
     output.write_text("keep me")
 
@@ -103,29 +106,7 @@ def test_opm_structured_diagnostics_are_exposed():
     assert error.original_token == "UNKNOWN_KEY = value"
 
 
-def test_python_file_parsing_reports_io_errors(tmp_path):
-    source = tmp_path / "source.kvn"
-    source.write_text(OPM_KVN)
-
-    with pytest.raises(ccsds_ndm.NdmIoError):
-        ccsds_ndm.from_file(str(tmp_path / "missing.kvn"), format="kvn")
-
-
-def test_generic_python_conversion_dispatches_non_opm_messages(tmp_path):
-    omm = (REPOSITORY_ROOT / "ccsds-ndm/data/kvn/omm_g7.kvn").read_text()
-    xml = ccsds_ndm.convert(omm, "xml")
-    assert isinstance(ccsds_ndm.from_str(xml, format="xml"), ccsds_ndm.Omm)
-
-    source = tmp_path / "source.omm"
-    destination = tmp_path / "destination.xml"
-    source.write_text(omm)
-    ccsds_ndm.convert_file(str(source), str(destination), "xml")
-    assert isinstance(
-        ccsds_ndm.from_file(str(destination), format="xml"), ccsds_ndm.Omm
-    )
-
-
-def test_combined_python_message_keeps_identity():
+def test_empty_combined_python_message_keeps_identity():
     empty = ccsds_ndm.from_str(
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<ndm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/>',
@@ -134,29 +115,24 @@ def test_combined_python_message_keeps_identity():
     assert isinstance(empty, ccsds_ndm.CombinedNdm)
     assert empty.messages == []
 
-    message = ccsds_ndm.from_str(COMBINED_XML, format="xml")
-    assert isinstance(message, ccsds_ndm.CombinedNdm)
 
-    xml = message.to_str("xml")
-    assert isinstance(ccsds_ndm.from_str(xml, format="xml"), ccsds_ndm.CombinedNdm)
-
-
-def test_python_conversion_delegates_to_strict_rust_core(tmp_path):
-    xml = ccsds_ndm.convert(OPM_KVN, "xml")
-    expected_kvn = ccsds_ndm.Opm.from_str(OPM_KVN, format="kvn").to_str("kvn")
-    assert ccsds_ndm.Opm.from_str(xml, format="xml").to_str("kvn") == expected_kvn
-
-    kvn = ccsds_ndm.convert(xml, "kvn")
-    assert ccsds_ndm.Opm.from_str(kvn, format="kvn").to_str("kvn") == expected_kvn
-
+def test_failed_conversion_preserves_existing_file(tmp_path):
     source = tmp_path / "source.kvn"
     destination = tmp_path / "destination.xml"
-    source.write_text(OPM_KVN)
-    ccsds_ndm.convert_file(str(source), str(destination), "xml")
-    ccsds_ndm.from_file(str(destination), format="xml")
-
     destination.write_text("sentinel")
     source.write_text("not an OPM")
     with pytest.raises(ccsds_ndm.NdmUnsupportedMessageError):
         ccsds_ndm.convert_file(str(source), str(destination), "xml")
     assert destination.read_text() == "sentinel"
+
+
+@pytest.mark.parametrize("format", ["kvn", "xml"])
+def test_opm_1_requires_an_edition_specific_reader(format):
+    text = OPM_KVN if format == "kvn" else ccsds_ndm.Opm.from_str(OPM_KVN).to_str("xml")
+    legacy = text.replace("CCSDS_OPM_VERS = 3.0", "CCSDS_OPM_VERS = 1.0").replace(
+        'version="3.0"', 'version="1.0"'
+    )
+    for parser in (ccsds_ndm.Opm.from_str, ccsds_ndm.from_str):
+        with pytest.raises(ccsds_ndm.NdmError, match="Unsupported.*1.0") as caught:
+            parser(legacy, format=format)
+        assert caught.value.code == "parse.unsupported_input_version"

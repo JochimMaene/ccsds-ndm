@@ -98,15 +98,148 @@ fn combined_envelope_carries_one_message_of_every_family() {
     .collect();
 
     let combined = CombinedNdm {
-        id: None,
-        comments: Vec::new(),
+        id: Some("TEST_ID_123".into()),
+        comments: vec!["Global NDM comment".into()],
         messages: messages.clone(),
     };
     ccsds_ndm::Validate::validate(&combined).unwrap();
 
-    let xml = Message::Ndm(combined).to_xml().unwrap();
+    let xml = Message::Ndm(combined.clone()).to_xml().unwrap();
     let Message::Ndm(reparsed) = ccsds_ndm::from_str(&xml).unwrap() else {
         panic!("combined envelope did not round-trip");
     };
-    assert_eq!(reparsed.messages, messages);
+    assert_eq!(reparsed, combined);
+}
+
+#[test]
+fn combined_schema_refuses_standalone_odm2_constituents_before_output() {
+    for source in [
+        include_str!("../../data/kvn/opm_g1.kvn"),
+        include_str!("../../data/kvn/omm_g9.kvn"),
+        include_str!("../../data/kvn/oem_g13.kvn"),
+    ] {
+        let mut child = ccsds_ndm::from_str(source).unwrap();
+        let (version, header) = match &mut child {
+            Message::Opm(value) => (&mut value.version, &mut value.header),
+            Message::Omm(value) => (&mut value.version, &mut value.header),
+            Message::Oem(value) => (&mut value.version, &mut value.header),
+            _ => unreachable!(),
+        };
+        *version = "2.0".into();
+        header.classification = None;
+        header.message_id = None;
+        let standalone = child.to_xml().unwrap();
+        let combined = CombinedNdm {
+            id: None,
+            comments: vec![],
+            messages: vec![child],
+        };
+        combined.validate().unwrap();
+        assert!(combined
+            .to_xml()
+            .unwrap_err()
+            .to_string()
+            .contains("NDM/XML 4.0.0"));
+        let mut output = Vec::new();
+        assert!(combined.write_xml_to(&mut output).is_err());
+        assert!(output.is_empty());
+        let document = format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?><ndm>{}</ndm>",
+            standalone.split_once('\n').unwrap().1
+        );
+        assert_eq!(CombinedNdm::from_xml(&document).unwrap(), combined);
+    }
+}
+
+#[test]
+fn combined_schema_refuses_legacy_tdm_but_standalone_input_remains_supported() {
+    use ccsds_ndm::messages::tdm::Tdm;
+    let source = include_str!("../../data/legacy/tdm_1_0_b9.xml");
+    let child = Tdm::from_xml(source).unwrap();
+    assert_eq!(child.version, "1.0");
+    let body = &source[source.find("<header>").unwrap()..source.rfind("</tdm>").unwrap()];
+    let xml = format!("<ndm><tdm id=\"CCSDS_TDM_VERS\" version=\"1.0\">{body}</tdm></ndm>");
+    assert!(CombinedNdm::from_xml(&xml).is_ok());
+    assert!(ccsds_ndm::from_str(&xml).is_ok());
+    let combined = CombinedNdm {
+        id: None,
+        comments: vec![],
+        messages: vec![Message::Tdm(child)],
+    };
+    combined.validate().unwrap();
+    assert!(combined.to_xml().is_err());
+    let mut output = Vec::new();
+    assert!(combined.write_xml_to(&mut output).is_err());
+    assert!(output.is_empty());
+}
+
+#[test]
+fn combined_xml_output_applies_cdm_available_value_checks() {
+    let mut cdm =
+        ccsds_ndm::messages::cdm::Cdm::from_kvn(include_str!("../../data/kvn/cdm_363.kvn"))
+            .unwrap();
+    cdm.header.message_for = Some("N/A".into());
+    assert!(cdm.to_xml().is_err());
+    let combined = CombinedNdm {
+        id: None,
+        comments: vec![],
+        messages: vec![Message::Cdm(cdm)],
+    };
+    assert!(combined.to_xml().is_err());
+    let mut output = Vec::new();
+    assert!(combined.write_xml_to(&mut output).is_err());
+    assert!(output.is_empty());
+}
+
+#[test]
+fn shipped_g22_ocm_constituent_violates_man_composition_order() {
+    let source = include_str!("../../data/xml/ndm_g22.xml");
+    let opm = &source[source.find("<opm ").unwrap()..source.find("</opm>").unwrap() + 6];
+    let without_opm = source.replacen(opm, "", 1);
+    let error = CombinedNdm::from_xml(&without_opm).unwrap_err().to_string();
+    assert!(error.contains("MAN_COMPOSITION"), "{error}");
+    let ocm = &without_opm[without_opm.find("<ocm ").unwrap()..];
+    let ocm = &ocm[..ocm.find("</ocm>").unwrap() + 6];
+    let without_both = without_opm.replacen(ocm, "", 1);
+    assert_eq!(
+        CombinedNdm::from_xml(&without_both).unwrap().messages.len(),
+        2
+    );
+}
+
+#[test]
+fn constituent_namespace_declarations_are_namespace_scope_not_attributes() {
+    let source = include_str!("../../data/xml/ndm_g12.xml");
+    let expected = CombinedNdm::from_xml(source).unwrap();
+    let child = &source[source.find("<apm").unwrap()..];
+    let tag = &child[..child.find('>').unwrap()];
+    for declaration in [
+        " xmlns:local=\"urn:example:local\"",
+        " xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"",
+    ] {
+        let declared = source.replacen(tag, &format!("{tag}{declaration}"), 1);
+        assert_eq!(
+            CombinedNdm::from_xml(&declared).unwrap(),
+            expected,
+            "{declaration}"
+        );
+    }
+    // A schema-location hint is an attribute, not a declaration (ODM 8.12.7).
+    let hinted = source.replacen(
+        tag,
+        &format!("{tag} xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"x.xsd\""),
+        1,
+    );
+    assert!(CombinedNdm::from_xml(&hinted).is_err());
+}
+
+#[test]
+fn empty_combined_envelope_is_accepted_and_generated_despite_the_should() {
+    for source in ["<ndm/>", "<ndm></ndm>"] {
+        let empty = CombinedNdm::from_xml(source).unwrap();
+        assert!(empty.messages.is_empty());
+        let xml = empty.to_xml().unwrap();
+        validate_xml("empty combined NDM", &xml);
+        assert_eq!(CombinedNdm::from_xml(&xml).unwrap(), empty);
+    }
 }

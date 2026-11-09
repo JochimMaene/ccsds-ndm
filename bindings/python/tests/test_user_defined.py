@@ -6,12 +6,7 @@
 Unit tests for UserDefined type in CCSDS NDM Python bindings.
 """
 
-import pytest
-
-try:
-    from ccsds_ndm import UserDefined
-except ImportError:
-    pytest.skip("UserDefined class not available", allow_module_level=True)
+from ccsds_ndm import UserDefined
 
 
 class TestUserDefined:
@@ -25,10 +20,8 @@ class TestUserDefined:
         comment = ["Comment 1", "Comment 2"]
         ud = UserDefined(parameters=params, comment=comment)
 
-        assert ud.user_defined["PARAM1"] == "VALUE1"
-        assert ud.user_defined["PARAM2"] == "VALUE2"
-        assert len(ud.comment) == 2
-        assert ud.comment[0] == "Comment 1"
+        assert ud.user_defined == params
+        assert ud.comment == comment
 
     def test_setters(self):
         ud = UserDefined()

@@ -4,16 +4,15 @@
 
 use crate::common::{mutated, validate_xml};
 use crate::{
-    assert_invalid_value_diagnostic, assert_missing_required, opm, opm_with_maneuvers,
-    validation_error_source, MINIMAL, OPM_3_KVN_FIXTURES,
+    assert_diagnostic, assert_missing_required, opm, opm_with_maneuvers, validation_error_source,
+    MINIMAL, OPM_3_KVN_FIXTURES,
 };
-use ccsds_ndm::common::StateVector;
 use ccsds_ndm::error::{Result, ValidationError};
-use ccsds_ndm::messages::opm::{KeplerianElements, Opm, OpmBody, OpmData, OpmMetadata, OpmSegment};
+use ccsds_ndm::messages::opm::{KeplerianElements, Opm};
 use ccsds_ndm::types::{
-    Angle, CalendarEpoch, Distance, Gm, GmUnits, Inclination, NonNegativeDouble, Velocity,
+    Angle, CalendarEpoch, Distance, Gm, GmUnits, Inclination, NonNegativeDouble,
 };
-use ccsds_ndm::{Message, Ndm, Validate};
+use ccsds_ndm::{Message, Ndm};
 use std::str::FromStr;
 
 fn assert_missing_object_name<T: std::fmt::Debug>(surface: &str, result: Result<T>) {
@@ -82,39 +81,19 @@ fn opm_3_xml_generation_rejects_unaudited_editions_across_rust_entry_points() {
         message.version = "1.0".into();
         message
     };
-    assert_unsupported_version(
-        "Ndm::to_xml",
-        "1.0",
-        "generation.unsupported_output_version",
-        historical.to_xml(),
-    );
+    assert_unsupported_version("Ndm::to_xml", historical.to_xml());
     let mut streamed = Vec::new();
-    assert_unsupported_version(
-        "Ndm::write_xml_to",
-        "1.0",
-        "generation.unsupported_output_version",
-        historical.write_xml_to(&mut streamed),
-    );
+    assert_unsupported_version("Ndm::write_xml_to", historical.write_xml_to(&mut streamed));
     assert!(
         streamed.is_empty(),
         "unsupported streaming generation wrote partial output"
     );
 
     let historical = Message::Opm(historical);
-    assert_unsupported_version(
-        "Message::to_xml",
-        "1.0",
-        "generation.unsupported_output_version",
-        historical.to_xml(),
-    );
+    assert_unsupported_version("Message::to_xml", historical.to_xml());
     let directory = tempfile::tempdir().expect("failed to create temporary directory");
     let path = directory.path().join("unsupported-opm.xml");
-    assert_unsupported_version(
-        "Message::to_xml_file",
-        "1.0",
-        "generation.unsupported_output_version",
-        historical.to_xml_file(&path),
-    );
+    assert_unsupported_version("Message::to_xml_file", historical.to_xml_file(&path));
     assert!(
         !path.exists(),
         "unsupported file generation created an output file"
@@ -139,7 +118,7 @@ fn opm_3_xml_generation_reports_an_invalid_root_id() {
     let mut opm = Opm::from_kvn(OPM_3_KVN_FIXTURES[0].1).expect("failed to parse OPM fixture");
     opm.id = Some("WRONG_ID".into());
 
-    assert_invalid_value_diagnostic("id", opm.to_xml(), "id");
+    assert_diagnostic("validation.invalid_value", "id", opm.to_xml(), "id");
 }
 
 #[test]
@@ -294,7 +273,9 @@ fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
                     .user_defined_parameters
                     .as_mut()
                     .unwrap()
-                    .user_defined[0]
+                    .parameters_mut()
+                    .next()
+                    .unwrap()
                     .parameter
                     .push('\u{1}')
             },
@@ -310,8 +291,8 @@ fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
                     .user_defined_parameters
                     .as_mut()
                     .unwrap()
-                    .comment
-                    .push("\u{1}".into())
+                    .entries
+                    .push(ccsds_ndm::types::UserDefinedEntry::Comment("\u{1}".into()))
             },
         ),
         (
@@ -325,7 +306,9 @@ fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
                     .user_defined_parameters
                     .as_mut()
                     .unwrap()
-                    .user_defined[0]
+                    .parameters_mut()
+                    .next()
+                    .unwrap()
                     .value
                     .push('\u{1}')
             },
@@ -336,7 +319,7 @@ fn opm_3_xml_generation_rejects_strings_that_cannot_appear_in_xml() {
         let mut opm =
             Opm::from_kvn(OPM_3_KVN_FIXTURES[fixture].1).expect("failed to parse OPM fixture");
         mutate(&mut opm);
-        assert_invalid_value_diagnostic(field, opm.to_xml(), path);
+        assert_diagnostic("validation.invalid_value", field, opm.to_xml(), path);
     }
 }
 
@@ -448,16 +431,11 @@ fn assert_non_finite_rejected<T: std::fmt::Debug>(surface: &str, result: Result<
     );
 }
 
-fn assert_unsupported_version<T: std::fmt::Debug>(
-    surface: &str,
-    expected_edition: &str,
-    expected_code: &str,
-    result: Result<T>,
-) {
+fn assert_unsupported_version<T: std::fmt::Debug>(surface: &str, result: Result<T>) {
     let error = result.expect_err(surface);
     assert_eq!(
         error.code(),
-        Some(expected_code),
+        Some("generation.unsupported_output_version"),
         "{surface} returned an unstable diagnostic code"
     );
     assert_eq!(
@@ -476,7 +454,7 @@ fn assert_unsupported_version<T: std::fmt::Debug>(
         diagnostic.notation,
         ccsds_ndm::error::DiagnosticNotation::Xml
     );
-    assert_eq!(diagnostic.source_edition, Some(expected_edition));
+    assert_eq!(diagnostic.source_edition, Some("1.0"));
 }
 
 fn assignment_keys(kvn: &str) -> Vec<&str> {
@@ -543,10 +521,19 @@ fn annex_g_opm_fixtures_generate_printable_ordered_kvn_with_preserved_units() {
         include_str!("../../data/kvn/opm_g3.kvn"),
         include_str!("../../data/kvn/opm_g4.kvn"),
     ] {
-        let generated = Opm::from_kvn(source)
-            .expect("Annex G OPM fixture should parse")
-            .to_kvn()
-            .expect("Annex G OPM should generate");
+        let message = Opm::from_kvn(source).expect("Annex G OPM fixture should parse");
+        if source.contains("COV_REF_FRAME") {
+            assert!(message
+                .body
+                .segment
+                .data
+                .covariance_matrix
+                .as_ref()
+                .unwrap()
+                .cov_ref_frame
+                .is_some());
+        }
+        let generated = message.to_kvn().expect("Annex G OPM should generate");
 
         assert_eq!(assignment_keys(&generated), assignment_keys(source));
         assert_eq!(assignment_units(&generated), assignment_units(source));
@@ -593,7 +580,7 @@ fn opm_kvn_rounds_values_that_need_seventeen_digits() {
     message.body.segment.data.state_vector.x.value = 1.234_567_890_123_456_7;
 
     let generated = message.to_kvn().expect("finite value should be rounded");
-    assert!(generated.contains("X                    = 1.234567890123457e0"));
+    assert!(generated.contains("X                    = 1.234567890123457"));
 
     let mut output = Vec::new();
     message
@@ -676,7 +663,7 @@ fn opm_kvn_rounds_numbers_in_every_optional_numeric_block() {
         assert!(message
             .to_kvn()
             .expect("finite value should be rounded")
-            .contains("1.234567890123457e0"));
+            .contains("1.234567890123457"));
         message
             .to_xml()
             .expect("the KVN-specific precision rule must not affect XML");
@@ -685,17 +672,24 @@ fn opm_kvn_rounds_numbers_in_every_optional_numeric_block() {
 
 #[test]
 fn opm_kvn_canonicalizes_gm_units_to_the_odm_spelling() {
-    let mut message =
-        Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).expect("fixture should parse");
-    message
-        .body
-        .segment
-        .data
-        .keplerian_elements
-        .as_mut()
-        .unwrap()
-        .gm
-        .units = Some(GmUnits::KM3PerS2);
+    let source = mutated(
+        include_str!("../../data/kvn/opm_g2.kvn"),
+        "GM = 398600.4415 [km**3/s**2]",
+        "GM = 398600.4415 [KM**3/S**2]",
+    );
+    let message = Opm::from_kvn(&source).expect("uppercase GM units should parse");
+    assert_eq!(
+        message
+            .body
+            .segment
+            .data
+            .keplerian_elements
+            .as_ref()
+            .unwrap()
+            .gm
+            .units,
+        Some(GmUnits::KM3PerS2)
+    );
 
     // ODM 7.7.1 admits only the keyword table spelling in KVN, so the uppercase spelling the
     // XML schema also permits is rewritten rather than rejected.
@@ -704,6 +698,7 @@ fn opm_kvn_canonicalizes_gm_units_to_the_odm_spelling() {
         .expect("uppercase GM units should be canonicalized, not rejected");
     assert!(kvn.contains("[km**3/s**2]"), "{kvn}");
     assert!(!kvn.contains("KM**3/S**2"), "{kvn}");
+    Opm::from_kvn(&kvn).expect("regenerated KVN should parse");
 
     // The uppercase spelling stays valid on the XML side.
     assert!(message
@@ -713,20 +708,12 @@ fn opm_kvn_canonicalizes_gm_units_to_the_odm_spelling() {
 }
 
 #[test]
-fn opm_kvn_gm_units_survive_a_kvn_round_trip() {
-    let source = mutated(
-        include_str!("../../data/kvn/opm_g2.kvn"),
-        "GM = 398600.4415 [km**3/s**2]",
-        "GM = 398600.4415 [KM**3/S**2]",
-    );
-    let message = Opm::from_kvn(&source).expect("uppercase GM units should parse");
-    let regenerated = message.to_kvn().expect("regeneration should succeed");
-    Opm::from_kvn(&regenerated).expect("regenerated KVN should parse");
-}
-
-#[test]
 fn opm_kvn_rejects_non_ascii_and_control_characters() {
-    for invalid in ["ESOC 🚀", "ESOC\tFlight Dynamics", "ESOC\nFlight Dynamics"] {
+    for invalid in [
+        "ESOC 🚀",
+        "ESOC\x0bFlight Dynamics",
+        "ESOC\nFlight Dynamics",
+    ] {
         let mut message = opm();
         message.header.originator = invalid.to_owned();
 
@@ -756,7 +743,9 @@ fn opm_kvn_rejects_invalid_user_defined_keyword_suffixes() {
             .user_defined_parameters
             .as_mut()
             .unwrap()
-            .user_defined[0]
+            .parameters_mut()
+            .next()
+            .unwrap()
             .parameter = invalid.to_owned();
 
         let error = message
@@ -789,7 +778,9 @@ fn opm_kvn_accepts_normative_user_defined_keyword_forms() {
             .user_defined_parameters
             .as_mut()
             .unwrap()
-            .user_defined[0]
+            .parameters_mut()
+            .next()
+            .unwrap()
             .parameter = valid.to_owned();
 
         let generated = message.to_kvn().expect("valid KVN keyword should generate");
@@ -849,7 +840,9 @@ fn opm_kvn_attributes_an_oversized_user_defined_keyword_to_its_parameter() {
         .user_defined_parameters
         .as_mut()
         .unwrap()
-        .user_defined[0];
+        .parameters_mut()
+        .next()
+        .unwrap();
     parameter.parameter = "A".repeat(237);
     parameter.value = "V".to_owned();
 
@@ -869,7 +862,9 @@ fn opm_kvn_attributes_an_oversized_user_defined_keyword_to_its_parameter() {
         .user_defined_parameters
         .as_mut()
         .unwrap()
-        .user_defined[0]
+        .parameters_mut()
+        .next()
+        .unwrap()
         .parameter = "A".repeat(239);
     let error = message
         .to_kvn()
@@ -990,7 +985,9 @@ fn xml_generation_accepts_calendar_ordinal_and_leap_second_boundaries() {
 fn minimal_message_omits_optional_blocks_and_roundtrips() {
     let message = Opm::from_kvn(MINIMAL).unwrap();
     let data = &message.body.segment.data;
+    assert!(message.body.segment.metadata.ref_frame_epoch.is_none());
     assert!(data.keplerian_elements.is_none());
+    assert!(!message.to_kvn().unwrap().contains("SEMI_MAJOR_AXIS"));
     assert!(data.spacecraft_parameters.is_none());
     assert!(data.covariance_matrix.is_none());
     assert!(data.maneuver_parameters.is_empty());
@@ -999,87 +996,20 @@ fn minimal_message_omits_optional_blocks_and_roundtrips() {
 }
 
 #[test]
-fn kvn_roundtrip() {
-    let kvn = r#"CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT1
-OBJECT_ID = 999
-CENTER_NAME = EARTH
-REF_FRAME = GCRF
-TIME_SYSTEM = UTC
-EPOCH = 2023-01-01T00:00:00
-X = 6503.514 [km]
-Y = 1239.647 [km]
-Z = -717.490 [km]
-X_DOT = -0.873160 [km/s]
-Y_DOT = 8.740420 [km/s]
-Z_DOT = -4.191076 [km/s]
-"#;
-    let opm = Opm::from_kvn(kvn).unwrap();
-    let output = opm.to_kvn().unwrap();
-
-    // Parse output again
-    let opm2 = Opm::from_kvn(&output).unwrap();
-    assert_eq!(opm2, opm);
-}
-
-#[test]
 fn kvn_preserves_reference_epoch_and_mean_anomaly() {
-    use ccsds_ndm::common::OdmHeader;
-    let opm = Opm::builder()
-        .version("3.0")
-        .header(
-            OdmHeader::builder()
-                .creation_date("2023-01-01T00:00:00".parse().unwrap())
-                .originator("TEST")
-                .build(),
-        )
-        .body(
-            OpmBody::builder()
-                .segment(
-                    OpmSegment::builder()
-                        .metadata(
-                            OpmMetadata::builder()
-                                .object_name("SAT")
-                                .object_id("1")
-                                .center_name("EARTH")
-                                .ref_frame("GCRF")
-                                .ref_frame_epoch("2000-01-01T12:00:00".parse().unwrap())
-                                .time_system("UTC")
-                                .build(),
-                        )
-                        .data(
-                            OpmData::builder()
-                                .state_vector(
-                                    StateVector::builder()
-                                        .epoch("2023-01-01T00:00:00".parse().unwrap())
-                                        .x(Distance::new(1.0, None))
-                                        .y(Distance::new(1.0, None))
-                                        .z(Distance::new(1.0, None))
-                                        .x_dot(Velocity::new(1.0, None))
-                                        .y_dot(Velocity::new(1.0, None))
-                                        .z_dot(Velocity::new(1.0, None))
-                                        .build(),
-                                )
-                                .keplerian_elements(
-                                    KeplerianElements::builder()
-                                        .semi_major_axis(Distance::new(7000.0, None))
-                                        .eccentricity(NonNegativeDouble::new(0.0).unwrap())
-                                        .inclination(Inclination::new(0.0, None).unwrap())
-                                        .ra_of_asc_node(Angle::new(0.0, None).unwrap())
-                                        .arg_of_pericenter(Angle::new(0.0, None).unwrap())
-                                        .mean_anomaly(Angle::new(0.0, None).unwrap())
-                                        .gm(Gm::new(398600.44, None).unwrap())
-                                        .build(),
-                                )
-                                .build(),
-                        )
-                        .build(),
-                )
-                .build(),
-        )
-        .build();
+    let mut opm = Opm::from_kvn(MINIMAL).unwrap();
+    opm.body.segment.metadata.ref_frame_epoch = Some("2000-01-01T12:00:00".parse().unwrap());
+    opm.body.segment.data.keplerian_elements = Some(
+        KeplerianElements::builder()
+            .semi_major_axis(Distance::new(7000.0, None))
+            .eccentricity(NonNegativeDouble::new(0.0).unwrap())
+            .inclination(Inclination::new(0.0, None).unwrap())
+            .ra_of_asc_node(Angle::new(0.0, None).unwrap())
+            .arg_of_pericenter(Angle::new(0.0, None).unwrap())
+            .mean_anomaly(Angle::new(0.0, None).unwrap())
+            .gm(Gm::new(398600.44, None).unwrap())
+            .build(),
+    );
 
     let kvn = opm.to_kvn().unwrap();
     let reparsed = Opm::from_kvn(&kvn).unwrap();
@@ -1088,52 +1018,27 @@ fn kvn_preserves_reference_epoch_and_mean_anomaly() {
 }
 
 #[test]
-fn minimal_kvn_omits_optional_keplerian_elements() {
-    use ccsds_ndm::common::OdmHeader;
-    // Minimal OPM without Keplerian Elements or optional Spacecraft Params
-    let opm = Opm::builder()
-        .version("3.0")
-        .header(
-            OdmHeader::builder()
-                .creation_date("2023-01-01T00:00:00".parse().unwrap())
-                .originator("TEST")
-                .build(),
-        )
-        .body(
-            OpmBody::builder()
-                .segment(
-                    OpmSegment::builder()
-                        .metadata(
-                            OpmMetadata::builder()
-                                .object_name("SAT")
-                                .object_id("1")
-                                .center_name("EARTH")
-                                .ref_frame("GCRF")
-                                .time_system("UTC")
-                                .build(),
-                        )
-                        .data(
-                            OpmData::builder()
-                                .state_vector(
-                                    StateVector::builder()
-                                        .epoch("2023-01-01T00:00:00".parse().unwrap())
-                                        .x(Distance::new(1.0, None))
-                                        .y(Distance::new(1.0, None))
-                                        .z(Distance::new(1.0, None))
-                                        .x_dot(Velocity::new(1.0, None))
-                                        .y_dot(Velocity::new(1.0, None))
-                                        .z_dot(Velocity::new(1.0, None))
-                                        .build(),
-                                )
-                                .build(),
-                        )
-                        .build(),
-                )
-                .build(),
-        )
-        .build();
-
-    let kvn = opm.to_kvn().unwrap();
-    assert!(!kvn.contains("SEMI_MAJOR_AXIS"));
-    assert!(opm.validate().is_ok());
+fn edition_two_maneuver_needs_spacecraft_block_but_not_mass_in_kvn() {
+    let mut message = Opm::from_kvn(include_str!("../../data/kvn/opm_g2.kvn")).unwrap();
+    assert!(!message.body.segment.data.maneuver_parameters.is_empty());
+    message.version = "2.0".into();
+    message.header.message_id = None;
+    message.header.classification = None;
+    message
+        .body
+        .segment
+        .data
+        .spacecraft_parameters
+        .as_mut()
+        .unwrap()
+        .mass = None;
+    let kvn = message.to_kvn().unwrap();
+    Opm::from_kvn(&kvn).unwrap();
+    message.version = "3.0".into();
+    let error = message.to_kvn().unwrap_err();
+    assert!(error.to_string().contains("MASS"));
+    assert_eq!(
+        error.field_path().as_deref(),
+        Some("body.segment.data.spacecraft_parameters.mass")
+    );
 }

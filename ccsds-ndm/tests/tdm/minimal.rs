@@ -45,7 +45,9 @@ const XML: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 
 #[test]
 fn minimal_kvn_parses() {
-    Tdm::from_kvn(KVN).unwrap();
+    let message = Tdm::from_kvn(KVN).unwrap();
+    assert!(message.body.segments[0].metadata.freq_offset.is_none());
+    assert!(message.body.segments[0].metadata.range_modulus.is_none());
 }
 
 #[test]
@@ -57,7 +59,11 @@ fn minimal_xml_parses() {
 fn rejects_missing_time_system_xml() {
     let input = mutated(XML, "<TIME_SYSTEM>UTC</TIME_SYSTEM>", "");
     let error = Tdm::from_xml(&input).unwrap_err();
-    assert_eq!(error.code(), Some("parse.xml.syntax"), "{error}");
+    assert_eq!(
+        error.code(),
+        Some("validation.missing_required_field"),
+        "{error}"
+    );
 }
 
 #[test]

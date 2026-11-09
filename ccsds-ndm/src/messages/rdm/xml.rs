@@ -98,31 +98,6 @@ pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {
     const STATE: &[&[u8]] = &[
         b"COMMENT", b"EPOCH", b"X", b"Y", b"Z", b"X_DOT", b"Y_DOT", b"Z_DOT",
     ];
-    const COVARIANCE: &[&[u8]] = &[
-        b"COMMENT",
-        b"COV_REF_FRAME",
-        b"CX_X",
-        b"CY_X",
-        b"CY_Y",
-        b"CZ_X",
-        b"CZ_Y",
-        b"CZ_Z",
-        b"CX_DOT_X",
-        b"CX_DOT_Y",
-        b"CX_DOT_Z",
-        b"CX_DOT_X_DOT",
-        b"CY_DOT_X",
-        b"CY_DOT_Y",
-        b"CY_DOT_Z",
-        b"CY_DOT_X_DOT",
-        b"CY_DOT_Y_DOT",
-        b"CZ_DOT_X",
-        b"CZ_DOT_Y",
-        b"CZ_DOT_Z",
-        b"CZ_DOT_X_DOT",
-        b"CZ_DOT_Y_DOT",
-        b"CZ_DOT_Z_DOT",
-    ];
     const SPACECRAFT: &[&[u8]] = &[
         b"COMMENT",
         b"WET_MASS",
@@ -185,7 +160,7 @@ pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {
             b"atmosphericReentryParameters" => in_sequence(child, ATMOSPHERIC),
             b"groundImpactParameters" => in_sequence(child, GROUND),
             b"stateVector" => in_sequence(child, STATE),
-            b"covarianceMatrix" => in_sequence(child, COVARIANCE),
+            b"covarianceMatrix" => in_sequence(child, crate::xml::OPM_COVARIANCE_CHILDREN),
             b"spacecraftParameters" => in_sequence(child, SPACECRAFT),
             b"odParameters" => in_sequence(child, OD),
             b"userDefinedParameters" => in_repeating_sequence(child, USER_DEFINED),
@@ -193,84 +168,70 @@ pub(super) fn validate_xml_sequences(xml: &str) -> Result<()> {
         },
         |element, attribute| match attribute {
             b"parameter" => element == b"USER_DEFINED",
-            b"units" => matches!(
-                element,
-                b"DRAG_PARAMETERS_ALTITUDE"
-                    | b"ORBIT_LIFETIME"
-                    | b"REENTRY_ALTITUDE"
-                    | b"ORBIT_LIFETIME_WINDOW_START"
-                    | b"ORBIT_LIFETIME_WINDOW_END"
-                    | b"ORBIT_LIFETIME_CONFIDENCE_LEVEL"
-                    | b"NOMINAL_IMPACT_LON"
-                    | b"NOMINAL_IMPACT_LAT"
-                    | b"NOMINAL_IMPACT_ALT"
-                    | b"IMPACT_1_CONFIDENCE"
-                    | b"IMPACT_1_START_LON"
-                    | b"IMPACT_1_START_LAT"
-                    | b"IMPACT_1_STOP_LON"
-                    | b"IMPACT_1_STOP_LAT"
-                    | b"IMPACT_1_CROSS_TRACK"
-                    | b"IMPACT_2_CONFIDENCE"
-                    | b"IMPACT_2_START_LON"
-                    | b"IMPACT_2_START_LAT"
-                    | b"IMPACT_2_STOP_LON"
-                    | b"IMPACT_2_STOP_LAT"
-                    | b"IMPACT_2_CROSS_TRACK"
-                    | b"IMPACT_3_CONFIDENCE"
-                    | b"IMPACT_3_START_LON"
-                    | b"IMPACT_3_START_LAT"
-                    | b"IMPACT_3_STOP_LON"
-                    | b"IMPACT_3_STOP_LAT"
-                    | b"IMPACT_3_CROSS_TRACK"
-                    | b"X"
-                    | b"Y"
-                    | b"Z"
-                    | b"X_DOT"
-                    | b"Y_DOT"
-                    | b"Z_DOT"
-                    | b"CX_X"
-                    | b"CY_X"
-                    | b"CY_Y"
-                    | b"CZ_X"
-                    | b"CZ_Y"
-                    | b"CZ_Z"
-                    | b"CX_DOT_X"
-                    | b"CX_DOT_Y"
-                    | b"CX_DOT_Z"
-                    | b"CX_DOT_X_DOT"
-                    | b"CY_DOT_X"
-                    | b"CY_DOT_Y"
-                    | b"CY_DOT_Z"
-                    | b"CY_DOT_X_DOT"
-                    | b"CY_DOT_Y_DOT"
-                    | b"CZ_DOT_X"
-                    | b"CZ_DOT_Y"
-                    | b"CZ_DOT_Z"
-                    | b"CZ_DOT_X_DOT"
-                    | b"CZ_DOT_Y_DOT"
-                    | b"CZ_DOT_Z_DOT"
-                    | b"WET_MASS"
-                    | b"DRY_MASS"
-                    | b"SOLAR_RAD_AREA"
-                    | b"DRAG_AREA"
-                    | b"RCS"
-                    | b"BALLISTIC_COEFF"
-                    | b"THRUST_ACCELERATION"
-                    | b"RECOMMENDED_OD_SPAN"
-                    | b"ACTUAL_OD_SPAN"
-                    | b"RESIDUALS_ACCEPTED"
-            ),
+            b"units" => {
+                crate::xml::OPM_COVARIANCE_CHILDREN[2..].contains(&element)
+                    || matches!(
+                        element,
+                        b"DRAG_PARAMETERS_ALTITUDE"
+                            | b"ORBIT_LIFETIME"
+                            | b"REENTRY_ALTITUDE"
+                            | b"ORBIT_LIFETIME_WINDOW_START"
+                            | b"ORBIT_LIFETIME_WINDOW_END"
+                            | b"ORBIT_LIFETIME_CONFIDENCE_LEVEL"
+                            | b"NOMINAL_IMPACT_LON"
+                            | b"NOMINAL_IMPACT_LAT"
+                            | b"NOMINAL_IMPACT_ALT"
+                            | b"IMPACT_1_CONFIDENCE"
+                            | b"IMPACT_1_START_LON"
+                            | b"IMPACT_1_START_LAT"
+                            | b"IMPACT_1_STOP_LON"
+                            | b"IMPACT_1_STOP_LAT"
+                            | b"IMPACT_1_CROSS_TRACK"
+                            | b"IMPACT_2_CONFIDENCE"
+                            | b"IMPACT_2_START_LON"
+                            | b"IMPACT_2_START_LAT"
+                            | b"IMPACT_2_STOP_LON"
+                            | b"IMPACT_2_STOP_LAT"
+                            | b"IMPACT_2_CROSS_TRACK"
+                            | b"IMPACT_3_CONFIDENCE"
+                            | b"IMPACT_3_START_LON"
+                            | b"IMPACT_3_START_LAT"
+                            | b"IMPACT_3_STOP_LON"
+                            | b"IMPACT_3_STOP_LAT"
+                            | b"IMPACT_3_CROSS_TRACK"
+                            | b"X"
+                            | b"Y"
+                            | b"Z"
+                            | b"X_DOT"
+                            | b"Y_DOT"
+                            | b"Z_DOT"
+                            | b"WET_MASS"
+                            | b"DRY_MASS"
+                            | b"SOLAR_RAD_AREA"
+                            | b"DRAG_AREA"
+                            | b"RCS"
+                            | b"BALLISTIC_COEFF"
+                            | b"THRUST_ACCELERATION"
+                            | b"RECOMMENDED_OD_SPAN"
+                            | b"ACTUAL_OD_SPAN"
+                            | b"RESIDUALS_ACCEPTED"
+                    )
+            }
             _ => false,
         },
     )
 }
 
 impl Rdm {
-    /// XML-only representability: `NOMINAL_IMPACT_ALT` is unbounded in RDM but the common 4.0
-    /// XSD's `altRange` is Earth-derived, so a book-valid altitude for a non-Earth body cannot be
-    /// expressed in this XML edition. The model keeps the value; conversion is refused rather
-    /// than the value being altered to fit.
+    /// XML output checks: the altitude bounds below plus the output-only impact-frame rule.
     pub(crate) fn validate_xml_representability(&self) -> Result<()> {
+        self.validate_xml_altitude()?;
+        self.validate_impact_frame_for_output()
+    }
+
+    /// Apply the XML-only Earth-derived impact-altitude bounds without imposing that schema
+    /// facet on the book's finite-double KVN domain.
+    pub(crate) fn validate_xml_altitude(&self) -> Result<()> {
         let Some(parameters) = &self.body.segment.data.ground_impact_parameters else {
             return Ok(());
         };

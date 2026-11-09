@@ -1,49 +1,42 @@
 use crate::common::{mutated, mutated_once};
 use crate::{KVN, XML};
-use ccsds_ndm::error::{CcsdsNdmError, FormatError};
+use ccsds_ndm::error::CcsdsNdmError;
 use ccsds_ndm::messages::tdm::{Tdm, TdmObservationData};
 use ccsds_ndm::types::{
     TdmAngleType, TdmDataQuality, TdmIntegrationRef, TdmMode, TdmPath, TdmRangeMode, TdmRangeUnits,
     TdmReferenceFrame, TdmTimetagRef, YesNo,
 };
 use ccsds_ndm::Ndm;
+
+#[test]
+fn original_e17_repeated_rcs_epoch_is_rejected_and_adaptation_remains_valid() {
+    let original = include_str!("../../data/invalid/tdm_e17_original.kvn");
+    let error = Tdm::from_kvn(original).unwrap_err();
+    crate::common::assert_validation_field(&error, "RCS");
+    assert!(error.to_string().contains("strictly increasing epochs"));
+    let adapted = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e17.kvn")).unwrap();
+    assert_eq!(Tdm::from_kvn(&adapted.to_kvn().unwrap()).unwrap(), adapted);
+    assert_eq!(Tdm::from_xml(&adapted.to_xml().unwrap()).unwrap(), adapted);
+}
 #[test]
 fn test_parse_tdm_example_e1_oneway() {
-    let kvn = r#"
-CCSDS_TDM_VERS = 2.0
-COMMENT TDM example created by yyyyy-nnnA Nav Team (NASA/JPL)
-COMMENT StarTrek 1-way data, Ka band down
-CREATION_DATE = 2005-160T20:15:00Z
-ORIGINATOR = NASA
-META_START
-COMMENT Data quality degraded by antenna pointing problem...
-COMMENT Slightly noisy data
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-25
-PARTICIPANT_2 = yyyy-nnnA
-MODE = SEQUENTIAL
-PATH = 2,1
-INTEGRATION_INTERVAL = 1
-INTEGRATION_REF = MIDDLE
-FREQ_OFFSET = 0
-TRANSMIT_DELAY_1 = 0.000077
-RECEIVE_DELAY_1 = 0.000077
-DATA_QUALITY = DEGRADED
-META_STOP
-DATA_START
-COMMENT TRANSMIT_FREQ_2 is spacecraft reference downlink
-TRANSMIT_FREQ_2 = 2005-159T17:41:00 32023442781.733
-RECEIVE_FREQ_1 = 2005-159T17:41:00 32021034790.7265
-RECEIVE_FREQ_1 = 2005-159T17:41:01 32021034828.8432
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
+    let tdm = Tdm::from_kvn(KVN).unwrap();
     assert_eq!(tdm.header.creation_date.to_string(), "2005-160T20:15:00Z");
     assert_eq!(tdm.body.segments.len(), 1);
     let seg = &tdm.body.segments[0];
     assert_eq!(seg.metadata.participant_1, "DSS-25");
     assert_eq!(seg.metadata.participant_2.as_deref(), Some("yyyy-nnnA"));
-    assert_eq!(seg.data.observations.len(), 3);
+    assert_eq!(seg.data.observations.len(), 31);
+    assert_eq!(tdm.version, "2.0");
+    assert_eq!(tdm.header.comment.len(), 2);
+    assert_eq!(
+        tdm.header.comment[0],
+        "TDM example created by yyyyy-nnnA Nav Team (NASA/JPL)"
+    );
+    assert_eq!(
+        seg.data.comment,
+        ["TRANSMIT_FREQ_2 is spacecraft reference downlink"]
+    );
     match &seg.data.observations[0].data {
         TdmObservationData::TransmitFreq2(v) => assert_eq!(*v, 32023442781.733),
         _ => panic!("Wrong type"),
@@ -52,58 +45,22 @@ DATA_STOP
 
 #[test]
 fn test_parse_tdm_example_e16_optical() {
-    let kvn = r#"
-CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2012-10-30T20:00:00
-ORIGINATOR = ESA
-META_START
-TIME_SYSTEM = UTC
-START_TIME = 2012-10-29T17:46:39.02
-STOP_TIME = 2012-10-29T17:50:53.02
-PARTICIPANT_1 = TFRM
-PARTICIPANT_2 = TRACK_NUMBER_001
-MODE = SEQUENTIAL
-PATH = 2,1
-ANGLE_TYPE = RADEC
-REFERENCE_FRAME = EME2000
-META_STOP
-DATA_START
-ANGLE_1 = 2012-10-29T17:46:39.02 332.2298750
-ANGLE_2 = 2012-10-29T17:46:39.02 -16.3028389
-MAG = 2012-10-29T17:46:39.02 12.1
-DATA_STOP
-"#;
+    let kvn = include_str!("../../data/kvn/tdm_e16.kvn");
     let tdm = Tdm::from_kvn(kvn).unwrap();
     let seg = &tdm.body.segments[0];
     assert_eq!(seg.metadata.angle_type, Some(TdmAngleType::Radec));
-    assert_eq!(seg.data.observations.len(), 3);
+    assert_eq!(seg.data.observations.len(), 9);
+    assert_eq!(tdm.body.segments.len(), 2);
+    assert_eq!(
+        seg.metadata.participant_2.as_deref(),
+        Some("TRACK NUMBER 001")
+    );
+    assert_eq!(
+        tdm.body.segments[1].metadata.participant_2.as_deref(),
+        Some("TRACK NUMBER 003")
+    );
     match &seg.data.observations[2].data {
         TdmObservationData::Mag(v) => assert_eq!(*v, 12.1),
-        _ => panic!("Wrong type"),
-    }
-}
-
-#[test]
-fn test_parse_tdm_example_e18_phase() {
-    let kvn = r#"
-CCSDS_TDM_VERS=2.0
-CREATION_DATE=2005-184T20:15:00
-ORIGINATOR=NASA
-META_START
-TIME_SYSTEM=UTC
-PARTICIPANT_1=DSS-55
-PARTICIPANT_2=yyyy-nnnA
-MODE=SEQUENTIAL
-PATH=1,2,1
-META_STOP
-DATA_START
-TRANSMIT_PHASE_CT_1=2005-184T11:12:23 7175173383.615373
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    let seg = &tdm.body.segments[0];
-    match &seg.data.observations[0].data {
-        TdmObservationData::TransmitPhaseCt1(s) => assert_eq!(*s, 7175173383.615373),
         _ => panic!("Wrong type"),
     }
 }
@@ -124,8 +81,8 @@ DATA_STOP
     assert!(
         crate::common::kvn_parse_error(&error)
             .unwrap()
-            .contexts
-            .contains(&"Expected CREATION_DATE"),
+            .message
+            .contains("Expected CREATION_DATE"),
         "{error}"
     );
 }
@@ -150,76 +107,6 @@ DATA_STOP
 }
 
 #[test]
-fn header_optional_comment() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-COMMENT Header comment 1
-COMMENT Header comment 2
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    assert_eq!(tdm.header.comment.len(), 2);
-    assert_eq!(tdm.header.comment[0], "Header comment 1");
-}
-
-#[test]
-fn header_optional_message_id() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = MSG-001
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    assert_eq!(tdm.header.message_id.as_deref(), Some("MSG-001"));
-}
-
-#[test]
-fn version_attribute() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    assert_eq!(tdm.version, "2.0");
-}
-
-#[test]
-fn metadata_mandatory_time_system() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    crate::common::assert_validation_field(&Tdm::from_kvn(kvn).unwrap_err(), "TIME_SYSTEM");
-}
-
-#[test]
 fn metadata_mandatory_participant_1() {
     let kvn = r#"CCSDS_TDM_VERS = 2.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -235,205 +122,6 @@ DATA_STOP
 }
 
 #[test]
-fn metadata_optional_participants_2_to_5() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-PARTICIPANT_2 = SPACECRAFT_A
-PARTICIPANT_3 = QUASAR_1
-PARTICIPANT_4 = RELAY_SAT
-PARTICIPANT_5 = DSS-25
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    let seg = &tdm.body.segments[0];
-    assert_eq!(seg.metadata.participant_1, "DSS-14");
-    assert_eq!(seg.metadata.participant_2.as_deref(), Some("SPACECRAFT_A"));
-    assert_eq!(seg.metadata.participant_3.as_deref(), Some("QUASAR_1"));
-    assert_eq!(seg.metadata.participant_4.as_deref(), Some("RELAY_SAT"));
-    assert_eq!(seg.metadata.participant_5.as_deref(), Some("DSS-25"));
-}
-
-#[test]
-fn metadata_path_choice() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-PARTICIPANT_2 = SPACECRAFT_A
-MODE = SEQUENTIAL
-PATH = 1,2,1
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    assert_eq!(
-        tdm.body.segments[0].metadata.path,
-        Some(TdmPath("1,2,1".to_string()))
-    );
-    assert!(tdm.body.segments[0].metadata.path_1.is_none());
-    assert!(tdm.body.segments[0].metadata.path_2.is_none());
-}
-
-#[test]
-fn metadata_path_1_path_2_choice() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-PARTICIPANT_2 = SPACECRAFT_A
-PARTICIPANT_3 = DSS-25
-MODE = SINGLE_DIFF
-PATH_1 = 1,2,1
-PATH_2 = 3,2,3
-RECEIVE_BAND = X
-META_STOP
-DATA_START
-RECEIVE_FREQ = 2023-01-01T00:00:00 8415000000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    let seg = &tdm.body.segments[0];
-    assert!(seg.metadata.path.is_none());
-    assert_eq!(seg.metadata.path_1, Some(TdmPath("1,2,1".to_string())));
-    assert_eq!(seg.metadata.path_2, Some(TdmPath("3,2,3".to_string())));
-}
-
-#[test]
-fn metadata_optional_freq_offset() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    assert!(tdm.body.segments[0].metadata.freq_offset.is_none());
-}
-
-#[test]
-fn metadata_explicit_freq_offset() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-FREQ_OFFSET = 8415000000.0
-META_STOP
-DATA_START
-RECEIVE_FREQ = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    assert_eq!(
-        tdm.body.segments[0].metadata.freq_offset,
-        Some(8415000000.0)
-    );
-}
-
-#[test]
-fn metadata_range_modulus_default() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    assert!(tdm.body.segments[0].metadata.range_modulus.is_none());
-}
-
-#[test]
-fn metadata_data_quality_values() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-DATA_QUALITY = VALIDATED
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    assert_eq!(
-        tdm.body.segments[0].metadata.data_quality,
-        Some(TdmDataQuality::Validated)
-    );
-}
-
-#[test]
-fn metadata_transmit_receive_delays() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-TRANSMIT_DELAY_1 = 0.000077
-TRANSMIT_DELAY_2 = 0.000088
-RECEIVE_DELAY_1 = 0.000077
-RECEIVE_DELAY_2 = 0.000099
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    let seg = &tdm.body.segments[0];
-    assert_eq!(seg.metadata.transmit_delay_1, Some(0.000077));
-    assert_eq!(seg.metadata.transmit_delay_2, Some(0.000088));
-    assert_eq!(seg.metadata.receive_delay_1, Some(0.000077));
-    assert_eq!(seg.metadata.receive_delay_2, Some(0.000099));
-}
-
-#[test]
-fn metadata_turnaround_ratio() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-TURNAROUND_NUMERATOR = 880
-TURNAROUND_DENOMINATOR = 749
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    let seg = &tdm.body.segments[0];
-    assert_eq!(seg.metadata.turnaround_numerator, Some(880));
-    assert_eq!(seg.metadata.turnaround_denominator, Some(749));
-}
-
-#[test]
 fn body_requires_at_least_one_segment() {
     let kvn = r#"CCSDS_TDM_VERS = 2.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -444,40 +132,6 @@ ORIGINATOR = TEST
         crate::common::kvn_parse_error(&error).unwrap().message,
         "unterminated or incomplete TDM section sequence"
     );
-}
-
-#[test]
-fn body_multiple_segments() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-25
-META_STOP
-DATA_START
-RANGE = 2023-01-01T01:00:00 2000.0
-DATA_STOP
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-34
-META_STOP
-DATA_START
-RANGE = 2023-01-01T02:00:00 3000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    assert_eq!(tdm.body.segments.len(), 3);
-    assert_eq!(tdm.body.segments[0].metadata.participant_1, "DSS-14");
-    assert_eq!(tdm.body.segments[1].metadata.participant_1, "DSS-25");
-    assert_eq!(tdm.body.segments[2].metadata.participant_1, "DSS-34");
 }
 
 #[test]
@@ -503,70 +157,6 @@ DATA_STOP
 }
 
 #[test]
-fn data_multiple_observations() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-RANGE = 2023-01-01T00:01:00 1001.0
-RANGE = 2023-01-01T00:02:00 1002.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    assert_eq!(tdm.body.segments[0].data.observations.len(), 3);
-}
-
-#[test]
-fn data_comment_optional() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-COMMENT Data section comment
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    assert_eq!(tdm.body.segments[0].data.comment.len(), 1);
-    assert_eq!(tdm.body.segments[0].data.comment[0], "Data section comment");
-}
-
-#[test]
-fn observation_angle_types() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-ANGLE_TYPE = AZEL
-META_STOP
-DATA_START
-ANGLE_1 = 2023-01-01T00:00:00 45.5
-ANGLE_2 = 2023-01-01T00:00:00 30.25
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    match &tdm.body.segments[0].data.observations[0].data {
-        TdmObservationData::Angle1(v) => assert_eq!(*v, 45.5),
-        _ => panic!("Wrong type"),
-    }
-    match &tdm.body.segments[0].data.observations[1].data {
-        TdmObservationData::Angle2(v) => assert_eq!(*v, 30.25),
-        _ => panic!("Wrong type"),
-    }
-}
-
-#[test]
 fn observation_doppler_types() {
     let kvn = r#"CCSDS_TDM_VERS = 2.0
 CREATION_DATE = 2023-01-01T00:00:00
@@ -581,240 +171,10 @@ DOPPLER_INTEGRATED = 2023-01-01T00:00:01 -0.45
 DOPPLER_COUNT = 2023-01-01T00:00:02 12345678.0
 DATA_STOP
 "#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    match &tdm.body.segments[0].data.observations[0].data {
-        TdmObservationData::DopplerInstantaneous(v) => assert_eq!(*v, -0.5),
-        _ => panic!("Wrong type"),
-    }
-    match &tdm.body.segments[0].data.observations[1].data {
-        TdmObservationData::DopplerIntegrated(v) => assert_eq!(*v, -0.45),
-        _ => panic!("Wrong type"),
-    }
-    match &tdm.body.segments[0].data.observations[2].data {
-        TdmObservationData::DopplerCount(v) => assert_eq!(*v, 12345678.0),
-        _ => panic!("Wrong type"),
-    }
-}
-
-#[test]
-fn observation_frequency_types() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-RECEIVE_FREQ = 2023-01-01T00:00:00 8415000000.0
-RECEIVE_FREQ_1 = 2023-01-01T00:00:01 8415000001.0
-TRANSMIT_FREQ_1 = 2023-01-01T00:00:02 7167941264.0
-TRANSMIT_FREQ_2 = 2023-01-01T00:00:03 7167941265.0
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    assert_eq!(tdm.body.segments[0].data.observations.len(), 4);
-    match &tdm.body.segments[0].data.observations[0].data {
-        TdmObservationData::ReceiveFreq(v) => assert_eq!(*v, 8415000000.0),
-        _ => panic!("Wrong type"),
-    }
-}
-
-#[test]
-fn observation_phase_count_types() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-TRANSMIT_PHASE_CT_1 = 2023-01-01T00:00:00 7175173383.615373
-RECEIVE_PHASE_CT_1 = 2023-01-01T00:00:01 8429753135.986102
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    match &tdm.body.segments[0].data.observations[0].data {
-        TdmObservationData::TransmitPhaseCt1(s) => {
-            assert_eq!(*s, 7175173383.615373);
-        }
-        _ => panic!("Wrong type"),
-    }
-    match &tdm.body.segments[0].data.observations[1].data {
-        TdmObservationData::ReceivePhaseCt1(s) => {
-            assert_eq!(*s, 8429753135.986102);
-        }
-        _ => panic!("Wrong type"),
-    }
-}
-
-#[test]
-fn observation_vlbi_types() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-PARTICIPANT_2 = DSS-25
-MODE = SINGLE_DIFF
-PATH_1 = 1,2
-PATH_2 = 2,1
-META_STOP
-DATA_START
-DOR = 2023-01-01T00:00:00 0.000123456
-VLBI_DELAY = 2023-01-01T00:00:01 -0.000000789
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    match &tdm.body.segments[0].data.observations[0].data {
-        TdmObservationData::Dor(v) => assert_eq!(*v, 0.000123456),
-        _ => panic!("Wrong type"),
-    }
-    match &tdm.body.segments[0].data.observations[1].data {
-        TdmObservationData::VlbiDelay(v) => assert_eq!(*v, -0.000000789),
-        _ => panic!("Wrong type"),
-    }
-}
-
-#[test]
-fn observation_media_types() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-STEC = 2023-01-01T00:00:00 50.0
-TROPO_DRY = 2023-01-01T00:00:01 2.3
-TROPO_WET = 2023-01-01T00:00:02 0.15
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    match &tdm.body.segments[0].data.observations[0].data {
-        TdmObservationData::Stec(v) => assert_eq!(*v, 50.0),
-        _ => panic!("Wrong type"),
-    }
-    match &tdm.body.segments[0].data.observations[1].data {
-        TdmObservationData::TropoDry(v) => assert_eq!(*v, 2.3),
-        _ => panic!("Wrong type"),
-    }
-    match &tdm.body.segments[0].data.observations[2].data {
-        TdmObservationData::TropoWet(v) => assert_eq!(*v, 0.15),
-        _ => panic!("Wrong type"),
-    }
-}
-
-#[test]
-fn observation_weather_types() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-PRESSURE = 2023-01-01T00:00:00 1013.25
-RHUMIDITY = 2023-01-01T00:00:01 65.5
-TEMPERATURE = 2023-01-01T00:00:02 293.15
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    match &tdm.body.segments[0].data.observations[0].data {
-        TdmObservationData::Pressure(v) => assert_eq!(*v, 1013.25),
-        _ => panic!("Wrong type"),
-    }
-    match &tdm.body.segments[0].data.observations[1].data {
-        TdmObservationData::Rhumidity(p) => assert_eq!(p.value, 65.5),
-        _ => panic!("Wrong type"),
-    }
-    match &tdm.body.segments[0].data.observations[2].data {
-        TdmObservationData::Temperature(v) => assert_eq!(*v, 293.15),
-        _ => panic!("Wrong type"),
-    }
-}
-
-#[test]
-fn observation_clock_types() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-CLOCK_BIAS = 2023-01-01T00:00:00 0.000001234
-CLOCK_DRIFT = 2023-01-01T00:00:01 0.0000000001
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    match &tdm.body.segments[0].data.observations[0].data {
-        TdmObservationData::ClockBias(v) => assert_eq!(*v, 0.000001234),
-        _ => panic!("Wrong type"),
-    }
-    match &tdm.body.segments[0].data.observations[1].data {
-        TdmObservationData::ClockDrift(v) => assert_eq!(*v, 0.0000000001),
-        _ => panic!("Wrong type"),
-    }
-}
-
-#[test]
-fn observation_optical_radar_types() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-MAG = 2023-01-01T00:00:00 12.5
-RCS = 2023-01-01T00:00:01 1.5
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    match &tdm.body.segments[0].data.observations[0].data {
-        TdmObservationData::Mag(v) => assert_eq!(*v, 12.5),
-        _ => panic!("Wrong type"),
-    }
-    match &tdm.body.segments[0].data.observations[1].data {
-        TdmObservationData::Rcs(v) => assert_eq!(*v, 1.5),
-        _ => panic!("Wrong type"),
-    }
-}
-
-#[test]
-fn observation_signal_strength_types() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-CARRIER_POWER = 2023-01-01T00:00:00 -150.5
-PC_N0 = 2023-01-01T00:00:01 45.5
-PR_N0 = 2023-01-01T00:00:02 35.2
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).unwrap();
-    match &tdm.body.segments[0].data.observations[0].data {
-        TdmObservationData::CarrierPower(v) => assert_eq!(*v, -150.5),
-        _ => panic!("Wrong type"),
-    }
-    match &tdm.body.segments[0].data.observations[1].data {
-        TdmObservationData::PcN0(v) => assert_eq!(*v, 45.5),
-        _ => panic!("Wrong type"),
-    }
-    match &tdm.body.segments[0].data.observations[2].data {
-        TdmObservationData::PrN0(v) => assert_eq!(*v, 35.2),
-        _ => panic!("Wrong type"),
+    // Integral double spellings and >2^31 accumulators read; a fraction is never truncated.
+    for (count, accepted) in [("1.0E3", true), ("4294967296", true), ("1000.5", false)] {
+        let input = kvn.replace("12345678.0", count);
+        assert_eq!(Tdm::from_kvn(&input).is_ok(), accepted, "{count}");
     }
 }
 
@@ -823,6 +183,7 @@ fn all_metadata_optional_fields() {
     let kvn = r#"CCSDS_TDM_VERS = 2.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
+MESSAGE_ID = MSG-001
 META_START
 COMMENT Metadata comment
 TRACK_ID = TRACK_001
@@ -832,12 +193,18 @@ START_TIME = 2023-01-01T00:00:00
 STOP_TIME = 2023-01-01T01:00:00
 PARTICIPANT_1 = DSS-14
 PARTICIPANT_2 = SPACECRAFT_A
+PARTICIPANT_3 = QUASAR_1
+PARTICIPANT_4 = RELAY_SAT
+PARTICIPANT_5 = DSS-25
 MODE = SEQUENTIAL
 PATH = 1,2,1
 EPHEMERIS_NAME_1 = DSS14_EPHEM
 EPHEMERIS_NAME_2 = SC_EPHEM
+EPHEMERIS_NAME_3 = QUASAR_EPHEM
+EPHEMERIS_NAME_4 = RELAY_EPHEM
+EPHEMERIS_NAME_5 = DSS25_EPHEM
 TRANSMIT_BAND = X
-RECEIVE_BAND = X
+RECEIVE_BAND = Ka
 TURNAROUND_NUMERATOR = 880
 TURNAROUND_DENOMINATOR = 749
 TIMETAG_REF = RECEIVE
@@ -855,13 +222,18 @@ DOPPLER_COUNT_BIAS = 240000000.0
 DOPPLER_COUNT_SCALE = 1000
 DOPPLER_COUNT_ROLLOVER = NO
 TRANSMIT_DELAY_1 = 0.000077
-RECEIVE_DELAY_1 = 0.000088
+TRANSMIT_DELAY_2 = 0.000088
+RECEIVE_DELAY_1 = 0.000077
+RECEIVE_DELAY_2 = 0.000099
 DATA_QUALITY = VALIDATED
 CORRECTION_RANGE = 0.001
 CORRECTIONS_APPLIED = YES
 META_STOP
 DATA_START
+COMMENT Range measurements
 RANGE = 2023-01-01T00:00:00 1000.0
+RANGE = 2023-01-01T00:01:00 1001.0
+DOPPLER_INTEGRATED = 2023-01-01T00:02:00 -0.5
 DATA_STOP
 "#;
     let tdm = Tdm::from_kvn(kvn).unwrap();
@@ -877,7 +249,7 @@ DATA_STOP
     assert_eq!(seg.metadata.mode, Some(TdmMode::Sequential));
     assert_eq!(seg.metadata.path, Some(TdmPath("1,2,1".to_string())));
     assert_eq!(seg.metadata.transmit_band.as_deref(), Some("X"));
-    assert_eq!(seg.metadata.receive_band.as_deref(), Some("X"));
+    assert_eq!(seg.metadata.receive_band.as_deref(), Some("Ka"));
     assert_eq!(seg.metadata.turnaround_numerator, Some(880));
     assert_eq!(seg.metadata.turnaround_denominator, Some(749));
     assert_eq!(seg.metadata.timetag_ref, Some(TdmTimetagRef::Receive));
@@ -902,16 +274,33 @@ DATA_STOP
     assert_eq!(seg.metadata.data_quality, Some(TdmDataQuality::Validated));
     assert_eq!(seg.metadata.correction_range, Some(0.001));
     assert_eq!(seg.metadata.corrections_applied, Some(YesNo::Yes));
-}
-
-#[test]
-fn test_tdm_empty_file_error() {
-    let error = Tdm::from_kvn("").unwrap_err();
-    let parse = crate::common::kvn_parse_error(&error)
-        .unwrap_or_else(|| panic!("expected a KVN parse error, got {error:?}"));
+    assert_eq!(tdm.header.message_id.as_deref(), Some("MSG-001"));
+    assert_eq!(seg.metadata.comment, ["Metadata comment"]);
+    assert_eq!(seg.metadata.participant_1, "DSS-14");
+    assert_eq!(seg.metadata.participant_2.as_deref(), Some("SPACECRAFT_A"));
+    assert_eq!(seg.metadata.participant_3.as_deref(), Some("QUASAR_1"));
+    assert_eq!(seg.metadata.participant_4.as_deref(), Some("RELAY_SAT"));
+    assert_eq!(seg.metadata.participant_5.as_deref(), Some("DSS-25"));
+    assert!(seg.metadata.path_1.is_none());
+    assert!(seg.metadata.path_2.is_none());
+    assert_eq!(seg.metadata.transmit_delay_1, Some(0.000077));
+    assert_eq!(seg.metadata.transmit_delay_2, Some(0.000088));
+    assert_eq!(seg.metadata.receive_delay_1, Some(0.000077));
+    assert_eq!(seg.metadata.receive_delay_2, Some(0.000099));
+    assert_eq!(Tdm::from_kvn(&tdm.to_kvn().unwrap()).unwrap(), tdm);
+    let distinct = mutated(
+        kvn,
+        "RECEIVE_DELAY_1 = 0.000077",
+        "RECEIVE_DELAY_1 = 0.000088",
+    );
+    let distinct = Tdm::from_kvn(&distinct).unwrap();
     assert_eq!(
-        parse.message,
-        "unterminated or incomplete TDM section sequence"
+        distinct.body.segments[0].metadata.transmit_delay_1,
+        Some(0.000077)
+    );
+    assert_eq!(
+        distinct.body.segments[0].metadata.receive_delay_1,
+        Some(0.000088)
     );
 }
 
@@ -922,72 +311,8 @@ CREATION_DATE = 2023-01-01T00:00:00
 CCSDS_TDM_VERS = 2.0
 "#;
     let err = Tdm::from_kvn(kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) => match *format_err {
-            FormatError::Kvn(ref err) => {
-                assert!(err.message.contains("assignment outside a TDM section"));
-            }
-            _ => panic!("unexpected format error: {:?}", format_err),
-        },
-        _ => panic!("Expected version-not-first error, got: {:?}", err),
-    }
-}
-
-#[test]
-fn test_tdm_unknown_data_keyword_error() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-META_STOP
-DATA_START
-UNKNOWN_DATA_TYPE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let err = Tdm::from_kvn(kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) => match *format_err {
-            FormatError::Kvn(ref err) => {
-                assert!(
-                    err.message.contains("unknown TDM observation keyword")
-                        || err.contexts.contains(&"while validating TDM KVN structure")
-                );
-            }
-            _ => panic!("unexpected format error: {:?}", format_err),
-        },
-        _ => panic!("Expected error, got: {:?}", err),
-    }
-}
-
-#[test]
-fn test_tdm_unknown_metadata_key_error() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-14
-UNKNOWN_METADATA = SOME_VALUE
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let err = Tdm::from_kvn(kvn).unwrap_err();
-    match err {
-        CcsdsNdmError::Format(format_err) => match *format_err {
-            FormatError::Kvn(ref err) => {
-                assert!(
-                    err.message.contains("unknown TDM metadata keyword")
-                        || err.contexts.contains(&"while validating TDM KVN structure")
-                );
-            }
-            _ => panic!("unexpected format error: {:?}", format_err),
-        },
-        _ => panic!("Expected error, got: {:?}", err),
-    }
+    let err = crate::common::kvn_parse_error(&err).expect("KVN syntax diagnostic");
+    assert!(err.message.contains("assignment outside a TDM section"));
 }
 
 #[test]
@@ -998,6 +323,10 @@ ORIGINATOR = TEST
 META_START
 TIME_SYSTEM = UTC
 PARTICIPANT_1 = P1
+PARTICIPANT_2 = P2
+PARTICIPANT_3 = P3
+PARTICIPANT_4 = P4
+PARTICIPANT_5 = P5
 TRANSMIT_DELAY_3 = 0.3
 TRANSMIT_DELAY_4 = 0.4
 TRANSMIT_DELAY_5 = 0.5
@@ -1036,40 +365,7 @@ DATA_STOP
     assert_eq!(meta.transmit_delay_5, Some(0.5));
     assert_eq!(meta.correction_aberration_diurnal, Some(0.7));
     assert_eq!(tdm.body.segments[0].data.observations.len(), 18);
-}
-
-#[test]
-fn unknown_header_and_observation_keywords_are_rejected() {
-    // Unknown key between header and body should FAIL
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-UNKNOWN_KEY = VALUE
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = P1
-META_STOP
-DATA_START
-RANGE = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let error = Tdm::from_kvn(kvn).unwrap_err();
-    assert_eq!(error.code(), Some("parse.kvn.syntax"), "{error}");
-
-    // An unknown observation key must not silently end the data block.
-    let kvn_malformed = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = P1
-META_STOP
-DATA_START
-BAD_KEY = 2023-01-01T00:00:00 1000.0
-DATA_STOP
-"#;
-    let error = Tdm::from_kvn(kvn_malformed).unwrap_err();
-    assert_eq!(error.code(), Some("parse.kvn.syntax"), "{error}");
+    assert_eq!(Tdm::from_kvn(&tdm.to_kvn().unwrap()).unwrap(), tdm);
 }
 
 #[test]
@@ -1083,9 +379,13 @@ fn test_observation_value_error_reports_record_line() {
         .count()
         + 1;
 
-    let CcsdsNdmError::Validation(error) = Tdm::from_kvn(&bad).unwrap_err() else {
+    let CcsdsNdmError::Validation(error) =
+        crate::common::parse_error_cause(Tdm::from_kvn(&bad).unwrap_err())
+    else {
         panic!("expected a validation error");
     };
+    // The range error names the keyword, not the shared Rust `Percentage` type.
+    assert!(error.to_string().contains("RHUMIDITY"), "{error}");
     let ccsds_ndm::error::ValidationError::OutOfRange { line, .. } = *error else {
         panic!("expected an out-of-range error");
     };
@@ -1132,9 +432,26 @@ fn tdm_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
             "non-ASCII content",
             mutated(KVN, participant, &format!("{participant} €")),
         ),
+        (
+            "unknown header keyword",
+            mutated(KVN, "META_START", "UNKNOWN_KEY = VALUE\nMETA_START"),
+        ),
+        (
+            "unknown observation keyword",
+            mutated(KVN, observation, "BAD_KEY = 2005-159T17:41:00 1"),
+        ),
     ] {
         let error = Tdm::from_kvn(&source).unwrap_err();
         assert_eq!(error.code(), Some("parse.kvn.syntax"), "{label}: {error}");
+        let expected = match label {
+            "unknown metadata keyword" => "unknown TDM metadata keyword",
+            "unknown observation keyword" => "unknown TDM observation keyword",
+            _ => continue,
+        };
+        assert_eq!(
+            crate::common::kvn_parse_error(&error).unwrap().message,
+            expected
+        );
     }
 }
 
@@ -1143,10 +460,6 @@ fn tdm_xml_rejects_unknown_nested_content_attributes_and_ordering_errors() {
     let epoch = "<EPOCH>2007-069T15:22:22.000</EPOCH>";
     let observable = "<TRANSMIT_FREQ_1>7167941264.0</TRANSMIT_FREQ_1>";
     for (label, source) in [
-        (
-            "unknown metadata child",
-            mutated(XML, "<metadata>", "<metadata><UNKNOWN>1</UNKNOWN>"),
-        ),
         (
             "unknown observation child",
             mutated(XML, "<observation>", "<observation><UNKNOWN>1</UNKNOWN>"),
@@ -1162,10 +475,6 @@ fn tdm_xml_rejects_unknown_nested_content_attributes_and_ordering_errors() {
                 observable,
                 "<TRANSMIT_FREQ_1 unexpected=\"value\">7167941264.0</TRANSMIT_FREQ_1>",
             ),
-        ),
-        (
-            "duplicate epoch",
-            mutated_once(XML, epoch, &format!("{epoch}{epoch}")),
         ),
         (
             "reordered observation members",
@@ -1188,6 +497,23 @@ fn tdm_xml_rejects_unknown_nested_content_attributes_and_ordering_errors() {
 }
 
 #[test]
+fn xml_duplicate_epochs_and_unknown_root_attributes_name_the_problem() {
+    let epoch = "<EPOCH>2007-069T15:22:22.000</EPOCH>";
+    for (input, expected) in [
+        (
+            mutated_once(XML, epoch, &format!("{epoch}{epoch}")),
+            "invalid TDM XML sequence: duplicate or out-of-order child 'EPOCH' in 'observation'",
+        ),
+        (
+            mutated_once(XML, "<tdm ", "<tdm extra=\"val\" "),
+            "unknown TDM root attribute 'extra'",
+        ),
+    ] {
+        crate::common::assert_invalid_format(&Tdm::from_xml(&input).unwrap_err(), expected);
+    }
+}
+
+#[test]
 fn tdm_xml_accepts_the_schema_defined_optional_observation_units() {
     let angle = mutated_once(
         XML,
@@ -1195,6 +521,10 @@ fn tdm_xml_accepts_the_schema_defined_optional_observation_units() {
         "<ANGLE_1 units=\"deg\">1.0</ANGLE_1>",
     );
     Tdm::from_xml(&angle).expect("ANGLE_1 units=deg is allowed by the TDM schema");
+    for units in ["rad", "DEG", "km"] {
+        let invalid = mutated(&angle, "units=\"deg\"", &format!("units=\"{units}\""));
+        assert!(Tdm::from_xml(&invalid).is_err(), "ignored {units}");
+    }
 
     let humidity = mutated_once(
         XML,
@@ -1213,6 +543,10 @@ fn tdm_xml_accepts_the_schema_defined_optional_observation_units() {
         }
         other => panic!("expected normalized humidity, got {other:?}"),
     }
+    let xml = normalized.to_xml().unwrap();
+    assert!(!xml.contains(r#"RHUMIDITY units="""#));
+    assert!(xml.contains("<RHUMIDITY>50</RHUMIDITY>"));
+    assert_eq!(Tdm::from_xml(&xml).unwrap(), normalized);
 }
 
 #[test]
@@ -1279,6 +613,11 @@ fn tdm_conditional_metadata_rules_name_the_offending_field() {
                 mutated(FIXTURE, "DATA_QUALITY = RAW", "ANGLE_TYPE = RADEC\nDATA_QUALITY = RAW"),
                 "Missing required field: REFERENCE_FRAME (required when ANGLE_TYPE=RADEC)",
             ),
+            // The RADEC rule applies in any letter case, even when the value stays `Other`.
+            (
+                mutated(FIXTURE, "DATA_QUALITY = RAW", "ANGLE_TYPE = Radec\nDATA_QUALITY = RAW"),
+                "Missing required field: REFERENCE_FRAME (required when ANGLE_TYPE=RADEC)",
+            ),
             // Path indices must refer to populated participants.
             (
                 mutated(FIXTURE, "PATH = 2,1", "PATH = 1,6"),
@@ -1294,242 +633,435 @@ fn tdm_conditional_metadata_rules_name_the_offending_field() {
 }
 
 #[test]
-fn tdm_xml_exhaustive_observations() {
-    // Exercise XML deserializer for a wide range of observation types
-    let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
-<tdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="CCSDS_TDM_VERS" version="2.0">
-  <header>
-    <CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE>
-    <ORIGINATOR>TEST</ORIGINATOR>
-  </header>
-  <body>
-    <segment>
-      <metadata>
-        <TIME_SYSTEM>UTC</TIME_SYSTEM>
-        <PARTICIPANT_1>P1</PARTICIPANT_1>
-      </metadata>
-      <data>
-        <observation>
-          <EPOCH>2023-01-01T00:00:00</EPOCH>
-          <ANGLE_1>1.0</ANGLE_1>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:01:00</EPOCH>
-          <ANGLE_2>2.0</ANGLE_2>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:02:00</EPOCH>
-          <CARRIER_POWER>3.0</CARRIER_POWER>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:03:00</EPOCH>
-          <CLOCK_BIAS>4.0</CLOCK_BIAS>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:04:00</EPOCH>
-          <CLOCK_DRIFT>5.0</CLOCK_DRIFT>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:05:00</EPOCH>
-          <DOPPLER_COUNT>6.0</DOPPLER_COUNT>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:06:00</EPOCH>
-          <DOPPLER_INSTANTANEOUS>7.0</DOPPLER_INSTANTANEOUS>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:07:00</EPOCH>
-          <DOPPLER_INTEGRATED>8.0</DOPPLER_INTEGRATED>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:08:00</EPOCH>
-          <DOR>9.0</DOR>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:09:00</EPOCH>
-          <MAG>10.0</MAG>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:10:00</EPOCH>
-          <PC_N0>11.0</PC_N0>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:11:00</EPOCH>
-          <PR_N0>12.0</PR_N0>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:12:00</EPOCH>
-          <PRESSURE>13.0</PRESSURE>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:13:00</EPOCH>
-          <RANGE>14.0</RANGE>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:14:00</EPOCH>
-          <RCS>15.0</RCS>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:15:00</EPOCH>
-          <RECEIVE_FREQ>16.0</RECEIVE_FREQ>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:16:00</EPOCH>
-          <RECEIVE_FREQ_1>17.0</RECEIVE_FREQ_1>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:17:00</EPOCH>
-          <RECEIVE_FREQ_2>18.0</RECEIVE_FREQ_2>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:18:00</EPOCH>
-          <RECEIVE_FREQ_3>19.0</RECEIVE_FREQ_3>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:19:00</EPOCH>
-          <RECEIVE_FREQ_4>20.0</RECEIVE_FREQ_4>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:20:00</EPOCH>
-          <RECEIVE_FREQ_5>21.0</RECEIVE_FREQ_5>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:21:00</EPOCH>
-          <RECEIVE_PHASE_CT_1>22.0</RECEIVE_PHASE_CT_1>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:22:00</EPOCH>
-          <RECEIVE_PHASE_CT_2>23.0</RECEIVE_PHASE_CT_2>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:23:00</EPOCH>
-          <RECEIVE_PHASE_CT_3>24.0</RECEIVE_PHASE_CT_3>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:24:00</EPOCH>
-          <RECEIVE_PHASE_CT_4>25.0</RECEIVE_PHASE_CT_4>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:25:00</EPOCH>
-          <RECEIVE_PHASE_CT_5>26.0</RECEIVE_PHASE_CT_5>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:26:00</EPOCH>
-          <RHUMIDITY>27.0</RHUMIDITY>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:27:00</EPOCH>
-          <STEC>28.0</STEC>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:28:00</EPOCH>
-          <TEMPERATURE>29.0</TEMPERATURE>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:29:00</EPOCH>
-          <TRANSMIT_FREQ_1>30.0</TRANSMIT_FREQ_1>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:30:00</EPOCH>
-          <TRANSMIT_FREQ_2>31.0</TRANSMIT_FREQ_2>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:31:00</EPOCH>
-          <TRANSMIT_FREQ_3>32.0</TRANSMIT_FREQ_3>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:32:00</EPOCH>
-          <TRANSMIT_FREQ_4>33.0</TRANSMIT_FREQ_4>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:33:00</EPOCH>
-          <TRANSMIT_FREQ_5>34.0</TRANSMIT_FREQ_5>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:34:00</EPOCH>
-          <TRANSMIT_FREQ_RATE_1>35.0</TRANSMIT_FREQ_RATE_1>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:35:00</EPOCH>
-          <TRANSMIT_FREQ_RATE_2>36.0</TRANSMIT_FREQ_RATE_2>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:36:00</EPOCH>
-          <TRANSMIT_FREQ_RATE_3>37.0</TRANSMIT_FREQ_RATE_3>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:37:00</EPOCH>
-          <TRANSMIT_FREQ_RATE_4>38.0</TRANSMIT_FREQ_RATE_4>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:38:00</EPOCH>
-          <TRANSMIT_FREQ_RATE_5>39.0</TRANSMIT_FREQ_RATE_5>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:39:00</EPOCH>
-          <TRANSMIT_PHASE_CT_1>40.0</TRANSMIT_PHASE_CT_1>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:40:00</EPOCH>
-          <TRANSMIT_PHASE_CT_2>41.0</TRANSMIT_PHASE_CT_2>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:41:00</EPOCH>
-          <TRANSMIT_PHASE_CT_3>42.0</TRANSMIT_PHASE_CT_3>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:42:00</EPOCH>
-          <TRANSMIT_PHASE_CT_4>43.0</TRANSMIT_PHASE_CT_4>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:43:00</EPOCH>
-          <TRANSMIT_PHASE_CT_5>44.0</TRANSMIT_PHASE_CT_5>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:44:00</EPOCH>
-          <TROPO_DRY>45.0</TROPO_DRY>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:45:00</EPOCH>
-          <TROPO_WET>46.0</TROPO_WET>
-        </observation>
-        <observation>
-          <EPOCH>2023-01-01T00:46:00</EPOCH>
-          <VLBI_DELAY>47.0</VLBI_DELAY>
-        </observation>
-      </data>
-    </segment>
-  </body>
-</tdm>"#;
-    let tdm = Tdm::from_xml(xml).expect("parse tdm xml");
-    assert_eq!(tdm.body.segments[0].data.observations.len(), 47);
-    let obs3 = &tdm.body.segments[0].data.observations[20];
-    match obs3.data {
-        TdmObservationData::ReceiveFreq5(v) => assert_eq!(v, 21.0),
-        _ => panic!("Expected ReceiveFreq5"),
+fn all_normative_line_endings_preserve_the_message() {
+    let expected = Tdm::from_kvn(crate::KVN).unwrap();
+    for ending in ["\n", "\r", "\r\n", "\n\r"] {
+        let input = crate::KVN.replace('\n', ending);
+        assert_eq!(Tdm::from_kvn(&input).unwrap(), expected, "{ending:?}");
     }
+}
 
-    // Test duplicate EPOCH error handling
-    let xml_dup = r#"<?xml version="1.0" encoding="UTF-8"?>
-<tdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="CCSDS_TDM_VERS" version="2.0">
-  <header><CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE><ORIGINATOR>T</ORIGINATOR></header>
-  <body><segment><metadata><TIME_SYSTEM>UTC</TIME_SYSTEM><PARTICIPANT_1>P</PARTICIPANT_1></metadata>
-  <data><observation><EPOCH>2023-01-01T00:00:00</EPOCH><EPOCH>2023-01-01T00:00:01</EPOCH><RANGE>1.0</RANGE></observation></data>
-  </segment></body></tdm>"#;
-    crate::common::assert_invalid_format(
-        &Tdm::from_xml(xml_dup).unwrap_err(),
-        "invalid TDM XML sequence: duplicate or out-of-order child 'EPOCH' in 'observation'",
-    );
+#[test]
+fn observation_numbers_use_shared_reading_rules_without_underflow() {
+    for value in [".5", "5.", "1e3", "1.2345678901234567", "5e-324"] {
+        assert!(
+            TdmObservationData::from_key_val("RANGE", value).is_ok(),
+            "{value}"
+        );
+    }
+    for value in ["1e-999", "1e999", "1e", "NaN", "INF"] {
+        assert!(
+            TdmObservationData::from_key_val("RANGE", value).is_err(),
+            "{value}"
+        );
+    }
+}
 
-    // Strict parsing rejects unknown root and observation attributes.
-    let xml_unknown = r#"<?xml version="1.0" encoding="UTF-8"?>
-<tdm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="CCSDS_TDM_VERS" version="2.0" extra="val">
-  <header><CREATION_DATE>2023-01-01T00:00:00</CREATION_DATE><ORIGINATOR>T</ORIGINATOR></header>
-  <body><segment><metadata><TIME_SYSTEM>UTC</TIME_SYSTEM><PARTICIPANT_1>P</PARTICIPANT_1></metadata>
-  <data><observation extra="ignore"><EPOCH>2023-01-01T00:00:00</EPOCH><RANGE>1.0</RANGE></observation></data>
-  </segment></body></tdm>"#;
-    crate::common::assert_invalid_format(
-        &Tdm::from_xml(xml_unknown).unwrap_err(),
-        "unknown TDM root attribute 'extra'",
+#[test]
+fn xml_accepts_schema_listed_lowercase_categories() {
+    for (field, upper, lower) in [
+        ("MODE", "SEQUENTIAL", "sequential"),
+        ("TIMETAG_REF", "TRANSMIT", "transmit"),
+        ("INTEGRATION_REF", "MIDDLE", "middle"),
+        ("RANGE_MODE", "COHERENT", "coherent"),
+        ("ANGLE_TYPE", "AZEL", "azel"),
+        ("REFERENCE_FRAME", "EME2000", "eme2000"),
+        ("DATA_QUALITY", "RAW", "raw"),
+    ] {
+        let base = if field == "MODE" {
+            mutated(XML, "<MODE>SEQUENTIAL</MODE>", "")
+        } else {
+            XML.to_owned()
+        };
+        let insertion = if field == "MODE" {
+            "<PATH>"
+        } else {
+            "</metadata>"
+        };
+        let make = |value: &str| {
+            mutated(
+                &base,
+                insertion,
+                &format!("<{field}>{value}</{field}>{insertion}"),
+            )
+        };
+        let xml = make(lower);
+        crate::common::validate_xml("lowercase TDM", &xml);
+        assert_eq!(
+            Tdm::from_xml(&xml).unwrap(),
+            Tdm::from_xml(&make(upper)).unwrap(),
+            "{field}"
+        );
+    }
+    for (field, value) in [
+        ("MODE", "Sequential"),
+        ("ANGLE_TYPE", "AzEl"),
+        ("REFERENCE_FRAME", "Eme2000"),
+    ] {
+        let base = mutated(XML, "<MODE>SEQUENTIAL</MODE>", "");
+        let insertion = if field == "MODE" {
+            "<PATH>"
+        } else {
+            "</metadata>"
+        };
+        let xml = mutated(
+            &base,
+            insertion,
+            &format!("<{field}>{value}</{field}>{insertion}"),
+        );
+        assert!(Tdm::from_xml(&xml).is_err(), "{field}={value}");
+    }
+}
+
+#[test]
+fn present_empty_xml_elements_use_schema_defaults_and_omissions_stay_absent() {
+    let source = XML.replace("‘DSS-25’", "DSS-25");
+    let baseline = Tdm::from_xml(&source).unwrap();
+    assert!(baseline.body.segments[0].metadata.freq_offset.is_none());
+    assert!(baseline.body.segments[0].metadata.data_quality.is_none());
+    let fields = [
+        "FREQ_OFFSET",
+        "RANGE_MODULUS",
+        "TRANSMIT_DELAY_1",
+        "TRANSMIT_DELAY_2",
+        "TRANSMIT_DELAY_3",
+        "TRANSMIT_DELAY_4",
+        "TRANSMIT_DELAY_5",
+        "RECEIVE_DELAY_1",
+        "RECEIVE_DELAY_2",
+        "RECEIVE_DELAY_3",
+        "RECEIVE_DELAY_4",
+        "RECEIVE_DELAY_5",
+        "DATA_QUALITY",
+    ];
+    for field in fields {
+        let explicit = if field == "DATA_QUALITY" {
+            "RAW"
+        } else {
+            "0.0"
+        };
+        let expected = Tdm::from_xml(&mutated(
+            &source,
+            "</metadata>",
+            &format!("<{field}>{explicit}</{field}></metadata>"),
+        ))
+        .unwrap();
+        let metadata = &expected.body.segments[0].metadata;
+        let json = serde_json::to_string(metadata).unwrap();
+        assert_eq!(
+            serde_json::from_str::<ccsds_ndm::messages::tdm::TdmMetadata>(&json).unwrap(),
+            *metadata
+        );
+        for empty in [format!("<{field}/>"), format!("<{field}></{field}>")] {
+            let xml = mutated(&source, "</metadata>", &format!("{empty}</metadata>"));
+            crate::common::validate_xml("TDM default", &xml);
+            let parsed = Tdm::from_xml(&xml).unwrap();
+            assert_eq!(parsed, expected, "{field}");
+            assert_eq!(Tdm::from_kvn(&parsed.to_kvn().unwrap()).unwrap(), expected);
+        }
+        if field != "DATA_QUALITY" {
+            for whitespace in [" ", "\t\r\n", "&#32;", "<![CDATA[ ]]>"] {
+                let xml = mutated(
+                    &source,
+                    "</metadata>",
+                    &format!("<{field}>{whitespace}</{field}></metadata>"),
+                );
+                let parsed = Tdm::from_xml(&xml).unwrap();
+                assert_eq!(parsed, expected, "{field}: {whitespace:?}");
+                assert_eq!(parsed.to_xml().unwrap(), expected.to_xml().unwrap());
+            }
+        }
+    }
+    for (field, data) in [
+        ("CLOCK_BIAS", TdmObservationData::ClockBias(0.0)),
+        ("CLOCK_DRIFT", TdmObservationData::ClockDrift(0.0)),
+    ] {
+        let mut expected = baseline.clone();
+        expected.body.segments[0].metadata.data_types = None;
+        expected.body.segments[0].data.observations[0].data = data;
+        let xml = expected.to_xml().unwrap();
+        let xml = mutated(
+            &xml,
+            &format!("<{field}>0</{field}>"),
+            &format!("<{field}/>"),
+        );
+        crate::common::validate_xml("TDM clock default", &xml);
+        assert_eq!(Tdm::from_xml(&xml).unwrap(), expected);
+        for whitespace in [" ", "\t\r\n", "&#32;", "<![CDATA[ ]]>"] {
+            let input = mutated(
+                &xml,
+                &format!("<{field}/>"),
+                &format!("<{field}>{whitespace}</{field}>"),
+            );
+            assert!(Tdm::from_xml(&input).is_err(), "{field}: {whitespace:?}");
+        }
+    }
+    for field in ["INTEGRATION_INTERVAL", "ANGLE_TYPE"] {
+        let xml = mutated(&source, "</metadata>", &format!("<{field}/></metadata>"));
+        assert!(Tdm::from_xml(&xml).is_err(), "non-defaulted {field}");
+    }
+}
+
+#[test]
+fn kvn_paths_with_blanks_after_commas_read_as_canonical_paths() {
+    // Orekit writes `PATH = 2, 1`; TDM 3.3 forbids the blank, but it carries no information.
+    const FIXTURE: &str = include_str!("../../data/kvn/tdm_e2.kvn");
+    let tdm = Tdm::from_kvn(&mutated(FIXTURE, "PATH = 2,1", "PATH = 2 , 1")).unwrap();
+    assert_eq!(tdm, Tdm::from_kvn(FIXTURE).unwrap());
+    assert!(tdm
+        .to_kvn()
+        .unwrap()
+        .contains("PATH                 = 2,1\n"));
+    let single_diff = mutated(
+        FIXTURE,
+        "MODE = SEQUENTIAL\nPATH = 2,1",
+        "MODE = SINGLE_DIFF\nPATH_1 = 2, 1\nPATH_2 = 1, 2",
     );
+    let metadata = &Tdm::from_kvn(&single_diff).unwrap().body.segments[0].metadata;
+    assert_eq!(metadata.path_1, Some(TdmPath("2,1".into())));
+    assert_eq!(metadata.path_2, Some(TdmPath("1,2".into())));
+}
+
+#[test]
+fn phase_count_exponents_are_xml_double_spellings_but_not_kvn_phase_counts() {
+    const FIXTURE: &str = include_str!("../../data/kvn/tdm_e18.kvn");
+    let line = "TRANSMIT_PHASE_CT_1=2005-184T11:12:23 7175173383.615373";
+    // TDM 4.3.11: KVN phase counts contain no alphabetic characters.
+    let error = Tdm::from_kvn(&mutated(
+        FIXTURE,
+        line,
+        "TRANSMIT_PHASE_CT_1=2005-184T11:12:23 7.175173383615373E9",
+    ))
+    .unwrap_err();
+    assert!(error.to_string().contains("without an exponent"), "{error}");
+    // The XSD types XML phase counts as xsd:double, so XML keeps the exponent text (trimmed
+    // like every other XML number) and KVN output refuses it rather than rewriting digits.
+    let xml = Tdm::from_kvn(FIXTURE).unwrap().to_xml().unwrap().replacen(
+        "<TRANSMIT_PHASE_CT_1>7175173383.615373<",
+        "<TRANSMIT_PHASE_CT_1> 7.175173383615373E9 <",
+        1,
+    );
+    let tdm = Tdm::from_xml(&xml).unwrap();
+    assert_eq!(
+        tdm.body.segments[0].data.observations[0].data,
+        TdmObservationData::TransmitPhaseCt1("7.175173383615373E9".into())
+    );
+    let error = tdm.to_kvn().unwrap_err();
+    crate::common::assert_validation_field(&error, "TRANSMIT_PHASE_CT_1");
+    assert!(error.to_string().contains("without an exponent"), "{error}");
+}
+
+#[test]
+fn legacy_kvn_is_input_only_and_rejects_version_two_content() {
+    let legacy = include_str!("../../data/kvn/tdm_e1.kvn").replacen("= 2.0", "= 1.0", 1);
+    let message = Tdm::from_kvn(&legacy).unwrap();
+    assert_eq!(message.version, "1.0");
+    assert!(ccsds_ndm::from_str(&legacy).is_ok());
+    assert_eq!(
+        message.to_kvn().unwrap_err().code(),
+        Some("generation.unsupported_output_version")
+    );
+    assert!(message.to_xml().is_err());
+    let later = legacy.replace("TIME_SYSTEM = UTC", "TRACK_ID = LATER\nTIME_SYSTEM = UTC");
+    assert!(Tdm::from_kvn(&later)
+        .unwrap_err()
+        .to_string()
+        .contains("TRACK_ID"));
+    // TDM 1.0 XML is input-only too (conformance::tdm1 covers the 1.0 schema rules).
+    let xml = include_str!("../../data/legacy/tdm_1_0_b9.xml");
+    assert_eq!(
+        Tdm::from_xml(&xml.replace("version=\"1.0\">", "version=\"1.1\">"))
+            .unwrap_err()
+            .code(),
+        Some("parse.unsupported_input_version")
+    );
+}
+
+#[test]
+fn categorical_values_ignore_case_and_blank_aliases_in_kvn() {
+    let source = include_str!("../../data/kvn/tdm_e1.kvn")
+        .replace("SEQUENTIAL", "Sequential")
+        .replace("DEGRADED", "Degraded");
+    let message = Tdm::from_kvn(&source).unwrap();
+    assert!(message.to_xml().unwrap().contains("SEQUENTIAL"));
+    assert_eq!(
+        "Single  Diff".parse::<TdmMode>().unwrap(),
+        TdmMode::SingleDiff
+    );
+    assert_eq!(
+        "One Way".parse::<TdmRangeMode>().unwrap(),
+        TdmRangeMode::OneWay
+    );
+    assert_eq!("Azel".parse::<TdmAngleType>().unwrap(), TdmAngleType::Azel);
+    assert_eq!(
+        "Eme2000".parse::<TdmReferenceFrame>().unwrap(),
+        TdmReferenceFrame::Eme2000
+    );
+    assert_eq!("Yes".parse::<YesNo>().unwrap(), YesNo::Yes);
+}
+
+#[test]
+fn legacy_tables_exclude_every_later_edition_metadata_keyword() {
+    let legacy = include_str!("../../data/kvn/tdm_e1.kvn").replacen("= 2.0", "= 1.0", 1);
+    for (keyword, value) in [
+        ("EPHEMERIS_NAME_1", "FILE"),
+        ("INTERPOLATION", "LINEAR"),
+        ("INTERPOLATION_DEGREE", "1"),
+        ("CORRECTION_MAG", "1"),
+        ("CORRECTION_RCS", "1"),
+        ("CORRECTION_ABERRATION_YEARLY", "1"),
+        ("CORRECTION_ABERRATION_DIURNAL", "1"),
+    ] {
+        let current = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e1.kvn")).unwrap();
+        let mut message = current;
+        match keyword {
+            "EPHEMERIS_NAME_1" => {
+                message.body.segments[0].metadata.ephemeris_name_1 = Some(value.into())
+            }
+            "INTERPOLATION" => {
+                message.body.segments[0].metadata.interpolation = Some(value.into());
+                message.body.segments[0].metadata.interpolation_degree = Some(1);
+            }
+            "INTERPOLATION_DEGREE" => {
+                message.body.segments[0].metadata.interpolation_degree = Some(1)
+            }
+            "CORRECTION_MAG" => message.body.segments[0].metadata.correction_mag = Some(1.0),
+            "CORRECTION_RCS" => message.body.segments[0].metadata.correction_rcs = Some(1.0),
+            "CORRECTION_ABERRATION_YEARLY" => {
+                message.body.segments[0]
+                    .metadata
+                    .correction_aberration_yearly = Some(1.0)
+            }
+            _ => {
+                message.body.segments[0]
+                    .metadata
+                    .correction_aberration_diurnal = Some(1.0)
+            }
+        }
+        message.body.segments[0].metadata.corrections_applied = Some(ccsds_ndm::types::YesNo::Yes);
+        let source = message.to_kvn().unwrap().replacen("= 2.0", "= 1.0", 1);
+        assert!(
+            Tdm::from_kvn(&source)
+                .unwrap_err()
+                .to_string()
+                .contains(keyword),
+            "{keyword}"
+        );
+    }
+    let source = legacy.replacen("META_START", "MESSAGE_ID = LATER\nMETA_START", 1);
+    assert!(Tdm::from_kvn(&source)
+        .unwrap_err()
+        .to_string()
+        .contains("MESSAGE_ID"));
+}
+
+#[test]
+fn itrf97_aliases_canonicalize_in_both_notations() {
+    for alias in ["ITRF97", "ITRF1997"] {
+        let input = KVN.replacen(
+            "META_STOP",
+            &format!("REFERENCE_FRAME = {alias}\nMETA_STOP"),
+            1,
+        );
+        let message = Tdm::from_kvn(&input).unwrap();
+        assert_eq!(
+            message.body.segments[0].metadata.reference_frame,
+            Some(TdmReferenceFrame::Itrf97)
+        );
+        let xml = message.to_xml().unwrap();
+        assert!(xml.contains("<REFERENCE_FRAME>ITRF-97</REFERENCE_FRAME>"));
+        assert_eq!(
+            Tdm::from_xml(&xml.replace("ITRF-97", alias)).unwrap(),
+            message
+        );
+    }
+}
+
+#[test]
+fn xml_data_quality_uses_schema_spellings_while_kvn_remains_case_insensitive() {
+    let source = Tdm::from_xml(XML).unwrap().to_xml().unwrap();
+    for (upper, expected) in [
+        ("RAW", TdmDataQuality::Raw),
+        ("VALIDATED", TdmDataQuality::Validated),
+        ("DEGRADED", TdmDataQuality::Degraded),
+    ] {
+        for value in [upper.to_owned(), upper.to_ascii_lowercase()] {
+            let xml = mutated(
+                &source,
+                "</metadata>",
+                &format!("<DATA_QUALITY>{value}</DATA_QUALITY></metadata>"),
+            );
+            crate::common::validate_xml("TDM data quality", &xml);
+            let parsed = Tdm::from_xml(&xml).unwrap();
+            assert_eq!(
+                parsed.body.segments[0].metadata.data_quality,
+                Some(expected.clone())
+            );
+        }
+        let mixed = format!("{}{}", &upper[..1], upper[1..].to_ascii_lowercase());
+        let xml = mutated(
+            &source,
+            "</metadata>",
+            &format!("<DATA_QUALITY>{mixed}</DATA_QUALITY></metadata>"),
+        );
+        assert!(Tdm::from_xml(&xml).is_err());
+        let kvn = mutated(
+            KVN,
+            "DATA_QUALITY = DEGRADED",
+            &format!("DATA_QUALITY = {mixed}"),
+        );
+        assert_eq!(
+            Tdm::from_kvn(&kvn).unwrap().body.segments[0]
+                .metadata
+                .data_quality,
+            Some(expected)
+        );
+    }
+    for value in ["rAw", " RAW ", "", " "] {
+        let xml = mutated(
+            &source,
+            "</metadata>",
+            &format!("<DATA_QUALITY>{value}</DATA_QUALITY></metadata>"),
+        );
+        if value.is_empty() {
+            assert_eq!(
+                Tdm::from_xml(&xml).unwrap().body.segments[0]
+                    .metadata
+                    .data_quality,
+                Some(TdmDataQuality::Raw)
+            );
+        } else {
+            assert!(Tdm::from_xml(&xml).is_err(), "{value:?}");
+        }
+    }
+}
+
+#[test]
+fn xml_unit_bearing_observations_follow_double_underflow_mapping() {
+    for field in ["ANGLE_1", "ANGLE_2", "RHUMIDITY"] {
+        for token in ["1e-999", "-1e-999", "5e-324"] {
+            let input = mutated_once(
+                XML,
+                "<TRANSMIT_FREQ_1>7167941264.0</TRANSMIT_FREQ_1>",
+                &format!("<{field}>{token}</{field}>"),
+            );
+            let message = Tdm::from_xml(&input).unwrap();
+            let value = match &message.body.segments[0].data.observations[0].data {
+                TdmObservationData::Angle1(value) | TdmObservationData::Angle2(value) => *value,
+                TdmObservationData::Rhumidity(value) => value.value,
+                other => panic!("unexpected observation: {other:?}"),
+            };
+            let expected = token.parse::<f64>().unwrap();
+            assert_eq!(value.to_bits(), expected.to_bits());
+            assert_eq!(Tdm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+        }
+    }
+    for field in ["RANGE", "DOPPLER_INSTANTANEOUS"] {
+        let input = mutated_once(
+            XML,
+            "<TRANSMIT_FREQ_1>7167941264.0</TRANSMIT_FREQ_1>",
+            &format!("<{field}>1e-999</{field}>"),
+        );
+        assert!(Tdm::from_xml(&input).is_err());
+    }
 }

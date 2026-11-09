@@ -23,85 +23,6 @@ use winnow::combinator::preceded;
 use winnow::error::AddContext;
 use winnow::prelude::*;
 
-/// Time systems listed in ODM 3.2.3.2.
-const BOOK_TIME_SYSTEMS: &[&str] = &[
-    "GMST", "GPS", "MET", "MRT", "SCLK", "TAI", "TCB", "TDB", "TCG", "TT", "UT1", "UTC",
-];
-
-/// Reference frames listed in ODM 3.2.3.3.
-const BOOK_REF_FRAMES: &[&str] = &[
-    "EME2000", "GCRF", "GRC", "ICRF", "ITRF2000", "ITRF-93", "ITRF-97", "MCI", "TDR", "TEME", "TOD",
-];
-
-/// Local orbital frames listed for COV_REF_FRAME in ODM 3.2.4.11, besides the 3.2.3.3 frames.
-const BOOK_LOCAL_FRAMES: &[&str] = &["RSW", "RTN", "TNW"];
-
-/// ODM 7.5.3 (KVN): normative text values are exclusively uppercase or exclusively lowercase.
-/// Only the values the book itself lists are known to be normative; ICD-defined values such as
-/// a mission frame are not, so their spelling is left alone. XML text follows xsd:string
-/// (8.13.5), so this is checked at the KVN boundary only.
-fn normative_case_error(
-    field: &'static str,
-    value: &str,
-    book_values: &[&str],
-) -> Option<ValidationError> {
-    let upper = value.bytes().any(|byte| byte.is_ascii_uppercase());
-    let lower = value.bytes().any(|byte| byte.is_ascii_lowercase());
-    let listed = book_values
-        .iter()
-        .any(|listed| xml_trimmed(value).eq_ignore_ascii_case(listed));
-    (upper && lower && listed).then(|| ValidationError::InvalidValue {
-        field: field.into(),
-        value: value.to_owned(),
-        expected: "an all-uppercase or all-lowercase value".into(),
-        line: None,
-    })
-}
-
-impl Oem {
-    /// The first 7.5.3 case violation among the book-listed values this message would carry
-    /// in KVN.
-    fn kvn_case_error(&self) -> Option<ValidationError> {
-        self.body
-            .segment
-            .iter()
-            .enumerate()
-            .find_map(|(index, segment)| {
-                let metadata = &segment.metadata;
-                [
-                    ("REF_FRAME", "ref_frame", &metadata.ref_frame, BOOK_REF_FRAMES),
-                    ("TIME_SYSTEM", "time_system", &metadata.time_system, BOOK_TIME_SYSTEMS),
-                ]
-                .into_iter()
-                .find_map(|(field, member, value, listed)| {
-                    normative_case_error(field, value, listed)
-                        .map(|error| error.at_path(format!("body.segment[{index}].metadata.{member}")))
-                })
-                .or_else(|| {
-                    segment
-                        .data
-                        .covariance_matrix
-                        .iter()
-                        .enumerate()
-                        .find_map(|(covariance, matrix)| {
-                            let frame = matrix.cov_ref_frame.as_deref()?;
-                            normative_case_error("COV_REF_FRAME", frame, BOOK_REF_FRAMES)
-                                .or_else(|| {
-                                    normative_case_error("COV_REF_FRAME", frame, BOOK_LOCAL_FRAMES)
-                                })
-                                .map(
-                                |error| {
-                                    error.at_path(format!(
-                                        "body.segment[{index}].data.covariance_matrix[{covariance}].cov_ref_frame"
-                                    ))
-                                },
-                            )
-                        })
-                })
-            })
-    }
-}
-
 pub(super) fn to_string(oem: &Oem) -> Result<String> {
     (|| {
         crate::generation::validate_output_version(
@@ -178,19 +99,16 @@ pub fn oem_metadata(input: &mut &str) -> KvnResult<OemMetadata> {
 
     Ok(OemMetadata {
         comment,
-        object_name: object_name
-            .ok_or_else(|| missing_field_err(input, "Metadata", "OBJECT_NAME"))?,
-        object_id: object_id.ok_or_else(|| missing_field_err(input, "Metadata", "OBJECT_ID"))?,
-        center_name: center_name
-            .ok_or_else(|| missing_field_err(input, "Metadata", "CENTER_NAME"))?,
-        ref_frame: ref_frame.ok_or_else(|| missing_field_err(input, "Metadata", "REF_FRAME"))?,
+        object_name: require_field(input, "OEM Metadata", "OBJECT_NAME", object_name)?,
+        object_id: require_field(input, "OEM Metadata", "OBJECT_ID", object_id)?,
+        center_name: require_field(input, "OEM Metadata", "CENTER_NAME", center_name)?,
+        ref_frame: require_field(input, "OEM Metadata", "REF_FRAME", ref_frame)?,
         ref_frame_epoch,
-        time_system: time_system
-            .ok_or_else(|| missing_field_err(input, "Metadata", "TIME_SYSTEM"))?,
-        start_time: start_time.ok_or_else(|| missing_field_err(input, "Metadata", "START_TIME"))?,
+        time_system: require_field(input, "OEM Metadata", "TIME_SYSTEM", time_system)?,
+        start_time: require_field(input, "OEM Metadata", "START_TIME", start_time)?,
         useable_start_time,
         useable_stop_time,
-        stop_time: stop_time.ok_or_else(|| missing_field_err(input, "Metadata", "STOP_TIME"))?,
+        stop_time: require_field(input, "OEM Metadata", "STOP_TIME", stop_time)?,
         interpolation,
         interpolation_degree,
     })
@@ -298,6 +216,7 @@ fn parse_state_vector_line(input: &mut &str) -> KvnResult<StateVectorAcc> {
 
 /// Parses a single covariance matrix (within COVARIANCE_START/STOP block).
 fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
+    let mut comment = collect_comments.parse_next(input)?;
     // `validate_syntax` has already placed EPOCH first in every matrix.
     key_token.parse_next(input)?;
 
@@ -305,7 +224,7 @@ fn parse_covariance_matrix(input: &mut &str) -> KvnResult<OemCovarianceMatrix> {
 
     // An empty optional value is absent (ODM 7.5.1), like the other optional OEM keywords.
     blank_lines.parse_next(input)?;
-    let mut comment = collect_comments.parse_next(input)?;
+    comment.extend(collect_comments.parse_next(input)?);
     let mut cov_ref_frame = None;
     let next = input.trim_start_matches([' ', '\t']);
     if next
@@ -466,16 +385,9 @@ fn oem_data(input: &mut &str, legacy_comments: bool) -> KvnResult<OemData> {
 
 /// Parses a single OEM segment (META_START ... META_STOP + data).
 fn oem_segment(input: &mut &str, legacy_comments: bool) -> KvnResult<OemSegment> {
-    // Expect META_START
     expect_block_start("META").parse_next(input)?;
-
-    // Parse metadata
     let metadata = oem_metadata.parse_next(input)?;
-
-    // Expect META_STOP
     expect_block_end("META").parse_next(input)?;
-
-    // Parse data
     let data = oem_data(input, legacy_comments)?;
 
     Ok(OemSegment { metadata, data })
@@ -523,16 +435,12 @@ fn oem_body(input: &mut &str, legacy_comments: bool) -> KvnResult<OemBody> {
 
 /// Parses a complete OEM message.
 pub fn parse_oem(input: &mut &str) -> KvnResult<Oem> {
-    // 1. Version
     let version = oem_version.parse_next(input)?;
-
-    // 2. Header
     let legacy_comments = version == "1.0";
     // Real producers place header comments between assignments. Keep them in the header; the
     // serializer writes them immediately after CCSDS_OEM_VERS.
     let header = odm_header_with_comments(input, true)?;
 
-    // 3. Body (segments)
     let body = oem_body(input, legacy_comments)?;
 
     Ok(Oem {
@@ -589,7 +497,10 @@ impl Oem {
     fn write_validated_kvn(&self, writer: &mut KvnWriter<'_>) -> Result<()> {
         // Paths are built only on failure: the checks run once per record at scale.
         fn text(field: &'static str, value: &str, path: impl FnOnce() -> String) -> Result<()> {
-            if !value.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
+            if !value
+                .bytes()
+                .all(|byte| (b' '..=b'~').contains(&byte) || byte == b'\t')
+            {
                 return Err(ValidationError::InvalidValue {
                     field: field.into(),
                     value: value.into(),
@@ -603,7 +514,7 @@ impl Oem {
             line_length_error(field, field.len().max(20) + 3 + value.len(), path)
         }
         // KVN reads an empty optional metadata or covariance value as absent (7.5.1), so writing
-        // one would drop it. The shared header parser keeps empty strings, so the header is exempt.
+        // one would drop it. Header text has its own shared representability checks.
         fn optional_text(
             field: &'static str,
             value: &str,
@@ -625,7 +536,8 @@ impl Oem {
         }
         fn comments(values: &[String], path: impl FnOnce() -> String) -> Result<()> {
             for value in values {
-                if let Some(error) = crate::validation::kvn_comment_error(value) {
+                let value = value.replace('\t', " ");
+                if let Some(error) = crate::validation::kvn_comment_error(&value) {
                     return Err(error.at_path(path()).into());
                 }
             }
@@ -637,25 +549,30 @@ impl Oem {
             &self.version,
         )?;
         crate::versioning::validate_oem_edition(self)?;
-        self.header.validate()?;
+        crate::validation::validate_at_field_path(self.header.validate(), "header")?;
         validate_within_path(self.body.validate_identity(), || "body".into())?;
         validate_within_path(self.body.validate_useable_spans(), || "body".into())?;
-        if let Some(error) = self.kvn_case_error() {
-            return Err(error.into());
-        }
-
         comments(&self.header.comment, || "header.comment".into())?;
-        if let Some(value) = &self.header.classification {
-            text("CLASSIFICATION", value, || "header.classification".into())?;
+        // XML padding around header strings is dropped, as for metadata strings below.
+        let mut header = self.header.clone();
+        header.originator = xml_trimmed(&header.originator).into();
+        for value in [&mut header.classification, &mut header.message_id]
+            .into_iter()
+            .flatten()
+        {
+            *value = xml_trimmed(value).into();
         }
-        text("ORIGINATOR", &self.header.originator, || {
+        if let Some(value) = &header.classification {
+            optional_text("CLASSIFICATION", value, || "header.classification".into())?;
+        }
+        text("ORIGINATOR", &header.originator, || {
             "header.originator".into()
         })?;
-        if let Some(value) = &self.header.message_id {
-            text("MESSAGE_ID", value, || "header.message_id".into())?;
+        if let Some(value) = &header.message_id {
+            optional_text("MESSAGE_ID", value, || "header.message_id".into())?;
         }
         writer.write_pair("CCSDS_OEM_VERS", &self.version);
-        self.header.write_kvn(writer);
+        header.write_kvn(writer);
         for (segment_index, segment) in self.body.segment.iter().enumerate() {
             let base = format!("body.segment[{segment_index}]");
             let metadata = &segment.metadata;
@@ -775,28 +692,6 @@ impl Oem {
                 })?;
             }
             if let Some(first) = segment.data.covariance_matrix.first() {
-                // ODM 7.8.9: KVN places covariance comments only at the start of the section.
-                if let Some((covariance_index, covariance)) = segment
-                    .data
-                    .covariance_matrix
-                    .iter()
-                    .enumerate()
-                    .skip(1)
-                    .find(|(_, covariance)| !covariance.comment.is_empty())
-                {
-                    return Err(ValidationError::InvalidValue {
-                        field: "COMMENT".into(),
-                        value: covariance.comment.join(" | "),
-                        expected:
-                            "comments attached only to the first covariance matrix for OEM KVN"
-                                .into(),
-                        line: None,
-                    }
-                    .at_path(format!(
-                        "{base}.data.covariance_matrix[{covariance_index}].comment"
-                    ))
-                    .into());
-                }
                 comments(&first.comment, || {
                     format!("{base}.data.covariance_matrix[0].comment")
                 })?;
@@ -818,6 +713,12 @@ impl Oem {
                     optional_text("COV_REF_FRAME", xml_trimmed(value), || {
                         format!("{base}.data.covariance_matrix[{covariance_index}].cov_ref_frame")
                     })?;
+                }
+                if covariance_index > 0 {
+                    comments(&covariance.comment, || {
+                        format!("{base}.data.covariance_matrix[{covariance_index}].comment")
+                    })?;
+                    writer.write_comments(&covariance.comment);
                 }
                 writer.write_pair("EPOCH", covariance.epoch);
                 if let Some(value) = &covariance.cov_ref_frame {
@@ -868,16 +769,11 @@ impl Oem {
                 .map(|(_, value)| value.trim())
         });
         (|| {
-            let normalized = crate::kvn::normalize_line_endings(kvn);
+            let normalized = crate::kvn::prepare_input(kvn, crate::validation::MessageKind::Oem)?;
             validate_syntax(&normalized, source_edition == Some("1.0"))?;
-            let oem = Self::from_kvn_str(&normalized)?;
+            let oem = Self::from_kvn_str(&normalized)
+                .map_err(|error| with_metadata_path(error, &normalized))?;
             crate::traits::Validate::validate(&oem)?;
-            // OEM 1.0 permits mixed-case text values (502.0-B-1, 4.3.3g).
-            if oem.version != "1.0" {
-                if let Some(error) = oem.kvn_case_error() {
-                    return Err(error.into());
-                }
-            }
             Ok(oem)
         })()
         .map_err(|error: crate::error::CcsdsNdmError| {
@@ -889,6 +785,37 @@ impl Oem {
             )
         })
     }
+}
+
+/// Give a missing metadata keyword the path of its segment, which the shared parser can't know.
+fn with_metadata_path(
+    error: crate::error::CcsdsNdmError,
+    kvn: &str,
+) -> crate::error::CcsdsNdmError {
+    use crate::error::{CcsdsNdmError, ValidationError};
+    let CcsdsNdmError::Validation(inner) = error else {
+        return error;
+    };
+    let path = match &*inner {
+        ValidationError::MissingRequiredField {
+            block,
+            field,
+            line: Some(line),
+        } if block == "OEM Metadata" => {
+            let segment = kvn
+                .lines()
+                .take(*line)
+                .filter(|record| record.trim() == "META_START")
+                .count()
+                .saturating_sub(1);
+            format!(
+                "body.segment[{segment}].metadata.{}",
+                field.to_ascii_lowercase()
+            )
+        }
+        _ => return CcsdsNdmError::Validation(inner),
+    };
+    inner.at_path(path).into()
 }
 
 impl ToKvn for Oem {
@@ -934,14 +861,14 @@ impl ToKvn for OemMetadata {
             writer.write_pair("INTERPOLATION", xml_trimmed(v));
         }
         if let Some(v) = &self.interpolation_degree {
-            writer.write_pair("INTERPOLATION_DEGREE", v);
+            writer.write_integer_pair("INTERPOLATION_DEGREE", v.0.get());
         }
     }
 }
 
 /// Validate the OEM KVN record structure.
 ///
-/// Expects `kvn` to have gone through [`crate::kvn::normalize_line_endings`], so every remaining
+/// Expects `kvn` to have gone through [`crate::kvn::prepare_input`], so every remaining
 /// carriage return is part of a CRLF pair.
 fn validate_syntax(kvn: &str, legacy_comments: bool) -> Result<()> {
     use crate::error::{CcsdsNdmError, FormatError};
@@ -1016,29 +943,13 @@ fn validate_syntax(kvn: &str, legacy_comments: bool) -> Result<()> {
     let mut covariance_closed = false;
     let mut implicit_covariance = false;
     let mut ephemeris_comments = false;
+    // A comment after a complete matrix must lead the next one (7.8.9).
+    let mut trailing_covariance_comment = None;
     let mut offset = 0usize;
 
     for (index, raw_line) in kvn.split('\n').enumerate() {
         let line_number = index + 1;
         let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
-        // Some producers pad comment lines past column 254. Match the reader's existing
-        // trailing-space normalization while retaining the limit for substantive content.
-        if line.len() > 254 && line.trim_end_matches(' ').len() > 254 {
-            return Err(invalid_at(
-                line_number,
-                offset,
-                254,
-                "line exceeds the normative 254-character limit",
-            ));
-        }
-        if let Some(index) = line.bytes().position(|byte| !(b' '..=b'~').contains(&byte)) {
-            return Err(invalid_at(
-                line_number,
-                offset,
-                index,
-                "non-printable or non-ASCII character",
-            ));
-        }
         let line = line.trim_start();
         if line.trim_end().is_empty() {
             offset += raw_line.len() + 1;
@@ -1053,7 +964,7 @@ fn validate_syntax(kvn: &str, legacy_comments: bool) -> Result<()> {
                     Phase::Header => header_fields_seen & 1 != 0,
                     Phase::Metadata => true,
                     Phase::Ephemeris => state_records == 0,
-                    Phase::Covariance => covariance_row == 0,
+                    Phase::Covariance => covariance_row == 0 || covariance_row == 6,
                 }
             };
             if !allowed {
@@ -1063,10 +974,23 @@ fn validate_syntax(kvn: &str, legacy_comments: bool) -> Result<()> {
                     "COMMENT is not at the beginning of an allowed OEM block",
                 ));
             }
+            if phase == Phase::Covariance && covariance_row == 6 {
+                trailing_covariance_comment.get_or_insert((line_number, offset));
+            }
             offset += raw_line.len() + 1;
             continue;
         }
         let line = line.trim_end();
+
+        if let Some((line_number, offset)) = trailing_covariance_comment.take() {
+            if !line.starts_with("EPOCH") {
+                return Err(invalid(
+                    line_number,
+                    offset,
+                    "COMMENT after the last covariance matrix must precede another EPOCH",
+                ));
+            }
+        }
 
         match line {
             "META_START" => {
@@ -1245,6 +1169,13 @@ fn validate_syntax(kvn: &str, legacy_comments: bool) -> Result<()> {
         offset += raw_line.len() + 1;
     }
 
+    if let Some((line_number, offset)) = trailing_covariance_comment {
+        return Err(invalid(
+            line_number,
+            offset,
+            "COMMENT after the last covariance matrix must precede another EPOCH",
+        ));
+    }
     if segments == 0
         || state_records == 0
         || !(phase == Phase::Ephemeris
@@ -1253,7 +1184,11 @@ fn validate_syntax(kvn: &str, legacy_comments: bool) -> Result<()> {
         return Err(invalid(
             kvn.lines().count().max(1),
             kvn.len(),
-            "incomplete OEM document",
+            if phase == Phase::Covariance {
+                "incomplete OEM covariance block: expected EPOCH, six matrix rows and COVARIANCE_STOP"
+            } else {
+                "incomplete OEM document"
+            },
         ));
     }
     // ODM 7.3.7 terminates every line, but a missing terminator on the last line is common in

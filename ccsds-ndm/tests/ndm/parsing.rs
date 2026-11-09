@@ -4,12 +4,159 @@ use ccsds_ndm::error::{DiagnosticNotation, DiagnosticOperation};
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::common::mutated_once;
-use ccsds_ndm::messages::ndm::CombinedNdm;
+use ccsds_ndm::messages::{ndm::CombinedNdm, ocm::Ocm};
 use ccsds_ndm::{from_str, Message, Ndm};
+
+#[test]
+fn constituent_error_locations_refer_to_the_original_combined_document() {
+    let original = include_str!("../../data/xml/ndm_g12.xml");
+    assert_eq!(
+        CombinedNdm::from_xml(&format!("\u{feff}{original}")).unwrap(),
+        CombinedNdm::from_xml(original).unwrap(),
+    );
+    let source = mutated_once(original, "<Q1>-0.005068</Q1>", "<Q1>bad</Q1>");
+    let expected_offset = source.find("bad</Q1>").unwrap() + "bad</Q1>".len();
+    let expected_line = source[..expected_offset]
+        .bytes()
+        .filter(|b| *b == b'\n')
+        .count()
+        + 1;
+    let expected_column = expected_offset - source[..expected_offset].rfind('\n').unwrap();
+    for error in [
+        CombinedNdm::from_xml(&source).unwrap_err(),
+        from_str(&source).unwrap_err(),
+        CombinedNdm::from_xml(&format!("\u{feff}{source}")).unwrap_err(),
+        from_str(&format!("\u{feff}{source}")).unwrap_err(),
+    ] {
+        let diagnostic = error.diagnostic().unwrap();
+        assert_eq!(diagnostic.byte_offset, Some(expected_offset));
+        assert_eq!(
+            diagnostic.source_location,
+            Some((expected_line, expected_column))
+        );
+        assert!(error.to_string().contains(&format!("line {expected_line}")));
+        assert!(diagnostic.original_token.unwrap().contains("bad</Q1>"));
+    }
+}
 
 /// Prefix the XML declaration that NDM/XML 4.2 requires on the first line.
 fn declared(body: &str) -> String {
     format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n{body}")
+}
+
+#[test]
+fn envelope_text_decodes_entities_cdata_and_empty_elements() {
+    let source = declared(
+        "<ndm><?ignored instruction?><MESSAGE_ID>A&amp;B&#32;&lt;C&gt;</MESSAGE_ID>\
+         <COMMENT>first <![CDATA[<&>]]> then &quot;quoted&quot;</COMMENT>\
+         <COMMENT>before<?ignored instruction?> after</COMMENT><COMMENT/></ndm>",
+    );
+    let message = CombinedNdm::from_xml(&source).unwrap();
+    assert_eq!(message.id.as_deref(), Some("A&B <C>"));
+    assert_eq!(
+        message.comments,
+        ["first <&> then \"quoted\"", "before after", ""]
+    );
+    let xml = message.to_xml().unwrap();
+    crate::common::validate_xml("combined text fields", &xml);
+    assert_eq!(CombinedNdm::from_xml(&xml).unwrap(), message);
+    assert_eq!(from_str(&source).unwrap(), Message::Ndm(message));
+
+    let empty = CombinedNdm::from_xml(&declared("<ndm><MESSAGE_ID/><COMMENT/></ndm>")).unwrap();
+    assert_eq!(empty.id.as_deref(), Some(""));
+    assert_eq!(empty.comments, [""]);
+    assert_eq!(
+        CombinedNdm::from_xml(&empty.to_xml().unwrap()).unwrap(),
+        empty
+    );
+    assert!(CombinedNdm::from_xml(&declared("<ndm/><?ignored instruction?>")).is_ok());
+}
+
+#[test]
+fn envelope_text_rejects_attributes_and_nested_elements() {
+    for element in ["MESSAGE_ID", "COMMENT"] {
+        for content in [
+            format!("<{element} bad=\"x\">a</{element}>"),
+            format!("<{element} bad=\"x\"/>"),
+            format!("<{element}><bad>x</bad></{element}>"),
+            format!("<{element}><bad/></{element}>"),
+        ] {
+            let source = declared(&format!("<ndm>{content}</ndm>"));
+            assert!(CombinedNdm::from_xml(&source).is_err(), "{content}");
+            assert!(from_str(&source).is_err(), "{content}");
+        }
+    }
+}
+
+#[test]
+fn envelope_text_accepts_only_namespace_resolved_schema_hints() {
+    for element in ["MESSAGE_ID", "COMMENT"] {
+        for hint in ["schemaLocation", "noNamespaceSchemaLocation"] {
+            let location = if hint == "schemaLocation" {
+                "urn:ccsds:schema:ndmxml schema.xsd"
+            } else {
+                "schema.xsd"
+            };
+            for (declarations, attributes) in [
+                (
+                    "xmlns:hint='http://www.w3.org/2001/XMLSchema-instance'",
+                    format!("hint:{hint}='{location}'"),
+                ),
+                (
+                    "",
+                    format!("xmlns:local='http://www.w3.org/2001/XMLSchema-instance' local:{hint}='{location}'"),
+                ),
+            ] {
+                for content in [
+                    format!("<{element} {attributes}>value</{element}>"),
+                    format!("<{element} {attributes}/>"),
+                ] {
+                    let source = declared(&format!("<ndm {declarations}>{content}</ndm>"));
+                    crate::common::validate_xml("combined envelope schema hints", &source);
+                    let message = CombinedNdm::from_xml(&source).unwrap();
+                    assert_eq!(from_str(&source).unwrap(), Message::Ndm(message.clone()));
+                    assert_eq!(CombinedNdm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+                }
+            }
+        }
+        for attributes in [
+            "hint:schemaLocation='urn:ccsds:schema:ndmxml schema.xsd'",
+            "xmlns:hint='urn:foreign' hint:schemaLocation='urn:ccsds:schema:ndmxml schema.xsd'",
+            "xmlns:hint='http://www.w3.org/2001/XMLSchema-instance' hint:unknown='value'",
+            "schemaLocation='urn:ccsds:schema:ndmxml schema.xsd'",
+            "xmlns:a='http://www.w3.org/2001/XMLSchema-instance' xmlns:b='http://www.w3.org/2001/XMLSchema-instance' a:schemaLocation='urn:a a.xsd' b:schemaLocation='urn:b b.xsd'",
+        ] {
+            let source = declared(&format!("<ndm><{element} {attributes}/></ndm>"));
+            assert!(CombinedNdm::from_xml(&source).is_err(), "{source}");
+            assert!(from_str(&source).is_err(), "{source}");
+        }
+    }
+    let source = declared(
+        "<ndm><COMMENT xmlns:hint='http://www.w3.org/2001/XMLSchema-instance' hint:schemaLocation='urn:ccsds:schema:ndmxml schema.xsd'/><COMMENT hint:schemaLocation='urn:ccsds:schema:ndmxml schema.xsd'/></ndm>",
+    );
+    assert!(
+        CombinedNdm::from_xml(&source).is_err(),
+        "local declarations cannot leak to siblings"
+    );
+}
+
+#[test]
+fn combined_xml_rejects_forbidden_literal_characters_even_in_ignored_content() {
+    for character in ['\0', '\u{1}', '\u{b}', '\u{fffe}', '\u{ffff}'] {
+        for body in [
+            format!("<ndm><MESSAGE_ID>{character}</MESSAGE_ID></ndm>"),
+            format!("<ndm><COMMENT><![CDATA[{character}]]></COMMENT></ndm>"),
+            format!("<ndm><!--{character}--></ndm>"),
+            format!("<ndm><?ignored {character}?></ndm>"),
+            format!("<ndm xmlns:unused='urn:{character}'/>"),
+            format!("<ndm/><!--{character}-->"),
+        ] {
+            let source = declared(&body);
+            let error = CombinedNdm::from_xml(&source).unwrap_err().to_string();
+            assert!(error.contains("XML 1.0 characters"), "{error}");
+            assert!(from_str(&source).is_err(), "{source}");
+        }
+    }
 }
 
 #[test]
@@ -65,232 +212,8 @@ fn combined_xml_parser_enforces_the_normative_envelope() {
 }
 
 #[test]
-fn sequential_kvn_messages_are_rejected_by_generic_detection() {
-    let input = r#"
-CCSDS_OPM_VERS = 3.0
-CREATION_DATE = 2021-01-01T12:00:00.000
-ORIGINATOR    = NASA
-OBJECT_NAME          = SATELLITE
-OBJECT_ID            = 2020-001A
-CENTER_NAME          = EARTH
-REF_FRAME            = GCRF
-TIME_SYSTEM          = UTC
-EPOCH                = 2021-01-01T12:00:00.000
-X                    = 6500.0 [km]
-Y                    = 0.0 [km]
-Z                    = 0.0 [km]
-X_DOT                = 0.0 [km/s]
-Y_DOT                = 7.5 [km/s]
-Z_DOT                = 0.0 [km/s]
-
-CCSDS_OEM_VERS = 3.0
-CREATION_DATE = 2021-01-01T12:00:00.000
-ORIGINATOR    = NASA
-META_START
-OBJECT_NAME          = SATELLITE
-OBJECT_ID            = 2020-001A
-CENTER_NAME          = EARTH
-REF_FRAME            = GCRF
-TIME_SYSTEM          = UTC
-START_TIME           = 2021-01-01T12:00:00.000
-USEABLE_START_TIME   = 2021-01-01T12:00:00.000
-USEABLE_STOP_TIME    = 2021-01-02T12:00:00.000
-STOP_TIME            = 2021-01-02T12:00:00.000
-INTERPOLATION        = HERMITE
-INTERPOLATION_DEGREE = 1
-META_STOP
-2021-01-01T12:00:00.000 6500.0 0.0 0.0 0.0 7.5 0.0
-"#;
-
-    let error = from_str(input).unwrap_err();
-    let diagnostic = error.diagnostic().unwrap();
-    assert_eq!(diagnostic.code, Some("unsupported.notation"));
-    assert_eq!(
-        diagnostic.operation,
-        ccsds_ndm::error::DiagnosticOperation::Parse
-    );
-    assert_eq!(
-        diagnostic.notation,
-        ccsds_ndm::error::DiagnosticNotation::Kvn
-    );
-    assert_eq!(
-        diagnostic.message_kind,
-        ccsds_ndm::validation::MessageKind::Ndm
-    );
-}
-
-#[test]
-fn combined_ndm_xml() {
-    let input = r#"<?xml version="1.0" encoding="UTF-8"?>
-<ndm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-    <MESSAGE_ID>TEST_ID_123</MESSAGE_ID>
-    <COMMENT>Global NDM comment</COMMENT>
-    <opm id="CCSDS_OPM_VERS" version="3.0">
-        <header>
-            <CREATION_DATE>2010-03-12T22:31:12.000</CREATION_DATE>
-            <ORIGINATOR>NASA</ORIGINATOR>
-        </header>
-        <body>
-            <segment>
-                <metadata>
-                    <OBJECT_NAME>OSIRIS-REX</OBJECT_NAME>
-                    <OBJECT_ID>2016-055A</OBJECT_ID>
-                    <CENTER_NAME>SUN</CENTER_NAME>
-                    <REF_FRAME>EME2000</REF_FRAME>
-                    <TIME_SYSTEM>UTC</TIME_SYSTEM>
-                </metadata>
-                <data>
-                    <stateVector>
-                        <EPOCH>2019-01-01T00:00:00.000Z</EPOCH>
-                        <X units="km"> -1.439815777703372E+08 </X>
-                        <Y units="km">  4.026410714752945E+07 </Y>
-                        <Z units="km">  1.928732688463953E+07 </Z>
-                        <X_DOT units="km/s"> -9.100918933256038E+00 </X_DOT>
-                        <Y_DOT units="km/s"> -2.628965615712169E+01 </Y_DOT>
-                        <Z_DOT units="km/s"> -1.144865805537552E+01 </Z_DOT>
-                    </stateVector>
-                </data>
-            </segment>
-        </body>
-    </opm>
-    <omm id="CCSDS_OMM_VERS" version="3.0">
-        <header>
-            <CREATION_DATE>2010-03-12T22:31:12.000</CREATION_DATE>
-            <ORIGINATOR>NASA</ORIGINATOR>
-        </header>
-        <body>
-            <segment>
-                <metadata>
-                    <OBJECT_NAME>OSIRIS-REX</OBJECT_NAME>
-                    <OBJECT_ID>2016-055A</OBJECT_ID>
-                    <CENTER_NAME>SUN</CENTER_NAME>
-                    <REF_FRAME>EME2000</REF_FRAME>
-                    <TIME_SYSTEM>UTC</TIME_SYSTEM>
-                    <MEAN_ELEMENT_THEORY>DSST</MEAN_ELEMENT_THEORY>
-                </metadata>
-                <data>
-                   <meanElements>
-                        <EPOCH>2019-01-01T00:00:00.000Z</EPOCH>
-                        <SEMI_MAJOR_AXIS units="km">6700.0</SEMI_MAJOR_AXIS>
-                        <ECCENTRICITY>0.001</ECCENTRICITY>
-                        <INCLINATION units="deg">56.0</INCLINATION>
-                        <RA_OF_ASC_NODE units="deg">10.0</RA_OF_ASC_NODE>
-                        <ARG_OF_PERICENTER units="deg">5.0</ARG_OF_PERICENTER>
-                        <MEAN_ANOMALY units="deg">20.0</MEAN_ANOMALY>
-                        <GM units="km**3/s**2">398600.4418</GM>
-                   </meanElements>
-                </data>
-            </segment>
-        </body>
-    </omm>
-</ndm>
-"#;
-
-    let msg = from_str(input).unwrap();
-    match msg {
-        Message::Ndm(ndm) => {
-            assert_eq!(ndm.id, Some("TEST_ID_123".to_string()));
-            assert_eq!(ndm.comments, vec!["Global NDM comment".to_string()]);
-            assert_eq!(ndm.messages.len(), 2);
-            assert!(matches!(ndm.messages[0], Message::Opm(_)));
-            assert!(matches!(ndm.messages[1], Message::Omm(_)));
-        }
-        _ => panic!("Expected Message::Ndm, got {:?}", msg),
-    }
-}
-
-#[test]
 fn combined_ndm_xml_attitude() {
-    let input = r#"<?xml version="1.0" encoding="UTF-8"?>
-<ndm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-    <COMMENT>Example: 1 each APM, AEM, ACM in combined instantiation</COMMENT>
-    <apm id="CCSDS_APM_VERS" version="2.0">
-        <header>
-            <CREATION_DATE>2007-11-10T15:23:57</CREATION_DATE>
-            <ORIGINATOR>CNES</ORIGINATOR>
-        </header>
-        <body>
-            <segment>
-                <metadata>
-                    <OBJECT_NAME>TEST</OBJECT_NAME>
-                    <OBJECT_ID>2007-011</OBJECT_ID>
-                    <CENTER_NAME>EARTH</CENTER_NAME>
-                    <TIME_SYSTEM>UTC</TIME_SYSTEM>
-                </metadata>
-                <data>
-                    <EPOCH>2007-10-01T00:02:00.000</EPOCH>
-                    <eulerAngleState>
-                        <REF_FRAME_A>SC_BODY</REF_FRAME_A>
-                        <REF_FRAME_B>J2000</REF_FRAME_B>
-                        <EULER_ROT_SEQ>ZXZ</EULER_ROT_SEQ>
-                        <ANGLE_1 units="deg">90.</ANGLE_1>
-                        <ANGLE_2 units="deg">130.</ANGLE_2>
-                        <ANGLE_3 units="deg">270.</ANGLE_3>
-                    </eulerAngleState>
-                </data>
-            </segment>
-        </body>
-    </apm>
-    <aem id="CCSDS_AEM_VERS" version="2.0">
-        <header>
-            <CREATION_DATE>2000-100T01:00:00</CREATION_DATE>
-            <ORIGINATOR>NASA/JPL</ORIGINATOR>
-        </header>
-        <body>
-            <segment>
-                <metadata>
-                    <OBJECT_NAME>TEST</OBJECT_NAME>
-                    <OBJECT_ID>2000-999Z</OBJECT_ID>
-                    <REF_FRAME_A>SC_BODY_1</REF_FRAME_A>
-                    <REF_FRAME_B>J2000</REF_FRAME_B>
-                    <TIME_SYSTEM>TDB</TIME_SYSTEM>
-                    <START_TIME>2000-100T00:00:00.000</START_TIME>
-                    <STOP_TIME>2000-100T00:00:00.000</STOP_TIME>
-                    <ATTITUDE_TYPE>QUATERNION</ATTITUDE_TYPE>
-                </metadata>
-                <data>
-                    <attitudeState>
-                        <quaternionEphemeris>
-                            <EPOCH>2000-100T00:00:00.000</EPOCH>
-                            <quaternion>
-                                <Q1>-0.005068</Q1>
-                                <Q2>0.906506</Q2>
-                                <Q3>0.002360</Q3>
-                                <QC>0.422157</QC>
-                            </quaternion>
-                        </quaternionEphemeris>
-                    </attitudeState>
-                </data>
-            </segment>
-        </body>
-    </aem>
-    <acm id="CCSDS_ACM_VERS" version="2.0">
-        <header>
-            <CREATION_DATE>1998-11-06T09:23:57</CREATION_DATE>
-            <ORIGINATOR>JAXA</ORIGINATOR>
-        </header>
-        <body>
-            <segment>
-                <metadata>
-                    <OBJECT_NAME>EUROBIRD-4A</OBJECT_NAME>
-                    <INTERNATIONAL_DESIGNATOR>2000-052A</INTERNATIONAL_DESIGNATOR>
-                    <TIME_SYSTEM>UTC</TIME_SYSTEM>
-                    <EPOCH_TZERO>1998-12-18T14:28:15.1172</EPOCH_TZERO>
-                </metadata>
-                <data>
-                    <att>
-                        <REF_FRAME_A>J2000</REF_FRAME_A>
-                        <REF_FRAME_B>SC_BODY</REF_FRAME_B>
-                        <NUMBER_STATES>4</NUMBER_STATES>
-                        <ATT_TYPE>QUATERNION</ATT_TYPE>
-                        <attLine>0.0 0.73566 -0.50547 0.41390 0.180707</attLine>
-                    </att>
-                </data>
-            </segment>
-        </body>
-    </acm>
-</ndm>
-"#;
+    let input = include_str!("../../data/xml/ndm_g12.xml");
 
     let msg = from_str(input).unwrap();
     match msg {
@@ -313,14 +236,6 @@ fn combined_xml_depth_has_a_fixed_safety_limit() {
     let document = format!("{}{}", "<ndm>".repeat(17), "</ndm>".repeat(17));
     let error = CombinedNdm::from_xml(&document).unwrap_err().to_string();
     assert!(error.contains("xml_depth"), "unexpected error: {error}");
-}
-
-#[test]
-fn strict_parsing_remains_the_default() {
-    crate::common::assert_validation_field(
-        &ccsds_ndm::from_str(include_str!("../../data/xml/ndm_g22.xml")).unwrap_err(),
-        "MASS",
-    );
 }
 
 #[test]
@@ -422,4 +337,161 @@ fn constituents_carry_only_id_and_version_unlike_standalone_messages() {
         &CombinedNdm::from_xml(&combined).unwrap_err(),
         "attribute 'xsi:noNamespaceSchemaLocation' is not allowed on a combined NDM constituent",
     );
+}
+
+#[test]
+fn constituent_edition_check_compares_decoded_xml_attribute_values() {
+    let source = include_str!("../../data/xml/ndm_g21.xml");
+    let expected = CombinedNdm::from_xml(source).unwrap();
+    let escaped = source.replacen("version=\"3.0\"", "version=\"&#51;.0\"", 1);
+    assert!(escaped.contains("version=\"&#51;.0\""));
+    assert_eq!(CombinedNdm::from_xml(&escaped).unwrap(), expected);
+}
+
+#[test]
+fn envelope_accepts_decoded_whitespace_only_inside_the_root() {
+    let expected = CombinedNdm::from_xml("<ndm><COMMENT>ok</COMMENT></ndm>").unwrap();
+    for whitespace in ["&#32;", "&#x9;&#10;&#13;", "<![CDATA[ \t\r\n]]>"] {
+        let xml = format!("<ndm>{whitespace}<COMMENT>ok</COMMENT>{whitespace}</ndm> \t\r\n");
+        assert_eq!(CombinedNdm::from_xml(&xml).unwrap(), expected);
+        assert_eq!(from_str(&xml).unwrap(), Message::Ndm(expected.clone()));
+        for root in ["<ndm/>", "<ndm></ndm>"] {
+            assert!(CombinedNdm::from_xml(&format!("{root}{whitespace}")).is_err());
+        }
+    }
+    for text in ["&#65;", "&amp;", "<![CDATA[ x ]]>"] {
+        assert!(CombinedNdm::from_xml(&format!("<ndm>{text}</ndm>")).is_err());
+    }
+}
+
+/// Space-Track-shaped NDM/XML 1.0 envelope: no-namespace root, schema hint, ODM 2.0 child.
+const SPACE_TRACK_NDM_1_0: &str = r#"<?xml version="1.0" encoding="utf-8"?>
+<ndm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:noNamespaceSchemaLocation="http://sanaregistry.org/r/ndmxml/ndmxml-1.0-master.xsd">
+    <omm id="CCSDS_OMM_VERS" version="2.0">
+        <header>
+            <COMMENT>GENERATED VIA SPACE-TRACK.ORG API</COMMENT>
+            <CREATION_DATE>2020-12-29T06:26:10</CREATION_DATE>
+            <ORIGINATOR>18 SPCS</ORIGINATOR>
+        </header>
+        <body>
+            <segment>
+                <metadata>
+                    <OBJECT_NAME>NUSAT-8 (MARIE)</OBJECT_NAME>
+                    <OBJECT_ID>2020-003C</OBJECT_ID>
+                    <CENTER_NAME>EARTH</CENTER_NAME>
+                    <REF_FRAME>TEME</REF_FRAME>
+                    <TIME_SYSTEM>UTC</TIME_SYSTEM>
+                    <MEAN_ELEMENT_THEORY>SGP4</MEAN_ELEMENT_THEORY>
+                </metadata>
+                <data>
+                    <meanElements>
+                        <EPOCH>2020-12-29T03:57:59.406624</EPOCH>
+                        <MEAN_MOTION>15.27989249</MEAN_MOTION>
+                        <ECCENTRICITY>0.00133560</ECCENTRICITY>
+                        <INCLINATION>97.2970</INCLINATION>
+                        <RA_OF_ASC_NODE>66.4161</RA_OF_ASC_NODE>
+                        <ARG_OF_PERICENTER>110.6345</ARG_OF_PERICENTER>
+                        <MEAN_ANOMALY>334.7107</MEAN_ANOMALY>
+                    </meanElements>
+                    <tleParameters>
+                        <EPHEMERIS_TYPE>0</EPHEMERIS_TYPE>
+                        <CLASSIFICATION_TYPE>U</CLASSIFICATION_TYPE>
+                        <NORAD_CAT_ID>45018</NORAD_CAT_ID>
+                        <ELEMENT_SET_NO>999</ELEMENT_SET_NO>
+                        <REV_AT_EPOCH>5327</REV_AT_EPOCH>
+                        <BSTAR>0.00008455300000</BSTAR>
+                        <MEAN_MOTION_DOT>0.00002241</MEAN_MOTION_DOT>
+                        <MEAN_MOTION_DDOT>0.0000000000000</MEAN_MOTION_DDOT>
+                    </tleParameters>
+                </data>
+            </segment>
+        </body>
+    </omm>
+</ndm>
+"#;
+
+#[test]
+fn ndm_xml_1_0_envelope_is_input_only_and_checked_against_its_own_schema() {
+    let combined = CombinedNdm::from_xml(SPACE_TRACK_NDM_1_0).unwrap();
+    let Message::Omm(omm) = &combined.messages[0] else {
+        panic!("expected OMM")
+    };
+    assert_eq!(omm.version, "2.0");
+    assert_eq!(
+        from_str(SPACE_TRACK_NDM_1_0).unwrap(),
+        Message::Ndm(combined.clone())
+    );
+    // Output stays scoped to the NDM/XML 4.0.0 envelope, which cannot carry ODM 2.0.
+    ccsds_ndm::Validate::validate(&combined).unwrap();
+    assert!(combined.to_xml().is_err());
+    let mut sink = Vec::new();
+    assert!(combined.write_xml_to(&mut sink).is_err());
+    assert!(sink.is_empty());
+
+    let body = &SPACE_TRACK_NDM_1_0
+        [SPACE_TRACK_NDM_1_0.find("<omm").unwrap()..SPACE_TRACK_NDM_1_0.find("</ndm>").unwrap()];
+    let ocm = Ocm::from_kvn(include_str!("../../data/kvn/ocm_g15.kvn"))
+        .unwrap()
+        .to_xml()
+        .unwrap();
+    let ocm = ocm.split_once('\n').unwrap().1;
+    let apm_1_0 = r#"<apm id="CCSDS_APM_VERS" version="1.0"><header/></apm>"#;
+    for (case, document) in [
+        (
+            "comments and constituents",
+            format!("<ndm><COMMENT>c</COMMENT>{body}</ndm>"),
+        ),
+        (
+            "child namespace declaration",
+            format!(
+                "<ndm>{}</ndm>",
+                body.replacen("<omm ", "<omm xmlns:local=\"urn:example\" ", 1)
+            ),
+        ),
+    ] {
+        assert!(CombinedNdm::from_xml(&document).is_ok(), "{case}");
+    }
+    for (case, document) in [
+        (
+            "MESSAGE_ID is 4.0.0-only",
+            format!("<ndm><MESSAGE_ID>x</MESSAGE_ID>{body}</ndm>"),
+        ),
+        (
+            "COMMENT after a constituent",
+            format!("<ndm>{body}<COMMENT>c</COMMENT></ndm>"),
+        ),
+        (
+            "4.0.0-only constituent family",
+            format!("<ndm>{body}{ocm}</ndm>"),
+        ),
+        (
+            "qualified root",
+            format!("<ndm xmlns=\"urn:ccsds:schema:ndmxml\">{body}</ndm>"),
+        ),
+        (
+            "qualified constituent",
+            format!(
+                "<ndm>{}</ndm>",
+                body.replacen("<omm ", "<omm xmlns=\"urn:ccsds:schema:ndmxml\" ", 1)
+            ),
+        ),
+        (
+            "1.0 types namespace on the root",
+            format!(
+                "<ndm xmlns=\"urn:ccsds:recommendation:navigation:schema:ndmxml\">{body}</ndm>"
+            ),
+        ),
+        (
+            "root version attribute",
+            format!("<ndm version=\"1.0\">{body}</ndm>"),
+        ),
+        ("APM 1.0 constituent", format!("<ndm>{apm_1_0}</ndm>")),
+        (
+            "APM 1.0 beside ODM 2.0",
+            format!("<ndm>{body}{apm_1_0}</ndm>"),
+        ),
+    ] {
+        assert!(CombinedNdm::from_xml(&document).is_err(), "{case}");
+    }
 }

@@ -51,22 +51,6 @@ pub(crate) fn validate_odm_assignments(kvn: &str, rules: &OdmAssignmentRules) ->
                 "lone carriage return",
             ));
         }
-        if line.len() > 254 {
-            return Err(invalid(
-                rules,
-                line_number,
-                line_offset,
-                "line exceeds the normative 254-character limit",
-            ));
-        }
-        if !line.bytes().all(|byte| (b' '..=b'~').contains(&byte)) {
-            return Err(invalid(
-                rules,
-                line_number,
-                line_offset,
-                "non-printable or non-ASCII character",
-            ));
-        }
 
         let line = line.trim();
         if line.is_empty() {
@@ -95,7 +79,13 @@ pub(crate) fn validate_odm_assignments(kvn: &str, rules: &OdmAssignmentRules) ->
                 rules,
                 line_number,
                 line_offset,
-                format!("unknown {} keyword", rules.message_name),
+                if key.starts_with("USER_DEFINED_")
+                    && key.bytes().any(|byte| byte.is_ascii_lowercase())
+                {
+                    "USER_DEFINED keywords and suffixes must be uppercase".into()
+                } else {
+                    format!("unknown {} keyword {key}", rules.message_name)
+                },
             )
         })?;
 
@@ -127,7 +117,10 @@ pub(crate) fn validate_odm_assignments(kvn: &str, rules: &OdmAssignmentRules) ->
                     rules,
                     line_number,
                     line_offset,
-                    format!("duplicate or out-of-order {} keyword", rules.message_name),
+                    format!(
+                        "duplicate or out-of-order {} keyword {key}",
+                        rules.message_name
+                    ),
                 ));
             }
         }

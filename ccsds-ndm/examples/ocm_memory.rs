@@ -84,7 +84,7 @@ fn create_covariance_ocm() -> Ocm {
         .unwrap();
         lines.push(CovLine {
             epoch: line_epoch,
-            values: vec![1.0 + i as f64, 0.0, 0.0, 0.0, 0.0, 1.0],
+            values: vec![1.0 + i as f64, 0.0, 1.0, 0.0, 0.0, 1.0],
         });
     }
 
@@ -108,7 +108,7 @@ fn create_covariance_ocm() -> Ocm {
                         .data(OcmData {
                             cov: vec![OcmCovarianceMatrix::builder()
                                 .cov_ref_frame("GCRF")
-                                .cov_type("CARTPV")
+                                .cov_type("CARTP")
                                 .cov_lines(lines)
                                 .build()],
                             ..OcmData::default()
@@ -193,10 +193,12 @@ fn retained_maneuver_bytes(ocm: &Ocm) -> usize {
         + lines
             .iter()
             .map(|line| {
-                line.values
-                    .iter()
-                    .map(|value| value.capacity())
-                    .sum::<usize>()
+                line.values.capacity() * std::mem::size_of::<String>()
+                    + line
+                        .values
+                        .iter()
+                        .map(|value| value.capacity())
+                        .sum::<usize>()
             })
             .sum::<usize>()
 }

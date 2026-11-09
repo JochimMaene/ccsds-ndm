@@ -37,3 +37,7 @@ State Blocks
 .. autoclass:: AngVelState
    :members:
    :undoc-members:
+
+.. autoclass:: AcmSensor
+   :members:
+   :undoc-members:

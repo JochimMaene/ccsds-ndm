@@ -30,6 +30,33 @@ use std::io::Write as IoWrite;
 pub(crate) const XML_HEADER: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
 pub(crate) const XML_DEPTH_LIMIT: usize = 16;
 
+/// XML children of the shared `OpmCovarianceMatrix`, in schema order.
+pub(crate) const OPM_COVARIANCE_CHILDREN: &[&[u8]] = &[
+    b"COMMENT",
+    b"COV_REF_FRAME",
+    b"CX_X",
+    b"CY_X",
+    b"CY_Y",
+    b"CZ_X",
+    b"CZ_Y",
+    b"CZ_Z",
+    b"CX_DOT_X",
+    b"CX_DOT_Y",
+    b"CX_DOT_Z",
+    b"CX_DOT_X_DOT",
+    b"CY_DOT_X",
+    b"CY_DOT_Y",
+    b"CY_DOT_Z",
+    b"CY_DOT_X_DOT",
+    b"CY_DOT_Y_DOT",
+    b"CZ_DOT_X",
+    b"CZ_DOT_Y",
+    b"CZ_DOT_Z",
+    b"CZ_DOT_X_DOT",
+    b"CZ_DOT_Y_DOT",
+    b"CZ_DOT_Z_DOT",
+];
+
 /// Namespace of NDM/XML elements in the qualified schema set (NDM/XML 4.3.4-4.3.5).
 const NDM_NAMESPACE: &[u8] = b"urn:ccsds:schema:ndmxml";
 /// XML Schema instance namespace used by schema-location hints.
@@ -53,7 +80,7 @@ pub(crate) fn validate_document_root(s: &str, root: &[u8], type_name: &str) -> R
 /// root, if anywhere, so only tags whose attributes mention `xmlns` are inspected; every other
 /// element costs one short byte scan.
 #[derive(Default)]
-struct Namespaces {
+pub(crate) struct Namespaces {
     /// Prefix (empty for the default namespace), namespace name, and declaring element depth.
     bindings: Vec<(Vec<u8>, Vec<u8>, usize)>,
     /// Whether a default namespace declaration is in scope.
@@ -80,7 +107,7 @@ enum Resolved<'a> {
 }
 
 impl Namespaces {
-    fn enter(
+    pub(crate) fn enter(
         &mut self,
         start: &quick_xml::events::BytesStart<'_>,
         depth: usize,
@@ -93,7 +120,12 @@ impl Namespaces {
             let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
             let prefix: &[u8] = match attribute.key.as_namespace_binding() {
                 Some(quick_xml::name::PrefixDeclaration::Default) => b"",
-                Some(quick_xml::name::PrefixDeclaration::Named(prefix)) => prefix,
+                Some(quick_xml::name::PrefixDeclaration::Named(prefix)) => {
+                    if !std::str::from_utf8(prefix).is_ok_and(is_ncname) {
+                        return Err(invalid("invalid XML namespace prefix".into()));
+                    }
+                    prefix
+                }
                 None => continue,
             };
             let name = attribute
@@ -112,7 +144,7 @@ impl Namespaces {
     }
 
     /// Drop the declarations of elements deeper than `depth`, which have closed.
-    fn leave(&mut self, depth: usize) {
+    pub(crate) fn leave(&mut self, depth: usize) {
         let mut popped = false;
         while self
             .bindings
@@ -151,14 +183,32 @@ impl Namespaces {
     }
 }
 
+/// XML 1.0 Name without colons (Namespaces in XML 1.0, NCName).
+fn is_ncname(name: &str) -> bool {
+    fn is_start(character: char) -> bool {
+        matches!(character,
+            'A'..='Z' | '_' | 'a'..='z'
+            | '\u{C0}'..='\u{D6}' | '\u{D8}'..='\u{F6}' | '\u{F8}'..='\u{2FF}'
+            | '\u{370}'..='\u{37D}' | '\u{37F}'..='\u{1FFF}' | '\u{200C}'..='\u{200D}'
+            | '\u{2070}'..='\u{218F}' | '\u{2C00}'..='\u{2FEF}' | '\u{3001}'..='\u{D7FF}'
+            | '\u{F900}'..='\u{FDCF}' | '\u{FDF0}'..='\u{FFFD}' | '\u{10000}'..='\u{EFFFF}')
+    }
+    let mut characters = name.chars();
+    characters.next().is_some_and(is_start)
+        && characters.all(|character| {
+            is_start(character)
+                || matches!(character, '-' | '.' | '0'..='9' | '\u{B7}' | '\u{300}'..='\u{36F}' | '\u{203F}'..='\u{2040}')
+        })
+}
+
 /// Whether an element uses the unqualified or the qualified NDM/XML schema set.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum ElementForm {
+pub(crate) enum ElementForm {
     Unqualified,
     Qualified,
 }
 
-fn element_form(
+pub(crate) fn element_form(
     namespaces: &Namespaces,
     name: quick_xml::name::QName<'_>,
     invalid: &impl Fn(String) -> CcsdsNdmError,
@@ -241,12 +291,27 @@ fn validate_root_start(
         )));
     }
     // The books show both an unprefixed and an `ndm:`-prefixed root for the qualified set.
-    element_form(namespaces, start.name(), invalid)?;
+    let form = element_form(namespaces, start.name(), invalid)?;
     let mut unknown_attribute = None;
     let mut schema_hints_seen = [false; 2];
     for attribute in start.attributes() {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         validate_attribute_value(&attribute, invalid)?;
+        if let Some(prefix) = attribute
+            .key
+            .prefix()
+            .filter(|_| attribute.key.as_namespace_binding().is_none())
+        {
+            if matches!(
+                namespaces.resolve(Some(prefix.into_inner()), false),
+                Resolved::Unknown | Resolved::Unbound
+            ) {
+                return Err(invalid(format!(
+                    "undeclared XML namespace prefix '{}'",
+                    String::from_utf8_lossy(prefix.into_inner())
+                )));
+            }
+        }
         let kind = match attribute_kind(namespaces, &attribute, &mut schema_hints_seen, invalid) {
             Ok(kind) => kind,
             Err(_) => {
@@ -258,12 +323,24 @@ fn validate_root_start(
             AttributeKind::Declaration => {}
             AttributeKind::SchemaLocation | AttributeKind::Plain(b"id") => {}
             AttributeKind::Plain(b"version") => {
-                *source_edition = Some(
-                    attribute
-                        .unescape_value()
-                        .map_err(|error| invalid(error.to_string()))?
-                        .into_owned(),
-                );
+                let version = attribute
+                    .unescape_value()
+                    .map_err(|error| invalid(error.to_string()))?
+                    .into_owned();
+                // Check the edition before any content that edition may lack is reported.
+                if let Some(kind) = crate::versioning::kind_for_xml_root(root) {
+                    crate::versioning::check_xml_input_version(kind, &version)?;
+                    // NDM/XML 1.0 (505.0-B-1) defined only the unqualified schema set.
+                    if kind == crate::validation::MessageKind::Tdm
+                        && version == "1.0"
+                        && form == ElementForm::Qualified
+                    {
+                        return Err(invalid(
+                            "TDM 1.0 XML has no qualified (namespaced) form in NDM/XML 1.0".into(),
+                        ));
+                    }
+                }
+                *source_edition = Some(version);
             }
             AttributeKind::Plain(key) => {
                 unknown_attribute.get_or_insert_with(|| key.to_vec());
@@ -279,8 +356,36 @@ fn validate_root_start(
     Ok(())
 }
 
+pub(crate) fn validate_attributes(
+    namespaces: &Namespaces,
+    start: &quick_xml::events::BytesStart<'_>,
+    element: &[u8],
+    attribute_allowed: &AttributeRule<'_>,
+    invalid: &impl Fn(String) -> CcsdsNdmError,
+) -> Result<()> {
+    let mut schema_hints_seen = [false; 2];
+    for attribute in start.attributes() {
+        let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+        validate_attribute_value(&attribute, invalid)?;
+        let unknown = match attribute_kind(namespaces, &attribute, &mut schema_hints_seen, invalid)
+        {
+            Ok(AttributeKind::Declaration | AttributeKind::SchemaLocation) => false,
+            Ok(AttributeKind::Plain(key)) => !attribute_allowed(element, key),
+            Err(_) => true,
+        };
+        if unknown {
+            return Err(invalid(format!(
+                "unknown attribute '{}' on '{}'",
+                String::from_utf8_lossy(attribute.key.as_ref()),
+                String::from_utf8_lossy(element)
+            )));
+        }
+    }
+    Ok(())
+}
+
 // Even ignored schema-location/namespace attributes must be well-formed XML.
-fn validate_attribute_value(
+pub(crate) fn validate_attribute_value(
     attribute: &quick_xml::events::attributes::Attribute<'_>,
     invalid: &impl Fn(String) -> CcsdsNdmError,
 ) -> Result<()> {
@@ -449,19 +554,9 @@ fn validate_document(
     let invalid_sequence =
         |message: String| invalid(format!("invalid {type_name} XML sequence: {message}"));
     let document = s.strip_prefix('\u{feff}').unwrap_or(s);
-    // Read equivalent XML 1.0 declarations from ordinary UTF-8 producers. Writing still
-    // emits the exact declaration in NDM/XML 4.2 and ODM 8.2.
-    if rules.root.is_some()
-        && !(document.starts_with("<?xml")
-            && document
-                .as_bytes()
-                .get(5)
-                .is_some_and(|b| matches!(b, b' ' | b'\t' | b'\r' | b'\n')))
-    {
-        return Err(invalid(
-            "an XML instantiation must start with an XML 1.0 declaration".into(),
-        ));
-    }
+    // Read equivalent XML 1.0 declarations from ordinary UTF-8 producers, and accept a missing
+    // one: XML 1.0 makes it optional and UTF-8 is the default, so omitting it loses nothing.
+    // Writing still emits the exact declaration in NDM/XML 4.2 and ODM 8.2.
     let mut reader = quick_xml::Reader::from_str(document);
     reader.config_mut().check_comments = true;
     let mut namespaces = Namespaces::default();
@@ -533,6 +628,15 @@ fn validate_document(
                     // NDM/XML 4.3.5: a qualified instantiation prefixes every element, so the
                     // two schema forms cannot be mixed below the root.
                     let form = element_form(&namespaces, start.name(), &invalid_sequence)?;
+                    // NDM/XML 1.0 (505.0-B-1) defined only the unqualified schema set.
+                    if form == ElementForm::Qualified
+                        && rules.root == Some(b"tdm".as_slice())
+                        && source_edition.as_deref() == Some("1.0")
+                    {
+                        return Err(invalid_sequence(
+                            "TDM 1.0 XML has no qualified (namespaced) form in NDM/XML 1.0".into(),
+                        ));
+                    }
                     if *child_form.get_or_insert(form) != form {
                         return Err(invalid_sequence(
                             "qualified and unqualified NDM/XML elements cannot be mixed".into(),
@@ -725,34 +829,6 @@ fn validate_document(
         Ok(())
     }
 
-    fn validate_attributes(
-        namespaces: &Namespaces,
-        start: &quick_xml::events::BytesStart<'_>,
-        element: &[u8],
-        attribute_allowed: &AttributeRule<'_>,
-        invalid: &impl Fn(String) -> CcsdsNdmError,
-    ) -> Result<()> {
-        let mut schema_hints_seen = [false; 2];
-        for attribute in start.attributes() {
-            let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
-            validate_attribute_value(&attribute, invalid)?;
-            let unknown =
-                match attribute_kind(namespaces, &attribute, &mut schema_hints_seen, invalid) {
-                    Ok(AttributeKind::Declaration | AttributeKind::SchemaLocation) => false,
-                    Ok(AttributeKind::Plain(key)) => !attribute_allowed(element, key),
-                    Err(_) => true,
-                };
-            if unknown {
-                return Err(invalid(format!(
-                    "unknown attribute '{}' on '{}'",
-                    String::from_utf8_lossy(attribute.key.as_ref()),
-                    String::from_utf8_lossy(element)
-                )));
-            }
-        }
-        Ok(())
-    }
-
     if !root_seen || !root_closed {
         return Err(invalid(format!("incomplete {type_name} XML document")));
     }
@@ -806,7 +882,7 @@ pub(crate) fn from_str_with_context<T: DeserializeOwned>(s: &str, type_name: &st
             error.to_string(),
         ))));
     }
-    let document = without_namespace_attributes(s)?;
+    let document = prepare_xml_document(s)?;
     let mut deserializer = quick_xml::de::Deserializer::from_str(&document);
     T::deserialize(&mut deserializer).map_err(|e| {
         let position = deserializer.get_ref().get_ref().buffer_position() as usize;
@@ -831,49 +907,107 @@ pub(crate) fn from_str_with_context<T: DeserializeOwned>(s: &str, type_name: &st
         // missing field. Report the end of the last content rather than the following line.
         let offset = s[..offset].trim_end_matches([' ', '\t', '\r', '\n']).len();
         let (line, column) = crate::error::line_column(s, offset);
-        crate::error::CcsdsNdmError::Format(Box::new(FormatError::XmlWithContext {
-            context: format!(
-                "Failed to parse {type_name} from XML near line {line}, column {column}"
-            ),
-            source: e,
-        }))
+        let message = e.to_string();
+        let source = if let Some(field) = message
+            .strip_prefix("missing field `")
+            .and_then(|value| value.strip_suffix('`'))
+        {
+            crate::error::ValidationError::MissingRequiredField {
+                block: type_name.to_owned().into(),
+                field: field.trim_start_matches('@').to_owned().into(),
+                line: Some(line),
+            }
+            .into()
+        } else {
+            crate::error::CcsdsNdmError::Format(Box::new(FormatError::XmlWithContext {
+                context: format!(
+                    "Failed to parse {type_name} from XML near line {line}, column {column}"
+                ),
+                source: e,
+            }))
+        };
+        match crate::versioning::kind_for_xml_root(type_name.as_bytes()) {
+            Some(kind) => {
+                let mut context = crate::error::ParseErrorContext {
+                    notation: crate::error::DiagnosticNotation::Xml,
+                    message_kind: kind,
+                    source_edition: None,
+                    byte_offset: Some(offset),
+                    line: Some(line),
+                    column: Some(column),
+                    original_token: s.get(offset.saturating_sub(64)..offset).map(str::to_owned),
+                    expected: None,
+                };
+                let mut reader = quick_xml::Reader::from_str(s);
+                loop {
+                    match reader.read_event() {
+                        Ok(Event::Start(root)) | Ok(Event::Empty(root)) => {
+                            context.source_edition = root
+                                .attributes()
+                                .flatten()
+                                .find(|attribute| attribute.key.as_ref() == b"version")
+                                .map(|attribute| {
+                                    String::from_utf8_lossy(attribute.value.as_ref()).into_owned()
+                                });
+                            break;
+                        }
+                        Ok(Event::Eof) | Err(_) => break,
+                        _ => {}
+                    }
+                }
+
+                CcsdsNdmError::Parsing {
+                    context: Box::new(context),
+                    source: Box::new(source),
+                }
+            }
+            None => source,
+        }
     })
 }
 
-/// Remove namespace declarations and XSI schema-location hints below the root.
-///
-/// They are not message content, but serde would otherwise see them as unknown fields. The
-/// document is copied only when it may contain such an attribute below the root.
-fn without_namespace_attributes(s: &str) -> Result<std::borrow::Cow<'_, str>> {
+/// Normalize literal attribute whitespace and remove namespace/schema hints below the root.
+/// Character references remain encoded so serde can distinguish them from literal whitespace.
+fn prepare_xml_document(s: &str) -> Result<std::borrow::Cow<'_, str>> {
     use quick_xml::name::{Namespace, ResolveResult};
 
-    let mut reader = quick_xml::NsReader::from_str(s);
-    let mut xsi_prefixes = vec!["xsi:".to_owned()];
+    let mut reader = quick_xml::Reader::from_str(s);
+    let mut depth = 0usize;
     loop {
-        match reader.read_event()? {
+        let event = reader.read_event()?;
+        let opens = matches!(event, Event::Start(_));
+        match event {
             Event::Start(start) | Event::Empty(start) => {
-                for attribute in start.attributes().flatten() {
-                    if let Some(quick_xml::name::PrefixDeclaration::Named(prefix)) =
-                        attribute.key.as_namespace_binding()
-                    {
-                        if attribute.value.as_ref() == XSI_NAMESPACE {
-                            xsi_prefixes.push(format!("{}:", String::from_utf8_lossy(prefix)));
-                        }
+                let raw = start.attributes_raw();
+                if raw.iter().any(|byte| matches!(byte, b'\t' | b'\r' | b'\n'))
+                    || (depth > 0 && (mentions_xmlns(raw) || raw.contains(&b':')))
+                {
+                    let rewrite = start.attributes().any(|attribute| {
+                        attribute.is_ok_and(|attribute| {
+                            attribute
+                                .value
+                                .iter()
+                                .any(|byte| matches!(byte, b'\t' | b'\r' | b'\n'))
+                                || (depth > 0
+                                    && (attribute.key.as_namespace_binding().is_some()
+                                        || matches!(
+                                            attribute.key.local_name().as_ref(),
+                                            b"schemaLocation" | b"noNamespaceSchemaLocation"
+                                        )))
+                        })
+                    });
+                    if rewrite {
+                        break;
                     }
                 }
-                break;
+                if opens {
+                    depth += 1;
+                }
             }
+            Event::End(_) => depth = depth.saturating_sub(1),
             Event::Eof => return Ok(std::borrow::Cow::Borrowed(s)),
             _ => {}
         }
-    }
-    let below_root = &s[reader.buffer_position() as usize..];
-    if !below_root.contains("xmlns")
-        && !xsi_prefixes
-            .iter()
-            .any(|prefix| below_root.contains(prefix.as_str()))
-    {
-        return Ok(std::borrow::Cow::Borrowed(s));
     }
 
     let mut reader = quick_xml::NsReader::from_str(s);
@@ -883,11 +1017,11 @@ fn without_namespace_attributes(s: &str) -> Result<std::borrow::Cow<'_, str>> {
         let event = reader.read_event()?;
         let event = match event {
             Event::Eof => break,
-            Event::Start(ref start) | Event::Empty(ref start) if depth > 0 => {
+            Event::Start(ref start) | Event::Empty(ref start) => {
                 let mut kept = start.to_owned();
                 kept.clear_attributes();
                 for attribute in start.attributes() {
-                    let attribute = attribute.map_err(quick_xml::Error::from)?;
+                    let mut attribute = attribute.map_err(quick_xml::Error::from)?;
                     let hint = matches!(
                         reader.resolver().resolve_attribute(attribute.key),
                         (ResolveResult::Bound(Namespace(XSI_NAMESPACE)), local)
@@ -896,9 +1030,23 @@ fn without_namespace_attributes(s: &str) -> Result<std::borrow::Cow<'_, str>> {
                                 b"schemaLocation" | b"noNamespaceSchemaLocation"
                             )
                     );
-                    if attribute.key.as_namespace_binding().is_none() && !hint {
-                        kept.push_attribute(attribute);
+                    if depth > 0 && (attribute.key.as_namespace_binding().is_some() || hint) {
+                        continue;
                     }
+                    if attribute
+                        .value
+                        .iter()
+                        .any(|byte| matches!(byte, b'\t' | b'\r' | b'\n' | b'"'))
+                    {
+                        // Normalize literal whitespace; Writer uses double quotes, regardless of the source delimiter.
+                        let value = std::str::from_utf8(&attribute.value)
+                            .expect("XML input is UTF-8")
+                            .replace("\r\n", " ")
+                            .replace(['\t', '\r', '\n'], " ")
+                            .replace('"', "&quot;");
+                        attribute.value = std::borrow::Cow::Owned(value.into_bytes());
+                    }
+                    kept.push_attribute(attribute);
                 }
                 if matches!(event, Event::Start(_)) {
                     Event::Start(kept)
@@ -956,10 +1104,12 @@ const ROOT_NAMESPACES: &str = concat!(
     r#" xmlns:ndm="urn:ccsds:schema:ndmxml""#
 );
 
-/// Inserts [`ROOT_NAMESPACES`] and preserves carriage returns in serialized values.
+/// Inserts [`ROOT_NAMESPACES`] and preserves XML-normalized whitespace in serialized values.
 struct RootNamespaces<W> {
     inner: W,
     state: RootNameState,
+    in_tag: bool,
+    in_attribute: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -974,39 +1124,44 @@ impl<W> RootNamespaces<W> {
         Self {
             inner,
             state: RootNameState::BeforeName,
+            in_tag: false,
+            in_attribute: false,
         }
     }
 }
 
 impl<W: FmtWrite> FmtWrite for RootNamespaces<W> {
     fn write_str(&mut self, value: &str) -> std::fmt::Result {
-        // XML 1.0 normalizes literal CR and CRLF to LF. quick-xml leaves CR literal
-        // in strings, so use character references to preserve the model's text.
-        if value.contains('\r') {
-            for (index, part) in value.split('\r').enumerate() {
-                if index > 0 {
-                    self.inner.write_str("&#13;")?;
-                }
-                self.write_str(part)?;
-            }
-            return Ok(());
-        }
-        if self.state == RootNameState::Done {
-            return self.inner.write_str(value);
-        }
-        for (index, character) in value.char_indices() {
-            match (self.state, character) {
-                (RootNameState::BeforeName, '<') => self.state = RootNameState::InName,
-                (RootNameState::InName, ' ' | '/' | '>') => {
+        let mut start = 0;
+        for (index, byte) in value.bytes().enumerate() {
+            match (self.state, byte) {
+                (RootNameState::BeforeName, b'<') => self.state = RootNameState::InName,
+                (RootNameState::InName, b' ' | b'/' | b'>') => {
                     self.state = RootNameState::Done;
-                    self.inner.write_str(&value[..index])?;
+                    self.inner.write_str(&value[start..index])?;
                     self.inner.write_str(ROOT_NAMESPACES)?;
-                    return self.inner.write_str(&value[index..]);
+                    start = index;
                 }
                 _ => {}
             }
+            match byte {
+                b'<' => self.in_tag = true,
+                b'>' => self.in_tag = false,
+                b'"' if self.in_tag => self.in_attribute = !self.in_attribute,
+                _ => {}
+            }
+            // XML normalizes CR everywhere, and TAB/LF additionally inside attributes.
+            let escaped = match byte {
+                b'\r' => "&#13;",
+                b'\t' if self.in_attribute => "&#9;",
+                b'\n' if self.in_attribute => "&#10;",
+                _ => continue,
+            };
+            self.inner.write_str(&value[start..index])?;
+            self.inner.write_str(escaped)?;
+            start = index + 1;
         }
-        self.inner.write_str(value)
+        self.inner.write_str(&value[start..])
     }
 }
 
@@ -1099,20 +1254,6 @@ mod tests {
     struct Wrapper {
         #[serde(rename = "val")]
         val: String,
-    }
-
-    #[test]
-    fn test_from_str_success() {
-        let xml = r#"<Wrapper><val>hello</val></Wrapper>"#;
-        let w: Wrapper = from_str(xml).unwrap();
-        assert_eq!(w.val, "hello");
-    }
-
-    #[test]
-    fn test_from_str_with_context_success() {
-        let xml = r#"<Wrapper><val>hello</val></Wrapper>"#;
-        let w: Wrapper = from_str_with_context(xml, "Wrapper").unwrap();
-        assert_eq!(w.val, "hello");
     }
 
     #[test]

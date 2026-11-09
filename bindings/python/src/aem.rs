@@ -31,16 +31,23 @@ fn parse_attitude_type(value: &str) -> PyResult<AttitudeTypeType> {
 /// The AEM allows for dynamic modeling of any number of torques (solar pressure, atmospheric
 /// torques, magnetics, etc.). It requires the use of an interpolation technique to interpret
 /// the attitude state at times different from the tabular epochs.
+///
+/// Parameters
+/// ----------
+/// header : AdmHeader
+///     Message header.
+/// segments : list[AemSegment]
+///     AEM Segments.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct Aem {
-    /// The message identifier.
+    /// The XML root id attribute, always "CCSDS_AEM_VERS"; see the header for MESSAGE_ID.
     ///
     /// :type: Optional[str]
     #[pyo3(get)]
     id: Option<String>,
 
-    /// The message version.
+    /// Message edition; only "2.0" is accepted.
     ///
     /// :type: str
     #[pyo3(get)]
@@ -148,51 +155,139 @@ impl Aem {
     fn validate(&self, py: Python<'_>) -> PyResult<()> {
         crate::api::validate_message(py, &self.to_core(py)?)
     }
-
-    /// Serialize to validated KVN or XML.
+    /// Validate and serialize this AEM message, preserving its edition.
+    ///
+    /// Parameters
+    /// ----------
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     Generated document, subject to the documented notation normalizations.
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
     fn to_str(
         &self,
         py: Python<'_>,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<String> {
         crate::api::generate_string(py, &self.to_core(py)?, format)
     }
-
+    /// Parse an AEM document and validate its contents.
+    ///
+    /// Parameters
+    /// ----------
+    /// data : str
+    ///     KVN or XML content.
+    /// format : str, optional
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// Aem
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Multiple KVN message headers require separate files or an XML envelope.
+    /// ValueError
+    ///     Unsupported format argument.
     #[staticmethod]
     #[pyo3(signature = (data, format=None))]
     fn from_str(
         py: Python<'_>,
         data: &str,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed(py, data, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Parse an AEM from a KVN or XML file.
+    /// Read a UTF-8 AEM document from a file and validate it.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Input file.
+    /// format : str, optional
+    ///     ``"kvn"`` or ``"xml"``; detected when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// Aem
+    ///     Parsed and validated message.
+    ///
+    /// Raises
+    /// ------
+    /// NdmFormatError
+    ///     Malformed KVN/XML content.
+    /// NdmValidationError
+    ///     CCSDS validation failure or unsupported edition.
+    /// NdmUnsupportedMessageError
+    ///     Unrecognized or different message family.
+    /// NdmUnsupportedNotationError
+    ///     Multiple KVN message headers require separate files or an XML envelope.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Input file could not be read or contains invalid UTF-8 bytes.
     #[staticmethod]
     #[pyo3(signature = (path, format=None))]
     fn from_file(
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+        #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
         format: Option<&str>,
     ) -> PyResult<Self> {
         let inner = crate::api::parse_typed_file(py, &path, format)?;
         Self::from_core(py, inner)
     }
-
-    /// Atomically write this AEM as KVN or XML.
+    /// Validate this AEM message and atomically replace the destination.
+    ///
+    /// Parameters
+    /// ----------
+    /// path : str or os.PathLike
+    ///     Destination file; existing content is replaced only after successful generation.
+    /// format : str
+    ///     ``"kvn"`` or ``"xml"`` (case-insensitive).
+    ///
+    /// Raises
+    /// ------
+    /// NdmValidationError
+    ///     Invalid model or unsupported output edition.
+    /// NdmFormatError
+    ///     Content cannot be represented in the requested notation.
+    /// NdmUnsupportedNotationError
+    ///     No CCSDS representation exists for the requested notation.
+    /// ValueError
+    ///     Unsupported format argument.
+    /// NdmIoError
+    ///     Temporary-file writing or atomic replacement failed.
     fn to_file(
         &self,
         py: Python<'_>,
         #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
         path: std::path::PathBuf,
-        #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-        format: &str,
+        #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] format: &str,
     ) -> PyResult<()> {
         crate::api::generate_file(
             py,
@@ -203,8 +298,16 @@ impl Aem {
     }
 }
 
+/// AEM metadata and attitude data for one segment.
+///
+/// Parameters
+/// ----------
+/// metadata : AemMetadata
+///     Segment interpretation, reference frames and time system.
+/// data : AemData
+///     Attitude data interpreted by the segment metadata.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct AemSegment {
     /// AEM Metadata Section.
     ///
@@ -255,8 +358,89 @@ impl AemSegment {
 }
 
 /// AEM Metadata Section.
+///
+/// Parameters
+/// ----------
+/// object_name : str
+///     Spacecraft name for which the attitude state is provided. While there is no CCSDS-based
+///     restriction on the value for this keyword, it is recommended to use names from the UN Office
+///     of Outer Space Affairs designator index (reference [ADM-2], which include Object name and
+///     international designator). When OBJECT_NAME is not known or cannot be disclosed, the value
+///     should be set to UNKNOWN.
+/// object_id : str
+///     Spacecraft identifier of the object corresponding to the attitude data to be given. While
+///     there is no CCSDS-based restriction on the value for this keyword, it is recommended to use
+///     international designators from the UN Office of Outer Space Affairs (reference [ADM-2]).
+///     Recommended values have the format YYYY-NNNP{PP}, where: YYYY = Year of launch. NNN = Three-
+///     digit serial number of launch in year YYYY (with leading zeros). P{PP} = At least one capital
+///     letter for the identification of the part brought into space by the launch. In cases in which
+///     the asset is not listed in reference [ADM-2], the UN Office of Outer Space Affairs designator
+///     index format is not used, or the content cannot be disclosed, the value should be set to
+///     UNKNOWN.
+/// ref_frame_a : str
+///     Name of the reference frame that defines the starting point of the transformation. The set of
+///     allowed values is described in annex B, subsection B3.
+/// ref_frame_b : str
+///     Name of the reference frame that defines the end point of the transformation. The set of
+///     allowed values is described in annex B, subsection B3.
+/// start_time : str
+///     Start of TOTAL time span covered by attitude ephemeris data immediately following this
+///     metadata block.
+/// stop_time : str
+///     End of TOTAL time span covered by the attitude ephemeris data immediately following this
+///     metadata block.
+/// time_system : str
+///     Time system used for both attitude ephemeris data and metadata. The set of allowed values is
+///     described in annex B, subsection B2.
+/// attitude_type : str
+///     The type of information contained in the data lines. This keyword must have a value from the
+///     set specified at the right. (See table 4-4 for details of the data contained in each line.)
+/// center_name : str, optional
+///     Celestial body orbited by the object, which may be a natural solar system body (planets,
+///     asteroids, comets, and natural satellites), including any planet barycenter or the solar
+///     system barycenter. The set of allowed values is described in annex B, subsection B8.
+/// useable_start_time : str, optional
+///     Optional start of USEABLE time span covered by attitude ephemeris data immediately following
+///     this metadata block. To allow for proper interpolation near the beginning/end of the attitude
+///     ephemeris data block, it may be necessary to utilize this keyword with values within the time
+///     span covered by the attitude ephemeris data records as denoted by the START/STOP_TIME time
+///     tags. The USEABLE_START_TIME time tag of a new block of ephemeris data must be greater than or
+///     equal to the USEABLE_STOP_TIME time tag of the previous block.
+/// useable_stop_time : str, optional
+///     Optional stop of USEABLE time span covered by attitude ephemeris data immediately following
+///     this metadata block. (See also USEABLE_START_TIME.)
+/// euler_rot_seq : str, optional
+///     Rotation sequence that defines the REF_FRAME_A to REF_FRAME_B transformation. The order of the
+///     transformation is from left to right, where the leftmost letter (X, Y, or Z) represents the
+///     rotation axis of the first rotation, the second letter (X, Y, or Z) represents the rotation
+///     axis of the second rotation, and the third letter (X, Y, or Z) represents the rotation axis of
+///     the third rotation. This keyword is applicable only if ATTITUDE_TYPE specifies the use of
+///     Euler angles. Accepts the twelve letter sequences in any case; ADM 1.0 numeric
+///     spellings such as ``"313"`` are rejected. The getter and all output use uppercase letters.
+/// angvel_frame : str, optional
+///     The frame of reference in which angular velocity data are specified. The set of allowed values
+///     is described in annex B, subsection B3. This keyword is applicable only if ATTITUDE_TYPE
+///     specifies the use of angular velocities in conjunction with either quaternions or Euler
+///     angles.
+/// interpolation_method : str, optional
+///     Recommended interpolation method for attitude ephemeris data in the block immediately
+///     following this metadata block.
+/// interpolation_degree : int, optional
+///     Recommended interpolation degree for attitude ephemeris data in the block immediately
+///     following this metadata block. It must be an integer value. This keyword must be used if the
+///     ‘INTERPOLATION_METHOD’ keyword is used.
+/// comment : list[str], optional
+///     Comments allowed only at the beginning of the Metadata section. Each comment line shall begin
+///     with this keyword.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If an attitude type, rotation sequence or interpolation degree is invalid.
+/// NdmEpochError
+///     If a CCSDS epoch or time tag is invalid.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct AemMetadata {
     pub inner: core_aem::AemMetadata,
@@ -275,7 +459,7 @@ impl AemMetadata {
         start_time,
         stop_time,
         time_system,
-        attitude_type=String::from("QUATERNION"),
+        attitude_type,
         center_name=None,
         useable_start_time=None,
         useable_stop_time=None,
@@ -408,7 +592,7 @@ impl AemMetadata {
     /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
     /// system barycenter. The set of allowed values is described in annex B, subsection B8.
     ///
-    /// Examples: EARTH, STS-106
+    /// Examples: EARTH, STS 106
     ///
     /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
@@ -590,6 +774,8 @@ impl AemMetadata {
     /// rotation axis of the second rotation, and the third letter (X, Y, or Z) represents the
     /// rotation axis of the third rotation. This keyword is applicable only if ATTITUDE_TYPE
     /// specifies the use of Euler angles.
+    /// Accepts the twelve letter sequences in any case; ADM 1.0 numeric spellings such as
+    /// ``"313"`` are rejected. The getter and all output use uppercase letters.
     ///
     /// Examples: ZXZ, XYZ
     ///
@@ -633,7 +819,7 @@ impl AemMetadata {
     /// Recommended interpolation method for attitude ephemeris data in the block immediately
     /// following this metadata block.
     ///
-    /// Examples: LINEAR, HERMITE, LAGRANGE
+    /// Examples: linear, HERMITE, LAGRANGE
     ///
     /// CCSDS Reference: 504.0-B-2, Section 4.2.3.
     ///
@@ -673,14 +859,19 @@ impl AemMetadata {
 ///
 /// Parameters
 /// ----------
-///     attitude_states : list[AttitudeState]
+/// attitude_states : list[AttitudeState]
 ///     Attitude states.
-///     attitude_type : str
-///     CCSDS attitude type shared by every state.
-///     comment : list[str], optional
+/// attitude_type : str
+///     CCSDS attitude type shared by every state (ADM table 4-4).
+/// comment : list[str], optional
 ///     Comments.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If attitude_type is unknown or a state has the wrong number of components.
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "ccsds_ndm")]
 pub struct AemData {
     /// Comments allowed only at the beginning of the Data section. Each comment line shall begin
     /// with this keyword.
@@ -793,15 +984,21 @@ impl AemData {
         format!("AemData(states={})", self.attitude_states.bind(py).len())
     }
 
-    /// Validate the data section against CCSDS rules.
-    fn validate(&self, py: Python<'_>, attitude_type: String) -> PyResult<()> {
-        let attitude_type = AttitudeTypeType::from_str(&attitude_type)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
-        self.to_core(py)?
-            .validate(&attitude_type)
-            .map_err(ccsds_error_to_pyerr)
+    /// Validate the data section's records against CCSDS rules.
+    ///
+    /// Records are always built for this section's ``attitude_type``; whether that matches the
+    /// metadata's ``ATTITUDE_TYPE`` (ADM 4.2.4.5) is checked by segment or message validation.
+    ///
+    /// Raises:
+    ///     NdmValidationError: If a record value or the record count is invalid.
+    fn validate(&self, py: Python<'_>) -> PyResult<()> {
+        use ccsds_ndm::Validate;
+        self.to_core(py)?.validate().map_err(ccsds_error_to_pyerr)
     }
 
+    /// Build rows matching epochs and ATTITUDE_TYPE, in ADM table 4-4 column order and fixed units.
+    /// The array shape is (len(epochs), number of components); shape errors raise ValueError.
+    /// CCSDS Reference: 504.0-B-2, Table 4-4.
     #[staticmethod]
     #[pyo3(signature = (epochs, array, attitude_type, comment=None))]
     fn from_numpy(
@@ -884,7 +1081,7 @@ impl AemData {
         })
     }
 
-    /// Epochs for attitude states (ISO 8601).
+    /// CCSDS calendar epochs for attitude states (ADM §6.8.9).
     ///
     /// :type: list[str]
     #[getter]
@@ -998,11 +1195,27 @@ impl AemData {
     }
 }
 
+/// One attitude state with a CCSDS calendar epoch and ordered numeric components.
+///
+/// Parameters
+/// ----------
+/// epoch : str
+///     CCSDS calendar epoch (ADM §6.8.9), interpreted in the segment TIME_SYSTEM.
+/// values : list[float]
+///     State components in the order and fixed units of ATTITUDE_TYPE (ADM table 4-4).
+///     AemData checks the component count when this state is added to a data section.
+///
+/// Raises
+/// ------
+/// NdmEpochError
+///     If epoch is not a CCSDS calendar epoch.
 #[gen_stub_pyclass]
-#[pyclass(from_py_object)]
+#[pyclass(module = "ccsds_ndm", from_py_object)]
 #[derive(Clone)]
 pub struct AttitudeState {
+    /// Record epoch in the metadata time system (ADM table 4-4).
     pub epoch: ccsds_ndm::types::CalendarEpoch,
+    /// Components in ATTITUDE_TYPE column order and fixed units (ADM table 4-4).
     #[pyo3(get, set)]
     pub values: Vec<f64>,
 }
@@ -1018,6 +1231,9 @@ impl AttitudeState {
         })
     }
 
+    /// Record epoch in the metadata time system (CCSDS 504.0-B-2, table 4-4).
+    ///
+    /// :type: str
     #[getter]
     fn get_epoch(&self) -> String {
         self.epoch.as_str().to_string()

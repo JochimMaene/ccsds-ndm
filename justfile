@@ -84,7 +84,7 @@ stubs-check:
 # aggregate diffing did not, so this guards the generator's output.
 [private]
 typecheck:
-    cd {{python_dir}} && uv run mypy --strict ccsds_ndm/__init__.pyi
+    cd {{python_dir}} && uv run mypy --strict ccsds_ndm/__init__.pyi tests/typing
 
 # Audit Python bindings against Rust core structs
 [private]
@@ -176,9 +176,11 @@ bench-python *args:
 build:
     cd {{python_dir}} && uv run --with maturin maturin build --release --strip --out ../../dist
 
-# Build and import the wheel in an isolated environment
+# Test installed wheel and source distribution in isolated environments
 package-python: build
     bash scripts/verify-python-package.sh
+    cd {{python_dir}} && uv run --with maturin maturin sdist --out ../../dist
+    bash scripts/verify-python-package.sh dist/*.tar.gz
 
 # Build and verify the publishable Rust crate artifact (CI supplies a clean checkout)
 package-rust:

@@ -7,17 +7,29 @@ use std::borrow::Cow;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
+/// CCSDS message family, independent of edition and wire notation.
 pub enum MessageKind {
+    /// Orbit Parameter Message.
     Opm,
+    /// Orbit Mean-Elements Message.
     Omm,
+    /// Orbit Ephemeris Message.
     Oem,
+    /// Orbit Comprehensive Message.
     Ocm,
+    /// Attitude Comprehensive Message.
     Acm,
+    /// Attitude Ephemeris Message.
     Aem,
+    /// Attitude Parameter Message.
     Apm,
+    /// Conjunction Data Message.
     Cdm,
+    /// Tracking Data Message.
     Tdm,
+    /// Reentry Data Message.
     Rdm,
+    /// Combined Navigation Data Message container.
     Ndm,
 }
 

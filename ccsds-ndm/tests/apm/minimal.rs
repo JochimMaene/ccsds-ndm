@@ -23,12 +23,8 @@ QUAT_STOP
 "#;
 
 #[test]
-fn minimal_kvn_parses() {
-    Apm::from_kvn(KVN).unwrap();
-}
-
-#[test]
 fn rejects_missing_frame_kvn() {
+    Apm::from_kvn(KVN).expect("valid control");
     let input = mutated(KVN, "REF_FRAME_A = SC_BODY_1\n", "");
     let error = Apm::from_kvn(&input).unwrap_err();
     assert_eq!(

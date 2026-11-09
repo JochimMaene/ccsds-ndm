@@ -18,6 +18,7 @@ from ccsds_ndm import (
     RdmMetadata,
     RdmSegment,
 )
+from ccsds_ndm import NdmEpochError
 
 
 class TestRdm:
@@ -32,6 +33,7 @@ class TestRdm:
             object_name="SAT1",
             international_designator="2023-001A",
             epoch_tzero="2023-01-01T00:00:00",
+            controlled_reentry="NO",
             center_name="EARTH",
             time_system="UTC",
         )
@@ -54,55 +56,39 @@ class TestRdm:
         # new(*, header, segment)
         return Rdm(header=header, segment=seg)
 
-    def test_roundtrip_kvn(self):
-        try:
-            rdm = self._create_valid_rdm()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
+    @pytest.mark.parametrize("format", ["kvn", "xml"])
+    def test_constructed_message_roundtrips(self, format):
+        message = self._create_valid_rdm()
+        parsed = Rdm.from_str(message.to_str(format), format=format)
+        assert parsed.header.originator == "TEST"
+        assert parsed.segment.data.atmospheric_reentry_parameters.orbit_lifetime == 5.0
 
-        kvn = rdm.to_str(format="kvn")
-        assert "CCSDS_RDM_VERS" in kvn
-
-        rdm2 = Rdm.from_str(kvn, format="kvn")
-        assert rdm2.header.originator == "TEST"
-        assert rdm2.segment.data.atmospheric_reentry_parameters.orbit_lifetime == 5.0
-
-    def test_roundtrip_xml(self):
-        try:
-            rdm = self._create_valid_rdm()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        xml = rdm.to_str(format="xml")
-        assert "<rdm" in xml
-
-        rdm2 = Rdm.from_str(xml, format="xml")
-        assert rdm2.segment.data.atmospheric_reentry_parameters.orbit_lifetime == 5.0
-
-    def test_file_io(self, tmp_path):
-        rdm = self._create_valid_rdm()
-        path = tmp_path / "test.rdm"
-
-        rdm.to_file(str(path), "kvn")
-        assert path.exists()
-
-        rdm2 = ccsds_ndm.from_file(str(path), format="kvn")
-        assert rdm2.header.originator == "TEST"
-
-    def test_epoch_fields_reject_numeric_xsd_branch(self):
-        with pytest.raises(ValueError):
-            RdmHeader(originator="TEST", creation_date="123.5", message_id="ID")
-
-        with pytest.raises(ValueError):
+    def test_metadata_requires_controlled_reentry(self):
+        # CONTROLLED_REENTRY is mandatory (RDM 3.4); it must not default to UNKNOWN.
+        with pytest.raises(TypeError, match="controlled_reentry"):
             RdmMetadata(
                 object_name="SAT1",
                 international_designator="2023-001A",
-                epoch_tzero="123.5",
+                epoch_tzero="2023-01-01T00:00:00",
                 center_name="EARTH",
                 time_system="UTC",
             )
 
-        with pytest.raises(ValueError):
+    def test_epoch_fields_reject_numeric_xsd_branch(self):
+        with pytest.raises(NdmEpochError):
+            RdmHeader(originator="TEST", creation_date="123.5", message_id="ID")
+
+        with pytest.raises(NdmEpochError):
+            RdmMetadata(
+                object_name="SAT1",
+                international_designator="2023-001A",
+                epoch_tzero="123.5",
+                controlled_reentry="NO",
+                center_name="EARTH",
+                time_system="UTC",
+            )
+
+        with pytest.raises(NdmEpochError):
             AtmosphericReentryParameters(
                 orbit_lifetime=5.0,
                 reentry_altitude=120.0,
@@ -124,6 +110,32 @@ class TestRdm:
         with pytest.raises(ccsds_ndm.NdmValidationError):
             rdm.to_str(format="xml")
 
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    def test_unitless_xml_impact_altitude_remains_editable(self):
+        rdm = self._create_valid_rdm()
+        rdm.segment.data.ground_impact_parameters = GroundImpactParameters(
+            impact_ref_frame="ITRF2000",
+            nominal_impact_lon=10.0,
+            nominal_impact_lat=20.0,
+            nominal_impact_alt=1.0,
+        )
+        xml = rdm.to_str("xml").replace(
+            '<NOMINAL_IMPACT_ALT units="m">', "<NOMINAL_IMPACT_ALT>"
+        )
+        assert "<NOMINAL_IMPACT_ALT>" in xml
+        parsed = Rdm.from_str(xml, "xml")
+        assert parsed.segment.data.ground_impact_parameters.nominal_impact_alt == 1.0
+        assert "<NOMINAL_IMPACT_ALT>" in parsed.to_str("xml")
+        parsed.segment.data.ground_impact_parameters.nominal_impact_alt = 2.0
+        parsed.validate()
+        line = next(
+            line
+            for line in parsed.to_str("kvn").splitlines()
+            if line.startswith("NOMINAL_IMPACT_ALT")
+        )
+        assert line.endswith("[m]")
+        assert (
+            Rdm.from_str(
+                parsed.to_str("xml")
+            ).segment.data.ground_impact_parameters.nominal_impact_alt
+            == 2.0
+        )

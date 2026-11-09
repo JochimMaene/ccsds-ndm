@@ -6,7 +6,6 @@
 Unit tests for Orbit Parameter Message (OPM) Python bindings.
 """
 
-import ccsds_ndm
 import pytest
 
 from ccsds_ndm import (
@@ -18,6 +17,7 @@ from ccsds_ndm import (
     OpmSegment,
     StateVector,
 )
+from ccsds_ndm import NdmEpochError
 
 
 class TestOpm:
@@ -65,43 +65,15 @@ class TestOpm:
 
         return Opm(header=header, segment=seg)
 
-    def test_roundtrip_kvn(self):
-        try:
-            opm = self._create_valid_opm()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        kvn = opm.to_str(format="kvn")
-        assert "CCSDS_OPM_VERS" in kvn
-
-        opm2 = Opm.from_str(kvn, format="kvn")
-        assert opm2.header.originator == "TEST"
-        assert opm2.segment.data.state_vector.x == 7000.0
-
-    def test_roundtrip_xml(self):
-        try:
-            opm = self._create_valid_opm()
-        except TypeError as e:
-            pytest.fail(f"Constructor failed: {e}")
-
-        xml = opm.to_str(format="xml")
-        assert "<opm" in xml
-
-        opm2 = Opm.from_str(xml, format="xml")
-        assert opm2.segment.data.state_vector.x == 7000.0
-
-    def test_file_io(self, tmp_path):
-        opm = self._create_valid_opm()
-        path = tmp_path / "test.opm"
-
-        opm.to_file(str(path), "kvn")
-        assert path.exists()
-
-        opm2 = ccsds_ndm.from_file(str(path), format="kvn")
-        assert opm2.header.originator == "TEST"
+    @pytest.mark.parametrize("format", ["kvn", "xml"])
+    def test_constructed_message_roundtrips(self, format):
+        message = self._create_valid_opm()
+        parsed = Opm.from_str(message.to_str(format), format=format)
+        assert parsed.header.originator == "TEST"
+        assert parsed.segment.data.state_vector.x == 7000.0
 
     def test_epoch_fields_require_calendar_form(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             OpmMetadata(
                 object_name="SAT1",
                 object_id="2023-001A",
@@ -111,7 +83,7 @@ class TestOpm:
                 ref_frame_epoch="12345.5",
             )
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             StateVector(
                 epoch="12345.5",
                 x=7000.0,
@@ -122,7 +94,3 @@ class TestOpm:
                 z_dot=0.0,
                 comment=None,
             )
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

@@ -1,5 +1,49 @@
 use ccsds_ndm::messages::omm::{Omm, TleToOmmOptions};
 use ccsds_ndm::Ndm;
+
+#[test]
+fn comment_merges_and_user_parameter_interleaving_are_preserved() {
+    let mut message = Omm::from_kvn(crate::KVN).unwrap();
+    message.body.segment.data.comment = vec!["outer-data".into()];
+    message.body.segment.data.mean_elements.comment = vec!["mean-elements".into()];
+    let kvn = message.to_kvn().unwrap();
+    let reparsed = Omm::from_kvn(&kvn).unwrap();
+    assert_eq!(
+        reparsed.body.segment.data.comment,
+        ["outer-data", "mean-elements"]
+    );
+    assert!(reparsed.body.segment.data.mean_elements.comment.is_empty());
+    assert_eq!(reparsed.to_kvn().unwrap(), kvn);
+
+    let mut message = Omm::from_kvn(crate::KVN).unwrap();
+    let user_xml = "<userDefinedParameters><COMMENT>first</COMMENT><USER_DEFINED parameter=\"A\">1</USER_DEFINED><COMMENT>second</COMMENT><USER_DEFINED parameter=\"B\">2</USER_DEFINED></userDefinedParameters>";
+    let xml = message.to_xml().unwrap();
+    let start = xml.find("<userDefinedParameters>").unwrap();
+    let end = start
+        + xml[start..].find("</userDefinedParameters>").unwrap()
+        + "</userDefinedParameters>".len();
+    message = Omm::from_xml(&format!("{}{}{}", &xml[..start], user_xml, &xml[end..])).unwrap();
+    let user = message
+        .body
+        .segment
+        .data
+        .user_defined_parameters
+        .as_ref()
+        .unwrap();
+    assert_eq!(
+        user.comments().cloned().collect::<Vec<_>>(),
+        ["first", "second"]
+    );
+    assert_eq!(
+        user.parameters()
+            .map(|value| value.parameter.as_str())
+            .collect::<Vec<_>>(),
+        ["A", "B"]
+    );
+    let regenerated = message.to_xml().unwrap();
+    assert!(regenerated.contains(user_xml));
+    assert!(message.to_kvn().is_err());
+}
 #[test]
 fn to_tle_lines_iss_example() {
     let kvn = r#"CCSDS_OMM_VERS = 2.0
@@ -28,16 +72,27 @@ MEAN_MOTION_DOT = 0.00000888 [rev/day**2]
 MEAN_MOTION_DDOT = 0.0000000000000 [rev/day**3]
 "#;
 
-    let omm = Omm::from_kvn(kvn).expect("failed to parse ISS OMM sample");
-    let (line1, line2) = omm.to_tle_lines().expect("failed to generate TLE lines");
-    assert_eq!(
-        line1,
-        "1 25544U 98067A   20348.69171878  .00000888  00000-0  24124-4 0  9995"
-    );
-    assert_eq!(
-        line2,
-        "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.49181153259845"
-    );
+    for object_id in ["1998-067A", "UNKNOWN"] {
+        let source = crate::common::mutated(
+            kvn,
+            "OBJECT_ID = 1998-067A",
+            &format!("OBJECT_ID = {object_id}"),
+        );
+        let omm = Omm::from_kvn(&source).expect("failed to parse ISS OMM sample");
+        let (line1, line2) = omm.to_tle_lines().expect("failed to generate TLE lines");
+        let expected_line1 =
+            "1 25544U 98067A   20348.69171878  .00000888  00000-0  24124-4 0  9995";
+        if object_id == "UNKNOWN" {
+            assert_eq!(&line1[9..17], "        ");
+            assert!(line1.starts_with("1 25544U"));
+        } else {
+            assert_eq!(line1, expected_line1);
+        }
+        assert_eq!(
+            line2,
+            "2 25544  51.6444 180.2777 0001779 128.5985 350.1361 15.49181153259845"
+        );
+    }
 }
 
 #[test]
@@ -72,86 +127,34 @@ fn tle_roundtrip_with_options() {
         object_name: Some("ISS (ZARYA)".to_string()),
         object_id: None,
         originator: Some("18 SPCS".to_string()),
-        message_id: None,
+        message_id: Some("TLE-CONVERSION".into()),
         creation_date: Some("2021-01-01T00:00:00".parse().unwrap()),
     };
 
-    let omm = Omm::from_tle_lines_with_options(line1, line2, &options)
+    let mut omm = Omm::from_tle_lines_with_options(line1, line2, &options)
         .expect("failed to parse TLE lines with options");
     assert_eq!(omm.header.creation_date.as_str(), "2021-01-01T00:00:00");
     assert_eq!(
         omm.body.segment.data.mean_elements.epoch.as_str(),
         "2020-12-13T16:36:04.502592"
     );
+    assert_eq!(omm.version, "3.0");
+    omm.validate().unwrap();
+    assert_eq!(Omm::from_kvn(&omm.to_kvn().unwrap()).unwrap(), omm);
+    assert_eq!(Omm::from_xml(&omm.to_xml().unwrap()).unwrap(), omm);
     let (line1_out, line2_out) = omm.to_tle_lines().expect("failed to regenerate TLE");
     assert_eq!(line1_out, line1);
     assert_eq!(line2_out, line2);
-}
-
-#[test]
-fn to_tle_lines_accepts_unknown_object_id() {
-    let kvn = r#"CCSDS_OMM_VERS = 2.0
-CREATION_DATE = 2020-12-13T17:26:09
-ORIGINATOR = 18 SPCS
-OBJECT_NAME = ISS (ZARYA)
-OBJECT_ID = UNKNOWN
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2020-12-13T16:36:04.502592
-MEAN_MOTION = 15.49181153 [rev/day]
-ECCENTRICITY = 0.00017790
-INCLINATION = 51.6444 [deg]
-RA_OF_ASC_NODE = 180.2777 [deg]
-ARG_OF_PERICENTER = 128.5985 [deg]
-MEAN_ANOMALY = 350.1361 [deg]
-EPHEMERIS_TYPE = 0
-CLASSIFICATION_TYPE = U
-NORAD_CAT_ID = 25544
-ELEMENT_SET_NO = 999
-REV_AT_EPOCH = 25984
-BSTAR = 0.00002412400000 [1/ER]
-MEAN_MOTION_DOT = 0.00000888 [rev/day**2]
-MEAN_MOTION_DDOT = 0.0000000000000 [rev/day**3]
-"#;
-    let omm = Omm::from_kvn(kvn).expect("failed to parse OMM");
-    let (line1, line2) = omm.to_tle_lines().expect("failed to generate TLE");
-    assert_eq!(line1[9..17].to_string(), "        ");
-    assert!(line1.starts_with("1 25544U"));
-    assert!(line2.starts_with("2 25544"));
+    let parameters = omm.body.segment.data.tle_parameters.as_mut().unwrap();
+    parameters.classification_type = None;
+    parameters.ephemeris_type = None;
+    assert_eq!(omm.to_tle_lines().unwrap(), (line1_out, line2_out));
 }
 
 #[test]
 fn to_tle_lines_accepts_sgp_slash_sgp4() {
-    let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2020-065T16:00:00
-ORIGINATOR = NOAA
-MESSAGE_ID = OMM 202013719185
-OBJECT_NAME = GOES 9
-OBJECT_ID = 1995-025A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP/SGP4
-EPOCH = 2020-064T10:34:41.4264
-MEAN_MOTION = 1.00273272
-ECCENTRICITY = 0.0005013
-INCLINATION = 3.0539
-RA_OF_ASC_NODE = 81.7939
-ARG_OF_PERICENTER = 249.2363
-MEAN_ANOMALY = 150.1602
-GM = 398600.8
-EPHEMERIS_TYPE = 0
-CLASSIFICATION_TYPE = U
-NORAD_CAT_ID = 23581
-ELEMENT_SET_NO = 0925
-REV_AT_EPOCH = 4316
-BSTAR = 0.0001
-MEAN_MOTION_DOT = -0.00000113
-MEAN_MOTION_DDOT = 0.0
-"#;
-    let omm = Omm::from_kvn(kvn).expect("failed to parse OMM");
+    let omm = Omm::from_kvn(crate::KVN).expect("failed to parse OMM");
+    assert_eq!(omm.body.segment.metadata.mean_element_theory, "SGP/SGP4");
     let (line1, line2) = omm.to_tle_lines().expect("failed to generate TLE");
     assert!(line1.starts_with("1 23581U 95025A"));
     assert!(line2.starts_with("2 23581"));
@@ -262,4 +265,124 @@ fn from_tle_lines_rejects_invalid_length() {
     assert!(err
         .to_string()
         .contains("exactly 68 (no checksum) or 69 (with checksum) characters"));
+}
+
+#[test]
+fn empty_user_defined_xml_block_cannot_silently_disappear_in_kvn() {
+    let mut original = Omm::from_kvn(crate::KVN).unwrap();
+    original.body.segment.data.user_defined_parameters = None;
+    let source = original.to_xml().unwrap();
+    for block in [
+        "<userDefinedParameters/>",
+        "<userDefinedParameters><COMMENT>only a comment</COMMENT></userDefinedParameters>",
+    ] {
+        let xml = source.replace("</data>", &format!("{block}</data>"));
+        let message = Omm::from_xml(&xml).unwrap();
+        assert!(message.to_kvn().is_err());
+        assert!(message.to_xml().unwrap().contains("userDefinedParameters"));
+    }
+}
+
+#[test]
+fn tle_export_requires_earth_teme_and_rounds_cyclic_angle_boundaries() {
+    for (center, frame, field) in [
+        ("MARS", "TEME", "CENTER_NAME"),
+        ("EARTH", "ICRF", "REF_FRAME"),
+    ] {
+        let mut message = Omm::from_kvn(crate::KVN).unwrap();
+        message.body.segment.metadata.center_name = center.into();
+        message.body.segment.metadata.ref_frame = frame.into();
+        crate::common::assert_validation_field(&message.to_tle_lines().unwrap_err(), field);
+        crate::common::assert_validation_field(&message.validate().unwrap_err(), field);
+        crate::common::assert_validation_field(&message.to_xml().unwrap_err(), field);
+    }
+    for (value, expected) in [(359.999_94, 359.9999), (359.999_96, 0.0)] {
+        let mut message = Omm::from_kvn(crate::KVN).unwrap();
+        let elements = &mut message.body.segment.data.mean_elements;
+        elements.ra_of_asc_node.value = value;
+        elements.arg_of_pericenter.value = value;
+        elements.mean_anomaly.value = value;
+        let (line1, line2) = message.to_tle_lines().unwrap();
+        let parsed = Omm::from_tle_lines(&line1, &line2).unwrap();
+        let elements = &parsed.body.segment.data.mean_elements;
+        assert_eq!(elements.ra_of_asc_node.value, expected);
+        assert_eq!(elements.arg_of_pericenter.value, expected);
+        assert_eq!(elements.mean_anomaly.value, expected);
+    }
+}
+
+#[test]
+fn tle_export_checks_epoch_and_launch_year_windows_without_restricting_omm() {
+    for (year, supported) in [(1956, false), (1957, true), (2056, true), (2057, false)] {
+        let mut message = Omm::from_kvn(crate::KVN).unwrap();
+        let epoch = format!("{year}-01-01T00:00:00");
+        message.body.segment.data.mean_elements.epoch = epoch.parse().unwrap();
+        message.validate().unwrap();
+        message.to_xml().unwrap();
+        if supported {
+            let (line1, line2) = message.to_tle_lines().unwrap();
+            let parsed = Omm::from_tle_lines(&line1, &line2).unwrap();
+            assert_eq!(parsed.body.segment.data.mean_elements.epoch.as_str(), epoch);
+        } else {
+            crate::common::assert_validation_field(
+                &message.to_tle_lines().unwrap_err(),
+                "EPOCH year",
+            );
+        }
+
+        let mut message = Omm::from_kvn(crate::KVN).unwrap();
+        let object_id = format!("{year}-001A");
+        message.body.segment.metadata.object_id = object_id.clone();
+        message.validate().unwrap();
+        message.to_xml().unwrap();
+        if supported {
+            let (line1, line2) = message.to_tle_lines().unwrap();
+            let parsed = Omm::from_tle_lines(&line1, &line2).unwrap();
+            assert_eq!(parsed.body.segment.metadata.object_id, object_id);
+        } else {
+            crate::common::assert_validation_field(
+                &message.to_tle_lines().unwrap_err(),
+                "OBJECT_ID launch year",
+            );
+        }
+    }
+}
+
+#[test]
+fn tle_export_checks_the_epoch_year_after_rounding() {
+    for (epoch, expected) in [
+        ("1956-12-31T23:59:59.999999", Some("1957-01-01T00:00:00")),
+        (
+            "2056-12-31T23:59:59.999",
+            Some("2056-12-31T23:59:59.999136"),
+        ),
+        ("2056-12-31T23:59:59.999999", None),
+    ] {
+        let mut message = Omm::from_kvn(crate::KVN).unwrap();
+        message.body.segment.data.mean_elements.epoch = epoch.parse().unwrap();
+        message.validate().unwrap();
+        message.to_xml().unwrap();
+        if let Some(expected) = expected {
+            let (line1, line2) = message.to_tle_lines().unwrap();
+            let parsed = Omm::from_tle_lines(&line1, &line2).unwrap();
+            assert_eq!(
+                parsed.body.segment.data.mean_elements.epoch.as_str(),
+                expected
+            );
+        } else {
+            crate::common::assert_validation_field(
+                &message.to_tle_lines().unwrap_err(),
+                "EPOCH year",
+            );
+        }
+    }
+}
+
+#[test]
+fn tle_export_rejects_non_ascii_object_ids_without_panicking() {
+    let mut message = Omm::from_kvn(crate::KVN).unwrap();
+    message.body.segment.metadata.object_id = "2023-éé".into();
+    message.validate().unwrap();
+    message.to_xml().unwrap();
+    crate::common::assert_validation_field(&message.to_tle_lines().unwrap_err(), "OBJECT_ID");
 }

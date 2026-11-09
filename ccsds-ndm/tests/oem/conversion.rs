@@ -3,6 +3,18 @@ use ccsds_ndm::messages::oem::Oem;
 use ccsds_ndm::{convert, Ndm, Notation, Validate};
 
 #[test]
+fn empty_interpolation_needs_no_degree_and_keeps_its_presence() {
+    let mut message = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
+    for segment in &mut message.body.segment {
+        segment.metadata.interpolation = Some(String::new());
+        segment.metadata.interpolation_degree = None;
+    }
+    let xml = message.to_xml().unwrap();
+    assert_eq!(Oem::from_xml(&xml).unwrap(), message);
+    assert!(message.to_kvn().is_err());
+}
+
+#[test]
 fn both_directions_reproduce_the_generated_text() {
     for source in KVN_FIXTURES {
         let kvn = Oem::from_kvn(source).unwrap().to_kvn().unwrap();
@@ -34,7 +46,7 @@ fn xml_to_kvn_rejects_partial_acceleration_without_emitting_ambiguous_data() {
 }
 
 #[test]
-fn xml_to_kvn_rejects_comments_that_cannot_keep_their_covariance_association() {
+fn xml_to_kvn_preserves_comments_on_later_covariance_matrices() {
     let mut message = Oem::from_xml(XML).unwrap();
     let mut second = message.body.segment[0].data.covariance_matrix[0].clone();
     second.epoch = "2019-12-28T23:28:00.331".parse().unwrap();
@@ -43,40 +55,31 @@ fn xml_to_kvn_rejects_comments_that_cannot_keep_their_covariance_association() {
     message.body.segment[0].data.covariance_matrix.push(second);
     let xml = message.to_xml().unwrap();
 
-    let error = convert(&xml, Notation::Kvn)
-        .expect_err("KVN cannot preserve a later covariance's comment association");
-    assert_eq!(error.code(), Some("validation.invalid_value"));
-    assert_eq!(
-        error.field_path().as_deref(),
-        Some("body.segment[0].data.covariance_matrix[1].comment")
-    );
+    let kvn = convert(&xml, Notation::Kvn).unwrap();
+    assert_eq!(Oem::from_kvn(&kvn).unwrap(), message);
+    let mut bytes = Vec::new();
+    message.write_kvn_to(&mut bytes).unwrap();
+    assert_eq!(bytes, kvn.as_bytes());
 }
 
 #[test]
-fn xml_to_kvn_round_trip_preserves_empty_comments() {
-    let mut message = Oem::from_xml(XML).unwrap();
-    message.header.comment = vec![String::new()];
-
-    let kvn = convert(&message.to_xml().unwrap(), Notation::Kvn).unwrap();
-    assert!(kvn.lines().any(|line| line == "COMMENT "));
-    let reparsed = Oem::from_kvn(&kvn).unwrap();
-    assert_eq!(reparsed.header.comment, vec![""]);
-    assert_eq!(
-        Oem::from_xml(&reparsed.to_xml().unwrap()).unwrap(),
-        reparsed
-    );
-}
-
-#[test]
-fn kvn_round_trip_keeps_leading_comment_blanks_only() {
+fn xml_comments_become_kvn_comments() {
     // Leading blanks are text; trailing blanks before the end of line are not
-    // significant in KVN (ODM 7.4.7).
-    let mut message = Oem::from_xml(XML).unwrap();
-    message.header.comment = vec!["   indented   ".into()];
-
-    let kvn = convert(&message.to_xml().unwrap(), Notation::Kvn).unwrap();
-    let reparsed = Oem::from_kvn(&kvn).unwrap();
-    assert_eq!(reparsed.header.comment, vec!["   indented"]);
+    // significant in KVN (ODM 7.4.7). A tab becomes a blank.
+    for (comment, expected) in [("", ""), ("   indented   ", "   indented"), ("a\tb", "a b")] {
+        let mut message = Oem::from_xml(XML).unwrap();
+        message.header.comment = vec![comment.into()];
+        let kvn = convert(&message.to_xml().unwrap(), Notation::Kvn).unwrap();
+        let reparsed = Oem::from_kvn(&kvn).unwrap();
+        assert_eq!(reparsed.header.comment, vec![expected]);
+        if comment.is_empty() {
+            assert!(kvn.lines().any(|line| line == "COMMENT "));
+            assert_eq!(
+                Oem::from_xml(&reparsed.to_xml().unwrap()).unwrap(),
+                reparsed
+            );
+        }
+    }
 }
 
 #[test]
@@ -110,4 +113,18 @@ fn xml_whitespace_around_text_values_is_padding_in_both_notations() {
         message.to_kvn().unwrap_err().field_path().as_deref(),
         Some("body.segment[1].metadata.center_name")
     );
+}
+
+#[test]
+fn xml_header_padding_is_dropped_on_kvn_output() {
+    let message = Oem::from_xml(XML).unwrap();
+    let xml = message.to_xml().unwrap();
+    let originator = message.header.originator;
+    let padded = xml.replace(
+        &format!("<ORIGINATOR>{originator}</ORIGINATOR>"),
+        &format!("<ORIGINATOR>\n  {originator}\n</ORIGINATOR>"),
+    );
+    assert_ne!(padded, xml);
+    let kvn = convert(&padded, Notation::Kvn).unwrap();
+    assert_eq!(Oem::from_kvn(&kvn).unwrap().header.originator, originator);
 }

@@ -11,71 +11,15 @@ use crate::kvn::ser::KvnWriter;
 use crate::traits::ToKvn;
 use serde::{Deserialize, Serialize};
 
-/// Represents the `ndmHeader` complex type from the XSD.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub struct NdmHeader {
-    /// User-defined comments.
-    ///
-    /// **Examples**: This is a comment
-    ///
-    /// **CCSDS Reference**: 505.0-B-3, Section 3.2.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[builder(default)]
-    pub comment: Vec<String>,
-    /// File creation date/time in UTC.
-    ///
-    /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
-    ///
-    /// **CCSDS Reference**: 505.0-B-3, Section 3.2.
-    pub creation_date: Epoch,
-    /// Creating agency or operator.
-    ///
-    /// **Examples**: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
-    ///
-    /// **CCSDS Reference**: 505.0-B-3, Section 3.2.
-    #[builder(into)]
-    pub originator: String,
-}
-
-impl ToKvn for NdmHeader {
-    fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_comments(&self.comment);
-        writer.write_pair("CREATION_DATE", self.creation_date);
-        writer.write_pair("ORIGINATOR", &self.originator);
-    }
-}
-
-impl crate::traits::Validate for NdmHeader {
-    fn validate(&self) -> Result<()> {
-        if self.originator.trim().is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "NDM Header".into(),
-                field: "ORIGINATOR".into(),
-                line: None,
-            }
-            .into());
-        }
-        if self.creation_date.is_empty() {
-            return Err(crate::error::ValidationError::MissingRequiredField {
-                block: "NDM Header".into(),
-                field: "CREATION_DATE".into(),
-                line: None,
-            }
-            .into());
-        }
-        Ok(())
-    }
-}
-
+/// Common APM, AEM and ACM header (ADM §§3.2.2, 4.2.2 and 5.3.2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct AdmHeader {
-    /// User-defined comments. (See 7.8 for formatting rules.)
+    /// User-defined comments. (See ADM 6.10 for formatting and placement rules.)
     ///
     /// **Examples**: This is a comment
     ///
-    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
+    /// **CCSDS Reference**: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default)]
     pub comment: Vec<String>,
@@ -84,14 +28,14 @@ pub struct AdmHeader {
     ///
     /// **Examples**: SBU, ‘Operator-proprietary data; secondary distribution not permitted’
     ///
-    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
+    /// **CCSDS Reference**: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub classification: Option<String>,
     /// File creation date/time in UTC. (For format specification, see 6.8.9.)
     ///
     /// **Examples**: 2001-11-06T11:17:33, 2002-204T15:56:23Z
     ///
-    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
+    /// **CCSDS Reference**: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
     pub creation_date: CalendarEpoch,
     /// Creating agency or operator. Select from the accepted set of values indicated in annex B,
     /// subsection B1 from the ‘Abbreviation’ column (when present), or the ‘Name’ column when an
@@ -100,15 +44,15 @@ pub struct AdmHeader {
     ///
     /// **Examples**: CNES, ESOC, GSFC, GSOC, JPL, JAXA, INTELSAT, USAF, INMARSAT
     ///
-    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
+    /// **CCSDS Reference**: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
     #[builder(into)]
     pub originator: String,
     /// ID that uniquely identifies a message from a given originator. The format and content of
     /// the message identifier value are at the discretion of the originator.
     ///
-    /// **Examples**: APM_201113719185, ABC-12_34
+    /// **Examples**: 201113719185, ABC-12_34
     ///
-    /// **CCSDS Reference**: 504.0-B-2, Section 3.2.2.
+    /// **CCSDS Reference**: 504.0-B-2, Sections 3.2.2 (APM), 4.2.2 (AEM), and 5.3.2 (ACM).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub message_id: Option<String>,
@@ -118,12 +62,12 @@ impl ToKvn for AdmHeader {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         if let Some(ref cls) = self.classification {
-            writer.write_pair("CLASSIFICATION", cls);
+            writer.write_pair("CLASSIFICATION", cls.trim());
         }
         writer.write_pair("CREATION_DATE", self.creation_date);
         writer.write_pair("ORIGINATOR", &self.originator);
         if let Some(ref msg_id) = self.message_id {
-            writer.write_pair("MESSAGE_ID", msg_id);
+            writer.write_pair("MESSAGE_ID", msg_id.trim());
         }
     }
 }
@@ -235,7 +179,7 @@ impl crate::traits::Validate for OdmHeader {
     }
 }
 
-/// Spacecraft Parameters (if maneuver is specified, then mass must be provided).
+/// Spacecraft parameters. OPM 3.0 maneuvers require mass; OPM 2.0 requires the block but permits omitted mass in KVN.
 ///
 /// References:
 /// - CCSDS 502.0-B-3, Section 3.2.4 (OPM Data Section)
@@ -295,6 +239,26 @@ pub struct SpacecraftParameters {
     pub drag_coeff: Option<NonNegativeDouble>,
 }
 
+impl SpacecraftParameters {
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        if self.mass.is_none()
+            && self.solar_rad_area.is_none()
+            && self.solar_rad_coeff.is_none()
+            && self.drag_area.is_none()
+            && self.drag_coeff.is_none()
+        {
+            return Err(ValidationError::invalid_value(
+                "spacecraftParameters",
+                "no parameters",
+                "at least one parameter to preserve the block and its comments in KVN",
+            )
+            .at_path("body.segment.data.spacecraft_parameters")
+            .into());
+        }
+        Ok(())
+    }
+}
+
 impl crate::traits::Validate for SpacecraftParameters {
     fn validate(&self) -> Result<()> {
         for (field, value) in [
@@ -340,6 +304,11 @@ impl crate::traits::Validate for SpacecraftParameters {
     }
 }
 
+/// Orbit-determination spans, observation counts, and residual statistics shared by CDM/RDM.
+///
+/// Counts are positive when supplied, following the XSD in all notations. Last-observation
+/// endpoints remain lexical epochs; validation does not compare their order.
+/// CCSDS 508.0-B-1 section 3.5.2 and CCSDS 508.1-B-1 section 3.5.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct OdParameters {
@@ -350,16 +319,16 @@ pub struct OdParameters {
     #[builder(default)]
     pub comment: Vec<String>,
 
-    /// The start of a time interval (UTC) that contains the time of the last accepted
-    /// observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+    /// The start of a time interval (UTC for CDM; metadata TIME_SYSTEM for RDM) that contains the time of the last accepted
+    /// observation. (See CDM 6.3.2.6 or RDM 5.3.3.5 for formatting rules.) For an exact time, the time interval is
     /// of zero duration (i.e., same value as that of TIME_LASTOB_END).
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub time_lastob_start: Option<CalendarEpoch>,
 
-    /// The end of a time interval (UTC) that contains the time of the last accepted
-    /// observation. (See 6.3.2.6 for formatting rules.) For an exact time, the time interval is
+    /// The end of a time interval (UTC for CDM; metadata TIME_SYSTEM for RDM) that contains the time of the last accepted
+    /// observation. (See CDM 6.3.2.6 or RDM 5.3.3.5 for formatting rules.) For an exact time, the time interval is
     /// of zero duration (i.e., same value as that of TIME_LASTOB_START).
     ///
     /// **CCSDS Reference**: 508.0-B-1, Section 3.5.2 / 508.1-B-1, Section 3.5.
@@ -553,16 +522,28 @@ pub struct StateVectorAcc {
 }
 
 // Quaternion (components each in [-1, 1])
+/// Rotation quaternion in vector-first order (ADM annex F).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct Quaternion {
+    /// First vector component, e1 * sin(phi/2) (ADM annex F).
     pub q1: f64,
+    /// Second vector component, e2 * sin(phi/2) (ADM annex F).
     pub q2: f64,
+    /// Third vector component, e3 * sin(phi/2) (ADM annex F).
     pub q3: f64,
+    /// Scalar component, cos(phi/2) (ADM annex F).
     pub qc: f64,
 }
 
 impl Quaternion {
+    pub(crate) fn validate_kvn_rounding(&self) -> Result<()> {
+        let [q1, q2, q3, qc] = [self.q1, self.q2, self.q3, self.qc]
+            .map(|value| crate::kvn::ser::OdmFloat::rounded_value(value).unwrap_or(value));
+        crate::traits::Validate::validate(&Self { q1, q2, q3, qc })
+    }
+
+    /// Construct a quaternion with finite components in [-1, 1]; full validation also checks its norm.
     pub fn new(q1: f64, q2: f64, q3: f64, qc: f64) -> crate::error::Result<Self> {
         let quaternion = Self { q1, q2, q3, qc };
         quaternion.validate_components()?;
@@ -576,15 +557,21 @@ impl Quaternion {
             ("Q3", self.q3),
             ("QC", self.qc),
         ] {
-            if !(-1.0..=1.0).contains(&v) {
-                return Err(crate::error::ValidationError::OutOfRange {
-                    name: name.into(),
-                    value: v.to_string(),
-                    expected: "[-1, 1]".into(),
-                    line: None,
-                }
-                .into());
+            Self::validate_component(name, v)?;
+        }
+        Ok(())
+    }
+
+    /// One component must lie in [-1, 1]; KVN readers check it on its own record.
+    pub(crate) fn validate_component(name: &'static str, v: f64) -> Result<()> {
+        if !(-1.0..=1.0).contains(&v) {
+            return Err(crate::error::ValidationError::OutOfRange {
+                name: name.into(),
+                value: v.to_string(),
+                expected: "[-1, 1]".into(),
+                line: None,
             }
+            .into());
         }
         Ok(())
     }
@@ -594,33 +581,43 @@ impl crate::traits::Validate for Quaternion {
     fn validate(&self) -> Result<()> {
         self.validate_components()?;
         let sum_sq = self.q1 * self.q1 + self.q2 * self.q2 + self.q3 * self.q3 + self.qc * self.qc;
-        if !(0.999..=1.001).contains(&sum_sq) {
-            return Err(crate::error::ValidationError::Generic {
-                message: format!("Quaternion not normalized: sum of squares = {}", sum_sq).into(),
+        if !(0.99..=1.01).contains(&sum_sq) {
+            return Err(crate::error::ValidationError::OutOfRange {
+                name: "QUATERNION".into(),
+                value: sum_sq.to_string(),
+                expected: "squared norm in [0.99, 1.01]".into(),
                 line: None,
             }
+            .at_path("quaternion")
             .into());
         }
         Ok(())
     }
 }
 
-// Quaternion derivative (dot components with units 1/s)
-// Quaternion derivative (dot components with units 1/s)
+/// Complete quaternion time-derivative vector in 1/s (ADM table 3-3).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct QuaternionDot {
+    /// Time derivative of Q1, in 1/s (ADM table 3-3).
     pub q1_dot: QuaternionDotComponent,
+    /// Time derivative of Q2, in 1/s (ADM table 3-3).
     pub q2_dot: QuaternionDotComponent,
+    /// Time derivative of Q3, in 1/s (ADM table 3-3).
     pub q3_dot: QuaternionDotComponent,
+    /// Time derivative of QC, in 1/s (ADM table 3-3).
     pub qc_dot: QuaternionDotComponent,
 }
 
 // Angular velocity triple (ANGVEL_X/Y/Z)
+/// Angular-velocity components in degrees per second (ADM table 4-4).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 pub struct AngularVelocity {
+    /// Angular velocity about the X axis, in deg/s (ADM table 4-4).
     pub x: AngleRate,
+    /// Angular velocity about the Y axis, in deg/s (ADM table 4-4).
     pub y: AngleRate,
+    /// Angular velocity about the Z axis, in deg/s (ADM table 4-4).
     pub z: AngleRate,
 }
 
@@ -628,7 +625,7 @@ pub struct AngularVelocity {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub struct StateVector {
-    /// Comments (allowed at the beginning of the OPM Metadata). (See 7.8 for formatting rules.)
+    /// Comments (allowed at the beginning of the state-vector block). (See 7.8 for formatting rules.)
     ///
     /// **CCSDS Reference**: 502.0-B-3, Section 3.2.4.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -768,6 +765,31 @@ pub struct QuaternionState {
         rename = "quaternionDot"
     )]
     pub quaternion_dot: Option<QuaternionDot>,
+}
+
+impl crate::traits::Validate for QuaternionState {
+    fn validate(&self) -> Result<()> {
+        for (field, value) in [
+            ("REF_FRAME_A", &self.ref_frame_a),
+            ("REF_FRAME_B", &self.ref_frame_b),
+        ] {
+            if value.trim().is_empty() {
+                return Err(ValidationError::missing_required("Quaternion", field).into());
+            }
+        }
+        self.quaternion.validate()?;
+        if let Some(dot) = &self.quaternion_dot {
+            for (field, value) in [
+                ("Q1_DOT", dot.q1_dot.value),
+                ("Q2_DOT", dot.q2_dot.value),
+                ("Q3_DOT", dot.q3_dot.value),
+                ("QC_DOT", dot.qc_dot.value),
+            ] {
+                require_finite(field, value)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Euler angle elements.
@@ -1034,6 +1056,7 @@ impl crate::traits::Validate for SpinState {
         }
         if let Some(value) = &self.nutation_per {
             Duration::validate_value(value.value, "NUTATION_PER")?;
+            TimeUnits::validate_seconds(&value.units, "NUTATION_PER")?;
         }
         if let Some(value) = &self.nutation_vel {
             if !value.value.is_finite() {
@@ -1203,17 +1226,48 @@ pub struct AttManeuverState {
     pub man_delta_mass: Option<DeltaMassZ>,
 }
 
+impl crate::traits::Validate for AttManeuverState {
+    fn validate(&self) -> Result<()> {
+        crate::validation::epoch_precision(&[("MAN_EPOCH_START", &self.man_epoch_start)])?;
+        Duration::validate_value(self.man_duration.value, "MAN_DURATION")?;
+        TimeUnits::validate_seconds(&self.man_duration.units, "MAN_DURATION")?;
+        if self.man_ref_frame.trim().is_empty() {
+            return Err(ValidationError::missing_required("Maneuver", "MAN_REF_FRAME").into());
+        }
+        for (field, value) in [
+            ("MAN_TOR_X", self.man_tor_x.value),
+            ("MAN_TOR_Y", self.man_tor_y.value),
+            ("MAN_TOR_Z", self.man_tor_z.value),
+        ] {
+            require_finite(field, value)?;
+        }
+        if let Some(mass) = &self.man_delta_mass {
+            require_finite("MAN_DELTA_MASS", mass.value)?;
+            if mass.value > 0.0 {
+                return Err(ValidationError::OutOfRange {
+                    name: "MAN_DELTA_MASS".into(),
+                    value: mass.value.to_string(),
+                    expected: "<= 0".into(),
+                    line: None,
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+}
+
 impl ToKvn for AttManeuverState {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         writer.write_pair("MAN_EPOCH_START", self.man_epoch_start);
-        writer.write_measure("MAN_DURATION", &self.man_duration.to_unit_value());
+        writer.write_odm_float_measure("MAN_DURATION", &self.man_duration.to_unit_value());
         writer.write_pair("MAN_REF_FRAME", &self.man_ref_frame);
-        writer.write_measure("MAN_TOR_X", &self.man_tor_x);
-        writer.write_measure("MAN_TOR_Y", &self.man_tor_y);
-        writer.write_measure("MAN_TOR_Z", &self.man_tor_z);
+        writer.write_odm_float_measure("MAN_TOR_X", &self.man_tor_x);
+        writer.write_odm_float_measure("MAN_TOR_Y", &self.man_tor_y);
+        writer.write_odm_float_measure("MAN_TOR_Z", &self.man_tor_z);
         if let Some(m) = &self.man_delta_mass {
-            writer.write_measure("MAN_DELTA_MASS", &m.to_unit_value());
+            writer.write_odm_float_measure("MAN_DELTA_MASS", &m.to_unit_value());
         }
     }
 }
@@ -1288,7 +1342,7 @@ pub struct QuaternionEphemeris {
 
 impl ToKvn for QuaternionEphemeris {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[
                 self.quaternion.q1,
@@ -1316,7 +1370,7 @@ pub struct QuaternionDerivative {
 
 impl ToKvn for QuaternionDerivative {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[
                 self.quaternion.q1,
@@ -1349,7 +1403,7 @@ pub struct QuaternionAngVel {
 
 impl ToKvn for QuaternionAngVel {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[
                 self.quaternion.q1,
@@ -1380,7 +1434,7 @@ pub struct EulerAngle {
 
 impl ToKvn for EulerAngle {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[self.angle_1.value, self.angle_2.value, self.angle_3.value],
         );
@@ -1409,7 +1463,7 @@ pub struct EulerAngleDerivative {
 
 impl ToKvn for EulerAngleDerivative {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[
                 self.angle_1.value,
@@ -1448,7 +1502,7 @@ pub struct EulerAngleAngVel {
 
 impl ToKvn for EulerAngleAngVel {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[
                 self.angle_1.value,
@@ -1480,7 +1534,7 @@ pub struct Spin {
 
 impl ToKvn for Spin {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[
                 self.spin_alpha.value,
@@ -1516,7 +1570,7 @@ pub struct SpinNutation {
 
 impl ToKvn for SpinNutation {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[
                 self.spin_alpha.value,
@@ -1555,7 +1609,7 @@ pub struct SpinNutationMom {
 
 impl ToKvn for SpinNutationMom {
     fn write_kvn(&self, writer: &mut KvnWriter) {
-        writer.write_aem_attitude_state(
+        writer.write_numeric_history(
             &self.epoch,
             &[
                 self.spin_alpha.value,
@@ -1574,8 +1628,11 @@ impl ToKvn for SpinNutationMom {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct AngVel {
+    /// Angular velocity about the X axis, in deg/s (ADM table 4-4).
     pub angvel_x: AngleRate,
+    /// Angular velocity about the Y axis, in deg/s (ADM table 4-4).
     pub angvel_y: AngleRate,
+    /// Angular velocity about the Z axis, in deg/s (ADM table 4-4).
     pub angvel_z: AngleRate,
 }
 
@@ -1584,32 +1641,39 @@ impl ToKvn for QuaternionState {
         writer.write_comments(&self.comment);
         writer.write_pair("REF_FRAME_A", &self.ref_frame_a);
         writer.write_pair("REF_FRAME_B", &self.ref_frame_b);
-        writer.write_pair("Q1", self.quaternion.q1);
-        writer.write_pair("Q2", self.quaternion.q2);
-        writer.write_pair("Q3", self.quaternion.q3);
-        writer.write_pair("QC", self.quaternion.qc);
+        writer.write_odm_float_pair("Q1", self.quaternion.q1);
+        writer.write_odm_float_pair("Q2", self.quaternion.q2);
+        writer.write_odm_float_pair("Q3", self.quaternion.q3);
+        writer.write_odm_float_pair("QC", self.quaternion.qc);
         if let Some(dot) = &self.quaternion_dot {
-            writer.write_pair("Q1_DOT", dot.q1_dot.value);
-            writer.write_pair("Q2_DOT", dot.q2_dot.value);
-            writer.write_pair("Q3_DOT", dot.q3_dot.value);
-            writer.write_pair("QC_DOT", dot.qc_dot.value);
+            writer.write_odm_float_measure("Q1_DOT", &dot.q1_dot);
+            writer.write_odm_float_measure("Q2_DOT", &dot.q2_dot);
+            writer.write_odm_float_measure("Q3_DOT", &dot.q3_dot);
+            writer.write_odm_float_measure("QC_DOT", &dot.qc_dot);
         }
     }
 }
 
 impl crate::traits::Validate for EulerAngleState {
     fn validate(&self) -> Result<()> {
+        if self.ref_frame_a.trim().is_empty() {
+            return Err(ValidationError::missing_required("Euler angles", "REF_FRAME_A").into());
+        }
+        if self.ref_frame_b.trim().is_empty() {
+            return Err(ValidationError::missing_required("Euler angles", "REF_FRAME_B").into());
+        }
+
         for (field, angle) in [
-            ("EULER_ANGLE_1", &self.angle_1),
-            ("EULER_ANGLE_2", &self.angle_2),
-            ("EULER_ANGLE_3", &self.angle_3),
+            ("ANGLE_1", &self.angle_1),
+            ("ANGLE_2", &self.angle_2),
+            ("ANGLE_3", &self.angle_3),
         ] {
             Angle::validate_value(angle.value, field)?;
         }
         for (field, rate) in [
-            ("EULER_ANGLE_1_DOT", &self.angle_1_dot),
-            ("EULER_ANGLE_2_DOT", &self.angle_2_dot),
-            ("EULER_ANGLE_3_DOT", &self.angle_3_dot),
+            ("ANGLE_1_DOT", &self.angle_1_dot),
+            ("ANGLE_2_DOT", &self.angle_2_dot),
+            ("ANGLE_3_DOT", &self.angle_3_dot),
         ] {
             if let Some(rate) = rate {
                 require_finite(field, rate.value)?;
@@ -1621,6 +1685,22 @@ impl crate::traits::Validate for EulerAngleState {
 
 impl crate::traits::Validate for AngVelState {
     fn validate(&self) -> Result<()> {
+        if self.ref_frame_a.trim().is_empty() {
+            return Err(
+                ValidationError::missing_required("Angular velocity", "REF_FRAME_A").into(),
+            );
+        }
+        if self.ref_frame_b.trim().is_empty() {
+            return Err(
+                ValidationError::missing_required("Angular velocity", "REF_FRAME_B").into(),
+            );
+        }
+        if self.angvel_frame.0.trim().is_empty() {
+            return Err(
+                ValidationError::missing_required("Angular velocity", "ANGVEL_FRAME").into(),
+            );
+        }
+
         for (field, rate) in [
             ("ANGVEL_X", &self.angvel_x),
             ("ANGVEL_Y", &self.angvel_y),
@@ -1634,6 +1714,10 @@ impl crate::traits::Validate for AngVelState {
 
 impl crate::traits::Validate for InertiaState {
     fn validate(&self) -> Result<()> {
+        if self.inertia_ref_frame.trim().is_empty() {
+            return Err(ValidationError::missing_required("Inertia", "INERTIA_REF_FRAME").into());
+        }
+
         for (field, moment) in [
             ("IXX", &self.ixx),
             ("IYY", &self.iyy),
@@ -1654,21 +1738,21 @@ impl ToKvn for EulerAngleState {
         writer.write_pair("REF_FRAME_A", &self.ref_frame_a);
         writer.write_pair("REF_FRAME_B", &self.ref_frame_b);
         writer.write_pair("EULER_ROT_SEQ", &self.euler_rot_seq);
-        writer.write_measure(
+        writer.write_odm_float_measure(
             "ANGLE_1",
             &UnitValue {
                 value: self.angle_1.value,
                 units: self.angle_1.units.clone(),
             },
         );
-        writer.write_measure(
+        writer.write_odm_float_measure(
             "ANGLE_2",
             &UnitValue {
                 value: self.angle_2.value,
                 units: self.angle_2.units.clone(),
             },
         );
-        writer.write_measure(
+        writer.write_odm_float_measure(
             "ANGLE_3",
             &UnitValue {
                 value: self.angle_3.value,
@@ -1676,7 +1760,7 @@ impl ToKvn for EulerAngleState {
             },
         );
         if let Some(v) = &self.angle_1_dot {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "ANGLE_1_DOT",
                 &UnitValue {
                     value: v.value,
@@ -1685,7 +1769,7 @@ impl ToKvn for EulerAngleState {
             );
         }
         if let Some(v) = &self.angle_2_dot {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "ANGLE_2_DOT",
                 &UnitValue {
                     value: v.value,
@@ -1694,7 +1778,7 @@ impl ToKvn for EulerAngleState {
             );
         }
         if let Some(v) = &self.angle_3_dot {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "ANGLE_3_DOT",
                 &UnitValue {
                     value: v.value,
@@ -1711,9 +1795,9 @@ impl ToKvn for AngVelState {
         writer.write_pair("REF_FRAME_A", &self.ref_frame_a);
         writer.write_pair("REF_FRAME_B", &self.ref_frame_b);
         writer.write_pair("ANGVEL_FRAME", &self.angvel_frame.0);
-        writer.write_measure("ANGVEL_X", &self.angvel_x);
-        writer.write_measure("ANGVEL_Y", &self.angvel_y);
-        writer.write_measure("ANGVEL_Z", &self.angvel_z);
+        writer.write_odm_float_measure("ANGVEL_X", &self.angvel_x);
+        writer.write_odm_float_measure("ANGVEL_Y", &self.angvel_y);
+        writer.write_odm_float_measure("ANGVEL_Z", &self.angvel_z);
     }
 }
 
@@ -1722,28 +1806,28 @@ impl ToKvn for SpinState {
         writer.write_comments(&self.comment);
         writer.write_pair("REF_FRAME_A", &self.ref_frame_a);
         writer.write_pair("REF_FRAME_B", &self.ref_frame_b);
-        writer.write_measure(
+        writer.write_odm_float_measure(
             "SPIN_ALPHA",
             &UnitValue {
                 value: self.spin_alpha.value,
                 units: self.spin_alpha.units.clone(),
             },
         );
-        writer.write_measure(
+        writer.write_odm_float_measure(
             "SPIN_DELTA",
             &UnitValue {
                 value: self.spin_delta.value,
                 units: self.spin_delta.units.clone(),
             },
         );
-        writer.write_measure(
+        writer.write_odm_float_measure(
             "SPIN_ANGLE",
             &UnitValue {
                 value: self.spin_angle.value,
                 units: self.spin_angle.units.clone(),
             },
         );
-        writer.write_measure(
+        writer.write_odm_float_measure(
             "SPIN_ANGLE_VEL",
             &UnitValue {
                 value: self.spin_angle_vel.value,
@@ -1752,7 +1836,7 @@ impl ToKvn for SpinState {
         );
 
         if let Some(v) = &self.nutation {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "NUTATION",
                 &UnitValue {
                     value: v.value,
@@ -1761,7 +1845,7 @@ impl ToKvn for SpinState {
             );
         }
         if let Some(v) = &self.nutation_per {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "NUTATION_PER",
                 &UnitValue {
                     value: v.value,
@@ -1770,7 +1854,7 @@ impl ToKvn for SpinState {
             );
         }
         if let Some(v) = &self.nutation_phase {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "NUTATION_PHASE",
                 &UnitValue {
                     value: v.value,
@@ -1779,7 +1863,7 @@ impl ToKvn for SpinState {
             );
         }
         if let Some(v) = &self.momentum_alpha {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "MOMENTUM_ALPHA",
                 &UnitValue {
                     value: v.value,
@@ -1788,7 +1872,7 @@ impl ToKvn for SpinState {
             );
         }
         if let Some(v) = &self.momentum_delta {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "MOMENTUM_DELTA",
                 &UnitValue {
                     value: v.value,
@@ -1797,7 +1881,7 @@ impl ToKvn for SpinState {
             );
         }
         if let Some(v) = &self.nutation_vel {
-            writer.write_measure(
+            writer.write_odm_float_measure(
                 "NUTATION_VEL",
                 &UnitValue {
                     value: v.value,
@@ -1812,12 +1896,12 @@ impl ToKvn for InertiaState {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         writer.write_pair("INERTIA_REF_FRAME", &self.inertia_ref_frame);
-        writer.write_measure("IXX", &self.ixx);
-        writer.write_measure("IYY", &self.iyy);
-        writer.write_measure("IZZ", &self.izz);
-        writer.write_measure("IXY", &self.ixy);
-        writer.write_measure("IXZ", &self.ixz);
-        writer.write_measure("IYZ", &self.iyz);
+        writer.write_odm_float_measure("IXX", &self.ixx);
+        writer.write_odm_float_measure("IYY", &self.iyy);
+        writer.write_odm_float_measure("IZZ", &self.izz);
+        writer.write_odm_float_measure("IXY", &self.ixy);
+        writer.write_odm_float_measure("IXZ", &self.ixz);
+        writer.write_odm_float_measure("IYZ", &self.iyz);
     }
 }
 
@@ -2175,6 +2259,7 @@ pub struct AtmosphericReentryParameters {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Time until re-entry: from the EPOCH_TZERO epoch in the metadata (days—double precision
     /// values allowed; integer values assumed to have .0 fractional part) to permanently
@@ -2245,6 +2330,13 @@ pub struct AtmosphericReentryParameters {
 
 impl crate::traits::Validate for AtmosphericReentryParameters {
     fn validate(&self) -> Result<()> {
+        require_finite("REENTRY_ALTITUDE", self.reentry_altitude.value)?;
+        if let Some(confidence) = &self.orbit_lifetime_confidence_level {
+            PercentageRequired::validate_value(
+                confidence.value,
+                "ORBIT_LIFETIME_CONFIDENCE_LEVEL",
+            )?;
+        }
         crate::validation::epoch_precision(&[
             ("NOMINAL_REENTRY_EPOCH", &self.nominal_reentry_epoch),
             ("REENTRY_WINDOW_START", &self.reentry_window_start),
@@ -2272,13 +2364,13 @@ impl crate::traits::Validate for AtmosphericReentryParameters {
 impl ToKvn for AtmosphericReentryParameters {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
-        writer.write_measure("ORBIT_LIFETIME", &self.orbit_lifetime.to_unit_value());
-        writer.write_measure("REENTRY_ALTITUDE", &self.reentry_altitude.to_unit_value());
+        writer.write_odm_float_measure("ORBIT_LIFETIME", &self.orbit_lifetime.to_unit_value());
+        writer.write_odm_float_measure("REENTRY_ALTITUDE", &self.reentry_altitude.to_unit_value());
         if let Some(v) = &self.orbit_lifetime_window_start {
-            writer.write_measure("ORBIT_LIFETIME_WINDOW_START", &v.to_unit_value());
+            writer.write_odm_float_measure("ORBIT_LIFETIME_WINDOW_START", &v.to_unit_value());
         }
         if let Some(v) = &self.orbit_lifetime_window_end {
-            writer.write_measure("ORBIT_LIFETIME_WINDOW_END", &v.to_unit_value());
+            writer.write_odm_float_measure("ORBIT_LIFETIME_WINDOW_END", &v.to_unit_value());
         }
         if let Some(v) = &self.nominal_reentry_epoch {
             writer.write_pair("NOMINAL_REENTRY_EPOCH", v);
@@ -2290,7 +2382,7 @@ impl ToKvn for AtmosphericReentryParameters {
             writer.write_pair("REENTRY_WINDOW_END", v);
         }
         if let Some(v) = &self.orbit_lifetime_confidence_level {
-            writer.write_measure("ORBIT_LIFETIME_CONFIDENCE_LEVEL", &v.to_unit_value());
+            writer.write_odm_float_measure("ORBIT_LIFETIME_CONFIDENCE_LEVEL", &v.to_unit_value());
         }
     }
 }
@@ -2303,6 +2395,7 @@ pub struct GroundImpactParameters {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Probability that any fragment will impact the Earth (either land or sea; 0 to 1).
     ///
@@ -2378,7 +2471,7 @@ pub struct GroundImpactParameters {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub nominal_impact_alt: Option<AltitudeRequired>,
+    pub nominal_impact_alt: Option<ImpactAltitude>,
     /// First (lowest) confidence interval for the impact location.
     ///
     /// **Units**: %
@@ -2718,19 +2811,19 @@ impl ToKvn for GroundImpactParameters {
     fn write_kvn(&self, writer: &mut KvnWriter) {
         writer.write_comments(&self.comment);
         if let Some(v) = &self.probability_of_impact {
-            writer.write_pair("PROBABILITY_OF_IMPACT", v.value);
+            writer.write_odm_float_pair("PROBABILITY_OF_IMPACT", v.value);
         }
         if let Some(v) = &self.probability_of_burn_up {
-            writer.write_pair("PROBABILITY_OF_BURN_UP", v.value);
+            writer.write_odm_float_pair("PROBABILITY_OF_BURN_UP", v.value);
         }
         if let Some(v) = &self.probability_of_break_up {
-            writer.write_pair("PROBABILITY_OF_BREAK_UP", v.value);
+            writer.write_odm_float_pair("PROBABILITY_OF_BREAK_UP", v.value);
         }
         if let Some(v) = &self.probability_of_land_impact {
-            writer.write_pair("PROBABILITY_OF_LAND_IMPACT", v.value);
+            writer.write_odm_float_pair("PROBABILITY_OF_LAND_IMPACT", v.value);
         }
         if let Some(v) = &self.probability_of_casualty {
-            writer.write_pair("PROBABILITY_OF_CASUALTY", v.value);
+            writer.write_odm_float_pair("PROBABILITY_OF_CASUALTY", v.value);
         }
         if let Some(v) = &self.nominal_impact_epoch {
             writer.write_pair("NOMINAL_IMPACT_EPOCH", v);
@@ -2745,70 +2838,70 @@ impl ToKvn for GroundImpactParameters {
             writer.write_pair("IMPACT_REF_FRAME", v);
         }
         if let Some(v) = &self.nominal_impact_lon {
-            writer.write_measure("NOMINAL_IMPACT_LON", &v.to_unit_value());
+            writer.write_odm_float_measure("NOMINAL_IMPACT_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.nominal_impact_lat {
-            writer.write_measure("NOMINAL_IMPACT_LAT", &v.to_unit_value());
+            writer.write_odm_float_measure("NOMINAL_IMPACT_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.nominal_impact_alt {
-            writer.write_measure("NOMINAL_IMPACT_ALT", &v.to_unit_value());
+            writer.write_odm_float_measure("NOMINAL_IMPACT_ALT", &v.to_unit_value());
         }
 
         if let Some(v) = &self.impact_1_confidence {
-            writer.write_measure("IMPACT_1_CONFIDENCE", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_1_CONFIDENCE", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_start_lon {
-            writer.write_measure("IMPACT_1_START_LON", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_1_START_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_start_lat {
-            writer.write_measure("IMPACT_1_START_LAT", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_1_START_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_stop_lon {
-            writer.write_measure("IMPACT_1_STOP_LON", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_1_STOP_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_stop_lat {
-            writer.write_measure("IMPACT_1_STOP_LAT", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_1_STOP_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_1_cross_track {
-            writer.write_measure("IMPACT_1_CROSS_TRACK", v);
+            writer.write_odm_float_measure("IMPACT_1_CROSS_TRACK", v);
         }
 
         if let Some(v) = &self.impact_2_confidence {
-            writer.write_measure("IMPACT_2_CONFIDENCE", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_2_CONFIDENCE", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_start_lon {
-            writer.write_measure("IMPACT_2_START_LON", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_2_START_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_start_lat {
-            writer.write_measure("IMPACT_2_START_LAT", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_2_START_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_stop_lon {
-            writer.write_measure("IMPACT_2_STOP_LON", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_2_STOP_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_stop_lat {
-            writer.write_measure("IMPACT_2_STOP_LAT", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_2_STOP_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_2_cross_track {
-            writer.write_measure("IMPACT_2_CROSS_TRACK", v);
+            writer.write_odm_float_measure("IMPACT_2_CROSS_TRACK", v);
         }
 
         if let Some(v) = &self.impact_3_confidence {
-            writer.write_measure("IMPACT_3_CONFIDENCE", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_3_CONFIDENCE", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_start_lon {
-            writer.write_measure("IMPACT_3_START_LON", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_3_START_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_start_lat {
-            writer.write_measure("IMPACT_3_START_LAT", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_3_START_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_stop_lon {
-            writer.write_measure("IMPACT_3_STOP_LON", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_3_STOP_LON", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_stop_lat {
-            writer.write_measure("IMPACT_3_STOP_LAT", &v.to_unit_value());
+            writer.write_odm_float_measure("IMPACT_3_STOP_LAT", &v.to_unit_value());
         }
         if let Some(v) = &self.impact_3_cross_track {
-            writer.write_measure("IMPACT_3_CROSS_TRACK", v);
+            writer.write_odm_float_measure("IMPACT_3_CROSS_TRACK", v);
         }
     }
 }
@@ -2821,6 +2914,7 @@ pub struct RdmSpacecraftParameters {
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default)]
     pub comment: Vec<String>,
     /// Total object mass at EPOCH_TZERO.
     ///
@@ -2843,7 +2937,7 @@ pub struct RdmSpacecraftParameters {
     pub hazardous_substances: Option<String>,
     /// Object area exposed to Solar Radiation Pressure (SRP).
     ///
-    /// **Units**: m²
+    /// **Units**: m**2
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2855,7 +2949,7 @@ pub struct RdmSpacecraftParameters {
     pub solar_rad_coeff: Option<NonNegativeDouble>,
     /// Object cross-sectional area.
     ///
-    /// **Units**: m²
+    /// **Units**: m**2
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2867,14 +2961,14 @@ pub struct RdmSpacecraftParameters {
     pub drag_coeff: Option<NonNegativeDouble>,
     /// Object radar cross section.
     ///
-    /// **Units**: m²
+    /// **Units**: m**2
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rcs: Option<Area>,
     /// Object ballistic coefficient.
     ///
-    /// **Units**: kg/m²
+    /// **Units**: kg/m**2
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2882,7 +2976,7 @@ pub struct RdmSpacecraftParameters {
     /// The object’s acceleration due to in-track thrust used to propagate the state vector and
     /// covariance to NOMINAL_RENTRY_EPOCH (if a controlled re-entry).
     ///
-    /// **Units**: m/s²
+    /// **Units**: m/s**2
     ///
     /// **CCSDS Reference**: 508.1-B-1, Section 3.5.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2938,39 +3032,6 @@ mod tests {
     use crate::traits::Validate;
 
     #[test]
-    fn test_ndm_header_validation() {
-        let h = NdmHeader::builder()
-            .creation_date("2000-01-01T00:00:00".parse().unwrap())
-            .originator("  ") // empty originator
-            .build();
-        assert!(h.validate().is_err());
-
-        let h2 = NdmHeader::builder()
-            .creation_date("2000-01-01T00:00:00".parse().unwrap())
-            .originator("NASA")
-            .build();
-        assert!(h2.validate().is_ok());
-    }
-
-    #[test]
-    fn test_ndm_header_kvn() {
-        let h = NdmHeader::builder()
-            .creation_date("2000-01-01T00:00:00".parse().unwrap())
-            .originator("NASA")
-            .comment(vec!["msg".into()])
-            .build();
-        let mut w = KvnWriter::new();
-        h.write_kvn(&mut w);
-        let s = w.finish();
-        // Check for presence of key and value separately to avoid whitespace issues
-        assert!(s.contains("COMMENT msg"));
-        assert!(s.contains("CREATION_DATE"));
-        assert!(s.contains("2000-01-01T00:00:00"));
-        assert!(s.contains("ORIGINATOR"));
-        assert!(s.contains("NASA"));
-    }
-
-    #[test]
     fn test_adm_header_validation() {
         let h = AdmHeader::builder()
             .creation_date("2000-01-01T00:00:00".parse().unwrap())
@@ -2999,188 +3060,6 @@ mod tests {
         assert!(s.contains("SECURE"));
         assert!(s.contains("MESSAGE_ID"));
         assert!(s.contains("MSG1"));
-    }
-
-    #[test]
-    fn test_odm_header_validation() {
-        let h = OdmHeader::builder()
-            .creation_date("2000-01-01T00:00:00".parse().unwrap())
-            .originator("")
-            .build();
-        assert!(h.validate().is_err());
-    }
-
-    #[test]
-    fn test_odm_header_kvn() {
-        let h = OdmHeader::builder()
-            .creation_date("2000-01-01T00:00:00".parse().unwrap())
-            .originator("JAXA")
-            .build();
-        let mut w = KvnWriter::new();
-        h.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("ORIGINATOR"));
-        assert!(s.contains("JAXA"));
-    }
-
-    #[test]
-    fn test_state_vector_kvn() {
-        let sv = StateVector::builder()
-            .epoch("2000-01-01T00:00:00".parse().unwrap())
-            .x(Position::new(1.0, None))
-            .y(Position::new(2.0, None))
-            .z(Position::new(3.0, None))
-            .x_dot(Velocity::new(4.0, None))
-            .y_dot(Velocity::new(5.0, None))
-            .z_dot(Velocity::new(6.0, None))
-            .build();
-
-        let mut w = KvnWriter::new();
-        sv.write_kvn(&mut w);
-        let s = w.finish();
-        // check output
-        assert!(s.contains("EPOCH"));
-        assert!(s.contains("2000-01-01T00:00:00"));
-        assert!(s.contains("X"));
-        assert!(s.contains("1"));
-        assert!(s.contains("Z_DOT"));
-        assert!(s.contains("6"));
-    }
-
-    #[test]
-    fn test_quaternion_state_kvn() {
-        let qs = QuaternionState::builder()
-            .ref_frame_a("A")
-            .ref_frame_b("B")
-            .quaternion(Quaternion {
-                q1: 1.0,
-                q2: 0.0,
-                q3: 0.0,
-                qc: 0.0,
-            })
-            .build();
-        let mut w = KvnWriter::new();
-        qs.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("REF_FRAME_A"));
-        assert!(s.contains("A"));
-        assert!(s.contains("Q1"));
-        assert!(s.contains("1"));
-    }
-
-    #[test]
-    fn test_euler_angle_state_kvn() {
-        let es = EulerAngleState::builder()
-            .ref_frame_a("A")
-            .ref_frame_b("B")
-            .euler_rot_seq(RotSeq::XYZ)
-            .angle_1(Angle::new(10.0, None).unwrap())
-            .angle_2(Angle::new(20.0, None).unwrap())
-            .angle_3(Angle::new(30.0, None).unwrap())
-            .build();
-        let mut w = KvnWriter::new();
-        es.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("EULER_ROT_SEQ"));
-        assert!(s.contains("XYZ"));
-        assert!(s.contains("ANGLE_1"));
-        assert!(s.contains("10"));
-    }
-
-    #[test]
-    fn test_ang_vel_state_kvn() {
-        let avs = AngVelState::builder()
-            .ref_frame_a("A")
-            .ref_frame_b("B")
-            .angvel_frame(AngVelFrameType("FRAME".into()))
-            .angvel_x(AngleRate::new(0.1, None))
-            .angvel_y(AngleRate::new(0.2, None))
-            .angvel_z(AngleRate::new(0.3, None))
-            .build();
-        let mut w = KvnWriter::new();
-        avs.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("ANGVEL_FRAME"));
-        assert!(s.contains("FRAME"));
-        assert!(s.contains("ANGVEL_X"));
-        assert!(s.contains("0.1"));
-    }
-
-    #[test]
-    fn test_spin_state_kvn() {
-        let ss = SpinState::builder()
-            .ref_frame_a("A")
-            .ref_frame_b("B")
-            .spin_alpha(Angle::new(10.0, None).unwrap())
-            .spin_delta(Angle::new(20.0, None).unwrap())
-            .spin_angle(Angle::new(30.0, None).unwrap())
-            .spin_angle_vel(AngleRate::new(0.1, None))
-            .build();
-        let mut w = KvnWriter::new();
-        ss.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("SPIN_ALPHA"));
-        assert!(s.contains("10"));
-        assert!(s.contains("SPIN_ANGLE_VEL"));
-        assert!(s.contains("0.1"));
-    }
-
-    #[test]
-    fn test_inertia_state_kvn() {
-        let is = InertiaState::builder()
-            .inertia_ref_frame("FRAME")
-            .ixx(Moment::new(100.0, None))
-            .iyy(Moment::new(200.0, None))
-            .izz(Moment::new(300.0, None))
-            .ixy(Moment::new(10.0, None))
-            .ixz(Moment::new(20.0, None))
-            .iyz(Moment::new(30.0, None))
-            .build();
-        let mut w = KvnWriter::new();
-        is.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("IXX"));
-        assert!(s.contains("100"));
-        assert!(s.contains("IXY"));
-        assert!(s.contains("10"));
-    }
-
-    #[test]
-    fn test_ephemeris_kvn() {
-        let epoch = "2000-01-01T00:00:00".parse().unwrap();
-        let qe = QuaternionEphemeris {
-            epoch,
-            quaternion: Quaternion {
-                q1: 1.0,
-                q2: 0.0,
-                q3: 0.0,
-                qc: 0.0,
-            },
-        };
-        let mut w = KvnWriter::new();
-        qe.write_kvn(&mut w);
-        assert!(w.finish().contains("2000-01-01T00:00:00 1.0 0.0 0.0 0.0"));
-
-        let qd = QuaternionDerivative {
-            epoch,
-            quaternion: Quaternion {
-                q1: 1.0,
-                q2: 0.0,
-                q3: 0.0,
-                qc: 0.0,
-            },
-            quaternion_dot: QuaternionDot {
-                q1_dot: QuaternionDotComponent::new(0.1, None),
-                q2_dot: QuaternionDotComponent::new(0.2, None),
-                q3_dot: QuaternionDotComponent::new(0.3, None),
-                qc_dot: QuaternionDotComponent::new(0.4, None),
-            },
-        };
-        let mut w = KvnWriter::new();
-        qd.write_kvn(&mut w);
-        assert!(w
-            .finish()
-            .contains("2000-01-01T00:00:00 1.0 0.0 0.0 0.0 0.1 0.2 0.3 0.4"));
     }
 
     fn opm_covariance_fixture() -> OpmCovarianceMatrix {
@@ -3222,181 +3101,23 @@ mod tests {
     }
 
     #[test]
-    fn test_opm_covariance_kvn() {
-        let cov = opm_covariance_fixture();
-        let mut w = KvnWriter::new();
-        cov.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("CX_X"));
-        assert!(s.contains("1"));
-        assert!(s.contains("CZ_DOT_Z_DOT"));
-        assert!(s.contains("21"));
-    }
-
-    #[test]
-    fn test_reentry_params_kvn() {
-        // AtmosphericReentryParameters
-        // GroundImpactParameters
-        let gi = GroundImpactParameters::builder()
-            .comment(vec![])
-            .probability_of_impact(Probability::new(0.5).unwrap())
-            .build();
-        let mut w = KvnWriter::new();
-        gi.write_kvn(&mut w);
-        let s = w.finish();
-        assert!(s.contains("PROBABILITY_OF_IMPACT"));
-        assert!(s.contains("0.5"));
-    }
-
-    #[test]
-    fn test_header_validation_missing_date() {
-        let h = NdmHeader::builder()
-            .creation_date(Epoch::new("").unwrap())
-            .originator("NASA")
-            .build();
-        assert!(h.validate().is_err());
-
-        assert!(CalendarEpoch::new("").is_err());
-    }
-
-    #[test]
-    fn test_aem_attitude_state_variants_kvn() {
-        let epoch = "2000-01-01T00:00:00".parse().unwrap();
-
-        // QuaternionAngVel
-        let qav = QuaternionAngVel {
-            epoch,
-            quaternion: Quaternion {
-                q1: 1.0,
-                q2: 0.0,
-                q3: 0.0,
-                qc: 0.0,
-            },
-            ang_vel: AngVel {
-                angvel_x: AngleRate::new(0.1, None),
-                angvel_y: AngleRate::new(0.2, None),
-                angvel_z: AngleRate::new(0.3, None),
-            },
-        };
-        let mut w = KvnWriter::new();
-        AemAttitudeState::QuaternionAngVel(qav).write_kvn(&mut w);
-        assert!(w.finish().contains("1.0 0.0 0.0 0.0"));
-
-        // EulerAngleDerivative
-        let ead = EulerAngleDerivative {
-            epoch,
-            angle_1: Angle::new(10.0, None).unwrap(),
-            angle_2: Angle::new(20.0, None).unwrap(),
-            angle_3: Angle::new(30.0, None).unwrap(),
-            angle_1_dot: AngleRate::new(0.1, None),
-            angle_2_dot: AngleRate::new(0.2, None),
-            angle_3_dot: AngleRate::new(0.3, None),
-        };
-        let mut w = KvnWriter::new();
-        AemAttitudeState::EulerAngleDerivative(ead).write_kvn(&mut w);
-        assert!(w.finish().contains("10.0 20.0 30.0"));
-
-        // SpinNutation
-        let sn = SpinNutation {
-            epoch,
-            spin_alpha: Angle::new(10.0, None).unwrap(),
-            spin_delta: Angle::new(20.0, None).unwrap(),
-            spin_angle: Angle::new(30.0, None).unwrap(),
-            spin_angle_vel: AngleRate::new(0.1, None),
-            nutation: Angle::new(5.0, None).unwrap(),
-            nutation_per: Duration::new(1.0, Some(TimeUnits::Day)).unwrap(),
-            nutation_phase: Angle::new(0.0, None).unwrap(),
-        };
-        let mut w = KvnWriter::new();
-        AemAttitudeState::SpinNutation(sn).write_kvn(&mut w);
-        let kvn = w.finish();
-        assert!(kvn.contains("10.0 20.0 30.0 0.1 5.0 1.0 0.0"));
-
-        // SpinNutationMom
-        let snm = SpinNutationMom {
-            epoch,
-            spin_alpha: Angle::new(10.0, None).unwrap(),
-            spin_delta: Angle::new(20.0, None).unwrap(),
-            spin_angle: Angle::new(30.0, None).unwrap(),
-            spin_angle_vel: AngleRate::new(0.1, None),
-            momentum_alpha: Angle::new(5.0, None).unwrap(),
-            momentum_delta: Angle::new(5.0, None).unwrap(),
-            nutation_vel: AngleRate::new(0.01, None),
-        };
-        let mut w = KvnWriter::new();
-        AemAttitudeState::SpinNutationMom(snm).write_kvn(&mut w);
-        assert!(w.finish().contains("0.01"));
-    }
-
-    #[test]
-    fn test_quaternion_validation() {
+    fn quaternion_norm_accepts_three_decimal_unit_values_and_rejects_others() {
+        // Not normalized, on the high side.
         let q = Quaternion {
             q1: 2.0,
             q2: 0.0,
             q3: 0.0,
             qc: 0.0,
         };
-        assert!(q.validate().is_err()); // Not normalized
-        let q2 = Quaternion {
-            q1: 1.0,
-            q2: 0.0,
-            q3: 0.0,
-            qc: 0.0,
-        };
-        assert!(q2.validate().is_ok());
-    }
-
-    #[test]
-    fn test_quaternion_xml_repro() {
-        let xml = r#"<quaternion>
-            <Q1>-0.005068</Q1>
-            <Q2>0.906506</Q2>
-            <Q3>0.002360</Q3>
-            <QC>0.422157</QC>
-        </quaternion>"#;
-        let q: Quaternion = quick_xml::de::from_str(xml).expect("Failed to parse Quaternion");
-        assert_eq!(q.q1, -0.005068);
-    }
-
-    #[test]
-    fn test_quaternion_ephemeris_xml_repro() {
-        let xml = r#"<quaternionEphemeris>
-            <EPOCH>2000-100T00:00:00.000</EPOCH>
-            <quaternion>
-                <Q1>-0.005068</Q1>
-                <Q2>0.906506</Q2>
-                <Q3>0.002360</Q3>
-                <QC>0.422157</QC>
-            </quaternion>
-        </quaternionEphemeris>"#;
-        // quick-xml usually expects root tag to match
-        let qe: QuaternionEphemeris =
-            quick_xml::de::from_str(xml).expect("Failed to parse QuaternionEphemeris");
-        assert_eq!(qe.quaternion.q1, -0.005068);
-    }
-
-    #[test]
-    fn test_nested_wrapper_xml_repro() {
-        #[derive(Deserialize, Debug)]
-        struct Wrapper {
-            #[serde(rename = "quaternionEphemeris")]
-            pub qe: Option<QuaternionEphemeris>,
-        }
-
-        let xml = r#"<attitudeState>
-            <quaternionEphemeris>
-                <EPOCH>2000-100T00:00:00.000</EPOCH>
-                <quaternion>
-                    <Q1>-0.005068</Q1>
-                    <Q2>0.906506</Q2>
-                    <Q3>0.002360</Q3>
-                    <QC>0.422157</QC>
-                </quaternion>
-            </quaternionEphemeris>
-        </attitudeState>"#;
-
-        let w: Wrapper = quick_xml::de::from_str(xml).expect("Failed to parse Wrapper");
-        assert!(w.qe.is_some());
-        assert_eq!(w.qe.unwrap().quaternion.q1, -0.005068);
+        assert!(q.validate().is_err());
+        let q = Quaternion::new(0.552, 0.432, -0.437, -0.562).unwrap();
+        q.validate().unwrap();
+        q.validate_kvn_rounding().unwrap();
+        let error = Quaternion::new(0.0, 0.0, 0.0, 0.0)
+            .unwrap()
+            .validate()
+            .unwrap_err();
+        assert_eq!(error.code(), Some("validation.out_of_range"));
+        assert!(error.to_string().contains("QUATERNION"));
     }
 }

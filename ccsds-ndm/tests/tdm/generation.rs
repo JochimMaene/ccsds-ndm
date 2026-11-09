@@ -92,12 +92,14 @@ fn tdm_paths_and_single_diff_receive_band_use_segment_context() {
     }
 
     let single_diff = include_str!("../../data/kvn/tdm_e10.kvn");
-    for data in [
-        TdmObservationData::ReceiveFreq(1.0),
-        TdmObservationData::Range(1.0),
+    // An empty XML RECEIVE_BAND names no band, so it does not satisfy the rule either.
+    for (data, band) in [
+        (TdmObservationData::ReceiveFreq(1.0), None),
+        (TdmObservationData::Range(1.0), None),
+        (TdmObservationData::Range(1.0), Some(String::new())),
     ] {
         let mut message = Tdm::from_kvn(single_diff).unwrap();
-        message.body.segments[0].metadata.receive_band = None;
+        message.body.segments[0].metadata.receive_band = band;
         message.body.segments[0].data.observations.truncate(1);
         message.body.segments[0].data.observations[0].data = data;
         assert_rejects(
@@ -115,6 +117,41 @@ fn tdm_paths_and_single_diff_receive_band_use_segment_context() {
         message.body.segments[0].data.observations.truncate(1);
         message.body.segments[0].data.observations[0].data = data;
         message.validate().unwrap();
+    }
+}
+
+#[test]
+fn two_and_three_way_differenced_doppler_needs_transmit_frequency_history() {
+    let single_diff = include_str!("../../data/kvn/tdm_e10.kvn");
+    let without_uplink = |message: &mut Tdm| {
+        message.body.segments[0]
+            .data
+            .observations
+            .retain(|o| !matches!(o.data, TdmObservationData::TransmitFreq1(_)))
+    };
+    // One-way differenced Doppler (Figure E-10 paths) needs no uplink history.
+    let mut one_way = Tdm::from_kvn(single_diff).unwrap();
+    without_uplink(&mut one_way);
+    one_way.validate().unwrap();
+
+    for (path_1, path_2) in [("2,1,2", "3,1,3"), ("2,1,3", "1,3")] {
+        let mut message = Tdm::from_kvn(single_diff).unwrap();
+        let metadata = &mut message.body.segments[0].metadata;
+        metadata.path_1.as_mut().unwrap().0 = path_1.into();
+        metadata.path_2.as_mut().unwrap().0 = path_2.into();
+        message.validate().unwrap();
+        without_uplink(&mut message);
+        assert_rejects(
+            &message,
+            "TRANSMIT_FREQ_n (required for two-way or three-way differenced Doppler, \
+             TDM 3.3.2.5.6)",
+        );
+        let kvn = single_diff
+            .replace("PATH_1 = 1,2", &format!("PATH_1 = {path_1}"))
+            .replace("PATH_2 = 1,3", &format!("PATH_2 = {path_2}"));
+        let start = kvn.find("TRANSMIT_FREQ_1").unwrap();
+        let end = start + kvn[start..].find('\n').unwrap() + 1;
+        assert!(Tdm::from_kvn(&format!("{}{}", &kvn[..start], &kvn[end..])).is_err());
     }
 }
 
@@ -236,100 +273,240 @@ fn unambiguous_tdm_numeric_boundaries_generate_valid_xml() {
 }
 
 #[test]
-fn kitchen_sink_roundtrip() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-MESSAGE_ID = KITCHEN-SINK-001
-META_START
-TRACK_ID = TRACK_001
-DATA_TYPES = RANGE,DOPPLER_INTEGRATED
-TIME_SYSTEM = UTC
-START_TIME = 2023-01-01T00:00:00
-STOP_TIME = 2023-01-01T01:00:00
-PARTICIPANT_1 = DSS-14
-PARTICIPANT_2 = SPACECRAFT_A
-PARTICIPANT_3 = QUASAR_1
-PARTICIPANT_4 = RELAY_SAT
-PARTICIPANT_5 = DSS-25
-MODE = SEQUENTIAL
-PATH = 1,2,1
-EPHEMERIS_NAME_1 = DSS14_EPHEM
-EPHEMERIS_NAME_2 = SC_EPHEM
-EPHEMERIS_NAME_3 = QUASAR_EPHEM
-EPHEMERIS_NAME_4 = RELAY_EPHEM
-EPHEMERIS_NAME_5 = DSS25_EPHEM
-TRANSMIT_BAND = X
-RECEIVE_BAND = Ka
-TURNAROUND_NUMERATOR = 880
-TURNAROUND_DENOMINATOR = 749
-TIMETAG_REF = RECEIVE
-INTEGRATION_INTERVAL = 60.0
-INTEGRATION_REF = MIDDLE
-FREQ_OFFSET = 0.0
-RANGE_MODE = COHERENT
-RANGE_MODULUS = 32768.0
-RANGE_UNITS = km
-ANGLE_TYPE = AZEL
-REFERENCE_FRAME = EME2000
-INTERPOLATION = LAGRANGE
-INTERPOLATION_DEGREE = 7
-DOPPLER_COUNT_BIAS = 240000000.0
-DOPPLER_COUNT_SCALE = 1000
-DOPPLER_COUNT_ROLLOVER = NO
-TRANSMIT_DELAY_1 = 0.000077
-RECEIVE_DELAY_1 = 0.000088
-DATA_QUALITY = VALIDATED
-CORRECTION_RANGE = 0.001
-CORRECTIONS_APPLIED = YES
-META_STOP
-DATA_START
-COMMENT Range measurements
-RANGE = 2023-01-01T00:00:00 1000.0
-RANGE = 2023-01-01T00:01:00 1001.0
-DOPPLER_INTEGRATED = 2023-01-01T00:02:00 -0.5
-DATA_STOP
-"#;
-    let tdm = Tdm::from_kvn(kvn).expect("parse kvn");
-    let generated = tdm.to_kvn().expect("generate kvn");
-    let tdm2 = Tdm::from_kvn(&generated).expect("parse generated kvn");
-
-    assert_eq!(tdm2, tdm);
+fn kvn_numbers_follow_the_digit_limit_without_rounding_phase_counts() {
+    let mut message = Tdm::from_kvn(KVN).unwrap();
+    let metadata = &mut message.body.segments[0].metadata;
+    for field in [
+        &mut metadata.integration_interval,
+        &mut metadata.freq_offset,
+        &mut metadata.range_modulus,
+        &mut metadata.doppler_count_bias,
+        &mut metadata.transmit_delay_1,
+        &mut metadata.transmit_delay_2,
+        &mut metadata.transmit_delay_3,
+        &mut metadata.transmit_delay_4,
+        &mut metadata.transmit_delay_5,
+        &mut metadata.receive_delay_1,
+        &mut metadata.receive_delay_2,
+        &mut metadata.receive_delay_3,
+        &mut metadata.receive_delay_4,
+        &mut metadata.receive_delay_5,
+        &mut metadata.correction_angle_1,
+        &mut metadata.correction_angle_2,
+        &mut metadata.correction_doppler,
+        &mut metadata.correction_mag,
+        &mut metadata.correction_range,
+        &mut metadata.correction_rcs,
+        &mut metadata.correction_receive,
+        &mut metadata.correction_transmit,
+        &mut metadata.correction_aberration_yearly,
+        &mut metadata.correction_aberration_diurnal,
+    ] {
+        *field = Some(1.234_567_890_123_456_7);
+    }
+    metadata.corrections_applied = Some(ccsds_ndm::types::YesNo::Yes);
+    let observation = message.body.segments[0].data.observations[0].clone();
+    message.body.segments[0].data.observations = [
+        TdmObservationData::Range(1.234_567_890_123_456_7),
+        TdmObservationData::ReceivePhaseCt1("9007199254740993.1234567890123456789".into()),
+    ]
+    .into_iter()
+    .map(|data| {
+        let mut observation = observation.clone();
+        observation.data = data;
+        observation
+    })
+    .collect();
+    let xml = message.to_xml().unwrap();
+    assert_eq!(Tdm::from_xml(&xml).unwrap(), message);
+    let kvn = message.to_kvn().unwrap();
+    assert!(
+        !kvn.contains("1.2345678901234567"),
+        "unrounded number: {kvn}"
+    );
+    assert!(kvn.contains("1.234567890123457"));
+    let reparsed = Tdm::from_kvn(&kvn).unwrap();
+    assert_eq!(
+        reparsed.body.segments[0].metadata.freq_offset,
+        Some(1.234_567_890_123_457)
+    );
+    assert_eq!(
+        reparsed.body.segments[0].data.observations[0].data.value(),
+        Some(1.234_567_890_123_457)
+    );
+    assert_eq!(
+        reparsed.body.segments[0].data.observations[1].data,
+        message.body.segments[0].data.observations[1].data
+    );
+    let mut streamed = Vec::new();
+    message.write_kvn_to(&mut streamed).unwrap();
+    assert_eq!(streamed, kvn.as_bytes());
 }
 
 #[test]
-fn xml_sample_parsing() {
-    let xml = include_str!("../../data/xml/tdm_e21.xml");
-    let mut tdm = Tdm::from_xml(xml).expect("parse xml");
-    assert!(!tdm.body.segments.is_empty());
-
-    crate::common::assert_validation_field(&tdm.to_kvn().unwrap_err(), "PARTICIPANT_1");
-    tdm.body.segments[0].metadata.participant_1 = "DSS-25".into();
-    let generated_kvn = tdm.to_kvn().expect("convert to kvn");
-    let tdm2 = Tdm::from_kvn(&generated_kvn).expect("parse generated kvn");
-
-    assert_eq!(tdm2, tdm);
+fn kvn_refuses_numbers_whose_rounded_spelling_overflows_before_output() {
+    for field in ["FREQ_OFFSET", "RANGE"] {
+        let mut message = Tdm::from_kvn(KVN).unwrap();
+        if field == "FREQ_OFFSET" {
+            message.body.segments[0].metadata.freq_offset = Some(f64::MAX);
+        } else {
+            message.body.segments[0].data.observations[0].data =
+                TdmObservationData::Range(f64::MAX);
+        }
+        message.validate().unwrap();
+        let xml = message.to_xml().unwrap();
+        assert_eq!(Tdm::from_xml(&xml).unwrap(), message);
+        assert!(message.to_kvn().unwrap_err().to_string().contains("number"));
+        let mut output = Vec::new();
+        assert!(message
+            .write_kvn_to(&mut output)
+            .unwrap_err()
+            .to_string()
+            .contains("number"));
+        assert!(output.is_empty());
+    }
 }
 
 #[test]
-fn rhumidity_xml_roundtrip_omits_empty_units_attr() {
-    let kvn = r#"CCSDS_TDM_VERS = 2.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-META_START
-TIME_SYSTEM = UTC
-PARTICIPANT_1 = DSS-10
-META_STOP
-DATA_START
-RHUMIDITY = 2023-01-01T00:03:00 12
-DATA_STOP
-"#;
+fn kvn_output_refuses_integers_and_lines_beyond_the_kvn_limits() {
+    // DOPPLER_COUNT_SCALE is u64 (XSD positiveInteger), but a KVN integer stops at 2^31-1.
+    let mut message = Tdm::from_kvn(KVN).unwrap();
+    message.body.segments[0].metadata.doppler_count_scale = Some(i32::MAX as u64 + 1);
+    message.validate().unwrap();
+    Tdm::from_xml(&message.to_xml().unwrap()).unwrap();
+    let error = message.to_kvn().unwrap_err();
+    assert!(error.to_string().contains("DOPPLER_COUNT_SCALE"), "{error}");
 
-    let tdm = Tdm::from_kvn(kvn).expect("failed to parse TDM KVN");
-    let xml = tdm.to_xml().expect("failed to serialize TDM XML");
-    assert!(!xml.contains(r#"RHUMIDITY units="""#));
-    assert!(xml.contains("<RHUMIDITY>12</RHUMIDITY>"));
+    // A long DATA_TYPES line (Orekit) is read, but TDM 4.2.1 has no continuation lines,
+    // so output is refused and names the keyword.
+    let types = vec!["RANGE"; 60].join(",");
+    let long = KVN.replacen(
+        "TIME_SYSTEM = UTC\n",
+        &format!("DATA_TYPES = {types}\nTIME_SYSTEM = UTC\n"),
+        1,
+    );
+    let message = Tdm::from_kvn(&long).unwrap();
+    Tdm::from_xml(&message.to_xml().unwrap()).unwrap();
+    let error = message.to_kvn().unwrap_err();
+    assert!(error.to_string().contains("DATA_TYPES"), "{error}");
+    assert!(error.to_string().contains("254"), "{error}");
+}
 
-    let parsed = Tdm::from_xml(&xml).expect("failed to parse TDM XML");
-    assert_eq!(parsed, tdm);
+#[test]
+fn doppler_count_kvn_checks_integer_bounds_and_canonicalizes_zero() {
+    for value in [f64::from(i32::MIN), -0.0, 5.0, f64::from(i32::MAX)] {
+        let mut message = Tdm::from_kvn(KVN).unwrap();
+        message.body.segments[0].data.observations[0].data =
+            TdmObservationData::DopplerCount(value);
+        let kvn = message.to_kvn().unwrap();
+        let line = kvn
+            .lines()
+            .find(|line| line.starts_with("DOPPLER_COUNT "))
+            .unwrap();
+        let token = line.split_whitespace().last().unwrap();
+        assert_eq!(token.parse::<i32>().unwrap(), value as i32);
+        if value == 0.0 {
+            assert_eq!(token, "0");
+        }
+        Tdm::from_kvn(&kvn).unwrap();
+    }
+    for value in [
+        f64::from(i32::MIN) - 1.0,
+        f64::from(i32::MAX) + 1.0,
+        1e20,
+        1e200,
+    ] {
+        let mut message = Tdm::from_kvn(KVN).unwrap();
+        message.body.segments[0].data.observations[0].data =
+            TdmObservationData::DopplerCount(value);
+        message.validate().unwrap();
+        Tdm::from_xml(&message.to_xml().unwrap()).unwrap();
+        let error = message.to_kvn().unwrap_err();
+        assert!(error.to_string().contains("DOPPLER_COUNT"), "{error}");
+        let mut output = Vec::new();
+        assert!(message.write_kvn_to(&mut output).is_err());
+        assert!(output.is_empty());
+    }
+}
+
+#[test]
+fn phase_counts_keep_arbitrary_precision_but_write_unsigned_zero() {
+    for value in ["9".repeat(200), "-0".into(), "-000.000".into()] {
+        let mut message = Tdm::from_kvn(KVN).unwrap();
+        message.body.segments[0].data.observations[0].data =
+            TdmObservationData::ReceivePhaseCt1(value.clone());
+        let xml = message.to_xml().unwrap();
+        assert!(xml.contains(&value));
+        let kvn = message.to_kvn().unwrap();
+        let token = kvn
+            .lines()
+            .find(|line| line.starts_with("RECEIVE_PHASE_CT_1 "))
+            .unwrap()
+            .split_whitespace()
+            .last()
+            .unwrap();
+        assert_eq!(token, if value.starts_with('-') { "0" } else { &value });
+        let reparsed = Tdm::from_kvn(&kvn).unwrap();
+        let mut output = Vec::new();
+        message.write_kvn_to(&mut output).unwrap();
+        assert_eq!(output, kvn.as_bytes());
+        assert_eq!(reparsed.to_kvn().unwrap(), kvn);
+    }
+}
+
+#[test]
+fn phase_counts_fill_missing_digits_on_either_side_of_the_decimal_point() {
+    for (value, expected) in [(".5", "0.5"), ("5.", "5.0"), ("-.5", "-0.5")] {
+        let mut message = Tdm::from_kvn(include_str!("../../data/kvn/tdm_e1.kvn")).unwrap();
+        message.body.segments[0].data.observations[0].data =
+            TdmObservationData::ReceivePhaseCt1(value.into());
+        let kvn = message.to_kvn().unwrap();
+        let line = kvn
+            .lines()
+            .find(|line| line.starts_with("RECEIVE_PHASE_CT_1 "))
+            .unwrap();
+        assert_eq!(line.split_whitespace().last().unwrap(), expected);
+        Tdm::from_kvn(&kvn).unwrap();
+    }
+}
+
+#[test]
+fn phase_count_line_limits_measure_the_emitted_spelling() {
+    let base = Tdm::from_kvn(KVN).unwrap();
+    let epoch_length = base.body.segments[0].data.observations[0]
+        .epoch
+        .to_string()
+        .len();
+    let budget = 254 - (20 + 3 + epoch_length + 1);
+    for (value, expected_length) in [
+        (format!("-{}", "0".repeat(300)), Some(1)),
+        (format!(".{}", "1".repeat(budget - 2)), Some(budget)),
+        (format!("{}.", "1".repeat(budget - 2)), Some(budget)),
+        (format!(".{}", "1".repeat(budget - 1)), None),
+        (format!("{}.", "1".repeat(budget - 1)), None),
+    ] {
+        let mut message = base.clone();
+        message.body.segments[0].data.observations[0].data =
+            TdmObservationData::ReceivePhaseCt1(value);
+        if let Some(length) = expected_length {
+            let kvn = message.to_kvn().unwrap();
+            let line = kvn
+                .lines()
+                .find(|line| line.starts_with("RECEIVE_PHASE_CT_1 "))
+                .unwrap();
+            assert_eq!(line.split_whitespace().last().unwrap().len(), length);
+            assert_eq!(line.len(), 20 + 3 + epoch_length + 1 + length);
+            Tdm::from_kvn(&kvn).unwrap();
+            let mut output = Vec::new();
+            message.write_kvn_to(&mut output).unwrap();
+            assert_eq!(output, kvn.as_bytes());
+        } else {
+            let error = message.to_kvn().unwrap_err();
+            crate::common::assert_validation_field(&error, "RECEIVE_PHASE_CT_1");
+            assert!(error.to_string().contains("254"), "{error}");
+            let mut output = Vec::new();
+            assert!(message.write_kvn_to(&mut output).is_err());
+            assert!(output.is_empty());
+        }
+    }
 }

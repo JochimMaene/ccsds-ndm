@@ -49,7 +49,9 @@ Nested model objects and record collections are live. Change them directly:
 
 Retained child references preserve their identity, and structural changes to repeated model fields
 such as OEM segment, state-vector, and covariance lists affect the owning message. Generation always
-validates the complete message. There is no commit step and no unchecked ``validate=False`` mode.
+validates the complete content represented by the selected notation, subject to the OCM XML
+exception described under generation guarantees below. There is no commit step and no unchecked
+``validate=False`` mode.
 
 Lists of plain values are copies, not live views: ``comment`` returns a new ``list`` of strings each
 time, so appending to it changes nothing. Assign the whole list instead:
@@ -66,6 +68,26 @@ message, generate and parse it again, for example ``Oem.from_str(message.to_str(
 That round trip validates and normalizes, so it only duplicates a complete, valid message, and it
 keeps only what the chosen notation represents.
 
+Preserving user-defined entry order
+-----------------------------------
+
+Shared user-defined blocks expose an ordered snapshot. Strings are comments; tuples are exact
+parameter names and values. Assign the whole list after editing:
+
+.. code-block:: python
+
+   from ccsds_ndm import UserDefined
+
+   user = UserDefined()
+   user.entries = [("SOURCE", "producer"), "Comment after SOURCE", ("QUALITY", "good")]
+
+XML preserves that order. KVN refuses interleaved comments where its logical-block rules cannot
+represent them. The ``comment`` and ``user_defined`` properties remain convenient projections;
+use ``entries`` to retain duplicate parameter names and exact comment associations.
+``OcmUserDefined.entries`` instead contains strings and live ``OcmUserDefinedParameter`` objects,
+including any ICD-defined sequence rows. Its ordered list is live; the filtered ``user_defined``
+list is a snapshot with live child objects, so use ``entries`` for append/delete operations.
+
 Converting notation
 -------------------
 
@@ -73,6 +95,10 @@ Use the same generic API for every recognized message family:
 
 .. code-block:: python
 
+   import ccsds_ndm
+
+   message = ccsds_ndm.from_file("input.opm")
+   kvn = message.to_str("kvn")
    xml = ccsds_ndm.convert(kvn, "xml")
    ccsds_ndm.convert_file("input.opm", "output.xml", "xml")
 
@@ -80,11 +106,20 @@ The input notation is detected automatically.
 
 OPM, OEM, and OMM support edition-correct ODM 2.0 and 3.0 output. The message's ``version``
 attribute selects the edition, for example ``message.version = "2.0"`` before ``to_file``. The 2.0 checks use the official `SANA NDM/XML schema
-archive <https://sanaregistry.org/r/ndmxml_unqualified/>`_. OPM and OEM ODM 1.0 remain parse-only
-because they do not have an audited schema-backed serializer; attempted relabeling is rejected.
+archive <https://sanaregistry.org/r/ndmxml_unqualified/>`_. OEM 1.0 has a restricted KVN input-only compatibility reader; stored 1.0 messages cannot be
+generated. TDM 1.0 has a restricted input-only reader in KVN and XML. OPM 1.0 input is rejected because its
+older syntax and requirements are not implemented as a separate edition; APM and AEM 1.0 input is
+rejected because some 1.0 values cannot be converted to the 2.0 meaning without guessing. ACM has only its defined 2.0 representation. See the
+project support matrix for the precise scope, including unsupported older combined ODM exports
+and missing mandatory provenance in producer feeds.
 
 CCSDS units
 -----------
+
+Reading accepts unambiguous numeric spellings and all four book line endings; writing uses
+canonical notation rules. The `shared lexical decisions
+<https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/design/validation-contract.md#shared-lexical-decisions>`_
+define the common rules and notation boundaries.
 
 The parser checks supplied units against each field's CCSDS unit enum. Required XML unit
 attributes must be present, incompatible KVN units are rejected, and dimensionless fields reject
@@ -97,17 +132,42 @@ Callers that accept untrusted input should enforce size limits at their system b
 nesting retains a fixed internal safety limit. Parsing materializes complete messages; streaming
 parsing is intentionally absent.
 
-Generation always validates the complete message before writing any caller-visible bytes and
-preserves the edition stored on the message. In Python, use ``to_str(format)`` for a string and
+Generation validates the complete message content represented by the selected notation before
+writing any caller-visible bytes and preserves the edition stored on the message. OCM XML
+omits the TC1 covariance-linkage check because its schema cannot represent that linkage; see the
+`OCM XML exception <https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/design/validation-contract.md#ocm-xml-linkage-exception>`_.
+In Python, use ``to_str(format)`` for a string and
 ``to_file(path, format)`` for atomic file replacement. Rust exposes ``to_kvn``, ``to_xml``, and
 the ``write_*_to`` streaming methods; streaming can leave partial output if the caller's sink
-fails mid-write. ``convert_file`` also replaces its destination atomically. Finite XML values
-are rounded when necessary to the 16-digit KVN representation required by CCSDS.
+fails mid-write. ``convert_file`` also replaces its destination atomically. Ordinary numeric
+values use double precision. KVN writers round them when necessary to the
+16-significant-digit representation and refuse rounding that invalidates a model constraint.
+TDM phase counts retain exact decimal strings instead, subject to KVN's line
+limit. Optional fixed-unit annotations and some comment positions are normalized during
+conversion, so a notation round trip need not produce an identical model. Other information
+that cannot be represented causes conversion to fail. The support matrix and family records
+describe the specific normalizations and refusals.
 
-Errors expose stable ``code()``, ``field_path()``, and ``diagnostic()`` accessors; diagnostic
+The shared XML parser checks supported message structure and field values without running an
+XSD engine. Ignored processing instructions and unused namespace declarations receive limited
+lexical checks; malformed names there can be accepted. Independently validate the source XML
+when full XML well-formedness or independent schema validation is required. This limit and the common
+preservation policy are recorded in the validation contract linked from the support matrix.
+
+Rust errors expose ``code()``, ``field_path()``, and ``diagnostic()`` accessors; diagnostic
 wording may improve before 1.0 while codes, enum meanings, and canonical paths are the machine
-interface. Python NDM exceptions additionally expose ``operation``, ``notation``,
+interface. Python NDM exceptions expose attributes (``code`` and ``field_path``, rather than methods),
+plus ``operation``, ``notation``,
 ``message_kind``, source edition, and available source location/token fields.
+Unavailable diagnostic fields are ``None``. The :doc:`exception reference <../api/core>` lists
+all codes, diagnostic fields, and Python exception bases.
+
+Constructors and setters parse lexical inputs such as epochs, units, and enum values immediately.
+Numeric checks at construction are field-specific and do not establish complete validity.
+Use ``validate()`` after numeric or structural edits: it checks all supported numeric domains and
+cross-field conditions, as does every generation method. Successful construction or mutation alone
+does not establish a valid message. Argument conversion failures use ordinary ``ValueError`` or
+``TypeError``; message validation raises ``NdmValidationError``.
 
 Migrating metadata construction
 -------------------------------
@@ -115,4 +175,6 @@ Migrating metadata construction
 Metadata constructors now require CCSDS-significant interpretation fields such as
 ``time_system``, reference frames, centers, and required interval epochs instead of silently
 supplying defaults. Pass those values explicitly. ``interpolation_degree=0`` is now rejected;
-omit it with ``None`` when no interpolation degree is present.
+omit it with ``None`` when no interpolation degree is present. CDM metadata likewise requires
+explicit ``covariance_method`` and ``maneuverable`` values; it no longer assumes calculated
+covariance or maneuver capability.

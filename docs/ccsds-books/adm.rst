@@ -11,6 +11,11 @@ ADM
 .. centered:: BLUE BOOK
 .. centered:: January 2024
 
+.. NOTE::
+   This is an extracted reference, not the authoritative publication. Table 5-7 is incomplete
+   here, including maneuver duration and stop rows. Consult the source PDF in ``data/`` and
+   the family conformance records for decisions based on the complete table.
+
 
 
 AUTHORITY

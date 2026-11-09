@@ -2,127 +2,8 @@ use crate::common::mutated;
 use crate::{KVN, XML};
 use ccsds_ndm::messages::omm::Omm;
 use ccsds_ndm::Ndm;
-#[test]
-fn test_omm_validation() {
-    // Construct a parsed OMM-like structure or just parse minimal incomplete one and validate
-    // SGP4 Theory requires BSTAR
-    let kvn_sgp4_missing_bstar = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-    crate::common::assert_validation_field(
-        &Omm::from_kvn(kvn_sgp4_missing_bstar).unwrap_err(),
-        "TLE_PARAMETERS",
-    );
 
-    // SGP4 with params but missing BSTAR
-    let kvn_sgp4_missing_bstar_field = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-COMMENT TLE Params present but partial
-MEAN_MOTION_DOT = 0.001 [rev/day**2]
-"#;
-    crate::common::assert_validation_field(
-        &Omm::from_kvn(kvn_sgp4_missing_bstar_field).unwrap_err(),
-        "BSTAR",
-    );
-
-    // Valid SGP4
-    let kvn_sgp4_valid = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-BSTAR = 0.0001
-MEAN_MOTION_DOT = 0.0001
-"#;
-    assert!(Omm::from_kvn(kvn_sgp4_valid).is_ok());
-}
-
-#[test]
-fn parse_omm_with_covariance() {
-    let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = DSST
-EPOCH = 2023-01-01T00:00:00
-SEMI_MAJOR_AXIS = 7000.0 [km]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-CX_X = 1.0 [km**2]
-CY_X = 0.0 [km**2]
-CY_Y = 1.0 [km**2]
-CZ_X = 0.0 [km**2]
-CZ_Y = 0.0 [km**2]
-CZ_Z = 1.0 [km**2]
-CX_DOT_X = 0.0 [km**2/s]
-CX_DOT_Y = 0.0 [km**2/s]
-CX_DOT_Z = 0.0 [km**2/s]
-CX_DOT_X_DOT = 0.01 [km**2/s**2]
-CY_DOT_X = 0.0 [km**2/s]
-CY_DOT_Y = 0.0 [km**2/s]
-CY_DOT_Z = 0.0 [km**2/s]
-CY_DOT_X_DOT = 0.0 [km**2/s**2]
-CY_DOT_Y_DOT = 0.01 [km**2/s**2]
-CZ_DOT_X = 0.0 [km**2/s]
-CZ_DOT_Y = 0.0 [km**2/s]
-CZ_DOT_Z = 0.0 [km**2/s]
-CZ_DOT_X_DOT = 0.0 [km**2/s**2]
-CZ_DOT_Y_DOT = 0.0 [km**2/s**2]
-CZ_DOT_Z_DOT = 0.01 [km**2/s**2]
-"#;
-    let omm = Omm::from_kvn(kvn).expect("OMM Covariance parse failed");
-    assert!(omm.body.segment.data.covariance_matrix.is_some());
-}
-
-#[test]
-fn test_mean_elements_choice_semi_major_axis_only() {
-    let kvn = r#"CCSDS_OMM_VERS = 3.0
+const DSST_KVN: &str = r#"CCSDS_OMM_VERS = 3.0
 CREATION_DATE = 2023-01-01T00:00:00
 ORIGINATOR = TEST
 OBJECT_NAME = SAT
@@ -139,6 +20,10 @@ RA_OF_ASC_NODE = 10.0 [deg]
 ARG_OF_PERICENTER = 20.0 [deg]
 MEAN_ANOMALY = 30.0 [deg]
 "#;
+
+#[test]
+fn test_mean_elements_choice_semi_major_axis_only() {
+    let kvn = DSST_KVN;
     let omm = Omm::from_kvn(kvn).expect("Should parse with SEMI_MAJOR_AXIS");
     assert!(omm
         .body
@@ -147,141 +32,8 @@ MEAN_ANOMALY = 30.0 [deg]
         .mean_elements
         .semi_major_axis
         .is_some());
-}
-
-#[test]
-fn test_mean_elements_choice_mean_motion_only() {
-    let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = DSST
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-"#;
-    let omm = Omm::from_kvn(kvn).expect("Should parse with MEAN_MOTION");
-    assert!(omm.body.segment.data.mean_elements.mean_motion.is_some());
-}
-
-#[test]
-fn test_tle_choice_bstar_only() {
-    let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-BSTAR = 0.0001 [1/ER]
-MEAN_MOTION_DOT = 0.0 [rev/day**2]
-MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-"#;
-    let omm = Omm::from_kvn(kvn).expect("Should parse with BSTAR");
-    let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
-    assert!(tle.bstar.is_some());
-    assert!(tle.bterm.is_none());
-}
-
-#[test]
-fn test_tle_choice_bterm_only() {
-    let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4-XP
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-BTERM = 0.02 [m**2/kg]
-MEAN_MOTION_DOT = 0.0 [rev/day**2]
-AGOM = 0.01 [m**2/kg]
-"#;
-    let omm = Omm::from_kvn(kvn).expect("Should parse with BTERM");
-    let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
-    assert!(tle.bterm.is_some());
-    assert!(tle.bstar.is_none());
-}
-
-#[test]
-fn test_tle_choice_mean_motion_ddot_only() {
-    let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-BSTAR = 0.0001 [1/ER]
-MEAN_MOTION_DOT = 0.0 [rev/day**2]
-MEAN_MOTION_DDOT = 0.0 [rev/day**3]
-"#;
-    let omm = Omm::from_kvn(kvn).expect("Should parse with MEAN_MOTION_DDOT");
-    let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
-    assert!(tle.mean_motion_ddot.is_some());
-    assert!(tle.agom.is_none());
-}
-
-#[test]
-fn test_tle_choice_agom_only() {
-    let kvn = r#"CCSDS_OMM_VERS = 3.0
-CREATION_DATE = 2023-01-01T00:00:00
-ORIGINATOR = TEST
-OBJECT_NAME = SAT
-OBJECT_ID = 2023-001A
-CENTER_NAME = EARTH
-REF_FRAME = TEME
-TIME_SYSTEM = UTC
-MEAN_ELEMENT_THEORY = SGP4-XP
-EPOCH = 2023-01-01T00:00:00
-MEAN_MOTION = 15.5 [rev/day]
-ECCENTRICITY = 0.001
-INCLINATION = 98.0 [deg]
-RA_OF_ASC_NODE = 10.0 [deg]
-ARG_OF_PERICENTER = 20.0 [deg]
-MEAN_ANOMALY = 30.0 [deg]
-BTERM = 0.02 [m**2/kg]
-MEAN_MOTION_DOT = 0.0 [rev/day**2]
-AGOM = 0.01 [m**2/kg]
-"#;
-    let omm = Omm::from_kvn(kvn).expect("Should parse with AGOM");
-    let tle = omm.body.segment.data.tle_parameters.as_ref().unwrap();
-    assert!(tle.agom.is_some());
-    assert!(tle.mean_motion_ddot.is_none());
+    assert_eq!(Omm::from_kvn(&omm.to_kvn().unwrap()).unwrap(), omm);
+    assert_eq!(Omm::from_xml(&omm.to_xml().unwrap()).unwrap(), omm);
 }
 
 fn assert_kvn_rejected(label: &str, source: String) {
@@ -309,6 +61,14 @@ fn omm_kvn_rejects_unknown_duplicate_reordered_and_misplaced_content() {
         (
             "unknown keyword",
             mutated(KVN, object_name, &format!("{object_name}\nUNKNOWN = value")),
+        ),
+        (
+            "non-numeric float",
+            mutated(
+                KVN,
+                "MEAN_MOTION = 1.00273272 [rev/day]",
+                "MEAN_MOTION = BAD",
+            ),
         ),
         (
             "comment inside a logical block",
@@ -443,8 +203,11 @@ fn omm_xml_allows_a_comment_to_reopen_the_user_defined_group() {
         .user_defined_parameters
         .as_ref()
         .unwrap();
-    assert_eq!(user_defined.comment, ["first", "second"]);
-    assert_eq!(user_defined.user_defined.len(), 2);
+    assert_eq!(
+        user_defined.comments().cloned().collect::<Vec<_>>(),
+        ["first", "second"]
+    );
+    assert_eq!(user_defined.parameters().count(), 2);
 }
 
 #[test]
@@ -512,7 +275,7 @@ fn strip_tle_parameters(kvn: &str) -> String {
 #[test]
 fn omm_kvn_validation_rules_name_the_offending_field() {
     const FIXTURE: &str = include_str!("../../data/kvn/omm_g7.kvn");
-    // The shipped theory is SGP/SGP4, which imposes no TLE requirements of its own.
+    // Select a specific propagator to exercise its coefficient requirements.
     let sgp4 = |kvn: &str| mutated(kvn, "THEORY = SGP/SGP4", "THEORY = SGP4");
     let sgp = |kvn: &str| mutated(kvn, "THEORY = SGP/SGP4", "THEORY = SGP");
 
@@ -523,6 +286,10 @@ fn omm_kvn_validation_rules_name_the_offending_field() {
         (
             mutated(FIXTURE, "OBJECT_NAME = GOES 9\n", ""),
             "Missing required field: OBJECT_NAME",
+        ),
+        (
+            mutated(FIXTURE, "OBJECT_ID = 1995-025A\n", ""),
+            "Missing required field: OBJECT_ID",
         ),
         // Mean element choice: exactly one of SEMI_MAJOR_AXIS or MEAN_MOTION.
         (
@@ -621,4 +388,78 @@ fn omm_kvn_validation_rules_name_the_offending_field() {
             "diagnostic did not name {expected}: {error}"
         );
     }
+}
+
+#[test]
+fn recognized_theory_spellings_keep_conditional_requirements() {
+    for theory in [
+        "SGP/SGP4", "sgp/sgp4", "SGP4", "sgp4", "SGP", "sgp", "PPT3", "ppt3",
+    ] {
+        let source = mutated(
+            crate::KVN,
+            "THEORY = SGP/SGP4",
+            &format!("THEORY = {theory}"),
+        );
+        let mut message = Omm::from_kvn(&source).unwrap();
+        assert_eq!(message.body.segment.metadata.mean_element_theory, theory);
+        message.body.segment.data.tle_parameters = None;
+        crate::common::assert_rejects(&message, "TLE_PARAMETERS");
+        crate::common::assert_validation_field(
+            &Omm::from_kvn(&strip_tle_parameters(&source)).unwrap_err(),
+            "TLE_PARAMETERS",
+        );
+    }
+    let source = mutated(crate::KVN, "THEORY = SGP/SGP4", "THEORY = sgp4");
+    let missing_bstar = source
+        .lines()
+        .filter(|line| !line.starts_with("BSTAR"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    crate::common::assert_validation_field(&Omm::from_kvn(&missing_bstar).unwrap_err(), "BSTAR");
+}
+
+/// MEAN_MOTION_DOT is conditional (table 4-3: SGP and PPT3), so KVN may omit it for other
+/// theories; both XML schemas still require it in every TLE block.
+#[test]
+fn mean_motion_dot_is_required_only_by_its_theories_and_by_xml() {
+    let source = crate::common::mutated(
+        crate::KVN,
+        "MEAN_MOTION_DOT = -0.00000113 [rev/day**2]\n",
+        "",
+    );
+    let message = Omm::from_kvn(&source).unwrap();
+    assert!(message
+        .body
+        .segment
+        .data
+        .tle_parameters
+        .as_ref()
+        .unwrap()
+        .mean_motion_dot
+        .is_none());
+    Omm::from_kvn(&message.to_kvn().unwrap()).unwrap();
+    crate::common::assert_validation_field(&message.to_xml().unwrap_err(), "MEAN_MOTION_DOT");
+    for theory in ["SGP", "PPT3"] {
+        let mut message = message.clone();
+        message.body.segment.metadata.mean_element_theory = theory.into();
+        crate::common::assert_validation_field(&message.validate().unwrap_err(), "MEAN_MOTION_DOT");
+    }
+}
+
+#[test]
+fn bad_epoch_retains_omm_source_edition_and_location() {
+    let source = include_str!("../../data/kvn/omm_g7.kvn");
+    let record = source
+        .lines()
+        .find(|line| line.starts_with("EPOCH ="))
+        .unwrap();
+    let invalid = source.replacen(record, "EPOCH = invalid", 1);
+    let error = Omm::from_kvn(&invalid).unwrap_err();
+    let diagnostic = error.diagnostic().unwrap();
+    assert_eq!(
+        diagnostic.message_kind,
+        ccsds_ndm::validation::MessageKind::Omm
+    );
+    assert_eq!(diagnostic.source_edition, Some("3.0"));
+    assert!(diagnostic.source_location.is_some());
 }

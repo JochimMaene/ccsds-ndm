@@ -12,7 +12,7 @@ use crate::common::{
 };
 use crate::error::{Result, ValidationError};
 use crate::kvn::parser::ParseKvn;
-use crate::traits::Ndm;
+use crate::traits::{Ndm, Validate};
 use crate::types::*;
 use serde::{Deserialize, Serialize};
 
@@ -35,11 +35,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(rename = "aem")]
 pub struct Aem {
+    /// Message provenance and creation epoch.
     pub header: AdmHeader,
+    /// Message segments and their data.
     pub body: AemBody,
+    /// Required XML root identifier, `CCSDS_AEM_VERS`; `None` is invalid.
     #[serde(rename = "@id")]
     #[builder(required, default = Some("CCSDS_AEM_VERS".to_string()))]
     pub id: Option<String>,
+    /// Supported message edition, "2.0".
     #[serde(rename = "@version")]
     #[builder(default = "2.0".to_string(), into)]
     pub version: String,
@@ -57,18 +61,50 @@ impl crate::traits::Validate for Aem {
     }
 }
 
+impl Aem {
+    pub(crate) fn validate_kvn_representability(&self) -> Result<()> {
+        for state in self
+            .body
+            .segment
+            .iter()
+            .flat_map(|segment| &segment.data.attitude_states)
+        {
+            let quaternion = match state {
+                AemAttitudeState::QuaternionEphemeris(state) => &state.quaternion,
+                AemAttitudeState::QuaternionDerivative(state) => &state.quaternion,
+                AemAttitudeState::QuaternionAngVel(state) => &state.quaternion,
+                _ => continue,
+            };
+            quaternion.validate_kvn_rounding()?;
+        }
+        Ok(())
+    }
+}
+
 impl Ndm for Aem {
     fn to_kvn(&self) -> Result<String> {
         crate::generation::to_kvn_string(self)
     }
 
     fn from_kvn(kvn: &str) -> Result<Self> {
-        let kvn = crate::detect::without_utf8_bom(kvn);
-        let normalized = crate::kvn::normalize_line_endings(kvn);
-        kvn::validate_kvn_syntax(&normalized)?;
-        let aem = Self::from_kvn_str(&normalized)?;
-        crate::traits::Validate::validate(&aem)?;
-        Ok(aem)
+        (|| {
+            let normalized = crate::kvn::prepare_input(
+                crate::detect::without_utf8_bom(kvn),
+                crate::validation::MessageKind::Aem,
+            )?;
+            kvn::validate_kvn_syntax(&normalized)?;
+            let aem = Self::from_kvn_str(&normalized)?;
+            crate::traits::Validate::validate(&aem)?;
+            Ok(aem)
+        })()
+        .map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Aem,
+                crate::error::DiagnosticNotation::Kvn,
+                kvn,
+                None,
+            )
+        })
     }
 
     fn to_xml(&self) -> Result<String> {
@@ -76,7 +112,14 @@ impl Ndm for Aem {
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        Self::from_xml_strict(xml)
+        Self::from_xml_strict(xml).map_err(|error: crate::error::CcsdsNdmError| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Aem,
+                crate::error::DiagnosticNotation::Xml,
+                xml,
+                None,
+            )
+        })
     }
 
     fn write_kvn_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
@@ -116,6 +159,14 @@ impl AemBody {
         }
 
         for (index, pair) in self.segment.windows(2).enumerate() {
+            if !pair[0]
+                .metadata
+                .time_system
+                .trim()
+                .eq_ignore_ascii_case(pair[1].metadata.time_system.trim())
+            {
+                continue;
+            }
             let (Some(previous), Some(current)) = (
                 pair[0].metadata.useable_stop_time,
                 pair[1].metadata.useable_start_time,
@@ -151,10 +202,8 @@ impl AemBody {
         let object_name = &first.metadata.object_name;
         let object_id = &first.metadata.object_id;
         for (index, segment) in self.segment.iter().enumerate().skip(1) {
-            if !segment
-                .metadata
-                .object_name
-                .eq_ignore_ascii_case(object_name)
+            if !crate::types::enum_token(&segment.metadata.object_name)
+                .eq_ignore_ascii_case(&crate::types::enum_token(object_name))
                 || segment.metadata.object_id != *object_id
             {
                 return Some(
@@ -185,6 +234,7 @@ impl crate::traits::Validate for AemSegment {
 }
 
 impl AemSegment {
+    /// Validate this value against the supported CCSDS profile.
     pub fn validate(&self) -> Result<()> {
         self.validate_inner()
     }
@@ -250,17 +300,22 @@ impl AemSegment {
 // Body & Segment
 //----------------------------------------------------------------------
 
+/// Attitude ephemeris segments (ADM §4.2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct AemBody {
+    /// Segments in source order.
     #[serde(rename = "segment")]
     pub segment: Vec<AemSegment>,
 }
 
+/// AEM metadata and its attitude history (ADM §4.2).
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, bon::Builder)]
 #[serde(deny_unknown_fields)]
 pub struct AemSegment {
+    /// Object, reference-frame and time-system interpretation for this segment.
     pub metadata: AemMetadata,
+    /// Records interpreted using this segment metadata.
     pub data: AemData,
 }
 
@@ -307,7 +362,7 @@ pub struct AemMetadata {
     /// asteroids, comets, and natural satellites), including any planet barycenter or the solar
     /// system barycenter. The set of allowed values is described in annex B, subsection B8.
     ///
-    /// **Examples**: EARTH, STS-106
+    /// **Examples**: EARTH, STS 106
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -406,7 +461,7 @@ pub struct AemMetadata {
     /// Recommended interpolation method for attitude ephemeris data in the block immediately
     /// following this metadata block.
     ///
-    /// **Examples**: LINEAR, HERMITE, LAGRANGE
+    /// **Examples**: linear, HERMITE, LAGRANGE
     ///
     /// **CCSDS Reference**: 504.0-B-2, Section 4.2.3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -424,6 +479,7 @@ pub struct AemMetadata {
 }
 
 impl AemMetadata {
+    /// Validate this value against the supported CCSDS profile.
     pub fn validate(&self) -> Result<()> {
         self.validate_inner()
     }
@@ -455,35 +511,6 @@ impl AemMetadata {
             return Err(ValidationError::missing_required(
                 "AEM Metadata",
                 "INTERPOLATION_DEGREE (required when INTERPOLATION_METHOD is present)",
-            )
-            .into());
-        }
-
-        let requires_euler_rot_seq = matches!(
-            self.attitude_type,
-            AttitudeTypeType::EulerAngle
-                | AttitudeTypeType::EulerAngleDerivative
-                | AttitudeTypeType::EulerAngleAngVel
-        );
-        let requires_angvel_frame = matches!(
-            self.attitude_type,
-            AttitudeTypeType::QuaternionAngVel | AttitudeTypeType::EulerAngleAngVel
-        );
-
-        // Validation Rule: EULER_ROT_SEQ is required if ATTITUDE_TYPE includes EULER_ANGLE
-        if requires_euler_rot_seq && self.euler_rot_seq.is_none() {
-            return Err(ValidationError::missing_required(
-                "AEM Metadata",
-                "EULER_ROT_SEQ (required for EULER_ANGLE types)",
-            )
-            .into());
-        }
-
-        // Validation Rule: ANGVEL_FRAME is required if ATTITUDE_TYPE includes ANGVEL
-        if requires_angvel_frame && self.angvel_frame.is_none() {
-            return Err(ValidationError::missing_required(
-                "AEM Metadata",
-                "ANGVEL_FRAME (required for ANGVEL types)",
             )
             .into());
         }
@@ -773,6 +800,7 @@ impl AemAttitudeState {
         }
     }
 
+    /// The calendar epoch carried by this attitude state.
     pub fn epoch(&self) -> &CalendarEpoch {
         match self {
             Self::QuaternionEphemeris(v) => &v.epoch,
@@ -787,6 +815,7 @@ impl AemAttitudeState {
         }
     }
 
+    /// The ATTITUDE_TYPE corresponding to this state variant (ADM table 4-4).
     pub fn attitude_type(&self) -> AttitudeTypeType {
         match self {
             Self::QuaternionEphemeris(_) => AttitudeTypeType::Quaternion,
@@ -828,9 +857,9 @@ impl AemAttitudeState {
         };
 
         match self {
-            Self::QuaternionEphemeris(value) => value.quaternion.validate_components(),
+            Self::QuaternionEphemeris(value) => value.quaternion.validate(),
             Self::QuaternionDerivative(value) => {
-                value.quaternion.validate_components()?;
+                value.quaternion.validate()?;
                 finite(&[
                     ("Q1_DOT", value.quaternion_dot.q1_dot.value),
                     ("Q2_DOT", value.quaternion_dot.q2_dot.value),
@@ -839,7 +868,7 @@ impl AemAttitudeState {
                 ])
             }
             Self::QuaternionAngVel(value) => {
-                value.quaternion.validate_components()?;
+                value.quaternion.validate()?;
                 finite(&[
                     ("ANGVEL_X", value.ang_vel.angvel_x.value),
                     ("ANGVEL_Y", value.ang_vel.angvel_y.value),
@@ -892,7 +921,8 @@ impl AemAttitudeState {
                     ("NUTATION_PHASE", value.nutation_phase.value),
                 ])?;
                 finite(&[("SPIN_ANGLE_VEL", value.spin_angle_vel.value)])?;
-                Duration::validate_value(value.nutation_per.value, "NUTATION_PER")
+                Duration::validate_value(value.nutation_per.value, "NUTATION_PER")?;
+                TimeUnits::validate_seconds(&value.nutation_per.units, "NUTATION_PER")
             }
             Self::SpinNutationMom(value) => {
                 angles(&[
@@ -909,22 +939,10 @@ impl AemAttitudeState {
             }
         }
     }
-
-    fn validate_state(&self) -> Result<()> {
-        self.validate_values()?;
-        match self {
-            Self::QuaternionEphemeris(value) => {
-                crate::traits::Validate::validate(&value.quaternion)
-            }
-            Self::QuaternionDerivative(value) => {
-                crate::traits::Validate::validate(&value.quaternion)
-            }
-            Self::QuaternionAngVel(value) => crate::traits::Validate::validate(&value.quaternion),
-            _ => Ok(()),
-        }
-    }
 }
 
+/// Checks the records on their own. Whether each record matches the segment's `ATTITUDE_TYPE`
+/// (ADM 4.2.4.5) needs the metadata, so `AemSegment` validation performs that check.
 impl crate::traits::Validate for AemData {
     fn validate(&self) -> Result<()> {
         self.validate_structure()
@@ -944,7 +962,7 @@ impl AemData {
             .into());
         }
         for state in &self.attitude_states {
-            state.validate_state()?;
+            state.validate_values()?;
         }
         Ok(())
     }
@@ -961,10 +979,5 @@ impl AemData {
             }
         }
         Ok(())
-    }
-
-    pub fn validate(&self, attitude_type: &AttitudeTypeType) -> Result<()> {
-        self.validate_structure()?;
-        self.validate_attitude_type(attitude_type)
     }
 }

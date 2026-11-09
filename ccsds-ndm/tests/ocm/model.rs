@@ -1,44 +1,13 @@
-use ccsds_ndm::common::OdmHeader;
-use ccsds_ndm::messages::ocm::{
-    CovLine, ManLine, Ocm, OcmBody, OcmData, OcmMetadata, OcmSegment, OcmTrajState, TrajLine,
-};
+use ccsds_ndm::messages::ocm::{Ocm, OcmMetadata, TrajLine};
 use ccsds_ndm::types::{Duration, TimeOffset, TimeUnits};
-use ccsds_ndm::Validate;
+use ccsds_ndm::{Ndm, Validate};
 #[test]
 fn ocm_validation_traj_lines() {
-    let mut ocm = Ocm::builder()
-        .header(
-            OdmHeader::builder()
-                .originator("TEST")
-                .creation_date("2000-01-01T00:00:00".parse().unwrap())
-                .build(),
-        )
-        .body(
-            OcmBody::builder()
-                .segment(Box::new(
-                    OcmSegment::builder()
-                        .metadata(
-                            OcmMetadata::builder()
-                                .time_system("UTC")
-                                .epoch_tzero("2000-01-01T00:00:00".parse().unwrap())
-                                .build(),
-                        )
-                        .data(OcmData::default())
-                        .build(),
-                ))
-                .build(),
-        )
-        .version("3.0")
-        .build();
-
-    let traj = OcmTrajState::builder()
-        .center_name("EARTH")
-        .traj_ref_frame("GCRF")
-        .traj_type("CARTPV")
-        .build();
+    let mut ocm = Ocm::from_kvn(crate::minimal::KVN).unwrap();
+    ocm.body.segment.metadata.epoch_tzero = "2000-01-01T00:00:00".parse().unwrap();
+    ocm.body.segment.data.traj[0].traj_lines.clear();
     // Missing lines
-    ocm.body.segment.data.traj.push(traj);
-    crate::common::assert_rejects(&ocm, "trajLine");
+    crate::common::assert_rejects(&ocm, "TRAJ data line");
 
     // Fix it
     ocm.body.segment.data.traj[0].traj_lines.push(TrajLine {
@@ -54,59 +23,11 @@ fn ocm_validation_traj_lines() {
 
     for value in ["2001-366T00:00:00", "2023-01-01T24:00:00", "+", "123."] {
         ocm.body.segment.data.traj[0].traj_lines[0].epoch = value.parse().unwrap();
-        crate::common::assert_validation_field(&ocm.validate().unwrap_err(), "trajLine epoch");
+        crate::common::assert_validation_field(
+            &ocm.validate().unwrap_err(),
+            "TRAJ data line epoch",
+        );
     }
-}
-
-// XSD: TIME_SYSTEM and EPOCH_TZERO are mandatory (no minOccurs="0")
-
-#[test]
-fn covline_xml_serialization() {
-    // Test serialization by wrapping in an XML struct
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Serialize, Deserialize)]
-    struct TestWrapper {
-        cov_line: CovLine,
-    }
-
-    let cov_line = CovLine {
-        epoch: "2023-01-01T00:00:00".parse().unwrap(),
-        values: vec![1.0, 2.0, 3.0],
-    };
-
-    let wrapper = TestWrapper { cov_line };
-
-    // Use quick-xml to serialize (which uses the custom Serialize impl)
-    let xml = quick_xml::se::to_string(&wrapper).unwrap();
-
-    // Deserialize and verify using quick-xml
-    let deserialized: TestWrapper = quick_xml::de::from_str(&xml).unwrap();
-    assert_eq!(deserialized.cov_line, wrapper.cov_line);
-}
-
-#[test]
-fn manline_xml_serialization() {
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Serialize, Deserialize)]
-    struct TestWrapper {
-        man_line: ManLine,
-    }
-
-    let man_line = ManLine {
-        epoch: "2023-01-01T00:00:00".parse().unwrap(),
-        values: vec!["1.0".to_string(), "2.0".to_string(), "3.0".to_string()],
-    };
-
-    let wrapper = TestWrapper { man_line };
-
-    // Use quick-xml to serialize
-    let xml = quick_xml::se::to_string(&wrapper).unwrap();
-
-    // Deserialize and verify
-    let deserialized: TestWrapper = quick_xml::de::from_str(&xml).unwrap();
-    assert_eq!(deserialized.man_line, wrapper.man_line);
 }
 
 #[test]
@@ -115,15 +36,15 @@ fn ocm_metadata_sclk_requirements_and_units() {
         .time_system("SCLK")
         .epoch_tzero("2023-01-01T00:00:00".parse().unwrap())
         .build();
-    let error = metadata.validate().unwrap_err().to_string();
-    assert!(error.contains("SCLK_OFFSET_AT_EPOCH"));
+    metadata.validate().unwrap();
+    assert!(metadata.sclk_offset_at_epoch.is_none());
 
     metadata.sclk_offset_at_epoch = Some(TimeOffset {
         value: 100.0,
         units: Some(TimeUnits::Seconds),
     });
-    let error = metadata.validate().unwrap_err().to_string();
-    assert!(error.contains("SCLK_SEC_PER_SI_SEC"));
+    metadata.validate().unwrap();
+    assert!(metadata.sclk_sec_per_si_sec.is_none());
 
     metadata.sclk_sec_per_si_sec = Some(Duration {
         value: 1.0,
@@ -135,11 +56,16 @@ fn ocm_metadata_sclk_requirements_and_units() {
     assert!(metadata.validate().is_ok());
 
     metadata.sclk_offset_at_epoch.as_mut().unwrap().units = Some(TimeUnits::Day);
-    let error = metadata.validate().unwrap_err().to_string();
-    assert!(error.contains("SCLK_OFFSET_AT_EPOCH"));
-
+    assert!(metadata
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("SCLK_OFFSET_AT_EPOCH"));
     metadata.sclk_offset_at_epoch.as_mut().unwrap().units = Some(TimeUnits::Seconds);
     metadata.sclk_sec_per_si_sec.as_mut().unwrap().units = Some(TimeUnits::Day);
-    let error = metadata.validate().unwrap_err().to_string();
-    assert!(error.contains("SCLK_SEC_PER_SI_SEC"));
+    assert!(metadata
+        .validate()
+        .unwrap_err()
+        .to_string()
+        .contains("SCLK_SEC_PER_SI_SEC"));
 }

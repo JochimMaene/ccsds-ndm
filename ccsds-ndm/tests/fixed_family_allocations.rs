@@ -30,49 +30,38 @@ fn measured<T>(
     (parse_stats, generation_stats)
 }
 
-fn omm_budget() {
-    let input = include_str!("../data/kvn/omm_g7.kvn");
-    let output_len = Omm::from_kvn(input).unwrap().to_kvn().unwrap().len();
+fn budget<M: Ndm>(
+    input: &str,
+    (parse_allocs, parse_bytes): (usize, usize),
+    (gen_allocs, gen_bytes): (usize, usize),
+) {
+    let output_len = M::from_kvn(input).unwrap().to_kvn().unwrap().len();
     let (parse, generation) = measured(
         input,
-        |input| Omm::from_kvn(input).unwrap(),
+        |input| M::from_kvn(input).unwrap(),
         |message, output| message.write_kvn_to(output).unwrap(),
         output_len,
     );
-    assert!(parse.allocations <= 128 && parse.bytes_allocated <= 24_000);
-    assert!(generation.allocations <= 48 && generation.bytes_allocated <= 2_000);
-}
-
-fn apm_budget() {
-    let input = include_str!("../data/kvn/apm_g1.kvn");
-    let output_len = Apm::from_kvn(input).unwrap().to_kvn().unwrap().len();
-    let (parse, generation) = measured(
-        input,
-        |input| Apm::from_kvn(input).unwrap(),
-        |message, output| message.write_kvn_to(output).unwrap(),
-        output_len,
-    );
-    assert!(parse.allocations <= 136 && parse.bytes_allocated <= 24_000);
-    assert!(generation.allocations <= 48 && generation.bytes_allocated <= 2_000);
-}
-
-fn rdm_budget() {
-    let input = include_str!("../data/kvn/rdm_c1.kvn");
-    let output_len = Rdm::from_kvn(input).unwrap().to_kvn().unwrap().len();
-    let (parse, generation) = measured(
-        input,
-        |input| Rdm::from_kvn(input).unwrap(),
-        |message, output| message.write_kvn_to(output).unwrap(),
-        output_len,
-    );
-    assert!(parse.allocations <= 96 && parse.bytes_allocated <= 12_000);
-    assert!(generation.allocations <= 40 && generation.bytes_allocated <= 2_000);
+    assert!(parse.allocations <= parse_allocs && parse.bytes_allocated <= parse_bytes);
+    assert!(generation.allocations <= gen_allocs && generation.bytes_allocated <= gen_bytes);
 }
 
 #[test]
 fn fixed_size_family_strict_paths_have_recorded_allocation_budgets() {
     // One test keeps the global allocation instrumentation isolated from concurrent regions.
-    omm_budget();
-    apm_budget();
-    rdm_budget();
+    budget::<Omm>(
+        include_str!("../data/kvn/omm_g7.kvn"),
+        (128, 24_000),
+        (48, 2_000),
+    );
+    budget::<Apm>(
+        include_str!("../data/kvn/apm_g1.kvn"),
+        (136, 24_000),
+        (48, 2_000),
+    );
+    budget::<Rdm>(
+        include_str!("../data/kvn/rdm_c1.kvn"),
+        (96, 12_000),
+        (40, 2_000),
+    );
 }

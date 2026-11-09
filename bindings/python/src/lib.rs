@@ -95,7 +95,7 @@ pub(crate) fn message_to_py(py: Python<'_>, message: Message) -> PyResult<Py<PyA
 /// data : str
 ///     The content to parse.
 /// format : str, optional
-///     ``"kvn"`` or ``"xml"``. Detected automatically when omitted.
+///     ``"kvn"`` or ``"xml"`` (case-insensitive). Detected automatically when omitted.
 ///
 /// Returns
 /// -------
@@ -104,15 +104,24 @@ pub(crate) fn message_to_py(py: Python<'_>, message: Message) -> PyResult<Py<PyA
 ///
 /// Raises
 /// ------
+/// NdmFormatError
+///     If the input is malformed.
+/// NdmValidationError
+///     If the message fails validation or uses an unsupported edition.
+/// NdmUnsupportedMessageError
+///     If the message family cannot be detected or is unsupported.
+/// NdmUnsupportedNotationError
+///     Multiple KVN message headers require separate files or an XML envelope.
 /// ValueError
-///     If the input is invalid or unsupported.
+///     If the requested format is unsupported.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (data, format=None))]
+#[gen_stub(override_return_type(type_repr="typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]", imports=("typing")))]
 fn from_str(
     py: Python,
     data: &str,
-    #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+    #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
     format: Option<&str>,
 ) -> PyResult<Py<PyAny>> {
     let notation = format.map(api::notation).transpose()?;
@@ -127,7 +136,25 @@ fn from_str(
 /// Parameters
 /// ----------
 /// path : str or os.PathLike
-///     Path to the file.
+///     Path to the UTF-8 file.
+/// format : str, optional
+///     ``"kvn"`` or ``"xml"``; detected when omitted.
+///
+/// Raises
+/// ------
+/// NdmIoError
+///     The file could not be read or contains invalid UTF-8 bytes.
+/// NdmFormatError
+///     Malformed document or explicitly unsupported UTF-16/UTF-32 encoding.
+/// NdmValidationError
+///     Validation failed or the edition is unsupported.
+/// NdmUnsupportedMessageError
+///     Unrecognized message family.
+/// NdmUnsupportedNotationError
+///     Multiple KVN message headers require separate files or an XML envelope.
+/// ValueError
+///     Unsupported format argument.
+///
 /// Returns
 /// -------
 /// Union[Oem, Cdm, Omm, Opm, Ocm, Tdm, Rdm, CombinedNdm, Aem, Apm, Acm]
@@ -135,11 +162,12 @@ fn from_str(
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (path, format=None))]
+#[gen_stub(override_return_type(type_repr="typing.Union[Oem, Cdm, Opm, Omm, Ocm, Rdm, Tdm, Aem, Apm, Acm, CombinedNdm]", imports=("typing")))]
 fn from_file(
     py: Python,
     #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
     path: PathBuf,
-    #[gen_stub(override_type(type_repr="typing.Optional[typing.Literal[\"kvn\", \"xml\"]]", imports=("typing")))]
+    #[gen_stub(override_type(type_repr="typing.Optional[builtins.str]", imports=("typing")))]
     format: Option<&str>,
 ) -> PyResult<Py<PyAny>> {
     let notation = format.map(api::notation).transpose()?;
@@ -150,14 +178,38 @@ fn from_file(
 }
 
 /// Convert any recognized NDM message between KVN and XML through the shared generation gate.
+///
+/// Parameters
+/// ----------
+/// data : str
+///     Input KVN or XML; notation is detected automatically.
+/// to_format : str
+///     ``"kvn"`` or ``"xml"`` (case-insensitive). The message's edition is preserved.
+///
+/// Returns
+/// -------
+/// str
+///     Validated output, subject to the documented notation normalizations.
+///
+/// Raises
+/// ------
+/// NdmFormatError
+///     Malformed input or content unrepresentable in the target notation.
+/// NdmValidationError
+///     Invalid message or unsupported edition.
+/// NdmUnsupportedMessageError
+///     Unrecognized family.
+/// NdmUnsupportedNotationError
+///     No CCSDS representation exists for the target notation.
+/// ValueError
+///     Unsupported format argument.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (data, to_format))]
 fn convert(
     py: Python<'_>,
     data: &str,
-    #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-    to_format: &str,
+    #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] to_format: &str,
 ) -> PyResult<String> {
     let notation = api::notation(to_format)?;
     py.detach(|| ccsds_ndm::convert(data, notation))
@@ -165,6 +217,30 @@ fn convert(
 }
 
 /// Convert any recognized NDM file and atomically replace the destination on success.
+///
+/// Parameters
+/// ----------
+/// source_path : str or os.PathLike
+///     UTF-8 input file; notation is detected automatically.
+/// destination_path : str or os.PathLike
+///     Output file, replaced only after successful validation and generation.
+/// to_format : str
+///     ``"kvn"`` or ``"xml"``; the source edition is preserved.
+///
+/// Raises
+/// ------
+/// NdmIoError
+///     File read, write, or replacement failed; filename and filename2 name both paths.
+/// NdmFormatError
+///     Malformed input or content unrepresentable in the target notation.
+/// NdmValidationError
+///     Invalid message or unsupported edition.
+/// NdmUnsupportedMessageError
+///     Unrecognized family.
+/// NdmUnsupportedNotationError
+///     No CCSDS representation exists for the target notation.
+/// ValueError
+///     Unsupported format argument.
 #[gen_stub_pyfunction]
 #[pyfunction]
 #[pyo3(signature = (source_path, destination_path, to_format))]
@@ -174,20 +250,28 @@ fn convert_file(
     source_path: PathBuf,
     #[gen_stub(override_type(type_repr="builtins.str | os.PathLike[builtins.str]", imports=("builtins", "os")))]
     destination_path: PathBuf,
-    #[gen_stub(override_type(type_repr="typing.Literal[\"kvn\", \"xml\"]", imports=("typing")))]
-    to_format: &str,
+    #[gen_stub(override_type(type_repr="builtins.str", imports=("typing")))] to_format: &str,
 ) -> PyResult<()> {
     let notation = api::notation(to_format)?;
     py.detach(|| ccsds_ndm::convert_file(&source_path, &destination_path, notation))
         .map_err(|error| match error.as_io_error() {
             // Either side can fail, so name both, as OSError's filename and filename2.
-            Some(io) => crate::errors::NdmIoError::new_err((
-                io.raw_os_error().unwrap_or(0),
-                io.to_string(),
-                source_path.display().to_string(),
-                None::<i32>,
-                destination_path.display().to_string(),
-            )),
+            Some(io) => {
+                let exception = crate::errors::NdmIoError::new_err((
+                    io.raw_os_error(),
+                    io.to_string(),
+                    source_path.display().to_string(),
+                    None::<i32>,
+                    destination_path.display().to_string(),
+                ));
+                let value = exception.value(py);
+                let _ = value.setattr("code", "io.error");
+                let _ = value.setattr("errno", io.raw_os_error());
+                let _ = value.setattr("strerror", io.to_string());
+                let _ = value.setattr("filename", source_path.display().to_string());
+                let _ = value.setattr("filename2", destination_path.display().to_string());
+                exception
+            }
             None => ccsds_error_to_pyerr(error),
         })
 }
@@ -241,6 +325,8 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ocm::OcmSegment>()?;
     m.add_class::<ocm::OcmMetadata>()?;
     m.add_class::<ocm::OcmData>()?;
+    m.add_class::<ocm::OcmUserDefined>()?;
+    m.add_class::<ocm::OcmUserDefinedParameter>()?;
     m.add_class::<ocm::OcmTrajState>()?;
     m.add_class::<ocm::TrajLine>()?;
     m.add_class::<ocm::OcmPhysicalDescription>()?;
@@ -260,8 +346,6 @@ fn ccsds_ndm_py(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<tdm::TdmMetadata>()?;
     m.add_class::<tdm::TdmData>()?;
     m.add_class::<tdm::TdmObservation>()?;
-    m.add_class::<tdm::TdmMode>()?;
-    m.add_class::<tdm::TdmPath>()?;
 
     // Register RDM wrapper classes
     m.add_class::<rdm::Rdm>()?;

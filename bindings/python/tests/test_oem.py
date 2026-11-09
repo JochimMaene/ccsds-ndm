@@ -22,6 +22,7 @@ from ccsds_ndm import (
     OemSegment,
     StateVectorAcc,
 )
+from ccsds_ndm import NdmEpochError
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "ccsds-ndm/data"
 
@@ -212,7 +213,7 @@ class TestOem:
         data = self._numpy_data()
         original = getattr(data, records)[0].epoch
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             setattr(data, epochs, ["2024-01-01T00:00:00", "not-a-timestamp"])
         assert getattr(data, records)[0].epoch == original
 
@@ -513,7 +514,3 @@ class TestOem:
     def test_covariance_matrix_takes_exactly_one_matrix(self, shape):
         with pytest.raises(ValueError, match=r"\(21,\) or \(6,6\)"):
             OemCovarianceMatrix("2023-01-01T00:00:00", np.ones(shape))
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

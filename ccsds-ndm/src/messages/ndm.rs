@@ -42,6 +42,9 @@ fn validate_combined_root_attributes(
 
 /// Parse a constituent as a standalone message within the namespace scope of the combined root.
 fn parse_constituent(
+    document: &str,
+    source_offset: usize,
+    constituent: usize,
     element: &str,
     start: &quick_xml::events::BytesStart<'_>,
     root_declarations: &[(Vec<u8>, Vec<u8>)],
@@ -71,7 +74,23 @@ fn parse_constituent(
         &element[..name_end],
         &element[name_end..]
     );
-    crate::from_str_with_notation(&standalone, Some(crate::detect::Notation::Xml))
+    crate::from_str_with_notation(&standalone, Some(crate::detect::Notation::Xml)).map_err(
+        |error| {
+            error.rebase_xml_location(
+                document,
+                |offset| {
+                    let offset = offset.saturating_sub(crate::xml::XML_HEADER.len() + 1);
+                    let offset = if offset <= name_end {
+                        offset
+                    } else {
+                        offset.saturating_sub(inherited.len()).max(name_end)
+                    };
+                    source_offset + offset
+                },
+                constituent,
+            )
+        },
+    )
 }
 
 /// ODM 8.12.7: "the only attributes that shall appear on the constituent message tags ... are
@@ -101,6 +120,83 @@ fn validate_combined_child_attributes(start: &quick_xml::events::BytesStart<'_>)
         ));
     }
     Ok(())
+}
+
+/// The bundled combined schema fixes ODM to edition 3.0 and TDM to edition 2.0.
+fn validate_combined_constituent_edition(message: &Message) -> Result<()> {
+    let (version, required) = match message {
+        Message::Opm(value) => (&value.version, "3.0"),
+        Message::Omm(value) => (&value.version, "3.0"),
+        Message::Oem(value) => (&value.version, "3.0"),
+        Message::Tdm(value) => (&value.version, "2.0"),
+        _ => return Ok(()),
+    };
+    if version != required {
+        return Err(crate::error::ValidationError::InvalidValue {
+            field: "constituent version".into(),
+            value: version.clone(),
+            expected: if required == "2.0" {
+                "TDM 2.0 in the NDM/XML 4.0.0 combined envelope; use standalone XML for TDM 1.0"
+            } else {
+                "ODM 3.0 in the NDM/XML 4.0.0 combined envelope; use standalone XML for ODM 2.0"
+            }
+            .into(),
+            line: None,
+        }
+        .into());
+    }
+    Ok(())
+}
+
+fn read_envelope_text(
+    reader: &mut quick_xml::Reader<&[u8]>,
+    start: &quick_xml::events::BytesStart<'_>,
+    empty: bool,
+    namespaces: &mut crate::xml::Namespaces,
+) -> Result<String> {
+    use quick_xml::events::Event;
+
+    namespaces.enter(start, 2, &invalid_envelope)?;
+    crate::xml::validate_attributes(
+        namespaces,
+        start,
+        start.local_name().as_ref(),
+        &|_, _| false,
+        &invalid_envelope,
+    )?;
+    namespaces.leave(1);
+    let mut value = String::new();
+    if empty {
+        return Ok(value);
+    }
+    loop {
+        match reader.read_event()? {
+            Event::Text(text) => {
+                value.push_str(&text.xml_content().map_err(quick_xml::Error::from)?)
+            }
+            Event::CData(text) => {
+                value.push_str(&text.xml_content().map_err(quick_xml::Error::from)?)
+            }
+            Event::GeneralRef(reference) => {
+                if let Some(character) = reference.resolve_char_ref()? {
+                    value.push(character);
+                } else {
+                    let name = reference.decode().map_err(quick_xml::Error::from)?;
+                    value.push_str(
+                        quick_xml::escape::resolve_predefined_entity(&name)
+                            .ok_or_else(|| invalid_envelope("unknown XML entity reference"))?,
+                    );
+                }
+            }
+            Event::End(end) if end.name() == start.name() => return Ok(value),
+            Event::Comment(_) | Event::PI(_) => {}
+            _ => {
+                return Err(invalid_envelope(
+                    "combined NDM text fields require text-only content",
+                ))
+            }
+        }
+    }
 }
 
 fn validate_combined_xml_depth(xml: &str) -> Result<()> {
@@ -171,27 +267,15 @@ pub struct CombinedNdm {
 impl crate::traits::Validate for CombinedNdm {
     fn validate(&self) -> Result<()> {
         for msg in &self.messages {
-            match msg {
-                Message::Opm(m) => m.validate()?,
-                Message::Omm(m) => m.validate()?,
-                Message::Oem(m) => m.validate()?,
-                Message::Ocm(m) => m.validate()?,
-                Message::Acm(m) => m.validate()?,
-                Message::Cdm(m) => m.validate()?,
-                Message::Tdm(m) => m.validate()?,
-                Message::Rdm(m) => m.validate()?,
-                Message::Aem(m) => m.validate()?,
-                Message::Apm(m) => m.validate()?,
-                Message::Ndm(_) => {
-                    return Err(crate::error::ValidationError::InvalidValue {
-                        field: "ndm".into(),
-                        value: "nested combined NDM".into(),
-                        expected: "a constituent standalone message".into(),
-                        line: None,
-                    }
-                    .into())
-                }
+            if matches!(msg, Message::Ndm(_)) {
+                return Err(crate::error::ValidationError::invalid_value(
+                    "ndm",
+                    "nested combined NDM",
+                    "a constituent standalone message",
+                )
+                .into());
             }
+            msg.validate()?;
         }
         Ok(())
     }
@@ -227,17 +311,37 @@ impl Ndm for CombinedNdm {
     fn to_xml(&self) -> Result<String> {
         self.validate_xml_envelope()?;
         self.validate_children_for_generation(crate::generation::OutputFormat::Xml)?;
-        crate::xml::to_string(self).map_err(|error| {
-            error.with_generation_context(
-                crate::validation::MessageKind::Ndm,
-                crate::error::DiagnosticNotation::Xml,
-                "combined",
-            )
-        })
+        crate::xml::to_string(self)
+            .and_then(|xml| {
+                if self
+                    .messages
+                    .iter()
+                    .any(|message| matches!(message, Message::Cdm(_)))
+                {
+                    crate::messages::cdm::xml::format_output(&xml)
+                } else {
+                    Ok(xml)
+                }
+            })
+            .map_err(|error| {
+                error.with_generation_context(
+                    crate::validation::MessageKind::Ndm,
+                    crate::error::DiagnosticNotation::Xml,
+                    "combined",
+                )
+            })
     }
 
     fn from_xml(xml: &str) -> Result<Self> {
-        Self::from_xml_strict(xml)
+        let xml = crate::detect::without_utf8_bom(xml);
+        Self::from_xml_strict(xml).map_err(|error| {
+            error.with_parse_context(
+                crate::validation::MessageKind::Ndm,
+                crate::error::DiagnosticNotation::Xml,
+                xml,
+                None,
+            )
+        })
     }
 
     /// Always returns `UnsupportedNotation`; combined NDM has no KVN representation.
@@ -250,6 +354,22 @@ impl Ndm for CombinedNdm {
     }
 
     fn write_xml_to<W: std::io::Write>(&self, output: &mut W) -> Result<()> {
+        if self
+            .messages
+            .iter()
+            .any(|message| matches!(message, Message::Cdm(_)))
+        {
+            output
+                .write_all(self.to_xml()?.as_bytes())
+                .map_err(|error| {
+                    CcsdsNdmError::from(error).with_generation_context(
+                        crate::validation::MessageKind::Ndm,
+                        crate::error::DiagnosticNotation::Xml,
+                        "combined",
+                    )
+                })?;
+            return Ok(());
+        }
         self.validate_xml_envelope()?;
         self.validate_children_for_generation(crate::generation::OutputFormat::Xml)?;
         crate::xml::to_writer(output, self).map_err(|error| {
@@ -281,9 +401,17 @@ impl CombinedNdm {
         &self,
         format: crate::generation::OutputFormat,
     ) -> Result<()> {
-        crate::traits::Validate::validate(self)?;
         for message in &self.messages {
+            if matches!(message, Message::Ndm(_)) {
+                return Err(crate::error::ValidationError::invalid_value(
+                    "ndm",
+                    "nested combined NDM",
+                    "a constituent standalone message",
+                )
+                .into());
+            }
             message.validate_for_generation(format)?;
+            validate_combined_constituent_edition(message)?;
         }
         Ok(())
     }
@@ -293,17 +421,24 @@ impl CombinedNdm {
         use quick_xml::events::Event;
         use quick_xml::reader::Reader;
 
+        if let Some(error) = crate::validation::xml_text_error("XML document", xml) {
+            return Err(invalid_envelope(error.to_string()));
+        }
         validate_combined_xml_depth(xml)?;
         crate::xml::validate_document_root(xml, b"ndm", "combined NDM")?;
 
         let mut reader = Reader::from_str(xml);
-        reader.config_mut().trim_text(true);
+        reader.config_mut().trim_text(false);
 
         let mut buf = Vec::new();
         let mut id = None;
         let mut comments = Vec::new();
         let mut messages = Vec::new();
+        let mut namespaces = crate::xml::Namespaces::default();
         let root_declarations;
+        let root_form;
+        // NDM/XML 1.0 declares its elements in no namespace; record each envelope element's form.
+        let mut qualified_children = false;
 
         let invalid = |message: &str| {
             CcsdsNdmError::Format(Box::new(FormatError::InvalidFormat(message.into())))
@@ -313,7 +448,9 @@ impl CombinedNdm {
         loop {
             match reader.read_event_into(&mut buf)? {
                 Event::Start(e) if e.local_name().as_ref() == b"ndm" => {
+                    namespaces.enter(&e, 1, &invalid_envelope)?;
                     root_declarations = validate_combined_root_attributes(&e)?;
+                    root_form = crate::xml::element_form(&namespaces, e.name(), &invalid_envelope)?;
                     break;
                 }
                 Event::Empty(e) if e.local_name().as_ref() == b"ndm" => {
@@ -328,8 +465,13 @@ impl CombinedNdm {
                                     messages: Vec::new(),
                                 });
                             }
-                            Event::Text(text) if is_ascii_whitespace(text.as_ref()) => {}
-                            Event::Comment(_) => {}
+                            Event::Text(text)
+                                if is_ascii_whitespace(
+                                    text.xml_content()
+                                        .map_err(quick_xml::Error::from)?
+                                        .as_bytes(),
+                                ) => {}
+                            Event::Comment(_) | Event::PI(_) => {}
                             _ => return Err(invalid("trailing content after combined NDM root")),
                         }
                     }
@@ -345,7 +487,13 @@ impl CombinedNdm {
                         context: "Missing <ndm> root tag".into(),
                     })
                 }
-                Event::Text(text) if !is_ascii_whitespace(text.as_ref()) => {
+                Event::Text(text)
+                    if !is_ascii_whitespace(
+                        text.xml_content()
+                            .map_err(quick_xml::Error::from)?
+                            .as_bytes(),
+                    ) =>
+                {
                     return Err(invalid("non-whitespace content before <ndm>"));
                 }
                 Event::Decl(_) | Event::Comment(_) | Event::PI(_) | Event::Text(_) => {}
@@ -359,8 +507,10 @@ impl CombinedNdm {
         let mut phase = 0u8;
         loop {
             let event_start_pos = reader.buffer_position() as usize;
-            match reader.read_event_into(&mut buf)? {
-                Event::Start(e) => {
+            let event = reader.read_event_into(&mut buf)?;
+            let empty = matches!(event, Event::Empty(_));
+            match event {
+                Event::Start(e) | Event::Empty(e) => {
                     let name_bytes = e.name();
                     let local_name = e.local_name();
                     let name = local_name.as_ref();
@@ -377,30 +527,51 @@ impl CombinedNdm {
                                     "MESSAGE_ID must occur at most once before comments and messages",
                                 ));
                             }
-                            let val = reader.read_text(name_bytes)?;
-                            id = Some(val.to_string());
+                            id = Some(read_envelope_text(&mut reader, &e, empty, &mut namespaces)?);
                         }
                         b"COMMENT" => {
                             if phase > 1 {
                                 return Err(invalid("COMMENT must precede contained messages"));
                             }
                             phase = 1;
-                            let val = reader.read_text(name_bytes)?;
-                            comments.push(val.to_string());
+                            comments.push(read_envelope_text(
+                                &mut reader,
+                                &e,
+                                empty,
+                                &mut namespaces,
+                            )?);
                         }
                         // Extract the outer XML of the current element.
                         b"opm" | b"omm" | b"oem" | b"ocm" | b"cdm" | b"tdm" | b"rdm" | b"acm"
                         | b"aem" | b"apm" => {
+                            if empty {
+                                return Err(invalid("combined NDM constituents cannot be empty"));
+                            }
                             validate_combined_child_attributes(&e)?;
+                            namespaces.enter(&e, 2, &invalid_envelope)?;
+                            qualified_children |=
+                                crate::xml::element_form(&namespaces, e.name(), &invalid_envelope)?
+                                    == crate::xml::ElementForm::Qualified;
+                            namespaces.leave(1);
                             phase = 2;
                             reader.read_to_end(name_bytes)?;
                             let end_pos = reader.buffer_position() as usize;
                             let full_element = &xml[actual_start_pos..end_pos];
 
-                            let msg = parse_constituent(full_element, &e, &root_declarations)?;
+                            let msg = parse_constituent(
+                                xml,
+                                actual_start_pos,
+                                messages.len(),
+                                full_element,
+                                &e,
+                                &root_declarations,
+                            )?;
                             messages.push(msg);
                         }
                         _ => {
+                            if empty {
+                                return Err(invalid("unexpected content in combined NDM envelope"));
+                            }
                             return Err(invalid(&format!(
                                 "unknown combined NDM child <{}>",
                                 String::from_utf8_lossy(name)
@@ -418,10 +589,33 @@ impl CombinedNdm {
                     )))
                 }
                 Event::Eof => return Err(invalid("combined NDM root is not closed")),
-                Event::Text(text) if !is_ascii_whitespace(text.as_ref()) => {
-                    return Err(invalid("unexpected text in combined NDM envelope"));
+                Event::Text(text) => {
+                    if !is_ascii_whitespace(
+                        text.xml_content()
+                            .map_err(quick_xml::Error::from)?
+                            .as_bytes(),
+                    ) {
+                        return Err(invalid("unexpected text in combined NDM envelope"));
+                    }
                 }
-                Event::Comment(_) | Event::Text(_) => {}
+                Event::CData(text) => {
+                    if !is_ascii_whitespace(
+                        text.xml_content()
+                            .map_err(quick_xml::Error::from)?
+                            .as_bytes(),
+                    ) {
+                        return Err(invalid("unexpected text in combined NDM envelope"));
+                    }
+                }
+                Event::GeneralRef(reference) => {
+                    if !reference
+                        .resolve_char_ref()?
+                        .is_some_and(|character| matches!(character, ' ' | '\t' | '\r' | '\n'))
+                    {
+                        return Err(invalid("unexpected text in combined NDM envelope"));
+                    }
+                }
+                Event::Comment(_) | Event::PI(_) => {}
                 _ => return Err(invalid("unexpected content in combined NDM envelope")),
             }
             buf.clear();
@@ -431,9 +625,52 @@ impl CombinedNdm {
             buf.clear();
             match reader.read_event_into(&mut buf)? {
                 Event::Eof => break,
-                Event::Text(text) if is_ascii_whitespace(text.as_ref()) => {}
-                Event::Comment(_) => {}
+                Event::Text(text)
+                    if is_ascii_whitespace(
+                        text.xml_content()
+                            .map_err(quick_xml::Error::from)?
+                            .as_bytes(),
+                    ) => {}
+                Event::Comment(_) | Event::PI(_) => {}
                 _ => return Err(invalid("trailing content after combined NDM root")),
+            }
+        }
+
+        let legacy = messages.iter().any(|message| match message {
+            Message::Opm(v) => v.version == "2.0",
+            Message::Omm(v) => v.version == "2.0",
+            Message::Oem(v) => v.version == "2.0",
+            Message::Apm(v) => v.version == "1.0",
+            Message::Aem(v) => v.version == "1.0",
+            Message::Tdm(v) => v.version == "1.0",
+            _ => false,
+        });
+        if legacy {
+            if id.is_some() {
+                return Err(invalid(
+                    "MESSAGE_ID is not representable in the NDM/XML 1.0 envelope",
+                ));
+            }
+            if root_form == crate::xml::ElementForm::Qualified || qualified_children {
+                return Err(invalid(
+                    "NDM/XML 1.0 envelope elements must be unqualified (in no namespace)",
+                ));
+            }
+            for message in &messages {
+                let compatible = match message {
+                    Message::Opm(v) => v.version == "2.0",
+                    Message::Omm(v) => v.version == "2.0",
+                    Message::Oem(v) => v.version == "2.0",
+                    Message::Apm(v) => v.version == "1.0",
+                    Message::Aem(v) => v.version == "1.0",
+                    Message::Tdm(v) => v.version == "1.0",
+                    _ => false,
+                };
+                if !compatible {
+                    return Err(invalid(
+                        "constituent editions do not belong to one supported NDM/XML envelope",
+                    ));
+                }
             }
         }
 

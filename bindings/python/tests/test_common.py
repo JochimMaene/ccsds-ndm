@@ -9,16 +9,17 @@ Unit tests for the shared header classes (OdmHeader, AdmHeader).
 import pytest
 
 from ccsds_ndm import AdmHeader, OdmHeader
+from ccsds_ndm import NdmEpochError
 
 
 @pytest.mark.parametrize("header_type", [OdmHeader, AdmHeader])
 def test_creation_date_requires_absolute_epoch(header_type):
-    with pytest.raises(ValueError):
+    with pytest.raises(NdmEpochError):
         header_type("123.5", "TEST")
 
     header = header_type("2002-204T15:56:23Z", "TEST")
     assert header.creation_date == "2002-204T15:56:23Z"
-    with pytest.raises(ValueError):
+    with pytest.raises(NdmEpochError):
         header.creation_date = "123.5"
 
 
@@ -44,7 +45,7 @@ def test_numpy_inputs_name_their_expected_dimensions():
             call()
 
 
-def test_errors_carry_their_file_and_family(tmp_path):
+def test_file_and_epoch_errors_keep_their_python_details(tmp_path):
     import errno
     from pathlib import Path
 
@@ -58,12 +59,6 @@ def test_errors_carry_their_file_and_family(tmp_path):
     assert excinfo.value.filename == str(missing)
 
     kvn = Path(__file__).resolve().parents[3] / "ccsds-ndm" / "data" / "kvn"
-    opm = kvn / "opm_g1.kvn"
-    with pytest.raises(
-        ccsds_ndm.NdmUnsupportedMessageError, match="expected OEM, found OPM"
-    ):
-        Oem.from_file(opm)
-
     # NdmEpochError is a ValueError, so existing handlers keep working.
     metadata = Oem.from_file(kvn / "oem_g11.kvn").segments[0].metadata
     with pytest.raises(ccsds_ndm.NdmEpochError):

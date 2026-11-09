@@ -11,7 +11,10 @@ A high-performance Rust library with Python bindings for parsing, validating, an
 
 ## Implemented Message Families
 
-The repository contains typed models, parsers, and serializers for the message families below. Inclusion in this table does not by itself claim that every edition, notation, operation, or public surface has completed the project's conformance quality bar. Exact support claims will be published in the support and conformance matrix.
+The repository contains typed models, parsers, and serializers for the message families below. Supported editions and their documented limits are listed in the
+[support matrix](https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/support-matrix.md).
+All current message families use the same
+[conformance verification criteria](https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/conformance/README.md#verification-criteria).
 
 | Message | Description |
 |---------|-------------|
@@ -21,7 +24,7 @@ The repository contains typed models, parsers, and serializers for the message f
 | **OCM** | Orbit Comprehensive Message – Detailed orbit data with maneuvers |
 | **CDM** | Conjunction Data Message – Collision assessment data |
 | **TDM** | Tracking Data Message – Ground station tracking measurements |
-| **RDM** | Reentry Data Message – Reentry prediction information |
+| **RDM** | Re-entry Data Message – Re-entry prediction information |
 | **APM** | Attitude Parameter Message – Single attitude state and attitude parameters |
 | **AEM** | Attitude Ephemeris Message – Attitude state time series |
 | **ACM** | Attitude Comprehensive Message – Detailed attitude data with maneuvers and covariance |
@@ -79,7 +82,7 @@ use ccsds_ndm::{from_file, Message};
 
 fn main() -> ccsds_ndm::error::Result<()> {
     // Parse any NDM file
-    let msg = from_file("example.ndm")?;
+    let msg = from_file("example.opm")?;
 
     // Match on the message type
     if let Message::Opm(opm) = msg {

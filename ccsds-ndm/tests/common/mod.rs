@@ -4,6 +4,17 @@
 
 use std::path::PathBuf;
 
+/// The cause checked by family tests; operation diagnostics are covered separately.
+#[allow(dead_code)]
+pub fn parse_error_cause(
+    error: ccsds_ndm::error::CcsdsNdmError,
+) -> ccsds_ndm::error::CcsdsNdmError {
+    match error {
+        ccsds_ndm::error::CcsdsNdmError::Parsing { source, .. } => parse_error_cause(*source),
+        error => error,
+    }
+}
+
 /// Changes a fixture only if the intended source text is present.
 #[allow(dead_code)]
 #[track_caller]

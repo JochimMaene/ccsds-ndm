@@ -27,6 +27,7 @@ fn covariance_ocm(records: usize) -> Ocm {
     message.body.segment.data.traj.truncate(1);
     message.body.segment.data.traj[0].traj_lines.truncate(1);
     message.body.segment.data.cov.truncate(1);
+    message.body.segment.data.cov[0].traj_id = None;
     message.body.segment.data.cov[0].cov_lines = (0..records)
         .map(|index| {
             let mut record = line.clone();

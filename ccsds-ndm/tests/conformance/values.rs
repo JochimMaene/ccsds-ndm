@@ -80,7 +80,7 @@ fn optional_xml_values_keep_their_schema_types_in_every_family() {
         let xml = from_str(&literal).unwrap().to_xml().unwrap();
         assert!(
             xml.contains(&format!("<{element}>n/a</{element}>")),
-            "{fixture}: {element} lost its literal text"
+            "{fixture}: {element} lost literal XML text"
         );
     }
 }
@@ -141,4 +141,302 @@ fn version_lines_and_epochs_carry_no_units() {
             "{fixture}: {error}"
         );
     }
+}
+
+#[test]
+fn opm_and_omm_elapsed_time_profile_is_explicit() {
+    for fixture in ["opm_g1.kvn", "omm_g9.kvn"] {
+        let input = std::fs::read_to_string(data_dir().join("kvn").join(fixture))
+            .unwrap()
+            .replace(
+                "MEAN_ELEMENT_THEORY = SGP/SGP4",
+                "MEAN_ELEMENT_THEORY = DSST",
+            );
+        let epoch_line = input
+            .lines()
+            .find(|line| line.starts_with("EPOCH ="))
+            .unwrap();
+        for system in ["MET", "MRT"] {
+            let input = mutated_once(
+                &input,
+                "TIME_SYSTEM = UTC",
+                &format!("TIME_SYSTEM = {system}"),
+            );
+            from_str(&input).unwrap();
+            for value in ["0001-000T01:00:00", "0001-999T01:00:00"] {
+                let invalid = mutated_once(&input, epoch_line, &format!("EPOCH = {value}"));
+                crate::common::assert_invalid_epoch(&from_str(&invalid).unwrap_err(), value);
+                let xml = from_str(&input).unwrap().to_xml().unwrap();
+                let old = epoch_line.strip_prefix("EPOCH = ").unwrap().trim();
+                let invalid_xml = mutated_once(
+                    &xml,
+                    &format!("<EPOCH>{old}</EPOCH>"),
+                    &format!("<EPOCH>{value}</EPOCH>"),
+                );
+                crate::common::validate_xml("elapsed time profile", &invalid_xml);
+                crate::common::assert_invalid_epoch(&from_str(&invalid_xml).unwrap_err(), value);
+            }
+        }
+    }
+}
+
+/// `gmType` is positive. Decision 5 applies XSD facets in every notation, so KVN input, the
+/// model, and both writers refuse a zero GM rather than only XML.
+#[test]
+fn opm_and_omm_gm_must_be_positive_in_every_notation() {
+    use ccsds_ndm::messages::{omm::Omm, opm::Opm};
+    use ccsds_ndm::Ndm;
+    let opm = mutated_once(
+        include_str!("../../data/kvn/opm_g2.kvn"),
+        "GM = 398600.4415",
+        "GM = 0.0",
+    );
+    let omm = mutated_once(
+        include_str!("../../data/kvn/omm_g7.kvn"),
+        "GM = 398600.8",
+        "GM = -1.0",
+    );
+    for error in [
+        Opm::from_kvn(&opm).unwrap_err(),
+        Omm::from_kvn(&omm).unwrap_err(),
+    ] {
+        crate::common::assert_validation_field(&error, "GM");
+    }
+    let mut message = Omm::from_kvn(include_str!("../../data/kvn/omm_g7.kvn")).unwrap();
+    message
+        .body
+        .segment
+        .data
+        .mean_elements
+        .gm
+        .as_mut()
+        .unwrap()
+        .value = 0.0;
+    assert_eq!(
+        message.validate().unwrap_err().field_path().as_deref(),
+        Some("body.segment.data.mean_elements.gm")
+    );
+    assert!(message.to_kvn().is_err());
+}
+
+/// Typed constructors name their Rust type; a KVN range error names the keyword instead.
+#[test]
+fn opm_and_omm_kvn_range_errors_name_the_keyword() {
+    use ccsds_ndm::messages::{omm::Omm, opm::Opm};
+    use ccsds_ndm::Ndm;
+    let opm = mutated_once(
+        include_str!("../../data/kvn/opm_g2.kvn"),
+        "RA_OF_ASC_NODE = 17.604721",
+        "RA_OF_ASC_NODE = 400",
+    );
+    let omm = mutated_once(
+        include_str!("../../data/kvn/omm_g7.kvn"),
+        "INCLINATION = 3.0539",
+        "INCLINATION = 181",
+    );
+    for (error, field) in [
+        (Opm::from_kvn(&opm).unwrap_err(), "RA_OF_ASC_NODE"),
+        (Omm::from_kvn(&omm).unwrap_err(), "INCLINATION"),
+    ] {
+        crate::common::assert_validation_field(&error, field);
+        assert!(error.to_string().contains(field), "{error}");
+    }
+}
+
+/// An empty mandatory XML string is schema-valid but not book-valid (ODM 7.5.1); it is
+/// reported as empty, not missing, with its model path.
+#[test]
+fn opm_and_omm_report_empty_mandatory_xml_strings_as_empty() {
+    use ccsds_ndm::messages::omm::Omm;
+    use ccsds_ndm::Ndm;
+    let xml = mutated_once(
+        include_str!("../../data/xml/omm_g10.xml"),
+        "<OBJECT_ID>1995-025A</OBJECT_ID>",
+        "<OBJECT_ID/>",
+    );
+    let error = Omm::from_xml(&xml).unwrap_err();
+    crate::common::assert_validation_field(&error, "OBJECT_ID");
+    assert_eq!(error.code(), Some("validation.missing_required_field"));
+    assert_eq!(
+        error
+            .as_validation_error()
+            .and_then(|error| error.field_path())
+            .as_deref(),
+        Some("body.segment.metadata.object_id")
+    );
+}
+
+#[test]
+fn mandatory_header_na_is_missing_in_every_family() {
+    for fixture in [
+        "opm_g1.kvn",
+        "omm_g7.kvn",
+        "oem_g11.kvn",
+        "ocm_g15.kvn",
+        "cdm_362.kvn",
+        "tdm_e1.kvn",
+        "rdm_c1.kvn",
+        "apm_g1.kvn",
+        "aem_g4.kvn",
+        "acm_g6.kvn",
+    ] {
+        let source =
+            std::fs::read_to_string(crate::common::data_dir().join("kvn").join(fixture)).unwrap();
+        for field in ["CREATION_DATE", "ORIGINATOR"] {
+            let record = source
+                .lines()
+                .find(|line| {
+                    line.split_once('=')
+                        .is_some_and(|(key, _)| key.trim() == field)
+                })
+                .unwrap();
+            let invalid = source.replacen(record, &format!("{field} = N/A"), 1);
+            let error = from_str(&invalid).unwrap_err();
+            assert_eq!(
+                error.code(),
+                Some("validation.missing_required_field"),
+                "{fixture}: {error}"
+            );
+            assert!(error.to_string().contains(field));
+        }
+    }
+}
+
+#[test]
+fn user_defined_na_and_blank_values_are_opaque_in_both_notations() {
+    use ccsds_ndm::{messages::opm::Opm, Ndm};
+    let source = format!(
+        "{}\nUSER_DEFINED_NA = N/A\nUSER_DEFINED_BLANK = \n",
+        include_str!("../../data/kvn/opm_g1.kvn")
+    );
+    let message = Opm::from_kvn(&source).unwrap();
+    let parameters: Vec<_> = message
+        .body
+        .segment
+        .data
+        .user_defined_parameters
+        .as_ref()
+        .unwrap()
+        .parameters()
+        .collect();
+    assert_eq!(parameters[0].value, "N/A");
+    assert_eq!(parameters[1].value, "");
+    assert_eq!(Opm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    assert_eq!(Opm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+}
+
+#[test]
+fn comment_text_that_looks_like_an_unavailable_assignment_is_opaque() {
+    use ccsds_ndm::{messages::opm::Opm, Ndm};
+    for comment in ["= N/A", "status = N/A"] {
+        let source = include_str!("../../data/kvn/opm_g1.kvn").replacen(
+            "CREATION_DATE",
+            &format!("COMMENT {comment}\nCREATION_DATE"),
+            1,
+        );
+        let message = Opm::from_kvn(&source).unwrap();
+        assert_eq!(message.header.comment, [comment]);
+        assert_eq!(Opm::from_kvn(&message.to_kvn().unwrap()).unwrap(), message);
+        assert_eq!(Opm::from_xml(&message.to_xml().unwrap()).unwrap(), message);
+    }
+}
+
+#[test]
+fn xml_na_is_literal_text_outside_cdm_and_never_a_number() {
+    use ccsds_ndm::{messages::opm::Opm, Ndm};
+    let mut message = Opm::from_kvn(include_str!("../../data/kvn/opm_g1.kvn")).unwrap();
+    message.header.message_id = Some("N/A".into());
+    message.body.segment.metadata.object_name = "N/A".into();
+    let source = message.to_xml().unwrap();
+    assert_eq!(Opm::from_xml(&source).unwrap(), message);
+    let start = source.find("<MASS").unwrap();
+    let end = start + source[start..].find("</MASS>").unwrap() + "</MASS>".len();
+    for leaf in ["<MASS>N/A</MASS>", "<MASS units='lb'>N/A</MASS>"] {
+        let invalid = format!("{}{}{}", &source[..start], leaf, &source[end..]);
+        assert!(Opm::from_xml(&invalid).is_err(), "{leaf}");
+    }
+}
+
+#[test]
+fn acm_and_rdm_preserve_opaque_user_defined_missing_value_spellings() {
+    for source in [
+        format!(
+            "{}\nUSER_START\nUSER_DEFINED_NA = N/A\nUSER_DEFINED_BLANK = \nUSER_STOP\n",
+            include_str!("../../data/kvn/acm_g6.kvn")
+        ),
+        format!(
+            "{}\nUSER_DEFINED_NA = N/A\nUSER_DEFINED_BLANK = \n",
+            include_str!("../../data/kvn/rdm_c1.kvn")
+        ),
+    ] {
+        let message = from_str(&source).unwrap();
+        let xml = message.to_xml().unwrap();
+        assert!(xml.contains("parameter=\"NA\">N/A</USER_DEFINED>"));
+        assert!(xml.contains("parameter=\"BLANK\""));
+        assert_eq!(from_str(&xml).unwrap(), message);
+        assert_eq!(from_str(&message.to_kvn().unwrap()).unwrap(), message);
+    }
+}
+
+#[test]
+fn xml_scalar_padding_and_tabs_normalize_before_kvn_preflights() {
+    for (fixture, field) in [
+        ("opm_g1.kvn", "OBJECT_NAME"),
+        ("omm_g7.kvn", "OBJECT_NAME"),
+        ("oem_g12.kvn", "OBJECT_NAME"),
+        ("ocm_g15.kvn", "ORIGINATOR"),
+        ("acm_g6.kvn", "OBJECT_NAME"),
+        ("tdm_e1.kvn", "PARTICIPANT_1"),
+        ("cdm_362.kvn", "OBJECT_NAME"),
+    ] {
+        let input = std::fs::read_to_string(data_dir().join("kvn").join(fixture)).unwrap();
+        let xml = from_str(&input).unwrap().to_xml().unwrap();
+        let opening = format!("<{field}>");
+        let start = xml.find(&opening).unwrap() + opening.len();
+        let end = start + xml[start..].find('<').unwrap();
+        let original = format!("{opening}{}</{field}>", &xml[start..end]);
+        let padded = xml.replace(&original, &format!("{opening} \r\nA\tB\n </{field}>"));
+        let parsed = from_str(&padded).unwrap();
+        let kvn = parsed
+            .to_kvn()
+            .unwrap_or_else(|error| panic!("{fixture}: {error}"));
+        assert!(
+            kvn.lines().any(|line| line
+                .split_once('=')
+                .is_some_and(|(key, value)| key.trim() == field && value.trim() == "A B")),
+            "{fixture}"
+        );
+        let invalid = format!("{}A\nB{}", &xml[..start], &xml[end..]);
+        if let Ok(message) = from_str(&invalid) {
+            assert!(
+                message.to_kvn().is_err(),
+                "{fixture}: embedded newline was flattened"
+            );
+        }
+    }
+}
+
+#[test]
+fn lowercase_user_defined_keywords_name_the_uppercase_rule() {
+    for fixture in ["opm_g1.kvn", "omm_g7.kvn"] {
+        let source = std::fs::read_to_string(data_dir().join("kvn").join(fixture)).unwrap();
+        let source = format!("{source}\nUSER_DEFINED_lower = value\n");
+        let error = from_str(&source).unwrap_err();
+        assert!(
+            error.to_string().contains("uppercase"),
+            "{fixture}: {error}"
+        );
+    }
+}
+
+#[test]
+fn bracketed_unit_padding_is_checked_at_public_message_boundaries() {
+    let source = std::fs::read_to_string(data_dir().join("kvn/opm_g2.kvn")).unwrap();
+    assert!(source.contains("[km]"));
+    let expected = from_str(&source).unwrap();
+    assert_eq!(
+        from_str(&source.replace("[km]", "[ km ]")).unwrap(),
+        expected
+    );
+    assert!(from_str(&source.replace("[km]", "[ lb ]")).is_err());
 }

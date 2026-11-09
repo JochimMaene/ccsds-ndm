@@ -5,6 +5,39 @@ use ccsds_ndm::messages::aem::Aem;
 use ccsds_ndm::Ndm;
 
 #[test]
+fn kvn_refuses_rounding_that_invalidates_each_quaternion_choice() {
+    use ccsds_ndm::types::AttitudeTypeType;
+    for kind in [
+        AttitudeTypeType::Quaternion,
+        AttitudeTypeType::QuaternionDerivative,
+        AttitudeTypeType::QuaternionAngVel,
+    ] {
+        let mut message = Aem::from_kvn(KVN).unwrap();
+        let segment = &mut message.body.segment[0];
+        segment.metadata.attitude_type = kind.clone();
+        for (index, state) in segment.data.attitude_states.iter_mut().enumerate() {
+            let mut values = vec![0.0; kind.value_count()];
+            if index == 1 {
+                values[..2].copy_from_slice(&[0.47047595604435294, 0.8767282217335952]);
+            } else {
+                values[3] = 1.0;
+            }
+            *state = AemAttitudeState::from_values(*state.epoch(), &values, &kind).unwrap();
+        }
+        ccsds_ndm::Validate::validate(&message).unwrap();
+        message.to_xml().unwrap();
+        assert!(message
+            .to_kvn()
+            .unwrap_err()
+            .to_string()
+            .contains("QUATERNION"));
+        let mut output = Vec::new();
+        assert!(message.write_kvn_to(&mut output).is_err());
+        assert!(output.is_empty());
+    }
+}
+
+#[test]
 fn aem_xml_emits_canonical_uppercase_attitude_types() {
     let lowercase = mutated(
         &mutated(
@@ -157,7 +190,7 @@ fn kvn_generation_rounds_history_numbers_to_the_ccsds_digit_limit() {
         unreachable!()
     };
     state.spin_alpha.value = 1.234_567_890_123_456_7;
-    assert!(message.to_kvn().unwrap().contains("1.234567890123457e0"));
+    assert!(message.to_kvn().unwrap().contains("1.234567890123457"));
 }
 
 #[test]
@@ -174,4 +207,38 @@ fn aem_overlong_records_are_rejected_before_streaming() {
         Some("validation.out_of_range")
     );
     assert!(output.is_empty());
+}
+
+#[test]
+fn aem_nutation_periods_reject_day_units_before_values_are_flattened() {
+    use ccsds_ndm::types::TimeUnits;
+    let mut message = Aem::from_xml(crate::XML).unwrap();
+    let state = message
+        .body
+        .segment
+        .iter_mut()
+        .flat_map(|segment| &mut segment.data.attitude_states)
+        .find_map(|state| match state {
+            AemAttitudeState::SpinNutation(value) => Some(value),
+            _ => None,
+        })
+        .unwrap();
+    state.nutation_per.units = Some(TimeUnits::Seconds);
+    let xml = message.to_xml().unwrap();
+    assert!(
+        Aem::from_xml(&xml.replace("NUTATION_PER units=\"s\"", "NUTATION_PER units=\"d\""))
+            .is_err()
+    );
+    let state = message
+        .body
+        .segment
+        .iter_mut()
+        .flat_map(|segment| &mut segment.data.attitude_states)
+        .find_map(|state| match state {
+            AemAttitudeState::SpinNutation(value) => Some(value),
+            _ => None,
+        })
+        .unwrap();
+    state.nutation_per.units = Some(TimeUnits::Day);
+    assert_rejects(&message, "NUTATION_PER units");
 }

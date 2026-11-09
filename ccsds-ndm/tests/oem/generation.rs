@@ -82,6 +82,12 @@ fn generation_diagnostics_identify_the_message_and_field() {
     invalid.body.segment[0].metadata.object_name.clear();
     for error in [invalid.to_kvn().unwrap_err(), invalid.to_xml().unwrap_err()] {
         assert_eq!(error.code(), Some("validation.missing_required_field"));
+        assert!(
+            error
+                .to_string()
+                .contains("Missing required field: OBJECT_NAME"),
+            "{error}"
+        );
         assert_eq!(
             error.field_path().as_deref(),
             Some("body.segment[0].metadata.object_name")
@@ -98,23 +104,10 @@ fn generation_diagnostics_identify_the_message_and_field() {
 }
 
 #[test]
-fn kvn_generation_rejects_overlapping_useable_spans() {
-    let mut overlapping_useable_spans = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
-    overlapping_useable_spans.body.segment[1]
-        .metadata
-        .start_time = "2019-12-28T21:00:00.000".parse().unwrap();
-    overlapping_useable_spans.body.segment[1]
-        .metadata
-        .useable_start_time = Some("2019-12-28T21:22:00.331".parse().unwrap());
-
-    assert_rejects(&overlapping_useable_spans, "USEABLE_START_TIME");
-}
-
-#[test]
 fn kvn_rounds_to_the_ccsds_digit_limit() {
     let mut message = Oem::from_kvn(KVN_FIXTURES[2]).unwrap();
     message.body.segment[0].data.state_vector[0].x.value = 1.234_567_890_123_456_7;
-    assert!(message.to_kvn().unwrap().contains("1.234567890123457e0"));
+    assert!(message.to_kvn().unwrap().contains("1.234567890123457"));
     message.to_xml().expect("XML retains the exact f64 value");
 }
 
@@ -191,11 +184,6 @@ fn unsupported_editions_and_edition_specific_fields_are_rejected() {
         historical.to_xml().unwrap_err().code(),
         Some("generation.unsupported_output_version")
     );
-
-    let mut version_two = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
-    version_two.version = "2.0".into();
-    version_two.header.message_id = Some("OEM-3-ONLY".into());
-    crate::common::assert_validation_field(&version_two.to_kvn().unwrap_err(), "MESSAGE_ID");
 }
 
 #[test]
@@ -312,9 +300,23 @@ fn serializes_multiple_covariance_matrices_in_one_block() {
 fn kvn_generation_applies_the_model_rules_it_checks_while_writing() {
     // The OEM KVN writer validates as it renders instead of calling `validate()` first, so each
     // model rule is pinned on every output path, not only on `validate()`.
+    let mut overlapping_useable_spans = Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
+    overlapping_useable_spans.body.segment[1]
+        .metadata
+        .start_time = "2019-12-28T21:00:00.000".parse().unwrap();
+    overlapping_useable_spans.body.segment[1]
+        .metadata
+        .useable_start_time = Some("2019-12-28T21:22:00.331".parse().unwrap());
+
+    assert_rejects(&overlapping_useable_spans, "USEABLE_START_TIME");
+
     let base = || Oem::from_kvn(KVN_FIXTURES[0]).unwrap();
     let mut message = base();
     message.body.segment[1].metadata.time_system = "TAI".into();
+    assert_eq!(
+        message.validate().unwrap_err().field_path().as_deref(),
+        Some("body.segment[1].metadata.time_system")
+    );
     assert_rejects(&message, "TIME_SYSTEM");
 
     let mut message = base();
@@ -328,13 +330,6 @@ fn kvn_generation_applies_the_model_rules_it_checks_while_writing() {
     let mut message = base();
     message.header.originator = " ".into();
     assert_rejects(&message, "ORIGINATOR");
-
-    let mut message = Oem::from_xml(XML).unwrap();
-    let segment = &mut message.body.segment[0];
-    let mut covariance = segment.data.covariance_matrix[0].clone();
-    covariance.epoch = segment.metadata.start_time;
-    segment.data.covariance_matrix.push(covariance);
-    assert_rejects(&message, "covarianceMatrix EPOCH");
 }
 
 #[test]

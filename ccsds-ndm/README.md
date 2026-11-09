@@ -15,7 +15,10 @@ cargo add ccsds-ndm
 
 ## Implemented Message Families
 
-The crate contains typed models, parsers, and serializers for the message families below. Inclusion in this table does not by itself claim verified support for every edition, notation, or operation. Exact support claims will be published in the project support and conformance matrix.
+The crate contains typed models, parsers, and serializers for the message families below. Supported editions and their documented limits are listed in the
+[support matrix](https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/support-matrix.md).
+All current message families use the same
+[conformance verification criteria](https://github.com/JochimMaene/ccsds-ndm/blob/main/docs/conformance/README.md#verification-criteria).
 
 | Message | Description |
 |---------|-------------|
@@ -39,7 +42,7 @@ use ccsds_ndm::{from_file, Message};
 
 fn main() -> ccsds_ndm::error::Result<()> {
     // Auto-detect format (KVN/XML) and message type
-    let msg = from_file("example.ndm")?;
+    let msg = from_file("example.opm")?;
 
     if let Message::Opm(opm) = msg {
         opm.validate()?;
@@ -57,7 +60,8 @@ Parse a specific type directly when you already know it:
 use ccsds_ndm::messages::opm::Opm;
 use ccsds_ndm::Ndm;
 
-let opm = Opm::from_kvn("CCSDS_OPM_VERS = 3.0\n...").unwrap();
+let text = std::fs::read_to_string("example.opm")?;
+let opm = Opm::from_kvn(&text)?;
 ```
 
 ## Features

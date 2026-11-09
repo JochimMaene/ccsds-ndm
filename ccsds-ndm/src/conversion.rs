@@ -1,11 +1,11 @@
-//! Notation conversion composed from strict typed parsers and validated generators.
+//! Notation conversion through typed parsers and validated generators.
 
 use crate::error::Result;
 use std::path::Path;
 
 use crate::detect::Notation;
 
-/// Strictly convert any detected NDM message between KVN and XML.
+/// Parse any detected NDM message and generate validated KVN or XML.
 pub fn convert(input: &str, target: Notation) -> Result<String> {
     let message = crate::from_str(input)?;
     match target {
@@ -14,7 +14,7 @@ pub fn convert(input: &str, target: Notation) -> Result<String> {
     }
 }
 
-/// Strictly convert any NDM file and atomically replace the destination on success.
+/// Convert any NDM file and atomically replace the destination on success.
 pub fn convert_file(
     source_path: impl AsRef<Path>,
     destination_path: impl AsRef<Path>,

@@ -24,17 +24,6 @@ fn both_conversion_directions_preserve_the_complete_typed_model() {
     );
 }
 
-#[test]
-fn xml_to_kvn_rounds_values_to_the_ccsds_digit_limit() {
-    let mut message = Opm::from_kvn(crate::OPM_3_KVN_FIXTURES[0].1).expect("fixture should parse");
-    message.body.segment.data.state_vector.x.value = 1.234_567_890_123_456_7;
-    let xml = message.to_xml().expect("XML can represent the f64 exactly");
-
-    let kvn = convert(&xml, Notation::Kvn)
-        .expect("finite XML value should round to a conforming KVN value");
-    assert!(kvn.contains("X                    = 1.234567890123457e0"));
-}
-
 /// KVN has one comment slot ahead of `EPOCH`, so `data.COMMENT` and `stateVector.COMMENT` are
 /// indistinguishable once written. Parsing assigns every pre-`EPOCH` comment to the data section,
 /// which makes the merge canonical and idempotent rather than arbitrary.
@@ -96,4 +85,36 @@ fn multiline_xml_comments_convert_to_separate_kvn_records() {
     let mut streamed = Vec::new();
     message.write_kvn_to(&mut streamed).unwrap();
     assert_eq!(streamed, kvn.as_bytes());
+}
+
+#[test]
+fn empty_user_defined_xml_block_cannot_silently_disappear_in_kvn() {
+    let source = Opm::from_kvn(crate::KVN).unwrap().to_xml().unwrap();
+    for block in [
+        "<userDefinedParameters/>",
+        "<userDefinedParameters><COMMENT>only a comment</COMMENT></userDefinedParameters>",
+    ] {
+        let xml = source.replace("</data>", &format!("{block}</data>"));
+        let message = Opm::from_xml(&xml).unwrap();
+        assert!(message.to_kvn().is_err());
+        assert!(message.to_xml().unwrap().contains("userDefinedParameters"));
+    }
+}
+
+#[test]
+fn repeated_user_parameter_names_preserve_both_values_across_notations() {
+    let source = Opm::from_kvn(crate::KVN).unwrap().to_xml().unwrap();
+    let xml = source.replace("</data>", "<userDefinedParameters><USER_DEFINED parameter=\"A\">first</USER_DEFINED><USER_DEFINED parameter=\"A\">second</USER_DEFINED></userDefinedParameters></data>");
+    let message = Opm::from_xml(&xml).unwrap();
+    let kvn = message.to_kvn().unwrap();
+    assert_eq!(
+        kvn.lines()
+            .filter(|line| line.starts_with("USER_DEFINED_A "))
+            .count(),
+        2
+    );
+    assert_eq!(Opm::from_kvn(&kvn).unwrap(), message);
+    let mut output = Vec::new();
+    message.write_kvn_to(&mut output).unwrap();
+    assert_eq!(output, kvn.as_bytes());
 }

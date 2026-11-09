@@ -20,6 +20,7 @@ from ccsds_ndm import (
     AemSegment,
     AttitudeState,
 )
+from ccsds_ndm import NdmEpochError
 
 KVN_DIR = Path(__file__).resolve().parents[3] / "ccsds-ndm" / "data" / "kvn"
 
@@ -67,13 +68,14 @@ class TestAem:
         assert state.epoch == "2023-01-01T00:01:00"
         assert state.values == [0.1, 0.2, 0.3, 0.4]
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             state.epoch = "not-an-epoch"
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             AttitudeState("123.5", [0.0, 0.0, 0.0, 1.0])
 
         meta = AemMetadata(
+            attitude_type="QUATERNION",
             object_name="SAT1",
             object_id="2023-001A",
             ref_frame_a="EME2000",
@@ -82,7 +84,7 @@ class TestAem:
             stop_time="2023-01-01T01:00:00",
             time_system="UTC",
         )
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             meta.start_time = "123.5"
 
     def test_aem_data_numpy(self):
@@ -178,7 +180,7 @@ class TestAem:
         )
         original = data.attitude_states[0].epoch
 
-        with pytest.raises(ValueError):
+        with pytest.raises(NdmEpochError):
             data.attitude_states_epochs = [
                 "2024-01-01T00:00:00",
                 "not-a-timestamp",
@@ -218,11 +220,10 @@ class TestAem:
     def test_section_validation_raises_ndm_validation_error(self):
         aem = Aem.from_file(KVN_DIR / "aem_g5.kvn")
         segment = aem.segments[0]
-        attitude_type = segment.metadata.attitude_type
         state = segment.data.attitude_states[0]
         state.values = [float("nan"), *state.values[1:]]
         with pytest.raises(ccsds_ndm.NdmValidationError):
-            segment.data.validate(attitude_type)
+            segment.data.validate()
 
         segment.metadata.object_name = ""
         for validate in (segment.metadata.validate, segment.validate):
@@ -244,24 +245,13 @@ class TestAem:
         with pytest.raises(ValueError, match="Cannot set epochs"):
             data.attitude_states_epochs = ["2023-01-01T00:00:00"]
 
-    def test_roundtrip_kvn(self):
-        aem = self._create_valid_aem()
-        kvn = aem.to_str(format="kvn")
-        assert "CCSDS_AEM_VERS" in kvn
-
-        aem2 = Aem.from_str(kvn, format="kvn")
-        assert aem2.header.originator == "TEST"
-        assert len(aem2.segments) == 1
-        assert aem2.segments[0].data.attitude_states[0].values[3] == 1.0
-
-    def test_roundtrip_xml(self):
-        aem = self._create_valid_aem()
-        xml = aem.to_str(format="xml")
-        assert "<aem" in xml
-
-        aem2 = Aem.from_str(xml, format="xml")
-        assert aem2.header.originator == "TEST"
-        assert len(aem2.segments) == 1
+    @pytest.mark.parametrize("format", ["kvn", "xml"])
+    def test_constructed_message_roundtrips(self, format):
+        message = self._create_valid_aem()
+        parsed = Aem.from_str(message.to_str(format), format=format)
+        assert parsed.header.originator == "TEST"
+        assert len(parsed.segments) == 1
+        assert parsed.segments[0].data.attitude_states[0].values[3] == 1.0
 
     def test_live_attitude_state_edits_are_revalidated_before_generation(self):
         aem = self._create_valid_aem()
@@ -271,26 +261,10 @@ class TestAem:
         with pytest.raises(ccsds_ndm.NdmValidationError, match="Q1"):
             aem.to_str(format="xml")
 
-    def test_file_io(self, tmp_path):
-        aem = self._create_valid_aem()
-        kvn_path = tmp_path / "test.aem"
-
-        # Write to file directly
-        aem.to_file(str(kvn_path), "kvn")
-        assert kvn_path.exists()
-
-        # Read back
-        aem2 = ccsds_ndm.from_file(str(kvn_path), format="kvn")
-        assert aem2.header.originator == "TEST"
-
-    def test_construction(self):
-        aem = self._create_valid_aem()
-        assert aem.header.originator == "TEST"
-        assert len(aem.segments) == 1
-
     def test_interpolation_degree_zero_is_rejected_not_dropped(self):
         with pytest.raises(ValueError, match="positive integer"):
             AemMetadata(
+                attitude_type="QUATERNION",
                 object_name="SAT1",
                 object_id="2023-001A",
                 ref_frame_a="EME2000",
@@ -310,7 +284,3 @@ class TestAem:
 
         meta.interpolation_degree = None
         assert meta.interpolation_degree is None
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

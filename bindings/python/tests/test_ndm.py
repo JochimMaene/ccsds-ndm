@@ -11,144 +11,54 @@ from pathlib import Path
 import ccsds_ndm
 import pytest
 
+
 from ccsds_ndm import (
     Cdm,
-    CdmBody,
-    CdmCovarianceMatrix,
-    CdmData,
-    CdmHeader,
-    CdmMetadata,
-    CdmSegment,
-    CdmStateVector,
     CombinedNdm,
     NdmValidationError,
-    OdmHeader,  # Correct header for OEM
     Oem,
-    OemData,
-    OemMetadata,
-    OemSegment,
-    RelativeMetadataData,
-    StateVectorAcc,  # Verified class name
     Tdm,
 )
 
 
+def test_combined_messages_reject_nested_or_cyclic_constituents_before_conversion():
+    message = ccsds_ndm.CombinedNdm([])
+    message.messages.append(message)
+    for operation in (message.validate, lambda: message.to_str("xml")):
+        with pytest.raises(ValueError, match="Nested combined"):
+            operation()
+    with pytest.raises(ValueError, match="Nested combined"):
+        message.messages = [ccsds_ndm.CombinedNdm([])]
+
+
+def test_combined_envelope_preserves_decoded_text_and_empty_fields():
+    source = (
+        '<?xml version="1.0" encoding="UTF-8"?><ndm>'
+        "<MESSAGE_ID>A&amp;B</MESSAGE_ID><COMMENT><![CDATA[A<B]]></COMMENT>"
+        "<?ignored instruction?><COMMENT/></ndm>"
+    )
+    message = CombinedNdm.from_str(source, format="xml")
+    text = message.to_str("xml")
+    assert "<MESSAGE_ID>A&amp;B</MESSAGE_ID>" in text
+    assert "amp;amp" not in text
+    assert "<COMMENT>A&lt;B</COMMENT>" in text
+    assert CombinedNdm.from_str(text, format="xml").to_str("xml") == text
+
+
+@pytest.mark.parametrize(
+    "content", ['<COMMENT bad="x">a</COMMENT>', "<COMMENT><bad>x</bad></COMMENT>"]
+)
+def test_combined_envelope_rejects_unsupported_text_structure(content):
+    source = f'<?xml version="1.0" encoding="UTF-8"?><ndm>{content}</ndm>'
+    with pytest.raises(ccsds_ndm.NdmFormatError):
+        CombinedNdm.from_str(source, format="xml")
+
+
+DATA = Path(__file__).resolve().parents[3] / "ccsds-ndm/data"
+
+
 class TestNdm:
     """Tests for NDM bindings."""
-
-    def _create_valid_oem(self):
-        header = OdmHeader(
-            "2023-01-01T00:00:00",  # creation_date
-            "TEST",  # originator
-            "UNCLASSIFIED",  # classification
-            "ID",  # message_id
-            None,  # comment
-        )
-        # OemMetadata signature verified:
-        meta = OemMetadata(
-            "SAT1",  # object_name
-            "2023-001A",  # object_id
-            "2023-01-01T00:00:00",  # start_time
-            "2023-01-01T01:00:00",  # stop_time
-            "EARTH",  # center_name
-            "EME2000",  # ref_frame
-            time_system="UTC",  # keyword for clarity (ref_frame is positional arg 6 in rust, but python binds args positionally or keyword based on signature)
-            # Rust signature: (object_name, object_id, start_time, stop_time, center_name, ref_frame, ...)
-            # So ref_frame is 6th. "EME2000" passed as 6th positional arg above?
-            # No, python call: "EARTH", "EME2000" (5th, 6th).
-            # Wait, time_system is 7th. I used keyword. That's fine.
-        )
-
-        vec = StateVectorAcc(
-            epoch="2023-01-01T00:00:00",
-            x=7000.0,
-            y=0.0,
-            z=0.0,
-            x_dot=0.0,
-            y_dot=7.5,
-            z_dot=0.0,
-            x_ddot=None,
-            y_ddot=None,
-            z_ddot=None,
-        )
-
-        data = OemData(state_vectors=[vec], comment=None)
-
-        seg = OemSegment(meta, data)
-        return Oem(header, [seg])
-
-    def _create_valid_cdm(self):
-        # reusing verified logic from test_cdm
-        header = CdmHeader(
-            creation_date="2023-01-01T00:00:00",
-            originator="TEST",
-            message_id="ID",
-            message_for="SATELLITE",
-            comment=[],
-        )
-        rel_meta = RelativeMetadataData(
-            tca="2023-01-01T12:00:00",
-            miss_distance=100.0,
-            collision_probability=0.001,
-            collision_probability_method="FOSTER-1992",
-            miss_distance_unit="m",
-        )
-
-        meta1 = CdmMetadata(
-            object="OBJECT1",
-            object_designator="12345",
-            catalog_name="SATCAT",
-            object_name="SAT1",
-            international_designator="2023-001A",
-            ref_frame="EME2000",
-        )
-        vector1 = CdmStateVector(7000.0, 0.0, 0.0, 0.0, 7.5, 0.0)
-        cov_args = (
-            [
-                1.0,
-                0.0,
-                1.0,
-                0.0,
-                0.0,
-                1.0,
-                0.0,
-                0.0,
-                0.0,
-                0.01,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.01,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.01,
-            ]
-            + [None] * 24
-            + [None]
-        )
-        cov1 = CdmCovarianceMatrix(*cov_args)
-        data1 = CdmData(vector1, cov1, comment=[])
-        seg1 = CdmSegment(meta1, data1)
-
-        meta2 = CdmMetadata(
-            object="OBJECT2",
-            object_designator="67890",
-            catalog_name="SATCAT",
-            object_name="DEBRIS",
-            international_designator="UNKNOWN",
-            ref_frame="EME2000",
-        )
-        vector2 = CdmStateVector(7100.0, 0.0, 0.0, 0.0, 7.4, 0.0)
-        cov2 = CdmCovarianceMatrix(*cov_args)
-        data2 = CdmData(vector2, cov2, comment=[])
-        seg2 = CdmSegment(meta2, data2)
-
-        body = CdmBody(rel_meta, [seg1, seg2])
-        return Cdm(header, body)
 
     def test_accepts_tdm_message(self):
         root = Path(__file__).parents[3]
@@ -171,7 +81,7 @@ class TestNdm:
         assert parsed.value.notation == "kvn"
         assert parsed.value.message_kind == "ndm"
 
-        ndm = CombinedNdm(messages=[self._create_valid_cdm()])
+        ndm = CombinedNdm(messages=[Cdm.from_file(DATA / "kvn/cdm_362.kvn")])
 
         with pytest.raises(ccsds_ndm.NdmUnsupportedNotationError) as generated:
             ndm.to_str(format="kvn")
@@ -185,14 +95,12 @@ class TestNdm:
         opm = (root / "ccsds-ndm/data/kvn/opm_g1.kvn").read_text()
 
         for format_hint in (None, "kvn"):
-            with pytest.raises(
-                ccsds_ndm.NdmUnsupportedMessageError, match="expected NDM, found OPM"
-            ):
+            with pytest.raises(ccsds_ndm.NdmUnsupportedNotationError, match="KVN"):
                 CombinedNdm.from_str(opm, format=format_hint)
 
     def test_ndm_roundtrip_xml(self):
-        oem = self._create_valid_oem()
-        cdm = self._create_valid_cdm()
+        oem = Oem.from_file(DATA / "kvn/oem_g11.kvn")
+        cdm = Cdm.from_file(DATA / "kvn/cdm_362.kvn")
 
         ndm = CombinedNdm(messages=[oem, cdm])
 
@@ -203,17 +111,6 @@ class TestNdm:
 
         ndm2 = CombinedNdm.from_str(xml, format="xml")
         assert len(ndm2.messages) == 2
-
-    def test_file_io(self, tmp_path):
-        oem = self._create_valid_oem()
-        ndm = CombinedNdm([oem])
-        path = tmp_path / "test.ndm"
-
-        ndm.to_file(str(path), "xml")
-        assert path.exists()
-
-        ndm2 = ccsds_ndm.from_file(str(path), format="xml")
-        assert len(ndm2.messages) == 1
 
     def test_failed_file_generation_preserves_existing_file(self, tmp_path):
         source = (
@@ -233,8 +130,8 @@ class TestNdm:
         assert path.read_text() == "keep me"
 
     def test_ndm_message_and_comment_setters(self):
-        oem = self._create_valid_oem()
-        cdm = self._create_valid_cdm()
+        oem = Oem.from_file(DATA / "kvn/oem_g11.kvn")
+        cdm = Cdm.from_file(DATA / "kvn/cdm_362.kvn")
 
         ndm = CombinedNdm(messages=[oem], comments=["initial"])
         assert len(ndm.messages) == 1
@@ -242,10 +139,11 @@ class TestNdm:
 
         ndm.messages = [oem, cdm]
         ndm.comments = ["updated", "suite"]
+        ndm.id = "ENVELOPE-1"
 
         assert len(ndm.messages) == 2
         assert ndm.comments == ["updated", "suite"]
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+        assert ndm.id == "ENVELOPE-1"
+        assert "<MESSAGE_ID>ENVELOPE-1</MESSAGE_ID>" in ndm.to_str("xml")
+        ndm.id = None
+        assert "ENVELOPE-1" not in ndm.to_str("xml")

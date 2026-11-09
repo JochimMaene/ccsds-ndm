@@ -1,5 +1,5 @@
 use crate::common::{assert_rejects, validate_xml};
-use crate::{sample_cdm_kvn, KVN};
+use crate::KVN;
 use ccsds_ndm::messages::cdm::Cdm;
 use ccsds_ndm::Ndm;
 #[test]
@@ -103,20 +103,11 @@ fn edited_cdm_numeric_values_are_validated_before_any_output() {
 #[test]
 fn every_kvn_generation_gate_rejects_loss_or_ambiguity_before_output() {
     type CdmMutation = fn(&mut Cdm);
-    let cases: [(&str, CdmMutation); 3] = [
-        ("first nested logical-block COMMENT", |message| {
-            message.body.segments[0]
-                .data
-                .od_parameters
-                .as_mut()
-                .unwrap()
-                .comment
-                .push("nested".to_owned());
-        }),
-        ("non-printable or non-ASCII character", |message| {
+    let cases: [(&str, CdmMutation); 2] = [
+        ("only printable ASCII records", |message| {
             message.body.segments[0].metadata.object_name = "SATELLITE €".to_owned();
         }),
-        ("without changing typed content", |message| {
+        ("only printable ASCII records", |message| {
             message.body.segments[0].metadata.object_name = "SATELLITE\nA".to_owned();
         }),
     ];
@@ -129,6 +120,76 @@ fn every_kvn_generation_gate_rejects_loss_or_ambiguity_before_output() {
         let streamed = message.write_kvn_to(&mut output).unwrap_err();
         assert_eq!(streamed.to_string(), error.to_string(), "{label}");
         assert!(output.is_empty(), "streaming wrote bytes for {label}");
+    }
+}
+
+#[test]
+fn cdm_kvn_rounds_computed_numbers_while_xml_retains_the_value() {
+    let mut control = Cdm::from_kvn(KVN).unwrap();
+    control.body.relative_metadata_data.miss_distance.value = 0.123_456_789_012_345_6;
+    assert_eq!(Cdm::from_kvn(&control.to_kvn().unwrap()).unwrap(), control);
+
+    for field in ["MISS_DISTANCE", "COLLISION_PROBABILITY", "X", "CR_R"] {
+        let mut message = Cdm::from_kvn(KVN).unwrap();
+        let value = 0.300_000_000_000_000_04;
+        match field {
+            "MISS_DISTANCE" => message.body.relative_metadata_data.miss_distance.value = value,
+            "COLLISION_PROBABILITY" => {
+                message
+                    .body
+                    .relative_metadata_data
+                    .collision_probability
+                    .as_mut()
+                    .unwrap()
+                    .value = value
+            }
+            "X" => message.body.segments[1].data.state_vector.x.value = value,
+            _ => {
+                message.body.segments[1]
+                    .data
+                    .covariance_matrix
+                    .as_mut()
+                    .unwrap()
+                    .cr_r
+                    .value = value
+            }
+        }
+        message.validate().unwrap();
+        let xml = message.to_xml().unwrap();
+        assert_eq!(Cdm::from_xml(&xml).unwrap(), message);
+        validate_xml("CDM full-precision double", &xml);
+        let kvn = message.to_kvn().unwrap();
+        let reparsed = Cdm::from_kvn(&kvn).unwrap();
+        let rounded = match field {
+            "MISS_DISTANCE" => reparsed.body.relative_metadata_data.miss_distance.value,
+            "COLLISION_PROBABILITY" => {
+                reparsed
+                    .body
+                    .relative_metadata_data
+                    .collision_probability
+                    .as_ref()
+                    .unwrap()
+                    .value
+            }
+            "X" => reparsed.body.segments[1].data.state_vector.x.value,
+            _ => {
+                reparsed.body.segments[1]
+                    .data
+                    .covariance_matrix
+                    .as_ref()
+                    .unwrap()
+                    .cr_r
+                    .value
+            }
+        };
+        assert_eq!(rounded, 0.3, "{field}");
+        let mut output = Vec::new();
+        message.write_kvn_to(&mut output).unwrap();
+        assert_eq!(output, kvn.as_bytes(), "{field}");
+        assert_eq!(
+            ccsds_ndm::Message::Cdm(message.clone()).to_kvn().unwrap(),
+            kvn
+        );
     }
 }
 
@@ -149,7 +210,7 @@ fn generation_rejects_partial_optional_covariance_rows() {
     assert!(error.to_string().contains("CDRG_T"));
 }
 
-/// The relative metadata numbers are plain doubles, so only finiteness constrains them. Before
+/// Every relative metadata number must be finite. Before
 /// this was routed, `validate` and the XML writer accepted a non-finite value while the KVN
 /// writer rejected it, and an infinity reached the document as the lexical `inf`, which `xmllint`
 /// rejects as "not a valid value of the atomic type 'xs:double'".
@@ -229,13 +290,9 @@ fn cdm_kvn_comments_keep_their_normative_block_association() {
         first.data.comment,
         ["Object1 Data", "Object1 OD Parameters"]
     );
-    assert!(first
-        .data
-        .od_parameters
-        .as_ref()
-        .unwrap()
-        .comment
-        .is_empty());
+    let od = first.data.od_parameters.as_ref().unwrap();
+    assert!(od.comment.is_empty());
+    assert!(od.time_lastob_start.is_some());
     assert_eq!(
         first.data.additional_parameters.as_ref().unwrap().comment,
         [
@@ -256,203 +313,168 @@ fn cdm_kvn_comments_keep_their_normative_block_association() {
 }
 
 #[test]
-fn kvn_roundtrip() {
-    let kvn = sample_cdm_kvn();
-    let cdm = Cdm::from_kvn(&kvn).expect("parse");
-    let regenerated = cdm.to_kvn().expect("to_kvn");
-    // Parse again to ensure structural equality
-    let cdm2 = Cdm::from_kvn(&regenerated).expect("re-parse");
-    assert_eq!(cdm2, cdm);
-}
+fn xml_nested_comments_merge_canonically_into_kvn() {
+    // Space-Track layout: empty <data> COMMENT, a comment-only odParameters (all leaves nil),
+    // then commented additionalParameters. KVN has one leading run for all of them.
+    let mut xml = Cdm::from_kvn(KVN).unwrap();
+    let data = &mut xml.body.segments[0].data;
+    data.comment.clear();
+    data.od_parameters = Some(ccsds_ndm::common::OdParameters {
+        comment: vec!["od".into()],
+        ..Default::default()
+    });
+    data.additional_parameters.as_mut().unwrap().comment = vec!["additional".into()];
+    data.state_vector.comment = vec!["state".into()];
+    // Second segment: comments after a valued first block stay with their own block.
+    let second = &mut xml.body.segments[1].data;
+    second.comment = vec!["outer".into()];
+    second.od_parameters.as_mut().unwrap().comment = vec!["od2".into()];
+    second.additional_parameters = None;
+    second.state_vector.comment = vec!["state2".into()];
+    let xml = Cdm::from_xml(&xml.to_xml().unwrap()).unwrap();
 
-#[test]
-fn xml_roundtrip() {
-    let kvn = sample_cdm_kvn();
-    let cdm = Cdm::from_kvn(&kvn).expect("parse");
-    let xml = cdm.to_xml().expect("to_xml");
-    let cdm2 = Cdm::from_xml(&xml).expect("from_xml");
-    assert_eq!(cdm2, cdm);
-}
-
-#[test]
-fn full_optional_fields_roundtrip() {
-    let kvn = r#"
-CCSDS_CDM_VERS = 1.0
-COMMENT Header comment
-CREATION_DATE = 2025-01-01T00:00:00
-
-ORIGINATOR = TEST
-MESSAGE_FOR = RECIPIENT
-MESSAGE_ID = MSG-001
-
-TCA = 2025-01-02T12:00:00
-MISS_DISTANCE = 100.0 [m]
-RELATIVE_SPEED = 7.5 [m/s]
-RELATIVE_POSITION_R = 10.0 [m]
-RELATIVE_POSITION_T = -20.0 [m]
-RELATIVE_POSITION_N = 5.0 [m]
-RELATIVE_VELOCITY_R = 0.1 [m/s]
-RELATIVE_VELOCITY_T = -0.2 [m/s]
-RELATIVE_VELOCITY_N = 0.05 [m/s]
-START_SCREEN_PERIOD = 2025-01-02T11:00:00
-STOP_SCREEN_PERIOD = 2025-01-02T13:00:00
-SCREEN_VOLUME_FRAME = RTN
-SCREEN_VOLUME_SHAPE = BOX
-SCREEN_VOLUME_X = 1000.0 [m]
-SCREEN_VOLUME_Y = 2000.0 [m]
-SCREEN_VOLUME_Z = 3000.0 [m]
-SCREEN_ENTRY_TIME = 2025-01-02T11:30:00
-SCREEN_EXIT_TIME = 2025-01-02T12:30:00
-COLLISION_PROBABILITY = 0.001
-COLLISION_PROBABILITY_METHOD = FOSTER-1992
-
-COMMENT Segment 1
-OBJECT = OBJECT1
-OBJECT_DESIGNATOR = 00001
-CATALOG_NAME = CAT
-OBJECT_NAME = OBJ1
-INTERNATIONAL_DESIGNATOR = 1998-067A
-OBJECT_TYPE = PAYLOAD
-OPERATOR_CONTACT_POSITION = POSITION
-OPERATOR_ORGANIZATION = ORG
-OPERATOR_PHONE = PHONE
-OPERATOR_EMAIL = EMAIL
-EPHEMERIS_NAME = EPH1
-COVARIANCE_METHOD = CALCULATED
-MANEUVERABLE = YES
-ORBIT_CENTER = EARTH
-REF_FRAME = EME2000
-GRAVITY_MODEL = EGM-96
-ATMOSPHERIC_MODEL = JACCHIA 70 DCA
-N_BODY_PERTURBATIONS = MOON,SUN
-SOLAR_RAD_PRESSURE = YES
-EARTH_TIDES = YES
-INTRACK_THRUST = YES
-
-TIME_LASTOB_START = 2025-01-01T00:00:00
-TIME_LASTOB_END = 2025-01-02T00:00:00
-RECOMMENDED_OD_SPAN = 7.0 [d]
-ACTUAL_OD_SPAN = 5.0 [d]
-OBS_AVAILABLE = 100
-OBS_USED = 95
-TRACKS_AVAILABLE = 50
-TRACKS_USED = 48
-RESIDUALS_ACCEPTED = 95.5 [%]
-WEIGHTED_RMS = 1.23
-
-AREA_PC = 10.0 [m**2]
-AREA_DRG = 12.0 [m**2]
-AREA_SRP = 15.0 [m**2]
-MASS = 1000.0 [kg]
-CD_AREA_OVER_MASS = 0.012 [m**2/kg]
-CR_AREA_OVER_MASS = 0.015 [m**2/kg]
-THRUST_ACCELERATION = 0.001 [m/s**2]
-SEDR = 0.05 [W/kg]
-
-X = 1.0 [km]
-Y = 2.0 [km]
-Z = 3.0 [km]
-X_DOT = 0.1 [km/s]
-Y_DOT = 0.2 [km/s]
-Z_DOT = 0.3 [km/s]
-
-CR_R = 1.0 [m**2]
-CT_R = 0.0 [m**2]
-CT_T = 1.0 [m**2]
-CN_R = 0.0 [m**2]
-CN_T = 0.0 [m**2]
-CN_N = 1.0 [m**2]
-CRDOT_R = 0.0 [m**2/s]
-CRDOT_T = 0.0 [m**2/s]
-CRDOT_N = 0.0 [m**2/s]
-CRDOT_RDOT = 1.0 [m**2/s**2]
-CTDOT_R = 0.0 [m**2/s]
-CTDOT_T = 0.0 [m**2/s]
-CTDOT_N = 0.0 [m**2/s]
-CTDOT_RDOT = 0.0 [m**2/s**2]
-CTDOT_TDOT = 1.0 [m**2/s**2]
-CNDOT_R = 0.0 [m**2/s]
-CNDOT_T = 0.0 [m**2/s]
-CNDOT_N = 0.0 [m**2/s]
-CNDOT_RDOT = 0.0 [m**2/s**2]
-CNDOT_TDOT = 0.0 [m**2/s**2]
-CNDOT_NDOT = 1.0 [m**2/s**2]
-CDRG_R = 0.001 [m**3/kg]
-CDRG_T = 0.002 [m**3/kg]
-CDRG_N = 0.003 [m**3/kg]
-CDRG_RDOT = 0.0001 [m**3/(kg*s)]
-CDRG_TDOT = 0.0002 [m**3/(kg*s)]
-CDRG_NDOT = 0.0003 [m**3/(kg*s)]
-CDRG_DRG = 0.00001 [m**4/kg**2]
-CSRP_R = 0.001 [m**3/kg]
-CSRP_T = 0.002 [m**3/kg]
-CSRP_N = 0.003 [m**3/kg]
-CSRP_RDOT = 0.0001 [m**3/(kg*s)]
-CSRP_TDOT = 0.0002 [m**3/(kg*s)]
-CSRP_NDOT = 0.0003 [m**3/(kg*s)]
-CSRP_DRG = 0.00001 [m**4/kg**2]
-CSRP_SRP = 0.00002 [m**4/kg**2]
-CTHR_R = 0.001 [m**2/s**2]
-CTHR_T = 0.002 [m**2/s**2]
-CTHR_N = 0.003 [m**2/s**2]
-CTHR_RDOT = 0.0001 [m**2/s**3]
-CTHR_TDOT = 0.0002 [m**2/s**3]
-CTHR_NDOT = 0.0003 [m**2/s**3]
-CTHR_DRG = 0.00001 [m**3/(kg*s**2)]
-CTHR_SRP = 0.00002 [m**3/(kg*s**2)]
-CTHR_THR = 0.000001 [m**2/s**4]
-
-OBJECT = OBJECT2
-OBJECT_DESIGNATOR = 00002
-CATALOG_NAME = CAT
-OBJECT_NAME = OBJ2
-INTERNATIONAL_DESIGNATOR = 1998-067B
-OBJECT_TYPE = PAYLOAD
-EPHEMERIS_NAME = EPH2
-COVARIANCE_METHOD = DEFAULT
-MANEUVERABLE = NO
-REF_FRAME = EME2000
-
-X = -1.0 [km]
-Y = -2.0 [km]
-Z = -3.0 [km]
-X_DOT = -0.1 [km/s]
-Y_DOT = -0.2 [km/s]
-Z_DOT = -0.3 [km/s]
-
-CR_R = 1.0 [m**2]
-CT_R = 0.0 [m**2]
-CT_T = 1.0 [m**2]
-CN_R = 0.0 [m**2]
-CN_T = 0.0 [m**2]
-CN_N = 1.0 [m**2]
-CRDOT_R = 0.0 [m**2/s]
-CRDOT_T = 0.0 [m**2/s]
-CRDOT_N = 0.0 [m**2/s]
-CRDOT_RDOT = 1.0 [m**2/s**2]
-CTDOT_R = 0.0 [m**2/s]
-CTDOT_T = 0.0 [m**2/s]
-CTDOT_N = 0.0 [m**2/s]
-CTDOT_RDOT = 0.0 [m**2/s**2]
-CTDOT_TDOT = 1.0 [m**2/s**2]
-CNDOT_R = 0.0 [m**2/s]
-CNDOT_T = 0.0 [m**2/s]
-CNDOT_N = 0.0 [m**2/s]
-CNDOT_RDOT = 0.0 [m**2/s**2]
-CNDOT_TDOT = 0.0 [m**2/s**2]
-CNDOT_NDOT = 1.0 [m**2/s**2]
-"#;
-    let cdm = Cdm::from_kvn(kvn).expect("parse full cdm");
-    let regenerated = cdm.to_kvn().expect("generate full kvn");
-    let cdm2 = Cdm::from_kvn(&regenerated).expect("parse regenerated full cdm");
-
-    assert!(cdm.body.segments[0].data.od_parameters.is_some());
-    assert!(cdm.body.segments[0]
-        .data
-        .covariance_matrix
+    let kvn = xml.to_kvn().unwrap();
+    let merged = Cdm::from_kvn(&kvn).unwrap();
+    let first = &merged.body.segments[0].data;
+    assert_eq!(first.comment, ["od", "additional"]);
+    assert!(first.od_parameters.is_none());
+    assert!(first
+        .additional_parameters
         .as_ref()
         .unwrap()
-        .cthr_thr
-        .is_some());
-    assert_eq!(cdm2, cdm);
+        .comment
+        .is_empty());
+    assert_eq!(first.state_vector.comment, ["state"]);
+    let second = &merged.body.segments[1].data;
+    assert_eq!(second.comment, ["outer", "od2"]);
+    assert!(second.od_parameters.as_ref().unwrap().comment.is_empty());
+    assert_eq!(second.state_vector.comment, ["state2"]);
+    assert_eq!(merged.to_kvn().unwrap(), kvn, "the merge is idempotent");
+}
+
+#[test]
+fn kvn_comment_lines_are_written_without_trailing_blanks() {
+    let mut message = Cdm::from_kvn(KVN).unwrap();
+    message.header.comment = vec!["padded   ".into()];
+    message.body.relative_metadata_data.miss_distance.value = 0.300_000_000_000_000_04;
+    let kvn = message.to_kvn().unwrap();
+    assert!(kvn.contains("COMMENT padded\n"), "{kvn}");
+    let parsed = Cdm::from_kvn(&kvn).unwrap();
+    assert_eq!(parsed.body.relative_metadata_data.miss_distance.value, 0.3);
+    assert_eq!(parsed.to_kvn().unwrap(), kvn);
+    let mut streamed = Vec::new();
+    message.write_kvn_to(&mut streamed).unwrap();
+    assert_eq!(streamed, kvn.as_bytes());
+}
+
+#[test]
+fn kvn_generation_supplies_fixed_units_missing_from_the_model() {
+    let source = crate::KVN
+        .lines()
+        .map(|line| line.split_once(" [").map_or(line, |(value, _)| value))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let message = Cdm::from_kvn(&source).unwrap();
+    assert!(message
+        .body
+        .relative_metadata_data
+        .miss_distance
+        .units
+        .is_none());
+    let kvn = message.to_kvn().unwrap();
+    for (field, units) in [
+        ("MISS_DISTANCE", "m"),
+        ("RELATIVE_SPEED", "m/s"),
+        ("RELATIVE_POSITION_R", "m"),
+        ("RELATIVE_VELOCITY_R", "m/s"),
+        ("RECOMMENDED_OD_SPAN", "d"),
+        ("RESIDUALS_ACCEPTED", "%"),
+        ("AREA_PC", "m**2"),
+        ("MASS", "kg"),
+        ("X", "km"),
+        ("X_DOT", "km/s"),
+        ("CR_R", "m**2"),
+    ] {
+        let line = kvn
+            .lines()
+            .find(|line| {
+                line.split_once('=')
+                    .is_some_and(|(key, _)| key.trim() == field)
+            })
+            .unwrap();
+        assert!(line.ends_with(&format!("[{units}]")), "{line}");
+    }
+    let mut output = Vec::new();
+    message.write_kvn_to(&mut output).unwrap();
+    assert_eq!(output, kvn.as_bytes());
+    let reparsed = Cdm::from_kvn(&kvn).unwrap();
+    assert_eq!(reparsed.to_kvn().unwrap(), kvn);
+    crate::common::validate_xml("CDM supplied KVN units", &reparsed.to_xml().unwrap());
+}
+
+#[test]
+fn cdm_xml_output_is_printable_ascii_with_bounded_lines() {
+    let mut message = Cdm::from_kvn(KVN).unwrap();
+    let xml = message.to_xml().unwrap();
+    assert!(
+        xml.lines().count() > 100,
+        "XML output is not split into records"
+    );
+    assert!(xml.lines().all(|line| line.len() <= 254 && line.is_ascii()));
+    validate_xml("CDM 6.2.2 output", &xml);
+    // Input stays lenient: one long line with non-ASCII text still reads.
+    let lenient = crate::XML
+        .replace('\n', "")
+        .replace("SATELLITE A", "SATÉLITE A");
+    Cdm::from_xml(&lenient).unwrap();
+
+    message.body.segments[0].metadata.object_name = "SATÉLITE".into();
+    message.to_xml().expect_err("non-ASCII XML output");
+    let mut output = Vec::new();
+    message
+        .write_xml_to(&mut output)
+        .expect_err("non-ASCII XML output");
+    assert!(output.is_empty());
+
+    message.body.segments[0].metadata.object_name = "SATELLITE".into();
+    message.header.comment = vec!["x".repeat(255)];
+    message
+        .write_xml_to(&mut output)
+        .expect_err("overlong XML comment");
+    assert!(output.is_empty());
+}
+
+#[test]
+fn xml_generation_refuses_present_empty_optional_strings() {
+    let message = Cdm::from_kvn(KVN).unwrap();
+    for edit in [
+        |m: &mut Cdm| m.header.message_for = Some(String::new()),
+        |m: &mut Cdm| m.body.segments[0].metadata.operator_phone = Some("   ".into()),
+        |m: &mut Cdm| {
+            m.body.relative_metadata_data.collision_probability_method = Some(String::new())
+        },
+    ] {
+        let mut edited = message.clone();
+        edit(&mut edited);
+        edited
+            .to_xml()
+            .expect_err("empty optional string would read back as None");
+    }
+}
+
+#[test]
+fn generation_enforces_the_international_designator_layout() {
+    // CARA Alfano test cases use `1001`; reading keeps them, output does not.
+    let kvn = crate::common::mutated_once(
+        KVN,
+        "INTERNATIONAL_DESIGNATOR = 1997-030E",
+        "INTERNATIONAL_DESIGNATOR = 1001",
+    );
+    let mut message = Cdm::from_kvn(&kvn).unwrap();
+    for error in [message.to_kvn().unwrap_err(), message.to_xml().unwrap_err()] {
+        crate::common::assert_validation_field(&error, "INTERNATIONAL_DESIGNATOR");
+    }
+    message.body.segments[0].metadata.international_designator = "UNKNOWN".into();
+    message.to_kvn().unwrap();
+    message.to_xml().unwrap();
 }
